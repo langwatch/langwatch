@@ -58,8 +58,11 @@ export class MemoryGatewayCacheRuleRepository extends GatewayCacheRuleRepository
     super();
   }
 
+  /** In the order the gateway checks them: lowest priority number first. */
   async findAll(organizationId: string): Promise<GatewayCacheRuleResource[]> {
-    return this.#live(organizationId).map(toResource);
+    return this.#live(organizationId)
+      .toSorted((left, right) => memoryKeysetCompare(checkOrder(left), checkOrder(right)))
+      .map(toResource);
   }
 
   async findPage(input: {
@@ -197,6 +200,14 @@ export class MemoryGatewayCacheRuleRepository extends GatewayCacheRuleRepository
       .filter((row) => row.organizationId === organizationId && row.archivedAt === null)
       .toSorted((left, right) => memoryKeysetCompare(pageOrder(left), pageOrder(right)));
   }
+}
+
+function checkOrder(row: CacheRuleRow): MemoryKeysetColumn[] {
+  return [
+    { value: row.priority, direction: "asc" },
+    { value: row.createdAt, direction: "asc" },
+    { value: row.id, direction: "asc" },
+  ];
 }
 
 function pageOrder(row: CacheRuleRow): MemoryKeysetColumn[] {

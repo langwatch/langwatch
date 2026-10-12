@@ -41,6 +41,7 @@ const INITIALIZED: OrganizationInitialized = {
   teamId: "team_1",
   organizationId: ORGANIZATION_ID,
   projectSlug: "acme-project",
+  grantsConfirmed: true,
 };
 const FIRST_PROJECT: Project = {
   id: PROJECT_ID,

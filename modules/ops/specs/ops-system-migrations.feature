@@ -36,6 +36,14 @@ Feature: Ops runs the system migration passes and names their cohorts
     And the tenant steps that pass drives settle without waiting for the hourly re-drive
 
   @unit
+  Scenario: The pass a finished upgrade requests runs ahead of any queue backlog
+    Given an upgrade run that has finished while the worker's queue holds a large backlog
+    When it asks a worker for one system-migrations pass
+    Then the request's queue jobs run on a list of their own, ahead of the backlog
+    And a request that does not settle within a minute is a warning, never a failed run
+    # T6: three tenant steps never started while their request sat behind about 800k jobs.
+
+  @unit
   Scenario: The pass a finished upgrade requests is asked under the platform tenant
     Given an upgrade run that has finished
     When it asks a worker for a system-migrations pass

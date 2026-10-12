@@ -127,6 +127,14 @@ Feature: Canonical user lifecycle
     Then each account after the checkpoint is recorded once as created, marked backfilled, at its row's creation time
     And the step waits until no older image that mints accounts without the fact still serves
 
+  # A retried or restarted attempt resumes from the checkpoint; its report keeps the total, so an
+  # attempt that resumes at the end of the table reports every account, not none.
+  @unit
+  Scenario: A resumed seed step reports every account its attempts counted
+    Given the seed step's checkpoint counted some accounts before its attempt stopped
+    When the step resumes from that checkpoint
+    Then each checkpoint it saves and the report it finishes with count on from that number
+
   @unit
   Scenario: The seed step's dry run records nothing
     When the step runs as a dry run

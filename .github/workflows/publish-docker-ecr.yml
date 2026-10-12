@@ -204,6 +204,10 @@ jobs:
               - 'tools/devscripts/**'
               - 'sdks/go/go.*'
               - 'infra/clickhouse-serverless/go.*'
+              # The Go scenario runner stage: its source and the two modules it imports.
+              - 'services/scenariorunner/**'
+              - 'pkg/**'
+              - 'sdks/go/**'
               - 'tsconfig.*.json'
               - '.dockerignore'
               - 'feature-map.json'

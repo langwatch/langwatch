@@ -13,6 +13,9 @@ type ProjectFactsBackfillPeers = Readonly<{
   preview?: (input: { organizationId: string }) => Promise<number>;
 }>;
 
+/** How many of a page's organizations record at once; the checkpoint still waits for the page. */
+const ORGANIZATION_WIDTH = 8;
+
 type ProjectFactsBackfillReport = {
   afterOrganizationId: string | null;
   organizations: number;
@@ -60,7 +63,7 @@ export class ProjectFactsBackfillService {
     return { afterOrganizationId: cursor ?? null, ...totals };
   }
 
-  /** One page's organizations; false when the signal stopped it part way. */
+  /** One page's organizations, a few at a time; false when the signal stopped it part way. */
   private async recordPage({
     ids,
     dryRun,
@@ -72,13 +75,52 @@ export class ProjectFactsBackfillService {
     signal: AbortSignal;
     totals: { organizations: number; projects: number };
   }): Promise<boolean> {
-    for (const organizationId of ids) {
-      if (signal.aborted) return false;
-      totals.projects += dryRun
-        ? ((await this.peers.preview?.({ organizationId })) ?? 0)
-        : await this.peers.record({ organizationId });
-      totals.organizations += 1;
-    }
-    return true;
+    let done = 0;
+    let failure: { error: unknown } | undefined;
+    await eachInLanes({
+      items: ids,
+      width: ORGANIZATION_WIDTH,
+      stop: () => signal.aborted || failure !== undefined,
+      each: async (organizationId) => {
+        let projects: number;
+        try {
+          projects = dryRun
+            ? ((await this.peers.preview?.({ organizationId })) ?? 0)
+            : await this.peers.record({ organizationId });
+        } catch (error) {
+          failure ??= { error };
+          return;
+        }
+        // Added after the await: `+=` across an await would drop another lane's count.
+        totals.projects += projects;
+        totals.organizations += 1;
+        done += 1;
+      },
+    });
+    // Every lane has stopped before the step hears the failure, so none writes after it.
+    if (failure) throw failure.error;
+    return done === ids.length;
   }
+}
+
+/** Runs `each` over the items in order, at most `width` at once, taking none once `stop` says so. */
+async function eachInLanes<Item>({
+  items,
+  width,
+  stop,
+  each,
+}: {
+  items: readonly Item[];
+  width: number;
+  stop: () => boolean;
+  each: (item: Item) => Promise<void>;
+}): Promise<void> {
+  const pending = [...items];
+  const lane = async (): Promise<void> => {
+    while (pending.length > 0 && !stop()) {
+      const item = pending.shift();
+      if (item !== undefined) await each(item);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, lane));
 }

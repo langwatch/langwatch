@@ -176,6 +176,13 @@ export const FEATURE_FLAGS = [
       "Offers the trained annotations evaluator in evaluator selection. Off by default; operators can enable it per project or organization.",
   },
   {
+    key: "release_scenario_go_runner_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Runs a project's non-voice scenario runs on the Go scenario runner shipped in the worker image instead of the Node scenario child. Off by default; enable per project or organization via the operator store. Voice runs always stay on the Node child, and a worker without the binary keeps every run on Node.",
+  },
+  {
     key: "release_voice_agents_enabled",
     scope: "PRODUCT",
     defaultValue: false,

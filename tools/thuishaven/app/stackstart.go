@@ -36,18 +36,30 @@ func (o *Orchestrator) StartWorktreeStack(worktreeDir string) error {
 	return o.sys.SpawnDetached(o.cfg.UpArgv, dir, filepath.Join(o.cfg.Home, "up-from-dashboard.log"))
 }
 
-// StartStackService adds one service to a running stack: `haven up +<service>`
-// detached in its worktree. The selection is sticky, so up restarts the stack
-// with the service added; progress is read from the registry, as for Start.
+// StartStackService turns one service on in a running stack: `haven service on
+// <service>` detached in its worktree. The selection is sticky, and the stack
+// starts only the lanes the service changes; progress is read from the registry.
 func (o *Orchestrator) StartStackService(slug, service string) error {
+	return o.switchStackService(slug, service, "on")
+}
+
+// StopStackService is StartStackService's `haven service off <service>`.
+func (o *Orchestrator) StopStackService(slug, service string) error {
+	return o.switchStackService(slug, service, "off")
+}
+
+func (o *Orchestrator) switchStackService(slug, service, verb string) error {
 	if !slices.Contains(domain.SelectableServices, service) {
 		return fmt.Errorf("unknown service %q", service)
+	}
+	if len(o.cfg.ServiceArgv) == 0 {
+		return fmt.Errorf("this haven cannot switch a service")
 	}
 	dir, err := o.registeredWorktree(slug)
 	if err != nil {
 		return err
 	}
-	argv := append(slices.Clone(o.cfg.UpArgv), "+"+service)
+	argv := append(slices.Clone(o.cfg.ServiceArgv), verb, service)
 	return o.sys.SpawnDetached(argv, dir, filepath.Join(o.cfg.Home, "up-from-dashboard.log"))
 }
 

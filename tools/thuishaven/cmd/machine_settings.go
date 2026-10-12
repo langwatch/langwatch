@@ -12,11 +12,11 @@ import (
 const machineSettingsUsage = "usage: haven machine settings [--json] | haven machine settings set <name> <value> | haven machine settings unset <name>"
 
 // machineSettingsSpec is `haven machine settings`: the machine-wide switches
-// (observability on/off, VM auto-stop and its grace), beside `machine limits`.
+// (observability on/off, the VM on/off, VM auto-stop and its grace), beside `machine limits`.
 func machineSettingsSpec() commandSpec {
 	return commandSpec{
 		name:    "settings",
-		summary: "machine settings: observability on|off, runtime-auto-stop on|off, runtime-idle-grace-minutes; set <name> <value> | unset <name>",
+		summary: "machine settings: observability on|off, vm on|off, runtime-auto-stop on|off, runtime-idle-grace-minutes; set <name> <value> | unset <name>",
 		args:    "[set <name> <value> | unset <name>]",
 		maxArgs: 3,
 		flags:   []flagSpec{{long: "--json", summary: "machine-readable"}},

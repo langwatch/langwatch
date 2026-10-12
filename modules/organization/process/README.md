@@ -17,7 +17,7 @@ Peers call these through the token, declared at `../contract/src/organization.ap
 #### `createAndAssign`
 
 ```typescript
-createAndAssign(input: Readonly<{ orgName?: string; phoneNumber?: string; signUpData?: Record<string, unknown>; primaryIntent?: OrganizationIntent | null; userDisplayName?: string | null; }>, by: OrganizationCaller): Promise<{ organization: { id: string; name: string }; team: { id: string; slug: string; name: string }; }>;
+createAndAssign(input: Readonly<{ orgName?: string; phoneNumber?: string; signUpData?: Record<string, unknown>; primaryIntent?: OrganizationIntent | null; userDisplayName?: string | null; }>, by: OrganizationCaller): Promise<{ organization: { id: string; name: string }; team: { id: string; slug: string; name: string }; /** False while the founder's grants are still landing; a read hint follows when they do. */ grantsConfirmed: boolean; }>;
 ```
 
 #### `checkSignUp`

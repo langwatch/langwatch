@@ -70,6 +70,7 @@ function stubDatabase({
       // that skips tenants already terminal for every migration the pass
       // drives; an empty page ends the leg without touching Redis.
       $queryRaw: vi.fn().mockResolvedValue([]),
+      systemMigrationTenantState: { findMany: vi.fn().mockResolvedValue([]) },
       organization: { findMany: organizationFindMany },
       project: { findMany: projectFindMany, findUniqueOrThrow: projectOrganization },
       user: { findMany: vi.fn().mockResolvedValue([]), findUnique },
@@ -353,6 +354,48 @@ describe("project-rooted migration composition", () => {
     expect(projectOrganization).toHaveBeenCalledWith({
       where: { id: "project_1" },
       select: { team: { select: { organizationId: true } } },
+    });
+  });
+
+  /** @scenario "A project's organization is read once per page of projects for the cohort" */
+  it("reads a page of projects' organizations in one query, for every migration", async () => {
+    const names = ["project-audit-repair", "project-audit-second"];
+    const { database, projectFindMany, projectOrganization } = stubDatabase({
+      enrollments: names.map((migrationName) => ({ organizationId: "org_acme", migrationName })),
+      memberships: {},
+    });
+    const projectIds = ["project_1", "project_2", "project_3"];
+    projectFindMany
+      .mockResolvedValueOnce(projectIds.map((id) => ({ id })))
+      .mockResolvedValueOnce(
+        projectIds.map((id) => ({ id, team: { organizationId: "org_acme" } })),
+      );
+    vi.spyOn(RedisMigrationLeaseRepository.prototype, "acquire").mockResolvedValue(true);
+    vi.spyOn(RedisMigrationLeaseRepository.prototype, "release").mockResolvedValue();
+    vi.spyOn(PrismaSystemMigrationStateRepository.prototype, "getRecord").mockImplementation(
+      async (args) => {
+        throw new SystemMigrationRecordNotFoundError(args);
+      },
+    );
+    vi.spyOn(
+      PrismaSystemMigrationStateRepository.prototype,
+      "upsertRecordUnlessRolledBack",
+    ).mockResolvedValue(true);
+    const adapter = SystemMigrationPassService.create({
+      repositories: passRepositoriesOver(database),
+      isSaaS: () => true,
+      tenantAxis: "project",
+      migrations: () => names.map((name) => migrationOf({ name })),
+      userMigrations: () => [],
+      newbornSweep: async () => {},
+    });
+
+    await expect(adapter.runPass({})).resolves.toMatchObject({ finalized: 6 });
+
+    expect(projectOrganization).not.toHaveBeenCalled();
+    expect(projectFindMany).toHaveBeenCalledWith({
+      where: { id: { in: projectIds } },
+      select: { id: true, team: { select: { organizationId: true } } },
     });
   });
 });

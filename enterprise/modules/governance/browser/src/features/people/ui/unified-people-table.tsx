@@ -124,12 +124,12 @@ export function UnifiedPeopleTable({
         size="sm"
         tableLayout="fixed"
         width="full"
-        minWidth="92rem"
+        minWidth="104rem"
         containerProps={{ overflowX: "auto" }}
       >
         <ListTable.Header>
           <ListTable.Row>
-            <ListTable.ColumnHeader>Person</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="16rem">Person</ListTable.ColumnHeader>
             <ListTable.ColumnHeader width="11rem">Provider</ListTable.ColumnHeader>
             <ListTable.ColumnHeader width="8rem">Kind</ListTable.ColumnHeader>
             <ListTable.ColumnHeader width="9.5rem">Department</ListTable.ColumnHeader>

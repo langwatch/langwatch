@@ -13,15 +13,16 @@ import (
 )
 
 // observabilityStack picks the observability tier: native host processes on
-// macOS, the LGTM container elsewhere or when LANGWATCH_HAVEN_OBS_TIER pins it.
-func observabilityStack(rt *colima.Runtime, ram uint64, cpus int) app.Observability {
-	tier, pinned, ok := selectedObservabilityTier()
+// macOS, the LGTM container elsewhere or when LANGWATCH_HAVEN_OBS_TIER pins it;
+// always native with the vm setting off.
+func observabilityStack(rt *colima.Runtime, limits domain.ObservabilityLimits, settings domain.MachineSettings) app.Observability {
+	tier, pinned, ok := selectedObservabilityTier(settings)
 	if !ok {
 		fmt.Fprintf(os.Stderr, "haven: %s=%q names no tier (native, container) — using %s\n",
 			domain.ObservabilityTierEnvVar, pinned, tier)
 	}
 	container := otellgtm.New(rt, havenHome(), envOr("HAVEN_OBS_IMAGE", domain.ObservabilityImage),
-		observabilityEndpoints(), observabilityLimits(ram, cpus))
+		observabilityEndpoints(), limits)
 	if tier == domain.ObservabilityTierContainer {
 		return container
 	}
@@ -29,7 +30,7 @@ func observabilityStack(rt *colima.Runtime, ram uint64, cpus int) app.Observabil
 	alloy, _ := domain.AlloyNativeArtifactFor(runtime.GOOS, runtime.GOARCH)
 	pyroscope, _ := domain.PyroscopeNativeArtifactFor(runtime.GOOS, runtime.GOARCH)
 	return otelnative.New(otelnative.Options{
-		Home: havenHome(), Endpoints: observabilityEndpoints(), Limits: observabilityLimits(ram, cpus),
+		Home: havenHome(), Endpoints: observabilityEndpoints(), Limits: limits,
 		TempoBin: devEnv("HAVEN_OBS_TEMPO_BIN"), TempoArtifact: tempo,
 		AlloyBin: devEnv("HAVEN_OBS_ALLOY_BIN"), AlloyArtifact: alloy,
 		PyroscopeBin: devEnv("HAVEN_OBS_PYROSCOPE_BIN"), PyroscopeArtifact: pyroscope,
@@ -39,8 +40,8 @@ func observabilityStack(rt *colima.Runtime, ram uint64, cpus int) app.Observabil
 
 // selectedObservabilityTier is the one tier selection, shared by the stack and
 // the viewer; ok is false when the pin names no tier.
-func selectedObservabilityTier() (tier domain.ObservabilityTier, pinned string, ok bool) {
+func selectedObservabilityTier(settings domain.MachineSettings) (tier domain.ObservabilityTier, pinned string, ok bool) {
 	pinned = devEnv(domain.ObservabilityTierEnvVar)
-	tier, ok = domain.ObservabilityTierFor(runtime.GOOS, pinned)
+	tier, ok = settings.ObservabilityTierFor(runtime.GOOS, pinned)
 	return tier, pinned, ok
 }

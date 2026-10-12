@@ -60,4 +60,7 @@ func TestConsoleFrontsAllButHealth(t *testing.T) {
 	if consoleFrontsAllButHealth([]string{"/healthz 503 console=true", "/ 503 console=true"}) {
 		t.Fatal("health behind the console is a failure")
 	}
+	if consoleFrontsAllButHealth([]string{"/healthz 200 console=false", "/readyz 200 console=false", "/ 503 console=true"}) {
+		t.Fatal("a failed install answering ready is a failure")
+	}
 }

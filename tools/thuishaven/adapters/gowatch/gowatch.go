@@ -6,9 +6,13 @@ package gowatch
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"hash"
 	"hash/fnv"
+	"io"
 	"io/fs"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -41,6 +45,18 @@ func (c *Clock) Due(now time.Time) bool {
 // Reset clears the pending burst; call it as the rebuild starts.
 func (c *Clock) Reset() { c.isDirty = false }
 
+// DueAt is when the pending burst falls due; zero when nothing is pending.
+func (c *Clock) DueAt() time.Time {
+	if !c.isDirty {
+		return time.Time{}
+	}
+	at := c.last.Add(c.Quiet)
+	if limit := c.first.Add(c.MaxWait); limit.Before(at) {
+		at = limit
+	}
+	return at
+}
+
 // watchedDirs are the Go trees `./cmd/service` builds from.
 var watchedDirs = []string{"cmd", "pkg", "services"}
 
@@ -50,24 +66,39 @@ var skippedDirs = map[string]bool{"node_modules": true, "dist": true, ".bin": tr
 // Fingerprint hashes every watched file's path, size and mtime. Tests never
 // change the binary, and a mass test write is the common AI burst, so
 // `_test.go` is not watched.
-func Fingerprint(repoRoot string) uint64 {
-	return FingerprintPaths(repoRoot, append([]string{"go.work"}, watchedDirs...)...)
+func Fingerprint(repoRoot string) uint64 { return GoTree(repoRoot).Fingerprint() }
+
+// GoTree is Fingerprint's tree, kept across polls.
+func GoTree(repoRoot string) *Tree {
+	return PathsTree(repoRoot, append([]string{"go.work"}, watchedDirs...)...)
 }
 
 // FingerprintPaths is Fingerprint over the given files and trees under root.
 func FingerprintPaths(root string, paths ...string) uint64 {
-	return fingerprint(root, isWatchedFile, skippedDirs, paths)
+	return PathsTree(root, paths...).Fingerprint()
+}
+
+// PathsTree is FingerprintPaths's tree, kept across polls.
+func PathsTree(root string, paths ...string) *Tree {
+	return &Tree{root: root, paths: paths, isWatched: isWatchedFile, skipped: skippedDirs}
 }
 
 // uiWatchedDirs hold the source `vite build` bundles; a dir named `process` is
 // a module's backend half, never in the bundle.
 var uiWatchedDirs = []string{"apps/ui", "modules", "enterprise/modules", "packages"}
 
-var uiSkippedDirs = map[string]bool{"node_modules": true, "dist": true, "__tests__": true, "process": true}
+var uiSkippedDirs = map[string]bool{
+	"node_modules": true, "dist": true, "__tests__": true, "process": true,
+	// Docs and build output: a Storybook build's JSON would otherwise read as a UI edit.
+	"specs": true, "adrs": true, "storybook-static": true, "coverage": true,
+}
 
 // UIFingerprint hashes the browser source the built UI is bundled from.
-func UIFingerprint(repoRoot string) uint64 {
-	return fingerprint(repoRoot, isUIFile, uiSkippedDirs, uiWatchedDirs)
+func UIFingerprint(repoRoot string) uint64 { return UITree(repoRoot).Fingerprint() }
+
+// UITree is UIFingerprint's tree, kept across polls.
+func UITree(repoRoot string) *Tree {
+	return &Tree{root: repoRoot, paths: uiWatchedDirs, isWatched: isUIFile, skipped: uiSkippedDirs}
 }
 
 func isUIFile(name string) bool {
@@ -81,32 +112,97 @@ func isUIFile(name string) bool {
 	return false
 }
 
-func fingerprint(root string, isWatched func(string) bool, skipped map[string]bool, paths []string) uint64 {
+// Tree is a watched set of files and trees that remembers each directory's
+// listing: a directory whose mtime has not moved has the same entries, so a
+// poll stats it instead of reopening and rereading it. Watched files are
+// still statted every poll, which is what sees an edit in place.
+type Tree struct {
+	root      string
+	paths     []string
+	isWatched func(string) bool
+	skipped   map[string]bool
+	listings  map[string]listing
+	next      map[string]listing // the listings this poll saw, kept for the next
+}
+
+// listing is one directory's watched files and descended subdirectories, as full paths.
+type listing struct {
+	mtime   int64
+	files   []string
+	subdirs []string
+}
+
+// Fingerprint hashes every watched file's path, size and mtime.
+func (t *Tree) Fingerprint() uint64 {
 	h := fnv.New64a()
-	for _, p := range paths {
-		top := filepath.Join(root, p)
-		_ = filepath.WalkDir(top, func(path string, d fs.DirEntry, err error) error {
-			switch {
-			case err != nil:
-				return filepath.SkipDir // an unreadable entry ends that directory's walk
-			case d.IsDir():
-				return skipDir(path, top, d.Name(), skipped)
-			case isWatched(d.Name()):
-				if info, err := d.Info(); err == nil {
-					_, _ = fmt.Fprintf(h, "%s|%d|%d\n", path, info.Size(), info.ModTime().UnixNano())
-				}
-			}
-			return nil
-		})
+	t.next = make(map[string]listing, len(t.listings))
+	for _, p := range t.paths {
+		top := filepath.Join(t.root, p)
+		info, err := os.Lstat(top)
+		switch {
+		case err != nil:
+		case info.IsDir():
+			t.walk(h, top, info)
+		case t.isWatched(info.Name()):
+			stampFile(h, top, info)
+		}
 	}
+	t.listings, t.next = t.next, nil
 	return h.Sum64()
 }
 
-func skipDir(path, top, name string, skipped map[string]bool) error {
-	if skipped[name] || (strings.HasPrefix(name, ".") && path != top) {
-		return filepath.SkipDir
+// walk hashes one directory's watched files and descends into its subdirectories.
+func (t *Tree) walk(h hash.Hash64, dir string, info fs.FileInfo) {
+	l, ok := t.listingFor(dir, info)
+	if !ok {
+		return // an unreadable directory ends that directory's walk
 	}
-	return nil
+	t.next[dir] = l
+	for _, path := range l.files {
+		if fi, err := os.Lstat(path); err == nil {
+			stampFile(h, path, fi)
+		}
+	}
+	for _, path := range l.subdirs {
+		if fi, err := os.Lstat(path); err == nil && fi.IsDir() {
+			t.walk(h, path, fi)
+		}
+	}
+}
+
+// listingFor is the kept listing while the directory's mtime holds, else a fresh read.
+func (t *Tree) listingFor(dir string, info fs.FileInfo) (listing, bool) {
+	mtime := info.ModTime().UnixNano()
+	if l, ok := t.listings[dir]; ok && l.mtime == mtime {
+		return l, true
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return listing{}, false
+	}
+	l := listing{mtime: mtime}
+	for _, e := range entries {
+		name := e.Name()
+		switch {
+		case e.IsDir() && !t.skipsDir(name):
+			l.subdirs = append(l.subdirs, filepath.Join(dir, name))
+		case !e.IsDir() && t.isWatched(name):
+			l.files = append(l.files, filepath.Join(dir, name))
+		}
+	}
+	return l, true
+}
+
+// skipsDir reports whether the Tree never descends into a directory of this name.
+func (t *Tree) skipsDir(name string) bool { return t.skipped[name] || strings.HasPrefix(name, ".") }
+
+// stampFile writes a file's path, size and mtime straight into the hash.
+func stampFile(h hash.Hash64, path string, info fs.FileInfo) {
+	var stamp [16]byte
+	_, _ = io.WriteString(h, path)
+	binary.LittleEndian.PutUint64(stamp[:8], uint64(info.Size()))
+	binary.LittleEndian.PutUint64(stamp[8:], uint64(info.ModTime().UnixNano()))
+	_, _ = h.Write(stamp[:])
 }
 
 func isWatchedFile(name string) bool {
@@ -176,36 +272,38 @@ func (s *Swapper) Pid() int {
 	return s.child.Process.Pid
 }
 
-// Watcher polls a checkout's Go trees and drives the swapper.
+// Watcher watches a checkout's Go trees and drives the swapper: file events
+// wake it, with Poll the fallback when the operating system refuses them.
 type Watcher struct {
 	RepoRoot string
 	Clock    *Clock
 	Swapper  *Swapper
 	Poll     time.Duration
 	last     uint64
+	tree     *Tree
 }
 
 // Run builds and starts once, then rebuilds on every due burst until ctx ends.
 func (w *Watcher) Run(ctx context.Context) error {
 	defer w.Swapper.Stop()
-	w.last = Fingerprint(w.RepoRoot)
+	w.tree = GoTree(w.RepoRoot)
+	w.last = w.tree.Fingerprint()
 	_ = w.Swapper.Rebuild(ctx)
-	tick := time.NewTicker(w.Poll)
-	defer tick.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case now := <-tick.C:
-			w.observe(ctx, now)
-		}
-	}
+	loop := Loop{Tree: w.tree, Clock: w.Clock, Poll: w.Poll, Safety: SafetyPoll, Log: w.Swapper.Log}
+	loop.Run(ctx, func(now time.Time) bool {
+		w.observe(ctx, now)
+		return false
+	})
+	return nil
 }
 
-// observe feeds one poll to the clock and rebuilds when the burst is due.
-// Changes made during the build show at the next poll: one rebuild follows.
+// observe feeds one wake to the clock and rebuilds when the burst is due.
+// Changes made during the build wake the loop again: one rebuild follows.
 func (w *Watcher) observe(ctx context.Context, now time.Time) {
-	if fp := Fingerprint(w.RepoRoot); fp != w.last {
+	if w.tree == nil {
+		w.tree = GoTree(w.RepoRoot)
+	}
+	if fp := w.tree.Fingerprint(); fp != w.last {
 		w.last = fp
 		w.Clock.Change(now)
 	}

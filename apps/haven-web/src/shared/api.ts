@@ -112,6 +112,9 @@ export const destroyPath = ({ slug }: { slug: string }) =>
 export const startServicePath = ({ slug, service }: { slug: string; service: string }) =>
   `/api/stacks/${encodeURIComponent(slug)}/start-service?service=${encodeURIComponent(service)}`;
 
+export const stopServicePath = ({ slug, service }: { slug: string; service: string }) =>
+  `/api/stacks/${encodeURIComponent(slug)}/stop-service?service=${encodeURIComponent(service)}`;
+
 export const seedPath = ({ slug }: { slug: string }) =>
   `/api/stacks/${encodeURIComponent(slug)}/seed`;
 

@@ -122,3 +122,16 @@ func TestSecretClassesNeverReadsTheDeletedRegistry(t *testing.T) {
 		t.Fatalf("a stray keys.json was read: %q", got)
 	}
 }
+
+// BenchmarkSecretClasses is the scan `haven env` and the status overlay pay,
+// run against this checkout.
+func BenchmarkSecretClasses(b *testing.B) {
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = domain.SecretClasses(root)
+	}
+}

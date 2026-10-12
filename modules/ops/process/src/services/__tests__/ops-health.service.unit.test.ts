@@ -134,6 +134,7 @@ const MIGRATIONS: OpsMigrationOverview[] = [
     availableOnThisInstallation: true,
     enrolledAutomatically: true,
     tenant: "organization",
+    migratedIsSteady: false,
     counts: { migrated: 9, finalized: 0, parked: 2, rolled_back: 0 },
     enrollment: null,
     attention: [
@@ -154,6 +155,7 @@ const MIGRATIONS: OpsMigrationOverview[] = [
     availableOnThisInstallation: true,
     enrolledAutomatically: true,
     tenant: "organization",
+    migratedIsSteady: false,
     counts: { migrated: 0, finalized: 5, parked: 0, rolled_back: 0 },
     enrollment: null,
     attention: [],

@@ -71,6 +71,7 @@ func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
 	}
 	var downed []int
 	var worktreeDir string
+	rdb := o.redisDBFor(slug)
 	if st, ok := o.stackBySlug(slug); ok {
 		worktreeDir = st.WorktreeDir
 		if st.LauncherPID != 0 {
@@ -85,6 +86,7 @@ func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
 	o.waitForProcessesDead(downed)
 	o.stopNxDaemon(ctx, worktreeDir)
 	o.dropWorktreeDatabases(ctx, slug)
+	o.flushStackRedis(ctx, slug, rdb)
 	// Logs are haven's own state, same as the databases above: remove this
 	// slug's share of them, not the checkout (ruling 2026-09-29). Best-effort —
 	// a slug with no registered stack has no worktree to resolve one from.
@@ -96,6 +98,7 @@ func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
 	o.removeStackHome(slug)
 	o.removeNxPrivateDir(slug)
 	o.removeStackCredentials(slug)
+	o.ClearSeedStatus(slug)
 	fmt.Printf("stack %q destroyed (database %s dropped)\n", slug, db)
 	return nil
 }
@@ -269,6 +272,24 @@ func (o *Orchestrator) dropWorktreeDatabases(ctx context.Context, slug string) {
 				o.log.Warn("destroy: postgres drop failed", zapErr(err))
 			}
 		}
+	}
+}
+
+// flushStackRedis empties the destroyed stack's Redis DB so the next stack given
+// that index does not inherit its queued jobs. A DB another registered stack
+// still uses is left alone.
+func (o *Orchestrator) flushStackRedis(ctx context.Context, slug string, rdb int) {
+	if o.rds == nil || !o.cfg.ShouldManageRedis {
+		return
+	}
+	for _, st := range o.store.Stacks() {
+		if st.Slug != slug && st.RedisDB == rdb {
+			o.log.Warn("destroy: redis db shared with another stack, not flushed", zap.Int("db", rdb), zap.String("with", st.Slug))
+			return
+		}
+	}
+	if err := o.rds.FlushDB(ctx, rdb); err != nil {
+		o.log.Warn("destroy: redis flush failed", zapErr(err))
 	}
 }
 

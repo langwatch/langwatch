@@ -6,8 +6,8 @@ import { api } from "../../behavior/organization-api.ts";
 import { SEAT_TYPE_COPY } from "../../model/seat-type-copy.ts";
 
 /**
- * Where the organization stands on each kind of seat, on the page where seats are decided.
- * Developer seats (ADR-171) are counted with no limit: the plan does not meter them.
+ * Each kind of seat in use, as one row of three at every width. Developer seats
+ * (ADR-171) are counted with no limit: the plan does not meter them.
  * Spec: specs/licensing/seat-reconciliation.feature, specs/members/developer-seat.feature
  */
 export function MemberSeatUsage({
@@ -22,7 +22,13 @@ export function MemberSeatUsage({
   if (!usage.data) return null;
 
   return (
-    <SimpleGrid columns={{ base: 1, md: 3 }} gap={3} width="full" maxWidth="2xl">
+    <SimpleGrid
+      columns={3}
+      gap={{ base: 2, md: 3 }}
+      width="full"
+      maxWidth="2xl"
+      data-testid="member-seat-usage"
+    >
       <ResourceLimitRow
         limitType="members"
         current={usage.data.membersCount}

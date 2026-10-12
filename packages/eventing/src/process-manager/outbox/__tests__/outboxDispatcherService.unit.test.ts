@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type * as metricsModule from "../../../metrics.ts";
@@ -335,6 +336,50 @@ describe("OutboxDispatcherService", () => {
         const second = await dispatcher.runOnce({ now: T0 + 1_100 });
         expect(second.retried).toEqual(["dispatch:turn_1:1"]);
         expect(handler).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe("when the handler is refused as clickhouse_unavailable", () => {
+      /** Shaped as process-stores' refusal: a handled error left at its default `retryable`. */
+      class Unavailable extends HandledError {
+        constructor(reason: Error) {
+          super("clickhouse_unavailable", "Database temporarily unavailable", {
+            httpStatus: 503,
+            fault: "platform",
+            reasons: [reason],
+          });
+        }
+      }
+      const refusedOver = (reason: Error) => new Unavailable(reason);
+
+      /** @scenario "A message whose ClickHouse is unavailable is retried, never dead-lettered on its first attempt" */
+      it("retries a dropped connection instead of dead-lettering it", async () => {
+        const dropped = Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" });
+        const handler = vi.fn().mockRejectedValue(refusedOver(dropped));
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 10,
+        });
+
+        const first = await dispatcher.runOnce({ now: T0 + 1 });
+        expect(first.retried).toEqual(["dispatch:turn_1:1"]);
+        expect(first.dead).toEqual([]);
+      });
+
+      /** @scenario "A message whose ClickHouse is unavailable is retried, never dead-lettered on its first attempt" */
+      it("still retires a refusal whose cause is permanent", async () => {
+        const handler = vi.fn().mockRejectedValue(refusedOver(new Error("Syntax error in SQL")));
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 10,
+        });
+
+        const first = await dispatcher.runOnce({ now: T0 + 1 });
+        expect(first.dead).toEqual(["dispatch:turn_1:1"]);
       });
     });
 

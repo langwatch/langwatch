@@ -7,9 +7,6 @@
   "exclude": [".claude/"],
   "references": [
     {
-      "path": "./apps/analyticssim-web"
-    },
-    {
       "path": "./apps/api"
     },
     {
@@ -19,43 +16,19 @@
       "path": "./apps/haven-web"
     },
     {
-      "path": "./apps/idpsim-web"
-    },
-    {
-      "path": "./apps/lambdasim-web"
-    },
-    {
-      "path": "./apps/llmsim-web"
-    },
-    {
-      "path": "./apps/mailsim-web"
-    },
-    {
-      "path": "./apps/outboundsim-web"
-    },
-    {
-      "path": "./apps/paymentsim-web"
-    },
-    {
       "path": "./apps/scenario-child"
     },
     {
       "path": "./apps/server"
     },
     {
-      "path": "./apps/storagesim-web"
+      "path": "./apps/sims"
     },
     {
       "path": "./apps/tasks"
     },
     {
-      "path": "./apps/telemetrysim-web"
-    },
-    {
       "path": "./apps/ui"
-    },
-    {
-      "path": "./apps/voicesim-web"
     },
     {
       "path": "./apps/worker"

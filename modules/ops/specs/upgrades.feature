@@ -77,6 +77,16 @@ Feature: Ops shows an installation's release upgrades, read-only
     When the overview counts the held organizations
     Then it counts 1
 
+  # A step whose `migrated` is its steady state (Alex, 2026-10-12): the sign-in credential repair
+  # marks every user it repairs as migrated and never finalizes them, by design.
+  @integration
+  Scenario: A step that never finalizes by design keeps its users in step, not held
+    Given the sign-in credential repair step has repaired 3 users and parked 1
+    When an operator opens the Organizations tab
+    Then its count reads "3 kept in step", not held
+    And only the parked user is listed as needing attention
+    And the overview still reads "Up to date"
+
   @integration
   Scenario: On cloud, held organizations turn Up to date into needs attention linking to the Organizations tab
     Given an installation that is up to date on cloud
@@ -329,6 +339,14 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then each target shows its goose version and how many steps are outstanding
     And the failed target shows its last error
 
+  # T7-F5: the shared target is a row of the table too, so an operator compares it with each private one.
+  @integration
+  Scenario: The dataplanes tab lists the shared ClickHouse target beside the private ones
+    Given the shared ClickHouse target and a private one
+    When an operator opens the Dataplanes tab
+    Then the shared target is listed first with its goose version and outstanding steps
+    And the private target is listed after it
+
   # A private organization recorded by the organization module whose route variable is missing or
   # malformed is refused by the stores (specs/private-dataplane/clickhouse-routing.feature); the
   # tab shows it so an operator sees why (Alex, 2026-10-11, T7-F2/T7-F3).
@@ -483,19 +501,19 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then it answers do not show
 
   @integration
-  Scenario: The shell's upgrade notice tells a member to contact their operator
+  Scenario: Home's upgrade notice tells a member to contact their operator
     Given the upgrade attention notice answers show
-    When a signed-in member without ops:view opens any page
-    Then the shell shows a warning banner reading "LangWatch's last update needs attention. Contact your LangWatch operator."
+    When a signed-in member without ops:view opens Home
+    Then the "Action needed for updates" card reads "LangWatch's last update needs attention. Contact your LangWatch operator."
     And it offers no link
 
   @integration
-  Scenario: An operator's upgrade notice links to Ops › Upgrades
+  Scenario: An operator's upgrade notice on Home links to Ops › Upgrades
     Given the upgrade attention notice answers show
-    When a signed-in operator holding ops:view opens any page
-    Then the banner links to /ops/upgrades
+    When a signed-in operator holding ops:view opens Home
+    Then one "Action needed for updates" card shows and links to /ops/upgrades
 
   @integration
   Scenario: The upgrade notice shows nothing while it loads
     Given the upgrade attention notice has not answered yet
-    Then the shell shows no banner and no error
+    Then Home shows no card and no error

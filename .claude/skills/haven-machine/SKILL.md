@@ -18,9 +18,7 @@ haven machine slot explain                         # explain the slot policy and
 haven machine run --sh 'pnpm test:unit'    # the heavy pool; one quoted argument so operators stay in the slot
 ```
 
-`haven machine run` flags: `--class heavy` (the only pool), `--agent-id <id>` (shorter wait ceiling for an
-agent's prompt cache), `--workers <n>` (narrowed to n test workers). Other `typecheck` args are
-forwarded. Knobs: `CHECK_SLOTS`, `CHECK_PRESSURE`, `HAVEN_TYPECHECK_SLOTS`,
+`haven machine run` flags: `--class heavy` (the only pool). Other `typecheck` args are forwarded. Knobs: `CHECK_SLOTS`, `CHECK_PRESSURE`, `HAVEN_TYPECHECK_SLOTS`,
 `HAVEN_TYPECHECK_MAX_RSS_MB` (kills a run over 6 GiB or 10 minutes), `HAVEN_TEST_WORKERS`,
 `HAVEN_SLOT_HELD` (set inside a run: already admitted). See `haven-env`.
 

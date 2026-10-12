@@ -1,7 +1,6 @@
 import {
   CODEX_OAUTH_CLIENT_ID,
   CODEX_OAUTH_ISSUER,
-  CODEX_VERIFICATION_URL,
   CodexAuthError,
   type CodexTokenKeys,
 } from "@langwatch/model-provider-contract";
@@ -71,10 +70,8 @@ export class CodexAccountService {
     private readonly fetchImpl: typeof fetch,
     issuer: string | undefined,
   ) {
-    // The override exists for tests (a local stand-in issuer) and for
-    // debugging against a staging identity service; production always runs
-    // on the real issuer, so the composing process passes nothing.
-    this.issuer = issuer ?? CODEX_OAUTH_ISSUER;
+    // The deployment's configured issuer (haven's +outbound names outboundsim); absent is OpenAI.
+    this.issuer = (issuer ?? CODEX_OAUTH_ISSUER).replace(/\/+$/, "");
   }
 
   async startDeviceSignIn(): Promise<CodexDeviceCode> {
@@ -91,7 +88,7 @@ export class CodexAccountService {
       userCode,
       deviceAuthId,
       intervalSeconds: Math.max(2, Number.isFinite(interval) ? interval : 5),
-      verificationUrl: CODEX_VERIFICATION_URL,
+      verificationUrl: `${this.issuer}/codex/device`,
     };
   }
 
@@ -114,7 +111,7 @@ export class CodexAccountService {
       ) {
         return { status: "pending" };
       }
-      throw error;
+      throw deviceRefusalOf(error);
     }
     const code = json.authorization_code;
     const verifier = json.code_verifier;
@@ -255,6 +252,20 @@ function isTerminalOAuthRejection(error: unknown): error is CodexAuthError {
     error.status < 500 &&
     error.message.includes("invalid_grant")
   );
+}
+
+/** The issuer's RFC 8628 answers that end a device code, named; anything else passes through. */
+function deviceRefusalOf(error: unknown): unknown {
+  if (!(error instanceof CodexAuthError) || error.kind !== "http" || error.status !== 400) {
+    return error;
+  }
+  if (error.message.includes("expired_token")) {
+    return new CodexAuthError("sign_in_expired", "the sign-in code expired before it was approved");
+  }
+  if (error.message.includes("access_denied")) {
+    return new CodexAuthError("sign_in_denied", "the sign-in was not approved");
+  }
+  return error;
 }
 
 interface CodexClaims {

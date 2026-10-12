@@ -16,7 +16,7 @@ import (
 )
 
 // The `haven sim mail` noun: read this worktree's own caught email — one client
-// over the sink's own HTTP API (services/mailsim), the same API a test would
+// over the sink's own HTTP API (services/sims/mailsim), the same API a test would
 // call directly. `address` needs no request; every other subcommand dials
 // d.orch.MailBaseURL, which refuses immediately, naming the lane and the
 // command that starts it, when the sink is not running.

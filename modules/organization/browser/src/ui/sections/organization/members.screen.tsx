@@ -347,7 +347,10 @@ function MemberRowActions({
   );
 }
 
-/** Holds a whole address; Enter opens the invite drawer carrying it (WEB-8700). */
+/**
+ * Holds a whole address; Enter opens the invite drawer carrying it (WEB-8700).
+ * A set width: a percentage one fills the row and pushes the button under it.
+ */
 function InlineInviteBox({
   value,
   onChange,
@@ -361,7 +364,7 @@ function InlineInviteBox({
     <Input
       value={value}
       size="sm"
-      maxWidth="240px"
+      width={{ base: "180px", sm: "240px" }}
       placeholder="Invite by email…"
       aria-label="Invite a teammate by email"
       onChange={(event) => onChange(event.target.value)}
@@ -535,11 +538,12 @@ function PeopleHeader({
         hint="Everybody in this organization, and everybody on their way in."
         right={
           canManage ? (
-            <HStack gap={2} flexWrap="wrap">
+            <HStack gap={2} data-testid="members-invite-row">
               <InlineInviteBox value={draft} onChange={setDraft} onSubmit={openInvite} />
               <Button
                 size="sm"
                 colorPalette="orange"
+                flexShrink={0}
                 onClick={openInvite}
                 data-testid="members-invite-open"
               >

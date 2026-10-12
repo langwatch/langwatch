@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * The daily billing tick of connected self-hosted customers (ADR-156 section 7):
- * the monthly statements, then the renewals whose credit waited on the old term's
- * last usage invoice. Each job runs whatever the one before it did. Seat changes
- * have their own pass every minute (`ConnectedSeatChangeService`).
+ * The daily billing tick of connected self-hosted customers (ADR-156 section 7): the seat
+ * invoices that failed, the monthly statements, then the renewals whose credit waited on the
+ * old term's last usage invoice. Each job runs whatever the one before it did. New seat
+ * changes have their own pass every minute (`ConnectedSeatChangeService`).
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -13,11 +13,13 @@ import type { ConnectedBillingRepository } from "../../../repositories/connected
 import type { ConnectedBillingService } from "./connected-billing.service.ts";
 import type { ConnectedCustomerFactsService } from "./connected-customer-facts.service.ts";
 import type { ConnectedMonthlyStatementService } from "./connected-monthly-statement.service.ts";
+import type { ConnectedSeatChangeService } from "./connected-seat-change.service.ts";
 
 const logger = createLogger("langwatch:billing:connected-billing-tick");
 
 /** What one tick drives, each only as wide as it is used. */
 type ConnectedBillingJobs = Readonly<{
+  seats: Pick<ConnectedSeatChangeService, "retryFailedSeatInvoices">;
   /** Absent where no process composed the statement mail: nothing is sent or recorded. */
   statements: Pick<ConnectedMonthlyStatementService, "run"> | undefined;
   renewals: Pick<ConnectedBillingService, "completeRenewalIfDue">;
@@ -33,6 +35,7 @@ export class ConnectedBillingTickService {
   }
 
   async run(): Promise<void> {
+    await this.runJob("seatChanges", () => this.jobs.seats.retryFailedSeatInvoices());
     await this.runJob("monthlyStatements", async () => {
       if (!this.jobs.statements) {
         logger.warn("no statement mail is composed in this process; monthly statements wait");

@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -766,9 +765,6 @@ func (m *viewerModel) navFooter() string {
 
 // dimText paints one string dim, the model's own half of the footer.
 func dimText(text string) string { return "\x1b[2m" + text + "\x1b[0m" }
-
-// itoa is strconv.Itoa under a shorter name, for building one footer string.
-func itoa(n int) string { return strconv.Itoa(n) }
 
 // selectTab moves to one tab by name.
 func (m *viewerModel) selectTab(name string) {

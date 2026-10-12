@@ -178,6 +178,21 @@ describe("the private tenant listing", () => {
   });
 });
 
+describe("given an organization created after the process looked it up", () => {
+  /** @scenario "An organization created after a process booted resolves on its next lookup" */
+  it("reads Postgres again on the next lookup and answers it, remembering no refusal", async () => {
+    const organizations: string[] = [];
+    const { directory, asked } = directoryOver({ organizations });
+    const cached = cachedTenantDirectory(directory);
+
+    await expect(cached.organizationForTenant("org_new")).resolves.toBeNull();
+    organizations.push("org_new");
+
+    await expect(cached.organizationForTenant("org_new")).resolves.toBe("org_new");
+    expect(asked.filter((read) => read === "organization:org_new")).toHaveLength(2);
+  });
+});
+
 describe("given an organization the organization module recorded as private", () => {
   describe("when the stores ask for its record", () => {
     /** @scenario "A recorded private organization whose route is missing is refused, naming the variable" */

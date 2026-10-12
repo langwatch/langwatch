@@ -95,9 +95,12 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       fontWeight="semibold"
       position="relative"
       overflow="hidden"
-      bg="transparent"
+      // Solid ground under the shader: with no WebGL/GPU the canvas paints
+      // nothing, and the contrast label would sit on the page background.
+      bg="purple.solid"
       boxShadow="0 1px 4px color-mix(in srgb, var(--chakra-colors-purple-fg) 25%, transparent), 0 0 0 1px color-mix(in srgb, var(--chakra-colors-accent-solid) 12%, transparent)"
       _dark={{
+        bg: "transparent",
         boxShadow:
           "0 1px 4px color-mix(in srgb, var(--chakra-colors-accent-solid) 16%, transparent)",
       }}

@@ -9,8 +9,8 @@ user-invocable: true
 One Go process playing the customer's IdP across independent tenants (`/t/1` to `/t/N`):
 an OIDC provider, a SAML identity provider, a SCIM 2.0 directory (it also pushes at
 LangWatch's SCIM endpoint) and a fake domain owner (`acme<n>.test`, DNS TXT and a
-well-known token). Permissive by design: never expose it. Code: `services/idpsim` (the
-README there is the full reference), console `apps/idpsim-web` (ADR-160).
+well-known token). Permissive by design: never expose it. Code: `services/sims/idpsim` (the
+README there is the full reference), console `apps/sims/src/idp` (ADR-160).
 
 ## Run it
 
@@ -33,7 +33,13 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 - SAML: sign-in `<base>/t/<n>/saml/sso`, metadata `<base>/t/<n>/saml/metadata`.
 - Zero-click login in a test: `login_hint=<email>`. Seeded users per tenant:
   `admin@acme<n>.test`, `member@acme<n>.test`.
+- Social sign-in (Google, GitHub, GitLab, Microsoft): `+idp` points `GOOGLE_SIGN_IN_BASE`,
+  `GITHUB_SIGN_IN_BASE`, `GITLAB_SIGN_IN_BASE` and `MICROSOFT_SIGN_IN_BASE` at tenant 1's
+  `/t/1/social/<provider>`. Set `AUTH_PROVIDER` to a non-email provider and any
+  `<PROVIDER>_CLIENT_ID`/`_SECRET` (idpsim accepts anything), then press the provider's button;
+  `login_hint=admin@acme1.test` skips the picker. Read `social.<provider>.*` in the activity feed.
 - Activity (every authorize, token, assertion, SCIM call with an outcome and a reason):
+- On an IS_SAAS stack also set LOCAL_PASSWORDS_ENABLED=on, or admin password sign-in is refused (EMAIL_PASSWORD_DISABLED).
   `GET /control/t/<n>/activity`, or the tenant page's activity tab. Read it first when a
   login fails: it says whether the request even arrived.
 
@@ -75,7 +81,7 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 `tenants` (every tenant, as the console's landing page lists them), `tenant show <t>` (also prints signing keys, skew and the armed break), `apps add|remove`, `populate`, `churn`, `user add`, `scim target set|clear`,
 `scim push|pull|sync`, `scim-event <t> <kind> [--style okta|entra] [--user] [--group] [--set k=v]`,
 `dns add|remove`, `verification set|clear`, `activity`, `signin <t> --user <email>` (prints the IdP-initiated URL),
-`reset`, `samlp <t> on|off`. Full table: `services/idpsim/README.md`.
+`reset`, `samlp <t> on|off`. Full table: `services/sims/idpsim/README.md`.
 
 - SAML sign-in (redirect binding) with no `login_hint` lands on the same account picker as OIDC;
   scripts skip it with `login_hint=<email>` on the SSO URL. A POST-binding request without a hint still asserts the first active user.
@@ -83,10 +89,6 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
   `haven sim idp legacy env <t>` for the env lines (apply with `haven down` then `haven up`).
   `azure` is Entra: the product's authority host is hard-wired, so resolve
   `login.microsoftonline.com` to idpsim over https; the env gives `AZURE_AD_TENANT_ID`.
-- An Auth0 tenant also answers the product's password change at the host root: `POST /oauth/token`
-  (password grant against each user's password, default `idpsim-password`; client_credentials for a
-  Management token) and `PATCH /api/v2/users/{auth0|id}`. `config {"auth0Scopes":["read:users"]}` drops
-  `update:users` (insufficient_scope); under 8 characters is a PasswordStrengthError; a reset restores both.
 - Legacy-SSO org (main's shape, no connection): `haven db seed --org name=<n>,plan=licence`, then set its
   `Organization."ssoDomain"` to `acme<t>.test` and `"ssoProvider"` to the legacy provider name over `haven db url`.
 - Failed SCIM apply (needs `SCIM_V2_GRANTS=1` at `haven up`): push the org's last active admin `active=false`;
@@ -107,4 +109,4 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 
 ## Spec and tests
 
-`specs/setup/idp-simulator.feature`. Go tests: `go test ./services/idpsim`.
+`specs/setup/idp-simulator.feature`. Go tests: `go test ./services/sims/idpsim`.

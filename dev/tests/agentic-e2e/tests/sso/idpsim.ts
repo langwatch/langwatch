@@ -1,6 +1,6 @@
 import { type APIRequestContext, expect } from "@playwright/test";
 
-/** One recorded request at a tenant (services/idpsim/activity.go). */
+/** One recorded request at a tenant (services/sims/idpsim/activity.go). */
 export interface IdpsimEvent {
   at: string;
   kind: string;

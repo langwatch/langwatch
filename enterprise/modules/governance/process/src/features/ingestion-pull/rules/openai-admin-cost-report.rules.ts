@@ -22,7 +22,7 @@ import * as AdminUsageReportAdapter from "../../cost/rules/admin-usage-report.ru
  * Compliance API and answers 403 to an admin key — the mistake the source this
  * one replaces was built on.
  */
-const API_BASE = "https://api.openai.com/v1/organization";
+const API_PATH = "/v1/organization";
 
 /**
  * The `limit` this adapter asks for, and NOT what it gets.
@@ -429,12 +429,14 @@ export function reportUrl({
   startingAt,
   page,
   hasKeyGrouping,
+  apiBase = "https://api.openai.com",
 }: {
   startingAt: string;
   page: string | null;
   hasKeyGrouping: boolean;
+  apiBase?: string;
 }): URL {
-  const url = new URL(`${API_BASE}/costs`);
+  const url = new URL(`${apiBase}${API_PATH}/costs`);
   const startMs = toEpochMs(startingAt);
   if (Number.isNaN(startMs)) {
     throw new Error(`openai admin puller cannot read a window start of "${startingAt}"`);

@@ -99,3 +99,34 @@ func TestStackEnvWithoutAStack(t *testing.T) {
 		})
 	})
 }
+
+func TestStackEnvNamesThisCheckoutsOwnStack(t *testing.T) {
+	t.Run("given two stacks started from one checkout, the other one beating last", func(t *testing.T) {
+		own := domain.Stack{Slug: "feat-plum", WorktreeDir: "/wt/main", Services: []domain.Service{{Name: "app", URL: "https://app.feat-plum.langwatch.localhost"}}}
+		other := domain.Stack{Slug: "fixlite", WorktreeDir: "/wt/main", Services: []domain.Service{{Name: "app", URL: "https://app.fixlite.langwatch.localhost"}}}
+		o := &Orchestrator{store: &fakeStore{stacks: []domain.Stack{other, own}}}
+
+		t.Run("when the primary checkout asks for its environment", func(t *testing.T) {
+			env, err := o.StackEnv(UpParams{WorktreeDir: "/wt/main", Branch: "feat/plum"})
+			if err != nil {
+				t.Fatalf("StackEnv: %v", err)
+			}
+			values := domain.EnvMap(env)
+			for _, key := range []string{"NEXTAUTH_URL", "BASE_HOST", "LANGWATCH_ENDPOINT"} {
+				if got := values[key]; got != "https://app.feat-plum.langwatch.localhost" {
+					t.Errorf("%s = %q, want this checkout's own stack", key, got)
+				}
+			}
+		})
+
+		t.Run("when LANGWATCH_SLUG names the other stack", func(t *testing.T) {
+			env, err := o.StackEnv(UpParams{WorktreeDir: "/wt/main", Branch: "feat/plum", ExplicitSlug: "fixlite"})
+			if err != nil {
+				t.Fatalf("StackEnv: %v", err)
+			}
+			if got := domain.EnvMap(env)["LANGWATCH_SLUG"]; got != "fixlite" {
+				t.Errorf("LANGWATCH_SLUG = %q, want the named stack", got)
+			}
+		})
+	})
+}

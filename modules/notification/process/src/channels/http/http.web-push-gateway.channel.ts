@@ -14,6 +14,16 @@ import type {
 /** A push service answers in well under a second; a stalled one is retried later. */
 const PUSH_TIMEOUT_MS = 15_000;
 
+/** Whether `url` is on the configured base's origin; an unparseable value never is. */
+function isOnBaseOrigin({ url, base }: { url: string; base: string | undefined }): boolean {
+  if (base === undefined) return false;
+  try {
+    return new URL(url).origin === new URL(base).origin;
+  } catch {
+    return false;
+  }
+}
+
 /** The egress fence refusing an address is the endpoint's shape, not a blip. */
 const FENCE_REFUSAL =
   /ssrf|blocked|not allowed|private|loopback|metadata|link-local|disallowed|redirects are not followed/i;
@@ -21,12 +31,16 @@ const FENCE_REFUSAL =
 /**
  * Sends through the egress fence: the endpoint came from a browser, so it is resolved and
  * pinned like any customer-supplied URL, private addresses are refused, and redirects are
- * not followed.
+ * not followed. Only the configured push service base's origin may be local.
  */
 export class HttpWebPushGatewayChannel implements WebPushGateway {
-  static create(): HttpWebPushGatewayChannel {
-    return new HttpWebPushGatewayChannel(
-      createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] }),
+  static create({
+    pushServiceBase,
+  }: { pushServiceBase?: string | undefined } = {}): HttpWebPushGatewayChannel {
+    const judged = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });
+    const exempt = createSsrfUrlValidator({ blockLocal: false, allowedHosts: [] });
+    return new HttpWebPushGatewayChannel((url) =>
+      isOnBaseOrigin({ url, base: pushServiceBase }) ? exempt(url) : judged(url),
     );
   }
 

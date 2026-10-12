@@ -227,6 +227,7 @@ func (cell *run) legacyVerdicts(ctx context.Context, final []LedgerRow) []Verdic
 		return []Verdict{{ID: "E8", Name: invariantNames["E8"], Result: "inconclusive", Detail: "memberships on head: " + err.Error()},
 			{ID: "E10", Name: invariantNames["E10"], Result: "inconclusive", Detail: "memberships on head: " + err.Error()}}
 	}
+	after = withoutOrganizations(after, cell.odd.organizations()) // made by the overlay after main's standing was read
 	email, password := generate.SeedAccount(cell.options.Seed)
 	_, passwordErr := signIn(ctx, cell.url(), email, password)
 	legacyMember := "member@" + ssoDomain

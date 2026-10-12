@@ -65,4 +65,38 @@ describe("the pull sources' fenced fetch", () => {
       });
     });
   });
+
+  describe("given a configured vendor base on a local origin", () => {
+    const fetch = createSsrfSafeFetch(
+      { blockLocal: true, allowedHosts: [] },
+      { exemptOrigins: ["http://127.0.0.1:6970"] },
+    );
+
+    /** @scenario "Only the configured vendor base is exempt from the local-address fence" */
+    it("fetches a request whose origin equals the base", async () => {
+      await expect(get(fetch, "http://127.0.0.1:6970/databricks/x")).resolves.toMatchObject({
+        status: 200,
+      });
+    });
+
+    /** @scenario "Only the configured vendor base is exempt from the local-address fence" */
+    it.each([
+      "http://127.0.0.1:6971/x",
+      "http://127.0.0.1/x",
+      "http://10.0.0.5:6970/x",
+      "https://127.0.0.1:6970/x",
+    ])("still refuses the other local address %s", async (url) => {
+      await expect(get(fetch, url)).rejects.toThrow(BLOCKED);
+      expect(fetchStub).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Only the configured vendor base is exempt from the local-address fence" */
+    it("refuses cloud metadata even when it is named as the base", async () => {
+      const metadata = createSsrfSafeFetch(
+        { blockLocal: true, allowedHosts: [] },
+        { exemptOrigins: ["http://169.254.169.254"] },
+      );
+      await expect(get(metadata, "http://169.254.169.254/latest")).rejects.toThrow(BLOCKED);
+    });
+  });
 });

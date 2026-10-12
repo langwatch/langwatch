@@ -142,6 +142,7 @@ func (s Stack) OverlayEnv() []string {
 			"LANGWATCH_IDPSIM_URL="+idp.URL,
 			"SSO_TRUSTED_IDP_ORIGINS="+idp.URL,
 		)
+		env = append(env, IdpSocialSignInEnv(idp.URL)...)
 		// And its NAMESERVER, because the domains a local walk claims are
 		// reserved names like `acme.test` that no public resolver will ever
 		// answer for. The simulator is authoritative for them and the
@@ -508,7 +509,12 @@ func AnalyticsProviderEnv(resolved map[string]string, endpoint string) []string 
 // OutboundProviderEnv points the product's four internal Slack channel settings
 // and its Slack Web API and webhook addresses at outboundsim's haven route, and
 // admits local webhook URLs, each only when the resolved environment leaves it unset.
-func OutboundProviderEnv(resolved map[string]string, endpoint string) []string {
+// It also names outboundsim as the base of each governance pull vendor (Databricks,
+// Dataverse, OpenAI, Anthropic, Microsoft sign-in and Graph) and of Codex sign-in and turns, at
+// outboundsim's direct IP-literal port: the egress fence refuses a *.localhost host,
+// and only a configured base is exempt from its private-address rule.
+func OutboundProviderEnv(resolved map[string]string, endpoint string, port int) []string {
+	direct := fmt.Sprintf("http://127.0.0.1:%d", port)
 	var env []string
 	for _, c := range []struct{ key, bucket string }{
 		{"SLACK_CHANNEL_SIGNUPS", "B0SIGNUPS"},
@@ -527,6 +533,41 @@ func OutboundProviderEnv(resolved map[string]string, endpoint string) []string {
 	}
 	if resolved["WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS"] == "" {
 		env = append(env, "WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1")
+	}
+	for _, v := range [][2]string{
+		{"DATABRICKS_WORKSPACE_BASE", direct},
+		{"DATAVERSE_ENVIRONMENT_BASE", direct + "/dataverse"},
+		{"OPENAI_ADMIN_API_BASE", direct + "/openai"},
+		{"ANTHROPIC_ADMIN_API_BASE", direct + "/anthropic"},
+		{"MICROSOFT_LOGIN_BASE", direct + "/microsoft-login"},
+		{"MICROSOFT_GRAPH_API_BASE", direct + "/microsoft-graph"},
+		{"CODEX_OAUTH_ISSUER", direct + "/codex-auth"},
+		{"CODEX_API_BASE", direct + "/codex-api"},
+		{"MANAGED_BEDROCK_STS_BASE", direct + "/sts"},
+	} {
+		if resolved[v[0]] == "" {
+			env = append(env, v[0]+"="+v[1])
+		}
+	}
+	return append(env, azureBlobEnv(resolved, endpoint)...)
+}
+
+// azureBlobEnv points Azure Blob object storage at outboundsim's path-style account on its
+// haven route, inert unless STORED_OBJECTS_BACKEND=azure. The authority host only satisfies the
+// token-mode transport check: managed identity asks IDENTITY_ENDPOINT, which haven leaves alone.
+func azureBlobEnv(resolved map[string]string, endpoint string) []string {
+	account := resolved["AZURE_BLOB_ACCOUNT_NAME"]
+	if account == "" {
+		account = "simaccount"
+	}
+	var env []string
+	for _, v := range [][2]string{
+		{"AZURE_BLOB_ENDPOINT", endpoint + "/azure-blob/" + account},
+		{"AZURE_BLOB_AUTHORITY_HOST", endpoint + "/azure-login"},
+	} {
+		if resolved[v[0]] == "" {
+			env = append(env, v[0]+"="+v[1])
+		}
 	}
 	return env
 }

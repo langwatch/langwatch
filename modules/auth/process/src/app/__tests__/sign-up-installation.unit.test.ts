@@ -52,7 +52,12 @@ async function bootAuth({
         trustedIdpOrigins: undefined,
         idpSimulatorUrl: undefined,
         localPasswords: false,
-        auth0ManagementClientId: undefined,
+        socialProviderBases: {
+          google: undefined,
+          github: undefined,
+          gitlab: undefined,
+          microsoft: undefined,
+        },
         cliRefreshTokenTtlSeconds: undefined,
         isSaas: false,
         signInProviders: NO_SIGN_IN_PROVIDERS,

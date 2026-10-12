@@ -39,6 +39,7 @@ export async function startAigateway(
   });
 
   const ready = await pollUntilHealthy({
+    handle,
     check: httpGetCheck(`http://127.0.0.1:${ctx.ports.aigateway}/healthz`),
     timeoutMs: 30_000,
   });

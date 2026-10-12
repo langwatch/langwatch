@@ -96,10 +96,36 @@ type BrowserLimits struct {
 // idle: an open page polling the app sits above it, a parked browser below.
 const BrowserIdleCPUPercent = 1.0
 
-// DefaultBrowserLimits are the defaults the knobs (HAVEN_BROWSER_SHELL_*) override.
+// LimitBrowserMemory is the shared browser's one memory limit, in MB: the
+// daemon unloads idle pages towards it and refuses new lanes above it, and
+// the governor kills the browser only above it plus BrowserKillHeadroomMB.
+const LimitBrowserMemory = "browser-memory-mb"
+
+// BrowserMemoryEnv is the limit's knob; haven hands it to the daemon it starts.
+const BrowserMemoryEnv = "HAVEN_BROWSER_MAX_RSS_MB"
+
+// MinBrowserMemoryMB holds the shared browser plus a few signed-in pages.
+const MinBrowserMemoryMB = 2048
+
+// DefaultBrowserMemoryMB is an eighth of the machine's RAM, 2 to 8 GiB.
+func DefaultBrowserMemoryMB(totalRAMBytes uint64) int {
+	return clampInt(int(totalRAMBytes>>20)/8, MinBrowserMemoryMB, 8192)
+}
+
+// BrowserKillHeadroomMB is how far above the limit the governor waits before
+// it kills the whole browser: a quarter of the limit, at least 1 GiB.
+func BrowserKillHeadroomMB(limitMB int) int { return max(limitMB/4, 1024) }
+
+// BrowserKillRSS is the governor's memory ceiling for a limit, in bytes.
+func BrowserKillRSS(limitMB int) int64 {
+	return int64(limitMB+BrowserKillHeadroomMB(limitMB)) << 20
+}
+
+// DefaultBrowserLimits are the defaults the knobs (HAVEN_BROWSER_SHELL_*) override;
+// MaxRSS follows the browser-memory-mb limit, here at its floor.
 func DefaultBrowserLimits() BrowserLimits {
 	return BrowserLimits{
-		MaxRSS:     3 << 30,
+		MaxRSS:     BrowserKillRSS(MinBrowserMemoryMB),
 		MaxCPU:     200,
 		CPUSustain: 2 * time.Minute,
 		MaxAge:     6 * time.Hour,

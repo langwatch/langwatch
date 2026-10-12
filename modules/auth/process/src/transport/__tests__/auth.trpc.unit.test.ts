@@ -95,7 +95,6 @@ const door: AuthApi = {
   getSignInSecuritySettings: () => unreached("getSignInSecuritySettings"),
   saveSignInSecuritySettings: () => unreached("saveSignInSecuritySettings"),
   releaseHeldAccount: () => unreached("releaseHeldAccount"),
-  changeFederatedPassword: () => unreached("changeFederatedPassword"),
   deactivateUser: () => unreached("deactivateUser"),
   deactivateAccount,
   setOwnFirstPassword,

@@ -8,8 +8,8 @@ user-invocable: true
 
 Fakes PostHog (posthog-node `/batch/`, posthog-js `/e/`, `/flags/`) and Customer.io (CDP
 `/v1/*`, Track API). Every call becomes one normalized record in memory. Keys are accepted
-and never checked: a dev shim, never expose it. Code: `services/analyticssim`, console
-`apps/analyticssim-web`.
+and never checked: a dev shim, never expose it. Code: `services/sims/analyticssim`, console
+`apps/sims/src/analytics`.
 
 ## Run it
 
@@ -41,7 +41,7 @@ Newest first. Assert: trigger the action, then filter by `id` and `name`.
 - Post PostHog batches or Customer.io calls at the loopback port; 16 MiB body cap.
 - The store is a fixed ring: adding is O(1). `ANALYTICSSIM_MAX_RECORDS` (default 5000),
   `ANALYTICSSIM_MAX_RAW_BYTES` (default 65536; bigger raw bodies become a size marker).
-  Benchmark: `go test -bench . -benchmem ./services/analyticssim`.
+  Benchmark: `go test -bench . -benchmem ./services/sims/analyticssim`.
 
 ## From a terminal or agent
 

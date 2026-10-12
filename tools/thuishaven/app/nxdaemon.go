@@ -26,7 +26,7 @@ const nxDaemonStopTimeout = 15 * time.Second
 // NxDaemons lists every Nx daemon running on the machine.
 func (o *Orchestrator) NxDaemons() []NxDaemon {
 	var out []NxDaemon
-	for _, s := range o.sys.ProcessSamples() {
+	for _, s := range o.processSamples() {
 		if dir, ok := domain.NxDaemonWorktree(s.Command); ok {
 			out = append(out, NxDaemon{PID: s.PID, Worktree: dir, RSS: s.RSSBytes})
 		}

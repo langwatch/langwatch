@@ -227,6 +227,20 @@ Feature: Shared project service
     And the step saves its checkpoint after each page, naming the page's last organization
 
   @unit
+  Scenario: A project fact backfill reads an organization's projects a page at a time
+    Given an organization with a thousand projects
+    When its presence settings, departments or created facts are recorded by a backfill
+    Then the projects are read a hundred to a query, and the organization's admin once
+    And every project's fact is recorded
+
+  @unit
+  Scenario: A project fact step records a page's organizations a few at a time
+    Given a page of organizations whose recording waits
+    When a project fact upgrade step runs
+    Then several organizations record at once, never more than the bound
+    And the checkpoint is saved only after the whole page is recorded
+
+  @unit
   Scenario: A project fact step resumes after the last page of organizations it saved
     Given a project fact upgrade step whose checkpoint names the second organization
     When the step runs again

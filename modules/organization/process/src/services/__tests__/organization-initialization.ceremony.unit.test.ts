@@ -28,7 +28,11 @@ function request(
 
 function harness(
   overrides: Partial<OrganizationSignals> = {},
-  createAndAssign = vi.fn(async () => ({ organization: ORGANIZATION, team: TEAM })),
+  createAndAssign = vi.fn(async () => ({
+    organization: ORGANIZATION,
+    team: TEAM,
+    grantsConfirmed: true,
+  })),
 ) {
   const signals = {
     trackServerEvent: vi.fn(),
@@ -208,6 +212,24 @@ describe("given the sign-up succeeded", () => {
         signUpData,
         primaryIntent: "AGENT_GOVERNANCE",
       });
+    });
+  });
+});
+
+describe("given a sign-up whose founder grants are still landing", () => {
+  /** @scenario "The sign-up answer says whether the founder's grants are confirmed" */
+  it("answers grantsConfirmed false, and true once they landed in time", async () => {
+    const landing = harness(
+      {},
+      vi.fn(async () => ({ organization: ORGANIZATION, team: TEAM, grantsConfirmed: false })),
+    );
+    const confirmed = harness();
+
+    await expect(landing.onboarding.initialize(request(), CALLER)).resolves.toMatchObject({
+      grantsConfirmed: false,
+    });
+    await expect(confirmed.onboarding.initialize(request(), CALLER)).resolves.toMatchObject({
+      grantsConfirmed: true,
     });
   });
 });

@@ -142,8 +142,9 @@ func PhaseAt(timeline []PhaseChange, atMs int64) string {
 
 // QueueSample is one reading of the group queues' waiting jobs.
 type QueueSample struct {
-	AtMs  int64 `json:"atMs"`
-	Depth int   `json:"depth"`
+	AtMs   int64 `json:"atMs"`
+	Depth  int   `json:"depth"`            // jobs due now
+	NotDue int   `json:"notDue,omitempty"` // jobs scheduled later, left out of Depth
 }
 
 type queueKind struct {
@@ -312,6 +313,9 @@ func StartWalker(ctx context.Context, spec WalkSpec) (*Walker, error) {
 	if err := os.WriteFile(script, walkScript, 0o600); err != nil {
 		return nil, err
 	}
+	if spec.Every <= 0 {
+		spec.Every = 10 * time.Second
+	}
 	args, _ := json.Marshal(map[string]any{"url": spec.URL, "email": spec.Email, "password": spec.Password, "runDir": spec.RunDir, "originMs": spec.Origin.UnixMilli(), "every": spec.Every.Milliseconds()})
 	command := exec.CommandContext(ctx, "node", script, string(args)) // #nosec G204 -- harness-written script.
 	command.Dir = spec.Dir
@@ -356,6 +360,35 @@ func expectedWhileStepsRun(record BrowserRecord, switched, ready int64) bool {
 		strings.Contains(record.Text, "upgrade_in_progress") && switched >= 0 && ready >= 0 && record.AtMs >= switched && record.AtMs <= ready
 }
 
+// unreadBody prefixes a walk record's text when the page navigated before its body could be read (walk.mjs).
+const unreadBody = "body unread"
+
+// unreadUpgrade503: a 503 with Retry-After in the window whose body was gone, on a path that answered a
+// readable upgrade_in_progress in the same window: the same answer, read too late.
+func unreadUpgrade503(record BrowserRecord, switched, ready int64, upgrading map[string]bool) bool {
+	return record.Kind == "http" && record.Status == http.StatusServiceUnavailable && record.RetryAfter != "" &&
+		strings.HasPrefix(record.Text, unreadBody) && switched >= 0 && ready >= 0 && record.AtMs >= switched &&
+		record.AtMs <= ready && upgrading[pathOf(record.URL)]
+}
+
+func pathOf(raw string) string {
+	path, _, _ := strings.Cut(raw, "?")
+	return path
+}
+
+// consoleTwinOf503: the console line Chromium writes for a failed load names no url or code, so it is
+// matched by status and window only, and capped at the number of expected 503s it echoes.
+func consoleTwinOf503(record BrowserRecord, switched, ready int64) bool {
+	return record.Kind == "console" && strings.Contains(record.Text, "status of 503") && switched >= 0 && ready >= 0 &&
+		record.AtMs >= switched && record.AtMs <= ready
+}
+
+// stopStartDowntime: a stop-start install serves nothing between the old release stopping and head's api
+// answering (the walker's "down" phase), so the balancer's 502s and the loads they abort are expected there.
+func stopStartDowntime(record BrowserRecord, stopStart bool) bool {
+	return stopStart && record.Phase == "down" && slices.Contains([]string{"console", "http", "requestfailed"}, record.Kind)
+}
+
 // mainTabAcrossSwitch: main's UI, loaded before the switch, reconnects its tRPC WebSocket to head, which
 // serves none and whose UI opens none; tolerated for a minute after the switch, a finding after that.
 func mainTabAcrossSwitch(record BrowserRecord, switched int64) bool {
@@ -366,11 +399,13 @@ func mainTabAcrossSwitch(record BrowserRecord, switched int64) bool {
 // mainPageAcrossSwitch: main's page, fetched just before the switch, loads its hashed assets from head,
 // which never built them (ADR-086's rolling-deploy skew; the lab has no LANGWATCH_ASSET_BASE). The
 // console line names no url, so only its 404 is matched; the http record beside it carries the path.
+// A stylesheet's 404 (text/plain) shows instead as a MIME refusal naming the asset.
 func mainPageAcrossSwitch(record BrowserRecord, switched int64) bool {
 	asset := strings.Contains(record.URL, "/assets/") &&
 		(record.Kind == "http" && record.Status == http.StatusNotFound || record.Kind == "requestfailed")
 	missing := record.Kind == "console" && strings.Contains(record.Text, "status of 404")
-	return (asset || missing) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
+	style := record.Kind == "console" && strings.HasPrefix(record.Text, "Refused to apply style from ") && strings.Contains(record.Text, "/assets/")
+	return (asset || missing || style) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
 }
 
 // mainClientOutdated: main's page, fetched just before the switch, sends head its old enveloped tRPC input
@@ -382,7 +417,9 @@ func mainClientOutdated(record BrowserRecord, switched int64) bool {
 		strings.Contains(decoded, `"json":`)
 	socket := record.Kind == "http" && record.Status == http.StatusNotFound && strings.Contains(record.URL, "/api/trpc-ws")
 	refused := record.Kind == "console" && strings.Contains(record.Text, "status of 400")
-	return (enveloped || socket || refused) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
+	told := record.Kind == "http" && record.Status == http.StatusBadRequest && strings.Contains(record.Text, "client_outdated")
+	logged := record.Kind == "console" && strings.HasPrefix(record.Text, "<< ") // main's tRPC logger echoing those refusals
+	return (enveloped || socket || refused || told || logged) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
 }
 
 // browserNoise is a console error or failed request the lab tolerates: every Match substring in the
@@ -395,26 +432,49 @@ type browserNoise struct {
 var acceptedBrowserNoise = []browserNoise{
 	{[]string{"static.hotjar.com"}, "third-party analytics, same on main"},
 	{[]string{"static.reo.dev", "ERR_BLOCKED_BY_ORB"}, "third-party analytics, same on main"},
+	{[]string{"/api/trpc/", "?input=", "net::ERR_ABORTED"}, "a tRPC read the page cancelled itself (navigation or a re-keyed query); its answer is judged by N2 and the api log"},
 }
 
 // BrowserFindings reads browser.jsonl: the walks completed and every error outside the accepted list.
-func BrowserFindings(path string, switched, ready int64) (walks, expected int, tolerated map[string]int, findings []BrowserRecord, err error) {
+func BrowserFindings(path string, switched, ready int64, stopStart bool) (walks, expected int, tolerated map[string]int, findings []BrowserRecord, err error) {
 	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return 0, 0, nil, nil, err
 	}
 	tolerated = map[string]int{}
+	var records []BrowserRecord
+	upgrading := map[string]bool{} // paths that answered a readable upgrade_in_progress in the window
+	twins := 0                     // the browser echoes each failed load as a console line naming no url: one per expected 503
 	for _, line := range strings.Split(string(data), "\n") {
 		var record BrowserRecord
 		if strings.TrimSpace(line) == "" || json.Unmarshal([]byte(line), &record) != nil {
 			continue
 		}
+		records = append(records, record)
+		if expectedWhileStepsRun(record, switched, ready) {
+			twins++
+			upgrading[pathOf(record.URL)] = true
+		}
+	}
+	for _, record := range records {
+		if unreadUpgrade503(record, switched, ready, upgrading) {
+			twins++
+		}
+	}
+	for _, record := range records {
 		switch {
 		case record.Kind == "walk":
 			walks++
-		case expectedWhileStepsRun(record, switched, ready):
+		case expectedWhileStepsRun(record, switched, ready), unreadUpgrade503(record, switched, ready, upgrading):
 			expected++
+		case twins > 0 && consoleTwinOf503(record, switched, ready):
+			twins--
+			tolerated["console 'status of 503' (the browser's echo of an expected upgrade_in_progress 503)"]++
 		case record.Kind == "walkerror":
+		case record.Kind == "navigated":
+			tolerated["the open tab navigated on its own between walks (told to reload)"]++
+		case stopStartDowntime(record, stopStart):
+			tolerated["502 or aborted load while no release serves (self-hosted stop-start downtime, T4-F3)"]++
 		case mainTabAcrossSwitch(record, switched):
 			tolerated["/api/trpc-ws (main's tab, open across the switch, reconnecting)"]++
 		case mainPageAcrossSwitch(record, switched):

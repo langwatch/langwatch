@@ -217,3 +217,38 @@ Feature: haven service selection
         again by hand
       And the next write replaces "storybook" with "design-system" and states
         the mail room under its own key
+
+  # Switching one service in place: `haven service on|off <name>`, and `haven up
+  # ±name` when the stack already runs in the asked mode. The selection is saved
+  # as with up; the stack's keeper rereads its plan and starts, stops or restarts
+  # only the lanes the change touches. Bound by app/selection_live_test.go.
+  Rule: A service switches in place without restarting the stack
+
+    Scenario: A service switches on in a running stack without restarting it
+      Given the stack is running without the mail room
+      When the developer runs "haven service on mail-room"
+      Then the mail room gets a port and its hostname and its lane starts
+      And no lane is stopped, and the next "haven up" keeps the mail room on
+
+    Scenario: A service switches off in a running stack without restarting it
+      Given the stack is running with the design system
+      When the developer runs "haven service off design-system"
+      Then the design system's lane stops and its hostname is removed
+      And every other lane keeps running untouched
+
+    Scenario: The ui, api and worker switch off and on as one
+      When the developer runs "haven service off app"
+      Then the ui, api and worker lanes stop together and the rest keep running
+      And "haven up -api" or "-worker" is refused, naming "-app"
+      And a selection file written before the switch existed keeps the app on
+
+    Scenario: A keeper applies only the difference between its plan and its lanes
+      Given a keeper running the lanes of its plan
+      When its plan is rewritten and it is sent the signal
+      Then a lane no longer planned stops, a new one starts, a changed one restarts
+      And a lane whose plan is unchanged keeps running
+
+    Scenario: A keeper from before live switches is never sent the signal
+      Given the stack's keeper predates live switches
+      When the developer switches a service
+      Then the selection is saved, no signal is sent, and the error names "haven up --force"

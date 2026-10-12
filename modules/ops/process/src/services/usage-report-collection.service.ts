@@ -399,17 +399,17 @@ export class UsageReportCollectionService {
   private async ingested(scope: Scope): Promise<Record<string, unknown>> {
     const { peers } = this.deps;
     const { projectIds } = scope;
+    // One owner and one window at a time, as main reads them: each owner already asks
+    // per project, so asking all fifteen at once overflows the ClickHouse queue.
     const byProject = <T>(
       read: (input: { projectIds: readonly string[]; since?: number }) => Promise<T>,
-    ) => inWindows(scope, (since) => read({ projectIds, ...since }));
+    ) => inWindowsInTurn(scope, (since) => read({ projectIds, ...since }));
 
-    const [traces, scenarios, instantEvals, codingAgents, gateway] = await Promise.all([
-      byProject((input) => peers.traces.countUsage(input)),
-      byProject((input) => peers.scenarios.countUsage(input)),
-      byProject((input) => peers.instantEvals.countUsage(input)),
-      byProject((input) => peers.codingAgents.countUsage(input)),
-      byProject((input) => peers.gateway.countUsage(input)),
-    ]);
+    const traces = await byProject((input) => peers.traces.countUsage(input));
+    const scenarios = await byProject((input) => peers.scenarios.countUsage(input));
+    const instantEvals = await byProject((input) => peers.instantEvals.countUsage(input));
+    const codingAgents = await byProject((input) => peers.codingAgents.countUsage(input));
+    const gateway = await byProject((input) => peers.gateway.countUsage(input));
 
     return {
       ...windowed("traces", traces, (count) => count.traces),
@@ -445,6 +445,17 @@ async function inWindows<T>(
     read({ since: scope.sevenDays }),
     read({ since: scope.twentyEightDays }),
   ]);
+  return { lifetime, sevenDays, twentyEightDays };
+}
+
+/** The same three stretches, each asked once the one before has answered. */
+async function inWindowsInTurn<T>(
+  scope: Scope,
+  read: (since: { since?: number }) => Promise<T>,
+): Promise<Windowed<T>> {
+  const lifetime = await read({});
+  const sevenDays = await read({ since: scope.sevenDays });
+  const twentyEightDays = await read({ since: scope.twentyEightDays });
   return { lifetime, sevenDays, twentyEightDays };
 }
 

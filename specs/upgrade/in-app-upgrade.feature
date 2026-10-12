@@ -1,5 +1,5 @@
 # The operator's only act is changing the image. The new worker runs every blocking upgrade step
-# under the runner's lease (`pnpm task upgrade` as a child process); the new api never runs a step
+# under the runner's lease, in its own process (Alex, 2026-10-11); the new api never runs a step
 # and holds no request: it serves every route from boot (NO-HOLDS, Alex 2026-10-09). A Postgres read
 # the schema is not ready for answers upgrade_in_progress (503, Retry-After); a ClickHouse read leaves
 # out a column a pending step has not added. Failures show on Ops > Upgrades with Retry; only a failed
@@ -18,7 +18,7 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
   Scenario: The worker on an installation behind its image runs the upgrade once, then takes jobs
     Given an installation whose ledger records a blocking step of this image as pending
     When the worker's gate asks
-    Then it takes the upgrade lease and runs `pnpm task upgrade` once as a child process
+    Then it takes the upgrade lease and runs the upgrade once in its own process
     And it takes no job before the ledger is current
     And it is admitted and starts its background steps when the upgrade succeeded
 
@@ -26,8 +26,29 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
   Scenario: The worker says it runs the upgrade because the installation is behind, naming the steps
     Given a worker whose installation is behind its image on one blocking step
     When its upgrade gate admits it
-    Then it reports that the installation is behind, naming the step and "pnpm task upgrade"
+    Then it reports that the installation is behind, naming the step, and that it runs the upgrade itself
     And the report says nothing is needed from the operator
+
+  @unit
+  Scenario: The worker's behind line counts the steps and names at most five
+    Given a worker whose installation is behind its image on several hundred steps
+    When its upgrade gate admits it
+    Then its line gives the number of steps not done and names only the first five
+    # T0-F12: the line listed about 480 ids; `pnpm task upgrade status` lists every one.
+
+  @unit
+  Scenario: A serving worker takes jobs once the blocking part is done, before the reconcilers end
+    Given a worker running the upgrade before it takes jobs
+    When the schema and every blocking step are done
+    Then it takes jobs while LangWatchQL provisioning and the system-migrations pass request finish
+    And a reconciler that fails afterwards is logged and recorded on the run, never holding jobs
+    # T0-F11: the api served for about a minute while the worker still sat in its reconcilers.
+
+  @unit
+  Scenario: `pnpm task upgrade` waits for the reconcilers and answers the whole run's outcome
+    Given a run-once upgrade
+    When a reconciler fails after the blocking part is done
+    Then the run answers failed and the command exits 1
 
   @unit
   Scenario: An image whose gate refuses runs nothing and refuses by name
@@ -64,6 +85,22 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     Then the ledger records the step as failed and the worker runs nothing
     And once a Retry returns the step to pending the worker runs the upgrade again
 
+  # T9-F2: the wait is level-triggered on the migration's row, so an operator's
+  # `prisma migrate resolve` frees the worker without a Retry or a restart.
+  @integration
+  Scenario: A waiting worker runs the upgrade again once the failed migration's row is resolved
+    Given the worker's upgrade run failed on a Prisma migration the upgrade does not re-run unasked
+    And the worker waits, saying it waits for a Retry or for the migration to be resolved
+    When an operator marks the migration's _prisma_migrations row rolled back or applied
+    Then on its next ask the worker runs the upgrade again by itself, with no Retry and no restart
+
+  @unit
+  Scenario: The worker waits on the run's outcome, never on a process exit code
+    Given the worker's gate runs the upgrade
+    When the run ends done, lease_not_acquired or any failure
+    Then the gate admits, waits for the lease holder, or waits for a Retry or the backoff
+    And the run happens in the worker's own process, so no exit code stands between them
+
   @unit
   Scenario: A restarted worker runs a failed upgrade once more
     Given the worker's upgrade run failed on a blocking step
@@ -89,10 +126,51 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     And a raw query failing for any other reason still answers 500
 
   @unit
+  Scenario: A ClickHouse read the schema is not ready for answers upgrade_in_progress
+    Given the worker is running the upgrade and a ClickHouse migration of the api's image is pending
+    When a repository's query names a table or column that migration has not created
+    Then REST answers 503 upgrade_in_progress with Retry-After
+    And a ClickHouse query failing for any other reason still answers 500
+
+  # Each private ClickHouse target catches up on its own; the worker shares which ones through Redis (Alex, 2026-10-11, T7-F18).
+  @unit
+  Scenario: A ClickHouse read from a private target still catching up answers upgrade_in_progress after admission
+    Given the gate admitted the api and the worker shares that a private ClickHouse target is catching up
+    When a read routed to that target names a table its migrations have not created yet
+    Then REST answers 503 upgrade_in_progress with Retry-After
+    And the failure is logged as a warning, not an error
+
+  @unit
+  Scenario: A ClickHouse read the schema is not ready for on a current target stays a 500 after admission
+    Given the gate admitted the api and no private ClickHouse target is catching up
+    When a read names a table the schema lacks
+    Then it answers an unhandled 500 that says the schema and ledger disagree
+
+  @unit
+  Scenario: A process that cannot read the catching-up targets from Redis answers as before
+    Given the gate admitted the api and Redis does not answer
+    When a read routed to a private target names a table the schema lacks
+    Then it answers an unhandled 500, and no request fails because of the check
+
+  @unit
+  Scenario: The worker shares which private targets are catching up with every instance
+    Given an admitted worker and a private ClickHouse target the ledger records behind
+    When its catch-up pass comes round
+    Then it writes that target's organisation to Redis with a short expiry
+    And once the target is current it clears the list
+
+  @unit
   Scenario: The browser retries a read answered upgrade_in_progress
     Given the api answers a read upgrade_in_progress
     When the browser's query client decides whether to try again
     Then it keeps retrying with backoff past the usual retry limit
+
+  @integration
+  Scenario: The shell's last-login write answered upgrade_in_progress waits instead of throwing
+    Given the api answers the signed-in shell's last-login write upgrade_in_progress
+    When a page opens while head's api is not ready
+    Then the page raises no uncaught error
+    And the write is tried again with backoff and lands once the api is ready
 
   @unit
   Scenario: A ClickHouse read leaves out a column a pending step has not added

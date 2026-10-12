@@ -69,7 +69,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   waits 10 min; `DEFAULT_LEASE_TIMING`, `packages/upgrade/src/runner/runner-lease.ts`), seeds an empty ledger, then walks
   the plan release by release: the release's schema, then its blocking steps; then the reconcilers.
   **A one-release upgrade applies its schema in one pass (`oneReleaseApplier`); a jump across
-  several releases steps (`releaseSteppingApplier`, `apps/tasks/src/upgrade.ts`): each release's
+  several releases steps (`releaseSteppingApplier`, `packages/upgrade/src/runner/release-stepping-applier.ts`): each release's
   Prisma folders and goose `up-to` its last version, then its blocking steps, so a blocking step sees
   its own release's schema** (`specs/upgrade/stepping.feature`). Unreleased schema goes in one pass at
   the end. Write a blocking step as stepped (frozen SQL, its own release's columns). Postgres sessions
@@ -100,14 +100,12 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   across modules by its id, typed as the generated `CodeStepId` union, so a missing or mistyped step
   fails typecheck (Alex, 2026-10-09, STEP-AFTER, STEP-AFTER-2). A new step's id joins the union when
   you run `node --experimental-transform-types packages/upgrade/scripts/image-code-steps.ts`. The
-  worker holds it `waiting` until each named step is `done` or `not-needed`; before a contract the
-  upgrade runs the named steps inline first, released or not. Only a background step runs after
-  others (`after_not_background`). An unknown id or a cycle is refused at plan time
+  worker holds it `waiting` until each named step is `done` or `not-needed`. Only a background
+  step runs after others (`after_not_background`). An unknown id or a cycle is refused at plan time
   (`step_after_unknown`, `step_after_cycle`).
-- A contract step whose drop needs a background step finished first names it in its SQL, beside the
-  contract note: `-- after: <step id>`. The upgrade runs that step (and what it runs after) inline
-  before the contract's release, released or not; an id that is not a background code step of the
-  image refuses the plan (`step_after_unknown`).
+- Nothing is deleted automatically (Alex, 2026-10-11): a drop is an operator step confirmed in Ops once safe; every step
+  runs after old writers are gone. The upgrade never runs a background or operator step itself,
+  and the migration-safety guards refuse a new `DROP TABLE` or `DROP COLUMN` in a migration file.
 - A fresh install applies all schema at once and plans code and upcast steps by mode, so **a data
   step is never the only way new rows become correct**: writers write the new shape from the release
   that adds it.
@@ -117,7 +115,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 | Piece                                                                      | State                                                                                                                 |
 | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Ledger, runner, `upgrade` / `upgrade status` / `upgrade plan`              | landed (`packages/upgrade/src/runner/upgrade-runner.ts`, `apps/tasks/src/upgrade.ts`)                                 |
-| Stepping applier (one release's schema at a time) for multi-release jumps  | landed (`releaseSteppingApplier`, `apps/tasks/src/upgrade.ts`)                                                        |
+| Stepping applier (one release's schema at a time) for multi-release jumps  | landed (`releaseSteppingApplier`, `packages/upgrade/src/runner/release-stepping-applier.ts`)                                                        |
 | Serving gate, first-install upgrade, roster 15 s / 60 s, rollback reopen   | landed (`packages/upgrade/src/gate/serving-upgrade-gate.ts`, `SERVING_ROSTER_TIMING`)                                 |
 | No ClickHouse configured refuses to serve                                  | landed (`NO_CLICKHOUSE_REFUSAL`, `packages/upgrade/src/gate/serving-upgrade-gate.ts`)                                 |
 | Prisma and ClickHouse guard scanners, retirement note, lock-heavy refusals | landed (`packages/{prisma-client,clickhouse-migrations}/src/__tests__/migration-safety.rules.ts`)                     |

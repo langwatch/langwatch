@@ -269,6 +269,8 @@ export class ModelProviderCommandService {
           ...(projectScopes ? { projectScopes } : {}),
         })
       : null;
+    // A row id names that row only for its own provider; never rewrite one provider into another.
+    if (existing && existing.provider !== input.provider) throw new ModelProviderNotFoundError();
 
     if (!existing) {
       const deprecation = this.options.catalog.pickProviderDeprecation(input.provider);

@@ -192,6 +192,8 @@ const modelProviderCodexSignInPollTrpcInputSchemaDefinition = z.object({
   /** Langy setup + onboarding pass true: also point the allowed
    *  feature slots at the codex model. Settings passes false. */
   setAsCodingDefaults: z.boolean().default(false),
+  /** The Codex row a re-authentication refreshes; absent saves a new row. */
+  modelProviderId: z.string().optional(),
 });
 export interface ModelProviderCodexSignInPollTrpcInputSchema extends Named<
   typeof modelProviderCodexSignInPollTrpcInputSchemaDefinition

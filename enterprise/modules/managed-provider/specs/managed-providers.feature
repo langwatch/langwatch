@@ -64,3 +64,18 @@ Feature: Managed model providers
       Given a managed Bedrock directory whose deployment is missing a required field
       When the process reads its configuration
       Then the process refuses to start and says the configuration is invalid
+
+  Rule: The STS endpoint is the real AWS one unless the deployment names a base
+
+    @unit
+    Scenario: An STS base that is unset or blank reaches AWS
+      Given MANAGED_BEDROCK_STS_BASE is not set, or is blank
+      When a managed Bedrock call assumes its roles
+      Then both role hops go to the AWS SDK's own STS endpoint for the region
+
+    @unit
+    Scenario: The role hops reach the STS base the deployment configures
+      Given MANAGED_BEDROCK_STS_BASE names a URL, such as outboundsim's /sts under haven's +outbound
+      When a managed Bedrock call assumes its roles
+      Then both the proxy hop and the customer hop are sent to that base
+      And a value that is set but is not a URL refuses the process at start, naming the setting

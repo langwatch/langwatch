@@ -157,7 +157,7 @@ const run = (dryRun: boolean) =>
 - **Source intact** after the run.
 - **Blocking**: the SQL runs against a fixture at its own release's schema (integration, local
   services named in your manifest). A multi-release jump steps the schema release by release
-  (`releaseSteppingApplier`, `apps/tasks/src/upgrade.ts`), but a one-release upgrade or the
+  (`releaseSteppingApplier`, `packages/upgrade/src/runner/release-stepping-applier.ts`), but a one-release upgrade or the
   unreleased tail applies it in one pass: name every column and rely on nothing a later release adds.
 - **Declaration**: an installation test asserts the module's steps collect (`migrationStepsOf`,
   `packages/process/src/__tests__/migration-steps.unit.test.ts`).

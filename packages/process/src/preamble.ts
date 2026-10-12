@@ -19,6 +19,7 @@ import {
   assertGatedRole,
   type UpgradeGatedRole,
   type UpgradeGate,
+  type UpgradeGateModules,
 } from "./migration/upgrade-gate.ts";
 import { isProcessModule } from "./process-container.ts";
 import { setProcessGlobals } from "./process-globals.ts";
@@ -58,10 +59,28 @@ type MetricsContext<Owners extends readonly PreambleOwner[]> = FactoryContext<Ow
 /** The environment the process was started with, as its main hands it in. */
 export type PreambleEnvironment = Readonly<Record<string, string | undefined>>;
 
-/** The serving gate's factory: resolves what it needs before boot seals secrets, opens nothing. */
+/**
+ * The serving gate's factory: resolves what it needs before boot seals secrets, opens nothing.
+ * The worker is also handed the environment and its modules, to run the upgrade in-process.
+ */
 type UpgradeGateFactory<Owners extends readonly PreambleOwner[]> = (
-  context: FactoryContext<Owners> & Readonly<{ role: UpgradeGatedRole }>,
+  context: FactoryContext<Owners> &
+    Readonly<{
+      role: UpgradeGatedRole;
+      environment: PreambleEnvironment;
+      bootModules?: UpgradeGateModules;
+    }>,
 ) => UpgradeGate | Promise<UpgradeGate>;
+
+/** What `start` and `runUpgradeOnce` both read before anything else: config and secrets. */
+type Prepared<Owners extends readonly PreambleOwner[]> = Readonly<{
+  owners: Owners;
+  environment: PreambleEnvironment;
+  config: ProcessConfigOf<Owners>;
+  resolver: SecretsResolver;
+  frameworkSecrets: ScopedSecrets;
+  redactPaths: readonly string[];
+}>;
 
 type ChainBuilder<Owners extends readonly PreambleOwner[]> = (
   config: ProcessConfigOf<Owners>,
@@ -141,7 +160,8 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
     return new ServerPreamble(this.name, { ...this.state, ownsProcess });
   }
 
-  async start(): Promise<ProcessServer> {
+  /** Config, the secrets chain and its preflight: what `start` and `runUpgradeOnce` share. */
+  private async prepare(): Promise<Prepared<Owners>> {
     const owners = this.state.owners;
     const environment = this.state.environment;
     if (!environment) {
@@ -164,6 +184,72 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
 
     const frameworkSecrets = resolver.scopeTo(this.name, declared);
     const redactPaths = [...SESSION_SECRET_LOG_PATHS, ...secretLogRedactPaths(declared)];
+    return { owners, environment, config, resolver, frameworkSecrets, redactPaths };
+  }
+
+  /** The gate this preamble composed, over the prepared config and secrets; the worker's runs. */
+  private async gateOver({
+    prepared,
+    gate: { role, gate },
+  }: {
+    prepared: Prepared<Owners>;
+    gate: Readonly<{ role: UpgradeGatedRole; gate: UpgradeGateFactory<Owners> }>;
+  }): Promise<UpgradeGate> {
+    const { config, frameworkSecrets, redactPaths, environment } = prepared;
+    return gate({
+      config,
+      secrets: frameworkSecrets,
+      redactPaths,
+      role,
+      environment,
+      ...(role === "worker" ? { bootModules: this.bootModulesInTasksRole() } : {}),
+    });
+  }
+
+  /**
+   * The installed list booted in the tasks role inside this process, as `withTasksApp` does in
+   * the tasks app: its own server, no telemetry of its own, closed once `use` settles.
+   */
+  private bootModulesInTasksRole(): UpgradeGateModules {
+    const { owners, chain, environment } = this.state;
+    return async (use) => {
+      const server = await new ServerPreamble(`${this.name}-upgrade`, {
+        owners,
+        ...(chain ? { chain } : {}),
+        ...(environment ? { environment } : {}),
+        healthPort: 0,
+        ownsProcess: false,
+      }).start();
+      try {
+        const app = await server.container("tasks").boot();
+        await server.run(app);
+        return await use(app);
+      } finally {
+        await server.close();
+      }
+    };
+  }
+
+  /**
+   * Runs the upgrade once and answers its exit code (0 done, 1 failed, 3 lease not acquired):
+   * `pnpm task upgrade` starts the worker this way (Alex, 2026-10-11, slice 2).
+   */
+  async runUpgradeOnce(): Promise<number> {
+    const upgradeGate = this.state.upgradeGate;
+    if (!upgradeGate) throw new Error(`${this.name}: runUpgradeOnce needs withUpgradeGate(...)`);
+    const prepared = await this.prepare();
+    const gate = await this.gateOver({ prepared, gate: upgradeGate });
+    try {
+      if (!gate.runOnce) throw new Error(`${this.name}: this gate cannot run the upgrade`);
+      return await gate.runOnce();
+    } finally {
+      await gate.release();
+    }
+  }
+
+  async start(): Promise<ProcessServer> {
+    const prepared = await this.prepare();
+    const { owners, config, resolver, frameworkSecrets, redactPaths } = prepared;
     const telemetry = await this.state.telemetry?.({
       config,
       secrets: frameworkSecrets,
@@ -201,9 +287,8 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
     // Hosted before boot's components: asked before the application starts, stopped after it.
     const upgradeGate = this.state.upgradeGate;
     if (upgradeGate) {
-      const { role } = upgradeGate;
-      const gate = await upgradeGate.gate({ config, secrets: frameworkSecrets, redactPaths, role });
-      server.hostUpgradeGate({ role, gate, logger: boundary.logger });
+      const gate = await this.gateOver({ prepared, gate: upgradeGate });
+      server.hostUpgradeGate({ role: upgradeGate.role, gate, logger: boundary.logger });
     }
 
     return server;

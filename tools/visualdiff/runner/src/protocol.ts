@@ -42,7 +42,7 @@ export interface PlanSide {
   replay?: string;
   /** pending names the file this side's address arrives in once its stack is up. */
   pending?: string;
-  /** mailUrl is this side's mail sink (services/mailsim), where its stack has one. */
+  /** mailUrl is this side's mail sink (services/sims/mailsim), where its stack has one. */
   mailUrl?: string;
   /** fixtures are the ids this side's seed generated; they win over the plan's. */
   fixtures?: Record<string, string>;

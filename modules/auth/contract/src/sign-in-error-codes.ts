@@ -8,7 +8,11 @@
 /** Better Auth's granular link-account codes, folded to one spelling per failure. */
 export const normalizeSignInErrorCode = (error: string | null | undefined): string | null => {
   if (!error) return null;
-  if (error === "email_doesn't_match" || error === "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED") {
+  if (
+    error === "email_does_not_match" ||
+    error === "email_doesn't_match" ||
+    error === "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED"
+  ) {
     return "DIFFERENT_EMAIL_NOT_ALLOWED";
   }
   if (

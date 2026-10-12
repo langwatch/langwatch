@@ -68,7 +68,7 @@ type procView struct {
 }
 
 func (o *Orchestrator) sampleProcs() procView {
-	samples := o.sys.ProcessSamples()
+	samples := o.processSamples()
 	byPID, children := processTree(samples)
 	return procView{samples: samples, byPID: byPID, children: children}
 }

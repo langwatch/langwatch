@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -20,9 +19,11 @@ var fallbackSlotDirs = []string{"tsc-slots", "vitest-slots"}
 
 // slotsStatus is the shared check budget as `haven status` reports it (JSON key `slots`).
 type slotsStatus struct {
-	Used        int                  `json:"used"`
-	Budget      int                  `json:"budget"`
-	Pressure    string               `json:"pressure"`
+	Used     int    `json:"used"`
+	Budget   int    `json:"budget"`
+	Pressure string `json:"pressure"`
+	// Capacity says the budget and why: "quiet, load 1.2 on 10 cores: 10 units".
+	Capacity    string               `json:"capacity,omitempty"`
 	ByClass     map[string]int       `json:"byClass"`
 	Holders     []slotHolderStatus   `json:"holders"`
 	MoreHolders int                  `json:"moreHolders,omitempty"`
@@ -61,6 +62,7 @@ type slotFallbackStatus struct {
 // them, waiters in any order (StartedAt is when each queued; the block sorts them).
 type slotsInput struct {
 	Budget   int
+	Capacity string
 	Pressure domain.Pressure
 	Holders  []domain.SlotClaim
 	Waiters  []domain.SlotClaim
@@ -73,7 +75,7 @@ type slotsInput struct {
 const unnamedSlotClass = "unnamed"
 
 func buildSlotsStatus(in slotsInput) slotsStatus {
-	s := slotsStatus{Budget: in.Budget, Pressure: in.Pressure.String(), ByClass: map[string]int{}}
+	s := slotsStatus{Budget: in.Budget, Capacity: in.Capacity, Pressure: in.Pressure.String(), ByClass: map[string]int{}}
 	holders := make([]slotHolderStatus, 0, len(in.Holders))
 	for _, h := range in.Holders {
 		class := h.Class
@@ -125,6 +127,9 @@ func seconds(now, since time.Time) int {
 // printSlots is the human block: one summary line, one line per holder and waiter.
 func printSlots(s slotsStatus) {
 	fmt.Printf("%s slots — %d/%d units (%s)%s\n", statusMark(s.Used <= s.Budget), s.Used, s.Budget, s.Pressure, classSummary(s.ByClass))
+	if s.Capacity != "" {
+		fmt.Printf("       capacity: %s\n", s.Capacity)
+	}
 	for _, h := range s.Holders {
 		fmt.Printf("       %-9s %du  pid %-6d %-20s %-24s %s\n", h.Class, h.Units, h.PID, h.Worktree, h.Label, secondsText(h.HeldSeconds))
 	}
@@ -165,26 +170,24 @@ func secondsText(s int) string { return (time.Duration(s) * time.Second).String(
 
 // collectSlots gathers the block from the budget, the given claims and the fallback folders.
 func (o *Orchestrator) collectSlots(holders, waiters []domain.SlotClaim, now time.Time) slotsStatus {
-	budget, pressure := o.slotBudget(now)
+	capacity, pressure := o.slotBudget(now)
 	return buildSlotsStatus(slotsInput{
-		Budget: budget, Pressure: pressure, Holders: holders, Waiters: waiters, Fallback: fallbackSlotRuns(),
+		Budget: capacity.Units, Capacity: capacity.Describe(), Pressure: pressure, Holders: holders, Waiters: waiters, Fallback: fallbackSlotRuns(),
 		RushGate: rushGatePrograms(), Now: now,
 	})
 }
 
-// slotBudget is the budget and level `haven machine slot run` would resolve now:
+// slotBudget is the capacity and level `haven machine slot run` would resolve now:
 // the daemon's published level when fresh, else measured (cmd/slot.go resolveSlotPressure).
-func (o *Orchestrator) slotBudget(now time.Time) (int, domain.Pressure) {
+func (o *Orchestrator) slotBudget(now time.Time) (domain.Capacity, domain.Pressure) {
 	rec, ok := o.store.ReadPressure()
-	level := domain.ClassifyPressure(o.sys.MemStat())
+	mem := o.sys.MemStat()
+	level := domain.ClassifyPressure(mem)
 	if ok && rec.Version == domain.PressureRecordVersion && now.Sub(rec.WrittenAt) <= domain.PressureStaleAfter {
 		level = domain.ReadPressure(rec, ok, now)
 	}
 	pressure := domain.ResolveCheckPressure(o.cfg.CheckPressure, level, o.cfg.CheckEnv.CI)
-	units, _ := domain.ResolveCheckUnits(domain.CheckMachine{
-		TotalRAMBytes: o.sys.TotalMemory(), NumCPU: runtime.NumCPU(), Pressure: pressure,
-	}, o.cfg.CheckEnv)
-	return units, pressure
+	return o.capacityAt(pressure, mem), pressure
 }
 
 // fallbackSlotRuns counts the entries in each fallback lock folder under ~/.cache/langwatch.

@@ -22,7 +22,7 @@ export class GroupQueueDispatcher {
   private shutdownRequested = false;
   private running = false;
   private paused = false;
-  /** Ends the loop's wait for a resume; set only while the loop is paused. */
+  /** Ends the loop's wait: for a resume, or a listed-group dispatcher's poll. */
   private wake: (() => void) | null = null;
 
   constructor(
@@ -39,8 +39,18 @@ export class GroupQueueDispatcher {
       signalTimeoutSec: number;
       logger: Logger;
       dispatchGroupAllowListKey?: string;
+      /** The lists a listed-group dispatcher runs, read before each claim. */
+      listedGroupsKeys?: () => Promise<readonly string[]>;
     },
   ) {}
+
+  /** Runs only listed groups, beside the queue's own dispatcher. */
+  private get listed(): boolean {
+    return (
+      this.params.dispatchGroupAllowListKey !== undefined ||
+      this.params.listedGroupsKeys !== undefined
+    );
+  }
 
   private async handleLoopError(error: unknown): Promise<void> {
     if (this.shutdownRequested) return;
@@ -105,6 +115,7 @@ export class GroupQueueDispatcher {
 
     // Drain signals that arrived during dispatch to prevent
     // immediate re-wake from stale notifications
+    if (this.listed) return;
     const signalKey = this.params.scripts.getSignalKey();
     await this.params.blockingConnection.del(signalKey);
   }
@@ -145,11 +156,27 @@ export class GroupQueueDispatcher {
   }
 
   private async waitForSignal(): Promise<void> {
+    if (this.listed) return this.pollListedGroups();
     const signalKey = this.params.scripts.getSignalKey();
     await this.params.blockingConnection.brpop(signalKey, await this.nextWakeTimeoutSec());
     // Drain remaining buffered signals — the upcoming dispatchBatch
     // handles multiple jobs in one Lua call, so N signals = 1 cycle.
     await this.params.blockingConnection.del(signalKey);
+  }
+
+  /**
+   * A listed-group dispatcher beside the queue's own polls instead: the signal list
+   * is the whole queue's, and taking from it leaves the other dispatcher asleep.
+   */
+  private pollListedGroups(): Promise<void> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => this.wake?.(), this.params.signalTimeoutSec * 1000);
+      this.wake = () => {
+        clearTimeout(timer);
+        this.wake = null;
+        resolve();
+      };
+    });
   }
 
   /**
@@ -172,6 +199,26 @@ export class GroupQueueDispatcher {
     }
   }
 
+  /** One claim over the allow-list, or over each open list in turn while slots remain. */
+  private async claim(maxJobs: number): Promise<DispatchResult[]> {
+    const claimFrom = (allowedGroupsKey: string | undefined, jobs: number) =>
+      this.params.scripts.dispatchBatch({
+        nowMs: nowInstant().epochMilliseconds,
+        activeTtlSec: this.params.activeTtlSec,
+        maxJobs: jobs,
+        allowedGroupsKey,
+      });
+    if (!this.params.listedGroupsKeys) {
+      return claimFrom(this.params.dispatchGroupAllowListKey, maxJobs);
+    }
+    const results: DispatchResult[] = [];
+    for (const listKey of await this.params.listedGroupsKeys()) {
+      if (results.length >= maxJobs) break;
+      results.push(...(await claimFrom(`${listKey}:candidates`, maxJobs - results.length)));
+    }
+    return results;
+  }
+
   private async dispatchBatch(): Promise<number> {
     if (this.paused) return 0;
     const availableSlots =
@@ -183,12 +230,7 @@ export class GroupQueueDispatcher {
     }
 
     const maxJobs = Math.min(availableSlots, MAX_BATCH_SIZE);
-    const results = await this.params.scripts.dispatchBatch({
-      nowMs: nowInstant().epochMilliseconds,
-      activeTtlSec: this.params.activeTtlSec,
-      maxJobs,
-      allowedGroupsKey: this.params.dispatchGroupAllowListKey,
-    });
+    const results = await this.claim(maxJobs);
 
     for (const result of results) {
       this.params.processingQueue.push(result).catch((err) => {

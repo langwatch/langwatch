@@ -16,6 +16,7 @@ import {
   observeEsProcessOutboxDispatchLag,
   observeEsProcessOutboxDuration,
 } from "../../metrics.ts";
+import { classifyClickHouseError, ErrorCategory } from "../../services/errorHandling.ts";
 import { toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
 import type { JsonValue } from "../json.ts";
 import type {
@@ -127,6 +128,8 @@ function retryAfterMsOf(error: unknown): number | undefined {
  */
 function isTerminalError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
+  // A handled refusal defaults to `retryable: false`; a transient ClickHouse cause still retries.
+  if (classifyClickHouseError(error) === ErrorCategory.RECOVERABLE) return false;
   return Reflect.get(error, "retryable") === false;
 }
 

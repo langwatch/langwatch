@@ -7,16 +7,17 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
-	analyticssim "github.com/langwatch/langwatch/services/analyticssim/cmd"
-	idpsim "github.com/langwatch/langwatch/services/idpsim/cmd"
-	lambdasim "github.com/langwatch/langwatch/services/lambdasim/cmd"
-	llmsim "github.com/langwatch/langwatch/services/llmsim/cmd"
-	mailsim "github.com/langwatch/langwatch/services/mailsim/cmd"
-	outboundsim "github.com/langwatch/langwatch/services/outboundsim/cmd"
-	paymentsim "github.com/langwatch/langwatch/services/paymentsim/cmd"
-	storagesim "github.com/langwatch/langwatch/services/storagesim/cmd"
-	telemetrysim "github.com/langwatch/langwatch/services/telemetrysim/cmd"
-	voicesim "github.com/langwatch/langwatch/services/voicesim/cmd"
+	analyticssim "github.com/langwatch/langwatch/services/sims/analyticssim/cmd"
+	githubsim "github.com/langwatch/langwatch/services/sims/githubsim/cmd"
+	idpsim "github.com/langwatch/langwatch/services/sims/idpsim/cmd"
+	lambdasim "github.com/langwatch/langwatch/services/sims/lambdasim/cmd"
+	llmsim "github.com/langwatch/langwatch/services/sims/llmsim/cmd"
+	mailsim "github.com/langwatch/langwatch/services/sims/mailsim/cmd"
+	outboundsim "github.com/langwatch/langwatch/services/sims/outboundsim/cmd"
+	paymentsim "github.com/langwatch/langwatch/services/sims/paymentsim/cmd"
+	storagesim "github.com/langwatch/langwatch/services/sims/storagesim/cmd"
+	telemetrysim "github.com/langwatch/langwatch/services/sims/telemetrysim/cmd"
+	voicesim "github.com/langwatch/langwatch/services/sims/voicesim/cmd"
 )
 
 // The supervising parent outlives its children, including when go run owns the
@@ -31,7 +32,7 @@ func simulatorArgv() []string {
 
 func runBundledSimulator(ctx context.Context, _ deps, inv invocation) error {
 	if len(inv.args) != 1 {
-		return fmt.Errorf("haven simulator requires mail, idp, storage, voice, llm, analytics, outbound, payment, telemetry or lambda")
+		return fmt.Errorf("haven simulator requires mail, idp, storage, voice, llm, analytics, outbound, payment, telemetry, lambda or github")
 	}
 
 	var run func(context.Context, []string) error
@@ -57,8 +58,10 @@ func runBundledSimulator(ctx context.Context, _ deps, inv invocation) error {
 		run, service = telemetrysim.Root, "telemetrysim"
 	case "lambda":
 		run, service = lambdasim.Root, "lambdasim"
+	case "github":
+		run, service = githubsim.Root, "githubsim"
 	default:
-		return fmt.Errorf("unknown simulator %q — use mail, idp, storage, voice, llm, analytics, outbound, payment, telemetry or lambda", inv.args[0])
+		return fmt.Errorf("unknown simulator %q — use mail, idp, storage, voice, llm, analytics, outbound, payment, telemetry, lambda or github", inv.args[0])
 	}
 
 	info := *contexts.MustGetServiceInfo(ctx)

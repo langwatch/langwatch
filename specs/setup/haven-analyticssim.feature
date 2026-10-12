@@ -7,10 +7,10 @@ Feature: analyticssim, a local stand-in for PostHog and Customer.io
   keeps them in memory, so a developer, apidiff and visualdiff can read what was
   sent. It checks no key: it is a dev shim.
 
-  # Bound by Go tests in services/analyticssim/analyticssim_test.go and
+  # Bound by Go tests in services/sims/analyticssim/analyticssim_test.go and
   # tools/thuishaven/domain/overlay_analytics_test.go and
   # tools/thuishaven/cmd/sim_analytics_test.go, by their `// @scenario`
-  # annotations, and by apps/analyticssim-web/src/__tests__/records-console.integration.test.tsx.
+  # annotations, and by apps/sims/src/analytics/__tests__/records-console.integration.test.tsx.
 
   Scenario: PostHog calls from either client become records
     Given analyticssim is running

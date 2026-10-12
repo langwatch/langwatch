@@ -49,6 +49,25 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
     };
   }
 
+  async findRecords({
+    migrationName,
+    tenantIds,
+  }: {
+    migrationName: string;
+    tenantIds: readonly string[];
+  }): Promise<TenantMigrationRecord[]> {
+    if (tenantIds.length === 0) return [];
+    const rows = await this.prisma.systemMigrationTenantState.findMany({
+      where: { migrationName, tenantId: { in: [...tenantIds] } },
+    });
+    return rows.map((row) => ({
+      migrationName: row.migrationName,
+      tenantId: row.tenantId,
+      status: parseStatus(row.status),
+      report: row.report,
+    }));
+  }
+
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
     // `undefined` would OMIT the column, leaving a previous parked tenant's
     // error report attached to the finalized row that replaced it. The

@@ -89,3 +89,41 @@ func TestGovernBrowserIdleMaxAge(t *testing.T) {
 		t.Fatalf("kills = %+v, want only the old idle shell", kills)
 	}
 }
+
+// @scenario "A headless browser above its memory ceiling is reaped whole"
+func TestBrowserMemoryLimitFollowsTheMachine(t *testing.T) {
+	cases := []struct {
+		ramGiB  uint64
+		limitMB int
+		killMB  int64
+	}{
+		{8, 2048, 3072},
+		{16, 2048, 3072},
+		{32, 4096, 5120},
+		{64, 8192, 10240},
+		{128, 8192, 10240},
+	}
+	for _, c := range cases {
+		limit := DefaultBrowserMemoryMB(c.ramGiB << 30)
+		if limit != c.limitMB {
+			t.Errorf("%d GiB: limit %d MB, want %d", c.ramGiB, limit, c.limitMB)
+		}
+		if kill := BrowserKillRSS(limit) >> 20; kill != c.killMB {
+			t.Errorf("%d GiB: governor kills above %d MB, want %d", c.ramGiB, kill, c.killMB)
+		}
+	}
+}
+
+// @scenario "A headless browser above its memory ceiling is reaped whole"
+func TestGovernorSparesABrowserBetweenLimitAndHeadroom(t *testing.T) {
+	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
+	limitMB := 8192
+	l := DefaultBrowserLimits()
+	l.MaxRSS = BrowserKillRSS(limitMB)
+	refusing := BrowserShell{PID: 1, RSS: int64(limitMB+512) << 20, Started: now.Add(-time.Hour)}
+	runaway := BrowserShell{PID: 2, RSS: l.MaxRSS + 1, Started: now.Add(-time.Hour)}
+	kills := GovernBrowser([]BrowserShell{refusing, runaway}, l, now)
+	if len(kills) != 1 || kills[0].PID != 2 {
+		t.Fatalf("kills = %+v, want only the shell past the headroom", kills)
+	}
+}
