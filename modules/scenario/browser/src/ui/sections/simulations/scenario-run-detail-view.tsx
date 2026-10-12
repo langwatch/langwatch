@@ -163,7 +163,7 @@ export function RunDetailView({
         <HStack w="100%" justify="space-between" gap={2.5} minWidth={0} paddingEnd={8}>
           <HStack gap={3} flex={1} minWidth={0}>
             <ScenarioRunStatusIcon status={scenarioState.status} />
-            <Heading size="md" truncate title={displayTitle}>
+            <Heading size="sm" truncate title={displayTitle}>
               {displayTitle}
             </Heading>
             {isCutAtLimitOf(scenarioState.metadata) ? <CutAtLimitBadge /> : null}

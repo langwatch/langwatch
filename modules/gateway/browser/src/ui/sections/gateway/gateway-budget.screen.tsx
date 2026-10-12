@@ -1,4 +1,5 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Card } from "@langwatch/design-system/card";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -8,7 +9,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Code,
   Heading,
   HStack,
@@ -17,7 +17,6 @@ import {
   Skeleton,
   SkeletonText,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -55,31 +54,31 @@ function BudgetHeaderActions({
   onArchive: () => void;
 }) {
   return (
-    <HStack>
+    <>
       {/* Audit history remains reachable even after archive —
           the full lifecycle trail stays queryable so operators
           can reconstruct why a budget was archived. */}
-      <Link href={`/settings/audit-log?targetKind=budget&targetId=${budgetId}`}>
-        <Button variant="outline" size="sm">
+      <PageLayout.HeaderButton asChild>
+        <Link href={`/settings/audit-log?targetKind=budget&targetId=${budgetId}`}>
           <FileClock size={14} /> Audit history
-        </Button>
-      </Link>
+        </Link>
+      </PageLayout.HeaderButton>
       {!isArchived && canUpdate && (
-        <Button variant="outline" size="sm" onClick={onReset}>
+        <PageLayout.HeaderButton onClick={onReset}>
           <TimerReset size={14} /> Reset period
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       {!isArchived && canUpdate && (
-        <Button variant="outline" size="sm" onClick={onEdit}>
+        <PageLayout.HeaderButton onClick={onEdit}>
           <Pencil size={14} /> Edit
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       {!isArchived && canDelete && (
-        <Button colorPalette="red" variant="outline" size="sm" onClick={onArchive}>
+        <Button colorPalette="red" variant="outline" size="md" flexShrink={0} onClick={onArchive}>
           <Archive size={14} /> Archive
         </Button>
       )}
-    </HStack>
+    </>
   );
 }
 
@@ -211,27 +210,31 @@ function BudgetDetailPage() {
   return (
     <AiGatewayLayout>
       <>
-        <PageLayout.Header>
-          <PageLayout.Heading>
-            {budget?.name ?? "Budget"}
-            {isArchived && (
-              <Badge colorPalette="gray" ml={2}>
-                archived
-              </Badge>
-            )}
-          </PageLayout.Heading>
-          <Spacer />
-          {budget && (
-            <BudgetHeaderActions
-              budgetId={budget.id}
-              isArchived={isArchived}
-              canUpdate={canUpdate}
-              canDelete={canDelete}
-              onReset={() => setResetting(true)}
-              onEdit={() => setEditing(true)}
-              onArchive={() => setArchiving(true)}
-            />
-          )}
+        <PageLayout.Header
+          actions={
+            budget && (
+              <BudgetHeaderActions
+                budgetId={budget.id}
+                isArchived={isArchived}
+                canUpdate={canUpdate}
+                canDelete={canDelete}
+                onReset={() => setResetting(true)}
+                onEdit={() => setEditing(true)}
+                onArchive={() => setArchiving(true)}
+              />
+            )
+          }
+        >
+          <Box flex="1 1 12rem" minWidth={0}>
+            <PageLayout.Heading>
+              {budget?.name ?? "Budget"}
+              {isArchived && (
+                <Badge colorPalette="gray" ml={2}>
+                  archived
+                </Badge>
+              )}
+            </PageLayout.Heading>
+          </Box>
         </PageLayout.Header>
 
         <PageLayout.Container>
@@ -351,52 +354,51 @@ function BudgetDetailPage() {
                     icon={<Receipt size={24} />}
                   />
                 ) : (
-                  <Card.Root variant="showcase" width="full" overflow="hidden">
+                  <Card variant="showcase" padding="none">
                     <ListTable
-                      containerProps={{ overflowX: "auto", maxWidth: "full" }}
-                      variant="line"
-                      size="sm"
-                      width="full"
+                      variant="embedded"
+                      scroll="x"
+                      scrollLabel="Recent budget activity table"
                     >
-                      <Table.Header>
-                        <Table.Row>
-                          <Table.ColumnHeader>When</Table.ColumnHeader>
-                          <Table.ColumnHeader>Virtual key</Table.ColumnHeader>
-                          <Table.ColumnHeader>Model</Table.ColumnHeader>
-                          <Table.ColumnHeader>Amount</Table.ColumnHeader>
-                          <Table.ColumnHeader>Status</Table.ColumnHeader>
-                        </Table.Row>
-                      </Table.Header>
-                      <Table.Body>
+                      <ListTable.Header>
+                        <ListTable.Row>
+                          <ListTable.ColumnHeader>When</ListTable.ColumnHeader>
+                          <ListTable.ColumnHeader>Virtual key</ListTable.ColumnHeader>
+                          <ListTable.ColumnHeader>Model</ListTable.ColumnHeader>
+                          <ListTable.ColumnHeader>Amount</ListTable.ColumnHeader>
+                          <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+                        </ListTable.Row>
+                      </ListTable.Header>
+                      <ListTable.Body>
                         {budget.recentLedger.map((line) => (
-                          <Table.Row key={line.id}>
-                            <Table.Cell>
+                          <ListTable.Row key={line.id}>
+                            <ListTable.Cell>
                               <Tooltip content={readableDate(line.occurredAt).toLocaleString()}>
                                 <Text fontSize="xs" color="fg.muted">
                                   {formatTimeAgo(toEpochMs(line.occurredAt))}
                                 </Text>
                               </Tooltip>
-                            </Table.Cell>
-                            <Table.Cell>
+                            </ListTable.Cell>
+                            <ListTable.Cell>
                               <Link
                                 href={`/gateway/virtual-keys/${line.virtualKeyId}`}
                                 color="orange.fg"
                               >
                                 <Text fontSize="sm">{line.virtualKeyName}</Text>
                               </Link>
-                            </Table.Cell>
-                            <Table.Cell>
+                            </ListTable.Cell>
+                            <ListTable.Cell>
                               <Code fontSize="xs">{line.model}</Code>
-                            </Table.Cell>
-                            <Table.Cell>{formatAmount(line.amountUsd)}</Table.Cell>
-                            <Table.Cell>
+                            </ListTable.Cell>
+                            <ListTable.Cell>{formatAmount(line.amountUsd)}</ListTable.Cell>
+                            <ListTable.Cell>
                               <StatusBadge status={line.status} />
-                            </Table.Cell>
-                          </Table.Row>
+                            </ListTable.Cell>
+                          </ListTable.Row>
                         ))}
-                      </Table.Body>
+                      </ListTable.Body>
                     </ListTable>
-                  </Card.Root>
+                  </Card>
                 )}
                 <Text fontSize="xs" color="fg.muted" mt={1}>
                   Most recent 20 requests. See Usage for aggregates over the full history.
@@ -456,7 +458,7 @@ function BudgetDetailSkeleton() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Box>
-      <Heading size="sm" mb={2}>
+      <Heading textStyle="cardTitle" mb={2}>
         {title}
       </Heading>
       <Separator mb={3} />

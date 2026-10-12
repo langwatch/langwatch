@@ -221,7 +221,7 @@ describe("given the organization has an ingestion key and a regular key", () => 
     /** @scenario The page carries a single title and subtitle */
     it("titles the page once and never gives the regular table a heading of its own", () => {
       renderWithApiKeyHost(<ApiKeysScreen />);
-      expect(screen.getByRole("heading", { name: "API Keys" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "API keys" })).toBeInTheDocument();
       expect(screen.getAllByRole("heading")).toHaveLength(2);
     });
 
@@ -257,8 +257,8 @@ describe("given the organization has an ingestion key and a regular key", () => 
     /** @scenario A key row never renders its secret */
     it("shows a five-character lookup prefix and nothing that could be a token", () => {
       renderWithApiKeyHost(<ApiKeysScreen />);
-      expect(screen.getByText("sk-lw-ab12c…")).toBeInTheDocument();
-      expect(screen.getByText("ik-lw-zz99y…")).toBeInTheDocument();
+      expect(screen.getByTitle("sk-lw-ab12c…")).toBeInTheDocument();
+      expect(screen.getByTitle("ik-lw-zz99y…")).toBeInTheDocument();
     });
   });
 });
@@ -381,6 +381,8 @@ describe("given keys bound at different scopes", () => {
         new FakeApiKeyHost({ grants, query: { [API_KEY_SCOPE_QUERY_KEY]: "TEAM:team-1" } }),
       );
       expect(screen.getByText(/No keys match the current scope/)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /How API keys are scoped/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
     });
   });
 });
@@ -409,7 +411,7 @@ describe("given the project still has a legacy key", () => {
       const banner = screen.getByTestId("legacy-project-key-banner");
       expect(banner).toHaveTextContent("Legacy project keys are going away");
       expect(banner).toHaveTextContent("Use personal access tokens instead.");
-      expect(within(banner).queryByRole("button")).toBeNull();
+      expect(within(banner).getByRole("button", { name: "Create an API key" })).toBeInTheDocument();
     });
 
     it("shows no banner once the legacy key is gone", () => {
@@ -479,13 +481,10 @@ describe("given a reader who is not an organization admin", () => {
 
 describe("given a key is being created", () => {
   describe("when the form would send a key bound to nothing", () => {
-    // The reachable shape of this guard, and the reason it exists: the drawer's
-    // own Create button stays live while an ambient project exists, so a reader
-    // who empties the scope picker gets as far as submitting a key with no
-    // bindings at all. The mint would refuse it; the screen refuses it first,
-    // with a sentence naming what to do.
+    // A reader who empties the scope picker and submits gets a sentence naming
+    // what to do, and the key is never minted.
     /** @scenario A key needs at least one scope */
-    it("refuses with a sentence the reader can act on rather than the generic line", async () => {
+    it("refuses with a sentence the reader can act on and never mints the key", async () => {
       const user = userEvent.setup();
       const host = new FakeApiKeyHost();
       renderWithApiKeyHost(<ApiKeysScreen />, host);
@@ -501,14 +500,11 @@ describe("given a key is being created", () => {
       await user.click(screen.getByTestId("clear-scopes"));
       await user.click(screen.getByRole("button", { name: "Create secret key" }));
 
-      await waitFor(() => expect(host.failures).toHaveLength(1));
-      expect(host.failures[0]).toEqual({
-        error: void 0,
-        fallbackTitle: "No permissions to grant",
-        description:
-          "You have no role bindings in this organization, so there is nothing to grant to a key.",
-      });
-      // Nothing went out: a form the screen refused never reaches the mint.
+      // The form now names the missing scope itself, so the screen's own guard
+      // is behind it and no failure toast is raised.
+      expect(await screen.findByText("Choose where this key can be used.")).toBeInTheDocument();
+      expect(host.failures).toHaveLength(0);
+      // Nothing went out: a form that refuses never reaches the mint.
       expect(mutations.create).not.toHaveBeenCalled();
     });
   });
@@ -525,20 +521,22 @@ describe("given a key is being created", () => {
       await user.click(await screen.findByRole("option", { name: "No expiration" }));
       await user.click(screen.getByRole("button", { name: "Create secret key" }));
 
-      expect(await screen.findByText("Token Created")).toBeInTheDocument();
+      expect(await screen.findByText("Token created")).toBeInTheDocument();
+      // The dialog names the key just created, from the form the screen kept.
+      expect(within(screen.getByTestId("token-created-key")).getByText("CI")).toBeInTheDocument();
       expect(
         screen.getByText("Copy this token now. You won't be able to see it again."),
       ).toBeInTheDocument();
 
       await user.click(screen.getAllByRole("button", { name: /close/i })[0]!);
-      await waitFor(() => expect(screen.queryByText("Token Created")).toBeNull());
+      await waitFor(() => expect(screen.queryByText("Token created")).toBeNull());
       // Reopening the create flow shows a blank form, never the token that was
       // just minted: the value lives in state the close cleared.
       await user.click(screen.getByRole("button", { name: /Create new secret key/ }));
       expect(
         await screen.findByRole("heading", { name: "Create new secret key" }),
       ).toBeInTheDocument();
-      expect(screen.queryByText("Token Created")).toBeNull();
+      expect(screen.queryByText("Token created")).toBeNull();
     });
   });
 });

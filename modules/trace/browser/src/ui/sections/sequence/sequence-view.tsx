@@ -132,7 +132,7 @@ function TypeFilterMenu({
           title="Filter span types"
         >
           <Icon as={LuFilter} boxSize={3} />
-          <Text textStyle="2xs" lineHeight={1} fontWeight={500}>
+          <Text textStyle="2xs" lineHeight={1} fontWeight="medium">
             {selectedCount === presentTypes.size
               ? "All types"
               : `${selectedCount}/${presentTypes.size}`}
@@ -201,7 +201,12 @@ function ZoomControls({
           transition="all 0.15s ease"
           minWidth="38px"
         >
-          <Text textStyle="2xs" lineHeight={1} fontVariantNumeric="tabular-nums" fontWeight={500}>
+          <Text
+            textStyle="2xs"
+            lineHeight={1}
+            fontVariantNumeric="tabular-nums"
+            fontWeight="medium"
+          >
             {Math.round(zoom * 100)}%
           </Text>
         </Box>
@@ -358,7 +363,7 @@ export function SequenceView({ spans, selectedSpanId, onSelectSpan, subMode }: S
           syntax={result.syntax}
         />
 
-        <Text textStyle="2xs" color="fg.subtle" flexShrink={0} marginLeft={1.5} fontWeight={500}>
+        <Text textStyle="2xs" color="fg.subtle" flexShrink={0} marginLeft={1.5} fontWeight="medium">
           {result.countLabel}
         </Text>
       </Flex>

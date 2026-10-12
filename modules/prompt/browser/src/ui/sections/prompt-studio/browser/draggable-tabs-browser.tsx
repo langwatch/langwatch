@@ -200,6 +200,8 @@ interface DraggableTabsWindowProps extends Omit<TabsRootProps, "onClick" | "defa
   onTabChange?: (params: { windowId: string; tabId: string }) => void;
   /** Named apart from the DOM's `onClick`, which it shadows and does not match. */
   onWindowClick?: (params: { windowId: string; tabId: string }) => void;
+  /** Panes beside each other share the width equally down to this floor. */
+  minPaneWidth?: string;
 }
 
 function DraggableTabsWindow({
@@ -208,6 +210,7 @@ function DraggableTabsWindow({
   activeTabId,
   onTabChange,
   onWindowClick,
+  minPaneWidth,
   ...props
 }: DraggableTabsWindowProps) {
   const windowContextValue: TabWindowContextValue = {
@@ -217,7 +220,14 @@ function DraggableTabsWindow({
 
   return (
     <TabWindowContext.Provider value={windowContextValue}>
-      <VStack height="full" gap={0} align="stretch" width="full">
+      <VStack
+        height="full"
+        gap={0}
+        align="stretch"
+        width="full"
+        flex={1}
+        minWidth={minPaneWidth ?? 0}
+      >
         <Tabs.Root
           value={activeTabId}
           onValueChange={(change) => onTabChange?.({ windowId, tabId: change.value })}
@@ -226,7 +236,7 @@ function DraggableTabsWindow({
           height="full"
           display="flex"
           flexDirection="column"
-          variant="enclosed"
+          variant="plain"
           lazyMount
           unmountOnExit
           {...props}
@@ -263,6 +273,7 @@ function DraggableTabsTabBar({ children, tabIds, ...props }: DraggableTabsTabBar
           gap={0}
           height="full"
           paddingY={0}
+          borderBottomWidth={0}
           background="none"
           // The strip, the switcher and the toolbar share one row. Without
           // this the switcher wraps onto a line of its own once the tabs fill
@@ -320,6 +331,14 @@ function DraggableBrowserTabTrigger({
       overflow="hidden"
       cursor="pointer"
       transition="all 0.15s ease-in-out"
+      height="32px"
+      paddingX={3}
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="lg"
+      background="transparent"
+      color="fg.muted"
+      _selected={{ background: "bg.panel", borderColor: "border.emphasized", color: "fg" }}
     >
       {children}
     </Tabs.Trigger>
@@ -336,19 +355,18 @@ function DraggableBrowserTabTrigger({
 function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
   const { windowId } = useTabWindowContext();
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
-    useSortable({
-      id,
-      data: {
-        windowId,
-        tabId: id,
-        label: (
-          <TabIdProvider tabId={id}>
-            <PromptBrowserTab dimmed={false} />
-          </TabIdProvider>
-        ),
-      },
-    });
+  const { listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({
+    id,
+    data: {
+      windowId,
+      tabId: id,
+      label: (
+        <TabIdProvider tabId={id}>
+          <PromptBrowserTab dimmed={false} />
+        </TabIdProvider>
+      ),
+    },
+  });
 
   return (
     <Box
@@ -363,7 +381,7 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
       // TAB_MAX_WIDTH down to TAB_MIN_WIDTH, and only then does the strip
       // scroll. They are never hidden - a hidden element has a zero-size rect,
       // which would corrupt @dnd-kit's drop-index math for these sortables.
-      flex="1 1 0"
+      flex={`0 1 ${TAB_MAX_WIDTH}`}
       minWidth={TAB_MIN_WIDTH}
       maxWidth={TAB_MAX_WIDTH}
       alignItems="stretch"
@@ -371,8 +389,10 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
       transform={CSS.Transform.toString(transform)}
       transition={transition}
       opacity={isDragging || isOver ? 0.5 : 1}
-      {...attributes}
       {...listeners}
+      // Pointer-only drag: the sensor list has no keyboard sensor, so dnd-kit's button role, tab
+      // stop and "press space" hints are left off; the tablist holds only tabs.
+      role="presentation"
     >
       {children}
     </Box>

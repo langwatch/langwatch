@@ -1,13 +1,7 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import type {
   CustomModelEntry,
@@ -36,19 +30,19 @@ function CustomModelRow({
   const isChat = entry.mode === "chat";
 
   return (
-    <Table.Row>
-      <Table.Cell>
+    <ListTable.Row>
+      <ListTable.Cell>
         <Text fontSize="sm">{entry.modelId}</Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text fontSize="sm">{entry.displayName}</Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Badge size="sm" colorPalette={isChat ? "blue" : "purple"}>
           {isChat ? "Chat" : "Embedding"}
         </Badge>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.ActionCell>
         <HStack gap={0}>
           <Button
             size="xs"
@@ -68,41 +62,43 @@ function CustomModelRow({
             <Trash2 size={14} />
           </Button>
         </HStack>
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.ActionCell>
+    </ListTable.Row>
   );
 }
 
 function CustomModelsTable({
   entries,
+  onAdd,
   onDelete,
   onEdit,
 }: {
   entries: CustomModelEntry[];
+  onAdd: () => void;
   onDelete: (entry: CustomModelEntry) => void;
   onEdit: (entry: CustomModelEntry) => void;
 }) {
   if (entries.length === 0) {
     return (
-      <Box borderWidth="1px" borderRadius="md" padding={4} textAlign="center">
-        <Text fontSize="sm" color="fg.muted">
-          No custom models added
-        </Text>
-      </Box>
+      <NoDataInfoBlock
+        size="line"
+        title="No custom models added"
+        action={{ label: "Add a model", onClick: onAdd }}
+      />
     );
   }
 
   return (
-    <Table.Root size="sm" variant="outline">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Model ID</Table.ColumnHeader>
-          <Table.ColumnHeader>Display Name</Table.ColumnHeader>
-          <Table.ColumnHeader>Type</Table.ColumnHeader>
-          <Table.ColumnHeader width="80px" />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+    <ListTable density="compact">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Model ID</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Display Name</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Type</ListTable.ColumnHeader>
+          <ListTable.ActionHeader />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {entries.map((entry) => (
           <CustomModelRow
             key={`${entry.mode}-${entry.modelId}`}
@@ -111,8 +107,8 @@ function CustomModelsTable({
             onEdit={onEdit}
           />
         ))}
-      </Table.Body>
-    </Table.Root>
+      </ListTable.Body>
+    </ListTable>
   );
 }
 
@@ -121,14 +117,14 @@ export const CustomModelInputSection = ({
   state,
   actions,
   provider,
-  dialogBackground,
+  ground,
   showRegistryLink = true,
 }: {
   state: UseModelProviderFormState;
   actions: UseModelProviderFormActions;
   provider: MaybeStoredModelProvider;
-  /** Override DialogContent background (e.g. "bg.surface" for solid on onboarding). */
-  dialogBackground?: string;
+  /** `card` keeps the card ground the onboarding page gives its dialogs. */
+  ground?: "card";
   /** Whether to show the "See all models" link and registry modal. Defaults to true. */
   showRegistryLink?: boolean;
 }) => {
@@ -219,6 +215,7 @@ export const CustomModelInputSection = ({
 
       <CustomModelsTable
         entries={allCustomModels}
+        onAdd={() => setAddModelDialogOpen(true)}
         onDelete={handleDeleteModel}
         onEdit={handleEditModel}
       />
@@ -242,7 +239,7 @@ export const CustomModelInputSection = ({
         onClose={handleCloseModelDialog}
         onSubmit={handleAddModel}
         initialValues={editingChatModel}
-        dialogBackground={dialogBackground}
+        ground={ground}
       />
 
       <AddCustomEmbeddingsModelDialog
@@ -250,7 +247,7 @@ export const CustomModelInputSection = ({
         onClose={handleCloseEmbeddingsDialog}
         onSubmit={handleAddEmbeddingsModel}
         initialValues={editingEmbeddingsModel}
-        dialogBackground={dialogBackground}
+        ground={ground}
       />
 
       {showRegistryLink && (
@@ -258,7 +255,7 @@ export const CustomModelInputSection = ({
           open={registryModalOpen}
           onClose={() => setRegistryModalOpen(false)}
           provider={provider.provider}
-          dialogBackground={dialogBackground}
+          ground={ground}
         />
       )}
     </VStack>

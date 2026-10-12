@@ -276,24 +276,16 @@ function LeaderboardNeedsResultsPage({ evaluatorId }: { evaluatorId: string }) {
   const { closeDrawer } = useDrawer();
 
   return (
-    <Drawer.Root open={true} placement="end" size="lg" onOpenChange={closeDrawer}>
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Leaderboard</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <Text
-            fontSize="sm"
-            color="fg.muted"
-            data-testid={`leaderboard-needs-results-page-${evaluatorId}`}
-          >
-            This leaderboard is built from the run&apos;s results, which are not carried in the
-            link. Open the run and expand the leaderboard card to see it.
-          </Text>
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer open={true} size="md" title="Leaderboard" onClose={closeDrawer}>
+      <Text
+        fontSize="sm"
+        color="fg.muted"
+        data-testid={`leaderboard-needs-results-page-${evaluatorId}`}
+      >
+        This leaderboard is built from the run&apos;s results, which are not carried in the link.
+        Open the run and expand the leaderboard card to see it.
+      </Text>
+    </Drawer>
   );
 }
 
@@ -348,56 +340,48 @@ function LoadedComparisonLeaderboardDrawer({
   });
 
   return (
-    <Drawer.Root open={true} placement="end" size="lg" onOpenChange={closeDrawer}>
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>{column.name}: leaderboard</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={4} paddingBottom={6}>
-            <LeaderboardStep
-              index={1}
-              title="Which one should you ship?"
-              subtitle="The ranking, and whether the run actually separates them."
-              help={SHIP_HELP}
-            >
-              <LeaderboardVerdictPanel
-                leaderboard={analysis.leaderboard}
-                verdict={analysis.verdict}
-                cheaperAlternative={analysis.cheaperAlternative}
-                variantNames={variantNames}
-                targetColors={targetColors}
-              />
-            </LeaderboardStep>
+    <Drawer open={true} size="md" title={`${column.name}: leaderboard`} onClose={closeDrawer}>
+      <VStack align="stretch" gap={4} paddingBottom={6}>
+        <LeaderboardStep
+          index={1}
+          title="Which one should you ship?"
+          subtitle="The ranking, and whether the run actually separates them."
+          help={SHIP_HELP}
+        >
+          <LeaderboardVerdictPanel
+            leaderboard={analysis.leaderboard}
+            verdict={analysis.verdict}
+            cheaperAlternative={analysis.cheaperAlternative}
+            variantNames={variantNames}
+            targetColors={targetColors}
+          />
+        </LeaderboardStep>
 
-            <LeaderboardStep
-              index={2}
-              title="Can you trust that?"
-              subtitle="What this run does and does not support."
-              help={TRUST_HELP}
-              hasProblem={analysis.trustHasProblem}
-            >
-              <LeaderboardTrustPanel
-                leaderboard={analysis.leaderboard}
-                rowsWithoutVerdict={column.rowsWithoutVerdict}
-                warnThreshold={DEFAULT_WARN_THRESHOLD}
-                sampleAdequacy={analysis.sampleAdequacy}
-                verbosity={analysis.verbosity}
-                judgeIndependence={analysis.judgeIndependence}
-                variantNames={variantNames}
-              />
-            </LeaderboardStep>
+        <LeaderboardStep
+          index={2}
+          title="Can you trust that?"
+          subtitle="What this run does and does not support."
+          help={TRUST_HELP}
+          hasProblem={analysis.trustHasProblem}
+        >
+          <LeaderboardTrustPanel
+            leaderboard={analysis.leaderboard}
+            rowsWithoutVerdict={column.rowsWithoutVerdict}
+            warnThreshold={DEFAULT_WARN_THRESHOLD}
+            sampleAdequacy={analysis.sampleAdequacy}
+            verbosity={analysis.verbosity}
+            judgeIndependence={analysis.judgeIndependence}
+            variantNames={variantNames}
+          />
+        </LeaderboardStep>
 
-            <TradeoffStep
-              analysis={analysis}
-              variantNames={variantNames}
-              targetColors={targetColors}
-              verdictsByRow={column.verdictsByRow}
-            />
-          </VStack>
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+        <TradeoffStep
+          analysis={analysis}
+          variantNames={variantNames}
+          targetColors={targetColors}
+          verdictsByRow={column.verdictsByRow}
+        />
+      </VStack>
+    </Drawer>
   );
 }

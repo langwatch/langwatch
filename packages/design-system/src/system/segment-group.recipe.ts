@@ -26,7 +26,7 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
     size: {
       sm: {
         item: { height: "28px", paddingInline: "10px", gap: 1.5 },
-        itemText: { fontSize: "12.5px", fontWeight: "medium" },
+        itemText: { textStyle: "label" },
       },
     },
   },

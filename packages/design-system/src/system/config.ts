@@ -9,8 +9,10 @@ import { colorSystem } from "../color-mode/color-system.ts";
 import { alertSlotRecipe, deepeningMesh, statusMesh } from "./alert.recipe.ts";
 import { drawerSlotRecipe } from "./drawer.recipe.ts";
 import { optionItemRecipe, optionListContent, optionListSizes } from "./option-list.recipe.ts";
+import { PRODUCT_COLOURS, productColourTokens } from "./product-colours.ts";
 import { sectionNavigationRailRecipe } from "./section-navigation.recipe.ts";
 import { segmentGroupSlotRecipe } from "./segment-group.recipe.ts";
+import { productTextStyles } from "./text-styles.ts";
 
 // Inter and JetBrains Mono are loaded by the CSS @import in the application's
 // globals.scss. This file names the families, it does not fetch them.
@@ -23,6 +25,9 @@ const displayFontFamily = '"Sentient", ui-serif, Georgia, "Times New Roman", ser
 /** The face the product's small technical lines are set in. */
 const monoFontFamily =
   '"JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace';
+
+const TOAST_SPRING =
+  "linear(0, 0.013 0.6%, 0.05 1.2%, 0.2 2.6%, 0.48 4.7%, 0.76 7.2%, 0.91 9.6%, 1.006 12.4%, 1.043 15.2%, 1.048 17.5%, 1.036 20.6%, 1.012 26.6%, 0.998 34.2%, 0.997 41.1%, 1 56.3%, 1)";
 
 /** The card a toast wears: the panel, its hairline and the ordinary foreground. */
 const toastPanel = {
@@ -44,7 +49,7 @@ const toastMesh = (palette: string) => ({
 
 /** A light-mode solid badge is quiet glass on its palette's solid colour: a fine rim, a light. */
 const badgeGlass = {
-  color: "white",
+  color: "colorPalette.onSolid",
   bg: "colorPalette.solid",
   backgroundImage:
     "linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 50%, transparent 100%)",
@@ -87,16 +92,17 @@ export const designSystemConfig = defineConfig({
     },
   },
   theme: {
+    textStyles: productTextStyles,
     keyframes: {
       // A toast rises a few pixels into place and fades out where it is: no blur, no scale.
       "toast-in": {
-        from: { transform: "translateY(8px)", opacity: 0 },
+        from: { transform: "translateY(16px) scale(0.96)", opacity: 0 },
         to: { transform: "none", opacity: 1 },
       },
       "toast-fade": { from: { opacity: 1 }, to: { opacity: 0 } },
     },
     tokens: {
-      sizes: { shellHeader: { value: "48px" } },
+      sizes: { pageHeader: { lg: { value: "48px" }, sm: { value: "48px" } } },
       fonts: {
         heading: {
           value: interFontFamily,
@@ -196,6 +202,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.fg}" },
+          onSolid: { value: "{colors.gray.contrast}" },
         },
         orange: {
           solid: { value: { _light: "#ED8926", _dark: "#ED8926" } },
@@ -230,6 +238,8 @@ export const designSystemConfig = defineConfig({
             },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.orange.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         green: {
           solid: {
@@ -266,6 +276,8 @@ export const designSystemConfig = defineConfig({
             },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.green.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         blue: {
           solid: {
@@ -287,6 +299,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.blue.700}", _dark: "{colors.blue.300}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.blue.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         yellow: {
           solid: {
@@ -326,6 +340,8 @@ export const designSystemConfig = defineConfig({
             },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.yellow.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         red: {
           solid: {
@@ -347,6 +363,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.red.700}", _dark: "{colors.red.200}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.red.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         pink: {
           solid: {
@@ -368,6 +386,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.pink.700}", _dark: "{colors.pink.200}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.pink.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         purple: {
           solid: {
@@ -407,6 +427,8 @@ export const designSystemConfig = defineConfig({
             },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.purple.solid}" },
+          onSolid: { value: { _light: "white", _dark: "{colors.gray.950}" } },
         },
         teal: {
           solid: {
@@ -428,6 +450,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.teal.700}", _dark: "{colors.teal.200}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.teal.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
         cyan: {
           solid: {
@@ -449,6 +473,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.cyan.700}", _dark: "{colors.cyan.200}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
+          indicator: { value: "{colors.cyan.solid}" },
+          onSolid: { value: "{colors.gray.950}" },
         },
 
         // Brand orange as LangWatch's accent; status.warning remains yellow.
@@ -462,7 +488,12 @@ export const designSystemConfig = defineConfig({
           emphasized: { value: "{colors.orange.emphasized}" },
           hover: { value: "{colors.orange.hover}" },
           focusRing: { value: "{colors.orange.focusRing}" },
+          indicator: { value: "{colors.orange.indicator}" },
+          onSolid: { value: "{colors.orange.onSolid}" },
         },
+
+        // product.<id>.<role> aliases, generated from the one map in product-colours.ts.
+        product: productColourTokens({ colours: PRODUCT_COLOURS }),
 
         // The logo: brand navy with white faces on light; on dark the faces
         // drop out and the lines go off-white, as the dark-theme wordmark draws it.
@@ -537,7 +568,7 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
           },
           fgMuted: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" },
+            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
           },
         },
 
@@ -545,11 +576,15 @@ export const designSystemConfig = defineConfig({
         bg: {
           DEFAULT: { value: { _light: "{colors.white}", _dark: "{colors.black}" } },
           // Branch-only roles alias the production main palette.
-          card: { value: "{colors.bg.panel}" },
+          // Dark is the user's chosen ink, not a Chakra step.
+          card: { value: { _light: "{colors.bg.panel}", _dark: "#0f1116" } },
           overlay: { value: "{colors.bg.panel}" },
+          // The callable Drawer's header and footer, at card strength (drawer-chrome).
+          drawer: { chrome: { value: "{colors.bg.card}" } },
           nested: { value: "{colors.bg.muted}" },
           raised: { value: "{colors.bg.panel}" },
-          control: { value: "{colors.bg.input}" },
+          // Light fields are white on the grey page, as main's were; grey read as disabled.
+          control: { value: { _light: "{colors.bg.surface}", _dark: "{colors.bg.input}" } },
           hover: { value: "{colors.bg.softHover}" },
           selected: { value: "{colors.nav.bgActive}" },
           stripe: { value: "{colors.bg.subtle}" },
@@ -623,7 +658,17 @@ export const designSystemConfig = defineConfig({
         // Border semantic tokens - visible in dark mode
         border: {
           // Branch-only roles alias the production main palette.
-          card: { value: "{colors.border}" },
+          card: { value: { _light: "{colors.border}", _dark: "#3a3a44" } },
+          // A drawer header or footer edge, and the faint highlight along it (drawer-chrome).
+          drawer: {
+            edge: { value: "{colors.border.card}" },
+            glint: {
+              value: {
+                _light: "color-mix(in srgb, {colors.white} 45%, transparent)",
+                _dark: "color-mix(in srgb, {colors.white} 18%, transparent)",
+              },
+            },
+          },
           nested: { value: "{colors.border.muted}" },
           control: { value: "{colors.border}" },
           strong: { value: "{colors.border.emphasized}" },
@@ -661,13 +706,18 @@ export const designSystemConfig = defineConfig({
       }),
       heading: defineRecipe({
         base: {
-          fontWeight: "500",
+          fontWeight: "600",
           color: "fg",
         },
         variants: {
           size: {
-            md: { textStyle: "md" },
-            lg: { textStyle: "2xl" },
+            sm: { textStyle: "sectionTitle" },
+            md: { textStyle: "metric" },
+            lg: { textStyle: "pageTitle" },
+            xl: { textStyle: "2xl" },
+            "2xl": { textStyle: "3xl" },
+            "3xl": { textStyle: "4xl" },
+            "4xl": { textStyle: "5xl" },
           },
         },
         defaultVariants: {
@@ -676,7 +726,7 @@ export const designSystemConfig = defineConfig({
       }),
       link: defineRecipe({
         base: {
-          focusRing: "none",
+          focusVisibleRing: "outside",
         },
       }),
       tag: defineRecipe({
@@ -736,7 +786,7 @@ export const designSystemConfig = defineConfig({
               h: "8",
               minW: "8",
               px: "2.5",
-              fontSize: "13px",
+              textStyle: "bodySm",
               _icon: {
                 flexShrink: 1,
                 width: "auto",
@@ -831,11 +881,31 @@ export const designSystemConfig = defineConfig({
           minWidth: 0,
           overflow: "hidden",
         },
-        variants: { variant: { solid: { _light: badgeGlass } } },
+        variants: { variant: { solid: { color: "colorPalette.onSolid", _light: badgeGlass } } },
       }),
     },
     slotRecipes: {
       segmentGroup: segmentGroupSlotRecipe,
+      radioCard: defineSlotRecipe({
+        slots: ["item", "itemDescription"],
+        base: {
+          item: { borderColor: "border.control" },
+          itemDescription: { color: "fg.muted", opacity: 1 },
+        },
+        variants: {
+          variant: {
+            outline: {
+              item: {
+                _checked: {
+                  bg: "bg.selected",
+                  borderColor: "colorPalette.fg",
+                  boxShadowColor: "colorPalette.fg",
+                },
+              },
+            },
+          },
+        },
+      }),
       tooltip: defineSlotRecipe({
         slots: ["content", "arrow", "arrowTip"],
         base: {
@@ -864,8 +934,8 @@ export const designSystemConfig = defineConfig({
           root: {
             borderRadius: "xl",
             transition: "all 0.2s ease-in-out",
-            // Home's card: the panel at half strength, blurred, so the page shows through
-            // darker than a solid panel and the card reads as one quiet material.
+            // The card tint at half strength, blurred: the ground's colour shows through and
+            // every card blends with it, as home's did.
             background: "bg.card/50",
             backdropFilter: "blur(12px)",
             borderColor: "border.card",
@@ -884,7 +954,7 @@ export const designSystemConfig = defineConfig({
                 borderWidth: "1px",
                 borderStyle: "solid",
                 borderColor: "border.card",
-                background: "bg.card",
+                background: "bg.card/50",
                 borderRadius: "showcase",
                 boxShadow: "showcase",
               },
@@ -897,10 +967,13 @@ export const designSystemConfig = defineConfig({
                 borderColor: "border.nested",
               },
             },
+            // `bg` and `borderColor` by the same keys Chakra's own variants set, so ours win.
             outline: {
               root: {
+                bg: "bg.card/50",
                 borderWidth: "1px",
                 borderStyle: "solid",
+                borderColor: "border.card",
                 boxShadow: "2xs",
               },
             },
@@ -908,6 +981,7 @@ export const designSystemConfig = defineConfig({
             // governance figures use. A clickable card adds its own hover lift.
             elevated: {
               root: {
+                bg: "bg.card/50",
                 borderWidth: "1px",
                 borderStyle: "solid",
                 borderColor: "border.card",
@@ -973,8 +1047,12 @@ export const designSystemConfig = defineConfig({
           variant: {
             line: {
               trigger: {
+                color: "fg.muted",
                 _selected: {
-                  color: "colorPalette.solid",
+                  color: "fg",
+                  fontWeight: "600",
+                  "--indicator-color": "colors.colorPalette.indicator",
+                  "--indicator-thickness": "2px",
                 },
               },
             },
@@ -1026,8 +1104,7 @@ export const designSystemConfig = defineConfig({
               trigger: {
                 py: "1",
                 px: "3",
-                textStyle: "sm",
-                fontSize: "13px",
+                textStyle: "bodySm",
               },
             },
           },
@@ -1060,6 +1137,7 @@ export const designSystemConfig = defineConfig({
             overflow: "clip",
             borderCollapse: "separate",
             borderSpacing: 0,
+            fontVariantNumeric: "normal",
           },
           row: {
             bg: "transparent",
@@ -1067,7 +1145,7 @@ export const designSystemConfig = defineConfig({
             _selected: { bg: "bg.selected", _hover: { bg: "bg.selected" } },
           },
           columnHeader: {
-            fontWeight: "bold",
+            fontWeight: "semibold",
             textStyle: "xs",
             textTransform: "uppercase",
             color: "fg.muted",
@@ -1141,12 +1219,13 @@ export const designSystemConfig = defineConfig({
                 lineHeight: "1em",
               },
               columnHeader: {
-                fontSize: "11px",
+                textStyle: "micro",
                 paddingY: 2,
                 paddingX: 3,
               },
               cell: {
-                fontSize: "13px",
+                textStyle: "bodySm",
+                lineHeight: "1em",
                 paddingY: 2,
                 paddingX: 3,
               },
@@ -1220,8 +1299,7 @@ export const designSystemConfig = defineConfig({
             pt: "3",
           },
           title: {
-            textStyle: "md",
-            fontWeight: "500",
+            textStyle: "sectionTitle",
           },
           // A dialog panel is opaque: the blur behind it is the backdrop's, never the panel's.
           content: {
@@ -1325,23 +1403,34 @@ export const designSystemConfig = defineConfig({
             // lands it as far from the right edge as the icon is from the left.
             paddingInlineStart: "3.5",
             paddingInlineEnd: "3",
-            // Collapsed, the newest card and two behind it show; behind cards show no content.
-            "&[data-overlap]": {
-              opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
-              transformOrigin: "top center",
-              "&:not([data-first]) > *": { opacity: 0 },
-            },
             // The stack measures a card unscaled before it mounts, so cards behind keep its height.
             "&:not([data-mounted])": { scale: "1" },
             transitionProperty: "translate, scale, opacity, height",
-            transitionDuration: "240ms",
-            transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)",
-            "&[data-state=open]": { animation: "toast-in 180ms cubic-bezier(0.2, 0, 0, 1) both" },
+            // Collapsed, the newest card and two behind it show; behind cards show no content.
+            // Cards behind recede: 6% smaller each, softer shadow, under a floating front card.
+            "&[data-overlap]": {
+              opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
+              transformOrigin: "top center",
+              translate: "0 calc(var(--y) - var(--toast-peek, 0) * var(--index) * 1px)",
+              scale: "calc(1 - var(--index) * 0.06)",
+              "&:not([data-mounted])": { scale: "1" },
+              boxShadow: "md",
+              "&[data-first]": { boxShadow: "2xl" },
+              "&:not([data-first]) > *": { opacity: 0 },
+            },
+            // A soft spring with a slight settle, as iOS stacks move; the curve is the spring
+            // sampled into linear(), so CSS runs it without JavaScript.
+            transitionDuration: "460ms",
+            transitionTimingFunction: TOAST_SPRING,
+            "&[data-state=open]": {
+              animation: `toast-in 460ms ${TOAST_SPRING} backwards`,
+            },
             "&[data-state=closed]": { animation: "toast-fade 120ms ease-in both" },
             _motionReduce: {
               transition: "none",
               animation: "none",
-              "&[data-state=closed]": { animation: "toast-fade 120ms linear both" },
+              "&[data-state=open]": { animation: "none" },
+              "&[data-state=closed]": { animation: "none", opacity: 0 },
             },
             // A status toast wears the middle strength of the status mesh. Repeated per type to
             // outrank Chakra's own filled defaults.

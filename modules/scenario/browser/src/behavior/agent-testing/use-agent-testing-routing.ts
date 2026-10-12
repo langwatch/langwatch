@@ -37,6 +37,8 @@ export type AgentTestingRouting = AgentTestingRoutingState & {
    */
   isReady: boolean;
   setTab: (tab: AgentTestingTab) => void;
+  /** The address each tab opens, for tabs drawn as links. */
+  tabHrefs: Record<AgentTestingTab, string>;
   selectSuite: (selection: AgentTestingSelection) => void;
   selectPlan: (planSlug: string | null) => void;
   selectRun: (batchRunId: string | null) => void;
@@ -212,6 +214,18 @@ export function useAgentTestingRouting(): AgentTestingRouting {
     [push],
   );
 
+  const tabHrefs = useMemo(() => {
+    const hrefOf = (tab: AgentTestingTab) =>
+      projectSlug
+        ? buildAgentTestingPush({
+            projectSlug,
+            state: { ...DEFAULT_STATE, tab },
+            query: router.query,
+          })
+        : "#";
+    return { cases: hrefOf("cases"), results: hrefOf("results") };
+  }, [projectSlug, router.query]);
+
   const selectSuite = useCallback(
     (selection: AgentTestingSelection) => {
       push({ ...DEFAULT_STATE, tab: "cases", selection });
@@ -249,6 +263,7 @@ export function useAgentTestingRouting(): AgentTestingRouting {
     ...state,
     isReady,
     setTab,
+    tabHrefs,
     selectSuite,
     selectPlan,
     selectRun,

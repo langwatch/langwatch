@@ -5,16 +5,9 @@
 
 import type { GrantScopeType } from "@langwatch/authz-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
-import {
-  Button,
-  Field,
-  Input,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Field, Input, NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
-import { useState } from "react";
+import { type FormEvent, type Ref, useId, useRef, useState } from "react";
 
 import type { GrantScope, GrantDraft } from "../../../model/grants/grant-draft.ts";
 import {
@@ -53,6 +46,98 @@ export type GrantDialogProps = {
   onClose: () => void;
 };
 
+function PrincipalField({
+  ref,
+  value,
+  onChange,
+  invalid,
+  members,
+  groups,
+}: {
+  ref: Ref<HTMLSelectElement>;
+  value: string;
+  onChange: (next: string) => void;
+  invalid: boolean;
+  members: GrantDialogProps["members"];
+  groups: GrantDialogProps["groups"];
+}) {
+  return (
+    <Field.Root required invalid={invalid}>
+      <Field.Label>Who</Field.Label>
+      <NativeSelect.Root>
+        <NativeSelect.Field
+          ref={ref}
+          aria-label="Who"
+          data-testid="grant-who"
+          value={value}
+          onChange={(event) => onChange(event.currentTarget.value)}
+        >
+          <option value="">Choose a member or a group</option>
+          <optgroup label="Members">
+            {members.map((member) => (
+              <option key={member.id} value={`user:${member.id}`}>
+                {member.name ?? member.email ?? member.id}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Groups">
+            {groups.map((group) => (
+              <option key={group.id} value={`group:${group.id}`}>
+                {group.name}
+              </option>
+            ))}
+          </optgroup>
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+      <Field.ErrorText>Choose a member or a group.</Field.ErrorText>
+    </Field.Root>
+  );
+}
+
+function RoleField({
+  ref,
+  value,
+  onChange,
+  invalid,
+  roles,
+  isBeyondReader,
+}: {
+  ref: Ref<HTMLSelectElement>;
+  value: string;
+  onChange: (next: string) => void;
+  invalid: boolean;
+  roles: GrantDialogProps["roles"];
+  isBeyondReader: (roleId: string) => boolean;
+}) {
+  return (
+    <Field.Root required invalid={invalid}>
+      <Field.Label>Role</Field.Label>
+      <NativeSelect.Root>
+        <NativeSelect.Field
+          ref={ref}
+          aria-label="Role"
+          data-testid="grant-role"
+          value={value}
+          onChange={(event) => onChange(event.currentTarget.value)}
+        >
+          <option value="">Choose a role</option>
+          {grantRoleOptions({ customRoles: roles }).map((role) => {
+            const beyond = isBeyondReader(role.id);
+            return (
+              <option key={role.id} value={role.id} disabled={beyond}>
+                {beyond ? `${role.name} (more access than you have)` : role.name}
+              </option>
+            );
+          })}
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+      <Field.ErrorText>Choose a role.</Field.ErrorText>
+    </Field.Root>
+  );
+}
+
 /** Mounted only while open, so each opening starts from the grant it is about. */
 export function GrantDialog({
   organizationId,
@@ -74,6 +159,10 @@ export function GrantDialog({
     { scopeType: "ORGANIZATION", scopeId: organizationId },
   ]);
   const [day, setDay] = useState("");
+  const [attempted, setAttempted] = useState(false);
+  const formId = useId();
+  const principalRef = useRef<HTMLSelectElement>(null);
+  const roleRef = useRef<HTMLSelectElement>(null);
 
   const scopeType: GrantScopeType = editing?.scope.type ?? SCOPE_TYPE_OF_TIER[scope[0]!.scopeType];
   const scopeId = editing?.scope.id ?? scope[0]!.scopeId;
@@ -85,7 +174,21 @@ export function GrantDialog({
     return permissionsBeyondReader({ requested, held: heldPermissions }).length > 0;
   };
 
-  const submit = () => {
+  const principalMissing = !editing && !principal;
+  const roleMissing = !roleId;
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSaving) return;
+    setAttempted(true);
+    if (principalMissing) {
+      principalRef.current?.focus();
+      return;
+    }
+    if (roleMissing) {
+      roleRef.current?.focus();
+      return;
+    }
     if (editing) {
       onChangeRole({ grantId: editing.id, roleId });
       return;
@@ -99,124 +202,81 @@ export function GrantDialog({
       ...(expiresAt ? { expiresAt } : {}),
     });
   };
-  const canSubmit = !!roleId && (!!editing || !!principal);
 
   return (
-    <Dialog.Root open onOpenChange={(event) => !event.open && onClose()}>
-      <Dialog.Content maxWidth="560px">
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>{editing ? "Change role" : "Grant a role"}</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="stretch" gap={5}>
-            {editing ? (
-              <Text fontSize="sm">
-                {grantPrincipalText(editing.principal)} on {grantScopeText(editing.scope)}
-              </Text>
-            ) : (
-              <Field.Root required>
-                <Field.Label>Who</Field.Label>
-                <NativeSelect.Root>
-                  <NativeSelect.Field
-                    aria-label="Who"
-                    data-testid="grant-who"
-                    value={principal}
-                    onChange={(event) => setPrincipal(event.currentTarget.value)}
-                  >
-                    <option value="">Choose a member or a group</option>
-                    <optgroup label="Members">
-                      {members.map((member) => (
-                        <option key={member.id} value={`user:${member.id}`}>
-                          {member.name ?? member.email ?? member.id}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Groups">
-                      {groups.map((group) => (
-                        <option key={group.id} value={`group:${group.id}`}>
-                          {group.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-              </Field.Root>
-            )}
+    <Dialog
+      open
+      onClose={onClose}
+      title={editing ? "Change role" : "Grant a role"}
+      size="md"
+      primaryAction={{
+        label: editing ? "Change role" : "Grant role",
+        type: "submit",
+        form: formId,
+        loading: isSaving,
+        "data-testid": "grant-submit",
+      }}
+    >
+      <form id={formId} noValidate onSubmit={submit}>
+        <VStack align="stretch" gap={5}>
+          {editing ? (
+            <Text fontSize="sm">
+              {grantPrincipalText(editing.principal)} on {grantScopeText(editing.scope)}
+            </Text>
+          ) : (
+            <PrincipalField
+              ref={principalRef}
+              value={principal}
+              onChange={setPrincipal}
+              invalid={attempted && principalMissing}
+              members={members}
+              groups={groups}
+            />
+          )}
 
-            <Field.Root required>
-              <Field.Label>Role</Field.Label>
-              <NativeSelect.Root>
-                <NativeSelect.Field
-                  aria-label="Role"
-                  data-testid="grant-role"
-                  value={roleId}
-                  onChange={(event) => setRoleId(event.currentTarget.value)}
-                >
-                  <option value="">Choose a role</option>
-                  {grantRoleOptions({ customRoles: roles }).map((role) => {
-                    const beyond = isBeyondReader(role.id);
-                    return (
-                      <option key={role.id} value={role.id} disabled={beyond}>
-                        {beyond ? `${role.name} (more access than you have)` : role.name}
-                      </option>
-                    );
-                  })}
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            </Field.Root>
+          <RoleField
+            ref={roleRef}
+            value={roleId}
+            onChange={setRoleId}
+            invalid={attempted && roleMissing}
+            roles={roles}
+            isBeyondReader={isBeyondReader}
+          />
 
-            {!editing && (
-              <>
-                <ScopeChipPicker
-                  value={scope}
-                  onChange={(next) => {
-                    const [first] = next;
-                    if (!first) return;
-                    setScope(next);
-                    onScopeChange({ type: SCOPE_TYPE_OF_TIER[first.scopeType], id: first.scopeId });
-                  }}
-                  organizationId={organizationId}
-                  {...(structure.organizationName
-                    ? { organizationName: structure.organizationName }
-                    : {})}
-                  availableTeams={[...structure.teams]}
-                  availableProjects={[...structure.projects]}
-                  label="Where"
-                  variant="single-select"
-                  showSummary={false}
+          {!editing && (
+            <>
+              <ScopeChipPicker
+                value={scope}
+                onChange={(next) => {
+                  const [first] = next;
+                  if (!first) return;
+                  setScope(next);
+                  onScopeChange({ type: SCOPE_TYPE_OF_TIER[first.scopeType], id: first.scopeId });
+                }}
+                organizationId={organizationId}
+                {...(structure.organizationName
+                  ? { organizationName: structure.organizationName }
+                  : {})}
+                availableTeams={[...structure.teams]}
+                availableProjects={[...structure.projects]}
+                label="Where"
+                variant="single-select"
+                showSummary={false}
+              />
+              <Field.Root>
+                <Field.Label>Ends on</Field.Label>
+                <Input
+                  type="date"
+                  aria-label="Ends on"
+                  value={day}
+                  onChange={(event) => setDay(event.currentTarget.value)}
                 />
-                <Field.Root>
-                  <Field.Label>Ends on</Field.Label>
-                  <Input
-                    type="date"
-                    aria-label="Ends on"
-                    value={day}
-                    onChange={(event) => setDay(event.currentTarget.value)}
-                  />
-                  <Field.HelperText>Leave empty for access that does not end.</Field.HelperText>
-                </Field.Root>
-              </>
-            )}
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="orange"
-            disabled={!canSubmit}
-            data-testid="grant-submit"
-            loading={isSaving}
-            onClick={submit}
-          >
-            {editing ? "Change role" : "Grant role"}
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+                <Field.HelperText>Leave empty for access that does not end.</Field.HelperText>
+              </Field.Root>
+            </>
+          )}
+        </VStack>
+      </form>
+    </Dialog>
   );
 }

@@ -1,5 +1,11 @@
 import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 
+/** Firmer line where a section ends: header base, section edges and the grid's frame. */
+export const WORKBENCH_SECTION_BORDER = "border";
+export const SECTION_LINE = "1px solid var(--chakra-colors-border)";
+/** Hairline between cells and columns; the one grid-line colour. */
+export const GRID_LINE = "1px solid var(--chakra-colors-border-muted)";
+
 /**
  * Cell/row styling shared by every dataset table surface, applied via
  * `css` on the scroll container — the source of truth for bare `<td>`/`<th>`
@@ -7,20 +13,19 @@ import type { SystemStyleObject } from "@langwatch/design-system/primitives";
  */
 export const datasetTableCss: SystemStyleObject = {
   "& th": {
-    borderBottom: "1px solid var(--chakra-colors-border)",
-    borderRight: "1px solid var(--chakra-colors-border-muted)",
+    borderBottom: SECTION_LINE,
+    borderRight: GRID_LINE,
     padding: "8px 12px",
     textAlign: "left",
     backgroundColor: "var(--chakra-colors-bg-panel)",
-    fontWeight: "medium",
-    fontSize: "13px",
+    textStyle: "label",
     position: "relative",
   },
   "& td": {
-    borderBottom: "1px solid var(--chakra-colors-border-muted)",
-    borderRight: "1px solid var(--chakra-colors-border-muted)",
+    borderBottom: GRID_LINE,
+    borderRight: GRID_LINE,
     padding: "8px 12px",
-    fontSize: "13px",
+    textStyle: "bodySm",
     verticalAlign: "top",
     "--cell-bg": "var(--chakra-colors-bg-panel)",
   },

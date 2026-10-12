@@ -154,7 +154,7 @@ describe("the playground's chrome", () => {
     it("offers to start a new prompt, in words", () => {
       renderWithDesignSystem(<AddPromptButton />);
 
-      expect(screen.getByRole("button", { name: /New Prompt/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /New prompt/ })).toBeInTheDocument();
     });
   });
 });

@@ -1,5 +1,5 @@
-import { Kbd } from "@langwatch/design-system/kbd";
 import { Box, Flex, HStack, Text } from "@langwatch/design-system/primitives";
+import { ShortcutHint, shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -8,6 +8,10 @@ import {
   selectPeersMatching,
   usePresenceStore,
 } from "../../../../behavior/presence/presence-store.ts";
+import {
+  drawerShortcut,
+  type TraceDrawerShortcutId,
+} from "../../../../features/trace-drawer/behavior/trace-drawer-shortcut-table.ts";
 import type { DrawerViewMode } from "../../../../model/trace-drawer-params.ts";
 import { PresenceMarker } from "../../../elements/presence/presence-marker.tsx";
 
@@ -51,9 +55,14 @@ interface ModeSwitchProps {
 /** Shown on every tab annotation mode makes unavailable. */
 const EDITING_DISABLED_REASON = "Finish annotating to switch views";
 
+type DrawerModeShortcutId = Extract<
+  TraceDrawerShortcutId,
+  "summary" | "trace" | "conversation" | "session" | "terminal"
+>;
+
 interface TabProps {
   label: string;
-  shortcut: string;
+  shortcutId: DrawerModeShortcutId;
   active: boolean;
   disabled?: boolean;
   onClick: () => void;
@@ -77,7 +86,7 @@ function ModePresenceDot({ traceId, mode }: { traceId: string; mode: DrawerViewM
 
 function ModeTab({
   label,
-  shortcut,
+  shortcutId,
   active,
   disabled,
   onClick,
@@ -85,9 +94,11 @@ function ModeTab({
   disabledReason,
 }: TabProps) {
   const inactiveColor = disabled ? "fg.subtle" : "fg.muted";
+  const shortcut = drawerShortcut(shortcutId);
   const tab = (
     <Flex
       as={disabled ? "div" : "button"}
+      aria-keyshortcuts={disabled ? undefined : shortcutAriaKeys(shortcut)}
       data-testid={`trace-mode-tab-${label.toLowerCase()}`}
       align="center"
       gap={1}
@@ -108,7 +119,7 @@ function ModeTab({
           intended "Summary [O]". Kbd is a closed component (no style
           override props), so the separation lives on a wrapper box. */}
       <Box marginLeft={0.5}>
-        <Kbd>{shortcut}</Kbd>
+        <ShortcutHint shortcut={shortcut} decorative />
       </Box>
       {presence}
       {/* Active indicator — a 2px underline that aligns with the row's
@@ -181,7 +192,7 @@ function CodingAgentTabs({
     <>
       <ModeTab
         label="Usage"
-        shortcut="U"
+        shortcutId="session"
         active={viewMode === "session"}
         disabled={isEditing}
         disabledReason={disabledReason}
@@ -190,9 +201,7 @@ function CodingAgentTabs({
       />
       <ModeTab
         label="Terminal"
-        // NOT M: that's Maximize. The tab advertised a shortcut that did
-        // something else entirely, which is worse than having none.
-        shortcut="E"
+        shortcutId="terminal"
         active={viewMode === "terminal"}
         disabled={isEditing}
         disabledReason={disabledReason}
@@ -232,14 +241,14 @@ export function ModeSwitch({
         a coding-agent trace for, leaving the raw transcript as the fallback view. */}
       <ModeTab
         label="Summary"
-        shortcut="O"
+        shortcutId="summary"
         active={viewMode === "summary"}
         onClick={() => onViewModeChange("summary")}
         presence={presenceFor("summary")}
       />
       <ModeTab
         label="Trace"
-        shortcut="T"
+        shortcutId="trace"
         active={viewMode === "trace"}
         onClick={() => onViewModeChange("trace")}
         presence={presenceFor("trace")}
@@ -262,7 +271,7 @@ export function ModeSwitch({
       {!isConversationHidden && (
         <ModeTab
           label="Conversation"
-          shortcut="C"
+          shortcutId="conversation"
           active={viewMode === "conversation"}
           disabled={conversationTab.disabled}
           disabledReason={conversationTab.reason}

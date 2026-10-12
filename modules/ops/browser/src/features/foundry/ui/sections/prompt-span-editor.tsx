@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { Box, Button, Flex, Input, Text } from "@langwatch/design-system/primitives";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -16,8 +17,8 @@ export function PromptSpanEditor({ span }: { span: SpanConfig }) {
   const entries = Object.entries(variables);
 
   return (
-    <Box rounded="lg" border="1px solid" borderColor="yellow.muted" bg="yellow.subtle" p={4}>
-      <Text fontSize="sm" fontWeight="semibold" color="yellow.fg" mb={3}>
+    <Card variant="nested" tone="yellow" padding="md">
+      <Text as="h3" fontSize="sm" fontWeight="semibold" color="yellow.fg" mb={3}>
         Prompt Configuration
       </Text>
       <Flex gap={3} mb={3}>
@@ -119,6 +120,6 @@ export function PromptSpanEditor({ span }: { span: SpanConfig }) {
           <Plus size={12} /> Add Variable
         </Button>
       </Flex>
-    </Box>
+    </Card>
   );
 }

@@ -8,6 +8,7 @@ import {
   type CustomGraph,
   type CustomGraphNameRef,
   type EmailSuppression,
+  type EmailSuppressionCursor,
   type ReportSchedule,
   type SuppressEmailCommand,
   type Trigger,
@@ -396,6 +397,17 @@ export class AutomationService {
     projectId: string;
   }): Promise<(EmailSuppression & { triggerName: string | null })[]> {
     return this.emailSuppressions.getAllEnriched(input);
+  }
+
+  getPageEnriched(input: {
+    projectId: string;
+    limit: number;
+    cursor?: EmailSuppressionCursor | null;
+  }): Promise<{
+    rows: (EmailSuppression & { triggerName: string | null })[];
+    nextCursor: EmailSuppressionCursor | null;
+  }> {
+    return this.emailSuppressions.getPageEnriched(input);
   }
 
   findUnsubscribeView(input: {

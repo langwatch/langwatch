@@ -1,4 +1,5 @@
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-proto";
+import { type CompressionAlgorithm } from "@opentelemetry/otlp-exporter-base";
 
 import {
   DEFAULT_ENDPOINT,
@@ -8,10 +9,13 @@ import {
   LANGWATCH_SDK_VERSION,
   LOGS_PATH,
 } from "../../internal/constants";
+import { resolveOtlpCompression } from "../../internal/otlp-compression";
 
 export interface LangWatchLogsExporterOptions {
   endpoint?: string;
   apiKey?: string;
+  /** Request compression: gzip unless an OTEL_EXPORTER_OTLP_*COMPRESSION env var is set. */
+  compression?: CompressionAlgorithm;
 }
 
 /** Extends OpenTelemetry OTLP HTTP logs exporter to send logs to LangWatch with authentication. */
@@ -33,6 +37,7 @@ export class LangWatchLogsExporter extends OTLPLogExporter {
         ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
       },
       url: otelEndpoint.toString(),
+      compression: resolveOtlpCompression({ compression: opts?.compression, signal: "LOGS" }),
     });
   }
 }

@@ -8,7 +8,7 @@
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import type { ChatTransport, UIMessage } from "ai";
-import type { ReactNode } from "react";
+import { type ReactNode, useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 if (typeof window !== "undefined" && !window.ResizeObserver) {
@@ -62,8 +62,27 @@ const transportRef = {
   current: null as ChatTransport<UIMessage> | null,
 };
 
+/** Mocks mutate in place; readers subscribe here so the compiled panel sees the change. */
+const changes = vi.hoisted(() => ({ version: 0, listeners: new Set<() => void>() }));
+function notifyChange() {
+  changes.version += 1;
+  changes.listeners.forEach((listener) => listener());
+}
+function useChanges() {
+  "use no memo";
+  return useSyncExternalStore(
+    (listener) => {
+      changes.listeners.add(listener);
+      return () => void changes.listeners.delete(listener);
+    },
+    () => changes.version,
+  );
+}
+
 vi.mock("@ai-sdk/react", () => ({
   useChat: (options: { transport: ChatTransport<UIMessage> }) => {
+    "use no memo";
+    useChanges();
     transportRef.current = options.transport;
     return {
       messages: chatRef.messages,
@@ -123,18 +142,22 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
         }),
       },
       messages: {
-        useQuery: () => ({
-          data: historyRef.current,
-          isLoading: false,
-          isFetching: false,
-          isError: false,
-          isSuccess: !!historyRef.current,
-          error: null,
-          refetch: () => {
-            refetchHistoryMock();
-            return Promise.resolve();
-          },
-        }),
+        useQuery: () => {
+          "use no memo";
+          useChanges();
+          return {
+            data: historyRef.current,
+            isLoading: false,
+            isFetching: false,
+            isError: false,
+            isSuccess: !!historyRef.current,
+            error: null,
+            refetch: () => {
+              refetchHistoryMock();
+              return Promise.resolve();
+            },
+          };
+        },
       },
       stopTurn: { useMutation: () => ({ mutateAsync: () => Promise.resolve() }) },
       onConversationUpdate: { useSubscription: () => undefined },
@@ -505,7 +528,7 @@ describe("Rule: a turn this tab did not start reattaches to its stream", () => {
       currentTurnId: null,
     };
     chatRef.messages = answered;
-    const { rerender } = renderPanel();
+    renderPanel();
     await waitFor(() => expect(transportRef.current).not.toBeNull());
     openConversationAfterScopeAnnounced();
     refetchHistoryMock.mockClear();
@@ -527,14 +550,14 @@ describe("Rule: a turn this tab did not start reattaches to its stream", () => {
       currentTurnId: "turn-9",
     };
     await act(async () => {
-      rerender(<LangySidecar />);
+      notifyChange();
     });
     await waitFor(() => expect(chatRef.setMessages).toHaveBeenCalled());
 
     // The engine takes it, which is what readies the resume.
     chatRef.messages = withFolderNotice;
     await act(async () => {
-      rerender(<LangySidecar />);
+      notifyChange();
     });
     await waitFor(() => expect(chatRef.resumeStream).toHaveBeenCalledTimes(1));
 

@@ -85,7 +85,7 @@ export function DatasetTabs({
 
   return (
     <HStack gap={2} flexWrap="nowrap" alignItems="center" overflow="auto" width="full">
-      <Text fontWeight="semibold" fontSize="sm" color="fg" paddingRight={2}>
+      <Text textStyle="cardTitle" color="fg" paddingRight={2}>
         Datasets
       </Text>
 
@@ -208,7 +208,7 @@ function DatasetTab({
       >
         <HStack gap={1}>
           <Database size={12} color={isSaved ? "var(--chakra-colors-blue-fg)" : "currentColor"} />
-          <Text fontSize="12px" fontWeight="medium">
+          <Text textStyle="caption" fontWeight="medium">
             {dataset.name}
           </Text>
         </HStack>
@@ -233,7 +233,7 @@ function DatasetTab({
         >
           <HStack gap={1}>
             <Database size={12} color={isSaved ? "var(--chakra-colors-blue-fg)" : "currentColor"} />
-            <Text fontSize="12px" fontWeight="semibold">
+            <Text textStyle="caption" fontWeight="semibold">
               {dataset.name}
             </Text>
             <ChevronDown size={10} />

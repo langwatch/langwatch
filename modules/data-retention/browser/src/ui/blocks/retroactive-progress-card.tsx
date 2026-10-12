@@ -1,13 +1,6 @@
 import type { RetentionCategory } from "@langwatch/data-retention-contract";
-import {
-  Button,
-  Card,
-  Heading,
-  HStack,
-  Progress,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Button, HStack, Progress, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { CATEGORY_LABELS } from "../../model/retention-constants.ts";
 
@@ -21,6 +14,14 @@ export type RetentionMutationProgress = {
   partsToDo: number;
 };
 
+function sentenceCase(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+}
+
+function labelOf(m: RetentionMutationProgress): string {
+  return m.category ? sentenceCase(CATEGORY_LABELS[m.category]) : "Stored data";
+}
+
 export function RetroactiveProgressCard({
   mutations,
   onCancel,
@@ -32,28 +33,29 @@ export function RetroactiveProgressCard({
 }) {
   if (mutations.length === 0) return null;
   return (
-    <Card.Root width="full">
-      <Card.Header>
-        <Heading as="h3" fontSize="lg">
-          Applying retention to existing data
-        </Heading>
-        <Text fontSize="sm" color="fg.muted">
-          ClickHouse rewrites the affected parts during background merges. Large datasets can take a
-          while; the count below is parts still pending.
-        </Text>
-      </Card.Header>
-      <Card.Body>
-        <VStack gap={4} align="stretch">
-          {mutations.map((m) => (
-            <VStack key={m.mutationId} gap={1} align="stretch">
+    <Card
+      title="Applying retention to existing data"
+      description="Applying your retention policy to existing data can take a while."
+      padding="lg"
+    >
+      <VStack gap={4} align="stretch">
+        {mutations.map((m, index) => {
+          const label = labelOf(m);
+          const sameLabel = mutations.filter((o) => labelOf(o) === label);
+          return (
+            <VStack key={`${m.mutationId}:${index}`} gap={1} align="stretch">
               <HStack justifyContent="space-between">
-                <Text>
-                  {m.table}
-                  {m.category ? ` · ${CATEGORY_LABELS[m.category]}` : ""}
-                </Text>
+                <HStack gap={2}>
+                  <Text>{label}</Text>
+                  {sameLabel.length > 1 && (
+                    <Text textStyle="caption" color="fg.muted">
+                      Update {sameLabel.indexOf(m) + 1}
+                    </Text>
+                  )}
+                </HStack>
                 <HStack gap={3}>
                   <Text fontSize="sm" color="fg.muted">
-                    {m.partsToDo} parts remaining
+                    In progress
                   </Text>
                   <Button
                     size="xs"
@@ -72,9 +74,9 @@ export function RetroactiveProgressCard({
                 </Progress.Track>
               </Progress.Root>
             </VStack>
-          ))}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+          );
+        })}
+      </VStack>
+    </Card>
   );
 }

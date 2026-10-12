@@ -51,6 +51,26 @@ describe("GrantDialog", () => {
       });
     });
 
+    it("names every missing field on submit and focuses the first, without granting", async () => {
+      const props = renderDialog();
+      const dialog = await screen.findByRole("dialog");
+
+      const submit = within(dialog).getByTestId("grant-submit");
+      expect(submit).toBeEnabled();
+      fireEvent.click(submit);
+
+      expect(await within(dialog).findByText("Choose a member or a group.")).toBeInTheDocument();
+      expect(within(dialog).getByText("Choose a role.")).toBeInTheDocument();
+      expect(within(dialog).getByLabelText("Who")).toHaveFocus();
+      expect(props.onCreate).not.toHaveBeenCalled();
+
+      fireEvent.change(within(dialog).getByLabelText("Who"), { target: { value: "user:u-sam" } });
+      fireEvent.click(submit);
+
+      expect(within(dialog).getByLabelText("Role")).toHaveFocus();
+      expect(props.onCreate).not.toHaveBeenCalled();
+    });
+
     /** @scenario A role beyond the reader's own access is greyed out */
     it("offers a custom role the reader lacks a permission of, but not to pick", async () => {
       renderDialog({

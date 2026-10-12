@@ -14,13 +14,15 @@ import {
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { isToastControl, useToastStack, useToastSwipe } from "./toast-interactions.ts";
+
 /** How many cards a collapsed stack shows: the newest and two peeking behind it. */
 export const STACK_DEPTH = 3;
 
 const instance: CreateToasterReturn = createToaster({
   placement: "bottom",
   pauseOnPageIdle: true,
-  // Cards overlap until the pointer or focus enters, then list; timers hold meanwhile.
+  // Interaction is owned by the region below; Zag keeps the toast lifecycle and measurements.
   overlap: true,
   gap: 12,
 });
@@ -96,39 +98,102 @@ export function Toaster({
 }: {
   renderMeta?: (meta: Record<string, unknown> | undefined) => ReactNode;
 }) {
+  const stack = useToastStack(instance);
+
   return (
     <Portal>
-      <ChakraToaster toaster={toaster} insetInline={{ mdDown: "4" }}>
-        {(toast) => {
-          const status = statusOf(toast.type);
-          return (
-            <Toast.Root width={{ md: "sm" }} role={status === "error" ? "alert" : undefined}>
-              <StatusIcon status={status} />
-              <Stack gap="0.5" flex="1" minWidth={0} maxWidth="100%">
-                {toast.title && <Toast.Title>{toast.title}</Toast.Title>}
-                {toast.description && (
-                  <Toast.Description color="inherit" opacity={1}>
-                    {toast.description}
-                  </Toast.Description>
+      <div ref={stack.region}>
+        <ChakraToaster
+          toaster={toaster}
+          insetInline={{ mdDown: "4" }}
+          data-expanded={stack.expanded ? "" : void 0}
+          data-hovered={stack.hovered ? "" : void 0}
+          onMouseOverCapture={(event) => event.stopPropagation()}
+          onMouseOutCapture={(event) => event.stopPropagation()}
+          onMouseMoveCapture={(event) => event.stopPropagation()}
+          onPointerEnter={(event) => {
+            if (event.pointerType !== "touch") stack.setHovered(true);
+          }}
+          onPointerLeave={() => stack.setHovered(false)}
+          onPointerDownCapture={() => {
+            stack.pointerFocus.current = true;
+          }}
+          onPointerUpCapture={() => {
+            stack.pointerFocus.current = false;
+          }}
+          onPointerCancelCapture={() => {
+            stack.pointerFocus.current = false;
+          }}
+          onFocusCapture={(event) => {
+            event.stopPropagation();
+            stack.setFocused(true);
+            // Pointer focus on a button must not open the stack before its action runs.
+            if (!stack.pointerFocus.current) stack.setExpanded(true);
+          }}
+          onBlurCapture={(event) => {
+            event.stopPropagation();
+            if (!event.currentTarget.contains(event.relatedTarget)) stack.setFocused(false);
+          }}
+          onClick={(event) => {
+            if (!isToastControl(event.target)) stack.setExpanded(true);
+          }}
+        >
+          {(toast) => {
+            if (!toast.id) return null;
+            const status = statusOf(toast.type);
+            return (
+              <SwipeToast id={toast.id} status={status} onDragging={stack.setDragging}>
+                <StatusIcon status={status} />
+                <Stack gap="0.5" flex="1" minWidth={0} maxWidth="100%">
+                  {toast.title && <Toast.Title>{toast.title}</Toast.Title>}
+                  {toast.description && (
+                    <Toast.Description color="inherit" opacity={1}>
+                      {toast.description}
+                    </Toast.Description>
+                  )}
+                  {renderMeta?.(toast.meta)}
+                </Stack>
+                {toast.action && (
+                  <Toast.ActionTrigger alignSelf="flex-start" flexShrink={0} css={toastActionStyle}>
+                    {toast.action.label}
+                  </Toast.ActionTrigger>
                 )}
-                {renderMeta?.(toast.meta)}
-              </Stack>
-              {toast.action && (
-                <Toast.ActionTrigger alignSelf="flex-start" flexShrink={0} css={toastActionStyle}>
-                  {toast.action.label}
-                </Toast.ActionTrigger>
-              )}
-              <Toast.CloseTrigger
-                position="static"
-                alignSelf="flex-start"
-                boxSize="5"
-                padding={0}
-                flexShrink={0}
-              />
-            </Toast.Root>
-          );
-        }}
-      </ChakraToaster>
+                <Toast.CloseTrigger
+                  position="static"
+                  alignSelf="flex-start"
+                  boxSize="5"
+                  padding={0}
+                  flexShrink={0}
+                />
+              </SwipeToast>
+            );
+          }}
+        </ChakraToaster>
+      </div>
     </Portal>
+  );
+}
+
+function SwipeToast({
+  id,
+  status,
+  onDragging,
+  children,
+}: {
+  id: string;
+  status: ToastStatus;
+  onDragging: (dragging: boolean) => void;
+  children: ReactNode;
+}) {
+  const swipe = useToastSwipe({ dismiss: () => instance.dismiss(id), onDragging });
+  return (
+    <Toast.Root
+      {...swipe}
+      width={{ md: "sm" }}
+      role={status === "error" ? "alert" : void 0}
+      style={{ touchAction: "pan-y", userSelect: "none" }}
+    >
+      {children}
+    </Toast.Root>
   );
 }

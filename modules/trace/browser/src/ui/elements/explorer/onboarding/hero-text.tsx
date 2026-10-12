@@ -41,7 +41,7 @@ export function renderHeading(stage: StageId, heading: string): React.ReactNode 
   if (stage === "postArrival") {
     return (
       <>
-        <Text as="span" color="blue.fg" fontWeight={500} marginRight={2} aria-hidden>
+        <Text as="span" color="blue.fg" fontWeight="medium" marginRight={2} aria-hidden>
           ↑
         </Text>
         {applyAuroraTextShimmer(heading.replace(/^↑\s*/, ""))}

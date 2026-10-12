@@ -222,7 +222,8 @@ export function FormFooter({ state, padding }: { state: AnnotationFormState; pad
       </Button>
       <Button
         size="xs"
-        colorPalette="blue"
+        colorPalette="orange"
+        variant="solid"
         onClick={state.handleSave}
         loading={state.isSaving}
         data-testid="annotation-form-save"

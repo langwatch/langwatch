@@ -87,7 +87,7 @@ export function PromptEditorFooter({
         variant="secondary"
       />
       {onApply && (
-        <Button colorPalette="blue" size="sm" onClick={onApply}>
+        <Button colorPalette="orange" variant="solid" size="sm" onClick={onApply}>
           Apply
         </Button>
       )}

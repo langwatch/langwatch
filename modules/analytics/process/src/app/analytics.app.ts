@@ -9,6 +9,8 @@ import {
   AnalyticsApi as AnalyticsApiToken,
   CustomChartPlaygroundNotEnabledError,
   MAX_LWQL_LENGTH,
+  type AnalyticsFeedbacksPageParams,
+  type AnalyticsFeedbacksPageResult,
   type AnalyticsFeedbacksResult,
   type AnalyticsFilterOption,
   type AnalyticsMetricSource,
@@ -524,6 +526,13 @@ export class AnalyticsModule
   /** The thumbs and comments left on the project's messages. */
   getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult> {
     return this.#dependencies.analytics.getFeedbacks(input);
+  }
+
+  /** The same feedbacks, newest first, one bounded page at a time. */
+  getFeedbacksPage(
+    input: AnalyticsReadInput & AnalyticsFeedbacksPageParams,
+  ): Promise<AnalyticsFeedbacksPageResult> {
+    return this.#dependencies.analytics.getFeedbacksPage(input);
   }
 
   /**

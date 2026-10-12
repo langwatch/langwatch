@@ -72,7 +72,7 @@ export function SimulationConsole({
       bg={CONSOLE_COLORS.consoleBg}
       color={CONSOLE_COLORS.consoleText}
       fontFamily="mono"
-      fontSize="13px"
+      textStyle="bodySm"
       lineHeight="1.6"
       minHeight="200px"
       overflow="auto"

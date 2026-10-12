@@ -1,6 +1,6 @@
+import { Banner } from "@langwatch/design-system/banner";
 import { Popover } from "@langwatch/design-system/popover";
 import {
-  Alert,
   Box,
   Button,
   Code,
@@ -50,7 +50,7 @@ export function SecretsIndicator({ projectId, onInsertSecret }: SecretsIndicator
         <HStack
           as="button"
           gap={1}
-          fontSize="13px"
+          textStyle="bodySm"
           color="fg.subtle"
           cursor="pointer"
           _hover={{ color: "fg" }}
@@ -141,14 +141,9 @@ export function SecretsIndicator({ projectId, onInsertSecret }: SecretsIndicator
 
             {/* Usage hint */}
             <Box padding={2} borderTopWidth="1px">
-              <Alert.Root status="info" size="sm">
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Text fontSize="xs">
-                    Use <Code fontSize="xs">secrets.NAME</Code> syntax in your code
-                  </Text>
-                </Alert.Content>
-              </Alert.Root>
+              <Banner status="info">
+                Use <Code textStyle="caption">secrets.NAME</Code> syntax in your code
+              </Banner>
             </Box>
           </VStack>
         </Popover.Body>

@@ -78,6 +78,17 @@ export const ConversationIdCell = {
   ),
 } as const satisfies CellDef<TraceListItem>;
 
+/** A session is a conversation under its coding-agent name: the same id, the same field. */
+export const SessionIdCell = {
+  id: "sessionId",
+  label: "Session ID",
+  render: ({ row }) => (
+    <MonoCell color="fg.subtle" truncate title={row.conversationId ?? undefined} userSelect="all">
+      {row.conversationId || dash}
+    </MonoCell>
+  ),
+} as const satisfies CellDef<TraceListItem>;
+
 export const OriginCell = {
   id: "origin",
   label: "Origin",
@@ -120,7 +131,7 @@ export const RootSpanNameCell = {
   id: "root-span-name",
   label: "Root span name",
   render: ({ row }) => (
-    <Text textStyle="sm" color={row.name ? "fg" : "fg.subtle"} fontWeight="500" truncate>
+    <Text textStyle="sm" color={row.name ? "fg" : "fg.subtle"} fontWeight="medium" truncate>
       {row.name || dash}
     </Text>
   ),
@@ -182,7 +193,7 @@ export const TraceNameCell = {
   id: "trace-name",
   label: "Trace name",
   render: ({ row }) => (
-    <Text textStyle="sm" color={row.traceName ? "fg" : "fg.subtle"} fontWeight="500" truncate>
+    <Text textStyle="sm" color={row.traceName ? "fg" : "fg.subtle"} fontWeight="medium" truncate>
       {row.traceName || dash}
     </Text>
   ),

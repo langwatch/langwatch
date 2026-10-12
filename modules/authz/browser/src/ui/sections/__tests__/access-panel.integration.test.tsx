@@ -332,6 +332,21 @@ describe("the Access tab", () => {
     });
 
     /** @scenario The Access tab narrows by scope and status */
+    it("says what to do when the filters leave nobody, and clears them", async () => {
+      state.assignments = [
+        assignment({ id: "gr-org", scopeType: "ORGANIZATION", scopeId: "org-1" }),
+      ];
+      renderWithAuthzHost(panel);
+
+      await userEvent.click(screen.getByRole("button", { name: /^Teams/ }));
+
+      expect(screen.getByText("No role assignments match these filters")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+      expect(screen.getAllByTestId("role-assignment-row")).toHaveLength(1);
+    });
+
+    /** @scenario The Access tab narrows by scope and status */
     it("pages a list longer than a page, paging onward showing the next holders", async () => {
       state.assignments = Array.from({ length: HOLDER_PAGE_SIZE + 1 }, (_, index) => {
         const name = `Holder ${String(index).padStart(3, "0")}`;
@@ -340,9 +355,9 @@ describe("the Access tab", () => {
       renderWithAuthzHost(panel);
 
       expect(screen.getAllByTestId("role-assignment-row")).toHaveLength(HOLDER_PAGE_SIZE);
-      expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "previous page" })).toBeDisabled();
 
-      await userEvent.click(screen.getByRole("button", { name: "Next" }));
+      await userEvent.click(screen.getByRole("button", { name: "next page" }));
 
       const rows = screen.getAllByTestId("role-assignment-row");
       expect(rows).toHaveLength(1);

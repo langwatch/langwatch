@@ -52,7 +52,12 @@ import type {
   AggregateSearchResult,
   ProjectionStateAtEvent,
 } from "./features/event-log/ops-event-log.ts";
-import type { ReplayHistoryEntry, ReplayStatus } from "./features/event-log/ops-replay.ts";
+import type {
+  ReplayHistoryEntry,
+  ReplayHistoryPage,
+  ReplayHistoryPageInput,
+  ReplayStatus,
+} from "./features/event-log/ops-replay.ts";
 import type {
   OpsMigrationCohortResult,
   OpsMigrationEnrollmentListing,
@@ -651,6 +656,7 @@ export interface OpsApi {
   getOutboxAttempts(input: GetOutboxAttemptsInput): Promise<OutboxAttemptView[]>;
   releaseLapsedLease(input: ReleaseLapsedLeaseInput): Promise<ReleaseLapsedLeaseResult>;
   getHistory(): Promise<ReplayHistoryEntry[]>;
+  getHistoryPage(input: ReplayHistoryPageInput): Promise<ReplayHistoryPage>;
   findHistoryEntry(input: FindHistoryEntryInput): Promise<ReplayHistoryEntry | null>;
   startReplay(input: StartReplayInput): Promise<StartReplayResult>;
   getStatus(): Promise<ReplayStatus>;

@@ -3,7 +3,9 @@
  * offers the setup on the spot, and swaps only the page body, so the switcher in
  * the chrome still reaches every other organization. The shell lends it the body.
  */
-import { Box, Card, Heading, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
@@ -43,9 +45,9 @@ export default function OrganizationMfaGate({
           <Box color="fg.muted">
             <ShieldCheck size={28} />
           </Box>
-          <Heading as="h1" size="lg">
+          <PageLayout.Heading>
             {gate.organizationName} requires two-step verification
-          </Heading>
+          </PageLayout.Heading>
           <Text color="fg.muted">{HELD_AT_THE_GATE.description}</Text>
           {gate.offerPasskey && (
             <Text color="fg.muted" data-testid="organization-mfa-gate-passkey">
@@ -54,16 +56,14 @@ export default function OrganizationMfaGate({
           )}
         </VStack>
 
-        <Card.Root width="full">
-          <Card.Body>
-            {/* Nothing to cancel back to, so a cancel only asks the standing again. */}
-            <TwoStepSetupFlow
-              holdsPassword={passwordStatus.data?.hasPassword ?? true}
-              onFinished={refresh}
-              onCancel={refresh}
-            />
-          </Card.Body>
-        </Card.Root>
+        <Card>
+          {/* Nothing to cancel back to, so a cancel only asks the standing again. */}
+          <TwoStepSetupFlow
+            holdsPassword={passwordStatus.data?.hasPassword ?? true}
+            onFinished={refresh}
+            onCancel={refresh}
+          />
+        </Card>
       </VStack>
     </Box>
   );

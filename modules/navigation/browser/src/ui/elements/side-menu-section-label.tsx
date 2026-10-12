@@ -1,23 +1,9 @@
 import { Text } from "@langwatch/design-system/primitives";
 
-import { useSideMenuDensity } from "./side-menu-density.tsx";
-
-/**
- * The heading above a group of sidebar menu items ("OBSERVE",
- * "ORGANIZATION"): one component for the current chrome and navigation-v2
- * sidebars, so the two cannot drift; reads its size from menu density.
- */
+/** A sidebar group label: 12px medium sentence case, at 4.5:1 in both modes. */
 export function SideMenuSectionLabel({ label }: { label: string }) {
-  const { sectionLabel } = useSideMenuDensity();
-
   return (
-    <Text
-      fontSize={sectionLabel.fontSize}
-      fontWeight={sectionLabel.fontWeight}
-      letterSpacing={sectionLabel.letterSpacing}
-      textTransform="uppercase"
-      whiteSpace="nowrap"
-    >
+    <Text textStyle="groupLabel" color="nav.fgMuted" whiteSpace="nowrap">
       {label}
     </Text>
   );

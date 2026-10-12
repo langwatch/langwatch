@@ -12,7 +12,6 @@ import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 import { useNow } from "../../../../behavior/use-now.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import type { Period } from "../../../../model/analytics/period.ts";
 import {
   formatPassRate,
@@ -62,19 +61,19 @@ function RecentRunRow({ run, onOpen }: { run: RecentRun; onOpen: (run: RecentRun
       data-testid={`recent-run-${run.batchRunId}`}
     >
       <HStack gap={2} width="full">
-        <Text fontSize="12px" fontWeight="medium" truncate minWidth={0}>
+        <Text textStyle="caption" fontWeight="medium" truncate minWidth={0}>
           {run.planName}
         </Text>
-        <Text fontSize="11px" color={FG_MUTED}>
+        <Text textStyle="micro" color="fg.muted">
           {formatTimeAgoCompact(run.timestamp, now)}
         </Text>
         <Box flex={1} />
         {run.isRunning ? (
-          <Text fontSize="11px" color={FG_MUTED}>
+          <Text textStyle="micro" color="fg.muted">
             {RUNNING_RUN_LABEL}
           </Text>
         ) : (
-          <Text fontSize="11px" fontWeight="semibold" color={passRateColor(run.passRate)}>
+          <Text textStyle="micro" fontWeight="semibold" color={passRateColor(run.passRate)}>
             {formatPassRate(run.passRate)}
           </Text>
         )}
@@ -86,7 +85,7 @@ function RecentRunRow({ run, onOpen }: { run: RecentRun; onOpen: (run: RecentRun
 /** What the list holds while it has no rows to hold. */
 function RecentRunsNote({ children }: { children: string }) {
   return (
-    <Text fontSize="11.5px" color={FG_MUTED} paddingX={3} paddingY={2}>
+    <Text textStyle="caption" color="fg.muted" paddingX={3} paddingY={2}>
       {children}
     </Text>
   );

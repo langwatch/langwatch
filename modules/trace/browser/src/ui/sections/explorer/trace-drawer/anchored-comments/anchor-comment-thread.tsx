@@ -33,7 +33,7 @@ export function AnchorCommentThread({ comments }: { comments: AnnotationByTrace[
           />
           <VStack align="stretch" gap={0.5} flex={1} minWidth={0}>
             <HStack gap={2}>
-              <Text textStyle="2xs" fontWeight="600">
+              <Text textStyle="2xs" fontWeight="semibold">
                 {comment.user?.name ?? comment.email ?? "anonymous"}
               </Text>
               <Box flex={1} />

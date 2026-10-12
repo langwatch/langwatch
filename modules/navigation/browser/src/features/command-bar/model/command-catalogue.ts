@@ -399,8 +399,8 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-settings-model-providers",
-    label: "Model Providers",
-    description: "Settings → Model Providers",
+    label: "Model providers",
+    description: "Settings → Model providers",
     icon: Key,
     category: "navigation",
     keywords: ["api", "key", "openai", "anthropic", "provider", "llm"],
@@ -839,7 +839,8 @@ export function filterCommands(commands: Command[], query: string): Command[] {
   return commands.filter((cmd) => {
     const labelMatch = cmd.label.toLowerCase().includes(lowerQuery);
     const descriptionMatch = cmd.description?.toLowerCase().includes(lowerQuery);
+    const productMatch = cmd.productLabel?.toLowerCase().includes(lowerQuery);
     const keywordMatch = cmd.keywords?.some((kw) => kw.toLowerCase().includes(lowerQuery));
-    return labelMatch || descriptionMatch || keywordMatch;
+    return labelMatch || descriptionMatch || productMatch || keywordMatch;
   });
 }

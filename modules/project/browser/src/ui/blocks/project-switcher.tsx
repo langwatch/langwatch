@@ -42,7 +42,7 @@ export default function ProjectSwitcher() {
       <Menu.Trigger asChild>
         <Button
           variant="ghost"
-          fontSize="13px"
+          textStyle="bodySm"
           paddingX={2}
           paddingY={1}
           height="auto"
@@ -72,7 +72,7 @@ export default function ProjectSwitcher() {
                   targetSlug: project.slug,
                 });
                 return (
-                  <Menu.Item key={project.id} value={project.id} fontSize="14px" asChild>
+                  <Menu.Item key={project.id} value={project.id} textStyle="body" asChild>
                     <Link href={href} onClick={follow(href)} _hover={{ textDecoration: "none" }}>
                       <HStack gap={2} minWidth={0}>
                         <ProjectAvatar name={project.name} />

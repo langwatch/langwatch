@@ -84,7 +84,7 @@ function EditIdentityProviderForm({
   return (
     <VStack align="stretch" gap={3} paddingTop={2} data-testid="edit-identity-provider">
       <VStack align="stretch" gap={1}>
-        <Heading size="sm">Identity provider settings</Heading>
+        <Heading textStyle="cardTitle">Identity provider settings</Heading>
         <Text color="fg.muted" fontSize="sm">
           The redirect address stays the same, and so do your domains and who this connection
           admits.

@@ -51,7 +51,7 @@ export function WorkflowConfigPopover({
             borderBottomWidth="1px"
             borderColor="border"
           >
-            <Text fontSize="14px" fontWeight={500}>
+            <Text textStyle="body" fontWeight="medium">
               {title}
             </Text>
             <Spacer />

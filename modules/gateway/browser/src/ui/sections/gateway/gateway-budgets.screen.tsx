@@ -1,18 +1,16 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Banner } from "@langwatch/design-system/banner";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
-  Alert,
   Badge,
   Button,
-  Card,
   HStack,
   Progress,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -229,86 +227,58 @@ function BudgetsPage() {
               title="No budgets yet"
               description="Budgets enforce a spend ceiling on any dimension: organization, group, team, project, member, or virtual key; each optionally limited to a single provider. Create one to start governing cost."
               icon={<Gauge size={32} />}
-            >
-              {canCreate && (
-                <PageLayout.HeaderButton primary onClick={() => setCreateOpen(true)} marginTop={4}>
-                  <Plus size={14} /> New budget
-                </PageLayout.HeaderButton>
-              )}
-            </NoDataInfoBlock>
+            />
           )}
           {showRows && (
             <VStack align="stretch" gap={4}>
               {!spendAvailable && (
-                <Alert.Root status="warning" data-testid="budget-spend-unavailable">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>Spend figures are unavailable</Alert.Title>
-                    <Alert.Description>
-                      Spend cannot be totalled right now, so these budgets are not stopping or
-                      warning about anything.
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
-              )}
-              <Card.Root variant="showcase" width="full" overflow="hidden">
-                {/* The card clips; the body scrolls. Without this the
-                    right-hand columns are simply unreachable on a narrow
-                    window instead of scrolling into view. Focusable so the
-                    scroll is reachable from the keyboard alone. */}
-                <Card.Body
-                  as="section"
-                  paddingY={0}
-                  paddingX={0}
-                  overflowX="auto"
-                  tabIndex={0}
-                  aria-label="Budgets table"
+                <Banner
+                  status="warning"
+                  title="Spend figures are unavailable"
+                  data-testid="budget-spend-unavailable"
                 >
-                  <ListTable
-                    containerProps={{ overflowX: "auto", maxWidth: "full" }}
-                    variant="line"
-                    size="md"
-                    width="full"
-                  >
-                    <Table.Header>
-                      <Table.Row>
-                        <Table.ColumnHeader>Name</Table.ColumnHeader>
-                        <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                        <Table.ColumnHeader>Window</Table.ColumnHeader>
-                        <Table.ColumnHeader>Spent / Limit</Table.ColumnHeader>
-                        <Table.ColumnHeader>
-                          <Tooltip
-                            content={
-                              <Text fontSize="xs">
-                                WARN: emits 402-equivalent warning header + audit event, request
-                                proceeds.{"\n"}BLOCK: the gateway returns HTTP 402 and refuses to
-                                dispatch once the limit is crossed.
-                              </Text>
-                            }
-                          >
-                            <Text as="span">On breach</Text>
-                          </Tooltip>
-                        </Table.ColumnHeader>
-                        <Table.ColumnHeader>Resets</Table.ColumnHeader>
-                        <Table.ColumnHeader></Table.ColumnHeader>
-                      </Table.Row>
-                    </Table.Header>
-                    <Table.Body>
-                      {rows.map((b) => (
-                        <BudgetTableRow
-                          key={b.id}
-                          budget={b}
-                          canUpdate={canUpdate}
-                          canDelete={canDelete}
-                          onOpen={() => router.push(`/gateway/budgets/${b.id}`)}
-                          onEdit={() => setEditing(b)}
-                          onArchive={() => setArchiving(b)}
-                        />
-                      ))}
-                    </Table.Body>
-                  </ListTable>
-                </Card.Body>
-              </Card.Root>
+                  Spend cannot be totalled right now, so these budgets are not stopping or warning
+                  about anything.
+                </Banner>
+              )}
+              <ListTable scroll="x" scrollLabel="Budgets table">
+                <ListTable.Header>
+                  <ListTable.Row>
+                    <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Scope</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Window</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Spent / Limit</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>
+                      <Tooltip
+                        content={
+                          <Text fontSize="xs">
+                            WARN: emits 402-equivalent warning header + audit event, request
+                            proceeds.{"\n"}BLOCK: the gateway returns HTTP 402 and refuses to
+                            dispatch once the limit is crossed.
+                          </Text>
+                        }
+                      >
+                        <Text as="span">On breach</Text>
+                      </Tooltip>
+                    </ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Resets</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader label="Actions" />
+                  </ListTable.Row>
+                </ListTable.Header>
+                <ListTable.Body>
+                  {rows.map((b) => (
+                    <BudgetTableRow
+                      key={b.id}
+                      budget={b}
+                      canUpdate={canUpdate}
+                      canDelete={canDelete}
+                      onOpen={() => router.push(`/gateway/budgets/${b.id}`)}
+                      onEdit={() => setEditing(b)}
+                      onArchive={() => setArchiving(b)}
+                    />
+                  ))}
+                </ListTable.Body>
+              </ListTable>
             </VStack>
           )}
         </PageLayout.Container>
@@ -374,13 +344,8 @@ function BudgetTableRow({
   const seatsOver = b.endUsersOver ?? 0;
   const seatsOverPct = seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
   return (
-    <Table.Row
-      data-testid="gateway-budget-row"
-      cursor="pointer"
-      _hover={{ bg: "bg.subtle" }}
-      onClick={onOpen}
-    >
-      <Table.Cell>
+    <ListTable.Row data-testid="gateway-budget-row" onActivate={onOpen}>
+      <ListTable.Cell>
         <VStack align="start" gap={0}>
           <Link href={`/gateway/budgets/${b.id}`}>
             <Text fontWeight="medium">{b.name}</Text>
@@ -391,8 +356,8 @@ function BudgetTableRow({
             </Text>
           )}
         </VStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <VStack align="start" gap={1}>
           <ScopeCell
             scopeType={b.scopeType}
@@ -412,13 +377,13 @@ function BudgetTableRow({
             </Tooltip>
           )}
         </VStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Badge variant="subtle" colorPalette="gray" textTransform="capitalize">
           {b.window.toLowerCase()}
         </Badge>
-      </Table.Cell>
-      <Table.Cell minWidth="220px">
+      </ListTable.Cell>
+      <ListTable.Cell minWidth="220px">
         <BudgetSpendCell
           budget={b}
           spent={spent}
@@ -428,13 +393,13 @@ function BudgetTableRow({
           seatsOver={seatsOver}
           seatsOverPct={seatsOverPct}
         />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Badge colorPalette={b.onBreach === "BLOCK" ? "red" : "yellow"}>
           {b.onBreach.toLowerCase()}
         </Badge>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         {b.window === "TOTAL" || b.window === "MANUAL" ? (
           <Text fontSize="xs" color="fg.muted">
             {b.window === "TOTAL" ? "never" : "on request"}
@@ -444,8 +409,8 @@ function BudgetTableRow({
             <Text fontSize="xs">{formatTimeAgo(toEpochMs(b.resetsAt))}</Text>
           </Tooltip>
         )}
-      </Table.Cell>
-      <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default">
+      </ListTable.Cell>
+      <ListTable.Cell stopRowActivation>
         <Menu.Root>
           <Menu.Trigger asChild>
             <Button
@@ -477,8 +442,8 @@ function BudgetTableRow({
             )}
           </Menu.Content>
         </Menu.Root>
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 

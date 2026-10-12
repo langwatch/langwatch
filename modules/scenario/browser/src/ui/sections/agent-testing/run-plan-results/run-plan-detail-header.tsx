@@ -11,7 +11,6 @@ import { Download, MoreVertical, Pencil, Play, Square, Settings2 } from "lucide-
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import type { AgentTestingViewMode } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import type { EvaluatorSummary } from "../../../../model/agent-testing/results/evaluation-summaries.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { type RunGroupSummary } from "../../../../model/suite/run-history-transforms.ts";
 import {
   EvaluatorPill,
@@ -61,7 +60,7 @@ export type RunPlanDetailHeaderProps = {
 function RunSummary({ run }: { run: RunPlanDetailRun }) {
   return (
     <HStack gap={2.5} flex="1" data-testid="run-summary-run">
-      <Text fontSize="12.5px" fontWeight="semibold" flexShrink={0}>
+      <Text textStyle="bodySm" fontWeight="semibold" flexShrink={0}>
         {run.title}
       </Text>
       {run.summary ? (
@@ -84,8 +83,8 @@ function RunSummary({ run }: { run: RunPlanDetailRun }) {
       ) : null}
       {run.note ? (
         <Text
-          fontSize="11.5px"
-          color={FG_MUTED}
+          textStyle="caption"
+          color="fg.muted"
           fontStyle="italic"
           truncate
           // A width of zero that grows: the note asks the line for nothing and
@@ -160,7 +159,7 @@ function HeaderActions({
             minWidth="28px"
             height="28px"
             paddingX={0}
-            color={FG_MUTED}
+            color="fg.muted"
             aria-label={`More actions for ${plan.name}`}
           >
             <MoreVertical size={14} />
@@ -183,10 +182,10 @@ function HeaderActions({
           size="xs"
           variant="ghost"
           height="32px"
-          paddingX="10px"
-          fontSize="12px"
+          paddingX="2.5"
+          textStyle="caption"
           fontWeight="medium"
-          color={FG_MUTED}
+          color="fg.muted"
           gap={1.5}
           onClick={() => onEditPlan(suiteId)}
           data-testid="edit-run-plan-button"
@@ -198,7 +197,7 @@ function HeaderActions({
       {onRunPlan && suiteId ? (
         <SmallButton
           variant="solid"
-          colorPalette="blue"
+          colorPalette="orange"
           height="32px"
           minHeight="32px"
           onClick={onRunPlan}

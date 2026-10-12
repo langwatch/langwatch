@@ -27,7 +27,8 @@ export function NeedsNameView({
         data-testid="talk-name-input"
       />
       <Button
-        colorPalette="blue"
+        colorPalette="orange"
+        variant="solid"
         disabled={pendingName.trim().length === 0}
         onClick={() => onSave({ isCutAtLimit: state.isCutAtLimit, name: pendingName.trim() })}
         data-testid="talk-name-save"

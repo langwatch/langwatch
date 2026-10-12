@@ -26,9 +26,19 @@ export const projectWeb = defineBrowserModule("project")
     "pages/settings": {
       path: "/settings",
       within: "settings",
-      label: "Project Settings",
+      label: "Organization settings",
       requires: "organization:view",
       load: () => import("./ui/sections/project-settings/project-settings-screen.tsx"),
+    },
+    "pages/settings/project": {
+      path: "/settings/project",
+      within: "settings",
+      label: "Project settings",
+      requires: "project:update",
+      load: async () => ({
+        default: (await import("./ui/sections/project-settings/project-settings-screen.tsx"))
+          .ProjectGeneralScreen,
+      }),
     },
   })
   /** The inline command palette, lent to governance's overview hero by token (§10.1). */

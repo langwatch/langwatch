@@ -13,7 +13,7 @@ import "@testing-library/jest-dom/vitest";
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { connectTools, renderScreen } from "./inventoryScreenHarness";
+import { connectTools, openTab, renderScreen } from "./inventoryScreenHarness";
 
 describe("given an admin on the Inventory page", () => {
   describe("when the tab strip renders", () => {
@@ -42,6 +42,16 @@ describe("given an admin on the Inventory page", () => {
       // off the wrong list is visible here rather than being a coincidence.
       expect(screen.getAllByRole("tab")[0]?.textContent).toContain("3");
       expect(screen.getAllByRole("tab")[2]?.textContent).toContain("2");
+    });
+
+    /** @scenario "The Sources tab says what a source is" */
+    it("describes the Sources pane as connections that send usage data, keeping its name", async () => {
+      renderScreen();
+      await openTab(/Sources/);
+      expect(screen.getByRole("tab", { name: /^Sources/ })).toBeInTheDocument();
+      expect(screen.getByRole("tabpanel")).toHaveAccessibleDescription(
+        /Connections that send usage data/,
+      );
     });
   });
 });

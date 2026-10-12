@@ -65,15 +65,20 @@ import type * as actualModule0 from "../../../../../behavior/explorer.store.ts";
 import type * as actualModule1 from "../../../../../behavior/view.slice.ts";
 import { useURLSync } from "../use-url-sync.ts";
 
-function Harness() {
+// The store mock is not reactive: a changed `tick` is how a test hands the hook
+// a render, which the compiler would otherwise skip for a prop-less child.
+let renders = 0;
+const nextRender = () => ++renders;
+
+function Harness({ tick = 0 }: { tick?: number }) {
   return (
     <BrowserRouter>
-      <HookMount />
+      <HookMount tick={tick} />
     </BrowserRouter>
   );
 }
 
-function HookMount() {
+function HookMount({ tick: _tick }: { tick: number }) {
   useURLSync();
   return null;
 }
@@ -171,7 +176,7 @@ describe("useURLSync lens selection from a fragment", () => {
         // last-used lens is restored off the back of it.
         allLenses = [...BUILT_INS, SHARED_LENS];
         activeLensId = "simplified";
-        rerender(<Harness />);
+        rerender(<Harness tick={nextRender()} />);
 
         expect(selectLensMock).toHaveBeenLastCalledWith("custom-abc", {
           persist: true,
@@ -188,10 +193,10 @@ describe("useURLSync lens selection from a fragment", () => {
         const { rerender } = render(<Harness />);
 
         activeLensId = "simplified";
-        rerender(<Harness />);
+        rerender(<Harness tick={nextRender()} />);
 
         allLenses = [...BUILT_INS, SHARED_LENS];
-        rerender(<Harness />);
+        rerender(<Harness tick={nextRender()} />);
 
         // Only the mount's fallback — the fragment never gets a second word.
         expect(selectLensMock).toHaveBeenCalledTimes(1);
@@ -212,7 +217,7 @@ describe("useURLSync lens selection from a fragment", () => {
         });
 
         allLenses = [...BUILT_INS, SHARED_LENS];
-        rerender(<Harness />);
+        rerender(<Harness tick={nextRender()} />);
 
         expect(selectLensMock).toHaveBeenCalledTimes(1);
       });

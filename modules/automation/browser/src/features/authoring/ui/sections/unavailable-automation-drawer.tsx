@@ -17,39 +17,24 @@ export function UnavailableAutomationDrawer({
 }) {
   const describeError = useDescribeError();
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="md"
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.CloseTrigger />
-          <Drawer.Title>Automation</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.Body>
-          {error ? (
-            <Alert.Root status="error">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>
-                  {describeError({ error, fallbackTitle: "Couldn't load this automation" })}
-                </Alert.Title>
-              </Alert.Content>
-            </Alert.Root>
-          ) : (
-            <VStack align="start" gap={1} data-testid="automation-not-found">
-              <Text fontWeight="medium">This automation no longer exists</Text>
-              <Text textStyle="sm" color="fg.muted">
-                It may have been deleted. Reload the list to see what is there now.
-              </Text>
-            </VStack>
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer onClose={onClose} title="Automation">
+      {error ? (
+        <Alert.Root status="error">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>
+              {describeError({ error, fallbackTitle: "Couldn't load this automation" })}
+            </Alert.Title>
+          </Alert.Content>
+        </Alert.Root>
+      ) : (
+        <VStack align="start" gap={1} data-testid="automation-not-found">
+          <Text fontWeight="medium">This automation no longer exists</Text>
+          <Text textStyle="sm" color="fg.muted">
+            It may have been deleted. Reload the list to see what is there now.
+          </Text>
+        </VStack>
+      )}
+    </Drawer>
   );
 }

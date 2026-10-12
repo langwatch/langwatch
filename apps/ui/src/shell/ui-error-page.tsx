@@ -91,7 +91,7 @@ function UiErrorCard({ error, isDevelopment }: UiErrorProps) {
         <Box padding={3} borderRadius="full" backgroundColor="red.subtle" color="red.fg">
           <AlertTriangle size={28} />
         </Box>
-        <Heading as="h1" size="md">
+        <Heading as="h1" size="sm">
           {copy.title}
         </Heading>
         <Text fontSize="sm" color="fg.muted" textAlign="center" maxWidth="400px">

@@ -11,11 +11,13 @@ import { Link } from "@langwatch/browser-host/link";
  * behind them stay there — a page that reached for a code would be a second
  * place the copy lives.
  */
+import { Card } from "@langwatch/design-system/card";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
   Button,
-  Card,
   Heading,
   HStack,
   SimpleGrid,
@@ -24,7 +26,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { readableDate } from "@langwatch/time";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import { Plug } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -82,7 +84,7 @@ export function DirectoryReconciliation({
   return (
     <VStack gap={6} width="full" align="stretch" data-testid="scim-reconciliation">
       <VStack gap={3} width="full" align="stretch">
-        <Heading size="sm">Connections</Heading>
+        <Heading textStyle="cardTitle">Connections</Heading>
         {connections.length === 0 && <NoConnectionYet maySetUp={maySetUpSingleSignOn} />}
         {connections
           .filter((connection) =>
@@ -117,42 +119,32 @@ export function DirectoryReconciliation({
  * under Authentication.
  */
 function NoConnectionYet({ maySetUp }: { maySetUp: boolean }) {
+  const accent = useProductAccent();
+  const explanation =
+    "Provisioning runs against a single sign-on connection, so connecting one is the first step. After that your identity provider creates, updates and removes people here on its own.";
   return (
-    <VStack
-      gap={2}
-      paddingY={8}
-      paddingX={4}
-      borderWidth="1px"
-      borderStyle="dashed"
-      borderColor="border.emphasized"
-      borderRadius="lg"
-      textAlign="center"
-      data-testid="directory-no-connection"
-    >
-      <Plug size={20} />
-      <Text fontWeight="500">No identity provider is connected yet</Text>
-      <Text fontSize="sm" color="fg.muted" maxWidth="60ch">
-        Provisioning runs against a single sign-on connection, so connecting one is the first step.
-        After that your identity provider creates, updates and removes people here on its own.
-      </Text>
-      {maySetUp ? (
-        <Button
-          asChild
-          size="sm"
-          colorPalette="orange"
-          color="orange.contrast"
-          _hover={{ color: "orange.contrast" }}
-        >
-          <Link unstyled href="/settings/authentication">
-            Set up single sign-on
-          </Link>
-        </Button>
-      ) : (
-        <Text fontSize="xs" color="fg.muted">
-          An administrator who manages single sign-on sets this up.
-        </Text>
-      )}
-    </VStack>
+    <NoDataInfoBlock
+      size="inline"
+      icon={<Plug />}
+      title="No identity provider is connected yet"
+      description={
+        maySetUp
+          ? explanation
+          : `${explanation} An administrator who manages single sign-on sets this up.`
+      }
+      primaryAction={
+        maySetUp ? (
+          <Button asChild size="sm" colorPalette={accent.colorPalette}>
+            <Link unstyled href="/settings/authentication">
+              Set up single sign-on
+            </Link>
+          </Button>
+        ) : (
+          void 0
+        )
+      }
+      testId="directory-no-connection"
+    />
   );
 }
 
@@ -186,32 +178,29 @@ function RetiredConnections({ connections }: { connections: ConnectionReconcilia
             away with it.
           </Text>
           {connections.map((connection) => (
-            <HStack
+            <Card
               key={connection.connectionId}
-              gap={2}
-              paddingX={3}
-              paddingY={2}
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="lg"
-              opacity={0.7}
+              variant="nested"
+              padding="sm"
               data-testid="retired-connection"
             >
-              <Text fontSize="sm" fontWeight="medium">
-                {connection.providerId}
-              </Text>
-              <Badge size="sm" colorPalette="gray">
-                {connection.connectionState === "DISCARDED"
-                  ? "Withdrawn before it went live"
-                  : "Removed"}
-              </Badge>
-              <Spacer />
-              {connection.managedPeople > 0 && (
-                <Text fontSize="xs" color="fg.muted">
-                  {connection.managedPeople} still here
+              <HStack gap={2}>
+                <Text fontSize="sm" fontWeight="medium">
+                  {connection.providerId}
                 </Text>
-              )}
-            </HStack>
+                <Badge size="sm" colorPalette="gray">
+                  {connection.connectionState === "DISCARDED"
+                    ? "Withdrawn before it went live"
+                    : "Removed"}
+                </Badge>
+                <Spacer />
+                {connection.managedPeople > 0 && (
+                  <Text fontSize="xs" color="fg.muted">
+                    {connection.managedPeople} still here
+                  </Text>
+                )}
+              </HStack>
+            </Card>
           ))}
         </VStack>
       )}
@@ -227,48 +216,48 @@ function ConnectionCard({
   connection: ConnectionReconciliationRow;
 }) {
   return (
-    <Card.Root width="full" data-testid="directory-connection">
-      <Card.Body>
-        <VStack align="stretch" gap={4}>
-          <HStack align="start">
-            <VStack align="start" gap={0}>
-              <Link href={CONNECTION_PAGE} fontWeight="600" data-testid="directory-connection-name">
-                {connection.providerId}
-              </Link>
-              {connection.verifiedDomains.length > 0 && (
-                <Text fontSize="xs" color="fg.muted" data-testid="directory-connection-domains">
-                  {connection.verifiedDomains.join(", ")}
-                </Text>
-              )}
-            </VStack>
-            <Spacer />
-            <Badge colorPalette={TONE_PALETTE[connection.status.tone] ?? "gray"}>
-              {connection.status.headline}
-            </Badge>
-          </HStack>
+    <Card padding="lg" data-testid="directory-connection">
+      <VStack align="stretch" gap={4}>
+        <HStack align="start">
+          <VStack align="start" gap={0}>
+            <Link href={CONNECTION_PAGE} fontWeight="600" data-testid="directory-connection-name">
+              {connection.providerId}
+            </Link>
+            {connection.verifiedDomains.length > 0 && (
+              <Text fontSize="xs" color="fg.muted" data-testid="directory-connection-domains">
+                {connection.verifiedDomains.join(", ")}
+              </Text>
+            )}
+          </VStack>
+          <Spacer />
+          <Badge colorPalette={TONE_PALETTE[connection.status.tone] ?? "gray"}>
+            {connection.status.headline}
+          </Badge>
+        </HStack>
 
-          <Text fontSize="sm" color="fg.muted">
-            {connection.status.waitingFor}
-          </Text>
+        <Text fontSize="sm" color="fg.muted">
+          {connection.status.waitingFor}
+        </Text>
 
-          <SimpleGrid columns={{ base: 1, md: 2 }} gap={3}>
-            <Fact label="Last push from the directory">
-              {connection.lastPushedAtMs
-                ? readableDate(connection.lastPushedAtMs).toLocaleString()
-                : "No push yet"}
-            </Fact>
-            <Fact label="People this directory manages">{connection.managedPeople}</Fact>
-          </SimpleGrid>
+        <SimpleGrid columns={{ base: 1, md: 2 }} gap={3}>
+          <Fact label="Last push from the directory">
+            {connection.lastPushedAtMs ? (
+              <FormattedDate value={connection.lastPushedAtMs} display="datetime" />
+            ) : (
+              "No push yet"
+            )}
+          </Fact>
+          <Fact label="People this directory manages">{connection.managedPeople}</Fact>
+        </SimpleGrid>
 
-          {connection.failures.length > 0 && <DirectoryFailures connection={connection} />}
+        {connection.failures.length > 0 && <DirectoryFailures connection={connection} />}
 
-          <RecentDirectoryActivity
-            organizationId={organizationId}
-            connectionId={connection.connectionId}
-          />
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+        <RecentDirectoryActivity
+          organizationId={organizationId}
+          connectionId={connection.connectionId}
+        />
+      </VStack>
+    </Card>
   );
 }
 
@@ -292,7 +281,7 @@ function DirectoryFailures({ connection }: { connection: ConnectionReconciliatio
               {failure.description}
             </Text>
             <Text fontSize="xs" color="fg.muted">
-              {readableDate(failure.occurredAtMs).toLocaleString()}
+              {<FormattedDate value={failure.occurredAtMs} display="datetime" />}
             </Text>
           </Box>
         ))}
@@ -315,7 +304,7 @@ function RecentDirectoryChanges({ changes }: { changes: DirectoryChangeRow[] }) 
 
   return (
     <VStack align="stretch" gap={3} data-testid="directory-recent-changes">
-      <Heading size="sm">Access changes assigned by your identity provider</Heading>
+      <Heading textStyle="cardTitle">Access changes assigned by your identity provider</Heading>
       <VStack align="stretch" gap={2}>
         {shown.map((change) => (
           <HStack key={`${change.grantId}-${change.kind}`} gap={3}>
@@ -325,7 +314,7 @@ function RecentDirectoryChanges({ changes }: { changes: DirectoryChangeRow[] }) 
             <Text fontSize="sm">{change.summary}</Text>
             <Spacer />
             <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-              {readableDate(change.occurredAtMs).toLocaleString()}
+              {<FormattedDate value={change.occurredAtMs} display="datetime" />}
             </Text>
           </HStack>
         ))}

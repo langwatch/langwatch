@@ -1,19 +1,20 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
   Button,
   HStack,
   Separator,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { useMemo, useState } from "react";
 
 import { api } from "../../../../behavior/gateway-api.ts";
 import { useGatewayToaster, useShowErrorToast } from "../../../../behavior/gateway-feedback.ts";
-import { Link } from "../../../../ui/elements/gateway-link.tsx";
+import { useGatewayHost } from "../../../../model/gateway-host.ts";
 
 type GuardrailDirectionEnum = "PRE" | "POST" | "STREAM_CHUNK";
 type WireDirection = "pre" | "post" | "stream_chunk";
@@ -74,6 +75,7 @@ export function GuardrailAttachmentsSection({
 }) {
   const toaster = useGatewayToaster();
   const showErrorToast = useShowErrorToast();
+  const host = useGatewayHost();
   const serverAttachedIds = useMemo(() => flattenAttachedIds(attachments), [attachments]);
   const [checked, setChecked] = useState<Set<string>>(serverAttachedIds);
 
@@ -118,7 +120,7 @@ export function GuardrailAttachmentsSection({
   if (guardrailsQuery.isLoading) {
     return (
       <SectionShell>
-        <Spinner size="sm" />
+        <SkeletonRows rows={3} />
       </SectionShell>
     );
   }
@@ -127,17 +129,26 @@ export function GuardrailAttachmentsSection({
   if (rows.length === 0) {
     return (
       <SectionShell>
-        <Text fontSize="sm" color="fg.muted">
-          No guardrails defined in this project yet.{" "}
-          {projectSlug ? (
-            <Link href="/gateway/guardrails" color="orange.fg" fontWeight="medium">
-              Create one
-            </Link>
-          ) : (
-            "Create one from the Guardrails admin page"
-          )}{" "}
-          to attach it here.
-        </Text>
+        <NoDataInfoBlock
+          size="line"
+          title={
+            projectSlug
+              ? "No guardrails defined in this project yet."
+              : "No guardrails defined in this project yet. Create one from the Guardrails admin page to attach it here."
+          }
+          next={
+            projectSlug
+              ? [
+                  {
+                    kind: "setting",
+                    label: "Create one to attach it here",
+                    href: "/gateway/guardrails",
+                    onNavigate: ({ href }) => host.navigate(href),
+                  },
+                ]
+              : void 0
+          }
+        />
       </SectionShell>
     );
   }

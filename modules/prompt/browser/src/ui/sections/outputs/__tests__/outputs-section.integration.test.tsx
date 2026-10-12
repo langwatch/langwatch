@@ -3,7 +3,7 @@
  * @see specs/prompts/prompt-editor-outputs.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -57,6 +57,39 @@ describe("OutputsSection", () => {
 
         expect(onChange).toHaveBeenLastCalledWith([{ identifier: "output", type: "float" }]);
       });
+    });
+  });
+
+  describe("given the prompt has exactly one output", () => {
+    /** @scenario "The last output cannot be removed" */
+    it("disables its remove button and leaves the outputs alone", async () => {
+      const user = userEvent.setup();
+      const { onChange } = renderSection([{ identifier: "output", type: "str" }]);
+
+      const remove = screen.getByTestId("remove-output-output");
+      expect(remove).toBeDisabled();
+      expect(remove).toHaveAccessibleName("Remove output output");
+      await user.click(remove);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an output name is being edited", () => {
+    /** @scenario "Output names use the same keyboard editing as variable names" */
+    it("commits once on Enter and keeps the old name on Escape", async () => {
+      const user = userEvent.setup();
+      const { onChange } = renderSection([{ identifier: "output", type: "str" }]);
+
+      await user.click(screen.getByTestId("output-name-output"));
+      const input = screen.getByTestId("output-name-input-output");
+      await user.clear(input);
+      await user.type(input, "score{Enter}");
+      expect(onChange).toHaveBeenCalledTimes(1);
+
+      await user.click(screen.getByTestId("output-name-output"));
+      await user.type(screen.getByTestId("output-name-input-output"), "x{Escape}");
+      expect(onChange).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(screen.getByTestId("output-name-output")).toHaveFocus());
     });
   });
 });

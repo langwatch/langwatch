@@ -4,6 +4,7 @@
  * and select-all/clear.
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import {
   Badge,
@@ -81,7 +82,7 @@ export interface ScenarioPickerProps {
   activeLabelFilter: string | null;
   /** Set the active label filter. */
   onLabelFilterChange: (label: string | null) => void;
-  /** Handler for "Create New Scenario" action. */
+  /** Handler for "Create new scenario" action. */
   onCreateNew: () => void;
   /** Whether to show error styling on the border. */
   hasError?: boolean;
@@ -171,12 +172,7 @@ export function ScenarioPicker({
     testSuites && testSuites.length > 0 ? groupScenariosByTestSuite(scenarios, testSuites) : null;
 
   return (
-    <Box
-      border="1px solid"
-      borderColor={hasError ? "red.fg" : "border"}
-      borderRadius="md"
-      width="full"
-    >
+    <Card variant="frame" padding="none" invalid={hasError}>
       <HStack paddingX={3} paddingY={2} gap={2}>
         <Box flex={1}>
           <SearchInput
@@ -186,9 +182,9 @@ export function ScenarioPicker({
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </Box>
-        <Tooltip content="Add Scenario">
+        <Tooltip content="Add scenario">
           <IconButton
-            aria-label="Add Scenario"
+            aria-label="Add scenario"
             size="sm"
             variant="ghost"
             onClick={onCreateNew}
@@ -310,13 +306,13 @@ export function ScenarioPicker({
         </Text>
         <HStack gap={2}>
           <Button size="xs" variant="ghost" onClick={onSelectAll}>
-            Select All
+            Select all
           </Button>
           <Button size="xs" variant="ghost" onClick={onClear}>
             Clear
           </Button>
         </HStack>
       </HStack>
-    </Box>
+    </Card>
   );
 }

@@ -18,7 +18,8 @@ import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { Link } from "../../../../ui/elements/app-link.tsx";
 import { usePeriodSelector } from "../../../elements/analytics/period-selector.tsx";
 import { HomeCard } from "./home-card.tsx";
-import { HOME_SECTION_PADDING, HomeSectionHeader } from "./home-section-header.tsx";
+import { HomeSectionHeader } from "./home-section-header.tsx";
+import { HOME_SECTION_PADDING } from "./home-section-layout.ts";
 
 const QUICK_STARTS = [
   {
@@ -93,13 +94,6 @@ function NewProjectQuickView({ projectSlug }: { projectSlug: string }) {
 }
 
 /**
- * TracesOverview: trace metrics labelled by time window (unlabelled delta
- * is noise). `full` is the classic home's card; `strip` is the Langy home's,
- * with the chart behind a control.
- */
-export type TracesOverviewVariant = "full" | "strip";
-
-/**
  * How many daily readings a curve needs before it's telling the truth: two
  * points is a slope with no evidence, worse than no line. Four is the
  * first window that shows shape, not noise.
@@ -116,12 +110,11 @@ const WIDER_WINDOW = { key: "30d", label: "Last 30 days" } as const;
  */
 const TREND_HEIGHT = 160;
 
-export function TracesOverview({
-  variant = "full",
-}: {
-  /** See `TracesOverviewVariant`. Nothing is ever removed, only re-presented. */
-  variant?: TracesOverviewVariant;
-}) {
+/**
+ * The home's figures as one compact strip, labelled by time window (an unlabelled
+ * delta is noise), with the trend chart behind a control.
+ */
+export function TracesOverview() {
   const host = useProjectHomeHost();
   const project = host.project();
   const hasPermission = (permission: string) => host.hasPermission(permission);
@@ -129,7 +122,6 @@ export function TracesOverview({
   const { daysDifference, setRelativePeriod } = usePeriodSelector();
   const [chartOpen, setChartOpen] = useState(false);
 
-  const compact = variant !== "full";
   // Two forms of one fact: the chip above the figures, and the same window
   // read as part of a sentence in the control that opens the trend.
   const periodLabel = daysDifference === 1 ? "Last day" : `Last ${daysDifference} days`;
@@ -137,7 +129,7 @@ export function TracesOverview({
   // The window is bucketed daily for the curve, so its length IS the number of
   // readings the curve would be drawn through.
   const trendIsMeaningful = daysDifference >= MIN_POINTS_FOR_A_TREND;
-  const showTrend = trendIsMeaningful && variant === "strip" && chartOpen;
+  const showTrend = trendIsMeaningful && chartOpen;
 
   const tracesOverviewGraph: CustomGraphProps["input"] = {
     graphId: "tracesOverview",
@@ -197,14 +189,7 @@ export function TracesOverview({
   }
 
   return (
-    <HomeCard
-      width="full"
-      // `compact` tightens the CONTENT below, never the header: a title that
-      // starts at a different inset from its neighbours is exactly the
-      // inconsistency this padding constant exists to remove.
-      padding={HOME_SECTION_PADDING}
-      _hover={{ boxShadow: "2xs" }}
-    >
+    <HomeCard width="full" padding={HOME_SECTION_PADDING}>
       <HomeSectionHeader title="Traces overview" qualifier={periodLabel}>
         <HStack gap={2} align="center">
           <Link
@@ -226,55 +211,53 @@ export function TracesOverview({
           deltas' baseline; a narrow window got the sentence but no chart.
           Both are always true now: the comparison (left) and what's worth
           doing about it (right), same shape either way so it never reads as a leftover. */}
-      {compact ? (
-        <HStack gap={3} flexWrap="wrap" width="full" align="center">
-          <Text fontSize="xs" color="fg.subtle">
-            Each figure is compared with the period before it.
-          </Text>
-          <Spacer />
-          {/* The chart is never deleted, only moved. In `strip` it waits behind
-              a named control that says what it will show and over what window,
-              so the click is worth taking rather than a mystery chevron. */}
-          {trendIsMeaningful && variant === "strip" && (
-            <chakra.button
-              type="button"
-              onClick={() => setChartOpen((open) => !open)}
-              aria-expanded={chartOpen}
-              display="inline-flex"
-              alignItems="center"
-              gap={1}
-              fontSize="xs"
-              color="fg.muted"
-              background="transparent"
-              borderWidth={0}
-              cursor="pointer"
-              _hover={{ color: "fg" }}
-            >
-              {chartOpen ? <LuChevronDown size={12} /> : <LuChevronRight size={12} />}
-              {chartOpen ? "Hide the trend" : `Show the trend over ${periodPhrase}`}
-            </chakra.button>
-          )}
-          {!trendIsMeaningful && (
-            // Not enough readings to draw a shape. Rather than a chart that
-            // invents one, offer the window that would show a real trend. The
-            // offer is the better thing, not an explanation of the absence.
-            <chakra.button
-              type="button"
-              onClick={() => setRelativePeriod(WIDER_WINDOW.key)}
-              fontSize="xs"
-              color="fg.muted"
-              background="transparent"
-              borderWidth={0}
-              cursor="pointer"
-              textDecoration="underline"
-              textUnderlineOffset="3px"
-              _hover={{ color: "orange.fg" }}
-            >
-              See {WIDER_WINDOW.label.toLowerCase()}
-            </chakra.button>
-          )}
-        </HStack>
-      ) : null}
+      <HStack gap={3} flexWrap="wrap" width="full" align="center">
+        <Text fontSize="xs" color="fg.subtle">
+          Each figure is compared with the period before it.
+        </Text>
+        <Spacer />
+        {/* The chart waits behind a named control that says what it will show
+              and over what window, so the click is worth taking rather than a
+              mystery chevron. */}
+        {trendIsMeaningful && (
+          <chakra.button
+            type="button"
+            onClick={() => setChartOpen((open) => !open)}
+            aria-expanded={chartOpen}
+            display="inline-flex"
+            alignItems="center"
+            gap={1}
+            fontSize="xs"
+            color="fg.muted"
+            background="transparent"
+            borderWidth={0}
+            cursor="pointer"
+            _hover={{ color: "fg" }}
+          >
+            {chartOpen ? <LuChevronDown size={12} /> : <LuChevronRight size={12} />}
+            {chartOpen ? "Hide the trend" : `Show the trend over ${periodPhrase}`}
+          </chakra.button>
+        )}
+        {!trendIsMeaningful && (
+          // Not enough readings to draw a shape. Rather than a chart that
+          // invents one, offer the window that would show a real trend. The
+          // offer is the better thing, not an explanation of the absence.
+          <chakra.button
+            type="button"
+            onClick={() => setRelativePeriod(WIDER_WINDOW.key)}
+            fontSize="xs"
+            color="fg.muted"
+            background="transparent"
+            borderWidth={0}
+            cursor="pointer"
+            textDecoration="underline"
+            textUnderlineOffset="3px"
+            _hover={{ color: "orange.fg" }}
+          >
+            See {WIDER_WINDOW.label.toLowerCase()}
+          </chakra.button>
+        )}
+      </HStack>
       {showTrend ? (
         <Box width="full">
           {/* Bucketed by day, not aggregated whole: the summary above is the

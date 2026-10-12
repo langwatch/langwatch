@@ -1,4 +1,5 @@
-import { Card, Badge, Box, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Badge, Box, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
 import { type GovernanceAgentRow } from "@langwatch/enterprise-governance-contract";
 
 import {
@@ -25,13 +26,7 @@ export function AgentCard({
   sample?: boolean;
 }) {
   return (
-    <Card.Root
-      variant="showcase"
-      data-testid="governance-agent-card"
-      alignItems="stretch"
-      gap={3}
-      padding={4}
-    >
+    <Card variant="showcase" data-testid="governance-agent-card" padding="md" bodyLayout="spaced">
       <HStack gap={2} align="baseline" wrap="wrap">
         <Text fontWeight="semibold">{agent.name}</Text>
         <AgentEnvironment environment={agent.environment} />
@@ -76,6 +71,6 @@ export function AgentCard({
           missingReason={AGENT_NEVER_RUN}
         />
       </SimpleGrid>
-    </Card.Root>
+    </Card>
   );
 }

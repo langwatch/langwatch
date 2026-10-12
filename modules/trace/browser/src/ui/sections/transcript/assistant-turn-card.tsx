@@ -84,7 +84,7 @@ export function AssistantTurnCard({
         <Text
           textStyle="2xs"
           color={palette.fg}
-          fontWeight="600"
+          fontWeight="semibold"
           textTransform="uppercase"
           letterSpacing="0.06em"
         >
@@ -98,7 +98,7 @@ export function AssistantTurnCard({
               onClick={() => setOpsHidden((v) => !v)}
               textStyle="2xs"
               color="fg.subtle"
-              fontWeight="500"
+              fontWeight="medium"
               cursor="pointer"
               _hover={{ color: "fg.muted" }}
               transition="color 0.12s ease"

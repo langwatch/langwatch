@@ -41,7 +41,7 @@ function IncompleteInviteLink() {
         />
       }
     >
-      <Text fontSize="13.5px" lineHeight="1.65" color="fg.muted" data-testid="invite-incomplete">
+      <Text textStyle="bodySm" color="fg.muted" data-testid="invite-incomplete">
         Nothing has been accepted, and nothing expires while you sort it out.
       </Text>
     </AuthCard>

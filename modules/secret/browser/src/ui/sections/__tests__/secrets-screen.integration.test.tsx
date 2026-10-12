@@ -130,16 +130,16 @@ describe("given the project has secrets", () => {
 
 describe("given the reader may manage secrets", () => {
   /** @scenario Add a secret */
-  it("offers the Add Secret action", () => {
+  it("offers the Add secret action", () => {
     renderWithSecretHost(<SecretsScreen />);
-    expect(screen.getByRole("button", { name: /Add Secret/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Add secret/ })).toBeInTheDocument();
   });
 
   /** @scenario Add a secret */
   it("normalises the name as it is typed and sends the value once", async () => {
     const user = userEvent.setup();
     renderWithSecretHost(<SecretsScreen />);
-    await user.click(screen.getByRole("button", { name: /Add Secret/ }));
+    await user.click(screen.getByRole("button", { name: /Add secret/ }));
 
     const name = await screen.findByPlaceholderText("e.g., OPENAI_API_KEY");
     await user.type(name, "my api-key 1");
@@ -168,7 +168,7 @@ describe("given the reader may manage secrets", () => {
     renderWithSecretHost(<SecretsScreen />);
 
     await user.click(screen.getByRole("button", { name: "Actions for OPENAI_API_KEY" }));
-    await user.click(await screen.findByRole("menuitem", { name: /Update Value/ }));
+    await user.click(await screen.findByRole("menuitem", { name: /Update value/ }));
 
     const value = await screen.findByPlaceholderText("Enter new secret value");
     expect(value).toHaveAttribute("type", "password");
@@ -185,13 +185,51 @@ describe("given the reader may manage secrets", () => {
   });
 });
 
+describe("given the reader saves before filling the dialog", () => {
+  /** @scenario Saving an incomplete secret says what is missing and sends nothing */
+  it("names the missing name, then the missing value, focusing each and sending nothing", async () => {
+    const user = userEvent.setup();
+    renderWithSecretHost(<SecretsScreen />);
+    await user.click(screen.getByRole("button", { name: /Add secret/ }));
+    const name = await screen.findByPlaceholderText("e.g., OPENAI_API_KEY");
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Enter a name for the secret.")).toBeInTheDocument();
+    expect(name).toHaveFocus();
+
+    await user.type(name, "TOKEN");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Enter the secret's value.")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Enter secret value")).toHaveFocus();
+    expect(calls.create).not.toHaveBeenCalled();
+  });
+
+  /** @scenario Saving an incomplete secret says what is missing and sends nothing */
+  it("names the missing new value on update, focusing it and sending nothing", async () => {
+    const user = userEvent.setup();
+    state.secrets = [secretRow()];
+    renderWithSecretHost(<SecretsScreen />);
+    await user.click(screen.getByRole("button", { name: "Actions for OPENAI_API_KEY" }));
+    await user.click(await screen.findByRole("menuitem", { name: /Update value/ }));
+    const value = await screen.findByPlaceholderText("Enter new secret value");
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Enter the new value.")).toBeInTheDocument();
+    expect(value).toHaveFocus();
+    expect(calls.update).not.toHaveBeenCalled();
+  });
+});
+
 describe("given the application lends a project switcher", () => {
-  it("shows it in the header, just before Add Secret", () => {
+  it("shows it in the header, just before Add secret", () => {
     const host = new FakeSecretHost({ projectSwitcher: <button>Web App project</button> });
     renderWithSecretHost(<SecretsScreen />, host);
 
     const switcher = screen.getByRole("button", { name: "Web App project" });
-    const addSecret = screen.getByRole("button", { name: /Add Secret/ });
+    const addSecret = screen.getByRole("button", { name: /Add secret/ });
     expect(switcher.nextElementSibling?.contains(addSecret)).toBe(true);
   });
 });
@@ -205,7 +243,7 @@ describe("given the reader may only view secrets", () => {
       new FakeSecretHost({ grants: new Set(["secrets:view"]) }),
     );
     expect(screen.getByText("OPENAI_API_KEY")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Add Secret/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Add secret/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Actions for/ })).toBeNull();
   });
 });
@@ -261,7 +299,7 @@ describe("given a write is refused", () => {
       const host = new FakeSecretHost();
       renderWithSecretHost(<SecretsScreen />, host);
 
-      await user.click(screen.getByRole("button", { name: /Add Secret/ }));
+      await user.click(screen.getByRole("button", { name: /Add secret/ }));
       await user.type(await screen.findByPlaceholderText("e.g., OPENAI_API_KEY"), "OPENAI");
       await user.type(screen.getByPlaceholderText("Enter secret value"), "v");
       await user.click(screen.getByRole("button", { name: "Save" }));
@@ -283,7 +321,7 @@ describe("given a write is refused", () => {
       const host = new FakeSecretHost();
       renderWithSecretHost(<SecretsScreen />, host);
 
-      await user.click(screen.getByRole("button", { name: /Add Secret/ }));
+      await user.click(screen.getByRole("button", { name: /Add secret/ }));
       await user.type(await screen.findByPlaceholderText("e.g., OPENAI_API_KEY"), "OPENAI");
       await user.type(screen.getByPlaceholderText("Enter secret value"), "v");
       await user.click(screen.getByRole("button", { name: "Save" }));
@@ -301,7 +339,7 @@ describe("given a write is refused", () => {
       const host = new FakeSecretHost();
       renderWithSecretHost(<SecretsScreen />, host);
 
-      await user.click(screen.getByRole("button", { name: /Add Secret/ }));
+      await user.click(screen.getByRole("button", { name: /Add secret/ }));
       await user.type(await screen.findByPlaceholderText("e.g., OPENAI_API_KEY"), "OPENAI");
       await user.type(screen.getByPlaceholderText("Enter secret value"), "v");
       await user.click(screen.getByRole("button", { name: "Save" }));
@@ -322,7 +360,7 @@ describe("given a write is refused", () => {
       renderWithSecretHost(<SecretsScreen />, host);
 
       await user.click(screen.getByRole("button", { name: "Actions for OPENAI_API_KEY" }));
-      await user.click(await screen.findByRole("menuitem", { name: /Delete Secret/ }));
+      await user.click(await screen.findByRole("menuitem", { name: /Delete secret/ }));
       await user.click(await screen.findByRole("button", { name: "Delete" }));
 
       await waitFor(() => expect(host.failures).toHaveLength(1));

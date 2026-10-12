@@ -5,10 +5,10 @@
  */
 
 import { Menu } from "@langwatch/design-system/menu";
-import { Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown } from "lucide-react";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { TOOLBAR_BUTTON_PROPS } from "../../../elements/agent-testing/shared/toggle-button.tsx";
 import type { ResultFilters } from "./result-atoms.ts";
 
@@ -46,7 +46,7 @@ function summarize({
 function filterTrigger({ label, summary }: { label: string; summary: string }) {
   return (
     <Button {...TOOLBAR_BUTTON_PROPS} data-testid={`results-filter-${label.toLowerCase()}`}>
-      <Text as="span" color={FG_MUTED} fontWeight="normal">
+      <Text as="span" color="fg.muted" fontWeight="normal">
         {label}:
       </Text>
       <Text as="span" maxWidth="150px" truncate>
@@ -87,7 +87,7 @@ export function ResultsStatusMenu({ status, onChange }: ResultsStatusMenuProps) 
         >
           {STATUS_OPTIONS.map((option) => (
             <Menu.RadioItem key={option.value} value={option.value}>
-              <Text fontSize="12.5px">{option.label}</Text>
+              <Text textStyle="bodySm">{option.label}</Text>
             </Menu.RadioItem>
           ))}
         </Menu.RadioItemGroup>
@@ -111,9 +111,19 @@ export function ResultsFilterMenu({ label, options, selected, onChange }: Result
 
       <Menu.Content minWidth="260px" maxHeight="300px" overflowY="auto">
         {options.length === 0 ? (
-          <Text fontSize="12.5px" color={FG_MUTED} paddingX={3} paddingY={2}>
-            Nothing to filter by yet.
-          </Text>
+          <Box paddingX={3}>
+            <NoDataInfoBlock
+              size="line"
+              title="Nothing to filter by yet."
+              next={[
+                {
+                  kind: "docs",
+                  label: "Learn more",
+                  href: "https://docs.langwatch.ai/agent-testing/results",
+                },
+              ]}
+            />
+          </Box>
         ) : (
           options.map((option) => (
             <Menu.CheckboxItem
@@ -123,11 +133,11 @@ export function ResultsFilterMenu({ label, options, selected, onChange }: Result
               onCheckedChange={() => toggle(option.value)}
             >
               <HStack gap={2} minWidth={0} width="full">
-                <Text fontSize="12.5px" truncate>
+                <Text textStyle="bodySm" truncate>
                   {option.label}
                 </Text>
                 {option.hint ? (
-                  <Text fontSize="10.5px" color={FG_MUTED} marginLeft="auto" whiteSpace="nowrap">
+                  <Text textStyle="micro" color="fg.muted" marginLeft="auto" whiteSpace="nowrap">
                     {option.hint}
                   </Text>
                 ) : null}
@@ -138,7 +148,7 @@ export function ResultsFilterMenu({ label, options, selected, onChange }: Result
 
         {selected.length > 0 ? (
           <Menu.Item value="__clear__" onClick={() => onChange([])}>
-            <Text fontSize="11.5px" color={FG_MUTED}>
+            <Text textStyle="caption" color="fg.muted">
               Clear
             </Text>
           </Menu.Item>

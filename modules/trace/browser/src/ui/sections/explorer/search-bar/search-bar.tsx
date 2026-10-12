@@ -510,7 +510,7 @@ const UnifiedErrorBanner: React.FC<{
               <Icon color="red.fg" boxSize="13px" flexShrink={0}>
                 <AlertCircle />
               </Icon>
-              <Text textStyle="xs" color="red.fg" fontWeight="500" flex={1}>
+              <Text textStyle="xs" color="red.fg" fontWeight="medium" flex={1}>
                 {message}
               </Text>
               {canExpand && (

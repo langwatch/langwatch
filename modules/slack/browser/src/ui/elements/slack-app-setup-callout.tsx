@@ -1,5 +1,4 @@
 import {
-  Box,
   Button,
   Code,
   HStack,
@@ -19,44 +18,42 @@ export function SlackAppSetupCallout() {
   const { isCopied, copyManifest } = useCopySlackAppManifest();
 
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" bg="bg.subtle" padding={3}>
-      <VStack align="stretch" gap={2}>
-        <HStack gap={3} wrap="wrap">
-          <Link
-            href="https://api.slack.com/apps"
-            target="_blank"
-            rel="noopener noreferrer"
-            fontSize="xs"
-            fontWeight="medium"
-          >
-            Create a Slack app
-          </Link>
-          <Button
-            variant="plain"
-            size="xs"
-            height="auto"
-            paddingX={0}
-            color="fg.muted"
-            _hover={{ color: "fg" }}
-            onClick={copyManifest}
-          >
-            {isCopied ? "Manifest copied" : "Copy app manifest"}
-          </Button>
-          <Button
-            variant="plain"
-            size="xs"
-            height="auto"
-            paddingX={0}
-            color="fg.muted"
-            _hover={{ color: "fg" }}
-            onClick={() => setStepsOpen((previous) => !previous)}
-          >
-            {stepsOpen ? "Hide the steps" : "Where do I get a bot token?"}
-          </Button>
-        </HStack>
-        {stepsOpen ? <SlackAppSetupSteps /> : null}
-      </VStack>
-    </Box>
+    <VStack align="stretch" gap={2}>
+      <HStack gap={3} wrap="wrap">
+        <Link
+          href="https://api.slack.com/apps"
+          target="_blank"
+          rel="noopener noreferrer"
+          fontSize="xs"
+          fontWeight="medium"
+        >
+          Create a Slack app
+        </Link>
+        <Button
+          variant="plain"
+          size="xs"
+          height="auto"
+          paddingX={0}
+          color="fg.muted"
+          _hover={{ color: "fg" }}
+          onClick={copyManifest}
+        >
+          {isCopied ? "Manifest copied" : "Copy app manifest"}
+        </Button>
+        <Button
+          variant="plain"
+          size="xs"
+          height="auto"
+          paddingX={0}
+          color="fg.muted"
+          _hover={{ color: "fg" }}
+          onClick={() => setStepsOpen((previous) => !previous)}
+        >
+          {stepsOpen ? "Hide the steps" : "Where do I get a bot token?"}
+        </Button>
+      </HStack>
+      {stepsOpen ? <SlackAppSetupSteps /> : null}
+    </VStack>
   );
 }
 

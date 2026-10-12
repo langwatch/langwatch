@@ -58,15 +58,15 @@ export function GuidedPanelHeader({
         <GuidedProviderMark providerKey={providerKey} size={20} />
       </Flex>
       <Box minW={0}>
-        <Text fontSize="14px" fontWeight="600" color="fg">
+        <Text textStyle="cardTitle" color="fg">
           {spec.name}
         </Text>
-        <Text fontSize="11.5px" color="fg.muted">
+        <Text textStyle="caption" color="fg.muted">
           {spec.hint}
         </Text>
       </Box>
       {connected && (
-        <HStack ml="auto" gap={1.5} fontSize="12px" fontWeight="500" color="green.fg">
+        <HStack textStyle="groupLabel" ml="auto" gap={1.5} color="green.fg">
           <Check size={14} /> Connected
         </HStack>
       )}
@@ -76,16 +76,7 @@ export function GuidedPanelHeader({
 
 export function GuidedFieldLabel({ children }: { children: string }) {
   return (
-    <Text
-      as="span"
-      display="block"
-      mb={1}
-      fontSize="11px"
-      fontWeight="600"
-      letterSpacing="0.04em"
-      textTransform="uppercase"
-      color="fg.subtle"
-    >
+    <Text textStyle="eyebrow" as="span" display="block" mb={1} color="fg.subtle">
       {children}
     </Text>
   );
@@ -125,6 +116,7 @@ function GuidedCredentialInput({
           <KeyRound size={14} />
         </Box>
         <chakra.input
+          textStyle="monoSm"
           aria-label={field.label}
           data-testid={`model-provider-credential-${field.key}`}
           value={value}
@@ -135,14 +127,12 @@ function GuidedCredentialInput({
           disabled={disabled}
           w="full"
           bg="transparent"
-          fontFamily="mono"
-          fontSize="12.5px"
           outline="none"
           _placeholder={{ color: "fg.subtle" }}
         />
       </Flex>
       {error ? (
-        <Text mt={1} fontSize="11.5px" color="fg.error" role="alert">
+        <Text textStyle="caption" mt={1} color="fg.error" role="alert">
           {error}
         </Text>
       ) : (
@@ -191,7 +181,7 @@ export function GuidedCredentialFields({
 /** Tells the guided reader the server's own key is in use until they paste one. */
 export function GuidedServerKeyHint({ providerName }: { providerName: string }) {
   return (
-    <Text mt={1} fontSize="11px" color="fg.muted" data-testid="environment-key-hint">
+    <Text textStyle="micro" mt={1} color="fg.muted" data-testid="environment-key-hint">
       This server already has a key for {providerName}. Connect to use it, or paste your own.
     </Text>
   );
@@ -227,14 +217,13 @@ export function GuidedConnectButton({
   const lit = ready || busy || connected;
   return (
     <Button
+      textStyle="cardTitle"
       onClick={onConnect}
       disabled={!ready || busy || connected}
       data-testid="model-provider-save"
       w="full"
       h="44px"
       borderRadius="12px"
-      fontSize="13.5px"
-      fontWeight="600"
       gap={2}
       bg={lit ? "fg" : "bg.muted"}
       color={lit ? "bg.panel" : "fg.subtle"}

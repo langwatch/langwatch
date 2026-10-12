@@ -8,10 +8,12 @@ import {
   HStack,
   Icon,
   Text,
+  VisuallyHidden,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { memo, useMemo, useRef } from "react";
+import { type KeyboardEvent, memo, useId, useMemo, useRef } from "react";
 import {
   LuChevronDown,
   LuPanelBottomClose,
@@ -34,26 +36,12 @@ import { usePrefetchSpanDetail } from "../../../../features/span/behavior/use-pr
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
 import { PresenceMarker } from "../../../elements/presence/presence-marker.tsx";
 import { spanTypeColor } from "../utils/span-type-color.ts";
-
-/**
- * Tab / menu label for a span: generic tool spans (claude_code.tool ...)
- * append WHICH tool ran so five identical tool tabs stay tellable apart.
- */
-function spanTabLabel(span: {
-  name: string | null;
-  spanId: string;
-  toolName?: string | null;
-}): string {
-  const base = span.name ?? span.spanId;
-  return span.toolName ? `${base} · ${span.toolName}` : base;
-}
-
-/**
- * When more than this many spans are pinned, collapse the tail into a "+N more"
- * dropdown so the tab strip doesn't run away into a horizontal scrollbar swamp.
- */
-const MAX_INLINE_PINNED = 4;
-const INLINE_KEEP_WHEN_OVERFLOW = 3;
+import {
+  inlineTabCount,
+  resolvePinnedSpans,
+  spanTabElementId,
+  spanTabLabel,
+} from "./span-tab-ids.ts";
 
 /**
  * `data-overflow-id` for the right-aligned instrumentation scope chip.
@@ -87,6 +75,10 @@ interface SpanTabBarProps {
    * a bottom-stacked pane (vertical layout).
    */
   collapsePosition?: "leading" | "trailing";
+  /** Instance-scoped base for the tab ids (from `useId` in the pane that owns the panel). */
+  idBase: string;
+  /** The id of the details panel the open tab controls. */
+  panelId: string;
 }
 
 function SpanFocusPresenceDot({ traceId, spanId }: { traceId: string; spanId: string }) {
@@ -103,21 +95,17 @@ function SpanFocusPresenceDot({ traceId, spanId }: { traceId: string; spanId: st
   return <PresenceMarker peers={peers} size={16} tooltipSuffix="this span" />;
 }
 
-/** Resolves each pinned span id to its tree node, dropping any that no longer exist. */
-function resolvePinnedSpans(pinnedSpanIds: string[], spanTree: SpanTreeNode[]): SpanTreeNode[] {
-  return pinnedSpanIds
-    .map((id) => spanTree.find((s) => s.spanId === id))
-    .filter((s): s is SpanTreeNode => s != null);
-}
-
 type TabDescriptor = {
   id: string;
   activeId?: string;
   label: string;
   onSelect: () => void;
-  render: () => React.ReactNode;
+  /** `tabbable`: this tab is the strip's one tab stop. */
+  render: (args: { tabbable: boolean }) => React.ReactNode;
   /** Dropdown-row contents when this tab is folded into the menu. */
   menuContent: React.ReactNode;
+  /** The tab's DOM id, so the strip can move focus to it. */
+  elementId: string;
 };
 
 function TabMenuLabel({ span }: { span: SpanTreeNode }) {
@@ -138,6 +126,8 @@ function pinnedTabDescriptor({
   span,
   traceId,
   isActive,
+  idBase,
+  panelId,
   onSelect,
   onHover,
   onUnpin,
@@ -145,6 +135,8 @@ function pinnedTabDescriptor({
   span: SpanTreeNode;
   traceId: string | null | undefined;
   isActive: boolean;
+  idBase: string;
+  panelId: string;
   onSelect: () => void;
   onHover: () => void;
   onUnpin: () => void;
@@ -155,11 +147,15 @@ function pinnedTabDescriptor({
     activeId: isActive ? id : undefined,
     label: spanTabLabel(span),
     onSelect,
-    render: () => (
+    elementId: spanTabElementId({ idBase, spanId: span.spanId }),
+    render: ({ tabbable }) => (
       <SpanTab
         overflowId={id}
         span={span}
         isActive={isActive}
+        tabbable={tabbable}
+        elementId={spanTabElementId({ idBase, spanId: span.spanId })}
+        panelId={panelId}
         onClick={onSelect}
         onHover={onHover}
         actionIcon={<Icon as={LuPinOff} boxSize={3} />}
@@ -176,12 +172,16 @@ function pinnedTabDescriptor({
 function ephemeralTabDescriptor({
   span,
   traceId,
+  idBase,
+  panelId,
   onSelect,
   onPin,
   onClose,
 }: {
   span: SpanTreeNode;
   traceId: string | null | undefined;
+  idBase: string;
+  panelId: string;
   onSelect: () => void;
   onPin: () => void;
   onClose: () => void;
@@ -192,11 +192,15 @@ function ephemeralTabDescriptor({
     activeId: id,
     label: spanTabLabel(span),
     onSelect,
-    render: () => (
+    elementId: spanTabElementId({ idBase, spanId: span.spanId }),
+    render: ({ tabbable }) => (
       <SpanTab
         overflowId={id}
         span={span}
         isActive
+        tabbable={tabbable}
+        elementId={spanTabElementId({ idBase, spanId: span.spanId })}
+        panelId={panelId}
         onClick={onSelect}
         actionIcon={<Icon as={LuPin} boxSize={3} />}
         actionLabel="Pin span tab"
@@ -251,10 +255,102 @@ function DetailCollapseToggle({
   );
 }
 
+/** The tablist: one tab stop, arrows, Home and End move focus; Enter or Space opens the tab. */
+function SpanTabList({
+  descriptors,
+  hiddenIds,
+}: {
+  descriptors: TabDescriptor[];
+  hiddenIds: ReadonlySet<string>;
+}) {
+  const instructionsId = useId();
+  const visibleTabs = descriptors.filter((d) => !hiddenIds.has(d.id));
+  // One tab stop: the open tab, else the first one on show.
+  const tabStopId = (visibleTabs.find((d) => d.activeId) ?? visibleTabs[0])?.id;
+  if (descriptors.length === 0) return null;
+  return (
+    <>
+      <VisuallyHidden id={instructionsId}>
+        Left and Right arrows move between span tabs. Home and End jump to the first and last. Enter
+        or Space opens the focused tab. Open bracket and close bracket select the previous and next
+        span.
+      </VisuallyHidden>
+      <HStack
+        role="tablist"
+        aria-label="Open spans"
+        aria-describedby={instructionsId}
+        gap="5px"
+        flexShrink={0}
+        flexWrap="nowrap"
+        align="stretch"
+        onKeyDown={(event) => handleTabKeys({ event, tabs: visibleTabs })}
+      >
+        {descriptors.map((descriptor) => (
+          <Flex
+            key={descriptor.id}
+            display={hiddenIds.has(descriptor.id) ? "none" : "flex"}
+            align="stretch"
+            flexShrink={0}
+          >
+            {descriptor.render({ tabbable: descriptor.id === tabStopId })}
+          </Flex>
+        ))}
+      </HStack>
+    </>
+  );
+}
+
+/**
+ * Arrows, Home and End move focus only. Enter and Space are the tab button's own: its click
+ * opens the span once. The keys handled here stop so the drawer's Left and Right (conversation)
+ * do not also fire; everything else, Tab included, goes on as before.
+ */
+function handleTabKeys({
+  event,
+  tabs,
+}: {
+  event: KeyboardEvent<HTMLElement>;
+  tabs: TabDescriptor[];
+}) {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  const targetId = event.target instanceof HTMLElement ? event.target.id : "";
+  const from = tabs.findIndex((d) => d.elementId === targetId);
+  if (from === -1) return;
+  const last = tabs.length - 1;
+  const landings: Record<string, number> = {
+    ArrowLeft: from === 0 ? last : from - 1,
+    ArrowRight: from === last ? 0 : from + 1,
+    Home: 0,
+    End: last,
+  };
+  const to = landings[event.key];
+  if (to === undefined) return;
+  event.preventDefault();
+  event.stopPropagation();
+  document.getElementById(tabs[to]?.elementId ?? "")?.focus();
+}
+
+/**
+ * A plain left press selects through the frame without taking focus, so the drawer's Left and
+ * Right (next trace) keep working after a click. Focus held on a tab of this strip is released.
+ */
+function keepFocusOnPointerPress(event: React.MouseEvent<HTMLElement>) {
+  const modified = event.altKey || event.ctrlKey || event.metaKey || event.shiftKey;
+  if (event.button !== 0 || modified) return;
+  event.preventDefault();
+  const held = document.activeElement;
+  const strip = event.currentTarget.closest('[role="tablist"]');
+  if (held instanceof HTMLElement && held.getAttribute("role") === "tab" && strip?.contains(held)) {
+    held.blur();
+  }
+}
+
 export const SpanTabBar = memo(function SpanTabBar({
   spanTree,
   rightSlot,
   collapsePosition = "leading",
+  idBase,
+  panelId,
 }: SpanTabBarProps) {
   const traceId = useTraceDrawer((s) => s.traceId);
   const selectedSpanId = useTraceDrawer((s) => s.selectedSpanId);
@@ -283,7 +379,7 @@ export const SpanTabBar = memo(function SpanTabBar({
   );
 
   const pinnedSpans = useMemo(
-    () => resolvePinnedSpans(pinnedSpanIds, spanTree),
+    () => resolvePinnedSpans({ pinnedSpanIds, spanTree }),
     [pinnedSpanIds, spanTree],
   );
 
@@ -291,8 +387,8 @@ export const SpanTabBar = memo(function SpanTabBar({
     ? pinnedSpans.some((s) => s.spanId === selectedSpan.spanId)
     : false;
 
-  const overflowing = pinnedSpans.length > MAX_INLINE_PINNED;
-  const inlineCount = overflowing ? INLINE_KEEP_WHEN_OVERFLOW : pinnedSpans.length;
+  const inlineCount = inlineTabCount({ pinnedCount: pinnedSpans.length });
+  const overflowing = inlineCount < pinnedSpans.length;
   // Both slices are memoized: they feed `tabDescriptors` → `tabIds` →
   // `useOverflowVisibility`, whose effect resets state whenever the items array changes
   // by reference.
@@ -310,6 +406,8 @@ export const SpanTabBar = memo(function SpanTabBar({
         span,
         traceId,
         isActive: selectedSpan?.spanId === span.spanId,
+        idBase,
+        panelId,
         onSelect: () => selectSpan(span.spanId),
         onHover: () => prefetchSpan(span.spanId),
         onUnpin: () => unpinSpan(span.spanId),
@@ -321,6 +419,8 @@ export const SpanTabBar = memo(function SpanTabBar({
       ephemeralTabDescriptor({
         span: selectedSpan,
         traceId,
+        idBase,
+        panelId,
         onSelect: () => selectSpan(selectedSpan.spanId),
         onPin: () => pinSpan(selectedSpan.spanId),
         onClose: clearSpan,
@@ -328,6 +428,8 @@ export const SpanTabBar = memo(function SpanTabBar({
     ];
   }, [
     traceId,
+    idBase,
+    panelId,
     inlinePinned,
     selectedSpan,
     isSelectedPinned,
@@ -382,16 +484,7 @@ export const SpanTabBar = memo(function SpanTabBar({
         overflowX="hidden"
         align="stretch"
       >
-        {tabDescriptors.map((descriptor) => (
-          <Flex
-            key={descriptor.id}
-            display={hiddenTabIds.has(descriptor.id) ? "none" : "flex"}
-            align="stretch"
-            flexShrink={0}
-          >
-            {descriptor.render()}
-          </Flex>
-        ))}
+        <SpanTabList descriptors={tabDescriptors} hiddenIds={hiddenTabIds} />
         {overflowPinned.length > 0 && (
           <PinnedSpanOverflowMenu
             spans={overflowPinned}
@@ -444,6 +537,10 @@ export const SpanTabBar = memo(function SpanTabBar({
 interface SpanTabProps {
   span: SpanTreeNode;
   isActive: boolean;
+  /** The strip's one tab stop. */
+  tabbable: boolean;
+  elementId: string;
+  panelId: string;
   onClick: () => void;
   onHover?: () => void;
   actionIcon: React.ReactNode;
@@ -460,6 +557,9 @@ interface SpanTabProps {
 function SpanTab({
   span,
   isActive,
+  tabbable,
+  elementId,
+  panelId,
   onClick,
   onHover,
   actionIcon,
@@ -472,6 +572,7 @@ function SpanTab({
   overflowId,
 }: SpanTabProps) {
   const activeBorderColor = spanTypeColor(span.type);
+  const accent = useProductAccent();
   return (
     <Tooltip
       content={
@@ -501,60 +602,93 @@ function SpanTab({
         transition="background 0.12s ease, color 0.12s ease"
         data-overflow-id={overflowId}
       >
-        <SpanTypeBadge type={span.type ?? "span"} />
-        <Text textStyle="xs" color="inherit" fontWeight="inherit" maxWidth="180px" truncate>
-          {spanTabLabel(span)}
-        </Text>
+        <HStack
+          asChild
+          gap={1.5}
+          background="transparent"
+          border="none"
+          padding={0}
+          color="inherit"
+          font="inherit"
+          textAlign="start"
+          cursor="inherit"
+          borderRadius="sm"
+          _focusVisible={{ outline: "2px solid", outlineColor: accent.roles.focusRing }}
+        >
+          <button
+            type="button"
+            role="tab"
+            id={elementId}
+            aria-selected={isActive}
+            aria-controls={isActive ? panelId : void 0}
+            aria-label={spanTabLabel(span)}
+            tabIndex={tabbable ? 0 : -1}
+            onMouseDown={keepFocusOnPointerPress}
+          >
+            <SpanTypeBadge type={span.type ?? "span"} />
+            <Text textStyle="xs" color="inherit" fontWeight="inherit" maxWidth="180px" truncate>
+              {spanTabLabel(span)}
+            </Text>
 
-        {span.type === "llm" && span.model != null && (
-          <Text textStyle="2xs" color="fg.subtle">
-            {span.model}
-          </Text>
-        )}
+            {span.type === "llm" && span.model != null && (
+              <Text textStyle="2xs" color="fg.subtle">
+                {span.model}
+              </Text>
+            )}
 
-        <Text textStyle="2xs" color="fg.subtle">
-          {formatDuration(span.durationMs)}
-        </Text>
+            <Text textStyle="2xs" color="fg.subtle">
+              {formatDuration(span.durationMs)}
+            </Text>
 
-        {span.status === "error" && <Circle size="6px" bg="red.solid" flexShrink={0} />}
+            {span.status === "error" && <Circle size="6px" bg="red.solid" flexShrink={0} />}
 
-        {presence}
+            {presence}
+          </button>
+        </HStack>
 
         <Tooltip content={actionLabel} positioning={{ placement: "top" }}>
           <Flex
-            as="button"
+            asChild
             align="center"
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              onAction();
-            }}
-            aria-label={actionLabel}
             color="fg.subtle"
             paddingX={1.5}
             paddingY={1}
             borderRadius="sm"
             _hover={{ color: "fg", bg: "bg.emphasized" }}
           >
-            {actionIcon}
+            <button
+              type="button"
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onAction();
+              }}
+              aria-label={actionLabel}
+            >
+              {actionIcon}
+            </button>
           </Flex>
         </Tooltip>
 
         {secondaryActionIcon && onSecondaryAction && (
           <Tooltip content={secondaryActionLabel ?? ""} positioning={{ placement: "top" }}>
             <Flex
-              as="button"
+              asChild
               align="center"
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                onSecondaryAction();
-              }}
-              aria-label={secondaryActionLabel}
               color="fg.subtle"
               paddingX={1}
               borderRadius="sm"
               _hover={{ color: "fg", bg: "bg.emphasized" }}
             >
-              {secondaryActionIcon}
+              <button
+                type="button"
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  onSecondaryAction();
+                }}
+                aria-label={secondaryActionLabel}
+              >
+                {secondaryActionIcon}
+              </button>
             </Flex>
           </Tooltip>
         )}

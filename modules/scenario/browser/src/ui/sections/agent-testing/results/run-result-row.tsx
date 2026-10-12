@@ -4,19 +4,20 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, chakra, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { isTerminalStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { MessageSquare, MoreVertical, Pencil, Play, Square } from "lucide-react";
+import { MessageSquare, Pencil, Play, Square } from "lucide-react";
 
 import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import {
   evaluationsOf,
   isAwaitingEvaluations,
 } from "../../../../model/agent-testing/results/evaluation-summaries.ts";
-import { FG_MUTED, ROW_HOVER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import { buildDisplayTitle } from "../../../../model/suite/run-history-transforms.ts";
 import {
   EvaluatorPill,
@@ -43,9 +44,6 @@ export type RunResultRowProps = Pick<
   | "onRerunCase"
 > & {
   scenarioRun: ScenarioRunData;
-  templateColumns: string;
-  /** True while any row of the run can still be stopped. */
-  hasStoppable: boolean;
   /** True when the table draws an Evaluators column. */
   hasEvaluators: boolean;
   /** True when the table draws a Caller column (AC24). */
@@ -81,7 +79,7 @@ function ResultRowActionsMenu({
           aria-label={`Actions for ${displayName}`}
           onClick={stop}
         >
-          <MoreVertical size={14} />
+          <MoreVerticalIcon size={14} />
         </Button>
       </Menu.Trigger>
       <Menu.Content>
@@ -139,7 +137,7 @@ function StopRunButton({
       size="xs"
       variant="outline"
       height="24px"
-      fontSize="11px"
+      textStyle="micro"
       paddingX={2}
       gap={1}
       aria-label={`Stop ${displayName}`}
@@ -167,8 +165,8 @@ function RowEvaluators({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
     if (!isAwaitingEvaluations(scenarioRun)) return null;
     return (
       <HStack gap={1.5} data-testid="run-result-evaluators-grading">
-        <Spinner size="xs" color={FG_MUTED} />
-        <Text fontSize="12px" fontWeight="medium" color={FG_MUTED}>
+        <Spinner size="xs" color="fg.muted" />
+        <Text textStyle="caption" fontWeight="medium" color="fg.muted">
           Grading
         </Text>
       </HStack>
@@ -207,7 +205,7 @@ function RowCaller({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
   const kind = runCallerKind(scenarioRun);
   if (!kind) return null;
   return (
-    <Text fontSize="12px" color={FG_MUTED}>
+    <Text textStyle="caption" color="fg.muted">
       {callerLabel(kind)}
     </Text>
   );
@@ -215,8 +213,6 @@ function RowCaller({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
 
 export function RunResultRow({
   scenarioRun,
-  templateColumns,
-  hasStoppable,
   hasEvaluators,
   hasCaller,
   resolveTargetName,
@@ -235,76 +231,74 @@ export function RunResultRow({
   const canCancel = !!onCancelRun && isCancellableStatus(scenarioRun.status);
 
   return (
-    <Box
-      display="grid"
-      gridTemplateColumns={templateColumns}
-      columnGap={3}
-      alignItems="start"
-      paddingX={4}
-      paddingY="10px"
-      cursor="pointer"
-      _hover={{ background: ROW_HOVER_BG }}
-      onClick={() => onScenarioRunClick(scenarioRun)}
+    <ListTable.Row
+      onActivate={() => onScenarioRunClick(scenarioRun)}
       data-testid={`run-result-row-${scenarioRun.scenarioRunId}`}
     >
-      <Box paddingTop="1px">
-        <LastResultLabel status={scenarioRun.status} results={scenarioRun.results ?? undefined} />
-      </Box>
+      <ListTable.Cell valign="top">
+        <Box paddingTop="1px">
+          <LastResultLabel status={scenarioRun.status} results={scenarioRun.results ?? undefined} />
+        </Box>
+      </ListTable.Cell>
 
-      <HStack gap={1.5} minWidth={0} flexWrap="wrap" paddingTop="1px">
-        <chakra.button
-          type="button"
-          minWidth={0}
-          textAlign="left"
-          cursor="pointer"
-          onClick={(event) => {
-            event.stopPropagation();
-            onScenarioRunClick(scenarioRun);
-          }}
-        >
-          <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
-            {displayName}
-          </Text>
-        </chakra.button>
-      </HStack>
+      <ListTable.Cell valign="top">
+        <HStack gap={1.5} minWidth={0} flexWrap="wrap" paddingTop="1px">
+          <chakra.button
+            type="button"
+            minWidth={0}
+            maxWidth="full"
+            textAlign="left"
+            cursor="pointer"
+            onClick={(event) => {
+              event.stopPropagation();
+              onScenarioRunClick(scenarioRun);
+            }}
+          >
+            <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
+              {displayName}
+            </Text>
+          </chakra.button>
+        </HStack>
+      </ListTable.Cell>
 
       {hasEvaluators ? (
-        <Box minWidth={0}>
+        <ListTable.Cell valign="top">
           <RowEvaluators scenarioRun={scenarioRun} />
-        </Box>
+        </ListTable.Cell>
       ) : null}
 
       {hasCaller ? (
-        <Box paddingTop="1px" minWidth={0}>
-          <RowCaller scenarioRun={scenarioRun} />
-        </Box>
+        <ListTable.Cell valign="top">
+          <Box paddingTop="1px" minWidth={0}>
+            <RowCaller scenarioRun={scenarioRun} />
+          </Box>
+        </ListTable.Cell>
       ) : null}
 
-      <Box paddingTop="1px" textAlign="right">
-        <RowMetrics scenarioRun={scenarioRun} />
-      </Box>
+      <ListTable.Cell align="end" valign="top">
+        <Box paddingTop="1px">
+          <RowMetrics scenarioRun={scenarioRun} />
+        </Box>
+      </ListTable.Cell>
 
-      <HStack
-        gap={1}
-        justify="flex-end"
-        minWidth={hasStoppable ? "88px" : undefined}
-        onClick={(event) => event.stopPropagation()}
-      >
-        {canCancel ? (
-          <StopRunButton
+      <ListTable.ActionCell>
+        <HStack gap={1} justify="flex-end">
+          {canCancel ? (
+            <StopRunButton
+              displayName={displayName}
+              isCancelling={cancellingJobId === scenarioRun.scenarioRunId}
+              onCancel={() => onCancelRun?.(scenarioRun)}
+            />
+          ) : null}
+          <ResultRowActionsMenu
             displayName={displayName}
-            isCancelling={cancellingJobId === scenarioRun.scenarioRunId}
-            onCancel={() => onCancelRun?.(scenarioRun)}
+            onOpenConversation={() => onScenarioRunClick(scenarioRun)}
+            onRerunCase={onRerunCase ? () => onRerunCase(scenarioRun) : undefined}
+            isRerunDisabled={!canRunAgain({ scenarioRun })}
+            onEditCase={onEditCase ? () => onEditCase(scenarioRun) : undefined}
           />
-        ) : null}
-        <ResultRowActionsMenu
-          displayName={displayName}
-          onOpenConversation={() => onScenarioRunClick(scenarioRun)}
-          onRerunCase={onRerunCase ? () => onRerunCase(scenarioRun) : undefined}
-          isRerunDisabled={!canRunAgain({ scenarioRun })}
-          onEditCase={onEditCase ? () => onEditCase(scenarioRun) : undefined}
-        />
-      </HStack>
-    </Box>
+        </HStack>
+      </ListTable.ActionCell>
+    </ListTable.Row>
   );
 }

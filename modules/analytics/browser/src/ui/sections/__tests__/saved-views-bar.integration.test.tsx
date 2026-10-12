@@ -20,8 +20,10 @@ vi.mock("../../../behavior/use-saved-views.tsx", () => ({
     reorderViews: vi.fn(),
   }),
 }));
-vi.mock("../analytics-header.tsx", () => ({ AnalyticsHeader: () => null }));
-vi.mock("../custom-dashboards-section.tsx", () => ({ CustomDashboardsSection: () => null }));
+vi.mock("../analytics-header.tsx", () => ({
+  AnalyticsHeader: ({ tabs }: { tabs: React.ReactNode }) => tabs,
+}));
+vi.mock("../custom-dashboards-section.tsx", () => ({ DashboardsTabMenu: () => null }));
 vi.mock("../../../behavior/use-filter-toggle.ts", () => ({
   useFilterToggle: () => ({ showFilters: false }),
 }));
@@ -32,7 +34,7 @@ describe("the analytics page", () => {
   it("shows the saved views and the view options menu under its content", () => {
     render(
       <AnalyticsTestHarness host={new StubAnalyticsHost()}>
-        <AnalyticsLayout title="Analytics" railEntry="overview">
+        <AnalyticsLayout tab="overview">
           <p>page content</p>
         </AnalyticsLayout>
       </AnalyticsTestHarness>,
@@ -44,21 +46,22 @@ describe("the analytics page", () => {
     expect(screen.getByRole("button", { name: "View options" })).toBeInTheDocument();
   });
 
-  it("lists every analytics page in its rail and marks the current one", () => {
+  it("lists every analytics page as a header tab and marks the current one", () => {
     render(
       <AnalyticsTestHarness host={new StubAnalyticsHost()}>
-        <AnalyticsLayout title="Online Evaluations" railEntry="evaluations">
+        <AnalyticsLayout tab="evaluations">
           <p>page content</p>
         </AnalyticsLayout>
       </AnalyticsTestHarness>,
     );
 
-    const rail = screen.getByRole("navigation", { name: "Analytics navigation" });
-    const links = Array.from(rail.querySelectorAll("a")).map((link) => link.textContent);
-    expect(links).toEqual(["Overview", "Users", "Topics", "LLM Metrics", "Online Evaluations"]);
-    expect(screen.getByRole("link", { name: "Online Evaluations" })).toHaveAttribute(
+    const tabs = screen.getByRole("navigation", { name: "Analytics pages" });
+    const links = Array.from(tabs.querySelectorAll("a")).map((link) => link.textContent);
+    expect(links).toEqual(["Overview", "Users", "Topics", "LLM metrics", "Evaluations"]);
+    expect(screen.getByRole("link", { name: "Evaluations" })).toHaveAttribute(
       "aria-current",
       "page",
     );
+    expect(screen.getByRole("link", { name: "Users" })).not.toHaveAttribute("aria-current");
   });
 });

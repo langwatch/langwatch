@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Button, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { ArrowRight, FlaskConical, RefreshCw } from "lucide-react";
@@ -5,13 +6,13 @@ import { ArrowRight, FlaskConical, RefreshCw } from "lucide-react";
 const capabilities = [
   {
     icon: FlaskConical,
-    title: "Automated Testing",
+    title: "Automated testing",
     description:
       "Define test scenarios that run automatically against your AI agent to verify it handles real-world situations correctly.",
   },
   {
     icon: RefreshCw,
-    title: "Regression Detection",
+    title: "Regression detection",
     description:
       "Catch regressions early by re-running scenarios after every change, ensuring your agent never breaks existing behavior.",
   },
@@ -21,30 +22,15 @@ const capabilities = [
   description: string;
 }[];
 
-function ScenarioWelcomeContent({ onProceed }: { onProceed: () => void }) {
+const INTRO =
+  "Scenarios let you test your agent behavior with repeatable, automated checks. Define situations, set expectations, and verify your agent responds correctly every time.";
+
+function CapabilityCards({ variant }: { variant: "panel" | "nested" }) {
   return (
-    <VStack gap={8} align="center">
-      <VStack gap={3} textAlign="center">
-        <Heading as="h2" size="xl">
-          Welcome to Scenarios
-        </Heading>
-        <Text fontSize="md" color="fg.muted">
-          Scenarios let you test your agent behavior with repeatable, automated checks. Define
-          situations, set expectations, and verify your agent responds correctly every time.
-        </Text>
-      </VStack>
-      <VStack gap={4} w="full">
-        {capabilities.map(({ icon: Icon, title, description }) => (
-          <HStack
-            key={title}
-            gap={4}
-            p={5}
-            w="full"
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="lg"
-            align="start"
-          >
+    <VStack gap={4} w="full">
+      {capabilities.map(({ icon: Icon, title, description }) => (
+        <Card key={title} variant={variant} padding="lg">
+          <HStack gap={4} align="start">
             <Box
               p={2}
               borderRadius="md"
@@ -62,11 +48,8 @@ function ScenarioWelcomeContent({ onProceed }: { onProceed: () => void }) {
               </Text>
             </VStack>
           </HStack>
-        ))}
-      </VStack>
-      <Button colorPalette="blue" size="lg" onClick={onProceed}>
-        Create Your First Scenario <ArrowRight size={16} />
-      </Button>
+        </Card>
+      ))}
     </VStack>
   );
 }
@@ -74,7 +57,20 @@ function ScenarioWelcomeContent({ onProceed }: { onProceed: () => void }) {
 export function ScenarioWelcomeScreen({ onProceed }: { onProceed: () => void }) {
   return (
     <VStack py={16} px={8} maxW="640px" mx="auto">
-      <ScenarioWelcomeContent onProceed={onProceed} />
+      <VStack gap={8} align="center">
+        <VStack gap={3} textAlign="center">
+          <Heading as="h2" size="lg">
+            Welcome to Scenarios
+          </Heading>
+          <Text fontSize="md" color="fg.muted">
+            {INTRO}
+          </Text>
+        </VStack>
+        <CapabilityCards variant="panel" />
+        <Button colorPalette="orange" variant="solid" size="lg" onClick={onProceed}>
+          Create Your First Scenario <ArrowRight size={16} />
+        </Button>
+      </VStack>
     </VStack>
   );
 }
@@ -89,18 +85,20 @@ export function ScenarioWelcomeModal({
   onProceed: () => void;
 }) {
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={(details) => onOpenChange(details.open)}
-      placement="center"
+      onClose={() => onOpenChange(false)}
+      title="Welcome to Scenarios"
+      description={INTRO}
       size="lg"
+      placement="center"
+      primaryAction={{
+        label: "Create Your First Scenario",
+        icon: <ArrowRight size={14} />,
+        onClick: onProceed,
+      }}
     >
-      <Dialog.Content maxWidth="640px">
-        <Dialog.CloseTrigger />
-        <Dialog.Body py={8} px={8}>
-          <ScenarioWelcomeContent onProceed={onProceed} />
-        </Dialog.Body>
-      </Dialog.Content>
-    </Dialog.Root>
+      <CapabilityCards variant="nested" />
+    </Dialog>
   );
 }

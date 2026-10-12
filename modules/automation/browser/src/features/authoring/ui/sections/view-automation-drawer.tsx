@@ -4,16 +4,7 @@ import {
   RUNAWAY_PAUSE_EXPLANATION,
 } from "@langwatch/automation-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
-import {
-  Badge,
-  Button,
-  Code,
-  HStack,
-  Skeleton,
-  Spacer,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Badge, Code, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type NamedSlackConnection } from "@langwatch/slack-contract";
 import { Calendar, TrendingUp } from "react-feather";
@@ -112,99 +103,74 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
   }
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
+    <Drawer
       size="md"
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
+      onClose={onClose}
+      title={trigger?.name ?? (isSchedule ? "Report" : "Automation")}
+      titleContent={triggerQuery.isLoading ? <Skeleton height="24px" width="200px" /> : void 0}
+      badges={
+        <>
+          {kindBadgeOf({ trigger, isGraphAlert, isSchedule })}
+          {pausedBadgeOf({ trigger })}
+        </>
+      }
+      footer={{ primaryAction: { label: "Edit", onClick: () => onEdit(automationId) } }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.CloseTrigger />
-          <VStack align="start" gap={1}>
-            {triggerQuery.isLoading ? (
-              <Skeleton height="24px" width="200px" />
-            ) : (
-              <Drawer.Title>{trigger?.name ?? (isSchedule ? "Report" : "Automation")}</Drawer.Title>
-            )}
-            <HStack gap={2}>
-              {kindBadgeOf({ trigger, isGraphAlert, isSchedule })}
-              {pausedBadgeOf({ trigger })}
-            </HStack>
-          </VStack>
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={6}>
-            <VStack align="start" gap={1}>
-              <Text textStyle="xs" color="fg.muted" fontWeight="medium">
-                Type
-              </Text>
-              <Text textStyle="sm">
-                {trigger
-                  ? (CLIENT_PROVIDERS[trigger.action]?.shared.label ?? trigger.action)
-                  : null}
-              </Text>
-            </VStack>
+      <VStack align="stretch" gap={6}>
+        <VStack align="start" gap={1}>
+          <Text textStyle="xs" color="fg.muted" fontWeight="medium">
+            Type
+          </Text>
+          <Text textStyle="sm">
+            {trigger ? (CLIENT_PROVIDERS[trigger.action]?.shared.label ?? trigger.action) : null}
+          </Text>
+        </VStack>
 
-            <VStack align="start" gap={1}>
-              <Text textStyle="xs" color="fg.muted" fontWeight="medium">
-                Destination
-              </Text>
-              {destinationSummaryOf({
-                trigger,
-                actionParams,
-                datasetName,
-                slackConnections: slackConnectionsQuery.data?.connections,
-              }) ?? <Text textStyle="sm">None</Text>}
-            </VStack>
+        <VStack align="start" gap={1}>
+          <Text textStyle="xs" color="fg.muted" fontWeight="medium">
+            Destination
+          </Text>
+          {destinationSummaryOf({
+            trigger,
+            actionParams,
+            datasetName,
+            slackConnections: slackConnectionsQuery.data?.connections,
+          }) ?? <Text textStyle="sm">None</Text>}
+        </VStack>
 
-            <VStack align="start" gap={1} width="full">
-              <Text textStyle="xs" color="fg.muted" fontWeight="medium">
-                Conditions
-              </Text>
-              {conditionsSummaryOf({
-                trigger,
-                isGraphAlert,
-                isUnconditioned,
-                actionParams,
-                graph: graphQuery.data?.graph,
-              })}
-            </VStack>
+        <VStack align="start" gap={1} width="full">
+          <Text textStyle="xs" color="fg.muted" fontWeight="medium">
+            Conditions
+          </Text>
+          {conditionsSummaryOf({
+            trigger,
+            isGraphAlert,
+            isUnconditioned,
+            actionParams,
+            graph: graphQuery.data?.graph,
+          })}
+        </VStack>
 
-            {trigger ? (
-              <NextFiringSection automationId={automationId} projectId={projectId} />
-            ) : null}
+        {trigger ? <NextFiringSection automationId={automationId} projectId={projectId} /> : null}
 
-            {traceQuery ? <MatchingTracesSection projectId={projectId} query={traceQuery} /> : null}
+        {traceQuery ? <MatchingTracesSection projectId={projectId} query={traceQuery} /> : null}
 
-            {trigger ? (
-              <HistorySection
-                automationId={automationId}
-                projectId={projectId}
-                isGraphAlert={isGraphAlert}
-                canRunConditions={!!traceQuery}
-                isUnconditioned={isUnconditioned}
-                isReport={isSchedule}
-              />
-            ) : null}
+        {trigger ? (
+          <HistorySection
+            automationId={automationId}
+            projectId={projectId}
+            isGraphAlert={isGraphAlert}
+            canRunConditions={!!traceQuery}
+            isUnconditioned={isUnconditioned}
+            isReport={isSchedule}
+          />
+        ) : null}
 
-            {isWebhook ? (
-              <WebhookDeliverySection automationId={automationId} projectId={projectId} />
-            ) : null}
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button colorPalette="orange" onClick={() => onEdit(automationId)}>
-              Edit
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+        {isWebhook ? (
+          <WebhookDeliverySection automationId={automationId} projectId={projectId} />
+        ) : null}
+      </VStack>
+    </Drawer>
   );
 }
 

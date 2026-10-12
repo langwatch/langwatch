@@ -113,10 +113,10 @@ export function ParameterRow({
           >
             <IconComponent size={16} />
           </Box>
-          <Text fontSize="13px" fontWeight="medium" flex={1}>
+          <Text textStyle="label" flex={1}>
             {config.label}
           </Text>
-          <Text fontSize="13px" color="fg.muted">
+          <Text textStyle="bodySm" color="fg.muted">
             {displayValue}
           </Text>
         </HStack>

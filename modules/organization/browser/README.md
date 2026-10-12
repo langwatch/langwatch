@@ -10,12 +10,12 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
 ## Screens
 
-| Page key                        | URL                        | Within   | Label          | Permission            | Flags |
-| ------------------------------- | -------------------------- | -------- | -------------- | --------------------- | ----- |
-| `pages/settings/audit-log`      | `/settings/audit-log`      | settings | Audit Log      | `organization:manage` | –     |
-| `pages/settings/directory`      | `/settings/directory`      | settings | Directory      | –                     | –     |
-| `pages/settings/authentication` | `/settings/authentication` | settings | Authentication | `sso:view`            | –     |
-| `pages/settings/teams/[team]`   | `/settings/teams/:team`    | settings | –              | `team:view`           | –     |
+| Page key                        | URL                        | Within   | Label          | Permission      | Flags |
+| ------------------------------- | -------------------------- | -------- | -------------- | --------------- | ----- |
+| `pages/settings/audit-log`      | `/settings/audit-log`      | settings | Audit Log      | `auditLog:view` | –     |
+| `pages/settings/directory`      | `/settings/directory`      | settings | Directory      | –               | –     |
+| `pages/settings/authentication` | `/settings/authentication` | settings | Authentication | `sso:view`      | –     |
+| `pages/settings/teams/[team]`   | `/settings/teams/:team`    | settings | –              | `team:view`     | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 
@@ -35,7 +35,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - `withApi(organizationApi)`, tRPC contracts: `organization.*`, `plan.*`.
-- Client packages (package.json): `@langwatch/enterprise-billing-client`, `@langwatch/enterprise-licensing-client`, `@langwatch/enterprise-scim-client`, `@langwatch/identity-client`, `@langwatch/organization-client`, `@langwatch/project-client`.
+- Client packages (package.json): `@langwatch/enterprise-licensing-client`, `@langwatch/enterprise-scim-client`, `@langwatch/identity-client`, `@langwatch/organization-client`, `@langwatch/project-client`.
 - Lends: `JoinOfferToken`, `JoinInsteadToken`, `PendingJoinRequestsToken`, `ProjectDepartmentFieldToken`.
 - Host APIs it requires: `OrganizationHostApi`.
 - Capabilities: `scope`, `copyTargets`, `organizationFacts`, `teamAccessWaiting`.

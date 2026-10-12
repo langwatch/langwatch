@@ -20,7 +20,7 @@ import { useNavigationHost } from "../../model/navigation-host.ts";
 import { LANGY_DOCK_TRANSITION, shellContentMaxWidth } from "../../model/shell-layout.ts";
 import { ProductIconRail } from "./icon-rail.tsx";
 import { MobileShell } from "./mobile-shell.tsx";
-import { ProductSidebar } from "./product-sidebar.tsx";
+import { detourSurface, ProductSidebar } from "./product-sidebar.tsx";
 import { ShellPageBody } from "./shell-page-body.tsx";
 import { ShellTopBar } from "./shell-top-bar.tsx";
 
@@ -175,7 +175,10 @@ function ShellContentRow({
         gap={0}
         minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
       >
-        <ProductSidebar surface={activeProductId ?? "settings"} isCompact={isCompactSidebar} />
+        <ProductSidebar
+          surface={activeProductId ?? detourSurface(host.pathname())}
+          isCompact={isCompactSidebar}
+        />
 
         <Box
           data-testid="shell-content-column"
@@ -205,14 +208,23 @@ function ShellContentRow({
             _dark={{
               borderColor: "border.muted",
             }}
-            overflow="auto"
+            overflow="hidden"
             display="flex"
             minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
             maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
             position="relative"
             data-tour="main-content"
           >
-            {children}
+            <Box
+              data-testid="shell-card-scroll"
+              width="full"
+              minWidth={0}
+              minHeight={0}
+              display="flex"
+              overflow="auto"
+            >
+              {children}
+            </Box>
           </Box>
         </Box>
       </HStack>

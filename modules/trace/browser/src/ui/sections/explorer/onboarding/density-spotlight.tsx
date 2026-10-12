@@ -123,7 +123,7 @@ export function DensitySpotlight({
                   <Icon boxSize={3.5} color={isActive ? "orange.fg" : "fg.muted"}>
                     <choice.icon />
                   </Icon>
-                  <Text textStyle="sm" fontWeight={500} color="fg">
+                  <Text textStyle="sm" fontWeight="medium" color="fg">
                     {choice.label}
                   </Text>
                 </HStack>
@@ -136,7 +136,7 @@ export function DensitySpotlight({
                     background="orange.solid"
                     color="orange.contrast"
                   >
-                    <Text textStyle="2xs" fontWeight={600}>
+                    <Text textStyle="2xs" fontWeight="semibold">
                       Continue
                     </Text>
                     <Text aria-hidden as="span" textStyle="2xs">
@@ -158,7 +158,7 @@ export function DensitySpotlight({
                     <Icon boxSize={2.5}>
                       <Check />
                     </Icon>
-                    <Text textStyle="2xs" fontWeight={600}>
+                    <Text textStyle="2xs" fontWeight="semibold">
                       Current
                     </Text>
                   </HStack>

@@ -56,7 +56,7 @@ describe("given a browser that installs dataset", () => {
       );
 
       expect(
-        await screen.findByRole("button", { name: "Create Dataset" }, { timeout: 10_000 }),
+        await screen.findByRole("button", { name: "Create dataset" }, { timeout: 10_000 }),
       ).toBeTruthy();
     });
   });

@@ -1,5 +1,4 @@
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Button, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { api } from "../../../../behavior/gateway-api.ts";
@@ -81,39 +80,29 @@ export function CacheRuleCreateDrawer({ open, onOpenChange, onCreated }: Props) 
   };
 
   return (
-    <Drawer.Root open={open} onOpenChange={() => handleClose()} placement="end" size="md">
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>New cache rule</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <CacheRuleForm
-            state={state}
-            onChange={(next) => {
-              setState(next);
-              setFieldComplaint(null);
-            }}
-            complaint={fieldComplaint}
-          />
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={handleClose} disabled={createMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              onClick={handleSubmit}
-              loading={createMutation.isPending}
-              disabled={!state.name.trim()}
-            >
-              Create rule
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer
+      open={open}
+      onClose={handleClose}
+      title="New cache rule"
+      size="md"
+      busy={createMutation.isPending}
+      footer={{
+        cancel: { label: "Cancel", onClick: handleClose },
+        primaryAction: {
+          label: "Create rule",
+          loading: createMutation.isPending,
+          onClick: () => void handleSubmit(),
+        },
+      }}
+    >
+      <CacheRuleForm
+        state={state}
+        onChange={(next) => {
+          setState(next);
+          setFieldComplaint(null);
+        }}
+        complaint={fieldComplaint}
+      />
+    </Drawer>
   );
 }

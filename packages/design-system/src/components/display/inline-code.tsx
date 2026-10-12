@@ -62,8 +62,7 @@ const NEUTRAL = {
   borderWidth: 0,
   bg: "bg.control",
   color: "fg",
-  fontSize: "12px",
-  lineHeight: "16px",
+  textStyle: "monoSm",
 } as const;
 
 /**
@@ -83,8 +82,11 @@ export function InlineCode({
     title: children,
     "data-truncate": truncate,
     maxWidth: "full",
+    width: "fit-content",
     whiteSpace: "nowrap",
     fontFamily: "mono",
+    fontVariantNumeric: "normal",
+    letterSpacing: "normal",
     css: selectOnClick ? SELECT_ALL : undefined,
     ...(variant === "neutral" ? NEUTRAL : ACCENT),
   } as const;

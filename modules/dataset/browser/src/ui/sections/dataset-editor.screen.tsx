@@ -1,6 +1,7 @@
 // Dataset editor respecting I-READY gate; dataset ID from host route (screen decides readiness).
 
 import { datasetClient } from "@langwatch/dataset-client";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Alert, Box, Button, Spinner, Text } from "@langwatch/design-system/primitives";
 import { FlaskConical } from "lucide-react";
@@ -110,7 +111,20 @@ export default function DatasetEditorScreen() {
             </Button>
           </Alert.Root>
         )}
-        {datasetGone && <Text color="fg.muted">This dataset is no longer available.</Text>}
+        {datasetGone && (
+          <NoDataInfoBlock
+            size="line"
+            title="This dataset is no longer available."
+            next={[
+              {
+                kind: "setting",
+                label: "Back to datasets",
+                href: `/${project?.slug}/datasets`,
+                onNavigate: ({ href }) => host.navigate(href),
+              },
+            ]}
+          />
+        )}
         {isReady ? (
           <DatasetEditorTable
             datasetId={datasetId}

@@ -1,16 +1,12 @@
 /**
  * Empty state for /me "Recent activity", with personal-user-specific trace sources.
  */
-import {
-  Box,
-  chakra,
-  Flex,
-  Icon,
-  SimpleGrid,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { Bot, KeyRound, Webhook } from "lucide-react";
+import { Card, CardGrid } from "@langwatch/design-system/card";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, Flex, Icon, VStack } from "@langwatch/design-system/primitives";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
+import { docsUrl } from "@langwatch/handled-error/docs-url";
+import { Activity, Bot, KeyRound, Webhook } from "lucide-react";
 import type React from "react";
 
 import { Link } from "../elements/personal-link.tsx";
@@ -64,61 +60,24 @@ function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-const cardProps = {
-  appearance: "none" as const,
-  font: "inherit",
-  borderWidth: "1px",
-  borderColor: "border.muted",
-  borderRadius: "lg",
-  padding: 4,
-  bg: "bg.panel",
-  width: "full",
-  height: "full",
-  textAlign: "left" as const,
-  cursor: "pointer",
-  transition: "all 0.15s ease",
-  _hover: {
-    borderColor: "orange.emphasized",
-    bg: "orange.subtle",
-    transform: "translateY(-1px)",
-  },
-  _active: { transform: "translateY(0)" },
-};
-
 type Offer = {
   icon: React.ElementType;
   title: string;
   description: string;
 } & ({ onClick: () => void; href?: undefined } | { href: string; onClick?: undefined });
 
-function OfferBody({ icon, title, description }: Pick<Offer, "icon" | "title" | "description">) {
-  return (
-    <VStack align="start" gap={2}>
-      <Icon as={icon} boxSize={5} color="orange.solid" />
-      <Text fontWeight="600" fontSize="sm" color="fg">
-        {title}
-      </Text>
-      <Text fontSize="xs" color="fg.muted" lineHeight="tall">
-        {description}
-      </Text>
-    </VStack>
-  );
-}
-
 const OfferCard: React.FC<Offer> = ({ icon, title, description, onClick, href }) => {
-  if (href) {
-    return (
-      <Link href={href} display="block" _hover={{ textDecoration: "none" }}>
-        <Box {...cardProps}>
-          <OfferBody icon={icon} title={title} description={description} />
-        </Box>
-      </Link>
-    );
-  }
+  const accent = useProductAccent();
   return (
-    <chakra.button type="button" onClick={onClick} {...cardProps}>
-      <OfferBody icon={icon} title={title} description={description} />
-    </chakra.button>
+    <Card
+      titleLevel={3}
+      icon={<Icon as={icon} boxSize={5} color={accent.roles.solid} />}
+      title={title}
+      description={description}
+      opener={
+        href ? <Link href={href} /> : <button type="button" aria-label={title} onClick={onClick} />
+      }
+    />
   );
 };
 
@@ -151,20 +110,25 @@ export function PersonalTracesEmptyState({ projectSlug }: { projectSlug?: string
   return (
     <CompactIntegratePane ariaLabel="Start sending your AI usage">
       <VStack align="stretch" gap={6}>
-        <VStack align="start" gap={1.5}>
-          <Text textStyle="2xl" fontWeight="600" color="fg" letterSpacing="-0.015em">
-            No activity here yet
-          </Text>
-          <Text textStyle="sm" color="fg.muted" lineHeight="tall">
-            Send your AI usage to LangWatch with the tools you already have set up above - no SDK
-            wiring required.
-          </Text>
-        </VStack>
-        <SimpleGrid columns={{ base: 1, md: 3 }} gap={3}>
+        <NoDataInfoBlock
+          size="inline"
+          bordered={false}
+          icon={<Activity />}
+          title="No activity here yet"
+          description="Send your AI usage to LangWatch with the tools you already have set up above - no SDK wiring required."
+          next={[
+            {
+              kind: "docs",
+              label: "Coding agents quickstart",
+              href: docsUrl("/coding-agents/quickstart"),
+            },
+          ]}
+        />
+        <CardGrid columns={3}>
           {offers.map((offer) => (
             <OfferCard key={offer.title} {...offer} />
           ))}
-        </SimpleGrid>
+        </CardGrid>
       </VStack>
     </CompactIntegratePane>
   );

@@ -1574,7 +1574,7 @@ a shrink-only baseline and Postgres RLS is deferred.
 **Main's byte intakes stay for now** (Alex, 2026-09-30). The user avatar and AI tool icon
 data URLs, the deprecated multipart dataset routes, bug-report transcripts and inline scenario
 media keep main's shapes; each moves to createUpload, PUT and confirmUpload only by its own
-ruling. main's signal-focused home and briefing are restored behind `release_ui_home_signal_focused_enabled` (Alex, 2026-10-09);
+ruling. the project home is one composition for every reader, the Langy home; without Langy its field is the command bar (Alex, 2026-10-11);
 automation email previews render in the browser, as on main.
 
 **Every Redis cache key expires, and expiry is the only sweeper** (Alex, 2026-10-01). One Redis is the default: one
@@ -2414,7 +2414,9 @@ closes the top one and a reload restores the stack. No module-level drawer store
 whole browser.
 
 How a screen is laid out (titles, header actions, containers, drawers, empty and loading
-states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md` §4.
+states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md` §4. Drawers,
+dialogs and cards are prop-driven shapes, not assembled parts (ADR-002 in
+`packages/design-system/adrs/`, ruled 2026-10-11).
 
 **An in-app link is `@langwatch/browser-host/link`** (ruled 2026-09-29), or a design-system element handed `onNavigate`; a bare anchor or Chakra `Link` with an in-app address reloads the document. specs/ui/in-app-links.feature.
 

@@ -72,7 +72,7 @@ export function Typewriter({
         aria-hidden
         display="inline-block"
         w="3px"
-        ml="2px"
+        ml="0.5"
         borderRadius="2px"
         bg="currentColor"
         verticalAlign="baseline"

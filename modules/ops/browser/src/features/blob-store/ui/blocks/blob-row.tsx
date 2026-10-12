@@ -1,7 +1,9 @@
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
+import { InlineCode } from "@langwatch/design-system/inline-code";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { Badge, Button, Table, Text } from "@langwatch/design-system/primitives";
+import { Badge, Button, Text } from "@langwatch/design-system/primitives";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
-import { MoreVertical } from "lucide-react";
 
 import { formatBytes } from "../../../../model/ops-formatters.ts";
 import { formatLeaseLapse, formatTtl, sweepOutcomeLabel } from "../../model/blob-formatters.ts";
@@ -18,20 +20,16 @@ export function BlobRow({
   const outcome = sweepOutcomeLabel(blob.sweepOutcome);
 
   return (
-    <Table.Row>
-      <Table.Cell>
-        <Text textStyle="xs" fontFamily="mono">
-          {blob.projectId}
-        </Text>
-      </Table.Cell>
-      <Table.Cell>
-        <Text textStyle="xs" fontFamily="mono">
-          {blob.hash}
-        </Text>
-      </Table.Cell>
-      <Table.Cell>{formatBytes(blob.sizeBytes)}</Table.Cell>
-      <Table.Cell>{formatTtl(blob.ttlSeconds)}</Table.Cell>
-      <Table.Cell>
+    <ListTable.Row>
+      <ListTable.Cell>
+        <InlineCode variant="neutral">{blob.projectId}</InlineCode>
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <InlineCode variant="neutral">{blob.hash}</InlineCode>
+      </ListTable.Cell>
+      <ListTable.Cell>{formatBytes(blob.sizeBytes)}</ListTable.Cell>
+      <ListTable.Cell>{formatTtl(blob.ttlSeconds)}</ListTable.Cell>
+      <ListTable.Cell>
         {blob.liveLeases > 0 ? (
           <Badge colorPalette="green" variant="subtle">
             {blob.liveLeases} job{blob.liveLeases === 1 ? "" : "s"}
@@ -41,23 +39,23 @@ export function BlobRow({
             Nothing
           </Badge>
         )}
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="xs" color="fg.muted">
           {formatLeaseLapse(blob.earliestLeaseDeadlineMs)}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Badge colorPalette={outcome.palette} variant="subtle">
           {outcome.label}
         </Badge>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.ActionCell>
         {canManage && (
           <Menu.Root>
             <Menu.Trigger asChild>
               <Button variant="ghost" size="sm" aria-label={`Actions for payload ${blob.hash}`}>
-                <MoreVertical size={14} />
+                <MoreVerticalIcon size={14} />
               </Button>
             </Menu.Trigger>
             <Menu.Content>
@@ -67,7 +65,7 @@ export function BlobRow({
             </Menu.Content>
           </Menu.Root>
         )}
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.ActionCell>
+    </ListTable.Row>
   );
 }

@@ -3,6 +3,7 @@ import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automation-contract";
+import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
   Box,
@@ -10,7 +11,6 @@ import {
   Code,
   Heading,
   HStack,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -182,7 +182,7 @@ export function SectionHeader({
         {icon}
       </Box>
       <HStack gap={2} align="center" flex="1 0 auto">
-        <Heading size="md">{title}</Heading>
+        <Heading size="sm">{title}</Heading>
         <Badge colorPalette={accent} variant="subtle" borderRadius="full">
           {count}
         </Badge>
@@ -220,22 +220,22 @@ export function ReportRunCells({
   if (loading) {
     return (
       <>
-        <Table.Cell>
+        <ListTable.Cell>
           <Text textStyle="sm" color="fg.muted">
             …
           </Text>
-        </Table.Cell>
-        <Table.Cell>
+        </ListTable.Cell>
+        <ListTable.Cell>
           <Text textStyle="sm" color="fg.muted">
             …
           </Text>
-        </Table.Cell>
+        </ListTable.Cell>
       </>
     );
   }
   return (
     <>
-      <Table.Cell whiteSpace="nowrap">
+      <ListTable.Cell nowrap>
         {schedule?.nextRunAt ? (
           <Tooltip content={readableDate(schedule.nextRunAt).toLocaleString()}>
             <Text textStyle="sm" cursor="help">
@@ -247,8 +247,8 @@ export function ReportRunCells({
             {schedule ? "Paused" : "Not scheduled"}
           </Text>
         )}
-      </Table.Cell>
-      <Table.Cell whiteSpace="nowrap">
+      </ListTable.Cell>
+      <ListTable.Cell nowrap>
         {schedule?.lastRunAt ? (
           <Tooltip content={readableDate(schedule.lastRunAt).toLocaleString()}>
             <Text textStyle="sm" cursor="help">
@@ -260,20 +260,8 @@ export function ReportRunCells({
             Not yet
           </Text>
         )}
-      </Table.Cell>
+      </ListTable.Cell>
     </>
-  );
-}
-
-/** Muted one-liner shown in place of a table when a section is empty and has
- *  no dedicated use-case strip. */
-export function EmptyHint({ children }: { children: React.ReactNode }) {
-  return (
-    <Box border="1px dashed" borderColor="border" borderRadius="lg" padding={6} textAlign="center">
-      <Text textStyle="sm" color="fg.muted">
-        {children}
-      </Text>
-    </Box>
   );
 }
 

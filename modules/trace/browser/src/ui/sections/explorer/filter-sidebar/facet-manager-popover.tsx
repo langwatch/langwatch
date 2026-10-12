@@ -276,7 +276,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
             _hover={{ color: "fg", bg: "bg.muted" }}
           >
             <Settings2 size={12} />
-            <Text textStyle="2xs" fontWeight="600">
+            <Text textStyle="2xs" fontWeight="semibold">
               {triggerLabel}
             </Text>
             {orderedKeysAll.length > 0 && showCount && (
@@ -291,7 +291,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                 paddingX={1}
                 fontVariantNumeric="tabular-nums"
               >
-                <Text as="span" textStyle="2xs" fontWeight="600">
+                <Text as="span" textStyle="2xs" fontWeight="semibold">
                   {visibleCount}/{orderedKeysAll.length}
                 </Text>
               </Box>
@@ -345,7 +345,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
             >
               <Text
                 textStyle="2xs"
-                fontWeight="700"
+                fontWeight="semibold"
                 color="fg.subtle"
                 textTransform="uppercase"
                 letterSpacing="0.1em"
@@ -517,7 +517,7 @@ const FacetGroupRows: React.FC<
         </Icon>
         <Text
           textStyle="2xs"
-          fontWeight="700"
+          fontWeight="semibold"
           color="fg.subtle"
           textTransform="uppercase"
           letterSpacing="0.1em"

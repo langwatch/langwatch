@@ -6,11 +6,13 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { AddOrEditDatasetRoutedDrawerToken } from "@langwatch/dataset-client";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
-import { Button, HStack, VStack } from "@langwatch/design-system/primitives";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Box, Button, VStack } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
+import { useLangyStore } from "../../../behavior/langy/langy.store.ts";
 import { useDatasets } from "../../../behavior/reads/use-project-reads.ts";
 import { useTracesWithSpans } from "../../../behavior/reads/use-trace-mapping-reads.ts";
 import { useLocalStorageSelectedDataSetId } from "../../../behavior/use-local-storage-selected-dataset-id.ts";
@@ -20,7 +22,6 @@ import {
   useInvalidateDatasets,
 } from "../../../behavior/writes/use-trace-writes.ts";
 import { useAnnotationQueueSessionStore } from "../../../features/annotation/behavior/annotation-queue-session.store.ts";
-import { Drawer } from "../drawer.tsx";
 import { showErrorToast } from "../errors/index.ts";
 import { DatasetMappingPreview } from "./dataset-mapping-preview.tsx";
 import { DatasetSelector } from "./dataset-selector.tsx";
@@ -87,9 +88,7 @@ function entriesToAdd({
   );
 }
 
-function isScrolledToBottom(el: HTMLElement): boolean {
-  return el.scrollTop >= el.scrollHeight - el.clientHeight;
-}
+const FORM_ID = "add-dataset-record-form";
 
 function submitLabel({ rowCount, isReady }: { rowCount: number; isReady: boolean }): string {
   if (!isReady) return "Add  to dataset";
@@ -183,6 +182,9 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
       onClose: goBack,
     });
 
+  const floatingLangyOpen = useLangyStore((s) => s.isOpen && s.panelMode === "floating");
+  const [waitForFloatingLangy] = useState(() => floatingLangyOpen);
+
   const handleOnClose = () => {
     goBack();
     reset();
@@ -242,106 +244,65 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
     setEditableRowData(rowDataFromDataset);
   }, [rowDataFromDataset]);
 
-  // Scroll position tracking
-  const scrollRef = useRef<HTMLDivElement>(null);
   const editorPortalRef = useRef<HTMLDivElement>(null);
-  const [atBottom, setAtBottom] = useState(false);
-
-  useEffect(() => {
-    if (scrollRef.current) setAtBottom(isScrolledToBottom(scrollRef.current));
-  }, [rowDataFromDataset]);
+  const submitDisabled = !selectedDataset || !tracesWithSpans.data || rowsToAdd.length === 0;
 
   return (
-    <Drawer.Root
+    <Drawer
       open={true}
-      placement="end"
-      size="xl"
-      onOpenChange={({ open }) => {
-        if (!open) {
-          handleOnClose();
-        }
-      }}
-      onEscapeKeyDown={(e) => {
-        // Escape while the floating cell editor is open should only close
-        // the editor (its own handler), never the whole drawer.
-        if (editorPortalRef.current?.querySelector("[data-floating-cell-editor]")) {
-          e.preventDefault();
-        }
-      }}
+      onClose={handleOnClose}
+      size="workspace"
+      title="Add to Dataset"
+      body="flush"
       preventScroll={true}
+      companionMotion={waitForFloatingLangy ? "wait" : "follow"}
+      // Escape while the floating cell editor is open only closes the editor (its own handler).
+      closeOnEscape={() => !editorPortalRef.current?.querySelector("[data-floating-cell-editor]")}
+      footerAppearance="raised"
+      footerContent={
+        <Button
+          type="submit"
+          form={FORM_ID}
+          colorPalette="orange"
+          variant="solid"
+          marginTop={6}
+          marginBottom={4}
+          loading={createDatasetRecord.isPending}
+          disabled={submitDisabled}
+        >
+          {submitLabel({
+            rowCount: rowsToAdd.length,
+            isReady: !!selectedDataset && !!tracesWithSpans.data,
+          })}
+        </Button>
+      }
     >
-      <Drawer.Content
-        bg="bg"
-        maxWidth="1400px"
-        overflow="auto"
-        ref={scrollRef}
-        onScroll={(e) => setAtBottom(isScrolledToBottom(e.currentTarget))}
-      >
-        <Drawer.Header>
-          <HStack>
-            <Drawer.CloseTrigger />
-          </HStack>
-          <HStack>
-            <Drawer.Title>Add to Dataset</Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body overflow="visible" paddingX={0} ref={editorPortalRef}>
-          <form onSubmit={(event) => void handleSubmit(onSubmit)(event)}>
-            <VStack paddingX={6}>
-              <DatasetSelector
-                isLoading={datasets.isLoading}
-                isError={datasets.isError}
-                datasets={datasets.data}
-                localStorageDatasetId={datasetId}
-                errors={errors}
-                setValue={setValue}
-                onCreateNew={openDatasetEditor}
+      <Box ref={editorPortalRef}>
+        <form id={FORM_ID} onSubmit={(event) => void handleSubmit(onSubmit)(event)}>
+          <VStack paddingX={6} paddingBottom={4}>
+            <DatasetSelector
+              isLoading={datasets.isLoading}
+              isError={datasets.isError}
+              datasets={datasets.data}
+              localStorageDatasetId={datasetId}
+              errors={errors}
+              setValue={setValue}
+              onCreateNew={openDatasetEditor}
+            />
+            {selectedDataset && (
+              <DatasetMappingPreview
+                traces={tracesWithSpans.data ?? []}
+                columnTypes={selectedDataset.columnTypes}
+                rowData={rowDataFromDataset}
+                selectedDataset={selectedDataset}
+                onEditColumns={openDatasetEditor}
+                onRowDataChange={setRowDataFromDataset}
+                editorPortalRef={editorPortalRef}
               />
-              {selectedDataset && (
-                <DatasetMappingPreview
-                  traces={tracesWithSpans.data ?? []}
-                  columnTypes={selectedDataset.columnTypes}
-                  rowData={rowDataFromDataset}
-                  selectedDataset={selectedDataset}
-                  onEditColumns={openDatasetEditor}
-                  onRowDataChange={setRowDataFromDataset}
-                  editorPortalRef={editorPortalRef}
-                />
-              )}
-            </VStack>
-
-            <HStack
-              width="full"
-              justifyContent="flex-end"
-              position="sticky"
-              bottom={0}
-              paddingBottom={4}
-              background="bg.panel"
-              transition="box-shadow 0.3s ease-in-out"
-              boxShadow={
-                atBottom
-                  ? "none"
-                  : "0 -2px 5px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent)"
-              }
-              paddingX={6}
-            >
-              <Button
-                type="submit"
-                colorPalette="blue"
-                marginTop={6}
-                marginBottom={4}
-                loading={createDatasetRecord.isPending}
-                disabled={!selectedDataset || !tracesWithSpans.data || rowsToAdd.length === 0}
-              >
-                {submitLabel({
-                  rowCount: rowsToAdd.length,
-                  isReady: !!selectedDataset && !!tracesWithSpans.data,
-                })}
-              </Button>
-            </HStack>
-          </form>
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+            )}
+          </VStack>
+        </form>
+      </Box>
+    </Drawer>
   );
 }

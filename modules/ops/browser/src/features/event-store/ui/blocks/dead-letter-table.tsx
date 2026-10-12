@@ -1,5 +1,5 @@
+import { Card } from "@langwatch/design-system/card";
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Card, Table } from "@langwatch/design-system/primitives";
 
 import type {
   DeadLetterAttemptHistoryRenderer,
@@ -32,44 +32,41 @@ export function DeadLettersTable({
   renderAttemptHistory?: DeadLetterAttemptHistoryRenderer;
 }) {
   return (
-    <Card.Root borderColor="border.muted" boxShadow="none">
-      <Card.Body padding={0}>
-        <ListTable
-          density="compact"
-          columnRules={false}
-          containerProps={{ overflowX: "auto" }}
-          size="sm"
-          variant="line"
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Process</Table.ColumnHeader>
-              <Table.ColumnHeader>Intent</Table.ColumnHeader>
-              <Table.ColumnHeader>Process key</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">Attempts</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">Retired</Table.ColumnHeader>
-              <Table.ColumnHeader />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {messages.map((message) => (
-              <DeadLetterRow
-                key={message.id}
-                message={message}
-                now={now}
-                canManage={canManage}
-                isExpanded={expandedId === message.id}
-                isRedriving={redrivingId === message.id}
-                isDiscarding={discardingId === message.id}
-                onToggle={() => onToggle(message.id)}
-                onRedrive={() => onRedrive(message)}
-                onDiscard={() => onDiscard(message)}
-                renderAttemptHistory={renderAttemptHistory}
-              />
-            ))}
-          </Table.Body>
-        </ListTable>
-      </Card.Body>
-    </Card.Root>
+    <Card padding="none">
+      <ListTable
+        density="compact"
+        variant="embedded"
+        scroll="x"
+        scrollLabel="Dead-lettered messages"
+      >
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Process</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Intent</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Process key</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader align="end">Attempts</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader align="end">Retired</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader label="Actions" />
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
+          {messages.map((message) => (
+            <DeadLetterRow
+              key={message.id}
+              message={message}
+              now={now}
+              canManage={canManage}
+              isExpanded={expandedId === message.id}
+              isRedriving={redrivingId === message.id}
+              isDiscarding={discardingId === message.id}
+              onToggle={() => onToggle(message.id)}
+              onRedrive={() => onRedrive(message)}
+              onDiscard={() => onDiscard(message)}
+              renderAttemptHistory={renderAttemptHistory}
+            />
+          ))}
+        </ListTable.Body>
+      </ListTable>
+    </Card>
   );
 }

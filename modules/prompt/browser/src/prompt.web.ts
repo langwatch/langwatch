@@ -7,6 +7,7 @@ import {
   LlmConfigFieldToken,
   LlmConfigPopoverToken,
   OutputsSectionToken,
+  VariablesSectionToken,
   PromptEditorDrawerToken,
   PromptListDrawerToken,
   StudioPromptEditorToken,
@@ -54,6 +55,11 @@ export const promptWeb = defineBrowserModule("prompt")
   .lends(OutputsSectionToken, {
     load: async () => ({
       default: (await import("./ui/sections/prompts/lent-prompt-fields.tsx")).LentOutputsSection,
+    }),
+  })
+  .lends(VariablesSectionToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/prompts/lent-prompt-fields.tsx")).LentVariablesSection,
     }),
   })
   .lends(StudioPromptEditorToken, {

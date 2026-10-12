@@ -290,6 +290,59 @@ describe("given the gateway tour running on the virtual keys page", () => {
     });
   });
 
+  describe("when the list refresh behind the create is rejected", () => {
+    /** @scenario A failed list refresh does not hold back the minted key */
+    it("still hands the minted key over", async () => {
+      world.invalidateList.mockRejectedValue(new Error("refetch failed"));
+      renderDrawer();
+      await typeName("production-app");
+
+      await act(async () => {
+        await tourActions().submitVirtualKeyCreate?.();
+      });
+
+      expect(onCreated).toHaveBeenCalledTimes(1);
+      expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ secret: "secret-marker" }));
+    });
+
+    it("still hands the minted key over when the refresh throws at once", async () => {
+      world.invalidateList.mockImplementation(() => {
+        throw new Error("refetch threw");
+      });
+      renderDrawer();
+      await typeName("production-app");
+
+      await act(async () => {
+        await tourActions().submitVirtualKeyCreate?.();
+      });
+
+      expect(onCreated).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the handoff of the tour's key throws", () => {
+    /** @scenario A tour submit after a failed handoff does not mint again */
+    it("does not mint a second key when the tour submits again", async () => {
+      onCreated.mockImplementationOnce(() => {
+        throw new Error("could not open");
+      });
+      renderDrawer();
+      await typeName("production-app");
+
+      await act(async () => {
+        await tourActions().submitVirtualKeyCreate?.();
+      });
+      await screen.findByTestId("gateway-virtual-key-handoff-failed");
+      await act(async () => {
+        await tourActions().submitVirtualKeyCreate?.();
+      });
+
+      expect(world.create).toHaveBeenCalledTimes(1);
+      expect(world.recordReveal).toHaveBeenCalledTimes(1);
+      expect(onCreated).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when a person creates a key by hand", () => {
     it("asks for no reveal and records nothing", async () => {
       renderDrawer();

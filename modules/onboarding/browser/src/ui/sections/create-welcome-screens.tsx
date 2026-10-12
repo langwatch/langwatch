@@ -86,7 +86,7 @@ const OrganizationScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
           <Checkbox.Control>
             <Checkbox.Indicator />
           </Checkbox.Control>
-          <Checkbox.Label fontWeight="normal" fontSize="13px" color="fg.muted">
+          <Checkbox.Label textStyle="bodySm" fontWeight="normal" color="fg.muted">
             {"I agree to the LangWatch "}
             <Link href={LEGAL_LINKS.terms.href} isExternal fontWeight="medium" variant="underline">
               {LEGAL_LINKS.terms.label}

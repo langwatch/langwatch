@@ -12,8 +12,12 @@ const { state, calls } = vi.hoisted(() => ({
   state: {
     status: void 0 as Record<string, unknown> | undefined,
     triggerResult: { started: true } as { started: boolean },
+    pages: [{ outcome: "page", entries: [], hasMore: false, nextCursor: null }] as Record<
+      string,
+      unknown
+    >[],
   },
-  calls: { trigger: vi.fn(), invalidate: vi.fn() },
+  calls: { trigger: vi.fn(), invalidate: vi.fn(), fetchNextPage: vi.fn() },
 }));
 
 vi.mock("../../../behavior/topic-api.ts", () => ({
@@ -21,15 +25,29 @@ vi.mock("../../../behavior/topic-api.ts", () => ({
     useUtils: () => ({
       topics: {
         getClusteringStatus: { invalidate: calls.invalidate },
-        getClusteringRunHistory: { invalidate: calls.invalidate },
+        getClusteringRunHistoryPage: { invalidate: calls.invalidate },
       },
     }),
     topics: {
       getClusteringStatus: {
         useQuery: () => ({ data: state.status, isLoading: false }),
       },
-      getClusteringRunHistory: {
-        useQuery: () => ({ data: [], isLoading: false }),
+      getClusteringRunHistoryPage: {
+        useInfiniteQuery: (
+          _input: unknown,
+          options: { getNextPageParam: (last: Record<string, unknown>) => unknown },
+        ) => {
+          const last = state.pages.at(-1);
+          return {
+            data: { pages: state.pages },
+            isLoading: false,
+            isError: false,
+            isFetchingNextPage: false,
+            hasNextPage: last ? options.getNextPageParam(last) !== void 0 : false,
+            fetchNextPage: calls.fetchNextPage,
+            refetch: vi.fn(),
+          };
+        },
       },
       triggerTopicClustering: {
         useMutation: (options?: { onSuccess?: (result: { started: boolean }) => void }) => ({
@@ -66,6 +84,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.status = settledStatus({});
   state.triggerResult = { started: true };
+  state.pages = [{ outcome: "page", entries: [], hasMore: false, nextCursor: null }];
 });
 
 afterEach(cleanup);
@@ -141,5 +160,69 @@ describe("given the last run completed without finding any topic", () => {
 
     expect(screen.getByText(/found no new topics in 51 traces/i)).toBeTruthy();
     expect(screen.queryByText(/into 0 topics/i)).toBeNull();
+  });
+});
+
+const run = (runId: string, overrides: Record<string, unknown> = {}) => ({
+  runId,
+  startedAt: Date.now() - 60_000,
+  trigger: "scheduled",
+  outcome: "completed",
+  mode: "incremental",
+  skippedReason: null,
+  errorCode: null,
+  isErrorUserActionable: false,
+  tracesProcessed: 12,
+  topicsCount: 2,
+  subtopicsCount: 3,
+  ...overrides,
+});
+
+describe("given a run history with no runs", () => {
+  it("names what makes the first run and links the topic clustering docs", () => {
+    renderWithTopicHost(<TopicClusteringScreen />);
+
+    expect(screen.getByText(/no runs yet/i)).toBeTruthy();
+    expect(screen.getByRole("link", { name: /about topic clustering/i }).getAttribute("href")).toBe(
+      "https://docs.langwatch.ai/features/topic-clustering",
+    );
+  });
+});
+
+describe("given a run history with more runs than one page", () => {
+  it("asks the server for the next page from Load more", () => {
+    state.pages = [
+      { outcome: "page", entries: [run("run-1")], hasMore: true, nextCursor: "run-1" },
+    ];
+    renderWithTopicHost(<TopicClusteringScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    expect(calls.fetchNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows every loaded page in order and ends without the button", () => {
+    state.pages = [
+      { outcome: "page", entries: [run("run-1")], hasMore: true, nextCursor: "run-1" },
+      { outcome: "page", entries: [run("run-2")], hasMore: false, nextCursor: null },
+    ];
+    renderWithTopicHost(<TopicClusteringScreen />);
+
+    expect(screen.getAllByRole("row")).toHaveLength(3);
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
+  });
+});
+
+describe("given the history moved past the reader's place", () => {
+  it("says so and offers the newest runs instead of Load more", () => {
+    state.pages = [
+      { outcome: "page", entries: [run("run-1")], hasMore: true, nextCursor: "run-1" },
+      { outcome: "cursor_expired" },
+    ];
+    renderWithTopicHost(<TopicClusteringScreen />);
+
+    expect(screen.getByText(/history moved on/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Show newest runs" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
   });
 });

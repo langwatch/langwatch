@@ -8,6 +8,10 @@ import { create } from "storybook/theming";
 export const pickScheme = (): ThemeName =>
   window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 
+/** The toolbar's colour mode as a scheme: "System" (or nothing yet) follows the OS. */
+export const schemeFor = (mode: unknown): ThemeName =>
+  mode === "light" || mode === "dark" ? mode : pickScheme();
+
 const pixels = ({ value }: { value: string }): number => Number.parseInt(value, 10);
 
 export const paperTheme = ({ scheme }: { scheme: ThemeName }) => {
@@ -15,6 +19,8 @@ export const paperTheme = ({ scheme }: { scheme: ThemeName }) => {
   return create({
     base: scheme,
     brandTitle: "LangWatch design system",
+    brandUrl: "./",
+    brandImage: `./images/logo-full-${scheme}theme.svg`,
     colorPrimary: colour.brand,
     colorSecondary: colour.brand,
     appBg: colour["paper-soft"],

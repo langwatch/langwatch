@@ -126,8 +126,8 @@ describe("given the roles of an organization", () => {
       const admin = within(screen.getByTestId("builtin-role-admin"));
       const tokens = admin.getAllByTestId("permission-token").map((token) => token.textContent);
 
-      expect(tokens).toContain("team:manage");
-      expect(tokens).toContain("project:delete");
+      expect(tokens).toContain("Full access to teams");
+      expect(tokens.some((token) => token?.startsWith("Delete"))).toBe(true);
     });
 
     /** @scenario A predefined role card counts the people who hold it */
@@ -241,7 +241,7 @@ describe("given the roles of an organization", () => {
       await userEvent.click(screen.getByRole("button", { name: /See all 2 permissions/ }));
 
       expect(await screen.findByText("2 permissions across 1 area.")).toBeInTheDocument();
-      expect(screen.getByText("View traces")).toBeInTheDocument();
+      expect(within(screen.getByRole("dialog")).getByText("View traces")).toBeInTheDocument();
     });
   });
 

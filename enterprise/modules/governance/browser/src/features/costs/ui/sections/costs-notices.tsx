@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Alert, Text, VStack } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 
 import { useGovernancePlan } from "../../../../behavior/governance-session.ts";
 import { frameExceedsReadCeiling } from "../../model/costs-window.ts";
@@ -75,24 +76,24 @@ export function ReadCeilingNotice({
 export function CostsRefused() {
   const { isEnterprise } = useGovernancePlan();
   return (
-    <Alert.Root status="info" data-testid="cost-lanes-refused">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>
+    <Banner
+      status="info"
+      data-testid="cost-lanes-refused"
+      title={
+        <>
           {isEnterprise
             ? "You do not have access to cost data"
             : "Cost data comes with the Enterprise plan"}
-        </Alert.Title>
-        <Alert.Description>
-          {isEnterprise
-            ? "Your role does not open the cost views for this organization. An organization admin can grant it."
-            : "This organization's plan does not include the cost views, so no figures were read. Nothing is wrong with your setup."}{" "}
-          {/* Phrased as an invitation, not a statement of fact: this notice is
+        </>
+      }
+    >
+      {isEnterprise
+        ? "Your role does not open the cost views for this organization. An organization admin can grant it."
+        : "This organization's plan does not include the cost views, so no figures were read. Nothing is wrong with your setup."}{" "}
+      {/* Phrased as an invitation, not a statement of fact: this notice is
               only ever on screen with the samples turned OFF, so telling the
               reader they are on would be wrong at the exact moment it is read. */}
-          Sample data shows what this screen holds once it opens.
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+      Sample data shows what this screen holds once it opens.
+    </Banner>
   );
 }

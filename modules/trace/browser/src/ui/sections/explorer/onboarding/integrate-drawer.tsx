@@ -3,18 +3,19 @@ import {
   PROJECT_READ_PERMISSIONS,
   useMintPersonalToken,
 } from "@langwatch/api-key-client";
-import { Kbd } from "@langwatch/design-system/kbd";
-import { Box, HStack, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import { AggregateReadOnlyNotice } from "@langwatch/error-views";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 
+import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
 import { useOptionalTraceHost } from "../../../../behavior/trace-host.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { SdkSetup } from "../../../elements/explorer/onboarding/sdk-setup.tsx";
-import { Drawer } from "../../drawer.tsx";
 import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,
@@ -97,8 +98,8 @@ export function IntegrateDrawer({
     permissions: PROJECT_READ_PERMISSIONS,
   });
   const [segment, setSegment] = useState<Segment>("skill");
-
-  const activeSegment = SEGMENTS.find((s) => s.value === segment) ?? SEGMENTS[0];
+  const floatingLangyOpen = useLangyStore((s) => s.isOpen && s.panelMode === "floating");
+  const [waitForFloatingLangy] = useState(() => floatingLangyOpen);
 
   if (!project || !organization) return null;
 
@@ -110,38 +111,46 @@ export function IntegrateDrawer({
   };
 
   return (
-    <Drawer.Root open={open} onOpenChange={(e) => onOpenChange(e.open)} size="xl" placement="end">
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <VStack align="stretch" gap={1}>
-            <Drawer.Title>Send your own traces</Drawer.Title>
-            <Text color="fg.muted" textStyle="sm">
-              Mint a token, then pick how you want to integrate.
-            </Text>
-          </VStack>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          {/* An aggregate (ADR-177) is never sent traces and owns no key,
-              so the drawer mints nothing on it. */}
-          {isAggregateProjectKind(project.kind) ? (
-            <AggregateReadOnlyNotice />
-          ) : (
-            <ActiveProjectProvider value={activeProjectContext}>
-              <IntegrationContent
-                projectId={project.id}
-                minting={minting}
-                segment={segment}
-                onSegmentChange={setSegment}
-                activeSegmentDescription={activeSegment?.description ?? ""}
-                enabled={open}
-              />
-            </ActiveProjectProvider>
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer
+      open={open}
+      onClose={() => onOpenChange(false)}
+      size="xl"
+      title="Send your own traces"
+      subtitle="Create a token, then pick how you want to integrate."
+      companionMotion={waitForFloatingLangy ? "wait" : "follow"}
+    >
+      {/* An aggregate (ADR-177) is never sent traces and owns no key,
+          so the drawer mints nothing on it. */}
+      {isAggregateProjectKind(project.kind) ? (
+        <AggregateReadOnlyNotice />
+      ) : (
+        <ActiveProjectProvider value={activeProjectContext}>
+          <IntegrationContent
+            projectId={project.id}
+            minting={minting}
+            segment={segment}
+            onSegmentChange={setSegment}
+            enabled={open}
+          />
+        </ActiveProjectProvider>
+      )}
+    </Drawer>
   );
+}
+
+/** What a segment shows: the lifted onboarding screens, unchanged. */
+function SegmentPanel({ segment }: { segment: Segment }): React.ReactElement {
+  switch (segment) {
+    case "mcp":
+      return <ViaMcpClientScreen />;
+    case "skill":
+      // Traces onboarding leads with tracing — that's the job here.
+      return <SkillList primarySkillId={TRACING_SKILL_ID} />;
+    case "prompt":
+      return <PromptList primarySkillId={TRACING_SKILL_ID} />;
+    case "sdk":
+      return <SdkSetup />;
+  }
 }
 
 /**
@@ -154,9 +163,8 @@ interface IntegrationContentProps {
   minting: PersonalTokenMint;
   segment: Segment;
   onSegmentChange: (segment: Segment) => void;
-  activeSegmentDescription: string;
   /**
-   * When false, the S/M/P/I keyboard shortcuts are suppressed. The drawer passes
+   * When false, the S/M/P/D keyboard shortcuts are suppressed. The drawer passes
    * `enabled={open}` so shortcuts only fire while the drawer is open.
    */
   enabled?: boolean;
@@ -167,10 +175,9 @@ function IntegrationContent({
   minting,
   segment,
   onSegmentChange,
-  activeSegmentDescription,
   enabled = true,
 }: IntegrationContentProps): React.ReactElement {
-  // Tab letter shortcuts (S/M/P/I) fire whenever this component is
+  // Tab letter shortcuts (S/M/P/D) fire whenever this component is
   // active — always for IntegratePane, only while open for the drawer.
   // Suppressed when the user is typing in an input or contentEditable.
   useEffect(() => {
@@ -200,53 +207,39 @@ function IntegrationContent({
             automatically pick up the freshly-scoped credential. */}
         <ApiKeyIntegrationInfoCard projectId={projectId} minting={minting} />
 
-        <Tabs.Root
-          value={segment}
-          onValueChange={(e) => onSegmentChange(e.value as Segment)}
-          variant="line"
-          size="sm"
-          colorPalette="orange"
-        >
+        <Box>
           <Text textStyle="xs" color="fg.muted" marginBottom={2}>
             All four end up in the same explorer.
           </Text>
-          <Tabs.List>
-            {SEGMENTS.map((s) => (
-              <Tabs.Trigger key={s.value} value={s.value}>
-                <HStack gap={1.5}>
-                  <Box as="span">{s.label}</Box>
-                  <Kbd>{s.shortcut}</Kbd>
-                </HStack>
-              </Tabs.Trigger>
-            ))}
-          </Tabs.List>
-
-          <Box paddingTop={3} paddingBottom={4}>
-            <Text
-              color="fg"
-              textStyle="md"
-              fontWeight="medium"
-              letterSpacing="-0.01em"
-              lineHeight="snug"
-            >
-              {activeSegmentDescription}
-            </Text>
-          </Box>
-
-          <Tabs.Content value="mcp" padding={0}>
-            <ViaMcpClientScreen />
-          </Tabs.Content>
-          <Tabs.Content value="skill" padding={0}>
-            {/* Traces onboarding leads with tracing — that's the job here. */}
-            <SkillList primarySkillId={TRACING_SKILL_ID} />
-          </Tabs.Content>
-          <Tabs.Content value="prompt" padding={0}>
-            <PromptList primarySkillId={TRACING_SKILL_ID} />
-          </Tabs.Content>
-          <Tabs.Content value="sdk" padding={0}>
-            <SdkSetup />
-          </Tabs.Content>
-        </Tabs.Root>
+          <ContentTabs
+            label="Integration method"
+            value={segment}
+            onValueChange={({ value }) => onSegmentChange(value)}
+            body="flush"
+            mount="all"
+            items={SEGMENTS.map((s) => ({
+              value: s.value,
+              label: s.label,
+              shortcut: s.shortcut,
+              content: (
+                <>
+                  <Box paddingTop={3} paddingBottom={4}>
+                    <Text
+                      color="fg"
+                      textStyle="md"
+                      fontWeight="medium"
+                      letterSpacing="-0.01em"
+                      lineHeight="snug"
+                    >
+                      {s.description}
+                    </Text>
+                  </Box>
+                  <SegmentPanel segment={s.value} />
+                </>
+              ),
+            }))}
+          />
+        </Box>
       </VStack>
     </AnalyticsBoundary>
   );

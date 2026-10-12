@@ -9,7 +9,6 @@ import { Button, useDisclosure } from "@langwatch/design-system/primitives";
 import { History } from "lucide-react";
 import { useEffect } from "react";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { ScenarioVersionList } from "../drawers/scenario-version-list.tsx";
 
 export function CaseVersionHistoryPopover({
@@ -38,8 +37,8 @@ export function CaseVersionHistoryPopover({
         <Button
           size="xs"
           variant="ghost"
-          fontSize="12px"
-          color={FG_MUTED}
+          textStyle="caption"
+          color="fg.muted"
           title="Every version of this scenario"
           data-testid="case-modal-history"
         >
@@ -48,7 +47,7 @@ export function CaseVersionHistoryPopover({
       </Popover.Trigger>
       <Popover.Content width="440px" data-testid="scenario-version-history">
         <Popover.Arrow />
-        <Popover.Header fontWeight="semibold" fontSize="14px">
+        <Popover.Header fontWeight="semibold" textStyle="body">
           Version history
         </Popover.Header>
         <Popover.CloseTrigger />

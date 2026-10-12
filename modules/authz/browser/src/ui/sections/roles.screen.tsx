@@ -1,8 +1,9 @@
 import { Link } from "@langwatch/browser-host/link";
-import { UpgradeRequired } from "@langwatch/design-system/access-state";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 // Roles screen; three-state plan gate; grant asked twice for future reuse.
-import { Button, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, Skeleton, VStack } from "@langwatch/design-system/primitives";
+import { Lock } from "lucide-react";
 
 import { AUTHZ_MANAGE_PERMISSION, useAuthzHost } from "../../model/authz-host.ts";
 import { RolesPanel } from "./roles-panel.tsx";
@@ -29,17 +30,18 @@ export default function RolesScreen() {
     return (
       <>
         <RolesHeader />
-        <VStack gap={6} width="full" align="start" paddingTop={4}>
-          <Text color="fg.muted">What a role can do, and who holds one where.</Text>
-          <UpgradeRequired
-            feature="Custom roles"
-            actions={
-              <Button asChild colorPalette="orange" size="sm">
-                <Link href="/settings/plans">Compare plans</Link>
-              </Button>
-            }
-          />
-        </VStack>
+        <NoDataInfoBlock
+          size="page"
+          icon={<Lock />}
+          title="Roles & access is included in Enterprise"
+          description="Define your own roles and choose exactly what each person or group may do, and where."
+          testId="roles-enterprise-upsell"
+          primaryAction={
+            <Button asChild colorPalette="orange" size="sm">
+              <Link href="/settings/plans">See plans</Link>
+            </Button>
+          }
+        />
       </>
     );
   }

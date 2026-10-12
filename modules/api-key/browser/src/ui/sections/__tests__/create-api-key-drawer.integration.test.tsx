@@ -3,7 +3,7 @@
  * Pins what the create drawer sends: reset on open, key type, permission mode, payload.
  */
 
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,7 +22,22 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
 }));
 
 // The picker has its own suite in authz; this file pins what the drawer sends.
-vi.mock("@langwatch/design-system/scope-chip-picker", () => ({ ScopeChipPicker: () => null }));
+vi.mock("@langwatch/design-system/scope-chip-picker", () => ({
+  ScopeChipPicker: ({
+    onChange,
+  }: {
+    onChange: (next: { scopeType: string; scopeId: string }[]) => void;
+  }) => (
+    <div>
+      <button type="button" onClick={() => onChange([])}>
+        Clear scope
+      </button>
+      <button type="button" onClick={() => onChange([{ scopeType: "PROJECT", scopeId: "proj-1" }])}>
+        Use Web App
+      </button>
+    </div>
+  ),
+}));
 
 vi.mock("@langwatch/design-system/provider-scope-chips", () => ({
   ProviderScopeChips: () => null,
@@ -47,15 +62,24 @@ const ADMIN_MEMBERS = [
 function renderDrawer({
   isOpen = true,
   bindingsFailed = false,
-}: { isOpen?: boolean; bindingsFailed?: boolean } = {}) {
+  bindingsLoading = false,
+  isCreating = false,
+}: {
+  isOpen?: boolean;
+  bindingsFailed?: boolean;
+  bindingsLoading?: boolean;
+  isCreating?: boolean;
+} = {}) {
   const onCreate = vi.fn<(input: CreateApiKeyInput) => void>();
+  const refetch = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   const props = {
-    isCreating: false,
+    isCreating,
     myBindings: {
+      refetch,
       data: bindingsFailed
         ? undefined
         : [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" as const }],
-      isLoading: false,
+      isLoading: bindingsLoading,
       isError: bindingsFailed,
     },
     orgProjects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
@@ -79,9 +103,10 @@ function renderDrawer({
     );
   }
   renderWithApiKeyHost(<Toggled />);
-  return { onCreate };
+  return { onCreate, refetch };
 }
 
+const nameInput = () => screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev");
 const createButton = () => screen.getByRole("button", { name: "Create secret key" });
 
 async function chooseExpiration({
@@ -108,7 +133,6 @@ describe("given a member who is not an admin", () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
       expect(screen.queryByText("Key type")).toBeNull();
-      expect(createButton()).toBeDisabled();
       // Set directly: on a cold, loaded run the drawer's focus trap can land mid-typing and
       // swallow keystrokes, leaving the button disabled. This test pins the payload.
       const nameInput = screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev");
@@ -145,7 +169,8 @@ describe("given a member who is not an admin", () => {
       await chooseExpiration({ user, label: "No expiration" });
       fireEvent.click(screen.getByText("Restricted"));
       expect(await screen.findByTestId("counter")).toHaveTextContent("0");
-      expect(createButton()).toBeDisabled();
+      await user.click(createButton());
+      expect(onCreate).not.toHaveBeenCalled();
       await user.click(screen.getByRole("button", { name: "Pick traces view" }));
       expect(screen.getByTestId("counter")).toHaveTextContent("1");
       await user.click(createButton());
@@ -171,19 +196,21 @@ describe("given a member who is not an admin", () => {
 describe("given a named key with no expiry chosen", () => {
   describe("when the creator has not chosen yet", () => {
     /** @scenario "Create stays unavailable until an expiry is chosen" */
-    it("asks for a choice and keeps Create disabled until one is made", async () => {
+    it("asks for a choice and refuses Create until one is made", async () => {
       const user = userEvent.setup();
-      renderDrawer();
+      const { onCreate } = renderDrawer();
       fireEvent.change(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), {
         target: { value: "CI" },
       });
       expect(screen.getByTestId("api-key-expiration-hint")).toHaveTextContent(
         "Choose when this key expires",
       );
-      expect(createButton()).toBeDisabled();
+      await user.click(createButton());
+      expect(onCreate).not.toHaveBeenCalled();
       await chooseExpiration({ user, label: "No expiration" });
       expect(screen.queryByTestId("api-key-expiration-hint")).toBeNull();
-      expect(createButton()).toBeEnabled();
+      await user.click(createButton());
+      expect(onCreate).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -230,7 +257,124 @@ describe("given the read of the caller's access fails", () => {
       await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "CI");
       expect(screen.getByRole("alert")).toHaveTextContent("Couldn't read your access");
       expect(createButton()).toBeDisabled();
+      expect(screen.getByLabelText(/Couldn't read your access\. Retry above/)).toBeInTheDocument();
       expect(onCreate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A failed read of the caller's access can be retried from the drawer" */
+
+    it("retries the read without closing the form or losing what was entered", async () => {
+      const user = userEvent.setup();
+      const { refetch } = renderDrawer({ bindingsFailed: true });
+      await user.type(nameInput(), "CI");
+      await user.click(screen.getByRole("button", { name: "Retry" }));
+      expect(refetch).toHaveBeenCalledTimes(1);
+      expect(nameInput()).toHaveValue("CI");
+      expect(screen.getByText("Create new secret key")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a creator who submits an incomplete form", () => {
+  describe("when nothing has been filled in and the scope is cleared", () => {
+    /** @scenario "Every unmet requirement of a new key is named and the first is focused" */
+    it("names every missing requirement, focuses the first and mints nothing", async () => {
+      const user = userEvent.setup();
+      const { onCreate } = renderDrawer();
+      await user.click(screen.getByRole("button", { name: "Clear scope" }));
+      await user.click(screen.getByText("Restricted"));
+      await user.click(createButton());
+      expect(screen.getByText("Enter a name for this key.")).toBeInTheDocument();
+      expect(screen.getByText("Choose where this key can be used.")).toBeInTheDocument();
+      expect(
+        screen.getByText("Choose at least one permission, or switch to All."),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId("api-key-expiration-hint")).toBeInTheDocument();
+      await waitFor(() => expect(nameInput()).toHaveFocus());
+      expect(onCreate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when one field is fixed and the form is submitted again", () => {
+    it("keeps what was entered, drops that error and moves focus to the next gap", async () => {
+      const user = userEvent.setup();
+      const { onCreate } = renderDrawer();
+      await user.click(screen.getByRole("button", { name: "Clear scope" }));
+      await user.click(createButton());
+      await user.type(nameInput(), "CI");
+      await chooseExpiration({ user, label: "No expiration" });
+      await user.click(createButton());
+      expect(nameInput()).toHaveValue("CI");
+      expect(screen.queryByText("Enter a name for this key.")).toBeNull();
+      expect(screen.getByText("Choose where this key can be used.")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Clear scope" })).toHaveFocus(),
+      );
+      await user.click(screen.getByRole("button", { name: "Use Web App" }));
+      await user.click(createButton());
+      expect(onCreate).toHaveBeenCalledTimes(1);
+      expect(onCreate.mock.calls[0]?.[0]?.name).toBe("CI");
+    });
+  });
+
+  describe("when only the scope is missing", () => {
+    it("explains the scope, focuses it and mints nothing", async () => {
+      const user = userEvent.setup();
+      const { onCreate } = renderDrawer();
+      await user.type(nameInput(), "CI");
+      await chooseExpiration({ user, label: "No expiration" });
+      await user.click(screen.getByRole("button", { name: "Clear scope" }));
+      await user.click(createButton());
+      expect(screen.getByText("Choose where this key can be used.")).toBeInTheDocument();
+      expect(screen.queryByText("Enter a name for this key.")).toBeNull();
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Clear scope" })).toHaveFocus(),
+      );
+      expect(onCreate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when only the restricted permissions are missing", () => {
+    it("explains the permissions, focuses them and clears the error once one is chosen", async () => {
+      const user = userEvent.setup();
+      const { onCreate } = renderDrawer();
+      await user.type(nameInput(), "CI");
+      await chooseExpiration({ user, label: "No expiration" });
+      await user.click(screen.getByText("Restricted"));
+      await user.click(createButton());
+      expect(
+        screen.getByText("Choose at least one permission, or switch to All."),
+      ).toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Pick traces view" })).toHaveFocus(),
+      );
+      expect(onCreate).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Pick traces view" }));
+      expect(screen.queryByText("Choose at least one permission, or switch to All.")).toBeNull();
+    });
+  });
+
+  describe("when a create is already in flight", () => {
+    it("refuses a second submission", async () => {
+      const user = userEvent.setup();
+      const { onCreate } = renderDrawer({ isCreating: true });
+      await user.type(nameInput(), "CI");
+      await chooseExpiration({ user, label: "No expiration" });
+      await user.click(screen.getByTestId("api-key-create-submit"));
+      expect(onCreate).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given the caller's access is still loading", () => {
+  describe("when the drawer is open", () => {
+    it("keeps Create disabled and says why", () => {
+      renderDrawer({ bindingsLoading: true });
+      expect(createButton()).toBeDisabled();
+      expect(screen.getByText(/Reading your access/)).toBeInTheDocument();
+      expect(
+        screen.getByLabelText(/Reading your access\. Create is available/),
+      ).toBeInTheDocument();
     });
   });
 });

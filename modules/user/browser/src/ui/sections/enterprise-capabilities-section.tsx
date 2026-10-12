@@ -4,10 +4,10 @@
  */
 
 import { Link } from "@langwatch/browser-host/link";
+import { Card } from "@langwatch/design-system/card";
 import {
   Alert,
   Badge,
-  Box,
   Button,
   Heading,
   HStack,
@@ -15,6 +15,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import type { LucideIcon } from "lucide-react";
 import { ExternalLink, FileClock, KeyRound, Users } from "lucide-react";
 
@@ -72,34 +73,24 @@ function CapabilityRow({
   const Icon = capability.icon;
 
   return (
-    <HStack
-      align="start"
-      gap={4}
-      padding={4}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="lg"
-      width="full"
-    >
-      <Box color="fg.muted" paddingTop={1}>
-        <Icon size={20} />
-      </Box>
-      <VStack align="start" gap={1} flex={1}>
-        <HStack gap={2}>
-          <Text fontWeight="medium">{capability.name}</Text>
-          {isLicensed ? (
-            <Badge colorPalette="green" size="sm" variant="surface">
-              Available
-            </Badge>
-          ) : (
-            <Badge colorPalette="orange" size="sm" variant="surface">
-              Enterprise license
-            </Badge>
-          )}
-        </HStack>
-        <Text color="fg.muted" fontSize="sm">
-          {capability.description}
-        </Text>
+    <Card
+      titleLevel={3}
+      padding="lg"
+      bodyLayout="spaced"
+      icon={<Icon size={20} />}
+      title={capability.name}
+      badge={
+        isLicensed ? (
+          <Badge colorPalette="green" size="sm" variant="surface">
+            Available
+          </Badge>
+        ) : (
+          <Badge colorPalette="orange" size="sm" variant="surface">
+            Enterprise license
+          </Badge>
+        )
+      }
+      footer={
         <Link
           href={`${DOCS_BASE}${capability.docsPath}`}
           target="_blank"
@@ -112,8 +103,12 @@ function CapabilityRow({
             <ExternalLink size={12} />
           </HStack>
         </Link>
-      </VStack>
-    </HStack>
+      }
+    >
+      <Text color="fg.muted" fontSize="sm">
+        {capability.description}
+      </Text>
+    </Card>
   );
 }
 
@@ -175,6 +170,7 @@ export function EnterpriseCapabilitiesSection() {
     },
   );
   const isEnterprise = activePlan.data?.type === "ENTERPRISE";
+  const accent = useProductAccent();
 
   if (host.deployment().isSaas) return null;
 
@@ -185,7 +181,7 @@ export function EnterpriseCapabilitiesSection() {
         <SsoConfiguredButNotInUseNotice />
 
         <VStack align="start" gap={1}>
-          <Heading as="h2" size="md">
+          <Heading as="h2" size="sm">
             Organization sign-in and governance
           </Heading>
           <Text color="fg.muted" fontSize="sm">
@@ -206,11 +202,11 @@ export function EnterpriseCapabilitiesSection() {
             <Button
               asChild
               size="sm"
-              colorPalette="orange"
+              colorPalette={accent.colorPalette}
               variant="outline"
-              color="orange.fg"
-              bg="orange.subtle"
-              _hover={{ bg: "orange.muted" }}
+              color={accent.roles.fg}
+              bg={accent.roles.subtle}
+              _hover={{ bg: accent.roles.muted }}
             >
               <Link unstyled href="/settings/license">
                 Activate a license

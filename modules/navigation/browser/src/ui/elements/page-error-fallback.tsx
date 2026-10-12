@@ -37,7 +37,7 @@ export function PageErrorFallback({
           <Box padding={3} borderRadius="full" bg="red.subtle">
             <AlertTriangle size={28} color="var(--chakra-colors-red-fg)" />
           </Box>
-          <Heading size="md" color="fg.default">
+          <Heading size="sm" color="fg.default">
             Something went wrong
           </Heading>
           <Text textStyle="sm" color="fg.muted" textAlign="center" maxWidth="400px">

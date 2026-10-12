@@ -411,7 +411,7 @@ function NoAccountYet({
         intro={NO_ACCOUNT_WITHOUT_EMAIL_COPY.describe}
         finePrint={<FrontDoorFinePrint />}
       >
-        <VStack width="full" align="stretch" gap="14px">
+        <VStack width="full" align="stretch" gap="3.5">
           <div data-testid="unknown-identifier" hidden>
             {email}
           </div>
@@ -443,7 +443,7 @@ function NoAccountYet({
       }
       finePrint={<FrontDoorFinePrint />}
     >
-      <VStack width="full" align="stretch" gap="14px">
+      <VStack width="full" align="stretch" gap="3.5">
         <div data-testid="unknown-identifier" hidden>
           {email}
         </div>

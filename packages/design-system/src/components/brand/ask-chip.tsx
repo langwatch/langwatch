@@ -27,7 +27,7 @@ export function AskChip({
     display: "inline-flex",
     alignItems: "center",
     gap: 1.5,
-    fontSize: "12px",
+    textStyle: "caption",
     color: "fg.muted",
     background: "bg.panel/90",
     borderWidth: "1px",

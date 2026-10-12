@@ -1,16 +1,16 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Box, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
-import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { isProviderKey, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import { useModelProvidersSettings } from "@langwatch/model-provider-client";
 import { modelProviders } from "@langwatch/model-provider-contract";
+import { useState } from "react";
 
 import {
   findModelProviderById,
   isResolvableProviderId,
   useAllModelProvidersList,
 } from "../../behavior/use-all-model-providers-list.ts";
-import { EditModelProviderForm } from "./model-provider-form.tsx";
+import { EditModelProviderForm, type ModelProviderSaveState } from "./model-provider-form.tsx";
 
 type EditModelProviderDrawerProps = {
   projectId?: string;
@@ -22,6 +22,11 @@ type EditModelProviderDrawerProps = {
 export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => {
   const { projectId, organizationId, modelProviderId, providerKey } = props;
   const { closeDrawer } = useDrawer();
+  const [saveState, setSaveState] = useState<ModelProviderSaveState>({
+    busy: false,
+    label: "Save",
+    canSave: true,
+  });
   const { providers, isLoading } = useModelProvidersSettings({ projectId });
   // Resolve by id from the flat list — see useAllModelProvidersList for
   // why the collapsed Record is wrong here (#5380). `isAllProvidersLoading`
@@ -58,46 +63,45 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
     isCollapsedRecordPending || (isEditingSpecificRow && isAllProvidersLoading);
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
+    <Drawer
+      onClose={closeDrawer}
       size="xl"
-      onOpenChange={({ open }) => {
-        if (!open) {
-          closeDrawer();
-        }
-      }}
-      modal={false}
+      title={title || "Model provider"}
+      icon={
+        provider && isProviderKey(provider.provider) ? (
+          <ProviderIconGlyph provider={provider.provider} size="28px" />
+        ) : (
+          void 0
+        )
+      }
+      loading={isFormDataLoading}
+      footer={
+        isFormDataLoading
+          ? void 0
+          : {
+              cancel: { onClick: closeDrawer },
+              busy: saveState.busy,
+              primaryAction: {
+                label: saveState.label,
+                type: "submit",
+                form: "model-provider-form",
+                loading: saveState.busy,
+                disabledReason: saveState.canSave
+                  ? void 0
+                  : "This provider configuration no longer exists",
+                "data-testid": "model-provider-save",
+              },
+            }
+      }
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <HStack>
-            <Drawer.CloseTrigger />
-          </HStack>
-          <HStack gap={3}>
-            {provider && (
-              <Box width="28px" height="28px">
-                {modelProviderIcons[provider.provider as keyof typeof modelProviderIcons]}
-              </Box>
-            )}
-            <Drawer.Title>{title}</Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body>
-          {isFormDataLoading ? (
-            <VStack height="200px" justify="center">
-              <Spinner />
-            </VStack>
-          ) : (
-            <EditModelProviderForm
-              projectId={projectId}
-              organizationId={organizationId}
-              modelProviderId={modelProviderId}
-              providerKey={providerKey}
-            />
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+      <EditModelProviderForm
+        projectId={projectId}
+        organizationId={organizationId}
+        modelProviderId={modelProviderId}
+        providerKey={providerKey}
+        formId="model-provider-form"
+        onSaveStateChange={setSaveState}
+      />
+    </Drawer>
   );
 };

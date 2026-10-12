@@ -190,33 +190,33 @@ describe("given no organization is in scope", () => {
 });
 
 describe("given the connectors page inside the Authentication section", () => {
-  /** @scenario "The Authentication pages share main's rail" */
-  it("frames it in main's rail with Connectors as the current entry", () => {
+  /** @scenario "The Authentication pages share one row of header tabs" */
+  it("titles the header Authentication with Connectors as the current tab", () => {
     renderWithScimHost(<ConnectorsScreen />);
 
-    const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
-    const links = within(rail).getAllByRole("link");
+    const tabs = screen.getByRole("navigation", { name: "Authentication pages" });
+    const links = within(tabs).getAllByRole("link");
     expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
       ["Overview", "/settings/authentication"],
       ["Identity provider", "/settings/authentication/provider"],
       ["Connectors", "/settings/authentication/connectors"],
     ]);
     expect(
-      within(rail).getByRole("link", { name: "Connectors" }).getAttribute("aria-current"),
+      within(tabs).getByRole("link", { name: "Connectors" }).getAttribute("aria-current"),
     ).toBe("page");
   });
 });
 
 describe("given an administrator reads where their provider sends people", () => {
   /** @scenario The protocol keeps its name in the body copy */
-  it("names SCIM in the copy while no page or rail entry is titled after it", () => {
+  it("names SCIM in the copy while no page or tab is titled after it", () => {
     renderWithScimHost(<ConnectorsScreen />);
 
     expect(screen.getByText(/removes people here on its own, over SCIM/)).toBeTruthy();
     expect(screen.getByText(/talks to us over SCIM/)).toBeTruthy();
-    expect(screen.getByRole("heading", { level: 1, name: "Connectors" })).toBeTruthy();
-    const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
-    for (const link of within(rail).getAllByRole("link")) {
+    expect(screen.getByRole("heading", { level: 1, name: "Authentication" })).toBeTruthy();
+    const tabs = screen.getByRole("navigation", { name: "Authentication pages" });
+    for (const link of within(tabs).getAllByRole("link")) {
       expect(link.textContent).not.toMatch(/scim/i);
     }
     for (const heading of screen.getAllByRole("heading")) {

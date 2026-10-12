@@ -79,7 +79,7 @@ export function EvaluatorResultCell({ result }: { result: unknown }) {
           closeOnScroll={false}
         >
           <Text
-            fontSize="13px"
+            textStyle="bodySm"
             lineClamp={showJson ? void 0 : 2}
             whiteSpace="pre-wrap"
             wordBreak="break-word"

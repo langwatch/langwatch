@@ -1,6 +1,7 @@
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
-import { Box, Field, HStack, Input, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
+import { Box, Field, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { AuthConfigSection } from "../elements/http-auth-config-section.tsx";
@@ -69,64 +70,83 @@ export function HttpConfigEditor({
               value={url}
               onChange={(e) => onUrlChange(e.target.value)}
               placeholder="https://api.example.com/endpoint"
-              fontFamily="mono"
-              fontSize="13px"
+              textStyle="mono"
               size="sm"
             />
           </HStack>
         </VStack>
       </Box>
 
-      {/* Tabbed Content */}
-      <Tabs.Root
+      <ContentTabs
+        label="HTTP agent"
         value={activeTab}
-        onValueChange={(e) => setActiveTab(e.value)}
-        width="full"
-        colorPalette="blue"
-      >
-        <Tabs.List paddingX={paddingX} borderBottomWidth="1px" borderColor="border">
-          <Tabs.Trigger value="body">Body</Tabs.Trigger>
-          <Tabs.Trigger value="auth">Auth</Tabs.Trigger>
-          <Tabs.Trigger value="headers">Headers</Tabs.Trigger>
-          <Tabs.Trigger value="test">Test</Tabs.Trigger>
-        </Tabs.List>
-
-        <Tabs.Content value="body" paddingX={paddingX} paddingY={3}>
-          <VStack gap={4} align="stretch">
-            <Field.Root>
-              <Field.Label fontSize="sm">Request Body Template</Field.Label>
-              <BodyTemplateEditor value={bodyTemplate} onChange={onBodyTemplateChange} />
-            </Field.Root>
-            <Field.Root>
-              <Field.Label fontSize="sm">Output Path (JSONPath)</Field.Label>
-              <OutputPathInput value={outputPath} onChange={onOutputPathChange} />
-            </Field.Root>
-          </VStack>
-        </Tabs.Content>
-
-        <Tabs.Content value="auth" paddingX={paddingX} paddingY={3}>
-          <AuthConfigSection value={auth} onChange={onAuthChange} readOnly={credentialsReadOnly} />
-        </Tabs.Content>
-
-        <Tabs.Content value="headers" paddingX={paddingX} paddingY={3}>
-          <HeadersConfigSection
-            value={headers}
-            onChange={onHeadersChange}
-            readOnly={credentialsReadOnly}
-          />
-        </Tabs.Content>
-
-        <Tabs.Content value="test" paddingX={paddingX} paddingY={3}>
-          <HttpTestPanel
-            onTest={onTest}
-            url={url}
-            method={method}
-            headers={headers}
-            outputPath={outputPath}
-            bodyTemplate={bodyTemplate}
-          />
-        </Tabs.Content>
-      </Tabs.Root>
+        onValueChange={({ value }) => setActiveTab(value)}
+        inset={paddingX === 0 || paddingX === "0" ? "none" : "sm"}
+        body="flush"
+        mount="all"
+        items={[
+          {
+            value: "body",
+            label: "Body",
+            content: (
+              <Box paddingY={3}>
+                <VStack gap={4} align="stretch">
+                  <Field.Root>
+                    <Field.Label fontSize="sm">Request Body Template</Field.Label>
+                    <BodyTemplateEditor value={bodyTemplate} onChange={onBodyTemplateChange} />
+                  </Field.Root>
+                  <Field.Root>
+                    <Field.Label fontSize="sm">Output Path (JSONPath)</Field.Label>
+                    <OutputPathInput value={outputPath} onChange={onOutputPathChange} />
+                  </Field.Root>
+                </VStack>
+              </Box>
+            ),
+          },
+          {
+            value: "auth",
+            label: "Auth",
+            content: (
+              <Box paddingY={3}>
+                <AuthConfigSection
+                  value={auth}
+                  onChange={onAuthChange}
+                  readOnly={credentialsReadOnly}
+                />
+              </Box>
+            ),
+          },
+          {
+            value: "headers",
+            label: "Headers",
+            content: (
+              <Box paddingY={3}>
+                <HeadersConfigSection
+                  value={headers}
+                  onChange={onHeadersChange}
+                  readOnly={credentialsReadOnly}
+                />
+              </Box>
+            ),
+          },
+          {
+            value: "test",
+            label: "Test",
+            content: (
+              <Box paddingY={3}>
+                <HttpTestPanel
+                  onTest={onTest}
+                  url={url}
+                  method={method}
+                  headers={headers}
+                  outputPath={outputPath}
+                  bodyTemplate={bodyTemplate}
+                />
+              </Box>
+            ),
+          },
+        ]}
+      />
     </>
   );
 }

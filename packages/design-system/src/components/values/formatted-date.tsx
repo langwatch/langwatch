@@ -21,6 +21,7 @@ import {
 } from "../../describe-instant.ts";
 import { useCopyToClipboard } from "../../use-copy-to-clipboard.ts";
 import { Tooltip } from "../overlays/tooltip.tsx";
+import { EmptyValue } from "./empty-value.tsx";
 
 /** One row of the card: a plain label, the exact value (never cut), a copy button. */
 function FormatRow({
@@ -106,7 +107,7 @@ export function DateFormats({
   return (
     <VStack align="stretch" gap={2} data-testid="date-formats">
       <Box>
-        <Text fontSize="13px" lineHeight="20px" fontWeight="medium" color="fg">
+        <Text textStyle="label" color="fg">
           {d.heading}
         </Text>
         <Text textStyle="xs" lineHeight="18px" color="fg.muted">
@@ -225,7 +226,7 @@ export function FormattedDate({
   const [open, setOpen] = useState(false);
   const epochMs = toEpochMs(value);
   const nowMs = useNowMs({ epochMs, live: open || display === "relative" || display === "auto" });
-  if (epochMs === null) return <Text as="span">{children ?? "—"}</Text>;
+  if (epochMs === null) return children ? <Text as="span">{children}</Text> : <EmptyValue />;
   return (
     <Tooltip
       interactive

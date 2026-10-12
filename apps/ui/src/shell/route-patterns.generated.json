@@ -24,6 +24,7 @@
   "/:project/studio/:workflow",
   "/",
   "/settings",
+  "/settings/project",
   "/settings/role-bindings",
   "/settings/annotation-scores",
   "/settings/data-retention",

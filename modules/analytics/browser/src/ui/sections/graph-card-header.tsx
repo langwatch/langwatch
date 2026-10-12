@@ -129,7 +129,7 @@ export function GraphCardHeader({
       return seriesNames.replace(/,([^,]*)$/, " and$1");
     }
 
-    return "Untitled Graph";
+    return "Untitled graph";
   }, [name, graph]);
 
   const hasFilters = useMemo(
@@ -162,7 +162,7 @@ export function GraphCardHeader({
           shouldTruncate
         />
       ) : (
-        <Heading size="sm" marginLeft={2}>
+        <Heading textStyle="cardTitle" marginLeft={2}>
           {displayName}
         </Heading>
       )}

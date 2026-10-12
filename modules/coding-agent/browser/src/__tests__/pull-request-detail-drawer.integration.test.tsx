@@ -235,7 +235,7 @@ describe("the pull request detail drawer", () => {
       expect(githubLink?.getAttribute("rel")).toContain("noopener");
 
       expect(screen.getByRole("heading", { name: "Sessions" })).toBeInTheDocument();
-      expect(screen.getByText("10.0K")).toBeInTheDocument();
+      expect(screen.getByText("10K")).toBeInTheDocument();
       expect(screen.getByText("$12.50")).toBeInTheDocument();
 
       expect(screen.getByText("Contributors")).toBeInTheDocument();
@@ -243,7 +243,7 @@ describe("the pull request detail drawer", () => {
 
       expect(screen.getByText("Models")).toBeInTheDocument();
       expect(screen.getByText("claude-fable-5")).toBeInTheDocument();
-      expect(screen.getByText("8.0K tokens")).toBeInTheDocument();
+      expect(screen.getByText("claude-fable-5").parentElement).toHaveTextContent("8K tokens");
     });
 
     it("lists a session by its facts", () => {

@@ -11,7 +11,7 @@ describe("AutomationUseCaseStrip", () => {
     const onOpen = vi.fn();
     renderWithDesignSystem(<AutomationUseCaseStrip kind="alert" onOpen={onOpen} />);
 
-    fireEvent.click(screen.getByText("Error spike"));
+    fireEvent.click(screen.getByRole("button", { name: "Error spike" }));
 
     expect(onOpen).toHaveBeenCalledWith({
       initialSource: "customGraph",
@@ -19,7 +19,7 @@ describe("AutomationUseCaseStrip", () => {
       initialAction: "SEND_SLACK_MESSAGE",
     });
 
-    fireEvent.click(screen.getByText("Traffic drop"));
+    fireEvent.click(screen.getByRole("button", { name: "Traffic drop" }));
 
     expect(onOpen).toHaveBeenLastCalledWith({
       initialSource: "customGraph",
@@ -32,7 +32,7 @@ describe("AutomationUseCaseStrip", () => {
     const onOpen = vi.fn();
     renderWithDesignSystem(<AutomationUseCaseStrip kind="automation" onOpen={onOpen} />);
 
-    fireEvent.click(screen.getByText("Build a dataset from errors"));
+    fireEvent.click(screen.getByRole("button", { name: "Build a dataset from errors" }));
 
     expect(onOpen).toHaveBeenCalledWith({
       initialName: "Error dataset",
@@ -40,7 +40,7 @@ describe("AutomationUseCaseStrip", () => {
       initialFilters: JSON.stringify({ "traces.error": ["true"] }),
     });
 
-    fireEvent.click(screen.getByText("Queue for review"));
+    fireEvent.click(screen.getByRole("button", { name: "Queue for review" }));
 
     expect(onOpen).toHaveBeenLastCalledWith({
       initialName: "Review queue",

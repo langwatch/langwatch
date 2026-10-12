@@ -11,7 +11,7 @@ Enterprise managed model providers: the policy for providers a deployment config
 | Classification | enterprise (`modules/catalogue.json`)                                                                                                  |
 | Subjects       | managed-model-provider, managed-provider                                                                                               |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                                            |
-| Api token      | `ManagedProviderApi` = `moduleApi<ManagedProviderApi>()("managed-provider")`, `contract/src/managed-provider.api.ts:40` (2 operations) |
+| Api token      | `ManagedProviderApi` = `moduleApi<ManagedProviderApi>()("managed-provider")`, `contract/src/managed-provider.api.ts:50` (2 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                                             |
 
 ## What managed-provider owns

@@ -1,5 +1,5 @@
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Badge, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { Badge, HStack, Text } from "@langwatch/design-system/primitives";
 import { type GovernanceAgentRow } from "@langwatch/enterprise-governance-contract";
 
 import {
@@ -45,20 +45,18 @@ export function AgentsTable({
       data-testid="governance-agents-table"
       containerProps={{ overflowX: "auto", width: "full" }}
     >
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Agent</Table.ColumnHeader>
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Agent</ListTable.ColumnHeader>
           {AGENT_TABLE_COLUMNS.map((column) => (
-            <Table.ColumnHeader key={column} whiteSpace="nowrap">
-              {column}
-            </Table.ColumnHeader>
+            <ListTable.ColumnHeader key={column}>{column}</ListTable.ColumnHeader>
           ))}
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {agents.map((agent) => (
-          <Table.Row key={agent.id} data-testid="governance-agent-row" data-agent={agent.name}>
-            <Table.Cell whiteSpace="nowrap">
+          <ListTable.Row key={agent.id} data-testid="governance-agent-row" data-agent={agent.name}>
+            <ListTable.Cell nowrap>
               <HStack gap={1.5}>
                 <Text textStyle="sm" fontWeight="medium">
                   {agent.name}
@@ -71,13 +69,13 @@ export function AgentsTable({
                   </Badge>
                 )}
               </HStack>
-            </Table.Cell>
+            </ListTable.Cell>
 
-            <Table.Cell whiteSpace="nowrap">
+            <ListTable.Cell nowrap>
               <AgentEnvironment environment={agent.environment} />
-            </Table.Cell>
+            </ListTable.Cell>
 
-            <Table.Cell whiteSpace="nowrap">
+            <ListTable.Cell nowrap>
               {/* Unclaimed is a fact about the agent, not a figure nobody
                   measured, so it is the badge the card uses and never a
                   "No data". */}
@@ -90,15 +88,15 @@ export function AgentsTable({
                   {agent.owner}
                 </Text>
               )}
-            </Table.Cell>
+            </ListTable.Cell>
 
-            <Table.Cell whiteSpace="nowrap">
+            <ListTable.Cell nowrap>
               <Badge size="xs" variant="subtle" colorPalette="purple">
                 {AGENT_SOURCE_LABELS[agent.source]}
               </Badge>
-            </Table.Cell>
+            </ListTable.Cell>
 
-            <Table.Cell>
+            <ListTable.Cell>
               {agent.models.length === 0 ? (
                 <AgentValue label="Models" value={null} />
               ) : (
@@ -110,41 +108,41 @@ export function AgentsTable({
                   ))}
                 </HStack>
               )}
-            </Table.Cell>
+            </ListTable.Cell>
 
-            <Table.Cell whiteSpace="nowrap">
+            <ListTable.Cell nowrap>
               <AgentValue
                 label="Health"
                 value={agent.health === null ? null : AGENT_HEALTH_LABELS[agent.health]}
               />
-            </Table.Cell>
+            </ListTable.Cell>
 
-            <Table.Cell whiteSpace="nowrap">
+            <ListTable.Cell nowrap>
               <AgentValue
                 label="Cost · 30 days"
                 value={formatAgentCost(agent)}
                 missingReason={agentCostMissingReason(agent)}
               />
-            </Table.Cell>
+            </ListTable.Cell>
 
-            <Table.Cell whiteSpace="nowrap">
+            <ListTable.Cell nowrap>
               <AgentValue label="Requests · 30 days" value={formatAgentRequests(agent)} />
-            </Table.Cell>
+            </ListTable.Cell>
 
-            <Table.Cell whiteSpace="nowrap">
+            <ListTable.Cell nowrap>
               <AgentValue
                 label="Last active"
                 value={formatAgentLastActive(agent)}
                 missingReason={AGENT_NEVER_RUN}
               />
-            </Table.Cell>
+            </ListTable.Cell>
 
-            <Table.Cell whiteSpace="nowrap">
+            <ListTable.Cell nowrap>
               <AgentValue label="Registered" value={formatRegistered(agent.registeredDaysAgo)} />
-            </Table.Cell>
-          </Table.Row>
+            </ListTable.Cell>
+          </ListTable.Row>
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </ListTable>
   );
 }

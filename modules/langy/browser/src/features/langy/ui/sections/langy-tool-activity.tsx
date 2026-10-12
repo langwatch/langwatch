@@ -1332,7 +1332,7 @@ function LatestSettledActivityCard({ group, devMode }: { group: ActivityGroup; d
       background="bg.subtle"
       boxShadow="langyCard"
       paddingX="15px"
-      paddingY="12px"
+      paddingY="3"
     >
       <HStack gap={1.5} align="center">
         <Box color="green.fg" display="flex" flexShrink={0}>
@@ -1456,7 +1456,7 @@ function RunningActivityCard({
       background="bg.subtle"
       boxShadow="langyCard"
       paddingX="15px"
-      paddingY="12px"
+      paddingY="3"
     >
       <RunningActivityHeader
         category={groupCategory(group)}

@@ -64,7 +64,7 @@ describe("virtual keys page", () => {
       renderPage(["virtualKeys:manage"]);
 
       expect(screen.getByText("No virtual keys yet")).toBeInTheDocument();
-      expect(screen.getAllByRole("button", { name: /New virtual key/ })).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: /New virtual key/ })).toHaveLength(1);
     });
 
     it("offers no create button to a viewer", () => {

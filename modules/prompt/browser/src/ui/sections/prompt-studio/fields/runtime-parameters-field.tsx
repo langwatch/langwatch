@@ -103,7 +103,7 @@ export function RuntimeParametersField() {
       </HStack>
 
       {entries.length === 0 ? (
-        <Text fontSize="13px" color="fg.subtle">
+        <Text textStyle="bodySm" color="fg.subtle">
           No parameters defined
         </Text>
       ) : (
@@ -118,7 +118,7 @@ export function RuntimeParametersField() {
                 width="120px"
                 flexShrink={0}
                 fontFamily="mono"
-                fontSize="13px"
+                textStyle="bodySm"
                 data-testid={`param-key-${index}`}
               />
               <Text color="fg.subtle" fontSize="sm" flexShrink={0}>
@@ -132,7 +132,7 @@ export function RuntimeParametersField() {
                 flex={1}
                 minWidth={0}
                 fontFamily="mono"
-                fontSize="13px"
+                textStyle="bodySm"
                 variant="flushed"
                 borderColor="border"
                 data-testid={`param-value-${index}`}

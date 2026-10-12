@@ -243,7 +243,7 @@ function MetricsContent() {
   };
 
   return (
-    <AnalyticsLayout title="LLM Metrics" railEntry="metrics">
+    <AnalyticsLayout tab="metrics">
       <HStack alignItems="start" gap={4}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width={"100%"}>
           <ChartCard title="LLM Metrics" colSpan={2}>

@@ -8,7 +8,7 @@ export default function OpsOperatorsScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Operators</PageLayout.Heading>
       </PageLayout.Header>
-      <PageLayout.Container paddingY={5} maxWidth="full">
+      <PageLayout.Container width="fill">
         <OperatorsContent />
       </PageLayout.Container>
     </>

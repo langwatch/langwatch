@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DeleteConfirmationDialog } from "../src/components/overlays/delete-confirmation-dialog.tsx";
@@ -12,7 +13,13 @@ describe("destructive confirmation", () => {
   /** @scenario Destructive confirmation gates clicks and Enter with the same phrase */
   it("requires the phrase for both Enter and clicks and resets after reopening", () => {
     const onConfirm = vi.fn();
-    const props = { open: true, onClose: vi.fn(), onConfirm, closeOnConfirm: false };
+    const props = {
+      title: "Delete dataset?",
+      open: true,
+      onClose: vi.fn(),
+      onConfirm,
+      closeOnConfirm: false,
+    };
     const view = renderWithDesignSystem(<DeleteConfirmationDialog {...props} />);
     const input = screen.getByRole("textbox", { name: "Type delete to confirm" });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -32,7 +39,13 @@ describe("destructive confirmation", () => {
   /** @scenario Loading prevents destructive confirmation */
   it("blocks Enter while the action or related items are loading", () => {
     const onConfirm = vi.fn();
-    const props = { open: true, onClose: vi.fn(), onConfirm, value: "delete" };
+    const props = {
+      title: "Delete dataset?",
+      open: true,
+      onClose: vi.fn(),
+      onConfirm,
+      value: "delete",
+    };
     const view = renderWithDesignSystem(<DeleteConfirmationDialog {...props} isLoading />);
     fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
     expect(onConfirm).not.toHaveBeenCalled();
@@ -46,6 +59,7 @@ describe("destructive confirmation", () => {
   it("shows group counts, outcomes and at most five names", () => {
     renderWithDesignSystem(
       <DeleteConfirmationDialog
+        title="Delete dataset?"
         open
         onClose={vi.fn()}
         onConfirm={vi.fn()}
@@ -78,6 +92,7 @@ describe("destructive confirmation", () => {
   it("preserves exact case with opt-in whitespace trimming", () => {
     renderWithDesignSystem(
       <DeleteConfirmationDialog
+        title="Delete dataset?"
         open
         onClose={vi.fn()}
         onConfirm={vi.fn()}
@@ -91,5 +106,27 @@ describe("destructive confirmation", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
     fireEvent.change(input, { target: { value: " RECLAIM " } });
     expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
+  });
+
+  /** @scenario The confirmation is an alert dialog that does not click through */
+  it("is an alert dialog, stops clicks reaching the opener and asks to close on Escape", async () => {
+    const onRowClick = vi.fn();
+    const onClose = vi.fn();
+    renderWithDesignSystem(
+      <div role="presentation" onClick={onRowClick}>
+        <DeleteConfirmationDialog
+          title="Delete dataset?"
+          open
+          onClose={onClose}
+          onConfirm={vi.fn()}
+        />
+      </div>,
+    );
+    const dialog = screen.getByRole("alertdialog", { name: "Delete dataset?" });
+    expect(dialog).toBeInTheDocument();
+    await userEvent.click(screen.getByText("This action cannot be undone."));
+    expect(onRowClick).not.toHaveBeenCalled();
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalled();
   });
 });

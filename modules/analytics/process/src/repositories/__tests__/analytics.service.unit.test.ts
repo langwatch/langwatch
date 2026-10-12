@@ -109,6 +109,10 @@ class RecordingRepository extends AnalyticsRepository {
     return { events: [] };
   }
 
+  async findFeedbackEventsPage() {
+    return { rows: [], hasMore: false };
+  }
+
   async findTopDocuments(documentsInput: unknown) {
     this.lastDocumentsInput = documentsInput;
     return { topDocuments: [], totalUniqueDocuments: 0 };

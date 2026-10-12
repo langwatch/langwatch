@@ -1,20 +1,12 @@
+import { Card } from "@langwatch/design-system/card";
+import { Badge, Button, Text } from "@langwatch/design-system/primitives";
+import { SettingsSection } from "@langwatch/design-system/settings-section";
 /**
  * Two-step verification, beside passkeys: a passkey is a way in, this stands
  * behind whichever way in was used. Absent entirely where the deployment offers none.
  * Spec: specs/identity/mfa-and-session-shape.feature
  */
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { SettingsSection } from "@langwatch/design-system/settings-section";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Smartphone } from "lucide-react";
 import { useState } from "react";
 
@@ -58,81 +50,65 @@ export function TwoStepVerificationSection() {
       }
       data-testid="two-factor-section"
     >
-      {twoStep.loading ? <Spinner size="sm" /> : null}
+      {twoStep.loading ? <SkeletonRows rows={2} /> : null}
 
       {!twoStep.loading && !twoStep.enabled ? (
-        <Card.Root width="full" data-testid="two-factor-empty">
-          <Card.Body>
-            <HStack align="center" gap={3}>
-              <VStack align="start" gap={0} minWidth={0}>
-                <Text fontSize="sm" fontWeight={500}>
-                  Two-step verification is off
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  Setting it up takes a minute and an app on your phone that makes sign-in codes.
-                </Text>
-              </VStack>
-              <Spacer />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsSettingUp(true)}
-                data-testid="set-up-two-factor"
-              >
-                Set up two-step verification
-              </Button>
-            </HStack>
-          </Card.Body>
-        </Card.Root>
+        <Card
+          titleLevel={3}
+          title="Two-step verification is off"
+          description="Setting it up takes a minute and an app on your phone that makes sign-in codes."
+          actions={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSettingUp(true)}
+              data-testid="set-up-two-factor"
+            >
+              Set up two-step verification
+            </Button>
+          }
+          data-testid="two-factor-empty"
+        />
       ) : null}
 
       {twoStep.enabled ? (
-        <Card.Root width="full" data-testid="two-factor-enabled">
-          <Card.Body>
-            <HStack align="start" gap={3}>
-              <Box color="fg.muted" display="flex" paddingTop={0.5}>
-                <Smartphone size={16} />
-              </Box>
-              <VStack align="start" gap={0} minWidth={0}>
-                <Text fontSize="sm" fontWeight={500}>
-                  Authenticator app
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  A code is asked for every time you sign in. Backup codes let you in when the app
-                  that makes them is not to hand.
-                </Text>
-              </VStack>
-              <Spacer />
-              <HStack align="start" gap={2}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsAskingForCodes(true)}
-                  data-testid="regenerate-backup-codes"
-                >
-                  Get new backup codes
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  colorPalette={held ? void 0 : "red"}
-                  disabled={held}
-                  onClick={() => setIsTurningOff(true)}
-                  data-testid="turn-off-two-factor"
-                >
-                  Turn off
-                </Button>
-              </HStack>
-            </HStack>
-            {held ? (
-              <Text fontSize="xs" color="fg.muted" paddingTop={2} data-testid="two-factor-held-by">
-                {twoStep.requiringOrganizations.map((one) => one.name).join(", ")} requires two-step
-                verification. To turn it off, leave that organization, or ask an administrator to
-                reset two-step verification for you, which starts a fresh setup.
-              </Text>
-            ) : null}
-          </Card.Body>
-        </Card.Root>
+        <Card
+          titleLevel={3}
+          icon={<Smartphone size={16} />}
+          title="Authenticator app"
+          description="A code is asked for every time you sign in. Backup codes let you in when the app that makes them is not to hand."
+          actions={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAskingForCodes(true)}
+                data-testid="regenerate-backup-codes"
+              >
+                Get new backup codes
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                colorPalette={held ? void 0 : "red"}
+                disabled={held}
+                onClick={() => setIsTurningOff(true)}
+                data-testid="turn-off-two-factor"
+              >
+                Turn off
+              </Button>
+            </>
+          }
+          data-testid="two-factor-enabled"
+        >
+          {held ? (
+            <Text fontSize="xs" color="fg.muted" data-testid="two-factor-held-by">
+              {twoStep.requiringOrganizations.map((one) => one.name).join(", ")} requires two-step
+              verification. To turn it off, leave that organization, or ask an administrator to
+              reset two-step verification for you, which starts a fresh setup.
+            </Text>
+          ) : null}
+        </Card>
       ) : null}
 
       <TurnOffTwoStepDialog

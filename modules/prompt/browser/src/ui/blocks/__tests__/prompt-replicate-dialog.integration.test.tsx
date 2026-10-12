@@ -22,7 +22,7 @@ vi.mock("@langwatch/design-system/select", () => {
   }) => (
     <div>
       <select
-        aria-label="Target Project"
+        aria-label="Target project"
         value={value[0] ?? ""}
         onChange={(event) => onValueChange({ value: [event.target.value] })}
       >
@@ -78,14 +78,28 @@ describe("the Replicate dialog on a prompt", () => {
 
     expect(screen.getAllByText("(no permission)")).toHaveLength(1);
 
-    fireEvent.change(screen.getByLabelText("Target Project"), {
+    fireEvent.change(screen.getByLabelText("Target project"), {
       target: { value: "project-viewer" },
     });
     const replicate = screen.getByRole("button", { name: "Replicate" });
     fireEvent.click(replicate);
 
-    expect(replicate).toBeDisabled();
+    expect(replicate).toBeEnabled();
     expect(onCopy).not.toHaveBeenCalled();
+    expect(screen.getByText("Choose a project you can create prompts in.")).toBeVisible();
+  });
+
+  /** @scenario "Replicating a prompt cannot target a project the reader may not create in" */
+  it("explains a Replicate with no project chosen instead of disabling it", () => {
+    const onCopy = vi.fn().mockResolvedValue(undefined);
+    renderDialog(onCopy);
+
+    const replicate = screen.getByRole("button", { name: "Replicate" });
+    expect(replicate).toBeEnabled();
+    fireEvent.click(replicate);
+
+    expect(onCopy).not.toHaveBeenCalled();
+    expect(screen.getByText("Choose a project you can create prompts in.")).toBeVisible();
   });
 
   /** @scenario "Replicating a prompt cannot target a project the reader may not create in" */
@@ -93,7 +107,7 @@ describe("the Replicate dialog on a prompt", () => {
     const onCopy = vi.fn().mockResolvedValue(undefined);
     renderDialog(onCopy);
 
-    fireEvent.change(screen.getByLabelText("Target Project"), {
+    fireEvent.change(screen.getByLabelText("Target project"), {
       target: { value: "project-admin" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Replicate" }));

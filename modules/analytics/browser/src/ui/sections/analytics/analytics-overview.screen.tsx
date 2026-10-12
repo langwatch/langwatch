@@ -1,8 +1,8 @@
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
+import { Card } from "@langwatch/design-system/card";
 import {
-  Alert,
   Box,
   Button,
-  Card,
   Flex,
   Grid,
   Heading,
@@ -29,23 +29,21 @@ function AnalyticsContent() {
   const project = host.project();
 
   return (
-    <AnalyticsLayout title="Overview" railEntry="overview">
+    <AnalyticsLayout tab="overview">
       {project && !project.hasFirstMessage && (
-        <Alert.Root status="warning" marginBottom={6}>
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>No traces received yet</Alert.Title>
-            <Alert.Description>
-              <Text as="span">
-                {"Tracing is not integrated yet, so there's no data to display. Go to the "}
-              </Text>
-              <Link textDecoration="underline" href={`/${project.slug}/traces`}>
-                setup
-              </Link>
-              <Text as="span"> page to get started.</Text>
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        <Box marginBottom={6}>
+          <Banner
+            status="warning"
+            title="No traces received yet"
+            action={
+              <BannerAction asChild>
+                <a href={`/${project.slug}/traces`}>Set up tracing</a>
+              </BannerAction>
+            }
+          >
+            Tracing is not integrated yet, so there is no data to display.
+          </Banner>
+        </Box>
       )}
 
       <HStack align="start" width="full" gap={8}>
@@ -61,7 +59,7 @@ function AnalyticsContent() {
   );
 }
 
-function CustomReportsSection({ slug }: { slug: string }) {
+export function CustomReportsSection({ slug }: { slug: string }) {
   const host = useAnalyticsHost();
   const project = host.project();
   const dashboardsQuery = useDashboards({ projectId: project?.id ?? "" });
@@ -72,31 +70,22 @@ function CustomReportsSection({ slug }: { slug: string }) {
     if (isAggregateProjectKind(project?.kind)) return null;
     return (
       <>
-        <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
+        <Heading as="h2" size="sm" paddingTop={6} paddingBottom={2}>
           Custom Dashboards
         </Heading>
-        <Card.Root borderStyle="dashed">
-          <Card.Body padding={5}>
-            <HStack gap={4}>
-              <Box color="fg.subtle">
-                <BarChart2 size={20} />
-              </Box>
-              <VStack align="start" gap={1} flex={1}>
-                <Text textStyle="sm" fontWeight="500">
-                  Build your own dashboard
-                </Text>
-                <Text textStyle="xs" color="fg.muted">
-                  Drag and drop charts to track the metrics that matter most to your team.
-                </Text>
-              </VStack>
+        <Card
+          placeholder
+          icon={<BarChart2 size={16} />}
+          title="Build your own dashboard"
+          description="Drag and drop charts to track the metrics that matter most to your team."
+          actions={
+            <Button asChild size="xs" variant="outline">
               <Link href={`/${slug}/analytics/reports`} _hover={{ textDecoration: "none" }}>
-                <Button size="sm" variant="outline">
-                  <Plus size={14} /> Create
-                </Button>
+                <Plus size={14} /> Create
               </Link>
-            </HStack>
-          </Card.Body>
-        </Card.Root>
+            </Button>
+          }
+        />
       </>
     );
   }
@@ -105,43 +94,39 @@ function CustomReportsSection({ slug }: { slug: string }) {
 
   return (
     <>
-      <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
+      <Heading as="h2" size="sm" paddingTop={6} paddingBottom={2}>
         Custom Dashboards
       </Heading>
       <Grid width="full" gap={3} gridTemplateColumns="repeat(auto-fill, minmax(250px, 1fr))">
         {dashboards.map((dashboard) => (
-          <Link
+          <Card
             key={dashboard.id}
-            href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
-            _hover={{ textDecoration: "none" }}
+            padding="none"
+            opener={
+              <Link
+                href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
+                aria-label={`Open ${dashboard.name}`}
+                _hover={{ textDecoration: "none" }}
+              />
+            }
           >
-            <Card.Root
-              width="full"
-              cursor="pointer"
-              borderColor="border"
-              _hover={{ borderColor: "orange.emphasized", shadow: "sm" }}
-              transition="all 0.15s ease"
-            >
-              <Card.Body paddingX={4} paddingY={3}>
-                <Flex gap={3} alignItems="center">
-                  <Box padding={2} borderRadius="md" bg="orange.subtle" color="orange.fg">
-                    <BarChart2 size={16} />
-                  </Box>
-                  <VStack align="start" gap={0} flex={1}>
-                    <Text fontWeight="500" textStyle="sm">
-                      {dashboard.name}
-                    </Text>
-                    <Text textStyle="xs" color="fg.muted">
-                      Custom Dashboard
-                    </Text>
-                  </VStack>
-                  <Box color="fg.subtle" marginLeft="auto">
-                    <ArrowUpRight size={14} />
-                  </Box>
-                </Flex>
-              </Card.Body>
-            </Card.Root>
-          </Link>
+            <Flex gap={3} alignItems="center" paddingX={4} paddingY={3}>
+              <Box padding={2} borderRadius="md" bg="orange.subtle" color="orange.fg">
+                <BarChart2 size={16} />
+              </Box>
+              <VStack align="start" gap={0} flex={1}>
+                <Text fontWeight="500" textStyle="sm">
+                  {dashboard.name}
+                </Text>
+                <Text textStyle="xs" color="fg.muted">
+                  Custom Dashboard
+                </Text>
+              </VStack>
+              <Box color="fg.subtle" marginLeft="auto">
+                <ArrowUpRight size={14} />
+              </Box>
+            </Flex>
+          </Card>
         ))}
       </Grid>
     </>

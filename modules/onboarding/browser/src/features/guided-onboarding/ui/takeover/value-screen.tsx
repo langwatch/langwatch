@@ -65,8 +65,7 @@ export function ValueScreen({
       <Box
         minH="84px"
         fontFamily="display"
-        fontSize="30px"
-        lineHeight="1.25"
+        textStyle="pageTitle"
         color="fg"
         data-testid="value-line"
       >
@@ -128,8 +127,8 @@ export function ValueScreen({
                 borderColor={picked ? "orange.solid" : "border.emphasized"}
                 bg={picked ? "orange.solid" : "bg.panel"}
                 color={picked ? "orange.contrast" : "transparent"}
-                fontSize="10.5px"
-                fontWeight="600"
+                textStyle="micro"
+                fontWeight="semibold"
                 transition="all 0.15s ease"
                 data-testid={`pick-order-${id}`}
               >
@@ -148,10 +147,10 @@ export function ValueScreen({
                 <chakra.img src={PATH_ICONS[id]} alt="" w="28px" h="28px" objectFit="contain" />
               </Flex>
               <Box minW={0}>
-                <Text fontSize="14.5px" fontWeight="600" color="fg">
+                <Text textStyle="cardTitle" color="fg">
                   {GUIDED_PATH_TITLES[id]}
                 </Text>
-                <Text mt={0.5} fontSize="12px" lineHeight="1.6" color="fg.muted">
+                <Text mt={0.5} textStyle="caption" color="fg.muted">
                   {GUIDED_PATH_DESCRIPTIONS[id]}
                 </Text>
               </Box>

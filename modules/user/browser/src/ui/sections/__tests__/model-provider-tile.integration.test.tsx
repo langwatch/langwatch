@@ -3,14 +3,16 @@
  *
  * The model-provider tile issues a personal key, and waits while the personal workspace is set up.
  */
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../testing.tsx";
 import { ModelProviderTile } from "../model-provider-tile.tsx";
 
-const { state, invalidations, pendingWorkspace } = vi.hoisted(() => {
+const { state, invalidations, pendingWorkspace, SECRET } = vi.hoisted(() => {
+  /** An inert fixture, longer than the masked preview so the tail stays hidden. */
+  const SECRET = "sk-lw-FIXTURE-0000000000000000";
   /** The wire shape of the retryable refusal sent before the personal project exists. */
   const pendingWorkspace = (): Error =>
     Object.assign(new Error("personal_workspace_pending"), {
@@ -23,7 +25,7 @@ const { state, invalidations, pendingWorkspace } = vi.hoisted(() => {
     contextError: null,
   };
   const invalidations: string[] = [];
-  return { state, invalidations, pendingWorkspace };
+  return { state, invalidations, pendingWorkspace, SECRET };
 });
 
 vi.mock("../../../behavior/personal-workspace-api.ts", () => {
@@ -53,7 +55,7 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
           isPending: false,
           mutate: () => {
             if (state.failWith) return options.onError?.(state.failWith);
-            options.onSuccess?.({ label: "my-app", secret: "sk-lw-secret", baseUrl: "https://gw" });
+            options.onSuccess?.({ label: "my-app", secret: SECRET, baseUrl: "https://gw" });
           },
         }),
       },
@@ -73,6 +75,7 @@ afterEach(() => {
 });
 
 async function issueKey() {
+  const user = userEvent.setup();
   renderWithPersonalWorkspaceHost(
     <ModelProviderTile
       displayName="Anthropic"
@@ -81,8 +84,9 @@ async function issueKey() {
     />,
     { host: fakePersonalWorkspaceHost() },
   );
-  await userEvent.click(screen.getByText("Anthropic"));
-  await userEvent.click(screen.getByRole("button", { name: "Issue key" }));
+  await user.click(screen.getByText("Anthropic"));
+  await user.click(screen.getByRole("button", { name: "Issue key" }));
+  return user;
 }
 
 describe("<ModelProviderTile />", () => {
@@ -106,6 +110,38 @@ describe("<ModelProviderTile />", () => {
 
       expect(screen.getByText("label already used")).toBeInTheDocument();
       expect(invalidations).toEqual([]);
+    });
+  });
+
+  describe("when the issued secret is copied", () => {
+    it("writes the whole secret although only its start is shown, then says so", async () => {
+      const user = await issueKey();
+      expect(screen.queryByText(SECRET)).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Copy secret" }));
+
+      expect(await screen.findByRole("button", { name: "Copied" })).toBeInTheDocument();
+      expect(await navigator.clipboard.readText()).toBe(SECRET);
+    });
+
+    it("keeps the secret available and never claims a copy the clipboard refused", async () => {
+      const user = await issueKey();
+      const refused = vi
+        .spyOn(navigator.clipboard, "writeText")
+        .mockRejectedValue(new Error("denied"));
+
+      await user.click(screen.getByRole("button", { name: "Copy secret" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't copy to the clipboard");
+      expect(screen.queryByRole("button", { name: "Copied" })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Reveal secret" }));
+      expect(screen.getByText(SECRET)).toBeInTheDocument();
+
+      refused.mockRestore();
+      await user.click(screen.getByRole("button", { name: "Copy secret" }));
+      await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+      expect(await navigator.clipboard.readText()).toBe(SECRET);
     });
   });
 });

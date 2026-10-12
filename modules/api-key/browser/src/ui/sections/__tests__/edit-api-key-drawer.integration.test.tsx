@@ -127,6 +127,23 @@ describe("given a service key with all permissions", () => {
     });
   });
 
+  describe("when the name is cleared and Save is pressed", () => {
+    it("keeps Save clickable, names the missing field, focuses it and sends nothing", async () => {
+      const user = userEvent.setup();
+      const onSave = renderDrawer(keyRow());
+      const [nameInput] = screen.getAllByRole("textbox");
+      await user.clear(nameInput!);
+      expect(save()).toBeEnabled();
+      await user.click(save());
+      expect(screen.getByText("Enter a name for this key.")).toBeInTheDocument();
+      expect(nameInput).toHaveFocus();
+      expect(onSave).not.toHaveBeenCalled();
+      await user.type(nameInput!, "Renamed");
+      await user.click(save());
+      expect(onSave.mock.calls[0]?.[0]).toMatchObject({ name: "Renamed" });
+    });
+  });
+
   describe("when the name changes and the description is emptied", () => {
     it("sends the new name and a null description", async () => {
       const user = userEvent.setup();

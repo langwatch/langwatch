@@ -101,7 +101,6 @@ routes:
   - /{slug}/prompts
   - /{slug}/pull-requests
   - /{slug}/sessions
-  - /{slug}/setup
   - /{slug}/simulations
   - /{slug}/simulations/scenarios
   - /{slug}/traces
@@ -218,7 +217,6 @@ routes:
   - /gateway/virtual-keys/{virtualKey}
   - /gateway/budgets/{budget}
   - /settings/teams/{team}
-  - /onboarding/{team}/project
   - /governance/teams/{team}
   - /governance/users/{actor}
   - /onboarding

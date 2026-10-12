@@ -73,6 +73,21 @@ const traces = (): Widget => ({
  * One board and its widgets, answered from memory across reloads; every call is kept. A path
  * in `held` waits for its gate to open; a path in `refused` fails, as a server refusing would.
  */
+function found(element: Element | null): Element {
+  if (!element) throw new Error("expected the element to be in the document");
+  return element;
+}
+
+/** The style rules written for an element's classes, media queries included. */
+function cssRulesOf(element: Element): string {
+  const css = Array.from(document.querySelectorAll("style"))
+    .map((style) => style.textContent ?? "")
+    .join("\n");
+  return Array.from(element.classList)
+    .flatMap((name) => css.match(new RegExp(`\\.${name}\\{[^}]*\\}`, "g")) ?? [])
+    .join("");
+}
+
 function inMemoryServer() {
   const state = {
     widgets: [traces()],
@@ -335,10 +350,10 @@ describe("the widget editor", () => {
         .getAllByRole("dialog")
         .find((dialog) => within(dialog).queryByRole("tab", { name: "API / MCP" }))!;
 
-      // jsdom resolves the drawer's `calc(100vw - dock)` against its own viewport width.
-      expect(getComputedStyle(drawer).maxWidth).toBe(
-        `${window.innerWidth - (LANGY_DOCK_WIDTH_PX + 24)}px`,
-      );
+      const positioner = found(drawer.closest(".chakra-drawer__positioner"));
+      expect(cssRulesOf(positioner)).toContain("justify-content:flex-start");
+      // jsdom skips media queries, so read the wide-screen width rule as written.
+      expect(cssRulesOf(drawer)).toContain(`calc(100vw - 1rem - ${LANGY_DOCK_WIDTH_PX + 24}px)`);
     });
 
     /** @scenario "Widget editor: the editor and Langy sit side by side" */
@@ -351,7 +366,7 @@ describe("the widget editor", () => {
         .getAllByRole("dialog")
         .find((dialog) => within(dialog).queryByRole("tab", { name: "API / MCP" }))!;
 
-      expect(getComputedStyle(drawer).maxWidth).not.toContain("100vw");
+      expect(cssRulesOf(drawer)).toContain("calc(100vw - 1rem - 0px)");
     });
   });
 

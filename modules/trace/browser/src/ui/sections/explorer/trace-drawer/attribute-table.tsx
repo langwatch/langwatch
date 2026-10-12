@@ -1047,7 +1047,7 @@ function AttrSection({
       {title && (
         <Text
           textStyle="2xs"
-          fontWeight="bold"
+          fontWeight="semibold"
           color="fg.muted"
           textTransform="uppercase"
           letterSpacing="0.08em"

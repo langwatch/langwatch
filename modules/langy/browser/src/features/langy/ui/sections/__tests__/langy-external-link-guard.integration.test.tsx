@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect, useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -91,6 +91,14 @@ async function settle() {
 beforeEach(() => {
   navigation.attempts = 0;
   vi.spyOn(window, "open").mockReturnValue(null);
+  // jsdom lays nothing out, so the dialog's initial-focus pick would see every control as hidden.
+  const rect = new DOMRect(0, 0, 10, 10);
+  vi.spyOn(Element.prototype, "getClientRects").mockReturnValue({
+    0: rect,
+    length: 1,
+    item: (index: number) => (index === 0 ? rect : null),
+    [Symbol.iterator]: () => [rect][Symbol.iterator](),
+  });
 });
 
 afterEach(async () => {
@@ -246,7 +254,10 @@ describe("given an answer linking somewhere that is not LangWatch", () => {
       whenClicked("Pricing");
 
       await theDialog();
-      const labels = screen.getAllByRole("button").map((button) => button.textContent ?? "");
+      const footer = within(await theDialog()).getAllByRole("button");
+      const labels = footer
+        .filter((button) => button.getAttribute("data-frame-action"))
+        .map((button) => button.textContent ?? "");
       expect(labels).toHaveLength(2);
       expect(labels).toContain("Stay here");
       expect(labels.some((label) => label.startsWith("Open example.com"))).toBe(true);

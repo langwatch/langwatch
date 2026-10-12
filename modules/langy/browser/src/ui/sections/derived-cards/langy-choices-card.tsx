@@ -254,7 +254,7 @@ function ChoicesQuestion({ card }: { card: LangyDerivedChoicesCard }) {
   return (
     <Box
       data-langy-choices-prose
-      paddingX="2px"
+      paddingX="0.5"
       css={{
         "& > div > :first-child": { marginTop: 0 },
         "& > div > :last-child": { marginBottom: 0 },

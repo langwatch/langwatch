@@ -294,26 +294,33 @@ describe("given the bulk upload drawer", () => {
       expect(await screen.findByLabelText("Exclude b")).toBeDisabled();
     });
 
-    it("blocks upload while two columns share a name, and re-enables once fixed", async () => {
+    it("refuses the upload while two columns share a name, and runs once fixed", async () => {
       const user = userEvent.setup();
       render_();
       await user.upload(fileInput(), [csv("data.csv")]);
       await waitFor(() => expect(screen.getByText(/confirm types/i)).toBeInTheDocument());
       await user.click(screen.getByText(/confirm types/i));
 
-      // Rename the second column onto the first's name — normalize would collide
-      // their values, so the upload must be blocked until it's resolved.
+      // Rename the second column onto the first's name: normalize would collide
+      // their values, so the upload is refused with a reason until it is resolved.
       const second = await screen.findByLabelText("Column 2 name");
       await user.clear(second);
       await user.type(second, "a");
 
-      await waitFor(() => expect(uploadButton()).toBeDisabled());
+      expect(uploadButton()).toBeEnabled();
       expect(screen.getAllByText(/column names must be unique/i).length).toBeGreaterThan(0);
+      await user.click(uploadButton());
+      expect(await screen.findByText(/fix the column names in data/i)).toBeInTheDocument();
+      expect(createFromStoredObject).not.toHaveBeenCalled();
 
-      // Resolve the collision → the gate clears.
+      // Resolve the collision: the message clears and the upload goes ahead.
       await user.clear(second);
       await user.type(second, "b");
-      await waitFor(() => expect(uploadButton()).toBeEnabled());
+      await waitFor(() =>
+        expect(screen.queryByText(/fix the column names in data/i)).not.toBeInTheDocument(),
+      );
+      await user.click(uploadButton());
+      await waitFor(() => expect(createFromStoredObject).toHaveBeenCalledTimes(1));
     });
 
     /** @scenario Files that share a name become distinct datasets */

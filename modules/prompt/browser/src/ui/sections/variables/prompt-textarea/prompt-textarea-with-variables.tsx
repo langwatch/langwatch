@@ -1,4 +1,5 @@
 import { Box, HStack } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import { extractLiquidVariables } from "@langwatch/prompt-contract";
 import {
   type ChangeEvent,
@@ -278,7 +279,7 @@ function textareaStyle({
     fontFamily: borderless
       ? undefined
       : 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-    fontSize: borderless ? "14px" : "13px",
+    fontSize: borderless ? TYPE_SCALE_PX.body : TYPE_SCALE_PX.bodySm,
     lineHeight: borderless ? "28px" : "1.5",
     padding: borderless ? "0 0 0 24px" : "8px 10px",
     ...(reservedBottomPadding !== null ? { paddingBottom: `${reservedBottomPadding}px` } : {}),

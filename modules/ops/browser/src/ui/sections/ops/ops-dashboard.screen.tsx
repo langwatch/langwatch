@@ -34,7 +34,7 @@ export default function OpsDashboardScreen() {
   return (
     <>
       <PageLayout.Header
-        flexWrap="wrap"
+        description="Throughput, queue health, and work that needs attention."
         actions={
           <>
             <ConnectionStatusIndicator
@@ -47,14 +47,9 @@ export default function OpsDashboardScreen() {
           </>
         }
       >
-        <VStack align="start" gap={1} minWidth={0}>
-          <PageLayout.Heading>Ops dashboard</PageLayout.Heading>
-          <PageLayout.Subtitle>
-            Throughput, queue health, and work that needs attention.
-          </PageLayout.Subtitle>
-        </VStack>
+        <PageLayout.Heading>Ops dashboard</PageLayout.Heading>
       </PageLayout.Header>
-      <PageLayout.Container paddingY={5} maxWidth="full">
+      <PageLayout.Container width="fill">
         {data && <OpsDashboardContent data={data} />}
         {!data && snapshot.isError && (
           <HandledErrorAlert

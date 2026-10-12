@@ -1,4 +1,5 @@
-import { Alert, Field } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
+import { Field } from "@langwatch/design-system/primitives";
 import type { ManagedModelProvider } from "@langwatch/enterprise-managed-provider-contract";
 
 export function ManagedModelProviderAlert({
@@ -10,13 +11,9 @@ export function ManagedModelProviderAlert({
 }) {
   return (
     <>
-      <Alert.Root status="warning">
-        <Alert.Indicator />
-        <Alert.Title>
-          The {provider.provider} provider credentials is managed by LangWatch for your
-          organization.
-        </Alert.Title>
-      </Alert.Root>
+      <Banner status="warning">
+        The {provider.provider} provider credentials is managed by LangWatch for your organization.
+      </Banner>
       <Field.Root invalid={Boolean(error)}>
         <Field.ErrorText>{error}</Field.ErrorText>
       </Field.Root>

@@ -464,7 +464,7 @@ describe("the toolbar of the Results tab", () => {
       for (const control of controls) {
         const rules = rulesFor(control);
         expect(rules).toMatch(/height:\s*32px/);
-        expect(rules).toMatch(/font-size:\s*12\.5px/);
+        expect(rules).toMatch(/font-size:\s*13px/);
       }
     });
 

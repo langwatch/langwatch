@@ -15,7 +15,6 @@ import { Hash, ToggleLeft, Type } from "lucide-react";
 
 import { useProjectEvaluators } from "../../../../behavior/agent-testing/evaluators/use-project-evaluators.ts";
 import { missingInputsOf } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { EvaluatorAttachmentPill } from "./suite-evaluators-section.tsx";
 
 /** The icon each field type reads with. */
@@ -33,13 +32,13 @@ function FieldChip({ field, onClick }: { field: SuiteFieldDefinition; onClick?: 
       alignItems="center"
       gap={1}
       height="24px"
-      paddingX="8px"
+      paddingX="2"
       borderRadius="full"
       borderWidth="1px"
       borderColor="border"
       background="bg.muted/60"
       fontFamily="mono"
-      fontSize="11px"
+      textStyle="micro"
       color="fg"
       cursor={onClick ? "pointer" : "default"}
       _hover={onClick ? { borderColor: "border.emphasized" } : undefined}
@@ -47,7 +46,7 @@ function FieldChip({ field, onClick }: { field: SuiteFieldDefinition; onClick?: 
       onClick={onClick}
       data-testid={`suite-field-chip-${field.identifier}`}
     >
-      <Icon as={FIELD_TYPE_ICONS[field.type]} boxSize="11px" color={FG_MUTED} />
+      <Icon as={FIELD_TYPE_ICONS[field.type]} boxSize="11px" color="fg.muted" />
       {field.identifier}
     </chakra.button>
   );
@@ -55,7 +54,7 @@ function FieldChip({ field, onClick }: { field: SuiteFieldDefinition; onClick?: 
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
   return (
-    <Text fontSize="11px" fontWeight="medium" color={FG_MUTED} flexShrink={0}>
+    <Text textStyle="micro" fontWeight="medium" color="fg.muted" flexShrink={0}>
       {children}
     </Text>
   );

@@ -3,6 +3,7 @@
  * left, a Group-by selector on the right.
  */
 
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import {
   Button,
   HStack,
@@ -78,7 +79,7 @@ export function RunHistoryFilters({
             onChange={(e) => onFiltersChange({ ...filters, scenarioId: e.target.value })}
             aria-label="Filter by scenario"
           >
-            <option value="">All Scenarios</option>
+            <option value="">All scenarios</option>
             {scenarioOptions.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -94,7 +95,7 @@ export function RunHistoryFilters({
             onChange={(e) => onFiltersChange({ ...filters, passFailStatus: e.target.value })}
             aria-label="Filter by pass/fail status"
           >
-            <option value="">All Statuses</option>
+            <option value="">All statuses</option>
             <option value="pass">Pass</option>
             <option value="fail">Fail</option>
             <option value="stalled">Stalled</option>
@@ -109,9 +110,14 @@ export function RunHistoryFilters({
           <HStack gap={2} aria-live="polite">
             <Spinner size="xs" />
             <Text fontSize="sm" color="fg.muted" whiteSpace="nowrap">
-              {exportProgress?.total
-                ? `Exporting ${exportProgress.exported.toLocaleString()} of ${exportProgress.total.toLocaleString()} runs…`
-                : "Exporting…"}
+              {exportProgress?.total ? (
+                <>
+                  Exporting <FormattedNumber value={exportProgress.exported} /> of{" "}
+                  <FormattedNumber value={exportProgress.total} /> runs…
+                </>
+              ) : (
+                "Exporting…"
+              )}
             </Text>
             {onCancelExport && (
               <Button size="xs" variant="ghost" onClick={onCancelExport}>

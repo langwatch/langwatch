@@ -229,7 +229,7 @@ function SignInErrorDescription({
           This email already has an account. Sign in the way you did before, then connect this
           method in Settings &gt; Security.
         </Text>
-        <Text fontSize="13px" color="fg.muted">
+        <Text textStyle="bodySm" color="fg.muted">
           If your organization uses single sign-on, enter your work email and choose your company
           login.
         </Text>
@@ -289,7 +289,7 @@ function SignInErrorDescription({
           We could not confirm that this login belongs to your LangWatch account, so it has not been
           added to it.
         </Text>
-        <Text fontSize="13px" color="fg.muted">
+        <Text textStyle="bodySm" color="fg.muted">
           An administrator in your organization can review the request and approve it. In the
           meantime, sign in with a method you have used before.
         </Text>
@@ -358,12 +358,7 @@ export function SignInError({ error: rawError }: { error: string }) {
         governingConnection={governingConnection}
       />
       {trace && (
-        <Text
-          fontSize="11.5px"
-          color="fg.subtle"
-          fontFamily="mono"
-          data-testid="sign-in-error-trace"
-        >
+        <Text textStyle="monoSm" color="fg.subtle" data-testid="sign-in-error-trace">
           Reference: {trace}
         </Text>
       )}

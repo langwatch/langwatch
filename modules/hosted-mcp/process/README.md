@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The callable Hosted MCP capability exposed to process transports.
 
-Peers call these through the token, declared at `../contract/src/mcp-authorize.schemas.ts:60`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/mcp-authorize.schemas.ts:71`; nothing else in this package is public.
 
 #### `createHandler`
 
@@ -40,7 +40,7 @@ Optional credential: the browser door resolves the consent page session; OAuth a
 Answers at `/api/mcp/authorize`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/mcp-authorize.rest.ts:43)
+// Rawbody: "text" (inline, src/transport/mcp-authorize.rest.ts:44)
 ```
 
 ## tRPC transport

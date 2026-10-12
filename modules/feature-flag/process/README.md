@@ -144,58 +144,58 @@ None: this module declares no REST family.
 
 ### `featureFlag`
 
-Contract `../contract/src/feature-flag.trpc.ts:30`, router `src/transport/feature-flag.trpc.ts:32`.
+Contract `../contract/src/feature-flag.trpc.ts:51`, router `src/transport/feature-flag.trpc.ts:34`.
 
 | Procedure                                  | Kind     | Gate                                                                                                                                                 | Input                                 | Output                              |
 | ------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------- |
-| `featureFlag.isEnabled`                    | query    | Service-authorized: TENANT_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written        | `featureFlagReadInputSchema`          | `enabledOutputSchema`               |
+| `featureFlag.isEnabled`                    | query    | Service-authorized: FLAG_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written          | `featureFlagReadInputSchema`          | `enabledOutputSchema`               |
 | `featureFlag.isEnabledForAnyOrganization`  | query    | Service-authorized: TENANT_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written        | `organizationFeatureFlagsInputSchema` | `enabledOutputSchema`               |
 | `featureFlag.isEnabledForEachOrganization` | query    | Service-authorized: TENANT_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written        | `organizationFeatureFlagsInputSchema` | `enabledByOrganizationOutputSchema` |
-| `featureFlag.resolve`                      | query    | Service-authorized: TENANT_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written        | `featureFlagTargetRequestSchema`      | `resolvedFlagsOutputSchema`         |
+| `featureFlag.resolve`                      | query    | Service-authorized: FLAG_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written          | `featureFlagTargetRequestSchema`      | `resolvedFlagsOutputSchema`         |
 | `featureFlag.experiments`                  | query    | Service-authorized: EXPERIMENT_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written         | `featureFlagTargetRequestSchema`      | `experimentsOutputSchema`           |
 | `featureFlag.setExperimentEnrolment`       | mutation | Service-authorized: TENANT_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written        | `experimentEnrolmentInputSchema`      | `experimentWriteOutputSchema`       |
 | `featureFlag.setExperimentTenantPolicy`    | mutation | Service-authorized: featureFlags:manageExperiments; the feature's own resolver authorizes the exact tenant target before any flag is read or written | `experimentTenantPolicyInputSchema`   | `experimentWriteOutputSchema`       |
 
 ```typescript
 // featureFlag.isEnabled
-type Input = z.infer<typeof featureFlagReadInputSchema>; // ../contract/src/feature-flag.schemas.ts:66
-// Output: enabledOutputSchema, ../contract/src/feature-flag.trpc.ts:20
+type Input = z.infer<typeof featureFlagReadInputSchema>; // ../contract/src/feature-flag.schemas.ts:98
+// Output: enabledOutputSchema, ../contract/src/feature-flag.trpc.ts:22
 interface Output {
   enabled: boolean;
 }
 
 // featureFlag.isEnabledForAnyOrganization
-type Input = z.infer<typeof organizationFeatureFlagsInputSchema>; // ../contract/src/feature-flag.schemas.ts:79
-type Output = z.infer<typeof enabledOutputSchema>; // ../contract/src/feature-flag.trpc.ts:20
+type Input = z.infer<typeof organizationFeatureFlagsInputSchema>; // ../contract/src/feature-flag.schemas.ts:110
+type Output = z.infer<typeof enabledOutputSchema>; // ../contract/src/feature-flag.trpc.ts:22
 
 // featureFlag.isEnabledForEachOrganization
-type Input = z.infer<typeof organizationFeatureFlagsInputSchema>; // ../contract/src/feature-flag.schemas.ts:79
-// Output: enabledByOrganizationOutputSchema, ../contract/src/feature-flag.trpc.ts:21
+type Input = z.infer<typeof organizationFeatureFlagsInputSchema>; // ../contract/src/feature-flag.schemas.ts:110
+// Output: enabledByOrganizationOutputSchema, ../contract/src/feature-flag.trpc.ts:30
 interface Output {
   enabledByOrganizationId: Record<string, boolean>;
 }
 
 // featureFlag.resolve
-type Input = z.infer<typeof featureFlagTargetRequestSchema>; // ../contract/src/feature-flag.schemas.ts:86
-// Output: resolvedFlagsOutputSchema, ../contract/src/feature-flag.trpc.ts:24
+type Input = z.infer<typeof featureFlagTargetRequestSchema>; // ../contract/src/feature-flag.schemas.ts:119
+// Output: resolvedFlagsOutputSchema, ../contract/src/feature-flag.trpc.ts:38
 interface Output {
   flags: Record<string, boolean>;
 }
 
 // featureFlag.experiments
-type Input = z.infer<typeof featureFlagTargetRequestSchema>; // ../contract/src/feature-flag.schemas.ts:86
-type Output = z.infer<typeof experimentsOutputSchema>; // ../contract/src/feature-flag.trpc.ts:25
+type Input = z.infer<typeof featureFlagTargetRequestSchema>; // ../contract/src/feature-flag.schemas.ts:119
+type Output = z.infer<typeof experimentsOutputSchema>; // ../contract/src/feature-flag.trpc.ts:43
 
 // featureFlag.setExperimentEnrolment
-type Input = z.infer<typeof experimentEnrolmentInputSchema>; // ../contract/src/feature-flag.schemas.ts:90
-// Output: experimentWriteOutputSchema, ../contract/src/feature-flag.trpc.ts:28
+type Input = z.infer<typeof experimentEnrolmentInputSchema>; // ../contract/src/feature-flag.schemas.ts:132
+// Output: experimentWriteOutputSchema, ../contract/src/feature-flag.trpc.ts:49
 interface Output {
   ok: true;
 }
 
 // featureFlag.setExperimentTenantPolicy
-type Input = z.infer<typeof experimentTenantPolicyInputSchema>; // ../contract/src/feature-flag.schemas.ts:98
-type Output = z.infer<typeof experimentWriteOutputSchema>; // ../contract/src/feature-flag.trpc.ts:28
+type Input = z.infer<typeof experimentTenantPolicyInputSchema>; // ../contract/src/feature-flag.schemas.ts:145
+type Output = z.infer<typeof experimentWriteOutputSchema>; // ../contract/src/feature-flag.trpc.ts:49
 ```
 
 ## Sockets

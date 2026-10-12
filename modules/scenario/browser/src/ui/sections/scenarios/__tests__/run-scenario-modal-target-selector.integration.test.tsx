@@ -112,7 +112,9 @@ describe("RunScenarioModal with TargetSelector", () => {
       await user.click(promptItem);
 
       // Dropdown closes after selection
-      expect(screen.queryByTestId("target-selector-dropdown")).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByTestId("target-selector-dropdown")).not.toBeInTheDocument();
+      });
 
       // Selected prompt is shown in the trigger
       expect(screen.getByTestId("target-selector-trigger")).toHaveTextContent("farewell-prompt");
@@ -121,7 +123,7 @@ describe("RunScenarioModal with TargetSelector", () => {
       expect(onClose).not.toHaveBeenCalled();
 
       // Dialog content is still visible
-      expect(screen.getByText("Run Scenario")).toBeInTheDocument();
+      expect(screen.getByText("Run scenario")).toBeInTheDocument();
     });
   });
 
@@ -136,14 +138,16 @@ describe("RunScenarioModal with TargetSelector", () => {
       await user.click(agentItem);
 
       // Dropdown closes
-      expect(screen.queryByTestId("target-selector-dropdown")).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByTestId("target-selector-dropdown")).not.toBeInTheDocument();
+      });
 
       // Selected agent shown in trigger
       expect(screen.getByTestId("target-selector-trigger")).toHaveTextContent("Test HTTP Agent");
 
       // Modal remains open
       expect(onClose).not.toHaveBeenCalled();
-      expect(screen.getByText("Run Scenario")).toBeInTheDocument();
+      expect(screen.getByText("Run scenario")).toBeInTheDocument();
     });
   });
 
@@ -164,6 +168,19 @@ describe("RunScenarioModal with TargetSelector", () => {
     });
   });
 
+  describe("when the target list is open", () => {
+    it("floats above the dialog instead of sitting in its scrolling body", async () => {
+      renderModal();
+      await openDropdown();
+
+      const body = screen
+        .getByTestId("target-selector-trigger")
+        .closest('[data-testid="run-scenario-modal-body"]');
+      expect(body).not.toBeNull();
+      expect(body).not.toContainElement(screen.getByTestId("target-selector-dropdown"));
+    });
+  });
+
   describe("when clicking inside the modal but outside the dropdown", () => {
     /** @scenario "Clicking outside the dropdown closes only the dropdown" */
     it("closes the dropdown but keeps the modal open", async () => {
@@ -171,7 +188,7 @@ describe("RunScenarioModal with TargetSelector", () => {
       await openDropdown();
 
       // Click the modal title text (inside modal, outside dropdown)
-      const modalTitle = screen.getByText("Run Scenario");
+      const modalTitle = screen.getByText("Run scenario");
       await user.click(modalTitle);
 
       // Dropdown closes
@@ -181,7 +198,7 @@ describe("RunScenarioModal with TargetSelector", () => {
 
       // Modal stays open
       expect(onClose).not.toHaveBeenCalled();
-      expect(screen.getByText("Run Scenario")).toBeInTheDocument();
+      expect(screen.getByText("Run scenario")).toBeInTheDocument();
     });
   });
 
@@ -189,6 +206,17 @@ describe("RunScenarioModal with TargetSelector", () => {
   // because Chakra/Ark's backdrop dismiss mechanism relies on internal
   // pointer event handling that doesn't work in jsdom. Our stopPropagation
   // fix is scoped to the dropdown container and cannot affect backdrop behavior.
+
+  describe("when Run is pressed before a target is chosen", () => {
+    it("names what is missing and starts nothing", async () => {
+      renderModal();
+
+      await user.click(screen.getByRole("button", { name: "Run" }));
+
+      expect(screen.getByRole("alert")).toHaveTextContent("Choose an agent or prompt");
+      expect(onRun).not.toHaveBeenCalled();
+    });
+  });
 
   describe("when completing the full run flow after selecting a target", () => {
     /** @scenario "Completing the full run flow after selecting a target" */

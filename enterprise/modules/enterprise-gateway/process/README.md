@@ -158,7 +158,7 @@ interface Input {
   label: string;
   routingPolicyId?: string;
 }
-// Output: issuedPersonalVirtualKeyAnswerSchema, ../contract/src/personal-virtual-key.ts:46
+// Output: issuedPersonalVirtualKeyAnswerSchema, ../contract/src/personal-virtual-key.ts:76
 interface Output {
   id: string;
   label: string;
@@ -174,7 +174,7 @@ interface Input {
   organizationId: string;
   id: string;
 }
-// Output: enterpriseGatewayWriteAcknowledgedSchema, ../contract/src/enterprise-gateway.api.ts:78
+// Output: enterpriseGatewayWriteAcknowledgedSchema, ../contract/src/enterprise-gateway.api.ts:83
 interface Output {
   ok: boolean;
 }
@@ -197,7 +197,7 @@ Contract `../contract/src/routing-policy.trpc.ts:27`, router `src/transport/rout
 
 ```typescript
 // routingPolicy.list
-// Input: listRoutingPoliciesInputSchema, ../contract/src/routing-policy.ts:42
+// Input: listRoutingPoliciesInputSchema, ../contract/src/routing-policy.ts:60
 interface Input {
   organizationId: string;
   selectableForScope?: {
@@ -213,7 +213,7 @@ interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof routingPolicySchema>; // ../contract/src/routing-policy.ts:22
+type Output = z.infer<typeof routingPolicySchema>; // ../contract/src/routing-policy.ts:47
 
 // routingPolicy.tierSuggestions
 // Input: inline, ../contract/src/routing-policy.trpc.ts:38
@@ -235,11 +235,11 @@ type Output = {
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof personalContextSchema>; // ../contract/src/routing-policy.ts:175
+type Output = z.infer<typeof personalContextSchema>; // ../contract/src/routing-policy.ts:225
 
 // routingPolicy.create
 // Input: z.object({ organizationId: z.string(), scopes: z .array(routingPolicyScopeEntrySchema) .m… (inline, ../contract/src/routing-policy.trpc.ts:52)
-type Output = z.infer<typeof routingPolicySchema>; // ../contract/src/routing-policy.ts:22
+type Output = z.infer<typeof routingPolicySchema>; // ../contract/src/routing-policy.ts:47
 
 // routingPolicy.update
 // Input: inline, ../contract/src/routing-policy.trpc.ts:67
@@ -253,15 +253,15 @@ interface Input {
   defaultModel?: string | null;
   policyRules?: Record<string, unknown>;
 }
-type Output = z.infer<typeof routingPolicySchema>; // ../contract/src/routing-policy.ts:22
+type Output = z.infer<typeof routingPolicySchema>; // ../contract/src/routing-policy.ts:47
 
 // routingPolicy.setDefault
 type Input = z.infer<typeof policyInOrganization>; // ../contract/src/routing-policy.trpc.ts:15
-type Output = z.infer<typeof routingPolicySchema>; // ../contract/src/routing-policy.ts:22
+type Output = z.infer<typeof routingPolicySchema>; // ../contract/src/routing-policy.ts:47
 
 // routingPolicy.delete
 type Input = z.infer<typeof policyInOrganization>; // ../contract/src/routing-policy.trpc.ts:15
-type Output = z.infer<typeof enterpriseGatewayWriteAcknowledgedSchema>; // ../contract/src/enterprise-gateway.api.ts:78
+type Output = z.infer<typeof enterpriseGatewayWriteAcknowledgedSchema>; // ../contract/src/enterprise-gateway.api.ts:83
 ```
 
 ## Sockets

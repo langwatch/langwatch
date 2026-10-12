@@ -97,10 +97,11 @@ describe("AgentVoiceEditorDrawer for phone targets", () => {
       renderVoiceDrawer({ agentId: "agent_phone" });
       const talk = await screen.findByTestId("voice-agent-talk");
       expect(talk).toBeDisabled();
-      expect(talk).toHaveAttribute(
-        "title",
-        "Browser calls are not available for phone targets. Call it from a scenario run.",
-      );
+      expect(
+        screen.getByLabelText(
+          "Browser calls are not available for phone targets. Call it from a scenario run.",
+        ),
+      ).toBeInTheDocument();
     });
   });
 

@@ -4,8 +4,8 @@
  * @see specs/suites/test-suites.feature
  */
 
-import { Button, Input, Text } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Input, Text } from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
 
 /** What the dialog says when the name is empty. */
@@ -46,52 +46,34 @@ export function SuiteNameDialog({
   };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={({ open: nextOpen }) => !nextOpen && onClose()}
+      onClose={onClose}
+      title="New test suite"
+      size="sm"
       placement="center"
+      onSubmit={submit}
+      primaryAction={{
+        label: "Create",
+        type: "submit",
+        loading: isCreating,
+        "data-testid": "suite-name-confirm",
+      }}
+      data-testid="agent-testing-suite-name-dialog"
     >
-      <Dialog.Content maxWidth="420px" data-testid="agent-testing-suite-name-dialog">
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>New test suite</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Input
-            size="sm"
-            placeholder="e.g. Refunds"
-            aria-label="Test suite name"
-            data-testid="suite-name-input"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                submit();
-              }
-            }}
-          />
-          {problem && (
-            <Text paddingTop={2} fontSize="12px" color="red.fg" data-testid="suite-name-problem">
-              {problem}
-            </Text>
-          )}
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" size="sm" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="orange"
-            size="sm"
-            loading={isCreating}
-            onClick={submit}
-            data-testid="suite-name-confirm"
-          >
-            Create
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <Input
+        size="sm"
+        placeholder="e.g. Refunds"
+        aria-label="Test suite name"
+        data-testid="suite-name-input"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+      />
+      {problem && (
+        <Text paddingTop={2} textStyle="caption" color="red.fg" data-testid="suite-name-problem">
+          {problem}
+        </Text>
+      )}
+    </Dialog>
   );
 }

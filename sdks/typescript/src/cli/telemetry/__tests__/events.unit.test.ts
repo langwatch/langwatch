@@ -32,7 +32,7 @@ vi.mock("@opentelemetry/sdk-logs", () => ({
   },
 }));
 
-vi.mock("@opentelemetry/exporter-logs-otlp-http", () => ({
+vi.mock("@opentelemetry/exporter-logs-otlp-proto", () => ({
   OTLPLogExporter: class {
     constructor(config: Record<string, unknown>) {
       exporterConstructed(config);
@@ -205,6 +205,24 @@ describe("createCommandEvents()", () => {
         expect(exporterConstructed).toHaveBeenCalledWith(
           expect.objectContaining({ url: "http://localhost:4318/v1/logs" }),
         );
+      });
+
+      it("compresses with gzip unless the standard compression env var is set", async () => {
+        const events = createCommandEvents({ resource: "trace", verb: "search", env: ENABLED_ENV });
+        events.started("Searching traces…");
+        await events.flush();
+        expect(exporterConstructed).toHaveBeenLastCalledWith(
+          expect.objectContaining({ compression: "gzip" }),
+        );
+
+        vi.stubEnv("OTEL_EXPORTER_OTLP_COMPRESSION", "none");
+        const other = createCommandEvents({ resource: "trace", verb: "search", env: ENABLED_ENV });
+        other.started("Searching traces…");
+        await other.flush();
+        expect(exporterConstructed).toHaveBeenLastCalledWith(
+          expect.objectContaining({ compression: undefined }),
+        );
+        vi.unstubAllEnvs();
       });
     });
 

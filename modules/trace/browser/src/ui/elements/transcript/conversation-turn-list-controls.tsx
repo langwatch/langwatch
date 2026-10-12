@@ -40,7 +40,7 @@ function EarlierTurnsHeader({
         <Text
           textStyle="2xs"
           color="fg.muted"
-          fontWeight="600"
+          fontWeight="semibold"
           textTransform="uppercase"
           letterSpacing="0.06em"
           lineHeight={1.4}

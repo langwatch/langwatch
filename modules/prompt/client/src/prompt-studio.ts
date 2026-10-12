@@ -1,6 +1,7 @@
 /** Prompt's editors the workflow studio and evaluator settings draw, by token (§10.1). */
 
 import { uiTokens } from "@langwatch/module";
+import type { ReactNode } from "react";
 
 import type {
   PromptAvailableSource,
@@ -120,6 +121,33 @@ export type OutputsSectionProps = {
   availableTypes?: PromptStudioField["type"][];
 };
 
+/** What a node panel hands prompt's variables editor (inputs, mappings or literal values). */
+export type VariablesSectionProps = {
+  variables: { identifier: string; type: PromptStudioField["type"] }[];
+  onChange: (variables: { identifier: string; type: PromptStudioField["type"] }[]) => void;
+  mappings?: Record<string, PromptFieldMapping>;
+  onMappingChange?: (identifier: string, mapping: PromptFieldMapping | undefined) => void;
+  availableSources?: PromptAvailableSource[];
+  values?: Record<string, string>;
+  onValueChange?: (identifier: string, value: string) => void;
+  showMappings?: boolean;
+  canAddRemove?: boolean;
+  readOnly?: boolean;
+  showAddButton?: boolean;
+  title?: string;
+  missingMappingIds?: Set<string>;
+  showMissingMappingsError?: boolean;
+  optionalHighlighting?: boolean;
+  lockedVariables?: Set<string>;
+  variableInfo?: Record<string, string>;
+  disabledMappings?: Set<string>;
+  isMappingDisabled?: boolean;
+  /** Draws a source's icon; the caller owns the icon set. */
+  renderSourceIcon?: (type: PromptAvailableSource["type"]) => ReactNode;
+  /** Lines a literal value opens with (1 or 2). */
+  valueRows?: 1 | 2;
+};
+
 /** What a studio node hands prompt's LLM config row; prompt resolves the model option itself. */
 export type LlmConfigFieldProps = {
   llmConfig: PromptStudioLlmConfig;
@@ -143,6 +171,7 @@ const prompt = uiTokens("prompt");
 
 export const StudioPromptEditorToken =
   prompt.component<StudioPromptEditorProps>("studioPromptEditor");
+export const VariablesSectionToken = prompt.component<VariablesSectionProps>("variablesSection");
 export const OutputsSectionToken = prompt.component<OutputsSectionProps>("outputsSection");
 export const LlmConfigFieldToken = prompt.component<LlmConfigFieldProps>("llmConfigField");
 export const LlmConfigPopoverToken = prompt.component<LlmConfigPopoverProps>("llmConfigPopover");

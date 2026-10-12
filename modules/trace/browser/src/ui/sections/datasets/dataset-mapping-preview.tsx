@@ -264,7 +264,7 @@ export function DatasetMappingPreview({
     // every preview checkbox under it, and a click on one went wherever the id
     // resolved first.
     <Box width="full" paddingY={4}>
-      <HStack width="full" gap="64px" align="start">
+      <HStack width="full" gap="16" align="start">
         <VStack align="start" maxWidth="50%" gap={4}>
           <Field.Root width="full">
             <HStack width="full" align="center" justify="space-between">
@@ -280,7 +280,7 @@ export function DatasetMappingPreview({
             traceCount={threadTraces.data?.length}
           />
           <Field.Root width="full">
-            <Field.HelperText margin={0} fontSize="13px" marginBottom={2}>
+            <Field.HelperText margin={0} textStyle="bodySm" marginBottom={2}>
               {isThreadMapping
                 ? "Groups traces by thread and maps to dataset columns"
                 : "Maps each trace individually to dataset columns"}
@@ -313,12 +313,12 @@ export function DatasetMappingPreview({
             />
           )}
         </VStack>
-        <VStack align="start" width="full" height="full">
+        <VStack align="start" width="full" minWidth={0} height="full">
           <HStack width="full" align="end">
             <Field.Root width="auto">
               <VStack align="start">
                 <Field.Label margin={0}>Preview</Field.Label>
-                <Field.HelperText margin={0} fontSize="13px">
+                <Field.HelperText margin={0} textStyle="bodySm">
                   {paragraph
                     ? paragraph
                     : "Those are the rows that are going to be added, double click a cell to edit it"}

@@ -87,6 +87,11 @@ export type UiFeatureShellInstall = {
   moduleHosts?: ComponentType<{ children?: ReactNode }>;
   /** Drawn once beside the open drawer, so it reads the host services a screen does. */
   footer?: ComponentType;
+  /**
+   * A provider drawn around the routed page, the open drawer and the footer together, inside
+   * the host services, so a drawer reads what its page does. Draws no markup of its own.
+   */
+  presentation?: ComponentType<{ children?: ReactNode }>;
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
   /** The watch the supplied transport's fetch reports session versions to (ADR-170). */
@@ -240,6 +245,11 @@ function refetchOnNewerSession({
   };
 }
 
+/** A composition that installed no presentation provider. */
+function UiNoPresentation({ children }: { children?: ReactNode }) {
+  return <>{children}</>;
+}
+
 /** What a composition with no footer draws there: nothing. */
 function UiNoFooter() {
   return null;
@@ -251,6 +261,7 @@ export function createUiFeatureShell({
   drawers = {},
   moduleHosts: ModuleHosts = UiNoModuleHosts,
   footer: Footer = UiNoFooter,
+  presentation: Presentation = UiNoPresentation,
   transport,
   sessionVersions,
   queryStore,
@@ -369,9 +380,11 @@ export function createUiFeatureShell({
               here rather than being signed out of a stack that is booting. */}
             <UiApiWaitingGate isDevelopment={isDevelopment} sessionQueryKey={sessionQueryKey}>
               <ModuleHosts>
-                {children}
-                <CurrentDrawer drawers={drawers} isDevelopment={isDevelopment} />
-                <Footer />
+                <Presentation>
+                  {children}
+                  <CurrentDrawer drawers={drawers} isDevelopment={isDevelopment} />
+                  <Footer />
+                </Presentation>
               </ModuleHosts>
             </UiApiWaitingGate>
           </UiScopeHostProvider>

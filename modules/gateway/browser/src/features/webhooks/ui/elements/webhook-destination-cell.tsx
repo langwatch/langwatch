@@ -1,4 +1,5 @@
-import { Badge, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Badge, Text, VStack } from "@langwatch/design-system/primitives";
 
 import {
   WEBHOOK_DESTINATION_LABELS,
@@ -32,7 +33,7 @@ export function WebhookDestinationCell({ endpoint }: { endpoint: WebhookDestinat
   const address = endpoint.sqs ? queueLabel(endpoint.sqs) : (endpoint.url ?? "");
   const fullAddress = endpoint.sqs?.queueUrl ?? endpoint.url ?? "";
   return (
-    <Table.Cell maxWidth="360px">
+    <ListTable.Cell maxWidth="360px">
       <VStack align="start" gap={1}>
         <Badge
           size="sm"
@@ -53,6 +54,6 @@ export function WebhookDestinationCell({ endpoint }: { endpoint: WebhookDestinat
           {address}
         </Text>
       </VStack>
-    </Table.Cell>
+    </ListTable.Cell>
   );
 }

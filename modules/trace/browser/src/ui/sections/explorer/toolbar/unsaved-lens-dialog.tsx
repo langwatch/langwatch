@@ -1,14 +1,6 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
-
-import {
-  DialogBody,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "../../dialog.tsx";
 
 interface UnsavedLensDialogProps {
   open: boolean;
@@ -30,38 +22,33 @@ export const UnsavedLensDialog: React.FC<UnsavedLensDialogProps> = ({
   onDiscard,
   onCancel,
 }) => (
-  <DialogRoot
+  <Dialog
     open={open}
-    onOpenChange={(e) => {
-      if (!e.open) onCancel();
-    }}
+    onClose={onCancel}
+    title="Unsaved local changes"
     size="sm"
+    showCloseButton={false}
+    trapFocus={false}
+    preventScroll={false}
+    footerContent={
+      <HStack gap={2}>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button variant="outline" size="sm" onClick={onDiscard}>
+          Discard
+        </Button>
+        {onSaveAsNew && (
+          <Button colorPalette="orange" variant="solid" size="sm" onClick={onSaveAsNew}>
+            Save as new lens…
+          </Button>
+        )}
+      </HStack>
+    }
   >
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>Unsaved local changes</DialogTitle>
-      </DialogHeader>
-      <DialogBody>
-        <Text color="fg.muted" fontSize="sm">
-          You have unsaved local changes on <strong>{lensName}</strong>. Save them as a new lens, or
-          discard and switch?
-        </Text>
-      </DialogBody>
-      <DialogFooter>
-        <HStack gap={2}>
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button variant="outline" size="sm" onClick={onDiscard}>
-            Discard
-          </Button>
-          {onSaveAsNew && (
-            <Button colorPalette="blue" size="sm" onClick={onSaveAsNew}>
-              Save as new lens…
-            </Button>
-          )}
-        </HStack>
-      </DialogFooter>
-    </DialogContent>
-  </DialogRoot>
+    <Text color="fg.muted" fontSize="sm">
+      You have unsaved local changes on <strong>{lensName}</strong>. Save them as a new lens, or
+      discard and switch?
+    </Text>
+  </Dialog>
 );

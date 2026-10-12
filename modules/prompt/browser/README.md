@@ -4,7 +4,7 @@ The browser half of [prompt](../README.md). What a browser installs when it inst
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/prompt.web.ts:18` (`defineBrowserModule("prompt")`), exported as `promptWeb` at `./declaration`.
+Declared in `src/prompt.web.ts:19` (`defineBrowserModule("prompt")`), exported as `promptWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -30,7 +30,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 - `withApi(promptApi)`, tRPC contracts: `prompts.*`, `promptTags.*`.
 - Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/enterprise-licensing-client`, `@langwatch/model-provider-client`, `@langwatch/prompt-client`, `@langwatch/trace-client`.
-- Lends: `LlmConfigFieldToken`, `LlmConfigPopoverToken`, `OutputsSectionToken`, `StudioPromptEditorToken`.
+- Lends: `LlmConfigFieldToken`, `LlmConfigPopoverToken`, `OutputsSectionToken`, `VariablesSectionToken`, `StudioPromptEditorToken`.
 - Host APIs it requires: `PromptHostApi`.
 
 <!-- readme:generated:end -->

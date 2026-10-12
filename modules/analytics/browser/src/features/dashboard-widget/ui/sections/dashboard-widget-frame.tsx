@@ -178,7 +178,7 @@ export function DashboardWidgetFrameOverWindow({
 
   if (!parsed.success) {
     return (
-      <Text fontSize="13px" color="fg.muted" padding={4}>
+      <Text textStyle="bodySm" color="fg.muted" padding={4}>
         This widget&apos;s definition could not be read.
       </Text>
     );

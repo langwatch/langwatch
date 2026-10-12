@@ -1,15 +1,6 @@
-import { Popover, type PopoverRootProps } from "@langwatch/design-system/popover";
+import { DateRangePicker } from "@langwatch/design-system/date-range-picker";
+import type { PopoverRootProps } from "@langwatch/design-system/popover";
 import type { ButtonProps } from "@langwatch/design-system/primitives";
-import {
-  Box,
-  Button,
-  Field,
-  HStack,
-  Input,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@langwatch/design-system/primitives";
 import {
   differenceInCalendarDays,
   format,
@@ -20,8 +11,6 @@ import {
   type TimeInput,
   readableDate,
 } from "@langwatch/time";
-import { ChevronDown } from "lucide-react";
-import { LuCalendar } from "react-icons/lu";
 
 import type { Period, PeriodMode } from "../../model/session-filters.ts";
 import { type ReadableDate } from "../../model/short-date.ts";
@@ -131,89 +120,32 @@ export function PeriodSelector({
   /** Where the range list opens. A control at the foot of a rail wants "top-start". */
   placement?: PeriodSelectorPlacement;
 }) {
-  const { open, onOpen, onClose, setOpen } = useDisclosure();
+  const matchedPreset = () => {
+    if (mode !== "relative") return undefined;
+    const minutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+    const matchedByMinutes = RELATIVE_PRESETS.find((preset) => preset.minutes === minutes);
+    if (matchedByMinutes) return matchedByMinutes;
 
-  const handleQuickSelect = (presetKey: RelativePresetKey) => {
-    setRelativePeriod(presetKey);
-    onClose();
+    return getPresetForRange(startDate, endDate, nowInstant().epochMilliseconds);
   };
-
-  const getDateRangeLabel = () => {
-    if (mode === "relative") {
-      const matchedByDays = getPresetForRange(startDate, endDate, nowInstant().epochMilliseconds);
-      if (matchedByDays) return matchedByDays.label;
-
-      const minutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
-      const subDay = RELATIVE_PRESETS.find((preset) => preset.minutes === minutes);
-      if (subDay) return subDay.label;
-    }
-
-    return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
-  };
+  const preset = matchedPreset();
 
   return (
-    <Popover.Root
-      open={open}
-      onOpenChange={({ open }) => setOpen(open)}
-      positioning={{ placement }}
-      size="sm"
-    >
-      <Popover.Trigger asChild>
-        <Button variant={triggerVariant} size={size} minWidth="fit-content" onClick={onOpen}>
-          <LuCalendar />
-          <Text>{label ?? getDateRangeLabel()}</Text>
-          <Box>
-            <ChevronDown size={16} />
-          </Box>
-        </Button>
-      </Popover.Trigger>
-      <Popover.Content width="fit-content">
-        <Popover.Arrow />
-        <Popover.CloseTrigger />
-        <Popover.Header>
-          <Popover.Title>Select Date Range</Popover.Title>
-        </Popover.Header>
-        <Popover.Body>
-          <HStack align="start" gap={6}>
-            <VStack gap={4}>
-              <Field.Root>
-                <Field.Label>Start Date</Field.Label>
-                <Input
-                  type="datetime-local"
-                  value={format(startDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) => setPeriod(readableDate(e.target.value), endDate)}
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>End Date</Field.Label>
-                <Input
-                  type="datetime-local"
-                  value={format(endDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) => setPeriod(startDate, readableDate(e.target.value))}
-                />
-              </Field.Root>
-            </VStack>
-            <VStack>
-              {clearPeriod && (
-                <Button
-                  width="full"
-                  onClick={() => {
-                    clearPeriod();
-                    onClose();
-                  }}
-                >
-                  All time
-                </Button>
-              )}
-              {RELATIVE_PRESETS.map((preset) => (
-                <Button width="full" key={preset.key} onClick={() => handleQuickSelect(preset.key)}>
-                  {preset.label}
-                </Button>
-              ))}
-            </VStack>
-          </HStack>
-        </Popover.Body>
-      </Popover.Content>
-    </Popover.Root>
+    <DateRangePicker
+      presets={RELATIVE_PRESETS}
+      activePresetKey={preset?.key}
+      startValue={format(startDate, "yyyy-MM-dd'T'HH:mm")}
+      endValue={format(endDate, "yyyy-MM-dd'T'HH:mm")}
+      triggerLabel={
+        label ?? preset?.label ?? `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`
+      }
+      onStartChange={(text) => setPeriod(readableDate(text), endDate)}
+      onEndChange={(text) => setPeriod(startDate, readableDate(text))}
+      onPresetSelect={setRelativePeriod}
+      onClear={clearPeriod}
+      size={size}
+      triggerVariant={triggerVariant}
+      placement={placement}
+    />
   );
 }

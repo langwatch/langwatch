@@ -3,13 +3,11 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, chakra, Text } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Box, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Phone, Play } from "lucide-react";
 import { useId } from "react";
 
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 import type { RunDialogController } from "./use-run-dialog-submit.ts";
 
@@ -61,7 +59,7 @@ export function RunDialogFooter({
   const runButton = (
     <SmallButton
       variant="solid"
-      colorPalette="blue"
+      colorPalette="orange"
       disabled={isRunBlocked}
       loading={controller.isBusy}
       onClick={onRun ?? (() => void controller.run())}
@@ -74,12 +72,12 @@ export function RunDialogFooter({
     </SmallButton>
   );
   return (
-    <Dialog.Footer borderTopWidth="1px" borderColor="border" paddingX={5} paddingY={3} gap={2}>
+    <HStack width="full" gap={2}>
       {reason ? (
         <Text
           id={reasonId}
-          fontSize="12px"
-          color={FG_MUTED}
+          textStyle="caption"
+          color="fg.muted"
           data-testid="run-dialog-blocked-reason"
         >
           {reason}
@@ -93,11 +91,11 @@ export function RunDialogFooter({
         paddingX={3}
         height="28px"
         borderRadius="lg"
-        fontSize="12px"
+        textStyle="caption"
         fontWeight="medium"
-        color={FG_MUTED}
+        color="fg.muted"
         cursor="pointer"
-        boxShadow={QUIET_BUTTON_SHADOW}
+        boxShadow="none"
         _hover={{ background: "bg.muted", color: "fg" }}
         _disabled={{ cursor: "not-allowed", opacity: 0.5 }}
       >
@@ -123,6 +121,6 @@ export function RunDialogFooter({
       ) : (
         runButton
       )}
-    </Dialog.Footer>
+    </HStack>
   );
 }

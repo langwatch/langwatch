@@ -140,7 +140,7 @@ function GraphCardBody({
         minWidth={0}
         overflow="hidden"
         paddingX={4}
-        paddingTop="10px"
+        paddingTop="2.5"
         paddingBottom={3}
       >
         <GraphCardHeader

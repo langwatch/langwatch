@@ -127,7 +127,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
   return (
     <Stack gap={2}>
       <HStack gap={2} align="baseline">
-        <Heading size="sm">{title}</Heading>
+        <Heading textStyle="cardTitle">{title}</Heading>
         {note ? (
           <Text textStyle="xs" color="fg.muted">
             {note}

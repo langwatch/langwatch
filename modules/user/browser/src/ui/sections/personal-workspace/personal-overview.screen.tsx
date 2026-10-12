@@ -1,3 +1,6 @@
+import { Banner } from "@langwatch/design-system/banner";
+import { Card } from "@langwatch/design-system/card";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
@@ -8,6 +11,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import numeral from "numeral";
@@ -81,6 +85,7 @@ export function PersonalOverviewScreen() {
   const [showTheoretical, setShowTheoretical] = useState(true);
   const [showBilled, setShowBilled] = useState(true);
 
+  const lastDay = spendByDay.at(-1);
   const maxDay = Math.max(
     ...spendByDay.map((d) => Math.max(showTheoretical ? d.usd : 0, showBilled ? d.billedUsd : 0)),
     0.01,
@@ -101,7 +106,7 @@ export function PersonalOverviewScreen() {
           <GuidedOnboardingOffer space="me" spaceInUse={spaceInUse} />
 
           <VStack id={PERSONAL_AI_TOOLS_ANCHOR} align="stretch" gap={3} scrollMarginTop={4}>
-            <Text color="fg.muted" fontSize="sm">
+            <Text color="fg.muted" textStyle="body">
               Pick a tool to get started, or issue a virtual key for your own integrations.
             </Text>
             <AiToolsPortal />
@@ -113,10 +118,10 @@ export function PersonalOverviewScreen() {
 
           <HStack alignItems="end" paddingTop={4}>
             <VStack align="start" gap={0}>
-              <Heading as="h3" size="md">
-                My Usage
+              <Heading as="h3" size="sm">
+                My usage
               </Heading>
-              <Text color="fg.muted" fontSize="sm">
+              <Text color="fg.muted" textStyle="body">
                 Your AI usage in {organizationName} this month
               </Text>
             </VStack>
@@ -178,7 +183,9 @@ export function PersonalOverviewScreen() {
                         positioning={{ placement: "top" }}
                         content={
                           <VStack gap={0.5} align="start">
-                            <Text fontWeight="semibold">{d.day}</Text>
+                            <Text textStyle="label">
+                              <FormattedDate value={d.day} display="date" />
+                            </Text>
                             <Text>Theoretical: {fmtUsd(d.usd)}</Text>
                             <Text>Billed: {fmtUsd(d.billedUsd)}</Text>
                           </VStack>
@@ -221,8 +228,10 @@ export function PersonalOverviewScreen() {
                   })}
                 </HStack>
                 <HStack justifyContent="space-between" fontSize="xs" color="fg.muted">
-                  <Text>{spendByDay[0]?.day}</Text>
-                  <Text>{spendByDay[spendByDay.length - 1]?.day}</Text>
+                  <Text>
+                    {spendByDay[0] && <FormattedDate value={spendByDay[0].day} display="date" />}
+                  </Text>
+                  <Text>{lastDay && <FormattedDate value={lastDay.day} display="date" />}</Text>
                 </HStack>
               </VStack>
             )}
@@ -292,30 +301,13 @@ function SummaryCard({
 }: {
   title: string;
   value: string;
-  /** Omitted or empty renders no second line at all, so the card keeps its
-   *  shape instead of reserving a blank row. */
+  /** Omitted or empty renders no hint at all. */
   subline?: string;
 }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-      backgroundColor="bg.subtle"
-    >
-      <Text fontSize="xs" color="fg.muted" textTransform="uppercase" letterSpacing="wider">
-        {title}
-      </Text>
-      <Text fontSize="2xl" fontWeight="semibold" marginTop={1} color="fg">
-        {value}
-      </Text>
-      {subline ? (
-        <Text fontSize="sm" color="fg.muted" marginTop={1}>
-          {subline}
-        </Text>
-      ) : null}
-    </Box>
+    <StatTile label={title} hint={subline || undefined}>
+      <StatTileFigure>{value}</StatTileFigure>
+    </StatTile>
   );
 }
 
@@ -334,46 +326,10 @@ function SectionCard({
   // table that should read edge-to-edge while the title stays inset.
   flushContent?: boolean;
 }) {
-  if (flushContent) {
-    return (
-      <Box
-        background="bg.card"
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        overflow="hidden"
-      >
-        <HStack paddingX={4} paddingTop={4} paddingBottom={3}>
-          <Text fontSize="sm" fontWeight="semibold">
-            {title}
-          </Text>
-          <Spacer />
-          {action}
-        </HStack>
-        <Box borderTopWidth="1px" borderTopColor="border.muted">
-          {children}
-        </Box>
-      </Box>
-    );
-  }
-
   return (
-    <Box
-      background="bg.card"
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
-      <HStack marginBottom={3}>
-        <Text fontSize="sm" fontWeight="semibold">
-          {title}
-        </Text>
-        <Spacer />
-        {action}
-      </HStack>
+    <Card title={title} actions={action} padding={flushContent ? "none" : "md"}>
       {children}
-    </Box>
+    </Card>
   );
 }
 
@@ -395,7 +351,6 @@ function BudgetStateBanners({
   if (!warningItem) return null;
   return (
     <BudgetBanner
-      tone="yellow"
       title="Approaching budget"
       message={`You've used ${fmtUsd(Number.parseFloat(warningItem.spentUsd) || 0)} of your ${fmtUsd(Number.parseFloat(warningItem.limitUsd) || 0)} ${budgetDescription(warningItem)}.`}
     />
@@ -423,40 +378,11 @@ function BreachedBudgetBanner({
   );
 }
 
-function BudgetBanner({
-  tone,
-  title,
-  message,
-}: {
-  tone: "red" | "yellow";
-  title: string;
-  message: string;
-}) {
-  const colors =
-    tone === "red"
-      ? { bg: "red.subtle", border: "red.muted", title: "red.fg", text: "red.fg" }
-      : {
-          bg: "yellow.subtle",
-          border: "yellow.emphasized",
-          title: "yellow.fg",
-          text: "yellow.fg",
-        };
-
+function BudgetBanner({ title, message }: { title: string; message: string }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor={colors.border}
-      backgroundColor={colors.bg}
-      borderRadius="md"
-      padding={4}
-    >
-      <Text fontWeight="semibold" color={colors.title}>
-        {title}
-      </Text>
-      <Text fontSize="sm" color={colors.text} marginTop={1}>
-        {message}
-      </Text>
-    </Box>
+    <Banner status="warning" title={title}>
+      {message}
+    </Banner>
   );
 }
 

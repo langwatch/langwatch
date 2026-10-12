@@ -37,4 +37,23 @@ describe("ExecutionInputPanel", () => {
       await waitFor(() => expect(screen.getByRole("textbox")).toHaveValue("updated upstream"));
     });
   });
+
+  describe("given the engine connection is not up", () => {
+    /** @scenario Run in the expanded input panel waits for the engine */
+    it("disables Execute and says it is reconnecting", () => {
+      const execute = vi.fn();
+      renderWithDesignSystem(
+        <ExecutionInputPanel
+          fields={[{ identifier: "input", type: "str", value: "seed" }]}
+          onExecute={execute}
+          disabledReason="Waiting for the engine to connect"
+          pendingText="Reconnecting…"
+        />,
+      );
+
+      expect(screen.getByRole("button", { name: /Execute/ })).toBeDisabled();
+      expect(screen.getByText("Reconnecting…")).toBeInTheDocument();
+      expect(execute).not.toHaveBeenCalled();
+    });
+  });
 });

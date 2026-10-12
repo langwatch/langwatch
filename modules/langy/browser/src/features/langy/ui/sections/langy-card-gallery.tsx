@@ -139,7 +139,7 @@ export function LangyCardGallery() {
   const closeCardGallery = useLangyStore((s) => s.closeCardGallery);
 
   return (
-    <VStack align="stretch" gap="18px" paddingX="19px" paddingY="16px">
+    <VStack align="stretch" gap="4.5" paddingX="19px" paddingY="4">
       <HStack gap={2}>
         <VStack align="start" gap={0} flex={1} minWidth={0}>
           <Text textStyle="sm" fontWeight="600" color="fg">

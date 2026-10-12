@@ -70,7 +70,7 @@ function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }
   );
 
   return (
-    <VStack align="stretch" gap={0} fontSize="12px" minWidth="180px" color="fg">
+    <VStack align="stretch" gap={0} textStyle="caption" minWidth="180px" color="fg">
       <VStack align="stretch" gap={2} padding={2}>
         {/* Total duration */}
         {scenarioRun.durationInMs > 0 && (
@@ -83,7 +83,7 @@ function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }
         {/* Total cost */}
         {scenarioRun.totalCost != null && (
           <HStack justify="space-between">
-            <Text color="fg.muted">Total Cost</Text>
+            <Text color="fg.muted">Total cost</Text>
             <Text fontWeight="medium">{formatCost(scenarioRun.totalCost)}</Text>
           </HStack>
         )}
@@ -265,7 +265,7 @@ export function ScenarioTargetRow({
             interactive
           >
             <HStack position="relative" zIndex={1} gap={2} flexShrink={0} color="fg.subtle">
-              {latencyMs > 0 && <Text fontSize="11px">{formatLatency(latencyMs)}</Text>}
+              {latencyMs > 0 && <Text textStyle="micro">{formatLatency(latencyMs)}</Text>}
               {scenarioRun.totalCost != null && (
                 <>
                   <Text color="fg.subtle">{"⋅"}</Text>

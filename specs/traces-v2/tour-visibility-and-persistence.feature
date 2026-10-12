@@ -79,6 +79,7 @@ Rule: "Show me around" collapses to an icon for established accounts
   Scenario: New account sees the text label
     Given the account was created less than 5 days ago
     Then the control shows the "Show me around" text label
+    And the label drops to the icon while the toolbar is too narrow
 
   Scenario: Established account sees the icon only
     Given the account was created 5 or more days ago

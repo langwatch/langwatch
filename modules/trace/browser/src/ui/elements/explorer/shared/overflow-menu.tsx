@@ -53,8 +53,8 @@ export const OverflowMenu: React.FC<OverflowMenuProps> = ({
           size={triggerSize}
           variant="ghost"
           paddingX={0.5}
-          minWidth="auto"
-          height={triggerSize === "sm" ? "26px" : "22px"}
+          minWidth="24px"
+          height={triggerSize === "sm" ? "26px" : "24px"}
           color="fg.muted"
           aria-label={ariaLabel ?? `Show ${items.length} more`}
         >

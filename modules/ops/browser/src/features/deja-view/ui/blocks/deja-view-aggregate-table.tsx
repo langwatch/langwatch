@@ -1,6 +1,7 @@
+import { Card } from "@langwatch/design-system/card";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Card, Table, Text } from "@langwatch/design-system/primitives";
+import { Text } from "@langwatch/design-system/primitives";
 import { ChevronRight } from "lucide-react";
 
 import { formatTimestamp } from "../../model/deja-view-fragment.ts";
@@ -14,64 +15,60 @@ export function AggregateTable({
   onSelect: (aggregateId: string, tenantId: string) => void;
 }) {
   return (
-    <Card.Root borderColor="border.muted" boxShadow="none" overflow="hidden">
-      <Table.ScrollArea>
-        <ListTable
-          density="compact"
-          columnRules={false}
-          containerProps={{ overflowX: "auto" }}
-          size="sm"
-          variant="line"
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Aggregate ID</Table.ColumnHeader>
-              <Table.ColumnHeader>Type</Table.ColumnHeader>
-              <Table.ColumnHeader>Tenant</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">Event count</Table.ColumnHeader>
-              <Table.ColumnHeader>Last event</Table.ColumnHeader>
-              <Table.ColumnHeader />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {aggregates.map((agg) => (
-              <Table.Row
-                key={`${agg.tenantId}:${agg.aggregateId}`}
-                cursor="pointer"
-                _hover={{ bg: "bg.subtle" }}
-                onClick={() => onSelect(agg.aggregateId, agg.tenantId)}
-              >
-                <Table.Cell>
-                  <Text textStyle="xs" fontFamily="mono">
-                    {agg.aggregateId}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell>
-                  <InlineCode>{agg.aggregateType}</InlineCode>
-                </Table.Cell>
-                <Table.Cell>
-                  <Text textStyle="xs" fontFamily="mono" color="fg.muted">
-                    {agg.tenantId}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell textAlign="end">
-                  <Text textStyle="sm" fontWeight="medium">
-                    {agg.eventCount}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell>
-                  <Text textStyle="xs" color="fg.muted">
-                    {formatTimestamp(agg.lastEventTime)}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell>
-                  <ChevronRight size={14} />
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </ListTable>
-      </Table.ScrollArea>
-    </Card.Root>
+    <Card padding="none">
+      <ListTable
+        density="compact"
+        variant="embedded"
+        scroll="x"
+        scrollLabel="Aggregate search results"
+      >
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Aggregate ID</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Type</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Tenant</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader align="end">Event count</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Last event</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader label="Open" />
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
+          {aggregates.map((agg) => (
+            <ListTable.Row
+              key={`${agg.tenantId}:${agg.aggregateId}`}
+              onActivate={() => onSelect(agg.aggregateId, agg.tenantId)}
+            >
+              <ListTable.Cell>
+                <ListTable.RowAction
+                  label={`Open aggregate ${agg.aggregateId}`}
+                  onActivate={() => onSelect(agg.aggregateId, agg.tenantId)}
+                >
+                  <InlineCode variant="neutral">{agg.aggregateId}</InlineCode>
+                </ListTable.RowAction>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <InlineCode>{agg.aggregateType}</InlineCode>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <InlineCode variant="neutral">{agg.tenantId}</InlineCode>
+              </ListTable.Cell>
+              <ListTable.Cell align="end">
+                <Text textStyle="sm" fontWeight="medium">
+                  {agg.eventCount}
+                </Text>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <Text textStyle="xs" color="fg.muted">
+                  {formatTimestamp(agg.lastEventTime)}
+                </Text>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <ChevronRight size={14} />
+              </ListTable.Cell>
+            </ListTable.Row>
+          ))}
+        </ListTable.Body>
+      </ListTable>
+    </Card>
   );
 }

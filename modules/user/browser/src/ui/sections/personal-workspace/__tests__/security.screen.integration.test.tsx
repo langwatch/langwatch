@@ -32,6 +32,7 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
     }),
     identity: {
       myIdentifiers: { useQuery: () => ({ data: [], isPending: false, error: null }) },
+      mySignInGovernance: { useQuery: () => ({ data: void 0, isPending: false }) },
       myMethodsLastUsed: { useQuery: () => ({ data: void 0 }) },
       addEmailIdentifier: mutation(),
       resendIdentifierConfirmation: mutation(),
@@ -40,6 +41,7 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
     },
     auth: {
       changePassword: mutation(),
+      unlinkAccount: mutation(),
       setPassword: mutation(),
       myAddressConfirmation: {
         useQuery: () => ({
@@ -64,7 +66,9 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
       hasPassword: {
         useQuery: () => ({ data: { hasPassword: state.hasPassword }, isLoading: false }),
       },
-      unlinkAccount: mutation(),
+      secureAccountNudge: {
+        useQuery: () => ({ data: void 0, isLoading: false, dataUpdatedAt: 0 }),
+      },
     },
   };
   return { personalWorkspaceApi: api, api };

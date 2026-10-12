@@ -8,6 +8,7 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Alert,
   Box,
@@ -16,11 +17,9 @@ import {
   Input,
   NativeSelect,
   RadioCard,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-contract/mapping-validation";
@@ -31,7 +30,7 @@ import type {
 } from "@langwatch/trace-contract";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
-import { AlertTriangle, ArrowLeft, HelpCircle, Spool, X } from "lucide-react";
+import { AlertTriangle, HelpCircle, Spool, X } from "lucide-react";
 import {
   type Dispatch,
   type SetStateAction,
@@ -364,8 +363,18 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   // Compute field groups for the dropdown
   const fieldGroups = useMemo(() => getFieldOptionsByCategory(), []);
 
+  const isLoading = createMutation.isPending || updateMutation.isPending;
+  const configureRef = useRef<HTMLButtonElement>(null);
+  const { shown, rejectSave } = useSaveValidation({
+    draft: { level, selectedEvaluator, name },
+    hasPendingMappings,
+    form,
+    configureRef,
+  });
+
   const handleSave = useCallback(() => {
-    saveMonitor({
+    if (isLoading) return;
+    const sent = saveMonitor({
       monitorId,
       projectId: project?.id,
       blocked: hasPendingMappings,
@@ -373,7 +382,10 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       create: createMutation.mutate,
       update: updateMutation.mutate,
     });
+    if (!sent) rejectSave();
   }, [
+    isLoading,
+    rejectSave,
     selectedEvaluator,
     project?.id,
     name,
@@ -388,207 +400,190 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     threadIdleTimeout,
   ]);
 
-  const isLoading = createMutation.isPending || updateMutation.isPending;
-  const canSave = canSaveMonitor({ level, selectedEvaluator, name, isLoading, hasPendingMappings });
-
   // Run on text
   const runOnText = runOnTextFor(sample);
 
   return (
-    <Drawer.Root open={isOpen} onOpenChange={({ open }) => !open && handleClose()} size="lg">
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            {canGoBack && (
-              <Button variant="ghost" size="sm" onClick={goBack} padding={1} minWidth="auto">
-                <ArrowLeft size={20} />
-              </Button>
-            )}
-            <Drawer.Title>
-              {monitorId ? "Edit Online Evaluation" : "New Online Evaluation"}
-            </Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack gap={0} align="stretch">
-            {/* Evaluation Level */}
-            <HorizontalFormControl
-              label="Evaluation Level"
-              helper="Select at which level should the online evaluation run"
-              align="start"
-              labelProps={{ paddingLeft: 0 }}
-            >
-              <RadioCard.Root
-                variant="outline"
-                colorPalette="orange"
-                value={level ?? ""}
-                onValueChange={handleLevelChange}
+    <Drawer
+      open={isOpen}
+      onClose={handleClose}
+      onBack={canGoBack ? goBack : void 0}
+      size="lg"
+      title={monitorId ? "Edit Online Evaluation" : "New Online Evaluation"}
+      footer={onlineEvaluationFooter({
+        monitorId,
+        isLoading,
+        onCancel: handleClose,
+        onSave: handleSave,
+      })}
+    >
+      <VStack gap={0} align="stretch">
+        {/* Evaluation Level */}
+        <HorizontalFormControl
+          label="Evaluation Level"
+          helper="Select at which level should the online evaluation run"
+          invalid={!!shown.level}
+          error={shown.level}
+          align="start"
+          labelProps={{ paddingLeft: 0 }}
+        >
+          <RadioCard.Root
+            variant="outline"
+            colorPalette="orange"
+            value={level ?? ""}
+            onValueChange={handleLevelChange}
+            width="full"
+          >
+            <VStack gap={2} width="full" align="stretch">
+              <StepRadio
+                value="trace"
+                data-testid="online-evaluation-level-trace"
+                title="Trace Level"
+                description="Evaluate each trace individually as it arrives"
+                icon={<LuListTree />}
                 width="full"
-              >
-                <VStack gap={2} width="full" align="stretch">
-                  <StepRadio
-                    value="trace"
-                    data-testid="online-evaluation-level-trace"
-                    title="Trace Level"
-                    description="Evaluate each trace individually as it arrives"
-                    icon={<LuListTree />}
-                    width="full"
-                  />
-                  <StepRadio
-                    value="thread"
-                    data-testid="online-evaluation-level-thread"
-                    title="Thread Level"
-                    description="Evaluate all traces in a thread together"
-                    icon={<Spool />}
-                    width="full"
-                  />
-                </VStack>
-              </RadioCard.Root>
-            </HorizontalFormControl>
+              />
+              <StepRadio
+                value="thread"
+                data-testid="online-evaluation-level-thread"
+                title="Thread Level"
+                description="Evaluate all traces in a thread together"
+                icon={<Spool />}
+                width="full"
+              />
+            </VStack>
+          </RadioCard.Root>
+        </HorizontalFormControl>
 
-            {/* Evaluator Selection - only show after level is selected */}
-            {level && (
-              <HorizontalFormControl
-                label="Evaluator"
-                helper={
-                  <EvaluatorHelperText
-                    hasSelection={!!selectedEvaluator}
-                    onRemoveSelection={() => {
-                      setSelectedEvaluator(null);
-                      form.setValue("name", "");
-                      setMappings({});
-                      setHasUnsavedChanges(true);
-                    }}
-                  />
-                }
-              >
-                <VStack align="stretch" gap={2}>
-                  <EvaluatorSelectionBox
-                    selectedEvaluator={selectedEvaluator}
-                    onSelectClick={handleSelectEvaluator}
-                    onEditClick={handleEditSelectedEvaluator}
-                    placeholder="Select Evaluator"
-                  />
+        {/* Evaluator Selection - only show after level is selected */}
+        {level && (
+          <HorizontalFormControl
+            label="Evaluator"
+            invalid={!!shown.evaluator}
+            error={shown.evaluator}
+            helper={
+              <EvaluatorHelperText
+                hasSelection={!!selectedEvaluator}
+                onRemoveSelection={() => {
+                  setSelectedEvaluator(null);
+                  form.setValue("name", "");
+                  setMappings({});
+                  setHasUnsavedChanges(true);
+                }}
+              />
+            }
+          >
+            <VStack align="stretch" gap={2}>
+              <EvaluatorSelectionBox
+                selectedEvaluator={selectedEvaluator}
+                onSelectClick={handleSelectEvaluator}
+                onEditClick={handleEditSelectedEvaluator}
+                placeholder="Select Evaluator"
+              />
 
-                  {/* Pending Mappings Warning */}
-                  {hasPendingMappings && (
-                    <PendingMappingsAlert
-                      pendingCount={pendingFields.length}
-                      onConfigure={openEvaluatorEditorForMappings}
-                    />
-                  )}
-                </VStack>
-              </HorizontalFormControl>
-            )}
-
-            {/* Name - only show after evaluator is selected */}
-            {level && selectedEvaluator && (
-              <>
-                <HorizontalFormControl
-                  label="Name"
-                  helper="A descriptive name for this online evaluation"
-                >
-                  <Input
-                    {...form.register("name")}
-                    data-testid="online-evaluation-name-input"
-                    placeholder="Enter evaluation name"
-                  />
-                </HorizontalFormControl>
-                <HorizontalFormControl
-                  label={
-                    <HStack>
-                      Preconditions (Optional)
-                      <Tooltip content="Conditions that must be met for this evaluation to run">
-                        <HelpCircle size={14} />
-                      </Tooltip>
-                    </HStack>
-                  }
-                  helper="Only run this evaluation when certain conditions are met"
-                >
-                  <PreconditionsEditor
-                    preconditions={preconditions}
-                    expanded={preconditionsExpanded}
-                    runOnText={runOnText}
-                    fieldGroups={fieldGroups}
-                    onAdd={addPrecondition}
-                    onUpdate={updatePrecondition}
-                    onRemove={removePrecondition}
-                  />
-                </HorizontalFormControl>
-                <HorizontalFormControl
-                  label={
-                    <HStack>
-                      Sampling (Optional)
-                      <Tooltip content="You can use this to save costs on expensive evaluations if you have too many messages incoming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
-                        <HelpCircle size={14} />
-                      </Tooltip>
-                    </HStack>
-                  }
-                  helper=""
-                >
-                  <VStack align="start">
-                    <HStack>
-                      <Input
-                        width="110px"
-                        type="number"
-                        data-testid="online-evaluation-sample-input"
-                        min="0.01"
-                        max="1"
-                        step="0.1"
-                        value={sample}
-                        onChange={(e) => form.setValue("sample", parseFloat(e.target.value) || 1)}
-                      />
-                    </HStack>
-                    <Text color="fg.subtle" fontStyle="italic">
-                      This evaluation will run on {runOnText}
-                      {preconditions.length > 0 && " matching the preconditions"}
-                    </Text>
-                  </VStack>
-                </HorizontalFormControl>
-              </>
-            )}
-
-            {/* Thread Idle Timeout - only show for thread level */}
-            {level === "thread" && selectedEvaluator && (
-              <HorizontalFormControl
-                label={
-                  <HStack>
-                    Thread Idle Time
-                    <Tooltip content="Wait for the thread to be idle (no new messages) before running the evaluation. This prevents re-evaluating on every single message in a thread.">
-                      <HelpCircle size={14} />
-                    </Tooltip>
-                  </HStack>
-                }
-                helper="How long to wait after the last message before evaluating the thread"
-              >
-                <ThreadIdleTimeoutSelect
-                  value={threadIdleTimeout}
-                  onChange={(value) => form.setValue("threadIdleTimeout", value)}
+              {/* Pending Mappings Warning */}
+              {hasPendingMappings && (
+                <PendingMappingsAlert
+                  pendingCount={pendingFields.length}
+                  onConfigure={openEvaluatorEditorForMappings}
+                  configureRef={configureRef}
+                  error={shown.mappings}
                 />
-              </HorizontalFormControl>
-            )}
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack gap={3} width="full" justify="flex-end">
-            <Button variant="outline" data-testid="online-evaluation-cancel" onClick={handleClose}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="blue"
-              data-testid="online-evaluation-save"
-              onClick={handleSave}
-              disabled={!canSave}
-              title={hasPendingMappings ? "Complete all mappings first" : undefined}
+              )}
+            </VStack>
+          </HorizontalFormControl>
+        )}
+
+        {/* Name - only show after evaluator is selected */}
+        {level && selectedEvaluator && (
+          <>
+            <HorizontalFormControl
+              label="Name"
+              helper="A descriptive name for this online evaluation"
+              invalid={!!shown.name}
+              error={shown.name}
             >
-              {isLoading && <Spinner size="sm" marginRight={2} />}
-              {monitorId ? "Save Changes" : "Create Online Evaluation"}
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+              <Input
+                {...form.register("name")}
+                data-testid="online-evaluation-name-input"
+                placeholder="Enter evaluation name"
+              />
+            </HorizontalFormControl>
+            <HorizontalFormControl
+              label={
+                <HStack>
+                  Preconditions (Optional)
+                  <Tooltip content="Conditions that must be met for this evaluation to run">
+                    <HelpCircle size={14} />
+                  </Tooltip>
+                </HStack>
+              }
+              helper="Only run this evaluation when certain conditions are met"
+            >
+              <PreconditionsEditor
+                preconditions={preconditions}
+                expanded={preconditionsExpanded}
+                runOnText={runOnText}
+                fieldGroups={fieldGroups}
+                onAdd={addPrecondition}
+                onUpdate={updatePrecondition}
+                onRemove={removePrecondition}
+              />
+            </HorizontalFormControl>
+            <HorizontalFormControl
+              label={
+                <HStack>
+                  Sampling (Optional)
+                  <Tooltip content="You can use this to save costs on expensive evaluations if you have too many messages incoming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
+                    <HelpCircle size={14} />
+                  </Tooltip>
+                </HStack>
+              }
+              helper=""
+            >
+              <VStack align="start">
+                <HStack>
+                  <Input
+                    width="110px"
+                    type="number"
+                    data-testid="online-evaluation-sample-input"
+                    min="0.01"
+                    max="1"
+                    step="0.1"
+                    value={sample}
+                    onChange={(e) => form.setValue("sample", parseFloat(e.target.value) || 1)}
+                  />
+                </HStack>
+                <Text color="fg.subtle" fontStyle="italic">
+                  This evaluation will run on {runOnText}
+                  {preconditions.length > 0 && " matching the preconditions"}
+                </Text>
+              </VStack>
+            </HorizontalFormControl>
+          </>
+        )}
+
+        {/* Thread Idle Timeout - only show for thread level */}
+        {level === "thread" && selectedEvaluator && (
+          <HorizontalFormControl
+            label={
+              <HStack>
+                Thread Idle Time
+                <Tooltip content="Wait for the thread to be idle (no new messages) before running the evaluation. This prevents re-evaluating on every single message in a thread.">
+                  <HelpCircle size={14} />
+                </Tooltip>
+              </HStack>
+            }
+            helper="How long to wait after the last message before evaluating the thread"
+          >
+            <ThreadIdleTimeoutSelect
+              value={threadIdleTimeout}
+              onChange={(value) => form.setValue("threadIdleTimeout", value)}
+            />
+          </HorizontalFormControl>
+        )}
+      </VStack>
+    </Drawer>
   );
 }
 
@@ -899,13 +894,13 @@ function PreconditionRow({
             </NativeSelect.Root>
           ) : (
             <>
-              {precondition.rule.includes("regex") && <Text fontSize="16px">{"/"}</Text>}
+              {precondition.rule.includes("regex") && <Text textStyle="sectionTitle">{"/"}</Text>}
               <Input
                 value={precondition.value}
                 onChange={(e) => updatePrecondition(index, "value", e.target.value)}
                 placeholder={precondition.rule.includes("regex") ? "regex" : "text"}
               />
-              {precondition.rule.includes("regex") && <Text fontSize="16px">{"/gi"}</Text>}
+              {precondition.rule.includes("regex") && <Text textStyle="sectionTitle">{"/gi"}</Text>}
             </>
           )}
         </HStack>
@@ -917,12 +912,16 @@ function PreconditionRow({
 function PendingMappingsAlert({
   pendingCount,
   onConfigure,
+  configureRef,
+  error,
 }: {
   pendingCount: number;
   onConfigure: () => void;
+  configureRef: React.Ref<HTMLButtonElement>;
+  error: string | undefined;
 }) {
   return (
-    <Alert.Root status="warning">
+    <Alert.Root status={error ? "error" : "warning"} role={error ? "alert" : void 0}>
       <Alert.Indicator>
         <AlertTriangle size={16} />
       </Alert.Indicator>
@@ -932,9 +931,11 @@ function PendingMappingsAlert({
             ? `${pendingCount} field${pendingCount > 1 ? "s" : ""} need${pendingCount === 1 ? "s" : ""} mapping`
             : "At least one field needs mapping"}
         </Alert.Title>
-        <Alert.Description>Configure how evaluator inputs map to trace data.</Alert.Description>
+        <Alert.Description>
+          {error ?? "Configure how evaluator inputs map to trace data."}
+        </Alert.Description>
       </Box>
-      <Button size="sm" variant="outline" onClick={onConfigure}>
+      <Button ref={configureRef} size="sm" variant="outline" onClick={onConfigure}>
         Configure
       </Button>
     </Alert.Root>
@@ -1186,20 +1187,80 @@ function confirmDiscard(hasUnsavedChanges: boolean): boolean {
   );
 }
 
-function canSaveMonitor({
+/** What is missing from the draft: a choice, then an evaluator, then a name. */
+function monitorProblems({
   level,
   selectedEvaluator,
   name,
-  isLoading,
-  hasPendingMappings,
 }: {
   level: EvaluationLevel;
   selectedEvaluator: WireEvaluatorWithFields | null;
   name: string;
+}) {
+  return {
+    level: !level,
+    evaluator: !!level && !selectedEvaluator,
+    name: !!selectedEvaluator && !name.trim(),
+  };
+}
+
+function onlineEvaluationFooter({
+  monitorId,
+  isLoading,
+  onCancel,
+  onSave,
+}: {
+  monitorId: string | undefined;
   isLoading: boolean;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return {
+    cancel: { onClick: onCancel, "data-testid": "online-evaluation-cancel" },
+    primaryAction: {
+      label: monitorId ? "Save Changes" : "Create Online Evaluation",
+      onClick: onSave,
+      loading: isLoading,
+      "data-testid": "online-evaluation-save",
+    },
+  };
+}
+
+/** What a rejected save shows: each missing piece named at its field, the name focused. */
+function useSaveValidation({
+  draft,
+  hasPendingMappings,
+  form,
+  configureRef,
+}: {
+  draft: Parameters<typeof monitorProblems>[0];
   hasPendingMappings: boolean;
-}): boolean {
-  return !!level && !!selectedEvaluator && !!name.trim() && !isLoading && !hasPendingMappings;
+  form: UseFormReturn<DrawerFormValues>;
+  configureRef: React.RefObject<HTMLButtonElement | null>;
+}) {
+  const [attempted, setAttempted] = useState(false);
+  const problems = { ...monitorProblems(draft), mappings: hasPendingMappings };
+  const rejectSave = () => {
+    setAttempted(true);
+    if (problems.mappings) configureRef.current?.focus();
+    else if (problems.name) form.setFocus("name");
+  };
+  return { shown: problemMessages({ problems, attempted }), rejectSave };
+}
+
+function problemMessages({
+  problems,
+  attempted,
+}: {
+  problems: ReturnType<typeof monitorProblems> & { mappings: boolean };
+  attempted: boolean;
+}) {
+  return {
+    mappings: attempted && problems.mappings ? "Complete all mappings first." : void 0,
+    level: attempted && problems.level ? "Choose an evaluation level." : void 0,
+    evaluator: attempted && problems.evaluator ? "Select an evaluator." : void 0,
+    name: attempted && problems.name ? "Enter a name for this online evaluation." : void 0,
+  };
 }
 
 function runOnTextFor(sample: number): string {
@@ -1479,11 +1540,12 @@ function saveMonitor({
   update: (payload: MonitorPayload & { id: string }) => void;
 }) {
   const { selectedEvaluator } = draft;
-  if (!selectedEvaluator || !projectId || !draft.name.trim() || blocked) return;
+  if (!selectedEvaluator || !projectId || !draft.name.trim() || blocked) return false;
   const payload = monitorPayload({ ...draft, selectedEvaluator, projectId });
   if (monitorId) {
     update({ id: monitorId, ...payload });
   } else {
     create(payload);
   }
+  return true;
 }

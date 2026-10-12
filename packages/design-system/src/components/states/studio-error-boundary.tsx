@@ -3,8 +3,10 @@ import { AlertTriangle, RotateCcw } from "lucide-react";
 import type * as React from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 
+import { useIsDevelopment } from "../../provider/environment.ts";
+
 /**
- * Private to `StudioDrawer`/`StudioDialog`. Reads a code if there is one for
+ * Private to the overlay error boundary. Reads a code if there is one for
  * a render-time crash, never the presentation registry, which is the
  * composing application's.
  */
@@ -16,13 +18,11 @@ function codeOfStudioError(error: unknown): string | undefined {
 interface StudioIsolatedErrorBoundaryProps {
   /** Human-readable error label shown when the crash carries no code. */
   scope?: string;
-  /**
-   * Whether the raw crash message is shown under the heading. This package
-   * cannot read the build, so the composing application says; production
-   * otherwise, which is what a customer must never see internals through.
-   */
+  /** Overrides the provider's `isDevelopment`: whether the raw crash message shows. */
   isDevelopment?: boolean;
   resetKeys?: readonly unknown[];
+  /** A control the fallback offers beside "Try again": a legacy Content's close. */
+  recovery?: React.ReactNode;
   onError?: (error: Error, info: { componentStack?: string | null }) => void;
   children: React.ReactNode;
 }
@@ -33,31 +33,33 @@ interface StudioIsolatedErrorBoundaryProps {
  */
 export const StudioIsolatedErrorBoundary: React.FC<StudioIsolatedErrorBoundaryProps> = ({
   scope,
-  isDevelopment = false,
+  isDevelopment: isDevelopmentOverride,
   resetKeys,
+  recovery,
   onError,
   children,
-}) => (
-  <ErrorBoundary
-    FallbackComponent={(props) => (
-      <InlineError {...props} scope={scope} isDevelopment={isDevelopment} />
-    )}
-    resetKeys={resetKeys ? [...resetKeys] : undefined}
-    onError={(error, info) => {
-      console.error("[StudioIsolatedErrorBoundary]", scope ?? "(no scope)", error);
-      onError?.(error as Error, info);
-    }}
-  >
-    {children}
-  </ErrorBoundary>
-);
-
-const InlineError: React.FC<FallbackProps & { scope?: string; isDevelopment: boolean }> = ({
-  error,
-  resetErrorBoundary,
-  scope,
-  isDevelopment,
 }) => {
+  const fromProvider = useIsDevelopment();
+  const isDevelopment = isDevelopmentOverride ?? fromProvider;
+  return (
+    <ErrorBoundary
+      FallbackComponent={(props) => (
+        <InlineError {...props} scope={scope} isDevelopment={isDevelopment} recovery={recovery} />
+      )}
+      resetKeys={resetKeys ? [...resetKeys] : undefined}
+      onError={(error, info) => {
+        console.error("[StudioIsolatedErrorBoundary]", scope ?? "(no scope)", error);
+        onError?.(error as Error, info);
+      }}
+    >
+      {children}
+    </ErrorBoundary>
+  );
+};
+
+const InlineError: React.FC<
+  FallbackProps & { scope?: string; isDevelopment: boolean; recovery?: React.ReactNode }
+> = ({ error, resetErrorBoundary, scope, isDevelopment, recovery }) => {
   const rawMessage = error instanceof Error ? error.message : String(error);
   const isRegistered = codeOfStudioError(error) !== undefined;
   const heading = isRegistered ? "Something went wrong" : (scope ?? "Something went wrong");
@@ -100,6 +102,7 @@ const InlineError: React.FC<FallbackProps & { scope?: string; isDevelopment: boo
           </Text>
         )}
         <HStack justify="flex-end">
+          {recovery}
           <Button size="xs" variant="outline" colorPalette="red" onClick={resetErrorBoundary}>
             <Icon boxSize="12px">
               <RotateCcw />

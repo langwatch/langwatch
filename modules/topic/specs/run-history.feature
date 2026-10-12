@@ -50,6 +50,50 @@ Feature: Topic clustering run history
     When the user views the run history
     Then only the most recent runs are shown
 
+  # The history keeps only the newest runs; a page continues over what is retained, never beyond it.
+  @unit
+  Scenario: The run history continues page by page, newest first, to its retained end
+    Given the retained history holds more runs than one page
+    When a member reads a page and then each page after it by the cursor it returned
+    Then every retained run appears exactly once, in the order the full history lists them
+    And only the last page says there is no more
+
+  @unit
+  Scenario: A project with no recorded runs has an empty single page
+    Given a project whose clustering process has recorded no runs
+    When a member reads the first page of the run history
+    Then the page holds no runs and says there is no more
+
+  @unit
+  Scenario: A run finishing between two pages does not repeat or skip a run
+    Given a member has read the first page of the run history
+    When another run finishes and joins the history before they read the next page
+    Then the next page continues after the last run they saw
+
+  @unit
+  Scenario: A cursor whose run has left the retained history asks the reader to restart
+    Given a cursor naming a run the projection has trimmed away, or one from another project
+    When a member reads the page it names
+    Then the answer is cursor_expired and carries no runs
+
+  @unit
+  Scenario: A run that never finished reads as abandoned on every page
+    Given a run whose terminal outcome was never recorded and is past the stale window
+    When a member reads the page that holds it
+    Then its entry reads as abandoned, as it does in the whole history
+
+  @unit
+  Scenario: Reading the run history by page is a project view, like reading it whole
+    Given a caller without the project view permission
+    When they read a page of the run history
+    Then they are refused and no history is read
+
+  @unit
+  Scenario: The whole-history read keeps answering the array it always did
+    Given a member who may view the project
+    When they read the run history without paging
+    Then they receive the full retained list as an array
+
   @unimplemented
   Scenario: History is rebuildable from the event log
     Given the run history read model is lost or corrupted

@@ -139,8 +139,7 @@ export function LangyCard({
         lineHeight="1.3"
         fontWeight={variant.titleWeight}
         fontFamily={variant.serifTitle ? SERIF : undefined}
-        fontSize={variant.serifTitle ? "18px" : "13px"}
-        letterSpacing={variant.serifTitle ? "-0.01em" : undefined}
+        textStyle={variant.serifTitle ? "sectionTitle" : "bodySm"}
       >
         {title}
       </Text>

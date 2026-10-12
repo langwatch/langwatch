@@ -11,14 +11,8 @@ import { describe, expect, it } from "vitest";
 import { browserModules } from "../../browser-modules.generated.ts";
 import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
-const {
-  cloudAdminGroup,
-  gatewayNavItems,
-  governanceNavItems,
-  instanceGroup,
-  opsGroup,
-  projectNavItems,
-} = await navigationWeb.installation.capabilities.chrome.load();
+const { adminMenu, gatewayNavItems, governanceNavItems, projectNavItems } =
+  await navigationWeb.installation.capabilities.chrome.load();
 
 const CATCH_ALL = "*";
 const PLACEHOLDER = "[project]";
@@ -44,11 +38,12 @@ function ownsSubtree({ resolved, declared }: { resolved: string; declared: strin
 
 /** The links the menus write directly, as absolute addresses. */
 const writtenLinks = [
-  ...[
-    opsGroup({ hasCloudOps: true, hosting: "cloud" }),
-    instanceGroup(),
-    cloudAdminGroup(),
-  ].flatMap((group) => group.items.map((item) => item.href)),
+  ...adminMenu({
+    hasCloudOps: true,
+    hosting: "cloud",
+    hasOpsAccess: true,
+    isPlatformAdmin: true,
+  }).flatMap((group) => group.items.map((item) => item.href)),
   ...gatewayNavItems.map((item) => item.href),
   ...governanceNavItems.map((item) => item.href),
 ];

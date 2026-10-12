@@ -20,7 +20,7 @@ import {
   getStringFromEnv,
   getStringListFromEnv,
 } from "@opentelemetry/core";
-import { registerInstrumentations, type Instrumentation } from "@opentelemetry/instrumentation";
+import type { Instrumentation } from "@opentelemetry/instrumentation";
 import {
   defaultResource,
   detectResources,
@@ -34,7 +34,7 @@ import {
   type ResourceDetector,
 } from "@opentelemetry/resources";
 import { LoggerProvider, type LogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { MeterProvider, type IMetricReader, type ViewOptions } from "@opentelemetry/sdk-metrics";
+import type { IMetricReader, MeterProvider, ViewOptions } from "@opentelemetry/sdk-metrics";
 import {
   type IdGenerator,
   type Sampler,
@@ -42,9 +42,10 @@ import {
   type SpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 
 import { type Logger } from "../../../logger";
+import { ATTR_SERVICE_NAME } from "../../semconv/otel";
+import { loadInstrumentation, loadSdkMetrics } from "./optional-peers";
 
 /**
  * Everything `@opentelemetry/sdk-node`'s `NodeSDK` was given here, kept
@@ -206,7 +207,9 @@ export class NodeSdk {
   start(): void {
     if (this.disabled) return;
 
-    registerInstrumentations({ instrumentations: this.instrumentations });
+    if (this.instrumentations.length > 0) {
+      loadInstrumentation().registerInstrumentations({ instrumentations: this.instrumentations });
+    }
     setupContextManager(this.configuration.contextManager);
     setupPropagator(
       this.configuration.textMapPropagator ?? getPropagatorFromEnv(this.configuration.logger),
@@ -231,7 +234,8 @@ export class NodeSdk {
     const reader = this.configuration.metricReader;
     if (!reader) return;
 
-    this.meterProvider = new MeterProvider({
+    const { MeterProvider: MeterProviderClass } = loadSdkMetrics();
+    this.meterProvider = new MeterProviderClass({
       resource,
       views: this.configuration.views ?? [],
       readers: [reader],

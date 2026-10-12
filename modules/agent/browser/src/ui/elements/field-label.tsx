@@ -7,7 +7,7 @@ export function FieldLabel({ children }: { children: React.ReactNode }) {
       as="span"
       gap={1.5}
       marginBottom={1}
-      fontSize="11.5px"
+      textStyle="caption"
       fontWeight="medium"
       color="fg.muted"
     >

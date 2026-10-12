@@ -182,7 +182,8 @@ export function ScoreChip({
               </Button>
               <Button
                 size="2xs"
-                colorPalette="blue"
+                colorPalette="orange"
+                variant="solid"
                 onClick={(e) => {
                   e.stopPropagation();
                   commit(draftSelection, draftReason);

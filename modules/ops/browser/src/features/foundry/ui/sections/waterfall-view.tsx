@@ -65,7 +65,7 @@ export function WaterfallView() {
             <Text
               key={i}
               position="absolute"
-              fontSize="10px"
+              textStyle="micro"
               color="fg.muted"
               transform="translateX(-50%)"
               left={`${((tick - minTime) / totalDuration) * 100}%`}
@@ -132,7 +132,7 @@ export function WaterfallView() {
                 w="50px"
                 flexShrink={0}
                 textAlign="right"
-                fontSize="10px"
+                textStyle="micro"
                 color="fg.muted"
                 pr={2}
               >

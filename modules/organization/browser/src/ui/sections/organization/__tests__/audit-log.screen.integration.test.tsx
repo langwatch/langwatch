@@ -5,6 +5,7 @@
  * @see specs/audit-log/audit-log.feature
  */
 
+import { AuditTrailDeniedError } from "@langwatch/organization-contract";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +23,7 @@ const { state } = vi.hoisted(() => ({
     members: [] as Record<string, unknown>[],
     fetchPages: [] as { auditLogs: Record<string, unknown>[]; totalCount: number }[],
     fetchRejectsWith: void 0 as unknown,
+    listError: void 0 as unknown,
   },
 }));
 
@@ -48,8 +50,11 @@ vi.mock("../../../../behavior/organization-api.ts", () => ({
         useQuery: (input: unknown) => {
           calls.listQuery(input);
           return {
-            data: { auditLogs: state.auditLogs, totalCount: state.totalCount },
+            data: state.listError
+              ? undefined
+              : { auditLogs: state.auditLogs, totalCount: state.totalCount },
             isLoading: state.isLoading,
+            error: state.listError ?? null,
           };
         },
       },
@@ -113,6 +118,7 @@ beforeEach(() => {
   state.members = [];
   state.fetchPages = [];
   state.fetchRejectsWith = void 0;
+  state.listError = void 0;
   calls.listQuery.mockReset();
   calls.exportFetch.mockReset();
 });
@@ -126,8 +132,9 @@ describe("given an organization below the Enterprise plan", () => {
       state.planType = "LAUNCH";
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
-      expect(screen.getByText("Audit logs on Enterprise")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Compare plans" })).toHaveAttribute(
+      expect(screen.getByRole("heading", { name: "Audit log" })).toBeInTheDocument();
+      expect(screen.getByText("Audit log is included in Enterprise")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "See plans" })).toHaveAttribute(
         "href",
         "/settings/plans",
       );
@@ -140,6 +147,24 @@ describe("given an organization below the Enterprise plan", () => {
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.queryByText("Timestamp")).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a reader the audit-log read refuses", () => {
+  describe("when the audit page is opened", () => {
+    /** @scenario "A reader without the organization-wide grant is told who can see the audit log" */
+    it("says only organization admins can see it, under the page header", () => {
+      state.auditLogs = [auditRow()];
+      state.listError = { data: { error: new AuditTrailDeniedError().serialize() } };
+      renderWithOrganizationHost(<AuditLogScreen />, planHost());
+
+      expect(screen.getByRole("heading", { name: "Audit log" })).toBeInTheDocument();
+      expect(
+        screen.getByText("Only organization admins can see the audit log"),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Timestamp")).not.toBeInTheDocument();
+      expect(screen.queryByText("No audit logs found")).not.toBeInTheDocument();
     });
   });
 });

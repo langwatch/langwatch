@@ -8,7 +8,6 @@
 import { Chip } from "@langwatch/design-system/chip";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
 import { Button, Heading, HStack, VStack, Icon } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { SimulationRunStatus } from "@langwatch/scenario-contract";
 import { Square, Edit2, Play } from "lucide-react";
@@ -64,7 +63,7 @@ function HeadingRow({
   return (
     <HStack gap={3} flex={1} minWidth={0}>
       <ScenarioRunStatusIcon status={scenarioState.status} />
-      <Heading size="md" truncate title={displayTitle}>
+      <Heading size="sm" truncate title={displayTitle}>
         {displayTitle}
       </Heading>
       {isCutAtLimitOf(scenarioState.metadata) && <CutAtLimitBadge />}
@@ -187,7 +186,6 @@ function HeaderActions({
         onOpenInTraces={isTraceReachable ? detail.handleOpenInTraces : null}
         dejaViewHref={detail.dejaView.href ?? null}
       />
-      <Drawer.CloseTrigger />
     </HStack>
   );
 }

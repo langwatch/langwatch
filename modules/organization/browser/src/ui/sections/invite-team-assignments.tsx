@@ -1,10 +1,11 @@
+import { Card } from "@langwatch/design-system/card";
+import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Alert,
+  Box,
   Button,
-  Card,
   createListCollection,
   Heading,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -70,7 +71,7 @@ export function InviteTeamAssignments(props: TeamAssignmentsProps) {
   }
   return (
     <VStack align="start" gap={3} width="100%" marginTop={2}>
-      <Heading>Team Assignments</Heading>
+      <Heading size="sm">Team Assignments</Heading>
       {fields.length === 0 && orgRole === OrganizationUserRole.EXTERNAL && (
         <LiteMemberNeedsTeamWarning />
       )}
@@ -126,45 +127,43 @@ function TeamAssignmentTable({
   onAddTeam: () => void;
 }) {
   return (
-    <Card.Root width="full" overflow="hidden">
-      <Card.Body paddingY={0} paddingX={0}>
-        <Table.Root variant="line" width="full">
-          {rowIds.length > 0 && (
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader width="48%">Team</Table.ColumnHeader>
-                <Table.ColumnHeader>Role</Table.ColumnHeader>
-                <Table.ColumnHeader width="60px" />
-              </Table.Row>
-            </Table.Header>
-          )}
-          <Table.Body>
-            {rowIds.map((rowId, teamIndex) => (
-              <TeamAssignmentRow
-                key={rowId}
-                {...rowProps}
-                teamIndex={teamIndex}
-                options={optionsFor(teamIndex)}
-                onRemove={() => onRemove(teamIndex)}
-              />
-            ))}
-            <Table.Row>
-              <Table.Cell colSpan={3}>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={onAddTeam}
-                  disabled={!canAddTeam}
-                >
-                  <Plus size={18} /> Add team
-                </Button>
-              </Table.Cell>
-            </Table.Row>
-          </Table.Body>
-        </Table.Root>
-      </Card.Body>
-    </Card.Root>
+    <Card padding="none">
+      <ListTable variant="embedded">
+        {rowIds.length > 0 && (
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader width="48%">Team</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Role</ListTable.ColumnHeader>
+              <ListTable.ActionHeader />
+            </ListTable.Row>
+          </ListTable.Header>
+        )}
+        <ListTable.Body>
+          {rowIds.map((rowId, teamIndex) => (
+            <TeamAssignmentRow
+              key={rowId}
+              {...rowProps}
+              teamIndex={teamIndex}
+              options={optionsFor(teamIndex)}
+              onRemove={() => onRemove(teamIndex)}
+            />
+          ))}
+          <ListTable.SpanRow columns={3}>
+            <Box paddingX={4} paddingY={3}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={onAddTeam}
+                disabled={!canAddTeam}
+              >
+                <Plus size={18} /> Add team
+              </Button>
+            </Box>
+          </ListTable.SpanRow>
+        </ListTable.Body>
+      </ListTable>
+    </Card>
   );
 }
 
@@ -183,11 +182,11 @@ function TeamAssignmentRow({
   onRemove: () => void;
 }) {
   return (
-    <Table.Row>
-      <Table.Cell>
+    <ListTable.Row>
+      <ListTable.Cell>
         <TeamSelect teamIndex={teamIndex} control={control} options={options} />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <TeamRoleSelect
           teamIndex={teamIndex}
           control={control}
@@ -196,8 +195,8 @@ function TeamAssignmentRow({
           setValue={setValue}
           isInviterAdmin={isInviterAdmin}
         />
-      </Table.Cell>
-      <Table.Cell paddingLeft={0} paddingY={2}>
+      </ListTable.Cell>
+      <ListTable.ActionCell>
         <Button
           type="button"
           variant="ghost"
@@ -207,8 +206,8 @@ function TeamAssignmentRow({
         >
           <Trash2 size={18} />
         </Button>
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.ActionCell>
+    </ListTable.Row>
   );
 }
 

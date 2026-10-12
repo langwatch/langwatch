@@ -19,7 +19,7 @@ export const GroupLabelCell: CellDef<TraceGroup> = {
         bg={dotColorForIndex(row.index)}
         flexShrink={0}
       />
-      <Text textStyle="sm" fontWeight="600" color="fg" truncate minWidth={0}>
+      <Text textStyle="sm" fontWeight="semibold" color="fg" truncate minWidth={0}>
         {row.label}
       </Text>
     </HStack>
@@ -36,7 +36,7 @@ export const GroupLabelCell: CellDef<TraceGroup> = {
         bg={dotColorForIndex(row.index)}
         flexShrink={0}
       />
-      <Text textStyle="md" fontWeight="500" color="fg" truncate minWidth={0}>
+      <Text textStyle="md" fontWeight="medium" color="fg" truncate minWidth={0}>
         {row.label}
       </Text>
     </HStack>

@@ -1,7 +1,19 @@
 import type { AgentHistoryEntry } from "@langwatch/agent-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
-import { ArrowUp, Bot, Copy, Edit, type LucideIcon, RefreshCw, Trash2, X } from "lucide-react";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
+import {
+  ArrowUp,
+  Bot,
+  Copy,
+  Edit,
+  History,
+  type LucideIcon,
+  RefreshCw,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { AgentClient } from "../../model/agent-client.ts";
@@ -16,6 +28,8 @@ const ACTION_META = {
   "agents.pushToCopies": { label: "Pushed to replicas", icon: ArrowUp },
   "agents.syncFromSource": { label: "Synced from source", icon: RefreshCw },
 } as const satisfies Record<string, { label: string; icon: LucideIcon }>;
+
+const AGENTS_DOCS_HREF = "https://langwatch.ai/docs/agent-testing/targets";
 
 export type AgentHistoryDrawerProps = {
   agentId: string;
@@ -49,48 +63,36 @@ export function AgentHistoryDrawer(props: AgentHistoryDrawerProps) {
   }, [props.agentId, props.agents, props.projectId]);
 
   return (
-    <Drawer.Root
-      open
-      placement="end"
-      size="md"
-      onOpenChange={({ open }) => !open && props.onClose()}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>{`${props.agentName} history`}</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          {isLoading && (
-            <HStack justify="center" paddingY={8}>
-              <Spinner />
-            </HStack>
-          )}
-          {isError && (
-            <Text role="alert" color="red.fg" textAlign="center" paddingY={8}>
-              Failed to load history.
-            </Text>
-          )}
-          {!isLoading && !isError && entries.length === 0 && (
-            <Text color="fg.muted" textAlign="center" paddingY={8}>
-              No history recorded yet.
-            </Text>
-          )}
-          {!isLoading && !isError && entries.length > 0 && (
-            <VStack gap={0} align="stretch">
-              {entries.map((entry, index) => (
-                <HistoryEntry
-                  key={entry.id}
-                  entry={entry}
-                  isLast={index === entries.length - 1}
-                  createdAtLabel={props.formatCreatedAt(entry.createdAt)}
-                />
-              ))}
-            </VStack>
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer onClose={() => props.onClose()} title={`${props.agentName} history`}>
+      {isLoading && <SkeletonRows rows={4} />}
+      {isError && (
+        <Text role="alert" color="red.fg" textAlign="center" paddingY={8}>
+          Failed to load history.
+        </Text>
+      )}
+      {!isLoading && !isError && entries.length === 0 && (
+        <NoDataInfoBlock
+          size="inline"
+          bordered={false}
+          icon={<History size={20} />}
+          title="No history recorded yet"
+          description="Edits, replicas and syncs of this agent are listed here as they happen."
+          next={[{ kind: "docs", label: "How agents are used", href: AGENTS_DOCS_HREF }]}
+        />
+      )}
+      {!isLoading && !isError && entries.length > 0 && (
+        <VStack gap={0} align="stretch">
+          {entries.map((entry, index) => (
+            <HistoryEntry
+              key={entry.id}
+              entry={entry}
+              isLast={index === entries.length - 1}
+              createdAtLabel={props.formatCreatedAt(entry.createdAt)}
+            />
+          ))}
+        </VStack>
+      )}
+    </Drawer>
   );
 }
 
@@ -112,7 +114,7 @@ function HistoryEntry({
   return (
     <HStack align="start" gap={3}>
       <VStack gap={0} align="center" flexShrink={0} width="24px">
-        <Box bg="blue.subtle" borderRadius="full" padding={1} mt="2px">
+        <Box bg="blue.subtle" borderRadius="full" padding={1} mt="0.5">
           <Icon size={12} color="var(--chakra-colors-blue-fg)" />
         </Box>
         {!isLast && <Box width="1px" flex={1} minHeight="24px" bg="border.muted" />}

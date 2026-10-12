@@ -76,4 +76,24 @@ describe("TraceFindBar", () => {
     expect(screen.queryByRole("search", { name: "Find on page" })).not.toBeInTheDocument();
     expect(useFindStore.getState().isOpen).toBe(false);
   });
+
+  /** @scenario "The find buttons teach their keys while the find field is focused" */
+  it("exposes the keys on the find buttons and describes the field", () => {
+    renderFindBar();
+    expect(screen.getByRole("button", { name: "Next match" })).toHaveAttribute(
+      "aria-keyshortcuts",
+      "Enter ArrowDown",
+    );
+    expect(screen.getByRole("button", { name: "Previous match" })).toHaveAttribute(
+      "aria-keyshortcuts",
+      "Shift+Enter ArrowUp",
+    );
+    expect(screen.getByRole("button", { name: "Close find" })).toHaveAttribute(
+      "aria-keyshortcuts",
+      "Escape",
+    );
+    expect(screen.getByRole("textbox", { name: "Find query" })).toHaveAccessibleDescription(
+      /Shift plus Enter.*Escape closes find/,
+    );
+  });
 });

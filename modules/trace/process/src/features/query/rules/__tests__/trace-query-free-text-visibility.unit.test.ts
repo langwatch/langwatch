@@ -22,8 +22,8 @@ function freeTextSql(searchContent: boolean): string | null {
 }
 
 describe("free-text search and the viewer's content visibility", () => {
-  /** @scenario "Free text matches captured content only for a viewer who may read it" */
   describe("given a viewer the captured input is hidden from", () => {
+    /** @scenario "Free text matches captured content only for a viewer who may read it" */
     it("matches the word against trace and span names only", () => {
       const searchContent = canSearchCapturedContent({
         canSeeCapturedInput: false,
@@ -84,8 +84,8 @@ describe("attribute filters and the viewer's content visibility", () => {
     });
   }
 
-  /** @scenario "An attribute filter on a value the viewer may not read matches nothing" */
   describe("given a viewer the captured input is hidden from", () => {
+    /** @scenario "An attribute filter on a value the viewer may not read matches nothing" */
     it("matches nothing on a captured-input attribute", () => {
       expect(attributeSql('span.attribute.gen_ai.prompt:"shipped"')).toBe("0 = 1");
       expect(attributeSql('trace.attribute.langwatch.gen_ai.input.text:"shipped"')).toBe("0 = 1");

@@ -19,7 +19,7 @@ Feature: Model provider step in product onboarding
 
   @unit
   Scenario: Only the platform flavour passes through the step
-    When I pick "Via the Platform"
+    When I pick "In the platform"
     Then I see the "Set up a model provider" step before the platform overview
     And picking a coding-agent flavour instead goes straight to its setup screen with no model provider step
 

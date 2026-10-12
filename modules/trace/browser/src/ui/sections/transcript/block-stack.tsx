@@ -119,7 +119,7 @@ function ToolsExpander({
       >
         <Icon as={open ? LuChevronDown : LuChevronRight} boxSize={3} marginEnd={1} />
         <Icon as={LuWrench} boxSize={3} marginEnd={1.5} />
-        <Text textStyle="xs" fontWeight="500">
+        <Text textStyle="xs" fontWeight="medium">
           {open ? `Hide ${calls}` : `Show ${calls}`}
         </Text>
       </Button>

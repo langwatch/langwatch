@@ -3,7 +3,6 @@ import {
   type AnnotationQueueItemStatus,
 } from "@langwatch/annotation-contract";
 /** One table renders every annotations view. */
-import { Link } from "@langwatch/browser-host/link";
 import { downloadCsv } from "@langwatch/csv/download";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
@@ -53,7 +52,7 @@ import { queueItemHref } from "../../model/annotation-queue-walk.ts";
 import { queueItemsToRows, type AnnotationRow } from "../../model/annotation-row.ts";
 import { annotationViewCopy, viewReadsMemberQueues } from "../../model/annotation-view.ts";
 import type { AnnotationView } from "../../model/annotation-view.ts";
-import { AnnotationTable, AnnotationTableSkeleton } from "../blocks/annotation-table.tsx";
+import { AnnotationTable } from "../blocks/annotation-table.tsx";
 import { PersonalFeatureGateDialog } from "../blocks/personal-feature-gate-dialog.tsx";
 import { AnnotationColumnsMenu } from "../elements/annotation-columns-menu.tsx";
 import { annotationColumnOptions } from "../elements/annotation-columns.ts";
@@ -480,13 +479,6 @@ export function AnnotationList({
         {copy.showStatusFilter && (
           <StatusFilterMenu value={statusFilter} onChange={setStatusFilter} />
         )}
-        <AnnotationColumnsMenu
-          columns={columnOptions}
-          choices={columnChoices.choices}
-          onColumnVisibleChange={columnChoices.setColumnVisible}
-          onReset={columnChoices.resetColumns}
-          hasChoices={columnChoices.hasChoices}
-        />
         <ListPeriodControl
           reading={{ period, mode: periodMode }}
           query={query}
@@ -494,29 +486,43 @@ export function AnnotationList({
           waitsForPick={!isPageProvidedRows && !rangeIsPicked}
           clearable={!isPageProvidedRows}
         />
-        <PageLayout.HeaderButton onClick={onExport ?? exportPage}>
-          {exportLabel ?? "Export"} <Download size={16} />
-        </PageLayout.HeaderButton>
+        {!showEmptyState && (
+          <>
+            <AnnotationColumnsMenu
+              columns={columnOptions}
+              choices={columnChoices.choices}
+              onColumnVisibleChange={columnChoices.setColumnVisible}
+              onReset={columnChoices.resetColumns}
+              hasChoices={columnChoices.hasChoices}
+            />
+
+            <PageLayout.HeaderButton onClick={onExport ?? exportPage}>
+              {exportLabel ?? "Export"} <Download size={16} />
+            </PageLayout.HeaderButton>
+          </>
+        )}
       </SectionNavigationHeader>
 
-      {isLoading && <AnnotationTableSkeleton />}
+      {isLoading && (
+        <Box flex={1} minWidth={0} overflow="auto" paddingX={6} paddingTop={6}>
+          <ListTable loading loadingLabel="Loading annotations">
+            <ListTable.Body>
+              <ListTable.LoadingRows rows={5} columns={6} />
+            </ListTable.Body>
+          </ListTable>
+        </Box>
+      )}
       {showEmptyState && (
         <NoDataInfoBlock
           title={emptyNotice?.title ?? copy.noDataTitle}
           description={emptyNotice?.description ?? copy.noDataDescription}
-          docsInfo={
-            <Text>
-              To get started with annotations, please visit our{" "}
-              <Link
-                href="https://docs.langwatch.ai/features/annotations"
-                isExternal
-                color="orange.fg"
-              >
-                documentation
-              </Link>
-              .
-            </Text>
-          }
+          next={[
+            {
+              kind: "docs",
+              label: "How annotation queues work",
+              href: "https://docs.langwatch.ai/annotations/queues",
+            },
+          ]}
           icon={<SquarePen />}
         />
       )}
@@ -535,7 +541,7 @@ export function AnnotationList({
           >
             {/* The card scrolls its own columns, so a table too wide for the
                 page never breaks out of the border around it. */}
-            <ListTable containerProps={{ overflowX: "auto" }} width="full">
+            <ListTable scroll="x" scrollLabel="Annotations">
               <AnnotationTable
                 rows={pageRows}
                 activeScoreTypes={activeScoreTypes}

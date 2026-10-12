@@ -101,7 +101,7 @@ export function RoleChip({ role }: { role: string }) {
       {RoleIcon && <Icon as={RoleIcon} boxSize={3} color={palette.fg} />}
       <Text
         textStyle="2xs"
-        fontWeight="600"
+        fontWeight="semibold"
         color={palette.fg}
         textTransform="uppercase"
         letterSpacing="0.06em"

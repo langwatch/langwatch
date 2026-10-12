@@ -12,6 +12,7 @@ export function ProjectComboboxPopup({
   visibleGroups,
   showTeamHeaders,
   currentProjectId,
+  query,
 }: {
   visibleGroups: {
     team: ProjectPickGroup["team"];
@@ -19,14 +20,15 @@ export function ProjectComboboxPopup({
   }[];
   showTeamHeaders: boolean;
   currentProjectId: string;
+  query: string;
 }) {
   return (
     <Portal>
       <Combobox.Positioner>
         <Combobox.Content minWidth="260px" maxHeight="360px" overflowY="auto" padding={0}>
           <ProjectSearchHeader />
-          <Combobox.Empty paddingX={3} paddingY={2} color="fg.muted" fontSize="13px">
-            No projects match your search.
+          <Combobox.Empty paddingX={3} paddingY={2} color="fg.muted" textStyle="bodySm">
+            {`No projects match "${query.trim()}"`}
           </Combobox.Empty>
           <Box padding={1}>
             {visibleGroups.map((group) => (
@@ -36,8 +38,7 @@ export function ProjectComboboxPopup({
                   paddingTop={2}
                   paddingBottom={1}
                   color="fg.muted"
-                  fontSize="11px"
-                  fontWeight="600"
+                  textStyle="groupLabel"
                 >
                   {showTeamHeaders ? group.team.label : "Projects"}
                 </Combobox.ItemGroupLabel>
@@ -82,7 +83,7 @@ function ProjectSearchHeader() {
           border={0}
           outline="none"
           background="transparent"
-          fontSize="13px"
+          textStyle="bodySm"
           color="fg"
           _placeholder={{ color: "fg.subtle" }}
           _focusVisible={{ outline: "none" }}

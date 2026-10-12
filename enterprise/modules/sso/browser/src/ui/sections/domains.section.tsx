@@ -6,7 +6,10 @@
  * whose published record has vanished still routes the people already here,
  * so it is never shown as simply "Proved".
  */
-import { Button, HStack, Input, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import type { SsoIssuedDnsRecord } from "@langwatch/enterprise-sso-contract";
 import { useEffect, useState } from "react";
 
@@ -28,8 +31,6 @@ import {
 import { CopyValueRow } from "../elements/copy-value-row.tsx";
 import { DomainStatusChip } from "../elements/domain-status-chip.tsx";
 import { InlineRefusal } from "../elements/refusals.tsx";
-import { SettingsCard } from "../elements/settings-card.tsx";
-import { SettingsTable } from "../elements/settings-table.tsx";
 
 export function DomainsSection({
   organizationId,
@@ -87,36 +88,30 @@ export function DomainsSection({
   };
 
   return (
-    <SettingsCard
+    <Card
+      padding="lg"
+      bodyLayout="spaced"
       title="Domains"
-      hint="The email domains this connection decides sign-in for."
-      testId="connection-domains"
+      description="The email domains this connection decides sign-in for."
+      data-testid="connection-domains"
     >
       <WhyADomainIsProved provesWithLicense={provesWithLicense} />
 
       {rows.length === 0 ? (
-        <Text color="fg.muted" fontSize="sm">
-          No domain has been claimed yet. Add the domain your team&apos;s email addresses end in,
-          for example{" "}
-          <Text as="span" fontFamily="mono">
-            acme.com
-          </Text>{" "}
-          for somebody signing in as{" "}
-          <Text as="span" fontFamily="mono">
-            jane@acme.com
-          </Text>
-          .
-        </Text>
+        <NoDataInfoBlock
+          size="line"
+          title="No domain has been claimed yet. Add the domain your team's email addresses end in, for example acme.com for somebody signing in as jane@acme.com."
+        />
       ) : (
-        <SettingsTable testId="connection-domains-table">
-          <Table.Header>
-            <Table.Row background="transparent">
-              <Table.ColumnHeader>Domain</Table.ColumnHeader>
-              <Table.ColumnHeader>Status</Table.ColumnHeader>
-              <Table.ColumnHeader />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+        <ListTable scroll="x" scrollLabel="Domains table" data-testid="connection-domains-table">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>Domain</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+              <ListTable.ActionHeader />
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
             {rows.map((row) => (
               <DomainTableRow
                 key={row.domain}
@@ -135,8 +130,8 @@ export function DomainsSection({
                 onRemovalAccepted={() => setPending({ domain: row.domain, kind: "removal" })}
               />
             ))}
-          </Table.Body>
-        </SettingsTable>
+          </ListTable.Body>
+        </ListTable>
       )}
 
       {canManage && (
@@ -182,7 +177,7 @@ export function DomainsSection({
           {PENDING_DOMAIN_WORDS[pending.kind]}
         </Text>
       )}
-    </SettingsCard>
+    </Card>
   );
 }
 
@@ -241,9 +236,9 @@ function DomainTableRow({
   };
 
   return (
-    <Table.Row data-testid="connection-domain-row">
-      <Table.Cell verticalAlign="top">{row.domain}</Table.Cell>
-      <Table.Cell verticalAlign="top">
+    <ListTable.Row data-testid="connection-domain-row">
+      <ListTable.Cell valign="top">{row.domain}</ListTable.Cell>
+      <ListTable.Cell valign="top">
         <VStack align="start" gap={1}>
           <DomainStatusChip {...chip} />
           <Text fontSize="xs" color="fg.muted" maxWidth="52ch">
@@ -266,8 +261,8 @@ function DomainTableRow({
             what={`That step on ${row.domain}`}
           />
         </VStack>
-      </Table.Cell>
-      <Table.Cell verticalAlign="top">
+      </ListTable.Cell>
+      <ListTable.ActionCell>
         <HStack gap={1} justify="end">
           {canManage && next.action && (
             <Button
@@ -302,8 +297,8 @@ function DomainTableRow({
             </Button>
           )}
         </HStack>
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.ActionCell>
+    </ListTable.Row>
   );
 }
 
@@ -334,7 +329,7 @@ function PublishedRecord({
     <VStack align="stretch" gap={2} data-testid="connection-domain-record">
       <Text fontSize="sm">
         Publish this for{" "}
-        <Text as="span" fontFamily="mono">
+        <Text as="span" textStyle="monoSm">
           {record.domain}
         </Text>
         , then ask us to look for it. We show the value once.

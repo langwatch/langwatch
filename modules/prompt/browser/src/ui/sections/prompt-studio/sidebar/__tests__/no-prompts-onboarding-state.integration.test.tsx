@@ -61,7 +61,7 @@ describe("NoPromptsOnboardingState", () => {
   it("offers Create First Prompt and trace's Setup via Agent menu for prompts", async () => {
     declarations.current = traceLends;
     renderWithDesignSystem(<NoPromptsOnboardingState />);
-    expect(screen.getByRole("button", { name: "Create First Prompt" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create first prompt" })).toBeInTheDocument();
     expect(
       await screen.findByRole("button", { name: "Setup via Agent (prompts)" }),
     ).toBeInTheDocument();

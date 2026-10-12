@@ -19,7 +19,7 @@ const MockLogger = vi.fn().mockImplementation(function () {
 });
 
 import { trace } from "@opentelemetry/api";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 
 // Mocks
 vi.mock("../../utils", () => ({

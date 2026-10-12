@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { HomeRecentItem } from "../../../../../behavior/use-recent-items.ts";
-import { groupItemsByType } from "../recent-items-section.tsx";
+import { groupItemsByType } from "../recent-items.model.ts";
 
 describe("groupItemsByType", () => {
   describe("when items have different types", () => {

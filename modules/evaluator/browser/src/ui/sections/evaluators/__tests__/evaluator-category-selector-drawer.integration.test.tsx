@@ -49,7 +49,13 @@ vi.mock("../evaluator-editor-shared.tsx", () => ({
     flushLocalConfig: vi.fn(),
   }),
   EvaluatorEditorBody: () => <div data-testid="mock-editor-body" />,
-  EvaluatorEditorFooter: () => <div data-testid="mock-editor-footer" />,
+  evaluatorEditorFooter: () => ({
+    primaryAction: {
+      label: "Mock editor save",
+      onClick: vi.fn(),
+      "data-testid": "mock-editor-footer",
+    },
+  }),
   EvaluatorEditorHeading: () => <span data-testid="mock-editor-heading" />,
 }));
 

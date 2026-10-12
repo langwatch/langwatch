@@ -4,14 +4,9 @@ import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 
 import { useColorMode } from "../../color-mode/index.tsx";
 import { useReducedMotion } from "../../use-reduced-motion.ts";
+import { MESH_AT_REST, MESH_COLORS, WARP_AT_REST, WARP_COLORS } from "./ambient-ground-shader.ts";
 
 import "./ambient-ground.css";
-
-/** Light field, warm glow, cloud, light field: the site's mesh, verbatim. */
-const MESH_COLORS = ["#ffffff", "#ffaf6e", "#cddcf9", "#ffffff"];
-
-/** Ink base, deep blue, sky blue, amber, rust: the site's dark warp, verbatim. */
-const WARP_COLORS = ["#0a0a0c", "#1e3a8a", "#5b8def", "#c97b3a", "#b85240"];
 
 /** The soft white radial that keeps the reading side clean, on light only. */
 const PROTECT_RADIAL = {
@@ -107,15 +102,15 @@ export function AmbientGround({
         >
           <MeshGradient
             colors={MESH_COLORS}
-            distortion={0.66}
-            swirl={shift.swirl}
+            distortion={MESH_AT_REST.distortion}
+            swirl={MESH_AT_REST.swirl + shift.swirl}
             grainMixer={0}
             grainOverlay={0}
-            speed={0.32}
-            rotation={100 + shift.rotation}
-            scale={1 + shift.scale}
-            offsetX={0.28 + shift.offsetX}
-            offsetY={-0.2 + shift.offsetY}
+            speed={MESH_AT_REST.speed}
+            rotation={MESH_AT_REST.rotation + shift.rotation}
+            scale={MESH_AT_REST.scale + shift.scale}
+            offsetX={MESH_AT_REST.offsetX + shift.offsetX}
+            offsetY={MESH_AT_REST.offsetY + shift.offsetY}
             style={{ width: "100%", height: "100%" }}
           />
         </div>
@@ -124,17 +119,17 @@ export function AmbientGround({
         <div className={shaderClass}>
           <Warp
             colors={WARP_COLORS}
-            proportion={0.5}
-            softness={1.3}
-            distortion={0.3}
-            swirl={0.12 + shift.swirl}
-            swirlIterations={4}
-            shapeScale={0.3}
-            rotation={28 + shift.rotation}
-            speed={0.1}
-            scale={1.1 + shift.scale}
-            offsetX={shift.offsetX}
-            offsetY={shift.offsetY}
+            proportion={WARP_AT_REST.proportion}
+            softness={WARP_AT_REST.softness}
+            distortion={WARP_AT_REST.distortion}
+            swirl={WARP_AT_REST.swirl + shift.swirl}
+            swirlIterations={WARP_AT_REST.swirlIterations}
+            shapeScale={WARP_AT_REST.shapeScale}
+            rotation={WARP_AT_REST.rotation + shift.rotation}
+            speed={WARP_AT_REST.speed}
+            scale={WARP_AT_REST.scale + shift.scale}
+            offsetX={WARP_AT_REST.offsetX + shift.offsetX}
+            offsetY={WARP_AT_REST.offsetY + shift.offsetY}
             shape="edge"
             style={{ width: "100%", height: "100%" }}
           />

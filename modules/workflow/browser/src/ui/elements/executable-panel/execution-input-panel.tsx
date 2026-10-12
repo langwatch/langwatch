@@ -4,9 +4,11 @@ import {
   Field,
   Heading,
   HStack,
+  Text,
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Play } from "lucide-react";
 import { useEffect, useEffectEvent } from "react";
 import { Controller, type FieldErrors, useForm } from "react-hook-form";
@@ -26,6 +28,9 @@ type InputPanelProps = {
   onExecute: (inputs: ExecuteData) => void;
   title?: string;
   buttonText?: string;
+  /** Why Run cannot start yet; shown as the tooltip, with `pendingText` beside the button. */
+  disabledReason?: string;
+  pendingText?: string;
 };
 
 /** What an empty input field suggests, by the kind of value it takes. */
@@ -41,6 +46,8 @@ export const ExecutionInputPanel = ({
   onExecute,
   title = "Inputs",
   buttonText = "Execute",
+  disabledReason,
+  pendingText,
 }: InputPanelProps) => {
   const defaultValues = (() => {
     return Object.fromEntries(
@@ -116,17 +123,25 @@ export const ExecutionInputPanel = ({
             </HorizontalFormControl>
           );
         })}
-        <HStack width="full" justify="end">
-          <Button
-            type="submit"
-            variant="solid"
-            colorPalette="orange"
-            size="sm"
-            loading={form.formState.isSubmitting}
-            loadingText={buttonText}
-          >
-            {buttonText} <Play size={16} />
-          </Button>
+        <HStack width="full" justify="end" gap={3}>
+          {pendingText && (
+            <Text as="output" textStyle="sm" color="fg.muted">
+              {pendingText}
+            </Text>
+          )}
+          <Tooltip content={disabledReason} disabled={!disabledReason} showArrow>
+            <Button
+              type="submit"
+              variant="solid"
+              colorPalette="orange"
+              size="sm"
+              disabled={!!disabledReason}
+              loading={form.formState.isSubmitting}
+              loadingText={buttonText}
+            >
+              {buttonText} <Play size={16} />
+            </Button>
+          </Tooltip>
         </HStack>
       </VStack>
     </form>

@@ -1,75 +1,73 @@
-import { Kbd } from "@langwatch/design-system/kbd";
-import { Group, HStack, IconButton, Text } from "@langwatch/design-system/primitives";
+import { Text, VStack } from "@langwatch/design-system/primitives";
+import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
+import { shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { AArrowDown, AArrowUp } from "lucide-react";
+import { Rows2, Rows4 } from "lucide-react";
 import type React from "react";
 
 import {
   type Density,
   useDensityStore,
 } from "../../../../features/explorer/behavior/density.store.ts";
+import { PAGE_SHORTCUTS } from "../traces-page/page-keyboard-shortcuts.tsx";
 
-// Icons map "visual height of letter" to "row height" — the up-arrow
-// "A↑" reads as "tighter rows, taller letters poking up" = compact,
-// and the down-arrow "A↓" reads as "looser rows, breathing room
-// below the letter" = comfortable.
-const OPTIONS: {
-  density: Density;
-  label: string;
-  Icon: typeof AArrowDown;
-}[] = [
-  { density: "compact", label: "Compact", Icon: AArrowUp },
-  { density: "comfortable", label: "Comfortable", Icon: AArrowDown },
+// What each density changes, in the reader's words: the tooltip is where people learn it.
+const OPTIONS: { density: Density; label: string; hint: string; Icon: typeof Rows4 }[] = [
+  {
+    density: "compact",
+    label: "Compact",
+    hint: "More traces on screen: smaller text, tight rows, errors inline and every filter section.",
+    Icon: Rows4,
+  },
+  {
+    density: "comfortable",
+    label: "Comfortable",
+    hint: "Easier to read: larger text, labelled input and output, conversations as chat turns.",
+    Icon: Rows2,
+  },
 ];
 
-const INACTIVE_ICON_OPACITY = 0.6;
+const isDensity = (value: string | null): value is Density =>
+  OPTIONS.some((option) => option.density === value);
 
-export const DensityToggle: React.FC = () => {
+/** Compact or comfortable rows, both always visible; labels drop when the bar is compact. */
+export const DensityToggle: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const density = useDensityStore((s) => s.density);
   const setDensity = useDensityStore((s) => s.setDensity);
 
-  // Toggle on any click — the segmented group is a binary switch, so
-  // there's no scenario where you'd click the already-active button on
-  // purpose. Treating every click as a flip removes the "which one is
-  // selected vs clickable" guessing game.
-  const toggle = () => {
-    setDensity(density === "compact" ? "comfortable" : "compact");
-  };
-
   return (
-    <Tooltip
-      content={
-        <HStack gap={1}>
-          <Text>Density</Text>
-          <Kbd>D</Kbd>
-        </HStack>
-      }
-      positioning={{ placement: "bottom" }}
+    <SegmentGroup.Root
+      size="xs"
+      value={density}
+      aria-label="Row density"
+      aria-keyshortcuts={shortcutAriaKeys(PAGE_SHORTCUTS.density)}
+      data-testid="trace-toolbar-density"
+      onValueChange={({ value }) => {
+        if (isDensity(value)) setDensity(value);
+      }}
     >
-      <Group attached>
-        {OPTIONS.map(({ density: value, label, Icon }) => {
-          const isActive = density === value;
-          // Active reads as a calm flat surface (transparent bg, full-opacity icon); inactive sits
-          // on the muted surface that reads as an available target to click.
-          return (
-            <IconButton
-              key={value}
-              aria-label={label}
-              aria-pressed={isActive}
-              variant="outline"
-              // Active button gets a clear "selected" treatment instead of the previous
-              // subtle opacity-only difference.
-              bg={isActive ? "bg.muted" : "transparent"}
-              color={isActive ? "fg" : "fg.muted"}
-              borderColor={isActive ? "border" : "border.muted"}
-              size="2xs"
-              onClick={toggle}
-            >
-              <Icon size={16} opacity={isActive ? 1 : INACTIVE_ICON_OPACITY} />
-            </IconButton>
-          );
-        })}
-      </Group>
-    </Tooltip>
+      <SegmentGroup.Indicator />
+      {OPTIONS.map(({ density: value, label, hint, Icon }) => (
+        <Tooltip
+          key={value}
+          content={
+            <VStack align="start" gap={1} maxWidth="240px">
+              <Text fontWeight="semibold">{label}</Text>
+              <Text>{hint}</Text>
+            </VStack>
+          }
+          shortcut={PAGE_SHORTCUTS.density}
+          positioning={{ placement: "bottom" }}
+        >
+          <SegmentGroup.Item value={value} cursor="pointer" paddingX={compact ? 1.5 : 2}>
+            <Icon size={14} aria-hidden="true" />
+            <SegmentGroup.ItemText>
+              {compact ? <Text srOnly>{label}</Text> : label}
+            </SegmentGroup.ItemText>
+            <SegmentGroup.ItemHiddenInput />
+          </SegmentGroup.Item>
+        </Tooltip>
+      ))}
+    </SegmentGroup.Root>
   );
 };

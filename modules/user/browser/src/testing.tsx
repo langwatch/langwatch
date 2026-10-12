@@ -3,8 +3,8 @@
  * Provides faked infrastructure and records interactions for assertions.
  */
 
-import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { permissionSatisfiedBy } from "@langwatch/authorization";
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 

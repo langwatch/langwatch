@@ -40,9 +40,9 @@ Permission `traces:create`. Credential `project`. Hidden from the OpenAPI docume
 Answers at `/api/demo/hotel_bot`.
 
 ```typescript
-// Body: hotelBotRequestSchema, ../contract/src/sample-agents.api.ts:13
+// Body: hotelBotRequestSchema, ../contract/src/sample-agents.api.ts:15
 type Body = Record<string, unknown>;
-// Response: hotelBotReplySchema, ../contract/src/sample-agents.api.ts:25
+// Response: hotelBotReplySchema, ../contract/src/sample-agents.api.ts:34
 interface Response {
   message: "Sent to LangWatch";
   ragResponse?: string | null;

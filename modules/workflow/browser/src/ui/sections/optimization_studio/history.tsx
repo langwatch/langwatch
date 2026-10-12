@@ -206,7 +206,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
         </FormProvider>
         <Separator />
         <VStack align="start" width="full" padding={5} maxHeight="350px" overflowY="auto">
-          <Text fontWeight={600} fontSize="16px" paddingTop={2}>
+          <Text textStyle="sectionTitle" paddingTop={2}>
             Previous Versions
           </Text>
           {versions.data?.map((version) => (
@@ -216,7 +216,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                 <VersionBox version={version} minWidth="48px" />
                 <VStack align="start" width="full" gap={1}>
                   <HStack>
-                    <Text fontWeight={600} fontSize="13px" lineClamp={1}>
+                    <Text textStyle="cardTitle" lineClamp={1}>
                       {version.commitMessage}
                     </Text>
                     {version.isCurrentVersion && (
@@ -225,7 +225,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                       </Tag.Root>
                     )}
                   </HStack>
-                  <HStack fontSize="12px">
+                  <HStack textStyle="caption">
                     <PersonAvatar
                       size="2xs"
                       backgroundColor="orange.solid"
@@ -273,7 +273,7 @@ export const VersionBox = ({
       paddingX={2}
       borderRadius={4}
       fontWeight={600}
-      fontSize="13px"
+      textStyle="bodySm"
       color="fg.muted"
       whiteSpace="nowrap"
       textAlign="center"

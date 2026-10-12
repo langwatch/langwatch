@@ -56,10 +56,8 @@ export function HorizontalFormControl({
           <Field.Label
             margin={0}
             {...(size === "sm" && {
-              fontSize: "12px",
-              textTransform: "uppercase",
-              color: "gray.500",
-              fontWeight: "bold",
+              textStyle: "eyebrow",
+              color: "label.fgMuted",
             })}
             {...(direction === "vertical" && {
               paddingLeft: 2,
@@ -76,7 +74,7 @@ export function HorizontalFormControl({
               )}
             </HStack>
           </Field.Label>
-          <Field.HelperText margin={0} fontSize="13px">
+          <Field.HelperText margin={0} textStyle="bodySm">
             {helper}
           </Field.HelperText>
         </VStack>

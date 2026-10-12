@@ -40,7 +40,7 @@ export function TraceCommentList({
   return (
     <VStack align="stretch" gap={3} minWidth="300px" maxWidth="380px" paddingX={3} paddingY={2.5}>
       <HStack gap={2}>
-        <Text textStyle="xs" fontWeight="600">
+        <Text textStyle="xs" fontWeight="semibold">
           {comments.length} annotation{comments.length === 1 ? "" : "s"}
         </Text>
         {hasCorrection && (
@@ -93,7 +93,7 @@ function CommentRow({
       />
       <VStack align="start" gap={0.5} flex={1} minWidth={0}>
         <HStack gap={1.5} width="full">
-          <Text textStyle="2xs" fontWeight="600">
+          <Text textStyle="2xs" fontWeight="semibold">
             {comment.user?.name ?? comment.email ?? "anonymous"}
           </Text>
           {comment.expectedOutput && <Icon as={Lightbulb} boxSize={2.5} color="yellow.fg" />}
