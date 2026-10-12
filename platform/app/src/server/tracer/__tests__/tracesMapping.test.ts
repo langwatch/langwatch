@@ -1217,6 +1217,54 @@ describe("tryAndConvertTo", () => {
     });
   });
 
+  describe("when given a RAGChunk object ({ content, document_id })", () => {
+    /**
+     * @scenario "RAG contexts reach langevals as JSON"
+     * getRAGChunks returns RAGChunk objects. tryAndConvertTo must extract the
+     * textual content instead of stringifying the full { document_id, content }
+     * envelope, so langevals receives plain context strings.
+     */
+    it("returns the textual content of the chunk, not the JSON envelope", () => {
+      expect(
+        tryAndConvertTo(
+          { document_id: "doc-1", content: "Paris is in France." },
+          "string",
+        ),
+      ).toBe("Paris is in France.");
+    });
+
+    it("converts an array of RAGChunk objects to an array of content strings", () => {
+      expect(
+        tryAndConvertTo(
+          [
+            { document_id: "doc-1", content: "Paris is in France." },
+            { document_id: "doc-2", content: "Rome is in Italy." },
+          ],
+          "string[]",
+        ),
+      ).toEqual(["Paris is in France.", "Rome is in Italy."]);
+    });
+
+    it("returns an empty string for a blank-content RAGChunk scalar (no JSON-envelope fallback)", () => {
+      expect(
+        tryAndConvertTo({ document_id: "doc-empty", content: "" }, "string"),
+      ).toBe("");
+    });
+
+    it("omits blank-content RAGChunk entries from a string[] conversion", () => {
+      expect(
+        tryAndConvertTo(
+          [
+            { document_id: "doc-1", content: "Paris is in France." },
+            { document_id: "doc-blank", content: "" },
+            { document_id: "doc-2", content: "Rome is in Italy." },
+          ],
+          "string[]",
+        ),
+      ).toEqual(["Paris is in France.", "Rome is in Italy."]);
+    });
+  });
+
   describe("when given a bare string", () => {
     it("returns the string unchanged", () => {
       expect(tryAndConvertTo("stockout", "string")).toBe("stockout");
