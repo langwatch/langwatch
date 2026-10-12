@@ -255,7 +255,11 @@ A Live client receives `session.closed` with reason `close_requested` on its dat
 
 Each gateway instance supervises a bounded number of calls (`LW_GATEWAY_VOICE_MAX_SUPERVISED_SESSIONS`, default 2000). A request to an instance that is full or shutting down answers `503 voice_broker_unavailable` with `Retry-After`, before anything is booked. On shutdown an instance keeps metering its calls for `LW_GATEWAY_VOICE_DRAIN_SECONDS` (default 570; the Helm chart sets `shutdown.voiceDrainSeconds`), then ends the ones still open.
 
-Twilio media relays have their own limits and do not count toward the 2000 supervised sessions above. An instance holds up to `LW_GATEWAY_VOICE_MAX_MEDIA_RELAYS` relays (default 500). One self-hosted install or one organization holds up to `LW_GATEWAY_VOICE_MAX_RELAYS_PER_SCOPE` (default 50), of which `LW_GATEWAY_VOICE_MAX_PENDING_RELAYS_PER_SCOPE` (default 20) may still wait for Twilio. A relay waits `LW_GATEWAY_VOICE_PENDING_TTL_SECONDS` (default 150) for Twilio to dial in, and a paired relay runs at most `LW_GATEWAY_VOICE_MAX_RELAY_SECONDS` (default 330). A relay past any cap answers `503 voice_relay_unavailable` with `Retry-After`. Relay ids name the pod that minted them through `GATEWAY_POD_IP` (set it to the pod's IP, for example with the Kubernetes downward API). Relays need `LW_GATEWAY_INTERNAL_SECRET`; without it they are disabled and the gateway logs a warning at boot. Both ceilings apply at once, so a deployment can hold 2000 supervised calls and 500 relays per instance.
+Twilio media relays have their own limits and do not count toward the 2000 supervised sessions above. Both ceilings apply at once, so an instance can hold 2000 supervised calls and 500 relays.
+
+An instance holds up to `LW_GATEWAY_VOICE_MAX_MEDIA_RELAYS` relays (default 500). One self-hosted install or one organization holds up to `LW_GATEWAY_VOICE_MAX_RELAYS_PER_SCOPE` (default 50), of which `LW_GATEWAY_VOICE_MAX_PENDING_RELAYS_PER_SCOPE` (default 20) may still wait for Twilio. A relay past any cap answers `503 voice_relay_unavailable` with `Retry-After`.
+
+A relay waits `LW_GATEWAY_VOICE_PENDING_TTL_SECONDS` (default 150) for Twilio to dial in, and a paired relay runs at most `LW_GATEWAY_VOICE_MAX_RELAY_SECONDS` (default 330). Relay ids name the pod that minted them through `GATEWAY_POD_IP` (set it to the pod's IP, for example with the Kubernetes downward API). Relays need `LW_GATEWAY_INTERNAL_SECRET`. Without it they are off, and the gateway logs a warning at boot.
 
 ## WebSocket relay
 
