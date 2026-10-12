@@ -1,3 +1,4 @@
+/** Spec: modules/trace/specs/trace-month-trace-ids.feature */
 import type { QueryRequest } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
@@ -62,7 +63,64 @@ describe("TraceUsageCountClickHouseRepository", () => {
   });
 });
 
+describe("TraceUsageCountClickHouseRepository trace ids first seen", () => {
+  /** @scenario "The upgrade sends each project's trace ids for the month in pages" */
+  it("pages trace ids by their earliest summary write inside the window, in id order", async () => {
+    const { queries, repository } = createRepository([{ traceId: "t1" }, { traceId: "t2" }]);
+    const fromMs = Date.UTC(2026, 9, 1);
+    const toMs = Date.UTC(2026, 9, 8, 15);
+
+    await expect(
+      repository.findTraceIdsFirstSeen({
+        tenantId: "project-1",
+        fromMs,
+        toMs,
+        afterTraceId: "t0",
+        limit: 5_000,
+      }),
+    ).resolves.toEqual(["t1", "t2"]);
+    const sql = queries[0]?.sql.replace(/\s+/g, " ");
+    expect(queries[0]?.tenantId).toBe("project-1");
+    expect(sql).toContain(
+      "WHERE TenantId = {tenantId:String} AND TraceId > {afterTraceId:String} AND OccurredAt >=",
+    );
+    expect(sql).toContain("HAVING min(CreatedAt) >= fromUnixTimestamp64Milli({from:Int64})");
+    expect(sql).toContain("ORDER BY TraceId LIMIT {limit:UInt32}");
+    expect(queries[0]?.params).toMatchObject({
+      afterTraceId: "t0",
+      from: fromMs,
+      to: toMs,
+      limit: 5_000,
+    });
+  });
+});
+
 describe("MemoryTraceUsageCountRepository", () => {
+  /** @scenario "The upgrade sends each project's trace ids for the month in pages" */
+  it("lists a trace once, in the window holding its earliest summary write", async () => {
+    const repository = MemoryTraceUsageCountRepository.create();
+    const at = (traceId: string, createdAt: string) =>
+      repository.record({ tenantId: "project-1", traceId, createdAt });
+    at("last-month", "2026-09-30 23:00:00.000");
+    at("last-month", "2026-10-02 00:00:00.000");
+    at("this-month-b", "2026-10-02 00:00:00.000");
+    at("this-month-b", "2026-10-03 00:00:00.000");
+    at("this-month-a", "2026-10-04 00:00:00.000");
+    at("after-start", "2026-10-08 15:00:00.000");
+    const page = (afterTraceId: string) =>
+      repository.findTraceIdsFirstSeen({
+        tenantId: "project-1",
+        fromMs: Date.UTC(2026, 9, 1),
+        toMs: Date.UTC(2026, 9, 8, 15),
+        afterTraceId,
+        limit: 1,
+      });
+
+    await expect(page("")).resolves.toEqual(["this-month-a"]);
+    await expect(page("this-month-a")).resolves.toEqual(["this-month-b"]);
+    await expect(page("this-month-b")).resolves.toEqual([]);
+  });
+
   it("probes and groups the tenant's matching traces since the cutoff", async () => {
     const repository = MemoryTraceUsageCountRepository.create();
     const base = { tenantId: "project-1", createdAt: "", occurredAtMs: 2_000 };

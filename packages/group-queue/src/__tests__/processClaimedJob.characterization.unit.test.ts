@@ -55,6 +55,7 @@ type Scenario = {
   siblings?: DrainedJob[];
   failStreak?: number;
   retryable?: boolean;
+  retryAfterMs?: number;
 };
 
 const connections: IORedis[] = [];
@@ -135,7 +136,12 @@ function recordingProcessor(scenario: Scenario): {
   };
   const processor = new GroupQueueProcessor<TestPayload>(definition, conn, {
     consumerEnabled: false,
-    failures: { classify: () => ({ retryable: scenario.retryable ?? true }) },
+    failures: {
+      classify: () => ({
+        retryable: scenario.retryable ?? true,
+        ...(scenario.retryAfterMs === undefined ? {} : { retryAfterMs: scenario.retryAfterMs }),
+      }),
+    },
   });
   return { processor, calls };
 }
@@ -252,5 +258,61 @@ describe("given a claimed job that coalesces its siblings", () => {
       },
     });
     expect(calls).toMatchSnapshot();
+  });
+});
+
+describe("given a coalesced batch that fails", () => {
+  const siblings: DrainedJob[] = [
+    { stagedJobId: "job-2", jobDataJson: jobValue("job-2"), originalScore: 1001 },
+    { stagedJobId: "job-3", jobDataJson: jobValue("job-3"), originalScore: 1002 },
+  ];
+  const named = (calls: unknown[], name: string) =>
+    calls.filter((call) => Array.isArray(call) && call[0] === name);
+
+  describe("when the failure names a retry delay because the server is overloaded", () => {
+    /** @scenario "An overloaded server backs the whole batch off instead of splitting it" */
+    it("re-stages the whole batch with a delay and makes zero splits", async () => {
+      const { processor, calls } = recordingProcessor({
+        siblings,
+        retryAfterMs: 0,
+        processBatch: async () => {
+          throw new Error("Code: 241. DB::Exception: MEMORY_LIMIT_EXCEEDED");
+        },
+      });
+      const warn = vi.spyOn(processor["logger"], "warn");
+
+      await processor["processClaimedJob"]({
+        stagedJobId: "job-1",
+        groupId: GROUP,
+        jobDataJson: jobValue("job-1"),
+        originalScore: 1000,
+      });
+
+      expect(named(calls, "handler.processBatch")).toHaveLength(1);
+      expect(named(calls, "scripts.retryRestage")).toHaveLength(1);
+      expect(named(calls, "scripts.stage")).toHaveLength(siblings.length);
+      const messages = warn.mock.calls.map((call) => call[1]);
+      expect(messages).not.toContain(
+        "Coalesced batch failed; splitting in half and retrying each half in order",
+      );
+      const backoffs = warn.mock.calls.filter(
+        (call) => call[1] === "Job attempt failed, re-staged with backoff",
+      );
+      expect(backoffs).toHaveLength(1);
+      expect(backoffs[0]?.[0]).toMatchObject({ backoffMs: expect.any(Number) });
+    });
+  });
+
+  describe("when the failure is retryable and names no delay", () => {
+    it("still splits the batch", async () => {
+      const calls = await runClaimed({
+        siblings,
+        processBatch: async () => {
+          throw new Error("handler failed");
+        },
+      });
+
+      expect(named(calls, "handler.processBatch").length).toBeGreaterThan(1);
+    });
   });
 });

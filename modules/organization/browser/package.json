@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
@@ -29,7 +29,6 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/enterprise-billing-client": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-licensing-client": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
@@ -58,6 +57,7 @@
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
+    "@langwatch/enterprise-billing-client": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@testing-library/jest-dom": "catalog:",

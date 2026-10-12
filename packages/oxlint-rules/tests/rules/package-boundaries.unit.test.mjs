@@ -449,7 +449,6 @@ describe("given package-boundaries", () => {
     /** @scenario "apps/tasks' migration runner may name a process package, nothing else in an app may" */
     it.each([
       "apps/tasks/src/system-migrations-pass.ts",
-      "apps/tasks/src/prisma-migrate.ts",
       "apps/tasks/src/lwql-provision.ts",
       "apps/tasks/src/lwql-render-access-config.ts",
     ])("reports nothing for %s", (file) => {

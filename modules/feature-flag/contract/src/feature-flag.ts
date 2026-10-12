@@ -324,17 +324,8 @@ export const FEATURE_FLAGS = [
     description:
       "Unlocks Agent Testing, the v2 interface for simulations (specs under specs/features/agent-testing/): one page with the scenarios and the results in tabs, test suites as folders of scenarios, run notes, scenario versions, and a wider run drawer that puts the results beside the conversation. Flag off leaves the Simulations pages and menu group exactly as they were; the flag only decides which interface renders, and the backend additions it uses are unflagged. Default on, so a self-hosted installation reads Agent Testing with no rule; a rule keeps a project or an organization on the Simulations pages. Every simulations address redirects to Agent Testing while the flag is on.",
   },
-  {
-    // D12 (ADR-117). Named `join_requests` rather than the usual
-    // `release_...` prefix so its auto-derived env override is exactly
-    // `JOIN_REQUESTS`, which is the operator lever the epic names and the
-    // one thing rollback consists of.
-    key: "join_requests",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Lets somebody with a verified company address find the organization their colleagues are already in and ask to join it, and lets an administrator turn that into automatic joining for a domain they name (spec: specs/identity/join-requests.feature, join-matching-and-privacy.feature, domain-auto-join.feature, join-before-create.feature). Off = the sign-up interstitial never renders, the members area shows no requests section, the lookup answers nothing to everyone, and no join command is ever dispatched. This is the whole of the rollback. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=join_requests, or set JOIN_REQUESTS=1 on a deployment.",
-  },
+  // `join_requests` (D12, ADR-117) was here and is retired, as on main: the
+  // lookup's own rules and the Access page setting are the only gates.
   {
     // D05 tier 3 (ADR-117). Named so its env override is exactly `SELF_SERVE_SSO`,
     // the per-organization lever whose rollback is the whole of tier 3's.

@@ -1,8 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join, relative, sep } from "node:path";
 
 import type { ArchitectureViolation, ClassifiedPackage, PackageManifest } from "../../types.ts";
-import { listFiles } from "../../workspace/layout.ts";
+import { IGNORED_DIRECTORIES, listFiles } from "../../workspace/layout.ts";
+import { type PackageManifestRecord, sourceText } from "../../workspace/module-graph.ts";
 import {
   composesApplication,
   featurePackageName,
@@ -66,7 +67,7 @@ function applyCatalogsLine(
 }
 
 /**
- * Hand-parsed, matching `workspaceGlobs` in `workspace/tsconfig-references.ts`:
+ * Hand-parsed, matching `workspaceGlobs` in `workspace/workspace-members.ts`:
  * the `catalog:`/`catalogs:` blocks are a flat two/four-space-indented map, so
  * reading them by hand keeps this policy free of a YAML dependency.
  */
@@ -596,11 +597,120 @@ function violationsForManifest(
   ];
 }
 
+/** The build configs' exclude set: what never ships, so a dependency only it reads is dev-only. */
+const TEST_DIRECTORY = /^(?:__tests__|__mocks__|__bench__|tests)$/;
+const TEST_FILE = /\.(?:test|spec|stories|bench)\.|^testing\.tsx?$|^vitest\.config\./;
+const TOOL_CONFIG_DIRECTORIES = [".storybook"];
+const READ_FILE = /\.(?:[cm]?[jt]sx?|css|html)$/;
+
+/** A package name in a quoted specifier: `"@scope/name"`, `'name/sub'`, `` `name` ``. */
+const QUOTED_PACKAGE = /["'`]((?:@[\w.-]+\/)?[\w.-]+)(?=["'`/])/g;
+
+type PackageUse = { readonly source: Set<string>; readonly test: Set<string> };
+
+function isTestFile({ directory, file }: { directory: string; file: string }): boolean {
+  const folders = relative(directory, file).split(sep).slice(0, -1);
+
+  return folders.some((folder) => TEST_DIRECTORY.test(folder)) || TEST_FILE.test(basename(file));
+}
+
+/** Every package name each of this package's own files quotes, split into source and test use. */
+function packageUse({
+  snapshot,
+  record,
+}: {
+  snapshot: WorkspaceSnapshot;
+  record: PackageManifestRecord;
+}): PackageUse {
+  const use: PackageUse = { source: new Set(), test: new Set() };
+  const read = ({ file, test }: { file: string; test: boolean }): void => {
+    const names = test ? use.test : use.source;
+    for (const match of sourceText({ file }).matchAll(QUOTED_PACKAGE)) names.add(match[1]!);
+  };
+  const files = snapshot.files({
+    directory: record.directory,
+    accept: (file) =>
+      READ_FILE.test(file) ||
+      (file.endsWith(".json") &&
+        dirname(file) === record.directory &&
+        !file.endsWith(`${sep}package.json`)),
+    ignoredDirectories: IGNORED_DIRECTORIES,
+  });
+
+  for (const file of files) {
+    if (snapshot.resolver.owningPackage({ file })?.directory !== record.directory) continue;
+    read({ file, test: isTestFile({ directory: record.directory, file }) });
+  }
+
+  // The walk skips dot folders; a tool config folder is read as test-side.
+  for (const folder of TOOL_CONFIG_DIRECTORIES) {
+    const directory = join(record.directory, folder);
+    for (const file of snapshot.files({ directory, accept: (path) => READ_FILE.test(path) })) {
+      read({ file, test: true });
+    }
+  }
+
+  return use;
+}
+
+/** A workspace dependency nothing reads, or one only tests read declared as a runtime one. */
+function dependencyUseViolations({
+  snapshot,
+  record,
+}: {
+  snapshot: WorkspaceSnapshot;
+  record: PackageManifestRecord;
+}): ArchitectureViolation[] {
+  const manifest: PackageManifest = JSON.parse(sourceText({ file: record.manifestPath }));
+  const declared = (section: Record<string, string> | undefined): string[] =>
+    Object.entries(section ?? {}).flatMap(([name, range]) =>
+      range.startsWith("workspace:") ? [name] : [],
+    );
+  const runtime = declared(manifest.dependencies);
+  const development = declared(manifest.devDependencies);
+  if (runtime.length === 0 && development.length === 0) return [];
+
+  const use = packageUse({ snapshot, record });
+  const scripts = Object.values(manifest.scripts ?? {}).join("\n");
+  const usedBySource = (name: string): boolean =>
+    use.source.has(name) || scripts.includes(name.replace(/^@[^/]+\//, ""));
+  const violation = (name: string, message: string): ArchitectureViolation => ({
+    policy: "package-dependencies",
+    file: record.manifestPath,
+    specifier: name,
+    message,
+    allowed: "Every declared workspace dependency becomes a project reference in the tsc -b chain.",
+  });
+
+  return [...runtime, ...development].flatMap((name) => {
+    if (usedBySource(name)) return [];
+    const section = runtime.includes(name) ? "dependencies" : "devDependencies";
+    if (!use.test.has(name)) {
+      return [
+        violation(
+          name,
+          `${record.name} reads nothing from ${name}: remove ${name} from ${section}.`,
+        ),
+      ];
+    }
+    if (section === "devDependencies") return [];
+
+    return [
+      violation(name, `Only ${record.name}'s tests read ${name}: move ${name} to devDependencies.`),
+    ];
+  });
+}
+
 export function lintManifests(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const packages = snapshot.packages;
   const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
 
-  return packages.flatMap((pkg) => violationsForManifest(pkg, byName, snapshot.root));
+  return [
+    ...packages.flatMap((pkg) => violationsForManifest(pkg, byName, snapshot.root)),
+    ...[...snapshot.resolver.packages.values()].flatMap((record) =>
+      dependencyUseViolations({ snapshot, record }),
+    ),
+  ];
 }
 
 export function exportedSubpaths(pkg: ClassifiedPackage): Set<string> {

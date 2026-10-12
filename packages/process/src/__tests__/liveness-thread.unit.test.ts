@@ -1,5 +1,5 @@
 import http from "node:http";
-import type { AddressInfo } from "node:net";
+import net, { type AddressInfo } from "node:net";
 import type { Duplex } from "node:stream";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -13,7 +13,7 @@ import {
 } from "../lifecycle/liveness-thread.ts";
 import { Server, type HealthRoute } from "../server.ts";
 
-const logger = { info: vi.fn(), error: vi.fn() };
+const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 const threads: LivenessThread[] = [];
 const listeners: http.Server[] = [];
 const servers: Server[] = [];
@@ -251,6 +251,105 @@ describe("Server", () => {
 
         await expect(fetch(url)).rejects.toThrow(TypeError);
       });
+    });
+  });
+});
+
+/** Writes raw bytes to a door and reads everything it answers until it closes. */
+function rawExchange(port: number, bytes: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const socket = net.connect(port, "127.0.0.1", () => socket.write(bytes));
+    let answer = "";
+    socket.setEncoding("latin1");
+    socket.on("data", (chunk: string) => {
+      answer += chunk;
+    });
+    socket.on("end", () => resolve(answer));
+    socket.on("error", reject);
+  });
+}
+
+describe("given the liveness thread is serving the process port", () => {
+  describe("when a caller sends a request the HTTP parser refuses, with a cookie", () => {
+    /** @scenario A request no door can parse is answered as Node would and named once in the log */
+    it("answers Node's 400, closes, and logs the parser code without the cookie", async () => {
+      const proxyPort = await mainThreadListener((_req, res) => res.end("main"));
+      const thread = await bootThread({ proxyPort });
+      const port = (thread.address as AddressInfo).port;
+      logger.warn.mockClear();
+
+      const answer = await rawExchange(
+        port,
+        "GET /api/auth/session HTTP/1.1\r\nHost: x\r\nCookie: session=SECRET-VALUE\r\nBad Header\r\n\r\n",
+      );
+
+      expect(answer).toBe("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+      await vi.waitFor(() => expect(logger.warn).toHaveBeenCalledTimes(1));
+      const [fields, message] = logger.warn.mock.calls[0]!;
+      expect(message).toBe("http request refused before routing");
+      expect(fields).toMatchObject({ code: "HPE_INVALID_HEADER_TOKEN", door: "public" });
+      expect(fields.head).toContain("GET /api/auth/session HTTP/1.1");
+      expect(fields.head).toContain("Cookie: <redacted>");
+      expect(JSON.stringify(fields)).not.toContain("SECRET-VALUE");
+    });
+  });
+});
+
+describe("given the main listener is the door", () => {
+  describe("when a caller sends a request the HTTP parser refuses, with a cookie", () => {
+    /** @scenario A request no door can parse is answered as Node would and named once in the log */
+    it("answers Node's 400 and logs the parser code without the cookie", async () => {
+      const server = Server.create({ name: "worker-test", logger, ownsProcess: false });
+      servers.push(server);
+      await server.serve({
+        name: "api",
+        start: () => undefined,
+        stop: () => undefined,
+        handler: (_request: unknown, response: http.ServerResponse) => response.end("ok"),
+      });
+      const address = server.healthAddress as AddressInfo;
+      logger.warn.mockClear();
+
+      const answer = await rawExchange(
+        address.port,
+        "GET / HTTP/1.1\r\nHost: x\r\nCookie: session=SECRET-VALUE\r\nBad Header\r\n\r\n",
+      );
+
+      expect(answer).toBe("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+      await vi.waitFor(() => expect(logger.warn).toHaveBeenCalledTimes(1));
+      expect(logger.warn.mock.calls[0]![0]).toMatchObject({ door: "main" });
+      expect(JSON.stringify(logger.warn.mock.calls)).not.toContain("SECRET-VALUE");
+    });
+  });
+});
+
+describe("given the liveness thread is serving the process port", () => {
+  describe("when the main thread's event stream says keep-alive to a request that said close", () => {
+    /** @scenario A connection the thread closes is never announced as kept alive */
+    it("answers Connection: close, so a pooling proxy's next request is served", async () => {
+      const proxyPort = await mainThreadListener((_req, res) => {
+        res.writeHead(200, { "Content-Type": "text/event-stream", Connection: "keep-alive" });
+        res.end("data: hint\n\n");
+      });
+      const thread = await bootThread({ proxyPort });
+      const port = (thread.address as AddressInfo).port;
+      const agent = new http.Agent({ keepAlive: true });
+      const ask = (path: string) =>
+        new Promise<http.IncomingMessage>((resolve, reject) => {
+          const headers = { connection: "close" };
+          const request = http.request({ host: "127.0.0.1", port, path, headers, agent }, (r) => {
+            r.resume();
+            r.on("end", () => resolve(r));
+          });
+          request.on("error", reject).end();
+        });
+
+      const stream = await ask("/api/sse/hints");
+      const next = await ask("/api/auth/session");
+      agent.destroy();
+
+      expect(stream.headers.connection).toBe("close");
+      expect(next.statusCode).toBe(200);
     });
   });
 });

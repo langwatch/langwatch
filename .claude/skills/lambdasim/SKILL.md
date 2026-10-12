@@ -41,7 +41,7 @@ Functions live in memory. An invoke of an unknown name or ARN registers it rathe
 
 ## Force a failure
 
-`haven sim lambda fault --error <kind>`, or the console's Forced error picker. Sticky until `none`.
+`haven sim lambda fault <kind>`, or the console's Forced error picker. Sticky until `off`.
 
 | kind             | answer                                                                             |
 | ---------------- | ---------------------------------------------------------------------------------- |
@@ -70,5 +70,5 @@ Caps: `LAMBDASIM_MAX_CALLS` (500) and `LAMBDASIM_MAX_BODY_BYTES` (65536 per body
 
 ```
 haven sim lambda status | list | get <id> | clear
-haven sim lambda fault --error <none|throttled|not-found|function-error|service>
+haven sim lambda fault <off|throttled|not-found|function-error|service>
 ```

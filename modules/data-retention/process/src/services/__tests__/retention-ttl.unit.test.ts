@@ -174,8 +174,8 @@ describe("usage_trace_meter retention exemption", () => {
   });
 
   it("declares its fixed 13-month delete in a migration", () => {
-    const migration = readFileSync(migrationEndingIn("_usage_trace_meter_retention.sql"), "utf8");
-    expect(migration).toContain("MODIFY TTL toDateTime(Month) + INTERVAL 13 MONTH DELETE");
+    const migration = readFileSync(migrationEndingIn("_create_usage_trace_meter.sql"), "utf8");
+    expect(migration).toContain("TTL toDateTime(Month) + INTERVAL 13 MONTH DELETE");
     expect(migration).not.toContain("_retention_days");
   });
 });

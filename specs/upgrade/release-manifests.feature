@@ -1,17 +1,17 @@
-# Release manifests, the LTS floor and the upgrade plan: slice S2 of
+# Release manifests and the upgrade plan: slice S2 of
 # dev/docs/plans/migrations-rethink-2026-10-06.md (6.3, 6.4, 6.5) and lane mig-s2-manifests of
 # dev/docs/plans/migrations-blitz-2026-10-06.md (3.2, 5.3; D3, D9, D10).
 #
 # A manifest is what "attached to a release" means: packages/upgrade/releases/<version>.json names
 # every step id the release shipped, Prisma folders by name, goose versions ascending, then code
-# steps in installed-module order. The stamp generator writes it in the release PR. The LTS floor
-# (packages/upgrade/releases/lts-floor.json) is the oldest release an image upgrades from.
+# steps in installed-module order. The stamp generator writes it in the release PR. No release is a
+# required stop (Alex, 2026-10-11): any install upgrades to the latest release through every step.
 # The plan is pure: it reads the ledger and the manifests and never touches a database.
 
 Feature: Release manifests order every migration step release by release
   As an operator upgrading a self-hosted installation across several releases
   I want each step attached to the release that shipped it and run in that release's order
-  So that a jump of several releases replays them one by one and never skips the LTS stop
+  So that a jump of several releases replays them one by one and never skips a step
 
   @unit
   Scenario: A stamped manifest lists Prisma folders, then goose versions, then code steps
@@ -73,14 +73,14 @@ Feature: Release manifests order every migration step release by release
     Then loading is refused naming the file
 
   @unit
-  Scenario: The shipped manifests chain from the backfill start to the LTS floor
-    When the manifests and the LTS floor shipped in the package are loaded
-    Then the LTS floor names release 3.20.1
+  Scenario: The shipped manifests chain from the backfill start
+    When the manifests shipped in the package are loaded
+    Then the first manifest's previous release is the 3.18.1 baseline
     And every release from 3.19.0 to 3.20.1 has a manifest whose previous release is the one before it
 
   @unit
   Scenario: An upgrade across several releases steps release by release
-    Given an installation recorded at 3.20.1 with an LTS floor of 3.19.0
+    Given an installation recorded at 3.20.1
     And manifests for 3.21.0, 3.22.0 and 3.23.0
     When an image of 3.23.0 plans its upgrade
     Then the plan holds 3.21.0, 3.22.0 and 3.23.0 in that order
@@ -94,17 +94,11 @@ Feature: Release manifests order every migration step release by release
     And the done step is not in it
 
   @unit
-  Scenario: An installation below the LTS floor is refused by the name of the LTS to stop at
-    Given an installation recorded at 3.16.0 with an LTS floor of 3.20.1
-    When an image of 3.23.0 plans its upgrade
-    Then the plan is refused before anything runs
-    And the refusal says to upgrade to 3.20.1 (LTS) first
-
-  @unit
-  Scenario: An image below the ledger's floor is refused
-    Given a ledger that records a floor of 3.22.0 from an earlier upgrade
-    When an image of 3.21.0 plans its upgrade
-    Then the plan is refused naming the image's release and the ledger's floor
+  Scenario: An install older than the 3.18.1 baseline plans every release from the baseline
+    Given an installation recorded at 3.16.0, older than the 3.18.1 baseline
+    And manifests for 3.19.0 and 3.19.1, the first naming 3.18.1 as its previous release
+    When an image of 3.19.1 plans its upgrade
+    Then the plan holds 3.19.0 and 3.19.1 in that order
 
   @unit
   Scenario: A fresh install applies all schema at once and needs no data, tenant or procedure step

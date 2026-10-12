@@ -12,7 +12,7 @@
   },
   "scripts": {
     "dev": "while true; do node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/app.entrypoint.ts; code=$?; test $code -eq 75 || exit $code; done",
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

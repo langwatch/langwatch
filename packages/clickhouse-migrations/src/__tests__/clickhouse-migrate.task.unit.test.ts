@@ -46,7 +46,6 @@ describe("clickhouse-migrate task", () => {
     await ClickHouseMigrateTask.createFromConfig({
       config: {
         buildTime: false,
-        skipped: false,
         sharedUrl: "http://shared:8123",
         privateEndpoints: [
           { organizationId: "org-2", url: "http://shared:8123" },
@@ -89,7 +88,6 @@ describe("clickhouse-migrate task", () => {
     await ClickHouseMigrateTask.createFromConfig({
       config: {
         buildTime: true,
-        skipped: false,
         sharedUrl: "http://shared:8123",
         privateEndpoints: [{ organizationId: "org-1", url: "http://private:8123" }],
       },
@@ -107,7 +105,6 @@ describe("clickhouse-migrate task", () => {
       }),
     ).toEqual({
       buildTime: false,
-      skipped: false,
       sharedUrl: "http://shared:8123",
       privateEndpoints: [{ organizationId: "org_1", url: "http://private:8123" }],
       settings: {
@@ -163,31 +160,6 @@ describe("clickhouse-migrate task", () => {
       for (const [options] of stubs.reconcileTTL.mock.calls) {
         expect(options.managedTables).toEqual(["stored_spans", "trace_summaries"]);
       }
-    });
-  });
-
-  describe("when the operator opted out", () => {
-    /** @scenario An operator can skip a migration step that a deploy already applied */
-    it("runs nothing for SKIP_CLICKHOUSE_MIGRATE=true", async () => {
-      await ClickHouseMigrateTask.create({
-        source: {
-          CLICKHOUSE_URL: "http://shared:8123",
-          SKIP_CLICKHOUSE_MIGRATE: "true",
-        },
-      }).execute();
-
-      expect(stubs.runMigrations).not.toHaveBeenCalled();
-    });
-
-    it("still migrates for a half-recognised value", async () => {
-      await ClickHouseMigrateTask.create({
-        source: {
-          CLICKHOUSE_URL: "http://shared:8123",
-          SKIP_CLICKHOUSE_MIGRATE: "1",
-        },
-      }).execute();
-
-      expect(stubs.runMigrations).toHaveBeenCalledTimes(1);
     });
   });
 

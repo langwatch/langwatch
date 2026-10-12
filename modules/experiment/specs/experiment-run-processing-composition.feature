@@ -143,3 +143,10 @@ Feature: Composing durable experiment-run processing
     Given a worker whose model-provider peer holds one custom cost rule for the project
     When the experiment module lists the project's model costs
     Then the custom rule comes first, followed by the static catalogue's rates
+
+  @unit
+  Scenario: Metrics jobs the previous release queued on trace run on experiment's lane
+    Given the previous release queued span_received jobs under "trace_processing:reactor:experimentMetricsSync"
+    When experiment's run pipeline is built
+    Then it aliases that key to its peer lane "traceSpanMetricsSync" for span_received, for one release
+    And a job of that key carrying any other event type is acknowledged with a log line, not blocked

@@ -65,12 +65,17 @@ Feature: Data Privacy service
       And the reader is told which pattern was rejected and why
 
     @unit
-    Scenario: A rule aimed at a department is refused by name
-      Given a reader who picked a department in the scope picker
+    Scenario: A rule aimed at a department of the organization is stored
+      Given a reader who picked a department of the project's organization in the scope picker
       When they save the rule
-      Then the save is refused as a tier that cannot carry a rule
-      And the reader is told to set the rule on the organization, a team or a project instead
-      And the reader is told to check their custom patterns and exceptions
+      Then the rule is stored on that department
+      And projects assigned to the department resolve it between their own rule and their team's
+
+    @unit
+    Scenario: A rule aimed at a department of another organization is refused as a missing scope
+      Given a reader who picked a department that belongs to a different organization, or to none
+      When they save the rule
+      Then the save is refused as a missing scope
       And no policy row is written
 
   Rule: Every backend the feature stores rules in answers the same way

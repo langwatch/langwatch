@@ -220,7 +220,25 @@ export class ProjectionRouter<
     }
     this.assertCoalesceWithinAppliedIdCap(projection);
     this.assertTrustedAbsenceIsTimeLocal(projection);
+    this.assertBoundedFallbackRebuilds(projection);
     this.foldProjections.set(projection.name, sealFoldProjection(projection));
+  }
+
+  /**
+   * A bounded fallback's final miss is not proof the state was never committed, so only a fold
+   * that rebuilds from its history on a miss may declare one.
+   */
+  private assertBoundedFallbackRebuilds<State>(
+    projection: FoldProjectionDefinition<State, EventType>,
+  ): void {
+    if (projection.options?.readWindow?.fallbackLookbackStepsMs === undefined) return;
+    if (projection.options.refoldOnStoreMiss === true) return;
+
+    throw new ConfigurationError(
+      "ProjectionRouter",
+      `Fold projection "${projection.name}" bounds its read-window fallback but does not refold on a store miss: a row older than its widest step would read as absent and the fold would start empty.`,
+      { projectionName: projection.name },
+    );
   }
 
   /**

@@ -57,14 +57,16 @@ export function AgentTestingHeader({
           page title in the product is the same size, so the header carries no
           padding or alignment override of its own: the defaults set by
           PageLayout.Header rule. */}
+      {/* A phone gives the title a row of its own above the tabs, so it is not cut short. */}
       <Grid
         width="full"
         alignSelf="stretch"
-        templateColumns="1fr auto 1fr"
+        templateColumns={{ base: "minmax(0, 1fr)", md: "1fr auto 1fr" }}
         alignItems="center"
-        gap={4}
+        columnGap={4}
+        rowGap={0}
       >
-        <GridItem minWidth={0}>
+        <GridItem minWidth={0} paddingTop={{ base: 2, md: 0 }}>
           {/* The title stays on one line and gives space back with an
               ellipsis; the note beside it reads in full, since it is the
               shorter of the two and the one a person cannot guess. */}
@@ -109,7 +111,7 @@ export function AgentTestingHeader({
           </Tabs.Root>
         </GridItem>
 
-        <GridItem />
+        <GridItem display={{ base: "none", md: "block" }} />
       </Grid>
     </SectionNavigationHeader>
   );

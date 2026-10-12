@@ -58,14 +58,6 @@ Feature: A worktree's own home page at <slug>.langwatch.localhost
     When I press start on that row and press it again
     Then the stack restarts with that service added and the row shows starting then live
 
-  @integration
-  Scenario: A stack whose database is below the upgrade floor can reset its databases from the stack home
-    Given the api is held by the upgrade floor
-    When I open the stack home
-    Then I see why the api is held and a reset databases action
-    And the reset waits until I type the stack's database name
-    And the stack's databases are dropped, migrated and seeded fresh
-
   # The seed console drives the same `haven db seed` the CLI runs (tools/seedgen);
   # it adds no seeding logic of its own.
   @integration

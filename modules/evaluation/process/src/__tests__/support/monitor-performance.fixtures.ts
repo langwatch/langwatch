@@ -43,7 +43,6 @@ export async function startMigratedClickHouse(): Promise<ClickHouseClient> {
       await ClickHouseMigrateTask.createFromConfig({
         config: {
           buildTime: false,
-          skipped: false,
           sharedUrl: provisioned.url,
           privateEndpoints: [],
         },

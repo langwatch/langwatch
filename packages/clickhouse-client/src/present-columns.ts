@@ -35,21 +35,42 @@ export class ClickHouseColumns {
   ) {}
 
   /**
-   * A select list over `columns` (name to the SQL default it reads as while missing). An unknown
-   * table or an unreadable list names every column: the query then fails as it would have.
+   * A select list over `columns` (name to the SQL default it reads as while missing), each
+   * backquoted and, given `alias`, read through it. An unknown table or an unreadable list names
+   * every column: the query then fails as it would have.
    */
   async select({
     table,
+    alias,
     columns,
   }: {
     table: string;
+    alias?: string;
     columns: Readonly<Record<string, string>>;
   }): Promise<string> {
     const present = (await this.tables().catch(() => undefined))?.get(table);
+    return ClickHouseColumns.named({
+      alias,
+      columns,
+      has: (name) => present === undefined || present.has(name),
+    });
+  }
+
+  /** A select list naming every column `has` keeps (all by default), the rest as defaults. */
+  static named({
+    alias,
+    columns,
+    has = () => true,
+  }: {
+    alias?: string | undefined;
+    columns: Readonly<Record<string, string>>;
+    has?: (name: string) => boolean;
+  }): string {
     return Object.entries(columns)
-      .map(([name, missing]) =>
-        present === undefined || present.has(name) ? name : `${missing} AS ${name}`,
-      )
+      .map(([name, missing]) => {
+        if (!has(name)) return `${missing} AS \`${name}\``;
+        return alias === undefined ? `\`${name}\`` : `${alias}.\`${name}\` AS \`${name}\``;
+      })
       .join(", ");
   }
 

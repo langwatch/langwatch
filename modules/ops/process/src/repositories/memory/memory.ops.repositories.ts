@@ -1,3 +1,4 @@
+import type { PrivateRouteVariable } from "@langwatch/clickhouse-client";
 import { type EventSourcing, type InMemoryProcessStore } from "@langwatch/eventing";
 import type { TenantSource } from "@langwatch/system-migrations";
 import {
@@ -21,6 +22,7 @@ import { MemoryAnomalyRateTrackerRepository } from "./memory.anomaly-rate-tracke
 import { MemoryAnomalyStateRepository } from "./memory.anomaly-state.repository.ts";
 import { MemoryBugReportRateLimitRepository } from "./memory.bug-report-rate-limit.repository.ts";
 import { MemoryBugReportRepository } from "./memory.bug-report.repository.ts";
+import { MemoryCloudLatestReleaseRepository } from "./memory.cloud-latest-release.repository.ts";
 import { MemoryCredentialsResealRepository } from "./memory.credentials-reseal.repository.ts";
 import {
   MemoryClickHouseHealthRepository,
@@ -119,6 +121,10 @@ class MemoryClickHouseRoutesRepository extends ClickHouseRoutesRepository {
   findPrivateRoutes(): ReadonlyMap<string, string> {
     return new Map();
   }
+
+  findPrivateRouteVariables(): readonly PrivateRouteVariable[] {
+    return [];
+  }
 }
 
 /**
@@ -177,6 +183,7 @@ export class MemoryOpsRepositories {
       anomalyState: MemoryAnomalyStateRepository.create({ store }),
       rateTracker: MemoryAnomalyRateTrackerRepository.create({ store }),
       storageReadings: MemoryStorageStatsReadingsRepository.create({ store }),
+      cloudLatestRelease: MemoryCloudLatestReleaseRepository.create({ store }),
       redisHealth: MemoryRedisHealthRepository.create(),
       clickhouseHealth: MemoryClickHouseHealthRepository.create(),
       events: MemoryEventExplorerRepository.create({ store }),

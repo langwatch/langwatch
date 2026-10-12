@@ -681,3 +681,9 @@ Feature: An aggregate project reads its member projects
     Then she lands on its Trace Explorer and never sees the home
     And the home is replaced in her history, so Back does not return to it
     And an ordinary project's home still opens as before
+
+  @unit
+  Scenario: A fenced read declared a full scan reaches the client declared
+    Given a repository reading through the proof-checked client
+    When it declares the read a full scan
+    Then the routed client receives the declaration, so it logs no cold-scan warning

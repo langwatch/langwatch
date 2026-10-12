@@ -29,7 +29,7 @@ export type UpgradeGateWaiting = Readonly<{
 }>;
 
 export type UpgradeGateVerdict =
-  | Readonly<{ admitted: true } | { admitted: false; refusal: string }>
+  | Readonly<{ admitted: true } | { admitted: false; outcome?: string; refusal: string }>
   | UpgradeGateWaiting;
 
 /** A worker's declared background steps, run by the gate's package (round 14: framework runs). */
@@ -67,8 +67,18 @@ const REFUSED_NEXT = "do what the refusal names, then start this process again";
 /** How often an upgrading api asks the ledger again (UPGRADE-IN-WORKER). */
 const RE_ASK_MS = 10_000;
 
+/** The line names at most five ids; `pnpm task upgrade status` lists every one (T0-F5). */
+const NAMED_OUTSTANDING = 5;
+
+export function outstandingSummary({ outstanding }: { outstanding: readonly string[] }): string {
+  const named = outstanding.slice(0, NAMED_OUTSTANDING).join(", ");
+  const more = outstanding.length > NAMED_OUTSTANDING ? ", …" : "";
+  const count = `${outstanding.length} ${outstanding.length === 1 ? "step" : "steps"} outstanding`;
+  return named ? `${count}: ${named}${more}` : count;
+}
+
 const isWaiting = (verdict: UpgradeGateVerdict): verdict is UpgradeGateWaiting =>
-  !verdict.admitted && "outcome" in verdict;
+  !verdict.admitted && "outcome" in verdict && verdict.outcome === "upgrading";
 
 export class UpgradeGateRefusedError extends Error {
   readonly code = "upgrade_gate_refused";
@@ -208,7 +218,7 @@ export function upgradeGateComponent({
             waitingOn: "the worker's upgrade run",
             next: "nothing to do: this api serves meanwhile",
           },
-          `the installation is upgrading (${verdict.outstanding.join(", ")}); serving and asking again every ${reAskMs / 1000} s`,
+          `the installation is upgrading (${outstandingSummary({ outstanding: verdict.outstanding })}); serving and asking again every ${reAskMs / 1000} s`,
         );
         upgrading = askInBackground({
           first: verdict,

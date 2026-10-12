@@ -3,6 +3,12 @@ import type { AddressInfo } from "node:net";
 import process from "node:process";
 import type { Duplex } from "node:stream";
 
+import {
+  answerClientError,
+  isLoggedClientError,
+  redactedRequestHead,
+  REFUSED_BEFORE_ROUTING,
+} from "./lifecycle/client-error.ts";
 import { GracefulShutdown } from "./lifecycle/graceful-shutdown.ts";
 import { drainHttpServer } from "./lifecycle/http-drain.ts";
 import {
@@ -17,6 +23,9 @@ import {
 } from "./lifecycle/liveness-thread.ts";
 import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./lifecycle/shutdown-deadline.ts";
 import { ResourceScope } from "./resource-scope.ts";
+
+/** A parse failure as Node reports it on `clientError`. */
+type ClientError = Error & { code?: string; rawPacket?: Buffer };
 
 /** What this package needs of a logger, so it depends on no logging implementation. */
 export interface ServerLogger {
@@ -92,6 +101,8 @@ export type ServerComponent = Readonly<{
    * Spec: specs/server/process-readiness.feature.
    */
   ready?: () => Promise<void>;
+  /** Called as the door closes, before any component stops; must not throw or wait. */
+  stopping?: () => void;
 }>;
 
 /** Owns process signals, listeners and teardown order. */
@@ -233,6 +244,20 @@ export class Server {
     await this.livenessThread?.liftConsole();
   }
 
+  /** Node's own answer to a request it could not parse, with one line saying what it was. */
+  private refuseUnparsed(error: ClientError, socket: Duplex): void {
+    if (isLoggedClientError(error.code)) {
+      const fields = {
+        code: error.code,
+        head: redactedRequestHead(error.rawPacket?.toString("latin1") ?? ""),
+        door: "main",
+      };
+      if (this.logger.warn) this.logger.warn(fields, REFUSED_BEFORE_ROUTING);
+      else this.logger.info(fields, REFUSED_BEFORE_ROUTING);
+    }
+    answerClientError({ code: error.code, socket });
+  }
+
   private openHealth(): Promise<void> {
     this.healthOpening ??= Promise.resolve(this.health?.start?.());
     return this.healthOpening;
@@ -247,6 +272,9 @@ export class Server {
         );
         listener.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) =>
           this.handleUpgrade(request, socket, head),
+        );
+        listener.on("clientError", (error: ClientError, socket: Duplex) =>
+          this.refuseUnparsed(error, socket),
         );
         if (this.livenessOffLoop) {
           this.livenessThread = await this.startOffLoop(listener, port ?? 0);
@@ -508,7 +536,10 @@ export class Server {
     // by name while the graph behind it is still whole.
     this.graceful.phase({
       name: `${this.name} door`,
-      run: () => this.refuseNewWork(),
+      run: () => {
+        this.refuseNewWork();
+        for (const component of this.components) component.stopping?.();
+      },
     });
     for (const component of [...this.components].reverse()) {
       this.graceful.phase({

@@ -39,9 +39,9 @@ import type { ExecutionTarget, RetentionPolicyResolver } from "./runtime.types.t
 import { EventSourcingPipeline } from "./runtimePipeline.ts";
 import {
   ConfigurationError,
-  QueueError,
   QueueTenantMismatchError,
   UndeclaredQueuedEventTypeError,
+  UnroutableQueuedJobError,
   ValidationError,
 } from "./services/errorHandling.ts";
 import {
@@ -933,19 +933,16 @@ export class EventSourcing {
     };
   }
 
-  /**
-   * Refuse a job this worker cannot route: reject for retry, not acknowledge.
-   */
+  /** Refuses a job this worker cannot route: retried, then dead-lettered once spent. */
   private rejectUnroutableJob(payload: Record<string, unknown>, queueName: string): never {
     const identity = EventSourcing.jobIdentity(payload);
     logger.error(
       identity,
       "No handler registered for this job in this worker; rejecting it for retry rather than dropping it",
     );
-    throw new QueueError({
+    throw new UnroutableQueuedJobError({
       queueName,
-      operation: "process",
-      message: "job routing key is not registered in this worker",
+      jobPath: `${identity.pipelineName}:${identity.jobType}:${identity.jobName}`,
       context: identity,
     });
   }
@@ -1048,7 +1045,9 @@ export class EventSourcing {
       coalesceMaxBytes: (payload: Record<string, unknown>) =>
         this.globalQueueCoalesceMaxBytes(payload),
       onExhausted: (payload: Record<string, unknown>) =>
-        readJobRouting(payload)?.onExhausted ?? "block",
+        this.lookupEntry(payload)
+          ? (readJobRouting(payload)?.onExhausted ?? "block")
+          : "dead-letter",
       processBatch: async (payloads: Record<string, unknown>[], delivery?: JobDelivery) =>
         this.processGlobalQueueBatch(payloads, delivery, queueName),
     };

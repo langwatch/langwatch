@@ -176,7 +176,8 @@ export const prismaTableCatalogue = {
   "SelfHostedInstance": "SelfHostedInstance",
   "SelfHostedInstanceReport": "SelfHostedInstanceReport",
   "WebPushSubscription": "WebPushSubscription",
-  "WebPushVapidKey": "WebPushVapidKey"
+  "WebPushVapidKey": "WebPushVapidKey",
+  "SignInProviderMount": "SignInProviderMount"
 } as const;
 
 export const prismaModelFieldCatalogue = {
@@ -571,6 +572,7 @@ export const prismaModelFieldCatalogue = {
   "Organization": [
     "id",
     "name",
+    "kind",
     "phoneNumber",
     "slug",
     "members",
@@ -581,6 +583,9 @@ export const prismaModelFieldCatalogue = {
     "OrganizationInvite",
     "usageSpendingMaxLimit",
     "datasetAttachmentMaxMb",
+    "privateClickHouseLabel",
+    "privateS3Label",
+    "privateDataplaneSeenAt",
     "maxSessionDurationDays",
     "mfaRequired",
     "lockoutAfterFailedAttempts",
@@ -653,6 +658,7 @@ export const prismaModelFieldCatalogue = {
     "planType",
     "maxMembers",
     "maxMembersLite",
+    "liteSeatsUnlimited",
     "issuedAt",
     "expiresAt",
     "source",
@@ -697,6 +703,7 @@ export const prismaModelFieldCatalogue = {
     "planType",
     "maxMembers",
     "maxMembersLite",
+    "liteSeatsUnlimited",
     "licenseTermDays",
     "services",
     "expiresAt",
@@ -2929,6 +2936,13 @@ export const prismaModelFieldCatalogue = {
     "publicKey",
     "privateKeyEncrypted",
     "createdAt"
+  ],
+  "SignInProviderMount": [
+    "id",
+    "provider",
+    "mounted",
+    "lastAppliedEventId",
+    "updatedAt"
   ]
 } as const;
 
@@ -3523,7 +3537,8 @@ export const prismaRelationCatalogue = {
   "SelfHostedInstance": {},
   "SelfHostedInstanceReport": {},
   "WebPushSubscription": {},
-  "WebPushVapidKey": {}
+  "WebPushVapidKey": {},
+  "SignInProviderMount": {}
 } as const;
 
 export type PrismaTableModel = keyof typeof prismaTableCatalogue;

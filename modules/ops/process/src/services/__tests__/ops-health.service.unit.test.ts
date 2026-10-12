@@ -133,6 +133,7 @@ const MIGRATIONS: OpsMigrationOverview[] = [
     requiresOperatorConfirmation: false,
     availableOnThisInstallation: true,
     enrolledAutomatically: true,
+    tenant: "organization",
     counts: { migrated: 9, finalized: 0, parked: 2, rolled_back: 0 },
     enrollment: null,
     attention: [
@@ -152,6 +153,7 @@ const MIGRATIONS: OpsMigrationOverview[] = [
     requiresOperatorConfirmation: false,
     availableOnThisInstallation: true,
     enrolledAutomatically: true,
+    tenant: "organization",
     counts: { migrated: 0, finalized: 5, parked: 0, rolled_back: 0 },
     enrollment: null,
     attention: [],
@@ -168,14 +170,14 @@ const UPGRADE: OpsUpgradeStatus = {
   installed: "3.21.0",
   origin: "3.20.1",
   image: "3.21.0",
-  floor: "3.20.1",
-  ledgerFloor: "3.20.1",
   lease: null,
   lastRun: null,
   counts: { done: 4, failed: 1 },
   failedStepIds: ["ops:tenant-split"],
   failedTargets: 2,
   deprecations: [],
+  version: { kind: "release", release: "3.21.0" },
+  latestRelease: null,
 };
 
 function health(overrides: Partial<OpsHealthReaders> = {}) {
@@ -216,7 +218,6 @@ describe("given an install with a backlog, dead letters, a blocked group and a p
         upgrade: {
           state: "needs_attention",
           release: "3.21.0",
-          floor: "3.20.1",
           failed_steps: 1,
           failed_targets: 2,
           held_tenants: 2,
@@ -232,7 +233,6 @@ describe("given an install with a backlog, dead letters, a blocked group and a p
       expect(answer.upgrade).toEqual({
         state: "needs_attention",
         release: "3.21.0",
-        floor: "3.20.1",
         failed_steps: 1,
         failed_targets: 2,
         held_tenants: 2,

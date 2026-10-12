@@ -30,3 +30,8 @@ export function useOpsPermission(): OpsPermissionReading {
 export function useIsOpsAdmin(): boolean {
   return useOpsHost().isOpsAdmin();
 }
+
+/** Whether this is the shared cloud install, where enrolment paces a rollout (ADR-173 §7). */
+export function useIsSharedInstall(): boolean {
+  return useOpsHost().sharedInstall();
+}

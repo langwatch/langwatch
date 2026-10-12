@@ -23,7 +23,7 @@ const confirmationSchema = z
 export const storedObjectConfig = Config.define((c) => ({
   /** The operator states every oversized-payload prefix has its lifecycle rule (ADR-172). */
   objectRetentionConfirmed: c.env("OBJECT_RETENTION_CONFIRMED", confirmationSchema),
-  /** The earlier spool-only spelling of the same statement, honoured until the LTS floor. */
+  /** The earlier spool-only spelling; stops being read in 3.23 (two after 3.21). */
   legacySpoolRetentionConfirmed: c.env("AZURE_BLOB_SPOOL_RETENTION_CONFIRMED", confirmationSchema),
   /** The address fence the image proxy judges an outbound picture by. */
   blockLocalHttpCalls,

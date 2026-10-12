@@ -105,6 +105,24 @@ Feature: Triggering online evaluations from an ingested trace
     Then the trigger runs on evaluation_processing's own lanes and none remains on trace_processing
 
   @unit
+  Scenario: Trigger jobs the previous release queued on trace run on evaluation's lanes
+    Given the previous release queued span_received and origin_resolved jobs under "trace_processing:reactor:evaluationTrigger"
+    When evaluation's pipeline registers its reactions to trace's span facts
+    Then it aliases that key to "traceEvaluationTrigger" for span_received and "traceOriginEvaluationTrigger" for origin_resolved, for one release
+
+  @unit
+  Scenario: SDK-evaluation jobs the previous release queued on trace run on evaluation's lane
+    Given the previous release queued span_received jobs under "trace_processing:reactor:customEvaluationSync"
+    When evaluation's pipeline registers its reactions to trace's span facts
+    Then it aliases that key to "traceCustomEvaluationSync", for one release
+
+  @unit
+  Scenario: A process with no trace reactions declares no alias
+    Given a process where no trace pipeline runs
+    When evaluation's pipeline is built
+    Then it carries no lane alias, so it never claims a job it has no lane for
+
+  @unit
   Scenario: The evaluation trigger composes from published services
     Given a process holding a monitor service, a feature-flag service and an evaluation queue
     When the evaluation trigger is composed

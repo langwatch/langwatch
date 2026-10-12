@@ -7,17 +7,19 @@
     "types": [],
     "noUncheckedIndexedAccess": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/__tests__/**"],
+  "files": [],
+  "include": [],
 
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

@@ -263,3 +263,10 @@ Feature: Shared project service
     Then the live and the archived project are listed
     And the governance project is not listed
     And a read that does not ask for archived projects still leaves the archived one out
+
+  @unit
+  Scenario: A member's landing projects come from their grants
+    Given a member whose grants name one team and one project in an organization
+    When the oldest shared project they belong to is looked up
+    Then only projects under that team or with that id are considered
+    And a member with no team or project grant is offered none

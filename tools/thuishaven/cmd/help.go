@@ -159,6 +159,10 @@ var envHelpText = `Environment variables.
                                  repository scripts run directly. A live queue
                                  owner is recognized through CHECK_QUEUE_HELD
                                  so descendants do not take another slot.
+                                 "slot run" counts core units: cores less two
+                                 (8 of 10) when green, half amber, a quarter red;
+                                 N here is N checks of two units. --class test
+                                 weighs VITEST_MAX_WORKERS (2, at most 4), others 2.
     CHECK_PRESSURE=green|amber|red
                                  Override the measured machine pressure when
                                  resolving the shared queue's capacity.

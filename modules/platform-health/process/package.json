@@ -16,14 +16,13 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
-    "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
@@ -41,6 +40,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",

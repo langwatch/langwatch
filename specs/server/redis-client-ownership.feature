@@ -265,3 +265,42 @@ Feature: Redis is an owned client, never a module singleton
       When the store reads, writes and deletes a key
       Then every operation reaches that connection under the store's namespace
       And no drop is reported
+
+  # Shutdown while Redis is unreachable (upgrade trial T0, finding F8): a
+  # command against a lost Redis queued until reconnect, which never came, so
+  # every shutdown phase awaiting one waited out its 10 s budget.
+
+  @integration
+  Scenario: A connection whose Redis went away closes promptly at shutdown
+    Given a connection, and a duplicate of it, whose Redis server has gone away
+    And a command still waiting for the server to come back
+    When shutdown begins and the duplicate is quit
+    Then the quit resolves within one second
+    And the waiting command fails rather than hanging
+    And no client reconnects once shutdown has begun
+
+  @integration
+  Scenario: A lost Redis at shutdown logs no unhandled error events
+    Given a connection, and a duplicate of it with no error listener of its own
+    When their Redis server goes away and shutdown begins
+    Then no "Unhandled error event" is written
+    And the loss after shutdown began is logged once at info
+
+  @integration
+  Scenario: A reachable Redis still drains at shutdown
+    Given a connection whose Redis server answers
+    When shutdown begins and a command is sent before the quit
+    Then the command is answered and the quit resolves
+
+  @unit
+  Scenario: Hosted components hear shutdown begin before any of them stops
+    Given a server hosting components that ask to hear shutdown begin
+    When the server closes
+    Then every such component is told it is stopping
+    And only then does the first component stop
+
+  @integration
+  Scenario: A worker's group queue closes promptly on a lost Redis
+    Given a group queue consuming from a Redis server that has gone away
+    When the door tells the process stores that shutdown has begun
+    Then the queue's close ends within about a second

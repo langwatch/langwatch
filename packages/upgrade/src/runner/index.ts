@@ -1,8 +1,4 @@
-export {
-  type InstalledRelease,
-  highestRecordedFloor,
-  inferInstalledRelease,
-} from "./installed-release.ts";
+export { type InstalledRelease, inferInstalledRelease } from "./installed-release.ts";
 export { type RegisteredStep, UpgradeRunnerRepository } from "./runner-ledger.repository.ts";
 export {
   DEFAULT_LEASE_TIMING,
@@ -36,6 +32,8 @@ export {
 } from "./run-phases.ts";
 export {
   gooseAppliedStepIds,
+  isPrivateTarget,
+  PRIVATE_TARGET_PREFIX,
   type SchemaTargetReport,
   type UpgradeReconciler,
   type UpgradeRunnerLog,

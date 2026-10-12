@@ -8,23 +8,19 @@
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"],
+  "files": [],
+  "include": [],
 
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../test-harness/tsconfig.build.json"
-    },
-    {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

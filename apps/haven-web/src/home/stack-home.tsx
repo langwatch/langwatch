@@ -9,16 +9,10 @@ import {
   Tabs,
   Text,
 } from "@langwatch/design-system-internal";
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy } from "react";
 
 import type { Navigate } from "../hub/hub-app.tsx";
-import {
-  START_PATH,
-  resetDatabasesPath,
-  restartPath,
-  seedPath,
-  startServicePath,
-} from "../shared/api.ts";
+import { START_PATH, restartPath, seedPath, startServicePath } from "../shared/api.ts";
 import type { StackHome as StackHomeData, Surface } from "../shared/contract.ts";
 import { HavenTopBar } from "../shared/haven-top-bar.tsx";
 import { tabPath } from "../shared/route.ts";
@@ -26,7 +20,6 @@ import { useLifecycle } from "../shared/use-lifecycle.ts";
 import { FactsPanel } from "./facts-panel.tsx";
 import { JobsPanel } from "./jobs-panel.tsx";
 import { RecentErrors } from "./recent-errors.tsx";
-import { ResetDialog } from "./reset-dialog.tsx";
 import { StoresPanel } from "./stores-panel.tsx";
 import { SurfacesPanel } from "./surfaces-panel.tsx";
 
@@ -76,8 +69,6 @@ export type StackHomeProps = {
 export const StackHome = ({ home, now, refresh, stale, tab, sub, navigate }: StackHomeProps) => {
   const current = tabOf({ tab });
   const { busy, act } = useLifecycle({ refresh });
-  const [resetting, setResetting] = useState(false);
-  const database = home.facts.databases.postgres.name;
   const app = home.surfaces.find((surface) => surface.name === "app");
   const restart = () =>
     void act({
@@ -96,13 +87,6 @@ export const StackHome = ({ home, now, refresh, stale, tab, sub, navigate }: Sta
       key: surface.name,
       path: startServicePath({ slug: home.slug, service: surface.start }),
       doing: `start ${surface.start}`,
-    });
-  const resetDatabases = ({ database }: { database: string }) =>
-    void act({
-      key: "reset",
-      path: resetDatabasesPath({ slug: home.slug }),
-      body: { confirm: database },
-      doing: `reset ${home.slug}'s databases`,
     });
   const seed = ({ size, persona }: { size: string; persona: string }) =>
     void act({
@@ -163,33 +147,6 @@ export const StackHome = ({ home, now, refresh, stale, tab, sub, navigate }: Sta
         <Callout title="This stack is not running">
           Its home answers anyway. Start it here, or run <Code>haven up</Code> in{" "}
           <Code>{home.facts.worktreeDir}</Code>.
-        </Callout>
-      )}
-      {home.belowFloor !== "" && (
-        <Callout
-          tone="error"
-          title="This stack's database is older than the supported upgrade floor"
-        >
-          {home.belowFloor}
-          {home.actions.canResetDatabases && (
-            <>
-              {" "}
-              <Button
-                variant="danger"
-                disabled={busy !== undefined}
-                loading={busy === "reset"}
-                onClick={() => setResetting(true)}
-              >
-                Reset databases
-              </Button>
-              <ResetDialog
-                database={database}
-                open={resetting}
-                onClose={() => setResetting(false)}
-                onConfirm={() => resetDatabases({ database })}
-              />
-            </>
-          )}
         </Callout>
       )}
       <Tabs

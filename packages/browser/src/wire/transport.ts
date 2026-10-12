@@ -22,6 +22,9 @@ export const UI_TRPC_ENDPOINT = "/api/trpc";
  */
 export const UI_SSE_ENDPOINT_PREFIX = "/api/sse/";
 
+/** Marks a polling read; auth's API door reads it (browser-session-verification.service.ts). */
+export const UI_BACKGROUND_READ_HEADER = "x-langwatch-background-read";
+
 /**
  * `EventSource` takes no relative URL and must stay same-origin for the
  * session cookie to ride along, so this resolves the document's own origin
@@ -67,10 +70,21 @@ function uiFeatureApiLinks({
     url,
     fetch: (input, init) => (fetch ?? globalThis.fetch)(input, { ...init, keepalive: true }),
   });
+  // A polling read opts in with `context: { background: true }`: the session it
+  // rides on is judged against its idle window but not kept alive by it.
+  const backgroundRouting = httpLink({
+    url,
+    ...(fetch ? { fetch } : {}),
+    headers: { [UI_BACKGROUND_READ_HEADER]: "1" },
+  });
   const httpRouting = splitLink({
     condition: (operation) => operation.context.keepalive === true,
     true: keepaliveRouting,
-    false: plainRouting,
+    false: splitLink({
+      condition: (operation) => operation.context.background === true,
+      true: backgroundRouting,
+      false: plainRouting,
+    }),
   });
 
   return [

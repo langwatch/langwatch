@@ -37,6 +37,7 @@ import {
   statusOfActivationCode,
 } from "../rules/activation-code.rules.ts";
 import { isInstanceIdShape } from "../rules/license-token.rules.ts";
+import { signedLiteSeats, storedLiteSeats } from "../rules/lite-seats.rules.ts";
 
 const HOURS_PER_DAY = 24;
 
@@ -102,9 +103,9 @@ export class ActivationCodeService {
       planType: input.planType,
       // Resolved now, the way a license issued directly is, so the row shows
       // the lite seats the minted license will carry.
-      ...licenseSeats({
-        members: input.maxMembers,
-        membersLite: resolveMembersLite({
+      maxMembers: input.maxMembers,
+      ...storedLiteSeats({
+        signed: resolveMembersLite({
           planType: input.planType,
           maxMembersLite: input.maxMembersLite,
         }),
@@ -251,7 +252,7 @@ export class ActivationCodeService {
       customer: { organizationId: row.organizationId },
       email: row.email,
       planType: row.planType,
-      ...licenseSeats({ members: row.maxMembers, membersLite: row.maxMembersLite }),
+      ...licenseSeats({ members: row.maxMembers, membersLite: signedLiteSeats(row).membersLite }),
       expiresAt,
       terms: { services: entitledConnectServices(row.services) },
       operatorId: this.collaborators.systemActorId,

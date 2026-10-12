@@ -23,12 +23,12 @@ import {
 } from "@langwatch/automation-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
+  Alert,
   Box,
   Button,
   HStack,
   Skeleton,
   Spacer,
-  Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -681,24 +681,16 @@ function cadenceModeOf({
  */
 function EmailLinkLandingBanner() {
   return (
-    <Box
-      mb={3}
-      padding={3}
-      borderRadius="md"
-      border="1px solid"
-      colorPalette="blue"
-      borderColor="colorPalette.muted"
-      bg="colorPalette.subtle"
-    >
-      <HStack gap={2} align="start">
-        <Box color="colorPalette.fg" flexShrink={0} mt="2px">
-          <Mail size={16} />
-        </Box>
-        <Text textStyle="sm" color="fg">
+    <Alert.Root status="info" marginBottom={3}>
+      <Alert.Indicator>
+        <Mail />
+      </Alert.Indicator>
+      <Alert.Content>
+        <Alert.Description>
           Opened from an email notification. You're editing the automation that sent it.
-        </Text>
-      </HStack>
-    </Box>
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 
@@ -1465,18 +1457,14 @@ function DrawerBodyContent({
 }) {
   if (editError) {
     return (
-      <Box
-        padding={3}
-        borderRadius="md"
-        border="1px solid"
-        colorPalette="red"
-        borderColor="colorPalette.muted"
-        bg="colorPalette.subtle"
-      >
-        <Text textStyle="sm" color="fg">
-          Couldn't load this {noun}. Close the drawer and try again.
-        </Text>
-      </Box>
+      <Alert.Root status="error">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Description>
+            Couldn't load this {noun}. Close the drawer and try again.
+          </Alert.Description>
+        </Alert.Content>
+      </Alert.Root>
     );
   }
   if (editLoading) {

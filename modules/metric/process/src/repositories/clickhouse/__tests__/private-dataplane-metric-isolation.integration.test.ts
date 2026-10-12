@@ -148,7 +148,6 @@ describe("given one organization on a private ClickHouse instance and one on the
             await ClickHouseMigrateTask.createFromConfig({
               config: {
                 buildTime: false,
-                skipped: false,
                 sharedUrl: endpoint.url,
                 privateEndpoints: [],
                 settings: {

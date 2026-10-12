@@ -16,8 +16,9 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b tsconfig.json tsconfig.test.json",
-    "test": "vitest run"
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
+    "test": "vitest run",
+    "test:repo": "vitest run --config vitest.repo.config.ts"
   },
   "dependencies": {
     "@ag-ui/core": "~0.0.57",

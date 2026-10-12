@@ -67,7 +67,7 @@ type waitPass struct {
 
 // waitMoves are the route moves one service needs, under its name and aliases.
 func (o *Orchestrator) waitMoves(pass waitPass, slug string, svc *domain.Service) []func() {
-	if svc.Port == 0 || svc.IsFallback || svc.Name == domain.ClickHouseService || svc.Name == domain.PostgresService {
+	if svc.Port == 0 || svc.IsFallback || svc.Name == domain.ClickHouseService || svc.Name == domain.PostgresService || svc.Name == domain.RedisService {
 		return nil
 	}
 	up := pass.leaving || o.sys.PortInUse(svc.Port)
@@ -79,6 +79,9 @@ func (o *Orchestrator) waitMoves(pass waitPass, slug string, svc *domain.Service
 	for _, name := range append([]string{svc.Name}, domain.ServiceHostAliases[svc.Name]...) {
 		port, has := pass.routes[o.cfg.Naming.Hostname(name, slug)]
 		switch {
+		case !has && up:
+			// A route lost to a racing teardown or a concurrent portless write comes back.
+			moves = append(moves, o.registerRoute(name, slug, svc.Port))
 		case has && port == svc.Port && waiting:
 			moves = append(moves, o.registerRoute(name, slug, pass.daemonPort))
 		case has && port == pass.daemonPort && up:

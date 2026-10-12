@@ -439,6 +439,10 @@
       "types": "./dist/components/layout/settings-card.d.ts",
       "default": "./src/components/layout/settings-card.tsx"
     },
+    "./scroll-fade": {
+      "types": "./dist/components/layout/scroll-fade.d.ts",
+      "default": "./src/components/layout/scroll-fade.tsx"
+    },
     "./section-navigation-frame": {
       "types": "./dist/components/layout/section-navigation-frame.d.ts",
       "default": "./src/components/layout/section-navigation-frame.tsx"
@@ -507,7 +511,7 @@
   "scripts": {
     "storybook": "storybook dev --port 6006",
     "build:storybook": "storybook build",
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
@@ -544,6 +548,7 @@
     "@types/react-dom": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "jsdom": "catalog:",
+    "oxc-parser": "catalog:",
     "playwright": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",

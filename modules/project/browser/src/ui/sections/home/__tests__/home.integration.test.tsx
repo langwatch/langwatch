@@ -39,6 +39,7 @@ vi.mock("../../../../behavior/home-api.ts", () => ({
 }));
 vi.mock("../../../../behavior/lent-peers.tsx", () => ({
   PendingJoinRequests: () => null,
+  UpgradeActionNeeded: () => null,
   GuidedOnboardingOffer: (props: { space: string; spaceInUse?: boolean | null }) => (
     <div
       data-testid="guided-offer"

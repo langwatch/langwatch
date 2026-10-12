@@ -24,7 +24,10 @@ import {
   TRACE_IDENTITY_COLUMNS,
   tableAliases,
 } from "./clickhouse.field-mappings.mapper.ts";
-import { translateAllFilters } from "./clickhouse.filter-translator.mapper.ts";
+import {
+  type FilterTranslation,
+  translateAllFilters,
+} from "./clickhouse.filter-translator.mapper.ts";
 import {
   latestVersionSubquery,
   parseLatestVersionColumn,
@@ -958,16 +961,20 @@ function translateSeriesMetric({
 function buildScopedFilterWhere({
   ts,
   input,
-  filterWhereClause,
+  filters,
 }: {
   ts: string;
   input: TimeseriesQueryInput;
-  filterWhereClause: string;
+  filters: FilterTranslation;
 }): { filterWhere: string; params: Record<string, unknown> } {
   const conditions: string[] = [];
   const params: Record<string, unknown> = {};
-  if (filterWhereClause !== "1=1") {
-    conditions.push(input.negateFilters ? `NOT (${filterWhereClause})` : filterWhereClause);
+  if (filters.whereClause !== "1=1") {
+    conditions.push(
+      input.negateFilters
+        ? (filters.negatedWhereClause ?? `NOT (${filters.whereClause})`)
+        : filters.whereClause,
+    );
   }
   if (input.traceIds && input.traceIds.length > 0) {
     conditions.push(`${ts}.TraceId IN ({traceIds:Array(String)})`);
@@ -1107,7 +1114,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const scope = buildScopedFilterWhere({
     ts,
     input,
-    filterWhereClause: filterTranslation.whereClause,
+    filters: filterTranslation,
   });
   Object.assign(allTranslationParams, scope.params);
   const filterWhere = scope.filterWhere;

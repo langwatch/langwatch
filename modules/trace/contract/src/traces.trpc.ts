@@ -403,10 +403,7 @@ export const tracesTrpc = defineTrpcContract("traces")
   )
   .withOutput(facetValuesResultSchema)
 
-  /**
-   * The AI composer's query translation. `service_unavailable` until a
-   * model-invocation capability is wired — see the handoff for the gap.
-   */
+  /** The AI composer's query translation, on the project's `traces.ai_search` model. */
   .mutation("aiQuery")
   .withInput(
     z.object({
@@ -417,11 +414,7 @@ export const tracesTrpc = defineTrpcContract("traces")
   )
   .withOutput(aiQueryResultSchema)
 
-  /**
-   * Higher-level AI action — the model picks between filtering and creating
-   * a saved lens. `service_unavailable` until a model-invocation capability
-   * is wired — see the handoff for the gap.
-   */
+  /** Higher-level AI action: the model picks between filtering and creating a saved lens. */
   .mutation("aiAction")
   .withInput(
     z.object({
@@ -435,7 +428,6 @@ export const tracesTrpc = defineTrpcContract("traces")
   /**
    * Enter on a sentence. The client calls this only when the submitted text
    * has bare words; a pure `field:value` query is applied without a call.
-   * `service_unavailable` until a model-invocation capability is wired.
    */
   .mutation("routeSearch")
   .withInput(routeSearchInputSchema)

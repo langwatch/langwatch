@@ -1,15 +1,10 @@
 import type { ScopedSecrets } from "@langwatch/secrets";
 
-import { clickhouseRoutesOf } from "./clickhouse-routes.ts";
+import { clickhouseRouteFamilyOf } from "./clickhouse-routes.ts";
 import { storesOwner, type StoresConfig } from "./config-owner.ts";
-import type {
-  ClickHousePrivateRoute,
-  ObjectStorageAzureConfig,
-  ObjectStorageConfig,
-  ProcessConfig,
-} from "./config.ts";
+import type { ObjectStorageAzureConfig, ObjectStorageConfig, ProcessConfig } from "./config.ts";
 import { buildProcessStores, type ProcessStores } from "./create-members.ts";
-import { objectStoragePrivateAccountsOf } from "./object-storage-private-accounts.ts";
+import { objectStoragePrivateFamilyOf } from "./object-storage-private-accounts.ts";
 import type { PipelineParticipation } from "./pipeline-selection.ts";
 
 /** The documented single-replica root, when a filesystem deployment names none. */
@@ -74,14 +69,18 @@ function objectStorageConfig(options: {
   const azure = azureConfigOf({ settings: settings.azure, values, production });
   const file = { backend: "file", root: settings.localRoot ?? DEFAULT_LOCAL_STORAGE_ROOT } as const;
   // An organisation with its own S3 account is placed there whatever the shared backend is.
-  const privateAccounts = objectStoragePrivateAccountsOf({
+  const { accounts, malformed } = objectStoragePrivateFamilyOf({
     family: values.dataplaneS3,
     ...(settings.s3.region ? { region: settings.s3.region } : {}),
   });
+  const privateAccounts = {
+    privateAccounts: accounts,
+    ...(malformed.length > 0 ? { malformedPrivateAccounts: malformed } : {}),
+  };
   switch (backend) {
     case "s3":
       // The legacy S3 selector with no bucket keeps its documented local-filesystem fallback.
-      if (!bucket) return { ...file, privateAccounts, legacyAzure: azure };
+      if (!bucket) return { ...file, ...privateAccounts, legacyAzure: azure };
       return {
         backend,
         s3: {
@@ -90,13 +89,13 @@ function objectStorageConfig(options: {
           ...(settings.s3.region ? { region: settings.s3.region } : {}),
           ...s3Credentials(values),
         },
-        privateAccounts,
+        ...privateAccounts,
         legacyAzure: azure,
       };
     case "azure":
-      return { backend, azure, privateAccounts };
+      return { backend, azure, ...privateAccounts };
     case "file":
-      return { ...file, privateAccounts, legacyAzure: azure };
+      return { ...file, ...privateAccounts, legacyAzure: azure };
   }
 }
 
@@ -109,7 +108,7 @@ function processConfigOf(options: {
     clickhouse: string | undefined;
     redis: string | undefined;
   }>;
-  clickhouseRoutes: readonly ClickHousePrivateRoute[];
+  clickhouseRoutes: ReturnType<typeof clickhouseRouteFamilyOf>;
   encryption: string | undefined;
   previousEncryption: string | undefined;
   storage: StorageSecrets;
@@ -120,11 +119,16 @@ function processConfigOf(options: {
   const previousEncryptionKey = options.previousEncryption;
   // A deployment whose every tenant is private names no shared URL, and still has ClickHouse.
   const clickhouse =
-    urls.clickhouse || clickhouseRoutes.length > 0
+    urls.clickhouse || clickhouseRoutes.routes.length > 0
       ? {
           clickhouse: {
             ...(urls.clickhouse ? { url: urls.clickhouse } : {}),
-            ...(clickhouseRoutes.length > 0 ? { privateRoutes: clickhouseRoutes } : {}),
+            ...(clickhouseRoutes.routes.length > 0
+              ? { privateRoutes: clickhouseRoutes.routes }
+              : {}),
+            ...(clickhouseRoutes.malformed.length > 0
+              ? { malformedRoutes: clickhouseRoutes.malformed }
+              : {}),
             poolSizing: config.clickhousePool,
             ...(config.clickhouseStatementLaneReserveShare === undefined
               ? {}
@@ -183,7 +187,7 @@ export function openStores(options: {
                       config,
                       pipelines,
                       urls: { database, clickhouse, redis },
-                      clickhouseRoutes: clickhouseRoutesOf(routes),
+                      clickhouseRoutes: clickhouseRouteFamilyOf(routes),
                       encryption: credentials ?? session,
                       previousEncryption: previous,
                       storage,

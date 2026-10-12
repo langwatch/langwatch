@@ -1,6 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
-  DepartmentScopeOwnershipUnavailableError,
   dataPrivacyConfigSchema,
   InvalidDataPrivacyConfigError,
   ScopeTargetNotFoundError,
@@ -14,6 +13,7 @@ import {
 import { overBroadSecretPatternProbe } from "@langwatch/redaction";
 import safe from "safe-regex2";
 
+import type { DataPrivacyDirectoryReader } from "../app/data-privacy.app.ts";
 import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository.ts";
 import {
   publicPiiRedactionLevel,
@@ -27,6 +27,8 @@ import { DataPrivacyResolutionService } from "./data-privacy-resolution.service.
 type ScopeLineage = Pick<AuthzApi, "checkScopeLineage">;
 
 type ScopeFacts = Pick<DataPrivacyProjectScopeService, "getScopeFacts">;
+/** The organization a department belongs to, as main read it (dataPrivacyPolicy.authz.ts:50). */
+type DepartmentOwners = Pick<DataPrivacyDirectoryReader, "findScopeOrganizationId">;
 
 export class DataPrivacyService {
   private readonly repository: DataPrivacyPolicyRepository;
@@ -34,6 +36,7 @@ export class DataPrivacyService {
   private readonly resolution: DataPrivacyResolutionService;
   private readonly scopes: ScopeFacts;
   private readonly lineage: ScopeLineage;
+  private readonly departments: DepartmentOwners;
 
   private constructor({
     repository,
@@ -41,24 +44,28 @@ export class DataPrivacyService {
     resolution,
     scopes,
     lineage,
+    departments,
   }: {
     repository: DataPrivacyPolicyRepository;
     cache: DataPrivacyPolicyCacheService;
     resolution: DataPrivacyResolutionService;
     scopes: ScopeFacts;
     lineage: ScopeLineage;
+    departments: DepartmentOwners;
   }) {
     this.repository = repository;
     this.cache = cache;
     this.resolution = resolution;
     this.scopes = scopes;
     this.lineage = lineage;
+    this.departments = departments;
   }
 
   static create(options: {
     repository: DataPrivacyPolicyRepository;
     scopes: ScopeFacts;
     lineage: ScopeLineage;
+    departments: DepartmentOwners;
     ttlMs?: number;
     now?: () => number;
   }): DataPrivacyService {
@@ -78,6 +85,7 @@ export class DataPrivacyService {
       }),
       scopes: options.scopes,
       lineage: options.lineage,
+      departments: options.departments,
     });
   }
 
@@ -172,7 +180,14 @@ export class DataPrivacyService {
       return input.organizationId;
     }
 
-    throw new DepartmentScopeOwnershipUnavailableError();
+    const departmentOrganizationId = await this.departments.findScopeOrganizationId({
+      scope: input.scope,
+    });
+    if (departmentOrganizationId !== input.organizationId) {
+      throw new ScopeTargetNotFoundError();
+    }
+
+    return input.organizationId;
   }
 
   private validated(config: DataPrivacyConfig): DataPrivacyConfig {

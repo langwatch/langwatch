@@ -210,16 +210,11 @@ func (System) GroupRSS(pid int) uint64 {
 }
 
 // TotalMemory returns the machine's physical RAM in bytes (0 if undetectable).
-// darwin: sysctl hw.memsize; linux: /proc/meminfo MemTotal.
+// darwin: the hw.memsize sysctl, read in-process; linux: /proc/meminfo MemTotal.
 func (System) TotalMemory() uint64 {
 	switch runtime.GOOS {
 	case "darwin":
-		out, err := probe("sysctl", "-n", "hw.memsize")
-		if err != nil {
-			return 0
-		}
-		n, _ := strconv.ParseUint(strings.TrimSpace(string(out)), 10, 64)
-		return n
+		return darwinMemSize()
 	case "linux":
 		f, err := os.Open("/proc/meminfo")
 		if err != nil {
@@ -439,4 +434,37 @@ func (System) OrphanedWorkers(marker string) []int {
 		}
 	}
 	return orphans
+}
+
+// ProcessCwds reads each pid's working directory with one lsof call (macOS has
+// no /proc). lsof exits non-zero when any pid has gone, so its output is read
+// whatever the exit status.
+func (System) ProcessCwds(pids []int) map[int]string {
+	out := map[int]string{}
+	if len(pids) == 0 {
+		return out
+	}
+	list := make([]string, 0, len(pids))
+	for _, pid := range pids {
+		if pid > 0 {
+			list = append(list, strconv.Itoa(pid))
+		}
+	}
+	raw, _ := probe("lsof", "-a", "-d", "cwd", "-Fn", "-p", strings.Join(list, ","))
+	return parseLsofCwds(string(raw))
+}
+
+// parseLsofCwds reads lsof's field output: a "p<pid>" line, then "n<path>".
+func parseLsofCwds(raw string) map[int]string {
+	out := map[int]string{}
+	pid := 0
+	for line := range strings.SplitSeq(raw, "\n") {
+		switch {
+		case strings.HasPrefix(line, "p"):
+			pid, _ = strconv.Atoi(line[1:])
+		case strings.HasPrefix(line, "n") && pid > 0:
+			out[pid] = line[1:]
+		}
+	}
+	return out
 }

@@ -6,6 +6,7 @@
 import type { ApiKeyListEntry, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -13,7 +14,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   HStack,
   Skeleton,
   Spacer,
@@ -499,40 +499,36 @@ export default function ApiKeysScreen() {
               testId="api-keys-empty"
             />
           ) : (
-            <Card.Root width="full" overflow="hidden">
-              <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-                <Table.Root variant="line" size="md" width="full">
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader minWidth="220px">Name</Table.ColumnHeader>
-                      <Table.ColumnHeader>Status</Table.ColumnHeader>
-                      <Table.ColumnHeader whiteSpace="nowrap">Secret key</Table.ColumnHeader>
-                      <Table.ColumnHeader>Created</Table.ColumnHeader>
-                      <Table.ColumnHeader whiteSpace="nowrap">Last used</Table.ColumnHeader>
-                      <Table.ColumnHeader>Type</Table.ColumnHeader>
-                      <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                      <Table.ColumnHeader>Permissions</Table.ColumnHeader>
-                      <Table.ColumnHeader width="100px"></Table.ColumnHeader>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {isLoadingKeys && <LoadingKeyRows />}
-                    {filteredKeys.map((apiKey) => (
-                      <ApiKeyTableRow
-                        key={apiKey.id}
-                        apiKey={apiKey}
-                        scopeBadge={getScopeBadge(apiKey)}
-                        canModify={isAdmin || apiKey.userId === currentUserId}
-                        onEdit={setApiKeyToEdit}
-                        onRevoke={setApiKeyToRevoke}
-                      />
-                    ))}
+            <ListTable size="md" width="full">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader minWidth="220px">Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Status</Table.ColumnHeader>
+                  <Table.ColumnHeader whiteSpace="nowrap">Secret key</Table.ColumnHeader>
+                  <Table.ColumnHeader>Created</Table.ColumnHeader>
+                  <Table.ColumnHeader whiteSpace="nowrap">Last used</Table.ColumnHeader>
+                  <Table.ColumnHeader>Type</Table.ColumnHeader>
+                  <Table.ColumnHeader>Scope</Table.ColumnHeader>
+                  <Table.ColumnHeader>Permissions</Table.ColumnHeader>
+                  <Table.ColumnHeader width="100px"></Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {isLoadingKeys && <LoadingKeyRows />}
+                {filteredKeys.map((apiKey) => (
+                  <ApiKeyTableRow
+                    key={apiKey.id}
+                    apiKey={apiKey}
+                    scopeBadge={getScopeBadge(apiKey)}
+                    canModify={isAdmin || apiKey.userId === currentUserId}
+                    onEdit={setApiKeyToEdit}
+                    onRevoke={setApiKeyToRevoke}
+                  />
+                ))}
 
-                    {!isLoadingKeys && filteredKeys.length === 0 && <NoMatchingKeysRow />}
-                  </Table.Body>
-                </Table.Root>
-              </Card.Body>
-            </Card.Root>
+                {!isLoadingKeys && filteredKeys.length === 0 && <NoMatchingKeysRow />}
+              </Table.Body>
+            </ListTable>
           )}
 
           {/* Ingestion keys render below the API keys table. */}

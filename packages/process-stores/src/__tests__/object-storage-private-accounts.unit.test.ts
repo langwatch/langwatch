@@ -35,6 +35,8 @@ describe("given the stores' DATAPLANE_S3__ family", () => {
       expect(accounts).toEqual([
         {
           organizationId: "org123",
+          label: "acme",
+          variable: "DATAPLANE_S3__acme__org123",
           bucket: "acme-dataplane",
           endpoint: "https://s3.acme.invalid",
           credentials: { accessKeyId: "content-marker", secretAccessKey: "content-marker" },

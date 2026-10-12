@@ -274,7 +274,7 @@ contract; insight knows nothing of ops.
   `hour`, `timezone`, `maxInsights`), which the setting now writes, so the schedule
   needed no migration. `lastRunRenewed` is written by every outcome since renewal;
   an outcome stored before it reads as none renewed. `InsightProjection` gained the
-  nullable `findingKey` (migration `20261010120032`).
+  nullable `findingKey` (migration `20261011160032`).
 - A brief written before renewal differs from one written after it, so a run in flight
   across that deploy that is retried ends `failed` with `brief_changed`, once. The same
   holds across the deploy that moved the method into the skill.
@@ -328,7 +328,7 @@ contract; insight knows nothing of ops.
   contracts (the organisation's member removed, the project's archived). Ops gains
   `InsightApi` as a peer.
 - `InsightDailyScheduleProjection` gained `offReason`, `consecutiveSkips` and
-  `skipStreakSlot` (migration `20261011090000`). The projection's version did not
+  `skipStreakSlot` (migration `20261011160040`). The projection's version did not
   change: a row folded before the migration reads no reason and no skipped day, and
   counts from its next run. A schedule a missing board turned off before the migration
   reads off with no reason, so its control shows the quiet switch.

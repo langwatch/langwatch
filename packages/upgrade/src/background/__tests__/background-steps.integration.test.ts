@@ -106,6 +106,7 @@ function serviceOver({
       markRunning: (input) => runner.markRunning(input),
       setStatus: (input) => runner.setStatus(input),
       saveReport: (input) => runner.saveReport(input),
+      reopen: (input) => runner.reopenDoneSteps({ ...input, from: "running" }),
     },
     steps: [step],
     serving: () => true,

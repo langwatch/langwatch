@@ -63,6 +63,6 @@ haven sim storage object <bucket> <key> [--raw]     # --raw writes the stored by
 haven sim storage delete <bucket> <key>
 haven sim storage clear [bucket]                    # every bucket without one
 haven sim storage presign <bucket> <key> [--put] [--expires=<s>]   # GET by default, 3600 s
-haven sim storage fault --error <0|4xx|5xx>      # PUT/GET object refused with that status; 0 clears it
+haven sim storage fault <4xx|5xx|off>            # PUT/GET object refused with that status; off clears it
 haven sim storage seed                              # the demo objects, as STORAGESIM_SEED does
 ```

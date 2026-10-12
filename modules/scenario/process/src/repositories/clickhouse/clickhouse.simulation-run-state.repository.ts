@@ -1,3 +1,4 @@
+import { ClickHouseColumns } from "@langwatch/clickhouse-client";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -28,7 +29,7 @@ import type { SimulationEventingClickHouseResolver } from "./clickhouse.simulati
 import {
   type ClickHouseCriteriaColumns,
   columnsToCriteria,
-  CRITERIA_COLUMNS_SQL,
+  CRITERIA_COLUMNS,
   criteriaToColumns,
 } from "./simulation-criteria.mapper.ts";
 
@@ -239,6 +240,8 @@ export class ClickHouseSimulationRunStateRepository<
 
     try {
       const client = await this.options.resolveClient(context.tenantId);
+      const input = { table: TABLE_NAME, alias: "t", columns: CRITERIA_COLUMNS };
+      const criteria = (await client.select?.(input)) ?? ClickHouseColumns.named(input);
       // Latest-version read via scalar equality on UpdatedAt (PREWHERE-able for heavy columns).
       // IN-tuple form causes OOM on runs with many snapshots; scalar is better for single-row gets.
       const result = await client.query({
@@ -258,7 +261,7 @@ export class ClickHouseSimulationRunStateRepository<
             t.Verdict AS Verdict, t.Reasoning AS Reasoning,
             t.MetCriteria AS MetCriteria, t.UnmetCriteria AS UnmetCriteria,
             t.InconclusiveCriteria AS InconclusiveCriteria,
-            ${CRITERIA_COLUMNS_SQL.replaceAll("`Criteria.", "t.`Criteria.")},
+            ${criteria},
             t.Error AS Error,
             ${EVALUATION_COLUMNS_SQL.replaceAll("`Evaluations.", "t.`Evaluations.")},
             toString(t.DurationMs) AS DurationMs,

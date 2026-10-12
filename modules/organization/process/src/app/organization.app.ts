@@ -189,6 +189,7 @@ import type { OrganizationSignals } from "../services/organization-signals.servi
 import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
 import type { OrganizationDemoProject } from "../services/organization-visibility.service.ts";
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
+import { PrivateDataplaneRecordService } from "../services/private-dataplane-record.service.ts";
 import { SeatLimitNoticeService } from "../services/seat-limit-notice.service.ts";
 import { SignUpPolicyService } from "../services/sign-up-policy.service.ts";
 import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
@@ -392,6 +393,11 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       createAndAssign: (input, by) => application.createAndAssign(input, by),
       ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
     });
+    application.#privateDataplanes = PrivateDataplaneRecordService.create({
+      routes: setup.repositories.privateClickHouseRoutes,
+      accounts: setup.repositories.privateS3Accounts,
+      organizations: setup.repositories.organization,
+    });
     application.#signUpPolicy = SignUpPolicyService.create({
       settings: setup.config.signUp,
       repository: setup.repositories.signUpPolicy,
@@ -501,6 +507,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #invitationDoor!: OrganizationInvitationDoorService;
   #joinRequests!: OrganizationJoinRequests;
   #initialization!: OrganizationInitializationService;
+  #privateDataplanes!: PrivateDataplaneRecordService;
   /** Who may sign up and found an organization; absent only in a test's app, which is open. */
   #signUpPolicy: SignUpPolicyService | null = null;
   /** organization_audit's sender, once registration answers with it. */
@@ -770,6 +777,10 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]> {
     return this.#dependencies.membership.listProvisioningSummaries();
+  }
+
+  ensureSystemOrganization(): Promise<{ id: string }> {
+    return this.#dependencies.membership.ensureSystemOrganization();
   }
 
   findProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary | null> {
@@ -1563,6 +1574,11 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   }
 
   /** Records one organization's stored presence switch, for the backfill task. */
+  /** Records the organizations routed to their own ClickHouse or S3; the worker's job calls it. */
+  recordPrivateDataplanes(): Promise<{ organizations: number }> {
+    return this.#privateDataplanes.recordSeen();
+  }
+
   recordStoredPresenceSetting(input: { organizationId: string }): Promise<boolean> {
     return this.#dependencies.organizations.recordStoredPresenceSetting(input);
   }

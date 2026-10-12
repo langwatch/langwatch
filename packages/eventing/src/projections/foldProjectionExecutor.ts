@@ -250,7 +250,18 @@ export class FoldProjectionExecutor {
     // attempt consulted the cache moments ago, so a second cache read is a
     // guaranteed miss that would only skew the cache metrics.
     const { readWindow: _readWindow, ...rest } = context;
-    const unwindowed = await read({ ...rest, bypassReadCache: true });
+    const lookbackStepsMs = projection.options?.readWindow?.fallbackLookbackStepsMs;
+    const unwindowed =
+      lookbackStepsMs === undefined || context.occurredAtMs === undefined
+        ? await read({ ...rest, bypassReadCache: true })
+        : await this.readWideningBack({
+            read,
+            missed: windowed,
+            context: { ...rest, bypassReadCache: true },
+            anchorMs: context.occurredAtMs,
+            toMs: context.readWindow.toMs,
+            lookbackStepsMs,
+          });
     incrementEsFoldReadWindowFallbackTotal(
       projectionName,
       unwindowed.state !== null ? "recovered" : "absent",
@@ -274,6 +285,36 @@ export class FoldProjectionExecutor {
       );
     }
     return unwindowed;
+  }
+
+  /**
+   * The bounded fallback a fold declares in place of one unbounded read: windows reaching each
+   * step back from the event, narrowest first, stopping at the first row found or refused.
+   */
+  private async readWideningBack<
+    Result extends { state: unknown; miss?: "absent" | "undecodable" },
+  >({
+    read,
+    missed,
+    context,
+    anchorMs,
+    toMs,
+    lookbackStepsMs,
+  }: {
+    read: (readContext: ProjectionStoreContext) => Promise<Result>;
+    /** The windowed read's miss, answered when no step is declared. */
+    missed: Result;
+    context: ProjectionStoreContext;
+    anchorMs: number;
+    toMs: number;
+    lookbackStepsMs: readonly number[];
+  }): Promise<Result> {
+    let last = missed;
+    for (const lookbackMs of lookbackStepsMs) {
+      last = await read({ ...context, readWindow: { fromMs: anchorMs - lookbackMs, toMs } });
+      if (last.state !== null || last.miss === "undecodable") return last;
+    }
+    return last;
   }
 
   /**

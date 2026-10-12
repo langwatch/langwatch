@@ -7,10 +7,11 @@ import { createRestRuntime } from "@langwatch/api/rest";
  */
 import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { type OtlpIngestCredential } from "@langwatch/otlp/door";
 import { LocalFeatureApis } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
-import { TraceApi, type OtlpIngestCredential } from "@langwatch/trace-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";

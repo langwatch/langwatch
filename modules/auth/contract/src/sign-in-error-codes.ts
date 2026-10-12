@@ -63,6 +63,9 @@ export const STABLE_AUTH_ERRORS = [
   "sso_issuer_mismatch",
   // The installation's sign-up policy does not admit this address: an invitation has to change.
   "auth_sign_up_restricted",
+  // The connection's arrival policy refused or held a newcomer: an administrator has to act.
+  "identity_jit_disabled",
+  "identity_link_proposed",
 ] as const;
 
 export const isStableAuthError = (error: string | null | undefined): boolean =>

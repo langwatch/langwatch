@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "Make Project.slug required. Every project should have one now.",
-      "expected_output": "Never SET NOT NULL on a populated column (set-not-null-on-populated-column, no escape hatch). Writers set slug from release A, a data step fills the gaps, and the application enforces it. If the database must enforce it, once the LTS floor is at or above A, add CHECK (\"slug\" IS NOT NULL) NOT VALID guarded by a DO $$ block, and VALIDATE CONSTRAINT in a later migration.",
+      "expected_output": "Never SET NOT NULL on a populated column (set-not-null-on-populated-column, no escape hatch). Writers set slug from release A, a data step fills the gaps, and the application enforces it. If the database must enforce it, once old writers are gone, add CHECK (\"slug\" IS NOT NULL) NOT VALID guarded by a DO $$ block, and VALIDATE CONSTRAINT in a later migration.",
       "files": []
     },
     {
@@ -22,7 +22,7 @@
     {
       "id": 4,
       "prompt": "Rename the column Monitor.name to Monitor.displayName. Prisma generated RENAME COLUMN, so just commit that.",
-      "expected_output": "Refuses the generated SQL (rename-in-place) and generates with prisma migrate dev --create-only to edit it. Expand: ADD COLUMN IF NOT EXISTS \"displayName\" beside the old; migrate: dual-write from release A and copy with a background .withMigrations step (never an inline UPDATE on an existing table), readers switch or read coalesce(new, old); contract: drop \"name\" only when the floor is at or above A, with `-- contract: retired in <release>`.",
+      "expected_output": "Refuses the generated SQL (rename-in-place) and generates with prisma migrate dev --create-only to edit it. Expand: ADD COLUMN IF NOT EXISTS \"displayName\" beside the old; migrate: dual-write from release A and copy with a background .withMigrations step (never an inline UPDATE on an existing table), readers switch or read coalesce(new, old); contract: drop \"name\" only once old writers are gone (needsOldWritersGone), with `-- contract: retired in <release>`.",
       "files": []
     },
     {

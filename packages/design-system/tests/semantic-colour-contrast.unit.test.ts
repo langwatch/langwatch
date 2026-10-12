@@ -132,3 +132,30 @@ describe("main palette contrast", () => {
     );
   });
 });
+
+describe("terminal colour parity", () => {
+  it.each([
+    ["terminal.fg", "fg"],
+    ["terminal.bg", "bg.card"],
+    ["terminal.black", "fg.subtle"],
+    ["terminal.red", "red.fg"],
+    ["terminal.green", "green.fg"],
+    ["terminal.yellow", "yellow.fg"],
+    ["terminal.blue", "blue.fg"],
+    ["terminal.magenta", "purple.fg"],
+    ["terminal.cyan", "cyan.fg"],
+    ["terminal.white", "fg"],
+    ["terminal.brightBlack", "fg.muted"],
+    ["terminal.brightRed", "red.fg"],
+    ["terminal.brightGreen", "green.fg"],
+    ["terminal.brightYellow", "yellow.fg"],
+    ["terminal.brightBlue", "blue.fg"],
+    ["terminal.brightMagenta", "pink.fg"],
+    ["terminal.brightCyan", "cyan.fg"],
+    ["terminal.brightWhite", "fg"],
+  ])("preserves %s as %s in both modes", (terminal, previous) => {
+    for (const mode of ["_light", "_dark"] satisfies Mode[]) {
+      expect(resolve(terminal, mode)).toBe(resolve(previous, mode));
+    }
+  });
+});

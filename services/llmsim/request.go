@@ -33,6 +33,7 @@ type request struct {
 	maxTokens    int
 	stream       bool
 	includeUsage bool
+	altSSE       bool // Gemini: stream as SSE (?alt=sse), not a JSON array
 	seedBytes    []byte
 }
 
@@ -290,6 +291,13 @@ func (s *Server) answer(h http.Header, req request) reply {
 		rep = reply{Mode: "canned", Text: text, Finish: "stop"}
 	} else if strings.EqualFold(h.Get(HeaderMode), "langy") || strings.Contains(req.model, "langy-echo") {
 		rep = langy(req, r)
+	} else if scriptedTools(req) {
+		rep = langy(req, r)
+		rep.Mode = "scripted"
+	} else if object, ok := scriptedJSON(req); ok {
+		rep = reply{Mode: "scripted", Text: object, Finish: "stop"}
+	} else if object, ok := s.takeNextJSON(req); ok {
+		rep = reply{Mode: "scripted", Text: object, Finish: "stop"}
 	} else {
 		rep = s.markovReply(req, r, toolsMode(h, req.model))
 	}
@@ -304,6 +312,35 @@ func (s *Server) answer(h http.Header, req request) reply {
 	}
 	rep.Out = max(rep.Out, 1)
 	return rep
+}
+
+// scriptedTools is true when tools are offered and the last user message holds
+// "/tool <name> <json args>" lines: any model then makes exactly those calls, so an
+// agent whose model cannot be switched to langy-echo can still be steered.
+func scriptedTools(req request) bool {
+	user := lastUserTurn(req.turns)
+	if len(req.tools) == 0 || user < 0 {
+		return false
+	}
+	_, scripted := parseScript(req.turns[user].text)
+	return scripted
+}
+
+// scriptedJSON is the object a "/json <object>" line of the last user message names,
+// when the request asks for JSON: a schema-less json_object caller (Ask AI) gets one
+// exact, parseable answer that random schema output would almost never be.
+func scriptedJSON(req request) (string, bool) {
+	user := lastUserTurn(req.turns)
+	if (req.schema == nil && !req.jsonObject) || user < 0 {
+		return "", false
+	}
+	for line := range strings.SplitSeq(req.turns[user].text, "\n") {
+		object, found := strings.CutPrefix(strings.TrimSpace(line), "/json ")
+		if found && json.Valid([]byte(object)) {
+			return strings.TrimSpace(object), true
+		}
+	}
+	return "", false
 }
 
 // toolsMode makes an unforced (auto) tool choice always call a tool: the

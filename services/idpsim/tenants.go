@@ -113,6 +113,13 @@ type Tenant struct {
 	// skew and lastAssertionID are SAML/OIDC fault state (saml_tamper.go); Reset clears both.
 	skew            time.Duration
 	lastAssertionID string
+	// amr is the authentication methods its ID tokens assert (amr.go); Reset clears it.
+	amr []string
+	// emailVerified overrides the email_verified claim its ID tokens carry (email_verified.go); "" keeps the default.
+	emailVerified string
+	// auth0Passwords and auth0Scopes are the Auth0 Management simulation (auth0_management.go); Reset clears both.
+	auth0Passwords map[string]string
+	auth0Scopes    []string
 	// keyVersion numbers Key; previousKey and previousCert are what the last
 	// rotation retired, still published until dropped (RotateKey).
 	keyVersion   int
@@ -203,6 +210,9 @@ func (t *Tenant) Reset() {
 	defer t.mu.Unlock()
 	t.seedUsers()
 	t.skew, t.lastAssertionID = 0, ""
+	t.amr = nil
+	t.emailVerified = ""
+	t.auth0Passwords, t.auth0Scopes = nil, nil
 }
 
 // Users returns a snapshot of the tenant's users.

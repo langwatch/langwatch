@@ -86,8 +86,9 @@ function resolveTsconfig(file: string): Resolved {
 }
 
 /**
- * A solution names other projects and compiles nothing itself (the root `tsconfig.json`, the two
- * declaration groups under `dev/`), so none of the package rules below apply to it.
+ * A solution names other projects, compiles nothing itself and states no options (the root
+ * `tsconfig.json`), so none of the package rules below apply to it. A package's container
+ * tsconfig.json keeps its options for the configs that extend it, so the rules do apply there.
  */
 function isSolution(file: string): boolean {
   const config = readTsconfig(join(REPO_ROOT, file));

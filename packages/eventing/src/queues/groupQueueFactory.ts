@@ -3,12 +3,14 @@ import { randomUUID } from "node:crypto";
 import {
   defineGroupQueue,
   GroupQueueConsumer,
+  GroupQueueError,
   GroupQueueProducer,
   NonRetryableGroupQueueError,
   type GroupQueueDependencies,
   type RunningGroupQueueConsumer,
 } from "@langwatch/group-queue";
 
+import { classifyClickHouseError, ErrorCategory } from "../services/errorHandling.ts";
 import type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./queue.types.ts";
 
 export interface EventingGroupQueueFactoryOptions {
@@ -32,6 +34,47 @@ export async function refuseInvalidValueOnce<T>({
       `Queue ${queueName} refused a value that fails its schema: ${error.message}`,
       { cause: error },
     );
+  }
+}
+
+/** The first error in a cause chain that ClickHouse's own classification calls transient. */
+function overloadedClickHouseError(error: unknown): unknown {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current != null; depth += 1) {
+    if (classifyClickHouseError(current) === ErrorCategory.RECOVERABLE) return current;
+    current = current instanceof Error ? current.cause : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * An overloaded ClickHouse fails a smaller batch just the same, so the batch
+ * names a retry delay: the queue backs it off whole on its own exponential
+ * schedule instead of splitting it (packages/group-queue/specs/batch-bisection.feature).
+ */
+export async function backOffWhenOverloaded<T>({
+  queueName,
+  run,
+}: {
+  queueName: string;
+  run: () => Promise<T>;
+}): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    const overloaded = overloadedClickHouseError(error);
+    if (overloaded === undefined) throw error;
+    const code =
+      overloaded !== null && typeof overloaded === "object" && "code" in overloaded
+        ? String(overloaded.code)
+        : "unknown";
+    throw new GroupQueueError({
+      queueName,
+      operation: "processBatch",
+      message: `ClickHouse overloaded (code ${code}); backing the batch off whole: ${error instanceof Error ? error.message : String(error)}`,
+      cause: error,
+      retryAfterMs: 0,
+    });
   }
 }
 
@@ -84,7 +127,10 @@ export function createEventingGroupQueueFactory({
         ? configuredConsumer.handleBatch({
             each: (payload, context) => refuse(() => eventingDefinition.process(payload, context)),
             batch: (payloads, context) =>
-              refuse(() => eventingDefinition.processBatch!(payloads, context)),
+              backOffWhenOverloaded({
+                queueName: eventingDefinition.name,
+                run: () => refuse(() => eventingDefinition.processBatch!(payloads, context)),
+              }),
           })
         : configuredConsumer.handle((payload, context) =>
             refuse(() => eventingDefinition.process(payload, context)),

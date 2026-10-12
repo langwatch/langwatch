@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "./dist/**/*", "./example/**/*"],
+  "references": [
+    {
+      "path": "../../modules/evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/redaction/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/egress/tsconfig.build.json"
+    }
+  ]
+}

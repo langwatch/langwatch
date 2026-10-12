@@ -24,6 +24,7 @@ export class SlackSignupAnnouncementChannel extends SignupAnnouncementChannel {
   }
 
   async post(message: SlackNoticeMessage): Promise<void> {
-    await this.webhook.send(message);
+    // The client sends its constructor options as payload; an undefined timeout drops out.
+    await this.webhook.send({ ...message, timeout: undefined });
   }
 }

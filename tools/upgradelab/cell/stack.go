@@ -28,6 +28,8 @@ type Stores struct {
 	Private                      []string       // private ClickHouse labels (hybrid)
 	S3                           map[string]int // storagesim port per object target: "" shared, else a private label
 	IDP                          int            // idpsim port, for profiles that sign in through an identity provider
+	IDPPublic, IDPCA             string         // legacy SSO: idpsim behind the cell's TLS proxy, and the CA the releases trust
+	Gates                        map[string]int // private-down drill: the gate port in front of each private target
 }
 
 // DatabaseURL is the Prisma URL both releases share; schema mydb matches the tenancy SQL.
@@ -281,7 +283,7 @@ var (
 
 // headBuildScript is the release image's install and build steps (infra/docker/Dockerfile), run in head's
 // checkout; the install keeps node_modules in step with packages head added.
-const headBuildScript = `pnpm install --frozen-lockfile --prefer-offline && pnpm start:prepare:files && pnpm ensure:built && pnpm exec tsc -b --builders 16 tsconfig.build.json && pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build`
+const headBuildScript = `export NX_DAEMON=false && pnpm install --frozen-lockfile --prefer-offline && pnpm start:prepare:files && pnpm ensure:built && NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -b --builders 16 modules/*/contract/tsconfig.build.json && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build`
 
 // BuildStamp sits in node_modules, which git ignores, so a build never dirties the checkout.
 const BuildStamp = "node_modules/.upgradelab-build"

@@ -6,7 +6,7 @@
 # path of an open operator tab), never per-tenant state. An older release's page reads rows a newer
 # runner wrote, so an unknown step kind or status is passed through raw and never thrown on.
 #
-# The installation state is the first match of: Unsupported, Needs attention, Upgrading, Never
+# The installation state is the first match of: Needs attention, Upgrading, Never
 # upgraded, Behind, Rolled back, Finishing in background, Up to date (round 17, U1-a: an empty
 # ledger is its own state, not Behind with a reason).
 
@@ -53,26 +53,11 @@ Feature: The upgrade reader answers the installation state and the ledger's rows
     And the reason is "blocking-steps-pending"
 
   @unit
-  Scenario: An image older than the ledger and at or above the floor reads as rolled back
-    Given the ledger records release 3.22.0 and the floor is 3.20.1
+  Scenario: An image older than the ledger reads as rolled back
+    Given the ledger records release 3.22.0
     And the image is release 3.21.0
     When the installation state is read
     Then the state is "rolled-back"
-
-  @unit
-  Scenario: An installed release below the floor reads as unsupported
-    Given the ledger records release 3.16.0 and the floor is 3.20.1
-    When the installation state is read
-    Then the state is "unsupported"
-    And the reason is "installed-below-floor"
-
-  @unit
-  Scenario: An image below the floor the ledger recorded reads as unsupported
-    Given a run recorded the floor 3.20.1
-    And the image is release 3.19.0
-    When the installation state is read
-    Then the state is "unsupported"
-    And the reason is "image-below-ledger-floor"
 
   @unit
   Scenario: A failed step reads as needs attention before anything softer
@@ -86,12 +71,6 @@ Feature: The upgrade reader answers the installation state and the ledger's rows
     When the installation state is read
     Then the state is "needs-attention"
     And the reason is "failed-target"
-
-  @unit
-  Scenario: Unsupported wins over every other state
-    Given the ledger records release 3.16.0 below the floor with a failed step and a live lease
-    When the installation state is read
-    Then the state is "unsupported"
 
   @unit
   Scenario: Releases are compared by version and an unversioned build is never ordered
@@ -128,12 +107,37 @@ Feature: The upgrade reader answers the installation state and the ledger's rows
     Then the origin is "inferred"
 
   @unit @integration
-  Scenario: An upgrade by an unreleased image reads as installed unreleased
-    Given a seed run recorded release 3.19.0, below the floor 3.20.1
+  Scenario: An upgrade by a development build reads as installed past every release
+    Given a seed run recorded release 3.19.0
     And a later upgrade by an image no release names succeeded
     When the status is read
-    Then the installed release is "unreleased", recorded
-    And the state is not unsupported
+    Then no installed release is named, and the origin is recorded
+
+  @unit
+  Scenario: An up-to-date development build names itself in the summary
+    Given an image no release names, called "Development build 3.20.1+abc1234"
+    And its upgrade succeeded with nothing left to run
+    When the status is read
+    Then the summary reads "Development build 3.20.1+abc1234 is current."
+    And the image reads "Development build 3.20.1+abc1234"
+
+  @unit
+  Scenario: An up-to-date release names its release in the summary
+    Given an installation on 3.21.0 running the 3.21.0 image with nothing left to run
+    When the status is read
+    Then the summary reads "3.21.0 is current."
+
+  @unit
+  Scenario: A state summary names no command to run
+    Given an image newer than the installed release
+    When the status is read
+    Then the summary names both releases and no command
+
+  @unit
+  Scenario: A step imported from before upgrade tracking carries the baseline release
+    Given a seed run imported a step the 3.18.1 baseline lists, with no release of its own
+    When the step is read
+    Then its release is 3.18.1
 
   @integration
   Scenario: An unknown step status is shown raw
@@ -265,10 +269,10 @@ Feature: The upgrade reader answers the installation state and the ledger's rows
 
   # Preflight (upgrade-ui plan 6.1.3, U6): rows in the checkup's verdict shape, read from the status.
   @unit
-  Scenario: The preflight refuses an installation below the floor, a failed step and a live lease, naming each fix
-    Given a status below the floor, with a failed step and a lease held
+  Scenario: The preflight refuses a failed step and a live lease, naming each fix
+    Given a status with a failed step and a lease held
     When the preflight is read
-    Then the floor, failed-step and lease rows are refused, each with a fix
+    Then the failed-step and lease rows are refused, each with a fix
 
   @unit
   Scenario: The preflight of a current installation is verified except the backup, which is always unchecked

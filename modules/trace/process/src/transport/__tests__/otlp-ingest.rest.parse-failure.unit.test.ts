@@ -5,10 +5,11 @@
  */
 import { createRestRuntime } from "@langwatch/api/rest";
 import type * as Observability from "@langwatch/observability";
+import type { OtlpIngestCredential } from "@langwatch/otlp/door";
 import type * as TestHarness from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
-import type { OtlpIngestCredential, TraceApi } from "@langwatch/trace-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type * as LangWatch from "langwatch";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

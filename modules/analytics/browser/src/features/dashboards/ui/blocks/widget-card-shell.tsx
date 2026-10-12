@@ -54,7 +54,7 @@ export function WidgetCardShell({
       borderColor="border"
       borderRadius="xl"
       background="bg.panel"
-      boxShadow="0 1px 2px rgb(16 16 32 / 0.04)"
+      boxShadow="xs"
     >
       <HStack
         height={`${HEADER_HEIGHT_PX}px`}

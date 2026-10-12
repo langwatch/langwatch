@@ -55,6 +55,16 @@ export interface ErrorPresentation {
   describe?: (error: HandledErrorShape) => string;
 }
 
+/** The Auth0 settings an operator must change, keyed by `meta.reason`; main's wording. */
+const AUTH0_PASSWORD_MISCONFIGURATIONS: Partial<Record<string, string>> = {
+  insufficient_scope:
+    "Auth0 is not authorized to update users. Ask an administrator to enable the update:users scope on the Auth0 Management M2M application.",
+  password_grant_not_enabled:
+    "Auth0 Password grant is not enabled on the Management M2M application. Ask an administrator to enable it under that application's Advanced Settings → Grant Types.",
+  not_configured:
+    "Auth0 is not configured on the server. Set AUTH0_ISSUER plus AUTH0_MGMT_CLIENT_ID/SECRET (or AUTH0_CLIENT_ID/SECRET).",
+};
+
 /** Reads a string out of `meta` without trusting it. */
 const str = (error: HandledErrorShape, key: string, fallback: string): string => {
   const value = error.meta[key];
@@ -459,6 +469,15 @@ const presentations = {
     describe: () =>
       "This endpoint runs one read-only SELECT over the analytics datasets. Remove anything else and try again.",
   },
+  lwql_parameter_invalid: {
+    title: "A parameter value doesn't fit its type",
+    describe: (error) => {
+      const parameter = str(error, "parameter", "");
+      return parameter
+        ? `The value given for "${parameter}" can't be read as the type the query declares. Fix the value or the type and try again.`
+        : "A value can't be read as the type the query declares for it. Fix the value or the type and try again.";
+    },
+  },
   lwql_parameter_missing: {
     title: "This query is missing a value",
     describe: () =>
@@ -669,6 +688,12 @@ const presentations = {
   clickhouse_overloaded: {
     title: "Too much running at once",
     describe: () => "We paused this one to keep the rest responsive. Try again.",
+  },
+  client_outdated: {
+    // fault: customer. A tab left open across an upgrade still speaks the
+    // earlier release's wire format; reloading fetches this one.
+    title: "This page is out of date: reload to continue",
+    describe: () => "LangWatch was updated while this page was open. Reload to pick up the update.",
   },
   broadcaster_not_active: {
     title: "Live updates disconnected",
@@ -1133,9 +1158,11 @@ const presentations = {
   },
   federated_password_change_unavailable: {
     // fault: platform. The identity provider refused for a reason only whoever
-    // configured it can fix, so the copy sends the reader to them.
+    // configured it can fix; a known `meta.reason` names the setting, as main did.
     title: "We couldn't change your password",
-    describe: () => "Ask whoever set up LangWatch here to check the sign-in configuration.",
+    describe: (error) =>
+      AUTH0_PASSWORD_MISCONFIGURATIONS[str(error, "reason", "")] ??
+      "Ask whoever set up LangWatch here to check the sign-in configuration.",
   },
   prompt_not_found: {
     title: "Prompt not found",
@@ -1702,6 +1729,10 @@ const presentations = {
     title: "Your license has expired",
     describe: () => "Renew it to carry on, or talk to your account team.",
   },
+  license_expiry_in_past: {
+    title: "That end date has already passed",
+    describe: () => "A license can only end on a future date. Pick a later one and try again.",
+  },
   license_signing_key_not_pem: {
     title: "That doesn't look like a private key",
     describe: () => "Paste the whole key, including its BEGIN and END lines.",
@@ -1944,11 +1975,6 @@ const presentations = {
         ? `It is already enrolled for ${migration}, so the next pass will process it. Nothing to do.`
         : "It is already enrolled for that migration, so the next pass will process it. Nothing to do.";
     },
-  },
-  migration_enrollment_cloud_only: {
-    title: "Enrollment does not apply to this installation",
-    describe: () =>
-      "Self-hosted installations run released migrations automatically for every organization, so there is nothing to enroll or withdraw.",
   },
   migration_enrollment_not_found: {
     title: "This organization is not enrolled",
@@ -2221,7 +2247,7 @@ const presentations = {
   authz_grant_not_confirmed: {
     title: "Access could not be confirmed",
     describe: () =>
-      "We could not confirm the access change in time, so nothing was granted. Try again in a moment.",
+      "Your access change is still processing. Refresh to check its status before trying again.",
   },
   auth_rate_limited: {
     title: "Too many attempts",
@@ -3003,15 +3029,6 @@ const presentations = {
     title: "That is the browser you are using",
     describe: () =>
       "Signing out of this one is a different action. Use the sign-out control instead.",
-  },
-
-  session_read_failed: {
-    // Read by somebody who has just been shown a sign-in screen they did not
-    // ask for. The words have to explain that: we could not find out whether
-    // they were signed in, so we treated them as signed out.
-    title: "We couldn't check whether you're signed in",
-    describe: () =>
-      "You've been signed out for now because we couldn't reach the service that answers that. Reload the page in a moment, and log in again if it still asks.",
   },
 
   subscription_service_unavailable: {
@@ -3972,6 +3989,13 @@ const presentations = {
       return `${subject} no longer in this organization, so it cannot be put in a department. Reload and try again.`;
     },
   },
+  private_dataplane_unavailable: {
+    // fault: platform. The organization keeps its data on its own servers and this
+    // deployment cannot reach them; nothing is served from the shared ones instead.
+    title: "Your organization's data store can't be reached",
+    describe: () =>
+      "Nothing was read or saved. An administrator has to restore the connection to your organization's own data store.",
+  },
   storage_not_writable: {
     // fault: platform. Storage for this deployment was never provisioned, so
     // retrying changes nothing and there is no customer-side setting to fix.
@@ -4331,7 +4355,7 @@ const presentations = {
       safeProse(str(error, "message", "")) || "Check the destination and try again.",
   },
   test_fire_unavailable: {
-    title: "Nothing to test yet",
+    title: "Test message not sent",
     // `meta.reason` is the sentence the service wrote for this exact scenario
     // ("This automation has no email recipients to test-fire to.") — it names
     // WHICH piece is missing, which the generic line cannot. It is also the

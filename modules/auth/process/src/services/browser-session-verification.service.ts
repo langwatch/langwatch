@@ -6,6 +6,9 @@ const logger = createLogger("langwatch:api:auth");
 
 const SESSION_TOKEN_COOKIE = /(?:^|;\s*)([^=;\s]*session_token)=/g;
 
+/** The browser transport's mark on a polling read (packages/browser/src/wire/transport.ts). */
+export const BACKGROUND_READ_HEADER = "x-langwatch-background-read";
+
 type BrowserSessionOperations = Pick<AuthApi, "verifyBrowserSession" | "resolveBrowserSession">;
 
 /** Who a browser request's session cookie names: a caller, or nobody at all. */
@@ -34,7 +37,8 @@ export class BrowserSessionVerificationService {
     if (verification.kind !== "verified") return { kind: "anonymous" };
     const { verified } = verification;
 
-    const resolution = await this.#resolution(verified);
+    const background = request.headers.get(BACKGROUND_READ_HEADER) === "1";
+    const resolution = await this.#resolution({ verified, background });
     if (resolution.kind === "anonymous") {
       // Better Auth verified the cookie and the Auth service still found no live session: the row
       // is gone, revoked, or was never this process's to see. Distinct from an anonymous caller.
@@ -61,11 +65,15 @@ export class BrowserSessionVerificationService {
     };
   }
 
-  async #resolution(
-    verified: Extract<BrowserSessionVerification, { kind: "verified" }>["verified"],
-  ): Promise<Awaited<ReturnType<BrowserSessionOperations["resolveBrowserSession"]>>> {
+  async #resolution({
+    verified,
+    background,
+  }: {
+    verified: Extract<BrowserSessionVerification, { kind: "verified" }>["verified"];
+    background: boolean;
+  }): Promise<Awaited<ReturnType<BrowserSessionOperations["resolveBrowserSession"]>>> {
     try {
-      return await this.sessions.resolveBrowserSession({ verified });
+      return await this.sessions.resolveBrowserSession({ verified, background });
     } catch (error) {
       logger.error(
         { error, sessionId: verified.session.id, userId: verified.user.id },

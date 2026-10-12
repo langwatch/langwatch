@@ -72,7 +72,7 @@ runs:
         cache-dependency-path: ${{ inputs.cache-dependency-path }}
         registry-url: ${{ inputs.registry-url }}
 
-    # The dev scripts (generate:modules, sync:references, ensure:built, and the
+    # The dev scripts (generate:modules, ensure:built, and the
     # apps' predev/pretest hooks) are Go: dev/scripts/devscripts.sh runs them.
     - name: Setup Go
       if: inputs.install != ''

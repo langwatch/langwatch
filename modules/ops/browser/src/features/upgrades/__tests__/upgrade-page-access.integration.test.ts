@@ -7,11 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { opsWeb } from "../../../ops.web.ts";
 
-const UPGRADE_PAGES = [
-  "pages/ops/upgrades",
-  "pages/ops/upgrades/releases/[release]",
-  "pages/ops/upgrades/runs/[runId]",
-] as const;
+const UPGRADE_PAGES = ["pages/ops/upgrades"] as const;
 
 function open({ page, grants }: { page: string; grants: readonly string[] }) {
   const screen = opsWeb.installation.screens[page];

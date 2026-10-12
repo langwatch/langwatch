@@ -29,13 +29,13 @@ type fieldError struct {
 
 func (e fieldError) Error() string { return e.Field + ": " + e.Message }
 
-var knownChannels = map[string]bool{ChannelSlackWebhook: true, ChannelSlackAPI: true, ChannelWebhook: true, ChannelSQS: true}
+var knownChannels = map[string]bool{ChannelSlackWebhook: true, ChannelSlackAPI: true, ChannelWebhook: true, ChannelSQS: true, ChannelDatabricks: true, ChannelFeed: true}
 
 // validate refuses a fault that could never answer anything, naming the field.
 func (f Fault) validate() error {
 	switch {
 	case f.Channel != "" && !knownChannels[f.Channel]:
-		return fieldError{"channel", "must be slack-webhook, slack-api, webhook or sqs"}
+		return fieldError{"channel", "must be slack-webhook, slack-api, webhook, sqs, databricks or feed"}
 	case f.Status != 0 && (f.Status < 100 || f.Status > 599):
 		return fieldError{"status", "must be 0 or between 100 and 599"}
 	case f.LatencyMs < 0:

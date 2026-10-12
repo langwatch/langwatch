@@ -79,3 +79,23 @@ Feature: An upgrade never waits forever on a lock or a lease
     Given a task invocation naming `upgrade` beside a legacy task
     When it starts
     Then it refuses before taking the lease, because `upgrade` takes the lease itself
+
+  # Gate review, 2026-10-10: one runner at a time, even when a renewal hangs.
+  @unit
+  Scenario: A runner whose lease renewal never answers stops before the lease expires
+    Given an upgrade run holding the lease whose renewal hangs
+    When the lease's time to live less one heartbeat passes with no renewal
+    Then the run's signal is aborted, naming the lease lost
+
+  @unit
+  Scenario: A run that finished reports its result even when its last lease check is refused
+    Given an upgrade run whose work finished and recorded its outcome
+    When the final lease renewal is refused
+    Then the run reports its result, not lease_lost
+    And it does not release the lease another runner holds
+
+  @unit
+  Scenario: A blocking step that passes its deadline is cut with an error naming the deadline
+    Given a blocking step whose run neither finishes nor fails
+    When it passes its deadline
+    Then its signal is aborted and it ends with an error naming the deadline

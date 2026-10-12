@@ -5,6 +5,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { UpgradeActionNeededToken } from "@langwatch/ops-client";
 import { opsWebConfigSchema } from "@langwatch/ops-contract";
 import { rumWebConfigSchema } from "@langwatch/rum-contract";
 
@@ -79,18 +80,6 @@ export const opsWeb = defineBrowserModule("ops")
     "pages/ops/upgrades": {
       requires: "ops:view",
       load: () => import("./features/upgrades/ui/sections/upgrades.screen.tsx"),
-    },
-    "pages/ops/upgrades/preview": {
-      requires: "ops:view",
-      load: () => import("./features/upgrades/ui/sections/upgrade-preview.screen.tsx"),
-    },
-    "pages/ops/upgrades/releases/[release]": {
-      requires: "ops:view",
-      load: () => import("./features/upgrades/ui/sections/upgrade-release.screen.tsx"),
-    },
-    "pages/ops/upgrades/runs/[runId]": {
-      requires: "ops:view",
-      load: () => import("./features/upgrades/ui/sections/upgrade-run.screen.tsx"),
     },
     "pages/ops/projections/[runId]": {
       requires: "ops:view",
@@ -189,7 +178,7 @@ export const opsWeb = defineBrowserModule("ops")
     },
     foundry: { load: () => import("./ui/sections/ops/ops-foundry-drawer.tsx") },
   })
-  /** The header's impersonation banner, handed to navigation's headerBanner. */
+  /** The header's impersonation and upgrade banners, handed to navigation's headerBanner. */
   .withCapabilities({
     impersonationBanner: {
       load: async () => ({
@@ -197,4 +186,17 @@ export const opsWeb = defineBrowserModule("ops")
           .ImpersonationHeaderBanner,
       }),
     },
+    upgradeAttentionBanner: {
+      load: async () => ({
+        default: (await import("./features/upgrades/ui/sections/upgrade-attention-banner.tsx"))
+          .UpgradeAttentionBanner,
+      }),
+    },
+  })
+  /** "Action needed for updates", lent to project's home for ops:view holders (§10.1). */
+  .lends(UpgradeActionNeededToken, {
+    load: async () => ({
+      default: (await import("./features/upgrades/ui/sections/upgrade-action-needed.tsx"))
+        .UpgradeActionNeeded,
+    }),
   });

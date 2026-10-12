@@ -8,16 +8,18 @@ import {
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
-  DEFAULT_PII_REDACTION_LEVEL,
   instrumentationScopeSchema,
-  RECORD_SPAN_COMMAND_TYPE,
-  recordSpanCommandDataSchema,
   resourceSchema,
   spanSchema,
-  SPAN_RECEIVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_VERSION_LATEST,
   type OtlpResource,
   type OtlpSpan,
+} from "@langwatch/otlp/trace-request";
+import {
+  DEFAULT_PII_REDACTION_LEVEL,
+  RECORD_SPAN_COMMAND_TYPE,
+  recordSpanCommandDataSchema,
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
   type RecordSpanCommandData,
   type SpanReceivedEvent,
   type PIIRedactionLevel,

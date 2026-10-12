@@ -866,11 +866,17 @@ export function createBeforeSessionCreateHook({
 /** What a session records at mint, asked of identity with this request's callback evidence. */
 export type SessionMintClaims = Readonly<{
   identity: Pick<IdentityApi, "claimsForMint">;
-  evidence: Pick<SessionCallbackEvidenceChannel, "findAcceptedAccounts">;
+  evidence: Pick<
+    SessionCallbackEvidenceChannel,
+    "findAcceptedAccounts" | "recordVerifiedCallbackToken" | "recordAuthenticatedCallbackAccount"
+  >;
 }>;
 
 /** Better Auth hands the route pattern (`.../acs/:providerId`); readers need the real path. */
-function toConcretePath(path: string, params: Record<string, string | undefined> = {}): string {
+export function toConcretePath(
+  path: string,
+  params: Record<string, string | undefined> = {},
+): string {
   return path.replace(/:([A-Za-z]+)/g, (whole, name: string) => params[name] ?? whole);
 }
 

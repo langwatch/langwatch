@@ -1,7 +1,8 @@
 import type { ComputeExperimentRunMetricsCommandData } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
+import { spanSchema } from "@langwatch/otlp/trace-request";
 import { nowInstant } from "@langwatch/time";
-import { spanSchema, type TraceSummaryData } from "@langwatch/trace-contract";
+import { type TraceSummaryData, type TraceSummaryLookupInput } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 const logger = createLogger("langwatch:experiment:trace-metrics-sync");
@@ -33,7 +34,7 @@ function hasExperimentCostMetrics(summary: TraceSummaryData): boolean {
 }
 
 interface ExperimentTraceMetricsSyncDeps {
-  findSummary: (input: { projectId: string; traceId: string }) => Promise<TraceSummaryData | null>;
+  findSummary: (input: TraceSummaryLookupInput) => Promise<TraceSummaryData | null>;
   findExperimentId: (input: { tenantId: string; runId: string }) => Promise<string | null>;
   computeRunMetrics: (data: ComputeExperimentRunMetricsCommandData) => Promise<void>;
 }
@@ -44,9 +45,13 @@ interface ExperimentTraceMetricsSyncDeps {
  */
 export function createExperimentTraceMetricsSyncHandler(
   deps: ExperimentTraceMetricsSyncDeps,
-): (input: { tenantId: string; traceId: string }) => Promise<void> {
-  return async ({ tenantId, traceId }) => {
-    const summary = await deps.findSummary({ projectId: tenantId, traceId });
+): (input: { tenantId: string; traceId: string; occurredAt?: number }) => Promise<void> {
+  return async ({ tenantId, traceId, occurredAt }) => {
+    const summary = await deps.findSummary({
+      projectId: tenantId,
+      traceId,
+      occurredAtMs: occurredAt,
+    });
     if (!summary || !hasExperimentCostMetrics(summary)) return;
     const runId = summary.attributes[EXPERIMENT_RUN_MARKER]!;
 

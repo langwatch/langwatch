@@ -1,5 +1,5 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { describe, expect, it, vi } from "vitest";
 
 import { type TraceTokenCounter } from "../../../../channels/token-counter.channel.ts";

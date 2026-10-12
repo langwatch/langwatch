@@ -20,6 +20,12 @@ describe("routeOf", () => {
     ).toEqual({ page: "sign-in", tenantId: 1, query: "client_id=c&social=github" });
   });
 
+  it("reads a SAML request's SSO page as the picker, marking it SAML", () => {
+    expect(routeOf({ pathname: "/t/3/saml/sso", search: "?SAMLRequest=abc&RelayState=r" })).toEqual(
+      { page: "sign-in", tenantId: 3, query: "SAMLRequest=abc&RelayState=r&saml=1" },
+    );
+  });
+
   it("answers not-found for anything else", () => {
     expect(routeOf({ pathname: "/t/x/", search: "" })).toEqual({ page: "not-found" });
     expect(routeOf({ pathname: "/nothing", search: "" })).toEqual({ page: "not-found" });

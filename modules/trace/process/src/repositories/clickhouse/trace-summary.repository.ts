@@ -505,6 +505,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       `,
       query_params: { traceId },
       format: "JSONEachRow",
+      // Reached only by callers holding no time (settlement digests, evaluation alerts).
+      SKIP_COLD_SCAN_CHECK: true,
     });
     const rows = occurredAtCountRowsSchema.parse(await result.json());
     const rowCountRaw = rows[0]?.rowCount;

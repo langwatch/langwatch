@@ -32,7 +32,7 @@ function makeFold({
   readWindow,
   refoldable = false,
 }: {
-  readWindow?: { widthMs: number };
+  readWindow?: { widthMs: number; fallbackLookbackStepsMs?: readonly number[] };
   /**
    * Pair `refoldOnStoreMiss` with a wired `eventLoaderUpTo`, the only shape
    * that may answer `undecodable` — rejecting a row is safe only because the
@@ -332,6 +332,57 @@ describe("FoldProjectionExecutor declared read window", () => {
         );
 
         expect(store.store).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the fold bounds its fallback with lookback steps", () => {
+    const STEPS_MS = [10 * WIDTH_MS, 30 * WIDTH_MS];
+    const boundedFold = () =>
+      makeFold({
+        readWindow: { widthMs: WIDTH_MS, fallbackLookbackStepsMs: STEPS_MS },
+        refoldable: true,
+      });
+    const readContexts = (store: { get: unknown }) =>
+      vi
+        .mocked(store.get as (key: string, c: ProjectionStoreContext) => unknown)
+        .mock.calls.map(([, readContext]) => readContext);
+
+    describe("when the row sits within the widest step", () => {
+      /** @scenario a bounded fallback widens back step by step instead of reading unbounded */
+      it("widens back step by step, stops at the hit and folds onto it", async () => {
+        const { fold, store } = boundedFold();
+        vi.mocked(store.get).mockImplementation(async (_key, readContext) =>
+          readContext.readWindow !== undefined &&
+          readContext.readWindow.fromMs <= OCCURRED_AT - STEPS_MS[1]!
+            ? { kind: "folded", state: { count: 5, LastEventOccurredAt: OCCURRED_AT - 1 } }
+            : { kind: "empty" },
+        );
+
+        const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
+
+        expect(readContexts(store).map((c) => c.readWindow)).toEqual([
+          { fromMs: OCCURRED_AT - WIDTH_MS, toMs: OCCURRED_AT + WIDTH_MS },
+          { fromMs: OCCURRED_AT - STEPS_MS[0]!, toMs: OCCURRED_AT + WIDTH_MS },
+          { fromMs: OCCURRED_AT - STEPS_MS[1]!, toMs: OCCURRED_AT + WIDTH_MS },
+        ]);
+        expect(readContexts(store)[1]?.bypassReadCache).toBe(true);
+        expect(state.count).toBe(6);
+        expect(fallbackMetric).toHaveBeenCalledWith("windowed", "recovered");
+      });
+    });
+
+    describe("when no step finds a row", () => {
+      /** @scenario a bounded fallback widens back step by step instead of reading unbounded */
+      it("never reads unbounded, and the miss at the widest step is final", async () => {
+        const { fold, store } = boundedFold();
+
+        const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
+
+        expect(readContexts(store)).toHaveLength(3);
+        expect(readContexts(store).every((c) => c.readWindow !== undefined)).toBe(true);
+        expect(state.count).toBe(1);
+        expect(fallbackMetric).toHaveBeenCalledWith("windowed", "absent");
       });
     });
   });

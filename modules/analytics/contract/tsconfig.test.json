@@ -3,40 +3,53 @@
   "compilerOptions": {
     "noEmit": true,
     "rootDir": ".",
-    "types": ["node"],
-    "incremental": true,
-    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
+    "types": ["node", "vitest/globals"],
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
+    "composite": false
   },
   // The suite, plus the sources it exercises. `node:fs` compiles here and
   // nowhere else: the import-free guard has to read its subject off disk,
   // while the contract itself must stay loadable by a browser.
-  "include": ["src/**/*.ts", "src/**/__tests__/**/*.ts"],
-  "exclude": [],
+  "include": [
+    "src/**/__tests__/**/*.ts",
+    "src/**/__mocks__/**/*.ts",
+    "src/**/tests/**/*.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.*.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.*.ts",
+    "src/**/*.stories.ts",
+    "src/**/*.stories.*.ts",
+    "src/**/*.bench.ts",
+    "src/**/*.bench.*.ts",
+    "src/**/__bench__/**/*.ts",
+    "src/**/testing.ts",
+    "src/visualization/vega-lite-schema-validator.generated.d.ts",
+    "src/**/__tests__/**/__tests__/**/*.ts",
+    "src/**/__tests__/**/__mocks__/**/*.ts",
+    "src/**/__tests__/**/tests/**/*.ts",
+    "src/**/__tests__/**/*.test.ts",
+    "src/**/__tests__/**/*.test.*.ts",
+    "src/**/__tests__/**/*.spec.ts",
+    "src/**/__tests__/**/*.spec.*.ts",
+    "src/**/__tests__/**/*.stories.ts",
+    "src/**/__tests__/**/*.stories.*.ts",
+    "src/**/__tests__/**/*.bench.ts",
+    "src/**/__tests__/**/*.bench.*.ts",
+    "src/**/__tests__/**/__bench__/**/*.ts",
+    "src/**/__tests__/**/testing.ts"
+  ],
+  "exclude": [
+    "src/visualization/__tests__/fixtures/index.ts",
+    "src/visualization/__tests__/fixtures/lwql-dataset-registry.ts",
+    "src/visualization/__tests__/fixtures/adversarial/index.ts",
+    "src/visualization/__tests__/fixtures/invalid/index.ts",
+    "src/visualization/__tests__/fixtures/valid/index.ts"
+  ],
 
   "references": [
     {
-      "path": "tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../authz/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/time/tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     }
   ]
 }

@@ -67,14 +67,6 @@ func TestContainsWord(t *testing.T) {
 	}
 }
 
-func TestRenderReferences(t *testing.T) {
-	for _, c := range renderReferencesCases {
-		if got := RenderReferences(c.in, c.refs); got != c.want {
-			t.Errorf("%s: RenderReferences =\n%q\nwant\n%q", c.name, got, c.want)
-		}
-	}
-}
-
 func TestGenerateModulesMatchesTheNodeScript(t *testing.T) {
 	root := t.TempDir()
 	writeTree(t, root, generateModulesFixture)
@@ -108,46 +100,12 @@ func TestGenerateModulesDryRunWritesNothing(t *testing.T) {
 	}
 }
 
-func TestSyncReferencesMatchesTheNodeScript(t *testing.T) {
-	root := t.TempDir()
-	writeTree(t, root, syncReferencesFixture)
-	code, stdout, stderr := run(t, "sync-references", "--root", root)
-	if code != syncReferencesCheckCode || stdout != syncReferencesCheckStdout {
-		t.Fatalf("check: exit %d, stdout %q, stderr %q", code, stdout, stderr)
-	}
-	code, stdout, _ = run(t, "sync-references", "--root", root, "--write")
-	if code != 0 || stdout != syncReferencesWriteStdout {
-		t.Fatalf("write: exit %d, stdout %q", code, stdout)
-	}
-	for path, want := range syncReferencesGolden {
-		got, err := os.ReadFile(filepath.Join(root, path))
-		if err != nil || string(got) != want {
-			t.Errorf("%s = %q (%v), want %q", path, got, err, want)
-		}
-	}
-}
-
 func BenchmarkGenerateModules(b *testing.B) {
 	root := ensureRepoRoot(b)
 	b.ReportAllocs()
 	for range b.N {
 		if _, err := GenerateModules(root); err != nil {
 			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkSyncReferences(b *testing.B) {
-	root := ensureRepoRoot(b)
-	members, err := ReadWorkspaceMembers(root)
-	if err != nil {
-		b.Fatal(err)
-	}
-	b.ReportAllocs()
-	for range b.N {
-		for _, project := range DeriveProjects(root, members) {
-			text, _ := os.ReadFile(project.File)
-			RenderReferences(string(text), project.References)
 		}
 	}
 }

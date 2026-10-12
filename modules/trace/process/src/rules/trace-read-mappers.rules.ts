@@ -6,8 +6,10 @@ import { type LogContentCategory, logContentKeys } from "@langwatch/coding-agent
  */
 import {
   type ChatArrayRoleStrip,
+  compileAttributePatterns,
   CONTENT_CATEGORIES,
   type ContentCategory,
+  matchesAnyAttributePattern,
 } from "@langwatch/data-privacy-contract";
 import { resolveNonBilledCost } from "@langwatch/span-normalisation";
 import type {
@@ -375,13 +377,46 @@ export function contentSearchTermsForViewer({
   protections: V2Protections;
 }): string[] {
   if (terms.length === 0) return terms;
+  return canSearchCapturedContent(protections) ? terms : [];
+}
+
+/** Whether a viewer's words may match captured content: only under no content protection. */
+export function canSearchCapturedContent(protections: V2Protections): boolean {
   if (protections.canSeeCapturedInput !== true || protections.canSeeCapturedOutput !== true) {
-    return [];
+    return false;
   }
   const { roles, stripToolCalls } = turnsHiddenForViewer(protections);
-  if (roles.size > 0 || stripToolCalls) return [];
-  if ((protections.hiddenAttributes?.length ?? 0) > 0) return [];
-  return terms;
+  if (roles.size > 0 || stripToolCalls) return false;
+  return (protections.hiddenAttributes?.length ?? 0) === 0;
+}
+
+/**
+ * Whether an attribute key holds a value the viewer may not read: a restricted custom attribute,
+ * a hidden category's content key, or captured input/output (and its derived keys) when hidden.
+ */
+export function hiddenAttributeKeyMatcher({
+  protections,
+  contentPrivacy,
+  derivedPrefixes,
+}: {
+  protections: V2Protections;
+  contentPrivacy: TraceContentPrivacy;
+  derivedPrefixes: { input: string; output: string };
+}): (key: string) => boolean {
+  const patterns = [
+    ...(protections.hiddenAttributes ?? []),
+    ...hiddenCategoryAttributeRules(protections, contentPrivacy),
+  ].map((rule) => rule.pattern);
+  for (const side of ["input", "output"] as const) {
+    const canSee =
+      side === "input" ? protections.canSeeCapturedInput : protections.canSeeCapturedOutput;
+    if (canSee === true) continue;
+    patterns.push(`${derivedPrefixes[side]}*`);
+    for (const key of contentPrivacy.contentKeyCatalog[side]) patterns.push(key, `${key}.*`);
+  }
+  if (patterns.length === 0) return () => false;
+  const matchers = compileAttributePatterns(patterns);
+  return (key) => matchesAnyAttributePattern(key, matchers);
 }
 
 /**

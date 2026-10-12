@@ -31,6 +31,8 @@ export interface BuiltMember<Value> {
   readonly close?: () => Promise<void>;
   /** One cheap query against what was opened; rejects when it does not answer. */
   readonly answer?: () => Promise<void>;
+  /** Runs before any member closes, so a lost server fails fast through every drain. */
+  readonly beginClose?: () => void;
 }
 
 /**
@@ -95,6 +97,7 @@ export function buildRedis(config: RedisConfig): BuiltMember<RedisConnection> {
   return {
     value: connection,
     close: () => RedisShutdownService.create().shutdown(connection),
+    beginClose: () => RedisShutdownService.create().beginShutdown(connection),
     answer: () => new RedisReadinessService().ping({ connection }),
   };
 }

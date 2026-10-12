@@ -11,6 +11,7 @@ import {
  * reads ClickHouse uncached, and the cell command and execution manager ride with it.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import type { ExperimentRunBoardWriteBackService } from "../../features/run/services/experiment-run-board-write-back.service.ts";
@@ -128,6 +129,27 @@ describe("experiment_run_processing without Redis", () => {
       const { retentionReads } = build();
 
       expect(retentionReads()).toBe(0);
+    });
+  });
+});
+
+describe("experiment_run_processing's alias of main's trace metrics lane", () => {
+  describe("when the run pipeline is built", () => {
+    /** @scenario "Metrics jobs the previous release queued on trace run on experiment's lane" */
+    it("aliases main's experimentMetricsSync key to its span metrics lane for span_received", () => {
+      const { pipeline } = build();
+
+      expect(
+        pipeline.laneAliases?.filter(
+          ({ from }) => from === "trace_processing:reactor:experimentMetricsSync",
+        ),
+      ).toEqual([
+        {
+          from: "trace_processing:reactor:experimentMetricsSync",
+          to: { jobType: "subscriber", lane: "traceSpanMetricsSync" },
+          eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+        },
+      ]);
     });
   });
 });

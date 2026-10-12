@@ -15,8 +15,13 @@ import type { FoldProjectionOptions, FoldProjectionStore } from "./foldProjectio
 // Schema → event type extraction
 // ---------------------------------------------------------------------------
 
-/** Zod schema for an event with a literal `type` field. */
-export type AnyEventSchema = z.ZodObject<{ type: z.ZodLiteral<string> } & z.ZodRawShape>;
+/**
+ * Zod schema for an event with a literal `type` field; core-typed so no zod class
+ * variance is measured.
+ */
+export type AnyEventSchema = z.ZodObject<
+  { type: z.core.$ZodType<string> & { readonly value: string } } & z.ZodRawShape
+>;
 
 // ---------------------------------------------------------------------------
 // Schema tuple → handler interface

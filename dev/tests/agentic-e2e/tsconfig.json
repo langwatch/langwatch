@@ -9,12 +9,15 @@
     "lib": ["ES2023", "DOM"],
     "types": ["node"],
     "esModuleInterop": true,
-    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["tests/**/*.ts", "playwright.config.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "../../../enterprise/modules/licensing/process/tsconfig.build.json"
+      "path": "./tsconfig.app.json"
     }
   ]
 }

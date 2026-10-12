@@ -438,6 +438,13 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then routing decisions do not change for up to one minute
     And then federation is offered without a restart
 
+  @unit
+  Scenario: A licence store that does not answer denies federation within the gate's timeout
+    Given a self-hosted installation whose licence store does not answer
+    When the sign-in page is routed
+    Then federation is denied once the gate's timeout passes, and the failed scan is logged
+    And the scan still in flight answers the next request once the store recovers
+
   # ── Callback linking ───────────────────────────────────────────────────
 
   @unit

@@ -391,6 +391,8 @@ export interface OrganizationApi {
     team: { id: string; slug: string; name: string };
   }>;
   listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
+  /** The install's hidden system organization, created with its one team on first ask; no fact. */
+  ensureSystemOrganization(): Promise<{ id: string }>;
   findProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary | null>;
   /** The self-hosted provisioning door's read: one organization's summary, or `not_found`. */
   getProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary>;

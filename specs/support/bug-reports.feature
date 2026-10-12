@@ -65,6 +65,13 @@ Feature: Bug Reports Intake
     And the message shows the title, the agent, the report kind, and a summary excerpt
     And the message links to the report in the admin area
 
+  @unit
+  Scenario: The Slack alert goes to the Slack address the deployment names
+    Given Slack notification credentials are configured
+    And the deployment names its own Slack Web API address
+    When a new report is stored
+    Then the Slack message is posted to that address, not to slack.com
+
   @integration
   Scenario: Missing Slack configuration never blocks intake
     Given Slack notification credentials are not configured

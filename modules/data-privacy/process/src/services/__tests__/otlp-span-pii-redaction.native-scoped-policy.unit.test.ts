@@ -4,7 +4,7 @@ import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import type { OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpKeyValue, OtlpSpan } from "@langwatch/otlp/trace-request";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";

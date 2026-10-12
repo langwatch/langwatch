@@ -36,3 +36,9 @@ Feature: Enterprise operator views
   Scenario: Core ops serves no operator view over an enterprise subject
     Given the core ops module is installed
     Then it declares neither the licenseRegistry nor the selfHostedInstances namespace
+
+  @unit
+  Scenario: A license asked to end in the past is refused by name
+    Given an operator issuing or reissuing a license
+    When the end date they give has already passed
+    Then the answer is a 422 with code "license_expiry_in_past", not a server error

@@ -1,3 +1,6 @@
+// TanStack mutates one table instance, so React Compiler caches would serve stale headers.
+"use no memo";
+
 import {
   closestCenter,
   DndContext,

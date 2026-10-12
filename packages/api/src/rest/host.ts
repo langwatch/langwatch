@@ -67,10 +67,18 @@ export type RestIdentities = Readonly<
  */
 export type RestFamilyBearers = (namespace: string) => RestIdentity;
 
-/** An upgrade in progress is an expected 503, so it warns; every other 5xx stays an error. */
+/**
+ * An upgrade in progress is an expected 503, so it warns; so does a refused private dataplane,
+ * which the stores log once at error. Every other 5xx stays an error.
+ */
 function restFailureLevel(error: unknown): "warn" | "error" {
-  return HandledError.isHandled(error) && error.code === "upgrade_in_progress" ? "warn" : "error";
+  return HandledError.isHandled(error) && WARNED_REFUSALS.has(error.code) ? "warn" : "error";
 }
+
+const WARNED_REFUSALS: ReadonlySet<string> = new Set([
+  "upgrade_in_progress",
+  "private_dataplane_unavailable",
+]);
 
 export class RestHost implements FeatureRestHost<MountableRestApp> {
   static create(options: {

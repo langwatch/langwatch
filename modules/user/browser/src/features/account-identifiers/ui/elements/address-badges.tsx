@@ -11,8 +11,8 @@ export function AddressBadges({
   confirmed: boolean | undefined;
 }) {
   return (
-    <HStack gap={2}>
-      <Text fontSize="sm" fontWeight={500}>
+    <HStack gap={2} flexWrap="wrap" minWidth={0}>
+      <Text fontSize="sm" fontWeight={500} overflowWrap="anywhere" minWidth={0}>
         {value}
       </Text>
       {isPrimary ? (

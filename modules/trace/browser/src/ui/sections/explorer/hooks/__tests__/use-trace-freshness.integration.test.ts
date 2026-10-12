@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // ─── Mocks set up before the module-under-test is imported ──────────────────
 
 let capturedOnTraceSummaryUpdated: ((traceIds: string[]) => void) | null = null;
+let capturedOnSpanStored: ((traceIds: string[]) => void) | null = null;
+let projectRow: { id: string; firstMessage?: boolean } = { id: "proj-1" };
 
 vi.mock("../../../use-trace-update-listener.ts", () => ({
   useTraceUpdateListener: (opts: {
@@ -12,12 +14,13 @@ vi.mock("../../../use-trace-update-listener.ts", () => ({
     onSpanStored?: (ids: string[]) => void;
   }) => {
     capturedOnTraceSummaryUpdated = opts.onTraceSummaryUpdated ?? null;
+    capturedOnSpanStored = opts.onSpanStored ?? null;
     return { connectionState: "connected" as const, lastEventAt: 0 };
   },
 }));
 
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
-  useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
+  useOrganizationTeamProject: () => ({ project: projectRow }),
 }));
 
 // The discover-freshness subscription opens a real SSE connection when
@@ -58,6 +61,7 @@ const mockDiscoverInvalidate = vi.fn().mockResolvedValue(undefined);
 const mockHeaderInvalidate = vi.fn().mockResolvedValue(undefined);
 const mockSpanTreeInvalidate = vi.fn().mockResolvedValue(undefined);
 const mockEvalsInvalidate = vi.fn().mockResolvedValue(undefined);
+const mockFirstMessageSetData = vi.fn();
 let openDrawerTraceId: string | null = null;
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
@@ -66,6 +70,7 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
     // useSSESubscription — it only needs to exist, not function.
     traces: { onDiscoverUpdate: {} },
     useUtils: () => ({
+      project: { getHasFirstMessage: { setData: mockFirstMessageSetData } },
       traces: {
         list: {
           cancel: mockListCancel,
@@ -139,6 +144,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   capturedOnTraceSummaryUpdated = null;
+  capturedOnSpanStored = null;
+  projectRow = { id: "proj-1" };
   openDrawerTraceId = null;
   liveUpdatesMode = "live";
   visibleIdsResult = { ids: new Set(), topTimestamp: undefined, page: 1 };
@@ -321,6 +328,40 @@ describe("useTraceFreshness", () => {
         await flushNewCountDebounce();
         expect(mockNewCountInvalidate).toHaveBeenCalledTimes(1);
       });
+    });
+  });
+
+  describe("given the project has never received a trace", () => {
+    /** @scenario "The Trace Explorer leaves its empty state when the first trace arrives" */
+    it.each([
+      ["a trace summary update", () => capturedOnTraceSummaryUpdated],
+      ["a stored span", () => capturedOnSpanStored],
+    ])("leaves the empty state on %s without waiting for the stored flag", async (_l, handler) => {
+      projectRow = { id: "proj-1", firstMessage: false };
+      renderHook(() => useTraceFreshness());
+      mockListInvalidate.mockClear();
+
+      await act(async () => {
+        handler()!(["first-trace"]);
+      });
+
+      expect(mockFirstMessageSetData).toHaveBeenCalledWith(
+        { projectId: "proj-1" },
+        { firstMessage: true },
+      );
+      expect(mockListInvalidate).toHaveBeenCalled();
+    });
+
+    it("leaves the flag alone once the project has a trace", async () => {
+      projectRow = { id: "proj-1", firstMessage: true };
+      renderHook(() => useTraceFreshness());
+
+      await act(async () => {
+        capturedOnTraceSummaryUpdated!(["later-trace"]);
+        capturedOnSpanStored!(["later-trace"]);
+      });
+
+      expect(mockFirstMessageSetData).not.toHaveBeenCalled();
     });
   });
 });

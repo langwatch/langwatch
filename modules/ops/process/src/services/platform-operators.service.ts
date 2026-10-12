@@ -36,7 +36,7 @@ export type PlatformOperatorSeedSettings = Readonly<{
 
 /** Who the one-time seed decides to grant, and why. `waiting`: nothing decided, nothing latched. */
 export type PlatformOperatorSeedOutcome = Readonly<{
-  via: "waiting" | "admin-emails" | "sole-organization-admin" | "none";
+  via: "waiting" | "admin-emails" | "sole-organization-admin" | "first-user" | "none";
   userIds: readonly string[];
   reason: string;
 }>;
@@ -144,13 +144,41 @@ export class PlatformOperatorsService {
   async seedOnce(settings: PlatformOperatorSeedSettings): Promise<PlatformOperatorSeedOutcome> {
     const outcome = await this.#decide(settings);
     if (outcome.via === "waiting") return outcome;
+    await this.#record({ via: outcome.via, userIds: outcome.userIds });
+    return outcome;
+  }
+
+  /**
+   * user's created fact: a self-hosted install's first user operates, whatever ADMIN_EMAILS says.
+   * Only the install's sole active user, while nobody holds the grant, is recorded as the seed's
+   * decision; that record's one fixed key and the process's latch grant only the first decision.
+   */
+  async grantFirstUser({
+    userId,
+    backfilled,
+    settings,
+  }: {
+    userId: string;
+    backfilled: boolean;
+    settings: PlatformOperatorSeedSettings;
+  }): Promise<boolean> {
+    if (settings.cloud || backfilled) return false; // a backfilled fact is never a sign-up
+    if ((await this.options.authz.listPlatformOperators()).length > 0) return false;
+    if ((await this.#userCount()) !== 1) return false;
+    const user = await this.options.users.findById({ id: userId });
+    if (!user || user.deactivatedAt !== null) return false;
+    await this.#record({ via: "first-user", userIds: [user.id] });
+    logger.info({ userId: user.id }, "recorded the install's first user as its platform operator");
+    return true;
+  }
+
+  async #record(decision: Parameters<PlatformOperatorSeedRecorder["record"]>[0]): Promise<void> {
     if (!this.#recorder) {
       throw new Error(
         "the platform-operator seed ran in a process that never connected its command",
       );
     }
-    await this.#recorder.record({ via: outcome.via, userIds: outcome.userIds });
-    return outcome;
+    await this.#recorder.record(decision);
   }
 
   /** The recorded decision's grants, as the system; authz keeps a holder's existing grant. */
@@ -238,8 +266,12 @@ export class PlatformOperatorsService {
   }
 
   async #anyUserExists(): Promise<boolean> {
+    return (await this.#userCount()) > 0;
+  }
+
+  async #userCount(): Promise<number> {
     const { emailDomains } = await this.options.users.countUsage();
-    return Object.values(emailDomains).some((count) => count > 0);
+    return Object.values(emailDomains).reduce((total, count) => total + count, 0);
   }
 
   async #verifiedUsersNamed(adminEmails: readonly string[]): Promise<string[]> {
@@ -274,15 +306,6 @@ export class PlatformOperatorsService {
     return profiles
       .filter((user): user is UserProfile => user !== null && user.deactivatedAt === null)
       .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]?.id;
-  }
-
-  /** Boot's one line while ADMIN_EMAILS is still set: it only ever fed the one-time seed. */
-  static bootWarnings({ adminEmails }: { adminEmails: readonly string[] }): string[] {
-    if (adminEmails.length === 0) return [];
-    return [
-      "ADMIN_EMAILS is set but grants nothing: only the one-time platform-operator seed read it. " +
-        "Manage operators at /ops/operators, or run the grant-platform-operator task.",
-    ];
   }
 
   async #activeUserOf(email: string): Promise<UserProfile> {

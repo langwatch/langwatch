@@ -1,3 +1,4 @@
+import { normalizeDomain } from "../../identifier.ts";
 import {
   isSsoPublishedProofChannel,
   type SsoConnectionLifecycleState,
@@ -42,6 +43,29 @@ export function isConfiguredLegacySsoRoute(state: {
   return state.source === "legacy-grandfathered" && state.providerId.length > 0;
 }
 
+/** A connection the legacy pin's domain may still move onto: neither discarded nor torn down. */
+const SSO_CONNECTION_GONE_STATES = new Set<string>(["DISCARDED", "TORN_DOWN"]);
+
+/**
+ * The legacy pin's domain still to move onto the organization's own connection (ADR-124 §7):
+ * the pin set, no grandfathered connection, and a live one of its own that has not verified it.
+ * Empty otherwise. Read off durable state, so it empties once the domain moves.
+ */
+export function legacySsoDomainsToMove({
+  legacySsoDomain,
+  connections,
+}: {
+  legacySsoDomain: string | undefined;
+  connections: readonly { source: string; state: string; verifiedDomains: readonly string[] }[];
+}): string[] {
+  if (!legacySsoDomain) return [];
+  if (connections.some((held) => held.source === "legacy-grandfathered")) return [];
+  const live = connections.filter((held) => !SSO_CONNECTION_GONE_STATES.has(held.state));
+  const domain = normalizeDomain(legacySsoDomain);
+  if (live.length === 0 || live.some((held) => held.verifiedDomains.includes(domain))) return [];
+  return [domain];
+}
+
 /** The domains whose evidence went missing and stayed missing (ADR-123). */
 export function lapsedDomainsOf(state: Pick<SsoConnectionState, "domainVerifications">): string[] {
   return state.domainVerifications
@@ -57,8 +81,20 @@ export type SsoDomainOwnershipQualification =
 /** The connection facts the qualification is read off. */
 export type QualifiableConnection = Pick<
   SsoConnectionState,
-  "verifiedDomains" | "domainVerifications" | "source"
+  "verifiedDomains" | "domainVerifications" | "source" | "organizationId" | "replacesConnectionId"
 >;
+
+/**
+ * The connection the grandfather migration creates for an organization, derived
+ * from it so every pass names the same aggregate and only it can hold the import.
+ */
+export function grandfatheredSsoConnectionId({
+  organizationId,
+}: {
+  organizationId: string;
+}): string {
+  return `ssoc_gf_${organizationId}`;
+}
 
 /** The one qualification used wherever domain control grants authority.
  *  `verifiedDomains` is routing history, not evidence: each method keeps what
@@ -77,7 +113,7 @@ export function qualifySsoDomainOwnership({
   if (proof.proofState === "LAPSED") return { status: "LAPSED", proof };
   if (proof.verifiedAtMs <= 0) return { status: "UNKNOWN", reason: "incomplete" };
 
-  const completeness = proofCompleteness({ proof, source: state.source });
+  const completeness = proofCompleteness({ proof, state });
   if (completeness === "complete") return { status: "QUALIFIED", proof };
   return { status: "UNKNOWN", reason: completeness };
 }
@@ -85,10 +121,10 @@ export function qualifySsoDomainOwnership({
 /** Whether a proof carries what its method needs; "inferred" for a method nothing records. */
 function proofCompleteness({
   proof,
-  source,
+  state,
 }: {
   proof: SsoDomainVerification;
-  source: QualifiableConnection["source"];
+  state: QualifiableConnection;
 }): "complete" | "incomplete" | "inferred" {
   if (isSsoPublishedProofChannel(proof.method)) return completeWhen(Boolean(proof.tokenHash));
   if (proof.method === "operator-attested") return completeWhen(proof.actorId !== null);
@@ -97,12 +133,22 @@ function proofCompleteness({
   if (proof.method === "license-token") {
     return completeWhen(Boolean(proof.evidenceRef) && proof.actorId !== null);
   }
-  // The one-time import stands in for an operator nobody asked, so a named
-  // person on it is a row that did not come from the migration.
+  // The one-time import stands in for an operator nobody asked, so a named person
+  // on it did not come from the migration. A replacement holds it only as inherited
+  // from the grandfathered connection it names, as main checks the predecessor.
   if (proof.method === "legacy-configuration") {
-    return completeWhen(source === "legacy-grandfathered" && proof.actorId === null);
+    return completeWhen(proof.actorId === null && holdsTheLegacyImport(state));
   }
   return "inferred";
+}
+
+function holdsTheLegacyImport(state: QualifiableConnection): boolean {
+  if (state.source === "legacy-grandfathered") return true;
+  return (
+    state.replacesConnectionId !== null &&
+    state.replacesConnectionId ===
+      grandfatheredSsoConnectionId({ organizationId: state.organizationId })
+  );
 }
 
 function completeWhen(holds: boolean): "complete" | "incomplete" {

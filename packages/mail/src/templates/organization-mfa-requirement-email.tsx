@@ -75,11 +75,16 @@ export const organizationMfaRequirementEmailTemplate = defineTemplate({
 
 export const sendOrganizationMfaRequirementEmail = async ({
   mailer,
+  idempotencyKey,
   ...props
-}: OrganizationMfaRequirementEmailProps & { mailer: MailSender }) => {
+}: OrganizationMfaRequirementEmailProps & {
+  mailer: MailSender;
+  /** Stable identity of this recipient's delivery, so a retry is not a second mail. */
+  idempotencyKey?: string;
+}) => {
   const { subject, html } = await renderMailTemplate(
     organizationMfaRequirementEmailTemplate,
     props,
   );
-  await sendEmail({ mailer, content: { to: props.to, subject, html } });
+  await sendEmail({ mailer, content: { to: props.to, subject, html, idempotencyKey } });
 };

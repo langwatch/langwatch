@@ -235,10 +235,10 @@ function ActivityRow({
       <Box color={`${meta.palette}.fg`} display="inline-flex" flexShrink={0}>
         <Icon size={14} />
       </Box>
-      <Text textStyle="sm" fontWeight="medium" flexShrink={0}>
+      <Text textStyle="sm" fontWeight="medium" minWidth={0} truncate title={entry.name}>
         {entry.name}
       </Text>
-      <Badge size="sm" colorPalette={meta.palette} variant="subtle">
+      <Badge size="sm" colorPalette={meta.palette} variant="subtle" flexShrink={0}>
         {meta.label}
       </Badge>
       <Box flex="1" />

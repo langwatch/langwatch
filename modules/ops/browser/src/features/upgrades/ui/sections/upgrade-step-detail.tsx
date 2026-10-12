@@ -5,7 +5,7 @@ import { ListTable } from "@langwatch/design-system/list-table";
 import { Alert, Heading, HStack, Stack, Table, Text } from "@langwatch/design-system/primitives";
 import { SummaryList, SummaryListItem } from "@langwatch/design-system/summary-list";
 
-import { modeLabel, statusTone } from "../../model/upgrade-labels.ts";
+import { modeLabel, releaseName, statusTone } from "../../model/upgrade-labels.ts";
 import type { UpgradeStepDetailView, UpgradeTargetView } from "../../model/upgrade-view.ts";
 import { UpgradeStatusBadge } from "../elements/upgrade-status-badge.tsx";
 
@@ -58,7 +58,7 @@ export function UpgradeStepDetail({ step }: { step: UpgradeStepDetailView }) {
         </SummaryListItem>
         <SummaryListItem label="Kind">{step.kind}</SummaryListItem>
         <SummaryListItem label="Mode">{modeLabel(step.mode)}</SummaryListItem>
-        <SummaryListItem label="Release">{step.release ?? "Unreleased"}</SummaryListItem>
+        <SummaryListItem label="Release">{releaseName(step.release)}</SummaryListItem>
         {step.finishBy && <SummaryListItem label="Finish by">{step.finishBy}</SummaryListItem>}
         <SummaryListItem label="Owner">{step.owner ?? "Unattributed"}</SummaryListItem>
         <SummaryListItem label="Started">

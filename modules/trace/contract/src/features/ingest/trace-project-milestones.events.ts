@@ -44,3 +44,22 @@ export interface TraceReceivedEventDataSchema extends Named<
 export const traceReceivedEventDataSchema: TraceReceivedEventDataSchema =
   traceReceivedEventDataSchemaDefinition;
 export type TraceReceivedEventData = z.infer<typeof traceReceivedEventDataSchema>;
+
+/** A page of a project's trace ids first seen in a month, sent by trace's upgrade step. */
+export const MONTH_TRACE_IDS_LISTED_EVENT_TYPE = "lw.trace.month_trace_ids_listed" as const;
+/** The most trace ids one listing event carries. */
+export const MONTH_TRACE_IDS_PAGE_SIZE = 5_000;
+
+const monthTraceIdsListedEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  /** `YYYY-MM`, the UTC month the traces' summaries were first written in. */
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  traceIds: z.array(z.string().min(1)).min(1).max(MONTH_TRACE_IDS_PAGE_SIZE),
+});
+export interface MonthTraceIdsListedEventDataSchema extends Named<
+  typeof monthTraceIdsListedEventDataSchemaDefinition
+> {}
+export const monthTraceIdsListedEventDataSchema: MonthTraceIdsListedEventDataSchema =
+  monthTraceIdsListedEventDataSchemaDefinition;
+export type MonthTraceIdsListedEventData = z.infer<typeof monthTraceIdsListedEventDataSchema>;

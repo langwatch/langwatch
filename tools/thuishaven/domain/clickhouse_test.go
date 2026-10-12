@@ -22,7 +22,7 @@ func TestRenderClickHouseConfig(t *testing.T) {
 
 			t.Run("caps every kept system log at the default TTL", func(t *testing.T) {
 				for _, name := range KeptSystemLogs {
-					want := "<" + name + "><ttl>event_date + INTERVAL 7 DAY</ttl></" + name + ">"
+					want := "<" + name + "><ttl>event_date + INTERVAL 7 DAY</ttl><flush_interval_milliseconds>60000</flush_interval_milliseconds></" + name + ">"
 					if !strings.Contains(cfg, want) {
 						t.Errorf("missing %q in:\n%s", want, cfg)
 					}
@@ -118,7 +118,8 @@ func TestRenderClickHouseConfigBoundsBackgroundWork(t *testing.T) {
 		t.Run("bounds background pools to the small VM it shares", func(t *testing.T) {
 			for _, want := range []string{
 				"<max_concurrent_queries>100</max_concurrent_queries>",
-				"<background_pool_size>8</background_pool_size>",
+				"<background_pool_size>2</background_pool_size>",
+				"<background_merges_mutations_concurrency_ratio>1</background_merges_mutations_concurrency_ratio>",
 				"<background_schedule_pool_size>64</background_schedule_pool_size>",
 			} {
 				if !strings.Contains(cfg, want) {
@@ -135,9 +136,9 @@ func TestRenderClickHouseConfigBoundsBackgroundWork(t *testing.T) {
 			// number_of_free_entries_in_pool_to_execute_optimize_entire_partition
 			// (stock 25) exceeds pool*ratio — a sanity check, not a warning.
 			for _, want := range []string{
-				"<number_of_free_entries_in_pool_to_lower_max_size_of_merge>4</number_of_free_entries_in_pool_to_lower_max_size_of_merge>",
-				"<number_of_free_entries_in_pool_to_execute_mutation>4</number_of_free_entries_in_pool_to_execute_mutation>",
-				"<number_of_free_entries_in_pool_to_execute_optimize_entire_partition>4</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>",
+				"<number_of_free_entries_in_pool_to_lower_max_size_of_merge>1</number_of_free_entries_in_pool_to_lower_max_size_of_merge>",
+				"<number_of_free_entries_in_pool_to_execute_mutation>1</number_of_free_entries_in_pool_to_execute_mutation>",
+				"<number_of_free_entries_in_pool_to_execute_optimize_entire_partition>1</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>",
 			} {
 				if !strings.Contains(cfg, want) {
 					t.Errorf("missing %q in:\n%s", want, cfg)
@@ -209,5 +210,20 @@ func TestDefaultClickHouseLimitsScaleWithRAMWithinBounds(t *testing.T) {
 		if got := DefaultClickHouseLimits(c.ram).ContainerMemoryMB; got != c.want {
 			t.Errorf("%d GiB: got %d MB, want %d", c.ram/gib, got, c.want)
 		}
+	}
+}
+
+func TestClickHouseUsersConfigMatchesProductionAsyncInserts(t *testing.T) {
+	for _, want := range []string{
+		"<async_insert>1</async_insert>",
+		"<wait_for_async_insert>1</wait_for_async_insert>",
+		"<max_threads>2</max_threads>",
+	} {
+		if !strings.Contains(ClickHouseUsersConfig, want) {
+			t.Errorf("default profile is missing %q", want)
+		}
+	}
+	if strings.Contains(ClickHouseUsersConfig, "async_insert_busy_timeout") {
+		t.Error("local keeps ClickHouse's adaptive flush timeout; production's 1 s stalls a sequential seed")
 	}
 }

@@ -30,11 +30,11 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     And the report says nothing is needed from the operator
 
   @unit
-  Scenario: An image below the installation's floor runs nothing and refuses
-    Given an api whose release is below the ledger's floor
+  Scenario: An image whose gate refuses runs nothing and refuses by name
+    Given an api whose database role cannot create the upgrade ledger
     When its upgrade gate admits it
     Then it runs no upgrade
-    And it refuses, naming the floor
+    And it refuses, naming the refusal
 
   @integration
   Scenario: The api never runs the upgrade when its installation is behind
@@ -81,6 +81,14 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     And tRPC and SSE answer the same handled code
 
   @unit
+  Scenario: A raw SQL read the schema is not ready for answers upgrade_in_progress
+    Given the worker is running the upgrade and a Postgres schema step of the api's image is pending
+    When a repository's raw SQL names a table or column that step has not created
+    And Prisma reports it as a failed raw query whose driver error carries the Postgres code
+    Then REST answers 503 upgrade_in_progress with Retry-After
+    And a raw query failing for any other reason still answers 500
+
+  @unit
   Scenario: The browser retries a read answered upgrade_in_progress
     Given the api answers a read upgrade_in_progress
     When the browser's query client decides whether to try again
@@ -110,6 +118,12 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     Then it answers 200
 
   @unit
+  Scenario: The upgrading line names a count and at most five step ids
+    Given an api whose gate answers upgrading with 482 outstanding steps
+    When the api starts
+    Then its log line reads "the installation is upgrading (482 steps outstanding: " followed by the first five ids and "…"
+
+  @unit
   Scenario: The api serves and reports ready once the ledger is current
     Given the api is in upgrading mode
     When the worker's run records the last blocking step as done
@@ -118,10 +132,18 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
 
   @unimplemented
   Scenario: The upgrading frame names the upgrade's phase and its progress
-    Given the worker is applying the second of five blocking steps
+    Given a self-hosted install whose worker is applying the second of five blocking steps
     When a signed-in browser opens any page other than sign-in and Upgrades
     Then the upgrading frame names the phase and "2 of 5"
     And it names no tenant, error, hostname or version
+
+  # UPGRADE-FACE (Alex, 2026-10-10): cloud never says it is upgrading.
+  @unimplemented
+  Scenario: A cloud browser waiting on an upgrade sees only the branded page
+    Given a cloud install whose worker is applying a blocking step
+    When a browser opens a page whose reads answer upgrade_in_progress
+    Then it shows the LangWatch logo on the gradient page, with at most one light line
+    And it shows no loader, phase, step count, version or the word "upgrade"
 
   @integration
   Scenario: The Upgrades page opens once its grant read settles, even when no feature flag answers
@@ -234,6 +256,20 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     Given the worker's upgrade failed on a Postgres schema step
     When the operator opens the console with the token
     Then the console shows the failed step, its error and the last 50 lines of the run report's log
+
+  @unit
+  Scenario: A read ahead of the schema while upgrading logs no error
+    Given the worker is upgrading and the ledger is behind this image
+    When a request reads a Postgres table or column the schema does not have yet
+    Then it answers 503 upgrade_in_progress
+    And the request is logged at info, not error
+
+  @unit
+  Scenario: A first install that failed in a schema phase opens the console without a failed step
+    Given the worker's first install failed in its Postgres or ClickHouse schema phase
+    And the failure wrote no failed step row, only the run's failed outcome
+    When the operator opens the console with the token
+    Then the console shows the run's error and the last lines of its log
 
   @unit
   Scenario: A failure on an installation that finished an upgrade before opens no console

@@ -62,14 +62,15 @@ const maxBody = 16 << 20
 
 // Server answers the product's outbound calls, the control API and the console.
 type Server struct {
-	cfg       Config
-	records   *store
-	faults    *faultSet
-	receivers *receiverSet
-	slack     *slackWorkspace
-	now       func() time.Time
-	mux       *http.ServeMux
-	console   http.Handler
+	cfg        Config
+	records    *store
+	faults     *faultSet
+	receivers  *receiverSet
+	slack      *slackWorkspace
+	databricks *dbxWorkspace
+	now        func() time.Time
+	mux        *http.ServeMux
+	console    http.Handler
 }
 
 // NewServer builds the server over the embedded console bundle.
@@ -86,7 +87,7 @@ func newServer(cfg Config, bundle fs.FS) *Server {
 	}
 	s := &Server{
 		cfg: cfg, records: newStore(cfg.MaxRecords), faults: &faultSet{}, receivers: seedReceivers(),
-		slack: seedWorkspace(), now: time.Now, console: newConsole(bundle),
+		slack: seedWorkspace(), databricks: seedDatabricks(time.Now()), now: time.Now, console: newConsole(bundle),
 	}
 	if cfg.Seed {
 		for _, r := range seedRecords() {
@@ -104,6 +105,14 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("POST /api/{method}", s.handleSlackAPI)
 	mux.HandleFunc("POST /hooks/{name}", s.handleWebhook)
 	mux.HandleFunc("POST /", s.handleSQS)
+	mux.HandleFunc("POST /oidc/v1/token", s.handleDbxToken)
+	mux.HandleFunc("GET /api/2.0/genie/spaces", s.handleDbxSpaces)
+	mux.HandleFunc("GET /api/2.0/genie/spaces/{space}/conversations", s.handleDbxConversations)
+	mux.HandleFunc("GET /api/2.0/genie/spaces/{space}/conversations/{conversation}/messages", s.handleDbxMessages)
+	mux.HandleFunc("GET /api/2.0/preview/scim/v2/Users", s.handleDbxUsers)
+	mux.HandleFunc("GET /api/2.0/preview/scim/v2/Users/{id}", s.handleDbxUser)
+	mux.HandleFunc("GET /feeds/{name}", s.handleFeed)
+	mux.HandleFunc("PUT /_sim/api/databricks/users", s.handleSetDbxUsers)
 	mux.HandleFunc("GET /_sim/api/status", s.handleStatus)
 	mux.HandleFunc("GET /_sim/api/setup", s.handleSetup)
 	mux.HandleFunc("GET /_sim/api/records", s.handleRecords)

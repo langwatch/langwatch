@@ -97,6 +97,8 @@ export interface ProcessMemberSource {
    * the first that does not. Spec: specs/server/process-readiness.feature.
    */
   answer?(): Promise<void>;
+  /** Tells every opened client shutdown has begun: a lost Redis stops reconnecting. */
+  beginClose?(): void;
   /** Closes every client this source opened, in reverse construction order. */
   close(): Promise<void>;
   /** The same close, so `await using members = buildProcessStores(...).members` works. */
@@ -289,13 +291,29 @@ export type ProcessStores = Readonly<{
   operatorReads: OperatorReadMint;
 }>;
 
+type OpenedMember = {
+  member: StoreClientName;
+  close: () => Promise<void>;
+  beginClose?: (() => void) | undefined;
+};
+
+/**
+ * Reverse construction order: eventing drains before the Redis its queue sits
+ * on goes away, and a client is never closed under something still holding
+ * it. A lost Redis stops reconnecting first, so that drain ends.
+ */
+async function closeOpened(opened: readonly OpenedMember[]): Promise<void> {
+  for (const entry of opened) entry.beginClose?.();
+  for (const entry of [...opened].reverse()) await entry.close();
+}
+
 export function buildProcessStores(options: BuildProcessStoresOptions): ProcessStores {
   const { config } = options;
   const supplied = options.members ?? {};
   refuseUndefinedMembers(supplied);
 
   const built = new Map<StoreClientName, unknown>();
-  const opened: { member: StoreClientName; close: () => Promise<void> }[] = [];
+  const opened: OpenedMember[] = [];
   const answering: { member: string; answer: () => Promise<void> }[] = [];
 
   const read = <Name extends StoreClientName>(name: Name): StoreClients[Name] => {
@@ -305,7 +323,9 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
 
     const result = builders[name]();
     built.set(name, result.value);
-    if (result.close) opened.push({ member: name, close: result.close });
+    if (result.close) {
+      opened.push({ member: name, close: result.close, beginClose: result.beginClose });
+    }
     if (result.answer) answering.push({ member: name, answer: result.answer });
     return result.value as StoreClients[Name];
   };
@@ -383,11 +403,11 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
         ),
       );
     },
+    beginClose(): void {
+      for (const entry of opened) entry.beginClose?.();
+    },
     async close(): Promise<void> {
-      // Reverse construction order: eventing drains before the Redis its queue
-      // sits on goes away, and a client is never closed under something still
-      // holding it.
-      for (const entry of [...opened].reverse()) await entry.close();
+      await closeOpened(opened);
       opened.length = 0;
       answering.length = 0;
       built.clear();
@@ -403,6 +423,7 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
 export function hostedStores(source: ProcessMemberSource) {
   return {
     name: "process stores",
+    stopping: () => source.beginClose?.(),
     stop: () => source.close(),
     ...(source.answer === undefined
       ? {}

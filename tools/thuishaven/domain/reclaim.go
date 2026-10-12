@@ -32,6 +32,10 @@ const (
 // that a machine does not carry a week of scratch.
 const TemporaryWorktreeIdle = 24 * time.Hour
 
+// StaleWorktreeAge is how long a worktree with no stack may go without a commit
+// before the hub marks it stale. Shown only: nothing reclaims on this clock.
+const StaleWorktreeAge = 14 * 24 * time.Hour
+
 // agentBranchPrefixes name the branches a spawned agent or a worktree driver
 // creates for itself. Matching on the branch (not the path) catches the ones that
 // live in an ordinary directory.

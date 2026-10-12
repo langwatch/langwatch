@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
+  },
+  "include": [
+    "src/**/__tests__/**/*",
+    "src/**/__mocks__/**/*",
+    "src/**/tests/**/*",
+    "src/**/*.test.*",
+    "src/**/*.spec.*"
+  ],
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    }
+  ]
+}

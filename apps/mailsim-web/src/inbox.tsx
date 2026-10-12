@@ -121,7 +121,10 @@ export const Inbox = () => {
   const toast = useToast();
   const { openId, open } = useOpenMessage();
   const notify = useNotify({ onOpen: open });
-  const { messages, connection, error, refresh } = useLiveInbox({ onList: notify.announce });
+  const { messages, connection, error, refresh } = useLiveInbox({
+    onList: notify.announce,
+    inBackground: notify.on,
+  });
   const opened = useOpened({ openId });
   const [info, setInfo] = useState<InboxInfo | undefined>(undefined);
   const [query, setQuery] = useState("");

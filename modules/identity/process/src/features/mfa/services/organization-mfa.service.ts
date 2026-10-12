@@ -12,12 +12,17 @@ import {
   satisfiesOrganizationMfaRequirement,
 } from "@langwatch/identity-contract";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 
+import type { IdentityEventing } from "../../../eventing/identity-command-senders.store.ts";
+import {
+  TWO_STEP_REQUIREMENT_PIPELINE_NAME,
+  type TwoStepRequirementChangedData,
+} from "../eventing/two-step-requirement.intent.ts";
 import type {
   OrganizationMfaSetting,
   TwoStepVerificationRepository,
 } from "../repositories/two-step-verification.repository.ts";
-import type { OrganizationMfaNotifierService } from "./organization-mfa-notifier.service.ts";
 
 type OrganizationMfaServiceDeps = {
   accounts: TwoStepVerificationRepository;
@@ -26,7 +31,8 @@ type OrganizationMfaServiceDeps = {
     AuthApi,
     "findSessionAmr" | "findAssertedAmrForIdentifiers" | "offersTwoStepVerification"
   >;
-  notifier: OrganizationMfaNotifierService;
+  /** Where a change is recorded; the worker tells the members from the fact. */
+  eventing: IdentityEventing;
   /** Whether this organization's plan carries the requirement, asked per call. */
   entitled: (args: { organizationId: string }) => Promise<boolean>;
 };
@@ -120,7 +126,8 @@ export class OrganizationMfaService {
 
   /**
    * The plan is asked only for a change that turns it ON: an organization whose plan lapsed
-   * with the requirement on can always release its held members.
+   * with the requirement on can always release its held members. The members are told on the
+   * worker, from the recorded fact, so the request answers once the setting is saved.
    */
   async setRequirement({
     organizationId,
@@ -145,15 +152,22 @@ export class OrganizationMfaService {
         `organization ${organizationId} asked to require a second factor on a plan that does not carry the requirement`,
       );
     }
-    await this.deps.accounts.saveOrganizationRequirement({ organizationId, mfaRequired });
-    const members = await this.deps.accounts.findMemberAccountFactors({ organizationId });
-    await this.deps.notifier.notifyRequirementChanged({
-      organizationId,
-      organizationName: current.name,
-      actorUserId,
-      required: mfaRequired,
-      members,
+    const recorder = await this.deps.eventing.resolvePipelineCommand({
+      pipeline: TWO_STEP_REQUIREMENT_PIPELINE_NAME,
+      command: "recordTwoStepRequirementChanged",
     });
+    if (recorder.kind === "unregistered") {
+      throw new Error(`${TWO_STEP_REQUIREMENT_PIPELINE_NAME} is not registered in this process`);
+    }
+    await this.deps.accounts.saveOrganizationRequirement({ organizationId, mfaRequired });
+    const change: TwoStepRequirementChangedData = {
+      tenantId: organizationId,
+      organizationId,
+      required: mfaRequired,
+      actorUserId,
+      occurredAt: nowInstant().epochMilliseconds,
+    };
+    await recorder.sender.send(change);
     return { previous: current.mfaRequired, next: mfaRequired };
   }
 

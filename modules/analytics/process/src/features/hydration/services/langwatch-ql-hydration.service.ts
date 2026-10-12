@@ -7,11 +7,11 @@
 
 import {
   type LangWatchQLAppFunctionCall,
-  type LangWatchQLCaller,
   type LangWatchQLColumn,
   type LangWatchQLPassInput,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
+  type LangWatchQLTextHydrationInput,
 } from "@langwatch/analytics-contract";
 import type { InstantEvalTranscriptFit } from "@langwatch/instant-eval-contract";
 
@@ -137,14 +137,8 @@ export class LangWatchQLHydrationService {
     parameters,
     calls,
     traceIds,
-  }: {
-    project: LangWatchQLCaller;
-    protections: LangWatchQLProtections;
-    sql: string;
-    parameters?: Readonly<Record<string, unknown>>;
-    calls: readonly LangWatchQLAppFunctionCall[];
-    traceIds: readonly string[];
-  }): Promise<readonly Record<string, unknown>[]> {
+    isInstantEvalsEnabled,
+  }: LangWatchQLTextHydrationInput): Promise<readonly Record<string, unknown>[]> {
     if (traceIds.length === 0) return [];
     const execution = await this.runner.executeLangWatchQLPass({
       project,
@@ -152,6 +146,7 @@ export class LangWatchQLHydrationService {
       sql,
       ...(parameters ? { parameters } : {}),
       pass: { kind: "page", traceIds },
+      isInstantEvalsEnabled,
     });
     const hydrated = await this.hydrate({
       projectIds: [project.id],

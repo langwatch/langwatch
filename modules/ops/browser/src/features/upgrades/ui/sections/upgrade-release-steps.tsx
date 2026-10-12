@@ -13,6 +13,7 @@ import {
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
+import { api } from "../../../../behavior/ops-api.ts";
 import { formatDuration } from "../../../../model/ops-formatters.ts";
 import {
   isFinished,
@@ -25,6 +26,7 @@ import type { UpgradeStepView } from "../../model/upgrade-view.ts";
 import { UpgradeErrorSummary } from "../elements/upgrade-error-summary.tsx";
 import { UpgradeStatusBadge } from "../elements/upgrade-status-badge.tsx";
 import { UpgradeStepState } from "../elements/upgrade-step-state.tsx";
+import { UpgradeReadState } from "./upgrade-read-state.tsx";
 
 /** How many steps fall under each value of one field, largest first. */
 function countBy(steps: readonly UpgradeStepView[], field: "status" | "kind"): [string, number][] {
@@ -218,7 +220,9 @@ export function UpgradeReleaseSteps({
   if (steps.length === 0) {
     return (
       <Text color="fg.muted">
-        {release ? `Release ${release} declared no steps.` : "No unreleased steps."}
+        {release
+          ? `Release ${release} declared no steps.`
+          : "The development build declares no steps."}
       </Text>
     );
   }
@@ -257,5 +261,23 @@ export function UpgradeReleaseSteps({
         </Collapsible.Root>
       )}
     </Stack>
+  );
+}
+
+/** W2 inside the Steps tab: one version's steps, read when its group opens. */
+export function UpgradeReleaseStepsRead({
+  release,
+  onOpenStep,
+}: {
+  release: string | null;
+  onOpenStep: (stepId: string) => void;
+}) {
+  const steps = api.ops.upgrade.listSteps.useQuery({ release });
+  return (
+    <UpgradeReadState read={steps} failedTitle="The steps could not load">
+      {(page) => (
+        <UpgradeReleaseSteps release={release} steps={page.items} onOpenStep={onOpenStep} />
+      )}
+    </UpgradeReadState>
   );
 }

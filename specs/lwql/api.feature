@@ -537,6 +537,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the code is the deployment's, not lwql_invalid_query
 
   @unit
+  Scenario: A parameter value that does not fit its declared type is refused with the parameter named
+    Given a query declaring {start:DateTime64(3)}
+    When the request binds start to a value the server cannot read as that type, such as an ISO string ending in Z
+    Then the query is refused with error code lwql_parameter_invalid at HTTP 400, a customer fault
+    And the refusal names the parameter and nothing else from the server's message
+
+  @unit
   Scenario: A missing column passed to a function is named in the refusal
     Given a query that passes a column no view carries to a function, as in arrayJoin(Labels)
     When the server refuses it as an unknown expression or function identifier

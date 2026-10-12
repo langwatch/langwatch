@@ -17,6 +17,8 @@ export const recordSchema = z.object({
     .transform((properties) => properties ?? {}),
   receivedAt: z.coerce.date(),
   raw: z.unknown(),
+  /** The forced error the call was refused with; absent when it was accepted. */
+  status: z.number().optional(),
 });
 export type AnalyticsRecord = z.infer<typeof recordSchema>;
 

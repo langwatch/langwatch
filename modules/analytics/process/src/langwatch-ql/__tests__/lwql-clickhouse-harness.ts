@@ -547,7 +547,6 @@ async function runShippedMigrations({
     await ClickHouseMigrateTask.createFromConfig({
       config: {
         buildTime: false,
-        skipped: false,
         sharedUrl: url.toString(),
         privateEndpoints: [],
       },

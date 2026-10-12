@@ -27,7 +27,10 @@ profiles (cloud, hybrid) start head's api (`-head-dir`) beside the old release, 
 `-switch-on` (default `/readyz`), then stop the old release; stop-start profiles (self-hosted) stop
 it first. A head api that exits before ready is restarted, as an orchestrator would, and counted (N7). A poller records head's phases, Playwright screenshots them and Ops > Upgrades
 (`shots/`), and after settle the cell judges I0, I2, I2b, I3, I4, I6, I8, I9, N1 to N7, O1 and, for
-hybrid, H1 to H3 into `report.md` and `report.json`. Exit 0 all pass, 1 an invariant failed, 2 a
+hybrid, H1 to H6 and H9 into `report.md` and `report.json`. Hybrid drills: `-drills private-down` puts a TCP gate in
+front of each private ClickHouse target and closes it while head's worker upgrades (H8); `route-broken` boots a
+second head api with the private route missing, then malformed, after settle (H7). `-overlays retention` also
+plants aged rows on the private target under the private organization's own rule. Exit 0 all pass, 1 an invariant failed, 2 a
 step stopped the cell (its databases are kept for inspection).
 
 Built code only, both sides: main runs `pnpm build` in `platform/app`, then `runtime:app` and

@@ -1,6 +1,7 @@
 import {
   type LangyConversationDetail as ContractConversationDetail,
   type LangyConversationEventPage,
+  type LangyConversationTurnData,
   type LangyConversationListCursor as ContractConversationListCursor,
   type LangyConversationListPage as ContractConversationListPage,
   type LangyMessageRow as ContractMessageRow,
@@ -134,6 +135,16 @@ export class LangyService {
     after: { acceptedAt: number; eventId: string };
   }): Promise<LangyConversationEventPage> {
     return this.conversations.getEventsAfter(input);
+  }
+
+  /** One turn's projected state for a caller who may see its conversation. */
+  findTurn(input: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    userId: string;
+  }): Promise<LangyConversationTurnData[]> {
+    return this.conversations.findTurn(input);
   }
 
   /** Writes one line into the transcript without starting a turn (ADR-129). */

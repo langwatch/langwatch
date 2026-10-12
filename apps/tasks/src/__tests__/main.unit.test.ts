@@ -6,21 +6,11 @@ import { runTasks } from "../main.ts";
 
 const calls = vi.hoisted(() => ({
   order: new Array<string>(),
-  prisma: vi.fn<() => Promise<void>>(),
+  lwql: vi.fn<() => Promise<void>>(),
   lock: vi.fn<(url: string | undefined, run: () => Promise<void>) => Promise<void>>(),
 }));
 
-vi.mock("../prisma-migrate.ts", () => ({ prismaMigrate: calls.prisma }));
-vi.mock("../clickhouse-migrate.ts", () => ({
-  clickhouseMigrate: async () => {
-    calls.order.push("clickhouse");
-  },
-}));
-vi.mock("../lwql-provision.ts", () => ({
-  lwqlProvision: async () => {
-    calls.order.push("lwql");
-  },
-}));
+vi.mock("../lwql-provision.ts", () => ({ lwqlProvision: calls.lwql }));
 vi.mock("../system-migrations-pass.ts", () => ({
   systemMigrationsPass: async () => {
     calls.order.push("system");
@@ -28,7 +18,7 @@ vi.mock("../system-migrations-pass.ts", () => ({
 }));
 vi.mock("../migration-lock.ts", () => ({ withMigrationLock: calls.lock }));
 
-const names = ["prisma-migrate", "clickhouse-migrate", "lwql-provision", "system-migrations-pass"];
+const names = ["lwql-provision", "system-migrations-pass"];
 
 function input() {
   return {
@@ -52,8 +42,8 @@ function input() {
 
 beforeEach(() => {
   calls.order.length = 0;
-  calls.prisma.mockReset().mockImplementation(async () => {
-    calls.order.push("prisma");
+  calls.lwql.mockReset().mockImplementation(async () => {
+    calls.order.push("lwql");
   });
   calls.lock.mockReset().mockImplementation(async (_url, run) => {
     calls.order.push("lock");
@@ -71,7 +61,7 @@ describe("given a migration sequence", () => {
     /** @scenario Several task names in one invocation run in one process */
     it("runs in argv order under one migration lock", async () => {
       await runTasks(names, input());
-      expect(calls.order).toEqual(["lock", "prisma", "clickhouse", "lwql", "system", "unlock"]);
+      expect(calls.order).toEqual(["lock", "lwql", "system", "unlock"]);
       expect(calls.lock).toHaveBeenCalledTimes(1);
     });
   });
@@ -81,7 +71,7 @@ describe("given a migration sequence", () => {
     it("runs every task and waits for nothing", async () => {
       const base = input();
       await runTasks(names, { ...base, connections: { ...base.connections, database: null } });
-      expect(calls.order).toEqual(["prisma", "clickhouse", "lwql", "system"]);
+      expect(calls.order).toEqual(["lwql", "system"]);
       expect(calls.lock).not.toHaveBeenCalled();
     });
   });
@@ -91,7 +81,7 @@ describe("given a migration sequence", () => {
     /** @scenario The lock is released even when a task fails */
     it("stops the sequence and releases the lock", async () => {
       const failure = new Error("migration failed");
-      calls.prisma.mockRejectedValueOnce(failure);
+      calls.lwql.mockRejectedValueOnce(failure);
       await expect(runTasks(names, input())).rejects.toBe(failure);
       expect(calls.order).toEqual(["lock", "unlock"]);
     });
@@ -101,7 +91,7 @@ describe("given a migration sequence", () => {
     /** @scenario Arguments alongside several task names are refused */
     it("refuses before running any task, because the argument has no single owner", async () => {
       await expect(
-        runTasks(["prisma-migrate", "clickhouse-migrate", "--dry-run"], input()),
+        runTasks(["lwql-provision", "system-migrations-pass", "--dry-run"], input()),
       ).rejects.toThrow("Available tasks:");
 
       expect(calls.order).toEqual([]);
@@ -111,11 +101,11 @@ describe("given a migration sequence", () => {
 
   describe("when a name is unknown or missing", () => {
     /** @scenario An unknown name is still reported against the catalogue */
-    it.each([{ argv: [] }, { argv: ["prisma-migrate", "unknown-task"] }])(
+    it.each([{ argv: [] }, { argv: ["lwql-provision", "unknown-task"] }])(
       "refuses before running any task: $argv",
       async ({ argv }) => {
         await expect(runTasks(argv, input())).rejects.toThrow("Available tasks:");
-        expect(calls.prisma).not.toHaveBeenCalled();
+        expect(calls.lwql).not.toHaveBeenCalled();
         expect(calls.lock).not.toHaveBeenCalled();
       },
     );
@@ -124,11 +114,11 @@ describe("given a migration sequence", () => {
   describe("when `upgrade` is named beside a leased task", () => {
     /** @scenario "Upgrade named beside legacy tasks is refused before anything runs" */
     it("refuses before taking the lease, since upgrade takes it itself", async () => {
-      await expect(runTasks(["prisma-migrate", "upgrade"], input())).rejects.toThrow(
+      await expect(runTasks(["lwql-provision", "upgrade"], input())).rejects.toThrow(
         "Run `upgrade` on its own",
       );
       expect(calls.lock).not.toHaveBeenCalled();
-      expect(calls.prisma).not.toHaveBeenCalled();
+      expect(calls.lwql).not.toHaveBeenCalled();
     });
   });
 
@@ -143,7 +133,7 @@ describe("given a migration sequence", () => {
   describe("when cancellation arrives during a task", () => {
     it("stops before the next task and releases the migration lock", async () => {
       const controller = new AbortController();
-      calls.prisma.mockImplementationOnce(async () => controller.abort());
+      calls.lwql.mockImplementationOnce(async () => controller.abort());
       await expect(
         runTasks(names, { ...input(), signal: controller.signal }),
       ).rejects.toMatchObject({

@@ -166,6 +166,13 @@ Feature: The local development topology
     Then the go lane hosts only the gateway
     And it carries no address for the service that was not selected
 
+  @unit
+  Scenario: Each stack's gateway spools its spend apart from every other stack's
+    Given two stacks running on one machine, each with its own gateway
+    When haven plans each stack's children
+    Then each gateway is handed a spend spool directory under its own stack's run state
+    And neither gateway can ship a spend record the other recorded to its own control plane
+
   # A checkout without cmd/service/combined_dev.go, or a monolith one, keeps
   # Haven's bundled simulator lanes (haven-bundled-simulators.feature).
   @unit
@@ -187,6 +194,16 @@ Feature: The local development topology
     And no "sims" lane is planned
     And with LANGWATCH_DEV_ONE_PROCESS=0 the "go" and "sims" lanes are planned as before
     And Langy keeps a lane of its own either way
+
+  # Bound by tools/thuishaven/app/plan_langy_test.go. A global CLI from a package
+  # manager lags the checkout, so Langy's commands would be tested against old flags.
+  @unit
+  Scenario: Langy on the host runs this checkout's langwatch CLI
+    Given a stack whose Langy runs on the host tier
+    When haven plans the Langy lane
+    Then the checkout's built CLI is built first when it is missing
+    And "langwatch" and "lw" shims that run it lead the Langy lane's PATH
+    And a failed CLI build keeps Langy, names the build command and its log, and leaves the CLI on PATH in use
 
   @unit
   Scenario: Services sharing one Go process keep their own telemetry identity
@@ -254,3 +271,24 @@ Feature: The local development topology
     When it starts them
     Then the worker is told it owns telemetry and the API is told it does not
     And so the telemetry SDK is set up exactly once for the process
+
+  @unit
+  Scenario: The overlay leaves browser telemetry keys the operator exported alone
+    Given the observability collector is up
+    And the shell that runs haven up exports RUM_ENABLED or RUM_COLLECTOR_ENDPOINT, even empty
+    When haven assembles the application's environment
+    Then each key the operator exported keeps their value
+    And haven fills only the RUM keys they left unset
+
+  @unit
+  Scenario: Taking one stack down leaves the shared proxy running
+    Given two stacks are registered and share the machine-wide portless proxy
+    When haven down takes one of them down, with or without --force
+    Then the proxy is never stopped; only haven down --all stops it
+    And a proxy that died with the stack's process group is started again while another stack remains
+
+  @unit
+  Scenario: Bringing a stack up starts a missing proxy
+    Given the portless proxy is not running
+    When haven up bootstraps the stack
+    Then the proxy is started before the stack is reported ready

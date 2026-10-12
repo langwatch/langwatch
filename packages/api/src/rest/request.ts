@@ -28,7 +28,12 @@ import { type SSEStreamingApi, streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z, ZodIssue, ZodSchema } from "zod";
 
-import { RESOLVED_ERROR, type ResolvedError } from "../errors.ts";
+import {
+  isUpgradeInProgress,
+  promoteStoreFailure,
+  RESOLVED_ERROR,
+  type ResolvedError,
+} from "../errors.ts";
 import type { RestIdentity } from "../hosting/api-door.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
@@ -749,7 +754,8 @@ function logRequestOutcome({
   // promoted the throw -- a ZodError has no `httpStatus`, so we derived
   // 500 for an error the caller received as a 422 ValidationError.
   const resolved = c.get(RESOLVED_ERROR) as ResolvedError | undefined;
-  const requestError = resolved ? resolved.error : error || c.error;
+  // A canonical family answers a promoted store failure without recording it: promote here too.
+  const requestError = resolved ? resolved.error : promoteStoreFailure(error || c.error);
 
   const statusCode =
     resolved?.status ?? (requestError ? getStatusCodeFromError(requestError) : c.res.status);
@@ -783,6 +789,12 @@ function logRequestOutcome({
   // A status the route DECLARED is an answer, not a fault.
   if (!requestError && c.get(DECLARED_ANSWER) === true) {
     logDeclaredAnswer(logger, record);
+
+    return;
+  }
+
+  if (isUpgradeInProgress(requestError)) {
+    logUpgradingAnswer(logger, record);
 
     return;
   }
@@ -903,6 +915,16 @@ function logDeclaredAnswer(logger: Logger, data: RequestLogData): void {
   const { extra, attribution, error: _cause, ...request } = data;
 
   logger.info({ ...extra, ...attribution, ...request }, "request handled");
+}
+
+/** A 503 answered while the worker upgrades the schema is expected, so it is info, not error. */
+function logUpgradingAnswer(logger: Logger, data: RequestLogData): void {
+  const { extra, attribution, error: _cause, ...request } = data;
+
+  logger.info(
+    { ...extra, ...attribution, ...request, handledErrorCode: "upgrade_in_progress" },
+    "request answered while upgrading",
+  );
 }
 
 function runAfterSSECompletion({

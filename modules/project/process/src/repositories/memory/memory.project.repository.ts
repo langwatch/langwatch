@@ -16,6 +16,7 @@ import {
   type CreateProjectInput,
   type InternalProject,
   type InternalProjectKind,
+  internalProjectKindSchema,
   type PaginatedProjects,
   type ArchivedProject,
   type Project,
@@ -111,12 +112,18 @@ export class MemoryProjectRepository implements ProjectRepository {
     return true;
   }
 
-  async findInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
+  async findInternalByOrganization({
+    organizationId,
+    kind,
+  }: {
+    organizationId: string;
+    kind: InternalProjectKind;
+  }): Promise<InternalProject | null> {
     const project = this.#database
       .projects()
       .find(
         (row) =>
-          row.kind === PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          row.kind === kind &&
           row.archivedAt === null &&
           this.#database.isInOrganization(row, organizationId),
       );
@@ -133,7 +140,7 @@ export class MemoryProjectRepository implements ProjectRepository {
 
   async findInternalBySlug(slug: string): Promise<InternalProject | null> {
     const project = this.#database.projects().find((row) => row.slug === slug);
-    if (!project || project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) return null;
+    if (!project || !internalProjectKindSchema.validate(project.kind)) return null;
 
     return this.#internal(project);
   }
@@ -144,6 +151,8 @@ export class MemoryProjectRepository implements ProjectRepository {
     slug: string;
     apiKey: string;
     teamId: string;
+    kind: InternalProjectKind;
+    framework: string;
   }): Promise<InternalProject> {
     const winner = this.#database.projects().find((row) => row.slug === input.slug);
     if (winner) return this.#internal(winner);
@@ -157,8 +166,8 @@ export class MemoryProjectRepository implements ProjectRepository {
           apiKey: input.apiKey,
           teamId: input.teamId,
           language: "internal",
-          framework: "governance",
-          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+          framework: input.framework,
+          kind: input.kind,
           traceSharingEnabled: false,
         }),
       ),
@@ -420,11 +429,11 @@ export class MemoryProjectRepository implements ProjectRepository {
 
   async findSharedProjectSlugs({
     organizationId,
-    memberUserId,
+    member,
     limit,
   }: {
     organizationId: string;
-    memberUserId?: string;
+    member?: { teamIds: readonly string[]; projectIds: readonly string[] };
     limit: number;
   }): Promise<string[]> {
     return this.#database
@@ -436,7 +445,9 @@ export class MemoryProjectRepository implements ProjectRepository {
           !team.isPersonal &&
           project.archivedAt === null &&
           !NEVER_LANDED_ON_PROJECT_KINDS.includes(project.kind) &&
-          (memberUserId === undefined || this.#database.isTeamMember(team.id, memberUserId))
+          (member === undefined ||
+            member.teamIds.includes(team.id) ||
+            member.projectIds.includes(project.id))
         );
       })
       .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())

@@ -17,7 +17,7 @@
     }
   },
   "scripts": {
-    "typecheck": "node scripts/check-feature-names.mjs && tsc -b tsconfig.test.json",
+    "typecheck": "node scripts/check-feature-names.mjs && GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

@@ -108,6 +108,7 @@ async function harness(
     record: null,
     goLive: null,
     legacyRoute: null,
+    legacyDomainsToMove: [],
     enterpriseRequired: false,
     migration: null,
   };
@@ -247,6 +248,7 @@ describe("the organization's own single sign-on surface", () => {
           record: null,
           goLive: null,
           legacyRoute: null,
+          legacyDomainsToMove: [],
           enterpriseRequired: false,
           migration: null,
         },

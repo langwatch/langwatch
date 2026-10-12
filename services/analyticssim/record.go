@@ -30,6 +30,7 @@ type Record struct {
 	Properties map[string]any  `json:"properties"`
 	ReceivedAt time.Time       `json:"receivedAt"`
 	Raw        json.RawMessage `json:"raw"`
+	Status     int             `json:"status,omitempty"` // the forced error the call was refused with
 	seeded     bool            // sample content, left out of Activity
 }
 

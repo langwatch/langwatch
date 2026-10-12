@@ -85,14 +85,6 @@
     "needsOldWritersGone": true
   },
   {
-    "id": "entitlement:seed-trace-meter",
-    "kind": "data",
-    "mode": "background",
-    "owner": "entitlement",
-    "description": "Seeds entitlement's trace meter from trace's span log at deploy.",
-    "needsOldWritersGone": true
-  },
-  {
     "id": "governance:record-coding-assistant-billing",
     "kind": "data",
     "mode": "background",
@@ -154,6 +146,13 @@
     "mode": "blocking",
     "owner": "ops",
     "description": "Carries organizations that finished or were enrolled in the Slack connections migration over to its new step, so it does not run for them again and keeps its enrolments."
+  },
+  {
+    "id": "ops:checkup-canary-project",
+    "kind": "data",
+    "mode": "background",
+    "owner": "ops",
+    "description": "Creates the hidden system organization and the project the Ops checkup's canaries run in, so they never write into a customer's project."
   },
   {
     "id": "ops:seed-platform-operators",
@@ -256,6 +255,14 @@
     "owner": "trace",
     "description": "Waits for ClickHouse to build the trace summaries updated-at index over existing rows.",
     "needsOldWritersGone": false
+  },
+  {
+    "id": "trace:send-month-trace-ids",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Sends each project's trace ids seen so far this month, so plan trace limits count from a complete month.",
+    "needsOldWritersGone": true
   },
   {
     "id": "user:record-created-facts",

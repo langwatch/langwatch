@@ -5,6 +5,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { SsoReplacementImportToken } from "@langwatch/enterprise-sso-contract";
 import { AuthenticationOverviewCardToken } from "@langwatch/organization-client";
 
 export const ssoWeb = defineBrowserModule("sso")
@@ -28,4 +29,8 @@ export const ssoWeb = defineBrowserModule("sso")
   // How people sign in, drawn on organization's Authentication overview.
   .lends(AuthenticationOverviewCardToken, {
     load: () => import("./ui/sections/sso-overview-card.tsx"),
+  })
+  // The back office's replacement import, drawn in ops' legacy-connection inventory.
+  .lends(SsoReplacementImportToken, {
+    load: () => import("./ui/sections/replacement-import.section.tsx"),
   });

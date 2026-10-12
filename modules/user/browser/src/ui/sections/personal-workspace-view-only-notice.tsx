@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { Alert } from "@langwatch/design-system/primitives";
 import { Eye } from "lucide-react";
 
 import { useLiteMemberGuard } from "../../behavior/personal-workspace-session.ts";
@@ -12,24 +12,16 @@ export function PersonalWorkspaceViewOnlyNotice() {
   if (!isLiteMember) return null;
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="lg"
-      bg="bg.subtle"
-      paddingY={3}
-      paddingX={4}
-      data-testid="personal-workspace-view-only-notice"
-    >
-      <HStack gap={3} align="start">
-        <Box color="fg.muted" paddingTop={0.5}>
-          <Eye size={16} />
-        </Box>
-        <Text fontSize="sm" color="fg.muted">
+    <Alert.Root status="neutral" data-testid="personal-workspace-view-only-notice">
+      <Alert.Indicator>
+        <Eye />
+      </Alert.Indicator>
+      <Alert.Content>
+        <Alert.Description>
           Your organization gives you view-only access, so you can read your workspace but not add
           to it. Ask an organization admin if you need to change something here.
-        </Text>
-      </HStack>
-    </Box>
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
   );
 }

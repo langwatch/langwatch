@@ -58,4 +58,68 @@ describe("SessionCallbackEvidenceChannel", () => {
 
     expect(channel.findAcceptedAccounts({ providerId: "auth0" })).toEqual([]);
   });
+
+  describe("when a deployment Okta or Auth0 callback verified an ID token", () => {
+    const token = (claims: Record<string, unknown>) =>
+      `h.${btoa(JSON.stringify(claims)).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_")}.s`;
+
+    /** @scenario A deployment Okta or Auth0 callback carries its verified token's factors to the session */
+    it("carries the token's amr onto the accepted account with the same subject", () => {
+      const channel = SessionCallbackEvidenceChannel.create();
+      return channel.runWithScope(async () => {
+        const path = "/oauth2/callback/okta";
+        channel.recordVerifiedCallbackToken({
+          providerId: "okta",
+          path,
+          verifiedIdToken: token({ sub: "00usam", amr: ["pwd", "mfa"] }),
+        });
+        channel.recordAuthenticatedCallbackAccount({
+          providerId: "okta",
+          providerAccountId: "00usam",
+          path,
+        });
+
+        expect(channel.findAcceptedAccounts({ providerId: "okta" })).toEqual([
+          {
+            providerId: "okta",
+            providerAccountId: "00usam",
+            assertedFactors: ["pwd", "mfa"],
+            verifiedTokenClaims: true,
+          },
+        ]);
+      });
+    });
+
+    /** @scenario A deployment Okta or Auth0 callback carries its verified token's factors to the session */
+    it("earns nothing for another subject or another provider's callback path", () => {
+      const channel = SessionCallbackEvidenceChannel.create();
+      return channel.runWithScope(async () => {
+        channel.recordVerifiedCallbackToken({
+          providerId: "auth0",
+          path: "/oauth2/callback/okta",
+          verifiedIdToken: token({ sub: "auth0|sam", amr: ["mfa"] }),
+        });
+        channel.recordVerifiedCallbackToken({
+          providerId: "okta",
+          path: "/oauth2/callback/okta",
+          verifiedIdToken: token({ sub: "00uother", amr: ["mfa"] }),
+        });
+        channel.recordAuthenticatedCallbackAccount({
+          providerId: "okta",
+          providerAccountId: "00usam",
+          path: "/oauth2/callback/okta",
+        });
+
+        expect(channel.findAcceptedAccounts({ providerId: "okta" })).toEqual([
+          {
+            providerId: "okta",
+            providerAccountId: "00usam",
+            assertedFactors: [],
+            verifiedTokenClaims: false,
+          },
+        ]);
+        expect(channel.findAcceptedAccounts({ providerId: "auth0" })).toEqual([]);
+      });
+    });
+  });
 });

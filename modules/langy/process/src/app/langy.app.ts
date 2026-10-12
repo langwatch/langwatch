@@ -891,7 +891,7 @@ export class LangyModule implements LangyApiContract {
 
     return LangyTurnSettlementWaiterService.create().awaitTurnSettlement({
       ...input,
-      langy: this,
+      langy: this.dependencies.langy,
       openBuffer: () => repositories.tokenBuffer.openBlocking(),
     });
   }

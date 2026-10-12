@@ -10,9 +10,12 @@ export const PLATFORM_OPERATOR_SEED_AGGREGATE_TYPE = "platform_operator_seed";
 export const PLATFORM_OPERATOR_SEED_RECORDED_EVENT_TYPE = "lw.ops.platform_operator_seed.recorded";
 export const PLATFORM_OPERATOR_SEED_RECORDED_EVENT_VERSION = "2026-10-01";
 
-/** The seed decided, once: who it granted (possibly nobody) and by which rule. */
+/**
+ * The seed decided, once: who it granted (possibly nobody) and by which rule. `first-user` is a
+ * self-hosted install's first sign-up, recorded from user's created fact.
+ */
 export const platformOperatorSeedRecordedEventDataSchema = z.object({
-  via: z.enum(["admin-emails", "sole-organization-admin", "none"]),
+  via: z.enum(["admin-emails", "sole-organization-admin", "first-user", "none"]),
   userIds: z.array(z.string()),
 });
 

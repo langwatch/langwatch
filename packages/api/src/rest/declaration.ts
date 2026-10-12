@@ -764,11 +764,15 @@ type RouteShape = Readonly<{
 }>;
 
 /** `S` with the fields `Changes` names replaced: one declaration, one move. */
-type With<S extends RouteShape, Changes extends Partial<RouteShape>> = Readonly<{
-  [Field in keyof RouteShape]: Field extends keyof Changes ? Changes[Field] : S[Field];
-}>;
+type With<S extends RouteShape, Changes extends Partial<RouteShape>> = {
+  readonly [Field in keyof RouteShape]: Field extends keyof Changes ? Changes[Field] : S[Field];
+};
 
-class RouteBuilder<Api, S extends RouteShape> {
+/** A body is declared only on a method that carries one; a GET or HEAD route is refused here. */
+type BodyMethodGate<Method> = [Extract<Method, "get" | "head">] extends [never] ? unknown : never;
+
+/** Declared invariant: measuring the variance walks every method of the chain. */
+class RouteBuilder<in out Api, in out S extends RouteShape> {
   private readonly router: RestTransportRouter<
     Api,
     S["family"],
@@ -836,7 +840,7 @@ class RouteBuilder<Api, S extends RouteShape> {
    * query fields. An absent body is refused 400, as an array route is never bodiless.
    */
   withInput<Item extends z.ZodType, const Field extends string>(
-    this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
+    this: RouteBuilder<Api, S> & BodyMethodGate<S["method"]>,
     schema: z.ZodArray<Item>,
     options: Readonly<{ as: Field }> &
       (Field extends UnionKeys<SourceInput<S["params"]>> | UnionKeys<SourceInput<S["query"]>>
@@ -851,16 +855,15 @@ class RouteBuilder<Api, S extends RouteShape> {
    * Content-Type is refused with `mismatch` before the parser reads the body.
    */
   withInput<Schema extends SourceSchema>(
-    this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
+    this: RouteBuilder<Api, S> & BodyMethodGate<S["method"]>,
     schema: Schema & DistinctSchema<Schema, S["params"]> & DistinctSchema<Schema, S["query"]>,
     options?: Readonly<{ mediaType: string; mismatch?: RestMediaTypeMismatch }>,
   ): RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head">; body: Schema }>>;
   withInput(
-    this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
     declared: SourceSchema | z.ZodArray,
     options?: Readonly<{ as?: string; mediaType?: string; mismatch?: RestMediaTypeMismatch }>,
   ): unknown {
-    assertBodyMethod(this.method, this.path);
+    const method = bodyMethodOf(this.method, this.path);
     assertSourceUnset("input", this.state.input);
     assertParsedBodyFree({ operation: this.operation, state: this.state });
 
@@ -874,7 +877,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       With<S, { method: Exclude<HttpMethod, "get" | "head">; body: SourceSchema }>
     >({
       router: this.router,
-      method: this.method,
+      method,
       path: this.path,
       operation: this.operation,
       state: {
@@ -900,7 +903,7 @@ class RouteBuilder<Api, S extends RouteShape> {
    * (415, main's 400 where kept) or read when `accepted`; `refuses` names types refused with 415.
    */
   withRawBody<Form extends RestRawBodyForm>(
-    this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
+    this: RouteBuilder<Api, S> & BodyMethodGate<S["method"]>,
     form: Form,
     options: Readonly<{
       mediaType?: string;
@@ -913,7 +916,7 @@ class RouteBuilder<Api, S extends RouteShape> {
     Api,
     With<S, { method: Exclude<HttpMethod, "get" | "head">; body: RestRawBodyDeclared<Form> }>
   > {
-    assertBodyMethod(this.method, this.path);
+    const method = bodyMethodOf(this.method, this.path);
     assertSourceUnset("rawBody", this.state.rawBody);
     assertParsedBodyFree({ operation: this.operation, state: this.state });
 
@@ -922,7 +925,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       With<S, { method: Exclude<HttpMethod, "get" | "head">; body: RestRawBodyDeclared<Form> }>
     >({
       router: this.router,
-      method: this.method,
+      method,
       path: this.path,
       operation: this.operation,
       state: {
@@ -938,7 +941,7 @@ class RouteBuilder<Api, S extends RouteShape> {
    * and each file part the route named is handed over beside it.
    */
   withMultipart<Fields extends z.ZodObject, const Files extends RestMultipartFiles>(
-    this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
+    this: RouteBuilder<Api, S> & BodyMethodGate<S["method"]>,
     multipart: Readonly<{ fields: Fields; files: Files }>,
   ): RouteBuilder<
     Api,
@@ -947,7 +950,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       { method: Exclude<HttpMethod, "get" | "head">; body: RestMultipartDeclared<Fields, Files> }
     >
   > {
-    assertBodyMethod(this.method, this.path);
+    const method = bodyMethodOf(this.method, this.path);
     assertSourceUnset("multipart", this.state.multipart);
     assertParsedBodyFree({ operation: this.operation, state: this.state });
     assertDeclaredFiles({ operation: this.operation, files: multipart.files });
@@ -962,7 +965,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       >
     >({
       router: this.router,
-      method: this.method,
+      method,
       path: this.path,
       operation: this.operation,
       state: {
@@ -1155,7 +1158,7 @@ class RouteBuilder<Api, S extends RouteShape> {
   withPermission(
     declared: AuthzPermission | readonly AuthzPermission[] | InputPermission,
     target?: RestPermissionTarget | RestPermissionReach | RestPermissionPlatform,
-  ): RouteBuilder<Api, With<S, { permission: true }>> {
+  ): unknown {
     if (target?.at === "platform") return this.#platformPermission(declared, target);
 
     const reach = target?.at === "grants" || target?.at === "organization" ? target.at : void 0;
@@ -2222,10 +2225,12 @@ function inputMediaTypeOf({ operation, mediaType, mismatch }: NamedMediaType): R
   return named;
 }
 
-function assertBodyMethod(method: HttpMethod, path: string): void {
+function bodyMethodOf(method: HttpMethod, path: string): Exclude<HttpMethod, "get" | "head"> {
   if (method === "get" || method === "head") {
     throw new Error(`REST ${method.toUpperCase()} ${path} cannot declare a JSON body`);
   }
+
+  return method;
 }
 
 function assertPublicRouteConstraints({

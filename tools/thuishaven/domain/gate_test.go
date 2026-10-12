@@ -439,3 +439,81 @@ func TestBackgroundDescriptionSaysItIsNotAResult(t *testing.T) {
 		})
 	})
 }
+
+// @scenario "The gate leaves compile and test runs to their launchers"
+// @scenario "The gate leaves oxlint runs to their launcher"
+// @scenario "Lint and builds keep the gate until they have launchers"
+func TestLauncherOwnedCoversOnlyLauncherRuns(t *testing.T) {
+	owned := []string{
+		"tsc --noEmit --ignoreConfig f.ts",
+		"pnpm exec tsc -b",
+		"npx vitest run src/x",
+		"vitest run",
+		"pnpm typecheck",
+		"pnpm --filter @langwatch/time typecheck",
+		"pnpm --filter @langwatch/time test src/x.unit.test.ts",
+		"VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/time test",
+		"pnpm test:unit run src/x",
+		"cd modules/x && pnpm typecheck",
+		"oxlint --quiet src",
+		"pnpm exec oxlint --quiet --type-aware --config .oxlintrc.jsonc f.ts",
+		"./node_modules/.bin/oxlint -c .oxlintrc.native.jsonc .",
+		"pnpm lint:fix",
+		"pnpm exec tsc -b && pnpm exec oxlint src",
+	}
+	for _, command := range owned {
+		if !LauncherOwned(command) {
+			t.Errorf("LauncherOwned(%q) = false, want true: the launcher takes its slot", command)
+		}
+	}
+	gated := []string{
+		"pnpm lint",
+		"pnpm --filter @langwatch/architecture-enforcer lint",
+		"pnpm exec oxlint src && pnpm exec oxfmt --check src",
+		"pnpm exec oxfmt --write f.ts",
+		"eslint .",
+		"next build",
+		"golangci-lint run",
+		"go build ./...",
+		"docker build .",
+		"pnpm typecheck && pnpm lint",
+		"git status",
+		"pnpm typecheck:src",
+		"pnpm test:affected",
+		"nx run-many -t typecheck -p @langwatch/time",
+	}
+	for _, command := range gated {
+		if LauncherOwned(command) {
+			t.Errorf("LauncherOwned(%q) = true, want false", command)
+		}
+	}
+	for _, command := range []string{"pnpm typecheck:src", "pnpm test:affected", "nx run-many -t test -p @langwatch/time"} {
+		if _, heavy := ClassifyCommand(command); heavy {
+			t.Errorf("ClassifyCommand(%q) is heavy; an Nx entry point is not the gate's to hold", command)
+		}
+	}
+}
+
+// @scenario "Haven steps aside for programs rush's gate owns"
+// @scenario "Haven keeps its gate for programs rush's gate does not own"
+func TestRushOwnedNeedsEveryHeavySegmentOwned(t *testing.T) {
+	owns := func(program string) bool { return program == "tsc" || program == "vitest" || program == "oxlint" }
+	for _, command := range []string{
+		"tsc --noEmit --ignoreConfig f.ts", "pnpm typecheck", "pnpm --filter x test", "npx vitest run",
+		"pnpm exec oxlint src", "pnpm lint:fix", "pnpm exec tsc -b && vitest run",
+	} {
+		if !RushOwned(command, owns) {
+			t.Errorf("RushOwned(%q) = false, want true", command)
+		}
+	}
+	for _, command := range []string{
+		"pnpm lint", "oxfmt --write f.ts", "tsc -b && oxfmt --check f.ts", "eslint .", "go build ./...", "ls -la",
+	} {
+		if RushOwned(command, owns) {
+			t.Errorf("RushOwned(%q) = true, want false", command)
+		}
+	}
+	if RushOwned("tsc -b", func(string) bool { return false }) {
+		t.Error("RushOwned with rush's gate off = true, want false")
+	}
+}

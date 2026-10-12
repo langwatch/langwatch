@@ -102,6 +102,9 @@ const INVALID_QUERY_ERRORS: readonly ServerError[] = [
   { code: "386", name: "NO_COMMON_TYPE" },
 ];
 
+/** A bound value that does not parse as its placeholder's declared type: the caller's input. */
+const BAD_QUERY_PARAMETER: ServerError = { code: "457", name: "BAD_QUERY_PARAMETER" };
+
 const UNKNOWN_TABLE: ServerError = { code: "60", name: "UNKNOWN_TABLE" };
 const UNKNOWN_DATABASE: ServerError = { code: "81", name: "UNKNOWN_DATABASE" };
 const ACCESS_DENIED: ServerError = { code: "497", name: "ACCESS_DENIED" };
@@ -228,6 +231,21 @@ export function extractUnknownIdentifier(error: unknown): string | undefined {
     }
   }
   return undefined;
+}
+
+/** True when a bound parameter's value did not parse as its declared type (457). */
+export function isClickHouseBadQueryParameterError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({ error, variants: [BAD_QUERY_PARAMETER] });
+}
+
+const PARAMETER_PATTERN = /for query parameter '([^']{1,128})'/;
+
+/** The placeholder's name from a 457 refusal, or `undefined`; fails closed on shape. */
+export function extractBadQueryParameter(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  const candidate = PARAMETER_PATTERN.exec(error.message)?.[1];
+  return candidate !== undefined && IDENTIFIER_SHAPE.test(candidate) ? candidate : undefined;
 }
 
 /**

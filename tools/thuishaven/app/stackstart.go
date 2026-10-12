@@ -51,20 +51,6 @@ func (o *Orchestrator) StartStackService(slug, service string) error {
 	return o.sys.SpawnDetached(argv, dir, filepath.Join(o.cfg.Home, "up-from-dashboard.log"))
 }
 
-// ResetStackDatabases runs `haven db reset --yes` detached in a stack's
-// worktree. The slug is pinned in the child's env: an inherited LANGWATCH_SLUG
-// must not make the reset drop a different stack's databases.
-func (o *Orchestrator) ResetStackDatabases(slug string) error {
-	dir, err := o.registeredWorktree(slug)
-	if err != nil {
-		return err
-	}
-	haven := o.cfg.UpArgv[:len(o.cfg.UpArgv)-1]
-	argv := append([]string{"/usr/bin/env", "LANGWATCH_SLUG=" + slug}, haven...)
-	argv = append(argv, "db", "reset", "--yes")
-	return o.sys.SpawnDetached(argv, dir, filepath.Join(o.cfg.Home, "reset-from-dashboard.log"))
-}
-
 // registeredWorktree is the worktree a registered stack runs from, checked
 // against git's list the same way Start checks a requested directory.
 func (o *Orchestrator) registeredWorktree(slug string) (string, error) {
@@ -114,7 +100,7 @@ func (o *Orchestrator) stackByDir(dir string) (domain.Stack, bool) {
 // SeedStack runs `haven db seed --size <size> --persona <persona>` detached in a
 // stack's worktree, for the stack home's seed console. The flags are checked by
 // seedgen's own parser first, so a bad request spawns nothing; the slug is
-// pinned as for ResetStackDatabases.
+// pinned so an inherited LANGWATCH_SLUG cannot redirect it.
 func (o *Orchestrator) SeedStack(slug, size, persona string) error {
 	args := []string{"--size", size, "--persona", persona}
 	if _, err := seedgen.ParseFlags(args, o.sys.Now().UTC()); err != nil {

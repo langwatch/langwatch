@@ -258,6 +258,7 @@ async function searchTraces({
     timeRange: { from: startEpoch, to: endEpoch },
     originNamed: namesOriginFilter(searchFields.filters),
     dateField,
+    protections,
   });
 
   const results = await app.listTraces({

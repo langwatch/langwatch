@@ -2,7 +2,6 @@
 
 export {
   readUiActor,
-  SessionReadFailedError,
   signOutUi,
   toUiActor,
   UI_SESSION_PATH,

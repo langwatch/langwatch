@@ -16,7 +16,7 @@ function boot({ isSaas, recorded }: { isSaas: boolean; recorded: IncomingUsageRe
     .withModules([saasProcessModule])
     .withStores(memoryStores())
     .withConfig({
-      saas: { isSaas, latestRelease: void 0, latestReleaseCommit: void 0, releaseFloor: void 0 },
+      saas: { isSaas, latestRelease: void 0, latestReleaseCommit: void 0 },
     })
     .provide({
       licensing: createApiFixture<LicensingApi>({

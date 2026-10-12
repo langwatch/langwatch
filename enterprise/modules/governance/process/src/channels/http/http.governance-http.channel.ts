@@ -21,8 +21,6 @@ import {
   type FencedFetchOptions,
 } from "@langwatch/egress";
 
-const validate = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });
-
 export interface SsrfSafeResponse {
   readonly ok: boolean;
   readonly status: number;
@@ -33,11 +31,19 @@ export interface SsrfSafeResponse {
   text(): Promise<string>;
 }
 
-export async function ssrfSafeFetch(
-  url: string,
-  init: FencedFetchOptions,
-): Promise<SsrfSafeResponse> {
-  const validated = await validate(url);
+/** The local-address part of the fence; cloud metadata is refused whatever it says. */
+export type GovernanceEgressPolicy = Readonly<{ blockLocal: boolean; allowedHosts: string[] }>;
 
-  return fetchValidatedDestination(validated, init, { rejectUnauthorized: true });
+/** A fenced fetch judged by `policy`, as main's `ssrfSafeFetch` read BLOCK_LOCAL_HTTP_CALLS. */
+export function createSsrfSafeFetch(
+  policy: GovernanceEgressPolicy,
+): (url: string, init: FencedFetchOptions) => Promise<SsrfSafeResponse> {
+  const validate = createSsrfUrlValidator(policy);
+  return async (url, init) => {
+    const validated = await validate(url);
+    return fetchValidatedDestination(validated, init, { rejectUnauthorized: true });
+  };
 }
+
+/** The strict fence, for destinations that are never on the private network. */
+export const ssrfSafeFetch = createSsrfSafeFetch({ blockLocal: true, allowedHosts: [] });

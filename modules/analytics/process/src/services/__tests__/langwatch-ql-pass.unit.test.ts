@@ -170,6 +170,7 @@ describe("LangWatchQLService.executePass", () => {
           protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
           sql: STATEMENT,
           pass: { kind: "probe" },
+          isInstantEvalsEnabled: false,
         }),
       );
 

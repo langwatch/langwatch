@@ -114,8 +114,8 @@ Feature: Event upcasting
     And a second full run rewrites nothing
 
   @unimplemented
-  Scenario: The rewrite step runs automatically on cloud and by version floor on self-hosted
-    Given the upcast was declared in a release above the installation's LTS floor
-    When the worker considers the rewrite step on a self-hosted installation
-    Then the step is "gated" until the floor reaches that release
-    And on cloud it runs once the release has rolled out
+  Scenario: The rewrite step runs once old writers are gone
+    Given the upcast was declared in a release
+    When the worker considers the rewrite step
+    Then the step waits until every serving process declares it (needsOldWritersGone)
+    And it runs once old writers are gone, on cloud and on self-hosted alike

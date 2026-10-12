@@ -1,4 +1,4 @@
-import type { RoutableConnection } from "@langwatch/identity-contract";
+import { emptySsoConnection, type RoutableConnection } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { SignInDomainRouting } from "../features/signin/services/signin-router.service.ts";
@@ -105,6 +105,7 @@ function grandfatherOf({
 }) {
   return SsoConnectionGrandfatherService.create({
     connections: serviceOf(connections),
+    connectionReads: connections,
     legacy: {
       getLegacySso: async () => ({ ssoDomain, ssoProvider: "okta" }),
     },
@@ -239,6 +240,32 @@ describe("the sso connection grandfather migration", () => {
         kind: "grandfathered",
         eventsAppended: 0,
       });
+    });
+  });
+
+  describe("given an organization that already holds another live connection", () => {
+    /** @scenario "The grandfather step finishes an organization that already has another live connection" */
+    it("finishes it with a report naming the legacy domains, and writes no grandfathered connection", async () => {
+      connections.seed({
+        ...emptySsoConnection({ connectionId: "ssoc_direct" }),
+        organizationId: ORG,
+        state: "VERIFICATION_PENDING",
+      });
+      const run = () =>
+        grandfatherOf({
+          legacyRouting: new StubRouting({ "acme.com": routable({ connectionId: `org:${ORG}` }) }),
+          connectionRouting: new StubRouting({}),
+        }).migrateOrganization({ organizationId: ORG });
+
+      for (const outcome of [await run(), await run()]) {
+        expect(outcome).toEqual({
+          status: "finalized",
+          report: { kind: "legacy_route_beside_connection", domains: ["acme.com"] },
+        });
+      }
+      await expect(
+        connections.getConnection({ connectionId: "ssoc_gf_org_acme" }),
+      ).rejects.toMatchObject({ code: "sso_connection_not_found" });
     });
   });
 });

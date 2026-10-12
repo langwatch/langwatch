@@ -90,8 +90,10 @@ secret comes back only from a mutation. A mutation writes the entity with
   which keeps its name and is off §15's deleted list (§10.1, Alex 2026-10-05).
 - **Host services are not "capabilities".** §3.5 reserves that word for the
   four layers; §16 renames the browser-host list to host services.
-- **A banner, toast or fatal error built by hand.** Use the design system and
-  the code-keyed error presentation (§12), never `error.message`.
+- **Any component built by hand.** A banner or alert, dialog, drawer, empty
+  state, menu, picker or table comes from `@langwatch/design-system`; a missing
+  need is added there first. Errors use the code-keyed presentation (§12),
+  never `error.message`.
 
 ## References
 

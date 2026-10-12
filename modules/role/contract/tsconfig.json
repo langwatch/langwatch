@@ -7,24 +7,18 @@
 
     "lib": ["es2023"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../authz/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/module/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

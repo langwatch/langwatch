@@ -160,6 +160,16 @@ export abstract class OrganizationRepository {
     userId: string;
     at: Instant;
   }): Promise<void>;
+  /**
+   * Records the labels of the private ClickHouse and S3 routes seen for an organization, each
+   * only where none is recorded yet: safe to repeat.
+   * Spec: specs/private-dataplane/clickhouse-routing.feature.
+   */
+  abstract recordPrivateDataplaneSeen(input: {
+    organizationId: string;
+    clickhouseLabel: string | null;
+    s3Label: string | null;
+  }): Promise<void>;
   abstract getOldestTeamId(organizationId: string): Promise<string>;
   abstract getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile>;
   abstract getWithAdministrators(organizationId: string): Promise<OrganizationWithAdministrators>;

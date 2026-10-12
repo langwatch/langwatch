@@ -9,6 +9,7 @@ import { MemoryIssuedLicenseRepository } from "./memory.issued-license.repositor
 import { MemoryLicensingRateLimitRepository } from "./memory.licensing-rate-limit.repository.ts";
 import { MemoryOrganizationLicenseRepository } from "./memory.organization-license.repository.ts";
 import { MemorySelfHostedInstanceRepository } from "./memory.self-hosted-instance.repository.ts";
+import { MemorySignInProviderMountRepository } from "./memory.sign-in-provider-mount.repository.ts";
 
 /** The twins, each empty. No cipher: a reissued license is held as written. */
 export class MemoryLicensingRepositories {
@@ -23,6 +24,7 @@ export class MemoryLicensingRepositories {
       connectOrganizations: MemoryConnectOrganizationRepository.create(),
       instanceIdentity: MemoryInstanceIdentityRepository.create(),
       rateLimits: MemoryLicensingRateLimitRepository.create(),
+      signInProviderMounts: MemorySignInProviderMountRepository.create(),
       memberSeats: MemoryMemberSeatRepository.create(),
     };
   }

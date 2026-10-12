@@ -212,9 +212,9 @@ export interface ProjectApi {
   touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void>;
   /** Stamps a project as having just seen coding-agent session activity. */
   touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void>;
-  /** The organisation's internal governance project, or nothing when it has none. */
+  /** The organisation's internal project of this kind, or nothing when it has none. */
   findInternal(input: InternalProjectQuery): Promise<InternalProject | null>;
-  /** The organisation's internal governance project, created on first ask. */
+  /** The organisation's internal project of this kind, created on first ask. */
   ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
   /** Every live internal project of this kind, across organisations: its id only. */
   findInternalIds(input: { kind: InternalProjectKind }): Promise<string[]>;

@@ -9,6 +9,7 @@ import type { AnomalyRateTrackerRepository, AnomalyStateRepository } from "./ano
 import type { BlobStoreRepository } from "./blob-store.repository.ts";
 import type { BugReportRateLimitRepository, BugReportRepository } from "./bug-report.repository.ts";
 import type { ClickHouseRoutesRepository } from "./clickhouse.routes.repository.ts";
+import type { CloudLatestReleaseRepository } from "./cloud-latest-release.repository.ts";
 import type { CredentialsResealRepository } from "./credentials-reseal.repository.ts";
 import type {
   ClickHouseHealthRepository,
@@ -86,6 +87,8 @@ export interface OpsRepositories {
   /** One per process: the queue-metrics writer records into it, the detector reads it. */
   readonly rateTracker: AnomalyRateTrackerRepository;
   readonly storageReadings: StorageStatsReadingsRepository;
+  /** The newest release cloud named in the last usage-report reply. */
+  readonly cloudLatestRelease: CloudLatestReleaseRepository;
   readonly redisHealth: RedisHealthRepository;
   readonly clickhouseHealth: ClickHouseHealthRepository;
   readonly events: EventExplorerRepository;

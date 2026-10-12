@@ -1,4 +1,4 @@
-import type { OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { describe, expect, it } from "vitest";
 
 import {

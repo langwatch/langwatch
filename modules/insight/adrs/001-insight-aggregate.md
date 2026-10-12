@@ -66,8 +66,8 @@ depends on insight.
 Three Postgres projections: `InsightProjection`, `InsightReaderProjection` and
 `InsightDailyScheduleProjection` (ADR-004). The insight and reader tables are
 folded from the `insight_processing` stream, and the schedule table from
-`insight_daily_run`. Migrations `20261010120020` to `20261010120022`,
-`20261010120031` and `20261010120032` create them and add the board pointer, the
+`insight_daily_run`. Migrations `20261011160020` to `20261011160022`,
+`20261011160031` and `20261011160032` create them and add the board pointer, the
 owner and the finding key. ClickHouse is not used. Nothing is deleted when a member
 leaves.
 

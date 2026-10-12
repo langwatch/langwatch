@@ -18,7 +18,7 @@
   },
   "scripts": {
     "preview": "node --disable-warning=ExperimentalWarning --experimental-transform-types preview/print-notices.ts",
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { loadReleaseBaseline, type ReleaseBaseline } from "../manifest/baseline.ts";
 import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
 import {
   gooseStepId,
@@ -57,21 +58,39 @@ export function imageGateSteps({
   };
 }
 
+/** The tree's step ids no manifest and no baseline step names: what makes an image unreleased. */
+export function unstampedSteps({
+  manifests,
+  tree,
+  baseline = loadReleaseBaseline(),
+}: {
+  manifests: readonly ReleaseManifest[];
+  tree: ReleaseTreeSteps;
+  baseline?: ReleaseBaseline;
+}): string[] {
+  const stamped = new Set([
+    ...baseline.steps,
+    ...manifests.flatMap((manifest) => manifest.steps.map(({ id }) => id)),
+  ]);
+  return [...treeStepIds({ tree })].filter((id) => !stamped.has(id));
+}
+
 /**
- * The release this image is (IMAGE-IDENTITY): the newest stamped manifest only when the tree
- * ships no step beyond the stamped ones, else null, "unreleased".
- * Spec: specs/upgrade/release-manifests.feature.
+ * The release this image is (IMAGE-IDENTITY): the newest stamped manifest, or the baseline's
+ * release when it ships none, only when the tree ships no step beyond the stamped ones, else
+ * null, "unreleased". Spec: specs/upgrade/release-manifests.feature.
  */
 export function imageRelease({
   manifests,
   tree,
+  baseline = loadReleaseBaseline(),
 }: {
   manifests: readonly ReleaseManifest[];
   tree: ReleaseTreeSteps;
+  baseline?: ReleaseBaseline;
 }): string | null {
-  const stamped = new Set(manifests.flatMap((manifest) => manifest.steps.map(({ id }) => id)));
-  const unstamped = [...treeStepIds({ tree })].some((id) => !stamped.has(id));
-  return unstamped ? null : (manifests.at(-1)?.release ?? null);
+  if (unstampedSteps({ manifests, tree, baseline }).length > 0) return null;
+  return manifests.at(-1)?.release ?? baseline.release;
 }
 
 /** Every Prisma folder and goose file this image ships, as steps (ids per blitz plan 5.3). */

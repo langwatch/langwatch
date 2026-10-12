@@ -85,6 +85,7 @@ function process(
           lokiDatasourceUid: undefined,
         },
         bugReportSlackChannel: undefined,
+        slackApiBase: "https://slack.com/api",
         cloudOps: cloud.asked ?? false,
         adminEmails: [],
         nodeEnvironment: undefined,

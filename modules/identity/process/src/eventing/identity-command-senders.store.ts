@@ -4,6 +4,7 @@ import {
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 
+import { TWO_STEP_REQUIREMENT_PIPELINE_NAME } from "../features/mfa/eventing/two-step-requirement.intent.ts";
 import { SENDER_NAME_BY_COMMAND } from "../features/sso-connection/eventing/sso-connection-ledger.store.ts";
 
 /** One pipeline command's sender, or that this process registered none for it. */
@@ -88,7 +89,7 @@ const JOIN_REQUEST_COMMAND_NAMES = [
 /** Every verb a connection has: each one its ledger can stage (sso-activation.feature). */
 const SSO_CONNECTION_COMMAND_NAMES: readonly string[] = Object.values(SENDER_NAME_BY_COMMAND);
 
-/** The three pipelines and the verbs each one is expected to publish. */
+/** The pipelines identity commands through and the verbs each one is expected to publish. */
 const EXPECTED_COMMANDS: ReadonlyMap<string, readonly string[]> = new Map<
   string,
   readonly string[]
@@ -96,10 +97,11 @@ const EXPECTED_COMMANDS: ReadonlyMap<string, readonly string[]> = new Map<
   [IDENTITY_PIPELINE_NAME, IDENTITY_COMMAND_NAMES],
   [JOIN_REQUEST_PIPELINE_NAME, JOIN_REQUEST_COMMAND_NAMES],
   [SSO_CONNECTION_PIPELINE_NAME, SSO_CONNECTION_COMMAND_NAMES],
+  [TWO_STEP_REQUIREMENT_PIPELINE_NAME, ["recordTwoStepRequirementChanged"]],
 ]);
 
 /**
- * Identity's command senders, handed over by each of its three eventing modules as the process
+ * Identity's command senders, handed over by each of its eventing modules as the process
  * connects them. A pipeline not yet connected answers null: not commandable on this process.
  */
 export class ConnectedIdentityEventing implements IdentityEventing {

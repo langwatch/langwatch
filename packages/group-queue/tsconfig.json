@@ -9,31 +9,21 @@
     "emitDeclarationOnly": true,
     "rootDir": ".",
     "outDir": "./dist",
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts", "src/**/__tests__/**"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     },
     {
-      "path": "../observability/tsconfig.build.json"
-    },
-    {
-      "path": "../task/tsconfig.build.json"
-    },
-    {
-      "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../test-harness/tsconfig.build.json"
-    },
-    {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.type-tests.json"
     }
   ]
 }

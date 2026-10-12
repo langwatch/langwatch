@@ -13,6 +13,7 @@ import { projectionReplayEventing } from "#eventing/ops-projection-replay.pipeli
 import { storageStatsEventing } from "#eventing/ops-storage-stats.pipeline";
 import { systemMigrationsEventing } from "#eventing/ops-system-migrations.pipeline";
 import { usageReportEventing } from "#eventing/ops-usage-report.pipeline";
+import { CheckupCanaryProjectService } from "#features/checkup/services/checkup-canary-project.service";
 import { upgradeAlertsEventing } from "#features/upgrades/eventing/ops-upgrade-alerts.pipeline";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
 import { CredentialsResealTask, credentialsResealCiphers } from "#tasks/credentials-reseal.task";
@@ -82,7 +83,7 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
         request: () => app.requestSystemMigrationPassAfterUpgrade(),
       }),
     ])
-    .withMigrations(({ app, repositories }) => [
+    .withMigrations(({ app, repositories, dependencies }) => [
       // Blocking, so the moved step finds its finished tenants before any pass runs (S6-COPY).
       defineMigrationStep({
         id: "ops:copy-automation-migration-state",
@@ -103,6 +104,18 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
             ? { wouldCopy: copied, wouldCopyEnrolments: enrolmentsCopied }
             : { copied, enrolmentsCopied };
         },
+      }),
+      defineMigrationStep({
+        id: "ops:checkup-canary-project",
+        kind: "data",
+        mode: "background",
+        description:
+          "Creates the hidden system organization and the project the Ops checkup's canaries run in, so they never write into a customer's project.",
+        run: ({ dryRun }) =>
+          CheckupCanaryProjectService.create({
+            organizations: dependencies.organizations,
+            projects: dependencies.projects,
+          }).ensure({ dryRun }),
       }),
       // The fresh-install wait for a first user stays on ops_platform_operator_seed
       // (Alex, 2026-10-09).

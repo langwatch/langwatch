@@ -12,3 +12,20 @@ export function isUnprovenAccount({
 }): boolean {
   return !emailVerified && lastLoginAtMs === null;
 }
+
+/**
+ * The adopt gap only matters while a sign-in method set before the proof is there to wipe: a
+ * password, a social link, a passkey or a passkey sign-up in flight. An unproven account with
+ * none of them is finalized and stays unverified (Alex, 2026-10-11).
+ */
+export function carriesPreProofSignInMethod({
+  accounts,
+  passkeys,
+  passkeySignupPending,
+}: {
+  accounts: number;
+  passkeys: number;
+  passkeySignupPending: boolean;
+}): boolean {
+  return accounts > 0 || passkeys > 0 || passkeySignupPending;
+}

@@ -54,13 +54,15 @@ export type TrpcReadOptions = Readonly<{
 export type TrpcContractMembers = Readonly<Record<string, TrpcContractMember>>;
 
 /** A built declaration: the namespace the process mounts it under, and its members. */
-export type TrpcContract<
+export interface TrpcContract<
   Namespace extends string = string,
   Members extends TrpcContractMembers = TrpcContractMembers,
-> = Readonly<{
+> {
+  /** Stamped by `build()` alone, so a hand-made record is not a contract; a type, never a value. */
+  readonly "~builtBy": "defineTrpcContract";
   readonly namespace: Namespace;
   readonly members: Members;
-}>;
+}
 
 /**
  * One more member, flattened. An intersection reads the same and types
@@ -187,7 +189,9 @@ function contractBuilder<Namespace extends string, Members extends TrpcContractM
     subscription: (name) => member(name, "subscription"),
     build: () => {
       assertQueriesAnswer(namespace, members);
-      return { namespace, members: Object.freeze({ ...members }) as Members };
+      // The stamp is a type alone: `build()` is the one place a record becomes a contract.
+      const built = { namespace, members: Object.freeze({ ...members }) as Members };
+      return built as TrpcContract<Namespace, Members>;
     },
   } as TrpcContractBuilder<Namespace, Members>;
 }

@@ -1,10 +1,10 @@
 /**
  * @vitest-environment jsdom
- * What the Upgrades overview, release, step and run sections show for the reader's answers.
+ * What the Upgrades overview, steps, step and run sections show for the reader's answers.
  * Spec: modules/ops/specs/upgrades.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -14,9 +14,11 @@ import type {
   UpgradeStepView,
 } from "../model/upgrade-view.ts";
 import { UpgradeReleaseSteps } from "../ui/sections/upgrade-release-steps.tsx";
-import { UpgradeRunPhases } from "../ui/sections/upgrade-run-phases.tsx";
+import { UpgradeRunDetail } from "../ui/sections/upgrade-run-phases.tsx";
+import { UpgradeRuns } from "../ui/sections/upgrade-runs.tsx";
 import { UpgradeStepDetail } from "../ui/sections/upgrade-step-detail.tsx";
-import { type UpgradeTenantStepView, UpgradesOverview } from "../ui/sections/upgrades-overview.tsx";
+import { UpgradeStepsTab } from "../ui/sections/upgrade-steps-tab.tsx";
+import { UpgradesOverview } from "../ui/sections/upgrades-overview.tsx";
 
 function renderIn(node: ReactNode) {
   return render(<DesignSystemProvider forcedTheme="light">{node}</DesignSystemProvider>);
@@ -32,14 +34,14 @@ function statusWith(overrides: Partial<UpgradeStatusView>): UpgradeStatusView {
     installed: "3.23.0",
     origin: "recorded",
     image: "3.23.0",
-    floor: "3.20.1",
-    ledgerFloor: "3.20.1",
     lease: null,
     lastRun: null,
     counts: { done: 4 },
     failedStepIds: [],
     failedTargets: 0,
     deprecations: [],
+    version: { kind: "release", release: "3.23.0" },
+    latestRelease: null,
     ...overrides,
   };
 }
@@ -74,53 +76,101 @@ const noop = () => undefined;
 
 function renderOverview({
   status,
-  failedSteps = [],
-  backgroundSteps = [],
-  backgroundLoading,
   operatorSteps,
-  tenantSteps,
   onRetryStep,
+  retryingStepId,
+  heldOrganizations,
+  sharedInstall,
 }: {
   status: UpgradeStatusView;
-  failedSteps?: UpgradeStepView[];
-  backgroundSteps?: UpgradeStepView[];
-  backgroundLoading?: boolean;
   operatorSteps?: UpgradeStepView[];
-  tenantSteps?: UpgradeTenantStepView[];
   onRetryStep?: (stepId: string) => void;
+  retryingStepId?: string | null;
+  heldOrganizations?: number;
+  sharedInstall?: boolean;
 }) {
   const onOpenStep = vi.fn();
+  const onOpenOrganizations = vi.fn();
   renderIn(
     <UpgradesOverview
       status={status}
-      releases={[
-        { release: "3.23.0", installed: true, image: true, stepCount: 4, counts: { done: 4 } },
-      ]}
-      runs={[]}
-      failedSteps={failedSteps}
-      backgroundSteps={backgroundSteps}
-      backgroundLoading={backgroundLoading}
+      hasRuns={true}
       operatorSteps={operatorSteps}
-      tenantSteps={tenantSteps}
       onRetryStep={onRetryStep}
-      onOpenRelease={noop}
-      onOpenRun={noop}
+      retryingStepId={retryingStepId}
       onOpenStep={onOpenStep}
+      heldOrganizations={heldOrganizations}
+      sharedInstall={sharedInstall}
+      onOpenOrganizations={onOpenOrganizations}
     />,
   );
-  return { onOpenStep };
+  return { onOpenStep, onOpenOrganizations };
+}
+
+function renderStepsTab({
+  backgroundSteps = [],
+  backgroundLoading,
+  onRetryStep,
+}: {
+  backgroundSteps?: UpgradeStepView[];
+  backgroundLoading?: boolean;
+  onRetryStep?: (stepId: string) => void;
+}) {
+  renderIn(
+    <UpgradeStepsTab
+      releases={[]}
+      backgroundSteps={backgroundSteps}
+      backgroundLoading={backgroundLoading}
+      onRetryStep={onRetryStep}
+      onOpenStep={noop}
+      releaseSteps={() => null}
+    />,
+  );
 }
 
 describe("UpgradesOverview", () => {
-  describe("when the installation is on the image's release", () => {
-    /** @scenario "The overview names the installed release, the image release and the floor" */
-    it("reads up to date and shows the installed release, the image release and the floor", () => {
+  describe("when the installation runs a release and is up to date", () => {
+    /** @scenario "The overview names the running release and one state line" */
+    it("reads Running with the release and the one state line Up to date", () => {
       renderOverview({ status: statusWith({}) });
 
+      expect(screen.getByTestId("upgrade-version")).toHaveTextContent("Running 3.23.0");
       expect(screen.getByTestId("upgrade-installation-state")).toHaveTextContent("Up to date");
-      expect(screen.getByTestId("upgrade-installed")).toHaveTextContent("3.23.0");
-      expect(screen.getByTestId("upgrade-image")).toHaveTextContent("3.23.0");
-      expect(screen.getByTestId("upgrade-floor")).toHaveTextContent("3.20.1");
+      expect(document.body).not.toHaveTextContent(/unreleased/i);
+    });
+
+    it("reads a development build as the release it contains and its short commit", () => {
+      renderOverview({
+        status: statusWith({
+          version: { kind: "development", containsRelease: "3.20.1", commit: "abc1234def" },
+        }),
+      });
+
+      expect(screen.getByTestId("upgrade-version")).toHaveTextContent(
+        "Development build 3.20.1+abc1234",
+      );
+    });
+  });
+
+  describe("when cloud names a newer release", () => {
+    /** @scenario "A newer release is named with its release notes only when cloud names one" */
+    it("names it with a release notes link, and nothing when no release is named", () => {
+      renderOverview({
+        status: statusWith({
+          latestRelease: { release: "3.24.0", notesUrl: "https://example.com/notes/3.24.0" },
+        }),
+      });
+
+      const latest = screen.getByTestId("upgrade-latest-release");
+      expect(latest).toHaveTextContent("Newer version 3.24.0 available");
+      expect(within(latest).getByRole("link", { name: /Release notes/ })).toHaveAttribute(
+        "href",
+        "https://example.com/notes/3.24.0",
+      );
+      cleanup();
+
+      renderOverview({ status: statusWith({}) });
+      expect(screen.queryByTestId("upgrade-latest-release")).toBeNull();
     });
   });
 
@@ -158,44 +208,23 @@ describe("UpgradesOverview", () => {
     });
   });
 
-  describe("when the image is newer than the ledger", () => {
-    /** @scenario "An image newer than the ledger reads as behind and names the command" */
-    it("reads behind and names the command to run", () => {
+  describe("when the worker is upgrading", () => {
+    /** @scenario "An upgrade in progress reads as step n of m and names no command" */
+    it("reads step n of m and shows no command", () => {
       renderOverview({
         status: statusWith({
-          state: "behind",
-          label: "Behind",
-          tone: "warning",
-          reason: "image-newer",
-          summary: "Image 3.23.0 is newer than the installed 3.22.0. Run the upgrade.",
-          installed: "3.22.0",
+          state: "upgrading",
+          label: "Upgrading",
+          tone: "info",
+          reason: "run-in-progress",
+          summary: "An upgrade is running.",
+          counts: { done: 10, "not-needed": 2, pending: 27, running: 1 },
         }),
       });
 
       const state = screen.getByTestId("upgrade-installation-state");
-      expect(state).toHaveTextContent("Behind");
-      expect(state).toHaveTextContent("pnpm task upgrade");
-    });
-  });
-
-  describe("when the installed release is below the floor", () => {
-    /** @scenario "A release below the floor reads as unsupported and names the LTS to upgrade to first" */
-    it("reads unsupported and names the LTS release to upgrade to first", () => {
-      renderOverview({
-        status: statusWith({
-          state: "unsupported",
-          label: "Unsupported",
-          tone: "danger",
-          reason: "installed-below-floor",
-          summary:
-            "Installed release 3.18.0 is below the supported floor 3.20.1. Upgrade to 3.20.1 first.",
-          installed: "3.18.0",
-        }),
-      });
-
-      const state = screen.getByTestId("upgrade-installation-state");
-      expect(state).toHaveTextContent("Unsupported");
-      expect(state).toHaveTextContent("Upgrade to 3.20.1 first.");
+      expect(state).toHaveTextContent("Upgrading: step 13 of 40");
+      expect(document.body).not.toHaveTextContent(/pnpm/);
     });
   });
 
@@ -205,11 +234,7 @@ describe("UpgradesOverview", () => {
       renderIn(
         <UpgradesOverview
           status={statusWith({ reason: "no-upgrade-recorded", installed: null })}
-          releases={[]}
-          runs={[]}
-          failedSteps={[]}
-          onOpenRelease={noop}
-          onOpenRun={noop}
+          hasRuns={false}
           onOpenStep={noop}
         />,
       );
@@ -218,25 +243,65 @@ describe("UpgradesOverview", () => {
     });
   });
 
-  describe("when a step failed", () => {
-    /** @scenario "A failed step names its error and its fix and is listed under needs attention" */
-    it("lists the step under needs attention with its error, opening the step", () => {
-      const failed = stepWith({
-        id: "ops:backfill-owner",
-        mode: "background",
-        status: "failed",
-        statusLabel: "Failed",
-        lastError: "Owner column missing: run the Prisma migration first",
-      });
-      const { onOpenStep } = renderOverview({
-        status: statusWith({ state: "needs-attention", label: "Needs attention", tone: "danger" }),
-        failedSteps: [failed],
+  describe("when two steps failed", () => {
+    const attention = statusWith({
+      state: "needs-attention",
+      label: "Needs attention",
+      tone: "danger",
+      reason: "failed-step",
+      summary: "2 steps failed.",
+      failedStepIds: ["ops:backfill-owner", "prisma:add-owner"],
+    });
+
+    /** @scenario "Failed steps read as needs attention with their count and one Retry for a manager" */
+    it("reads needs attention with the count, and its one Retry reopens both", () => {
+      const onRetryStep = vi.fn();
+      renderOverview({ status: attention, onRetryStep });
+
+      const state = screen.getByTestId("upgrade-installation-state");
+      expect(state).toHaveTextContent("Needs attention: 2 failed steps");
+      fireEvent.click(within(state).getByRole("button", { name: "Retry" }));
+      expect(onRetryStep.mock.calls).toEqual([["ops:backfill-owner"], ["prisma:add-owner"]]);
+    });
+
+    it("offers no Retry to a view-only reader", () => {
+      renderOverview({ status: attention });
+
+      expect(screen.queryByTestId("upgrade-retry-failed")).toBeNull();
+    });
+  });
+
+  describe("when an up-to-date installation has held organizations", () => {
+    /** @scenario "On cloud, held organizations turn Up to date into needs attention linking to the Organizations tab" */
+    it("reads needs attention with the count and links to the Organizations tab, naming no owner", () => {
+      const { onOpenOrganizations } = renderOverview({
+        status: statusWith({}),
+        heldOrganizations: 2,
+        sharedInstall: true,
       });
 
-      const attention = screen.getByTestId("upgrade-needs-attention");
-      expect(attention).toHaveTextContent("Owner column missing: run the Prisma migration first");
-      fireEvent.click(within(attention).getByRole("button", { name: /ops:backfill-owner/ }));
-      expect(onOpenStep).toHaveBeenCalledWith("ops:backfill-owner");
+      const state = screen.getByTestId("upgrade-installation-state");
+      expect(state).toHaveTextContent("Needs attention: 2 organizations held");
+      expect(state).not.toHaveTextContent("Up to date");
+      expect(screen.queryByTestId("upgrade-held-contact-owner")).toBeNull();
+      fireEvent.click(within(state).getByRole("button", { name: "View organizations" }));
+      expect(onOpenOrganizations).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "On self-hosted, the held organizations line also says to contact the organization owner" */
+    it("on self-hosted also says to contact the organization owner", () => {
+      renderOverview({ status: statusWith({}), heldOrganizations: 1, sharedInstall: false });
+
+      const state = screen.getByTestId("upgrade-installation-state");
+      expect(state).toHaveTextContent("Needs attention: 1 organization held");
+      expect(state).toHaveTextContent("Contact the organization owner.");
+    });
+
+    it("reads Up to date when no organization is held", () => {
+      renderOverview({ status: statusWith({}), heldOrganizations: 0, sharedInstall: false });
+
+      expect(screen.getByTestId("upgrade-installation-state")).toHaveTextContent("Up to date");
+      expect(screen.queryByTestId("upgrade-open-held-organizations")).toBeNull();
     });
   });
 
@@ -255,11 +320,12 @@ describe("UpgradesOverview", () => {
       statusLabel: "Pending",
     });
 
-    /** @scenario "An unfinished operator step shows its state and a failed one offers Retry to a manager" */
-    it("lists both with their status and offers Retry on the failed one only", () => {
+    /** @scenario "An unfinished operator step shows under Action needed and a failed one offers Retry" */
+    it("lists both under Action needed with their status and offers Retry on the failed one only", () => {
       const onRetryStep = vi.fn();
       renderOverview({ status: statusWith({}), operatorSteps: [failed, pending], onRetryStep });
 
+      expect(screen.getByRole("heading", { name: "Action needed" })).toBeInTheDocument();
       const list = screen.getByTestId("upgrade-operator-steps");
       expect(screen.getByTestId("upgrade-operator-step-ops:move-archives")).toHaveTextContent(
         "Pending",
@@ -271,40 +337,9 @@ describe("UpgradesOverview", () => {
       expect(onRetryStep).toHaveBeenCalledWith("ops:reseal-credentials");
     });
   });
+});
 
-  describe("when a tenant step exists", () => {
-    const tenantStep: UpgradeTenantStepView = {
-      name: "prompt:seed-tags-for-untagged-organizations",
-      title: "Default prompt tags",
-      description: "Seeds the default prompt tags.",
-      requiresOperatorConfirmation: false,
-      availableOnThisInstallation: true,
-      enrolledAutomatically: true,
-      counts: { migrated: 2, finalized: 40, parked: 1, rolled_back: 0 },
-      enrollment: null,
-      attention: [],
-    };
-
-    /** @scenario "Each tenant step shows its tenants' progress on the Upgrades page" */
-    it("lists its tenants finalized, held and parked, and opens the step", () => {
-      const { onOpenStep } = renderOverview({
-        status: statusWith({}),
-        tenantSteps: [tenantStep],
-      });
-
-      const row = screen.getByTestId(`upgrade-tenant-step-${tenantStep.name}`);
-      const cells = within(row).getAllByRole("cell");
-      expect(cells.map((cell) => cell.textContent)).toEqual([
-        `Default prompt tags${tenantStep.name}`,
-        "40",
-        "2",
-        "1",
-      ]);
-      fireEvent.click(row);
-      expect(onOpenStep).toHaveBeenCalledWith(tenantStep.name);
-    });
-  });
-
+describe("UpgradeStepsTab", () => {
   describe("when a background step failed", () => {
     const failed = stepWith({
       id: "ops:backfill-owner",
@@ -319,16 +354,10 @@ describe("UpgradesOverview", () => {
       status: "running",
       statusLabel: "Running",
     });
-    const finishing = statusWith({
-      state: "finishing-in-background",
-      label: "Finishing in background",
-      tone: "info",
-    });
-
     /** @scenario "A failed background step offers Retry to a manager" */
     it("offers Retry on the failed step only, to a manager", () => {
       const onRetryStep = vi.fn();
-      renderOverview({ status: finishing, backgroundSteps: [failed, running], onRetryStep });
+      renderStepsTab({ backgroundSteps: [failed, running], onRetryStep });
 
       const list = screen.getByTestId("upgrade-background-steps");
       expect(within(list).getAllByRole("button", { name: "Retry" })).toHaveLength(1);
@@ -339,7 +368,7 @@ describe("UpgradesOverview", () => {
 
     /** @scenario "A view-only operator sees the list and no Retry" */
     it("shows the failed step with its error and offers no Retry to a view-only reader", () => {
-      renderOverview({ status: finishing, backgroundSteps: [failed, running] });
+      renderStepsTab({ backgroundSteps: [failed, running] });
 
       const failedRow = screen.getByTestId("upgrade-background-step-ops:backfill-owner");
       expect(failedRow).toHaveTextContent("Failed");
@@ -353,7 +382,7 @@ describe("UpgradesOverview", () => {
 
     it("shows a running step's progress from its checkpoint report", () => {
       const replaying = { ...running, progress: { done: 63, total: 100 } };
-      renderOverview({ status: finishing, backgroundSteps: [failed, replaying] });
+      renderStepsTab({ backgroundSteps: [failed, replaying] });
 
       const row = screen.getByTestId("upgrade-background-step-ops:backfill-names");
       expect(row).toHaveTextContent("63%");
@@ -367,7 +396,7 @@ describe("UpgradesOverview", () => {
           { role: "api", image: "img-dev", release: null, lastSeenAt: null },
         ],
       };
-      renderOverview({ status: finishing, backgroundSteps: [failed, waiting] });
+      renderStepsTab({ backgroundSteps: [failed, waiting] });
 
       const row = screen.getByTestId("upgrade-background-step-ops:backfill-names");
       expect(row).toHaveTextContent("worker (3.20.1), api (img-dev)");
@@ -392,7 +421,7 @@ describe("UpgradesOverview", () => {
         ],
       });
       const failedBy = { ...failed, finishBy: "3.24.0" };
-      renderOverview({ status: finishing, backgroundSteps: [failedBy, replaying, waiting] });
+      renderStepsTab({ backgroundSteps: [failedBy, replaying, waiting] });
 
       const rows = [
         { id: "ops:backfill-names", label: "Running" },
@@ -414,10 +443,49 @@ describe("UpgradesOverview", () => {
     });
 
     it("shows a skeleton while the background steps load", () => {
-      renderOverview({ status: finishing, backgroundLoading: true });
+      renderStepsTab({ backgroundLoading: true });
 
       expect(screen.getByLabelText("Loading background steps")).toBeInTheDocument();
       expect(screen.queryByTestId("upgrade-background-steps")).toBeNull();
+    });
+  });
+});
+
+describe("UpgradeStepsTab, versions", () => {
+  describe("when the ledger knows the baseline, two releases and steps no release names", () => {
+    it("lists the development build first, then newest first, the baseline as and earlier", () => {
+      renderIn(
+        <UpgradeStepsTab
+          releases={[
+            {
+              release: "3.18.1",
+              installed: false,
+              image: false,
+              stepCount: 3,
+              counts: { done: 3 },
+            },
+            {
+              release: "3.20.1",
+              installed: true,
+              image: true,
+              stepCount: 2,
+              counts: { pending: 2 },
+            },
+            { release: null, installed: false, image: false, stepCount: 1, counts: { done: 1 } },
+          ]}
+          onOpenStep={noop}
+          releaseSteps={() => null}
+        />,
+      );
+
+      const groups = within(screen.getByTestId("upgrade-releases")).getAllByRole("button");
+      expect(groups.map((group) => group.textContent)).toEqual([
+        "Development build",
+        "3.20.1",
+        "3.18.1 and earlier",
+      ]);
+      expect(screen.getByTestId("upgrade-release-3.20.1")).toHaveTextContent("2 pending");
+      expect(document.body).not.toHaveTextContent(/unreleased/i);
     });
   });
 });
@@ -505,15 +573,14 @@ describe("UpgradeStepDetail", () => {
   });
 });
 
-describe("UpgradeRunPhases", () => {
+describe("UpgradeRunDetail", () => {
   describe("when a run passed through two releases", () => {
     /** @scenario "A run's steps are listed per release in the order the reader gives them" */
-    it("lists each release's steps under it, in order", () => {
+    it("lists each release's steps under it, in order", async () => {
       const run: UpgradeRunDetailView = {
         id: "run_1",
         kind: "upgrade",
         release: "3.23.0",
-        floor: "3.20.1",
         startedAt: "2026-10-06T10:00:00.000Z",
         finishedAt: "2026-10-06T10:01:00.000Z",
         outcome: "succeeded",
@@ -526,9 +593,10 @@ describe("UpgradeRunPhases", () => {
           stepWith({ id: "prisma:b", release: "3.23.0" }),
         ],
       };
-      renderIn(<UpgradeRunPhases run={run} />);
+      renderIn(<UpgradeRunDetail run={run} />);
+      fireEvent.click(screen.getByRole("tab", { name: "Steps" }));
 
-      const releases = screen.getAllByTestId("upgrade-run-release");
+      const releases = await screen.findAllByTestId("upgrade-run-release");
       expect(releases.map((release) => within(release).getByRole("heading").textContent)).toEqual([
         "3.22.0",
         "3.23.0",
@@ -542,7 +610,7 @@ describe("UpgradeRunPhases", () => {
   });
 });
 
-describe("UpgradeRunPhases, phases", () => {
+describe("UpgradeRunDetail, phases", () => {
   describe("when a run from 3.21.0 to 3.23.0 passed through two releases", () => {
     /** @scenario "A run's phases are listed in the order they ran" */
     it("lists the preflight first, each release's schema phases in order, the reconcile last", () => {
@@ -558,7 +626,6 @@ describe("UpgradeRunPhases, phases", () => {
         id: "run_2",
         kind: "upgrade",
         release: "3.23.0",
-        floor: "3.20.1",
         startedAt: at,
         finishedAt: at,
         outcome: "succeeded",
@@ -574,7 +641,7 @@ describe("UpgradeRunPhases, phases", () => {
         ],
         steps: [],
       };
-      renderIn(<UpgradeRunPhases run={run} />);
+      renderIn(<UpgradeRunDetail run={run} />);
 
       const rows = screen.getAllByTestId("upgrade-run-phase").map((row) => row.textContent);
       expect(rows).toEqual([
@@ -585,6 +652,66 @@ describe("UpgradeRunPhases, phases", () => {
         expect.stringMatching(/^ClickHouse schema3\.23\.0/),
         expect.stringMatching(/^Reconcile/),
       ]);
+    });
+  });
+});
+
+function runWith(overrides: Partial<UpgradeRunDetailView>): UpgradeRunDetailView {
+  return {
+    id: "run_1",
+    kind: "upgrade",
+    release: "3.23.0",
+    startedAt: "2026-10-06T10:00:00.000Z",
+    finishedAt: "2026-10-06T10:01:00.000Z",
+    outcome: "succeeded",
+    plan: { releases: ["3.23.0"] },
+    report: { applied: 3 },
+    phases: [],
+    steps: [],
+    ...overrides,
+  };
+}
+
+describe("UpgradeRuns and UpgradeRunDetail", () => {
+  describe("when an operator opens a run from the Runs tab", () => {
+    /** @scenario "A run opens as a drawer from the Runs tab with Phases, Steps and Log" */
+    it("opens the run, whose tabs are Phases, Steps and Log, the raw JSON behind Details", async () => {
+      const onOpenRun = vi.fn();
+      renderIn(<UpgradeRuns runs={[runWith({})]} onOpenRun={onOpenRun} />);
+      fireEvent.click(screen.getByTestId("upgrade-run-run_1"));
+      expect(onOpenRun).toHaveBeenCalledWith("run_1");
+      cleanup();
+
+      renderIn(<UpgradeRunDetail run={runWith({})} />);
+      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+        "Phases",
+        "Steps",
+        "Log",
+      ]);
+      fireEvent.click(screen.getByRole("tab", { name: "Log" }));
+      await screen.findByTestId("upgrade-run-log");
+      expect(screen.queryByTestId("upgrade-run-details")).toBeNull();
+      fireEvent.click(screen.getByTestId("upgrade-run-details-toggle"));
+      expect(await screen.findByTestId("upgrade-run-details")).toHaveTextContent("Run report");
+    });
+  });
+
+  describe("when the run imported history from before upgrade tracking", () => {
+    /** @scenario "The seed run reads as imported history with a one-line explanation" */
+    it("reads Imported history in the list and explains itself in the log", async () => {
+      const seed = runWith({ kind: "seed", release: null, plan: null, report: { seeded: {} } });
+      renderIn(<UpgradeRuns runs={[seed]} onOpenRun={noop} />);
+      expect(screen.getByTestId("upgrade-run-run_1")).toHaveTextContent("Imported history");
+      cleanup();
+
+      renderIn(<UpgradeRunDetail run={seed} />);
+      expect(screen.getByText(/Imported history/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("tab", { name: "Log" }));
+      expect(await screen.findByTestId("upgrade-run-imported")).toHaveTextContent(
+        "before upgrade tracking began",
+      );
+      expect(screen.getByTestId("upgrade-run-log")).not.toHaveTextContent("seeded");
+      expect(document.body).not.toHaveTextContent(/unreleased|Development build/i);
     });
   });
 });

@@ -129,7 +129,11 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 	piWorkerPath := langyWorkerBinaryPath(opts.RepoRoot)
 	return Child{
 		Name: "langyagent", Dir: opts.RepoRoot, Color: palette[6],
-		Shell: goServiceShell(opts.RepoRoot, "langyagent", opts.ShouldGoWatch),
+		// Langy's `langwatch` calls run this checkout's CLI, not a global one. Set in
+		// the shell: the lane runs under `bash -lc`, whose path_helper would demote an
+		// env PATH entry behind /etc/paths.d (ensureLangyCLI writes the shims).
+		Shell: "export PATH=" + shQuote(langyCLIBinDir(opts.RepoRoot)) + `:"$PATH"; ` +
+			goServiceShell(opts.RepoRoot, "langyagent", opts.ShouldGoWatch),
 		Env: append(append([]string{}, base...),
 			domain.LaneEnv("langyagent"),
 			fmt.Sprintf("PORT=%d", port),
@@ -150,6 +154,52 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 			// which reads as a bug instead of a setup gap.
 			"LANGY_PI_WORKER_BINARY_PATH="+piWorkerPath,
 		),
+	}
+}
+
+const langyCLIBuildCommand = nxCacheEnv + "pnpm --filter langwatch build"
+
+// langyCLIEntry is the checkout's built CLI; langyCLIBinDir holds the
+// `langwatch` and `lw` shims that run it, first on the host tier's PATH.
+func langyCLIEntry(repoRoot string) string {
+	return filepath.Join(repoRoot, "sdks", "typescript", "dist", "cli", "index.js")
+}
+
+func langyCLIBinDir(repoRoot string) string {
+	return filepath.Join(repoRoot, ".bin", "langwatch-cli")
+}
+
+// ensureLangyCLI builds the checkout's CLI when it is missing and writes the
+// shims Langy's PATH names. A failed build keeps Langy and says the CLI on
+// PATH is used instead, with the command and the log.
+func (o *Orchestrator) ensureLangyCLI(ctx context.Context, st domain.Stack, opts *PlanOptions) {
+	if !opts.Selection.Langy || st.LangyTier.RunsInContainer() {
+		return
+	}
+	entry := langyCLIEntry(opts.RepoRoot)
+	if _, err := os.Stat(entry); err != nil {
+		dir, _ := domain.StackLogPaths(st.WorktreeDir, st.Slug)
+		_ = os.MkdirAll(dir, 0o700)
+		logPath := filepath.Join(dir, "langwatch-cli-build.log")
+		fmt.Printf("  langyagent: building this checkout's langwatch CLI (output in %s)…\n", logPath)
+		job := onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "langwatch-cli-build", Dir: opts.RepoRoot, Shell: langyCLIBuildCommand + " >" + shQuote(logPath) + " 2>&1"}
+		if err := o.runOnceJob(ctx, job); err != nil {
+			fmt.Printf("  langyagent: the CLI build failed, so Langy uses the langwatch on PATH.\n  Build it with `%s`; log: %s\n", langyCLIBuildCommand, logPath)
+			o.log.Warn("langwatch CLI build failed — Langy uses the CLI on PATH", zap.String("log", logPath), zap.Error(err))
+			return
+		}
+	}
+	binDir := langyCLIBinDir(opts.RepoRoot)
+	if err := os.MkdirAll(binDir, 0o750); err != nil {
+		o.log.Warn("langwatch CLI shim directory", zap.Error(err))
+		return
+	}
+	shim := "#!/bin/sh\nexec node " + shQuote(entry) + " \"$@\"\n"
+	for _, name := range []string{"langwatch", "lw"} {
+		//nolint:gosec // G306: a shim the developer's own Langy runs needs the exec bit
+		if err := os.WriteFile(filepath.Join(binDir, name), []byte(shim), 0o750); err != nil {
+			o.log.Warn("langwatch CLI shim", zap.String("name", name), zap.Error(err))
+		}
 	}
 }
 

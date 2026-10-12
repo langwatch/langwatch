@@ -157,6 +157,14 @@ Feature: Resolve a feature flag, roll it out, and let people opt into experiment
       When a caller resolves the flag
       Then the rules are treated as empty rather than raising
 
+    # "Not answered yet" on a refused read held the landing redirect on a blank page for good.
+    @unit
+    Scenario: A refused browser flag read answers every flag off
+      Given a reader whose browser flag read was refused
+      When a screen asks for a flag
+      Then the flag reads off rather than not yet answered
+      And a flag this browser overrides keeps its override
+
     @unit
     Scenario: An operator write is visible to the next resolution
       Given an operator switched a default-on flag off
@@ -190,6 +198,18 @@ Feature: Resolve a feature flag, roll it out, and let people opt into experiment
     Scenario: A project cannot be paired with another organization
       Given a caller may view a project
       When they resolve it with an organization that does not own it
+      Then the request is refused before the flag is evaluated
+
+    @unit
+    Scenario: Any member of a project's organization reads that project's flags
+      Given a member of an organization whose team role grants no project:view
+      When they resolve a flag for a project that organization owns
+      Then the flag is evaluated for that project
+
+    @unit
+    Scenario: A project in another organization is refused a flag read
+      Given a caller who is not a member of the organization that owns a project
+      When they resolve a flag for that project
       Then the request is refused before the flag is evaluated
 
     @unit

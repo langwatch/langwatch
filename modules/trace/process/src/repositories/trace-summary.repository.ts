@@ -20,6 +20,17 @@ export interface FindByTraceIdOptions {
   window?: { fromMs: number; toMs: number };
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** How far back an anchored lookup searches, narrowest first; a miss at the last is final. */
+export const TRACE_SUMMARY_LOOKUP_LOOKBACK_STEPS_MS: readonly number[] = [
+  3 * DAY_MS,
+  7 * DAY_MS,
+  21 * DAY_MS,
+  30 * DAY_MS,
+];
+/** How far after its anchor a trace may sit: clock skew between a span and its trace's start. */
+export const TRACE_SUMMARY_LOOKUP_FORWARD_MS = DAY_MS;
+
 /** A single-trace summary read; the proof fences the tenants it may see (ADR-177). */
 export type FindByTraceIdParams = {
   authorization: Authorization;

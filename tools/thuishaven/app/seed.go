@@ -19,8 +19,9 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// seedTaskModule is the LANGWATCH_TASK_MODULES entry that gives `pnpm task` the seed:apply task.
-const seedTaskModule = "@langwatch/seedgen-runner"
+// seedTaskModule is the runner's entry under the worktree. A path, not the package name: the
+// tasks app imports nothing of it, so its package.json cannot list it as a dependency.
+const seedTaskModule = "tools/seedgen/runner/src/index.ts"
 
 // autoSeedWait is how long an up's auto-seed is waited on before it carries on in the background.
 var autoSeedWait = 60 * time.Second
@@ -211,7 +212,7 @@ func (o *Orchestrator) runSeedgen(ctx context.Context, t seedTarget, args []stri
 	for _, a := range o.runRecordArgs(t.Slug, args) {
 		shell += " " + shellQuote(a)
 	}
-	env := append(append([]string{}, t.Env...), "LANGWATCH_TASK_MODULES="+seedTaskModule)
+	env := append(append([]string{}, t.Env...), "LANGWATCH_TASK_MODULES="+filepath.Join(t.Dir, seedTaskModule))
 	env = append(env, o.licenceEnv(t.Slug, resolvedDevEnv(t.Dir), true)...)
 	err := o.sup.RunOnce(ctx, "seed", t.Dir, shell, env)
 	status.Exit, status.FinishedAt = exitCodeOf(err), o.sys.Now()

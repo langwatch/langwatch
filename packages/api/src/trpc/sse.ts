@@ -9,6 +9,7 @@ import { TRPCError } from "@trpc/server";
 
 import { credentialClassFor, handlerManagedAuth } from "../access-policy.ts";
 import {
+  ClientOutdatedError,
   LiveStreamCrossSiteBlockedError,
   LiveStreamNotFoundError,
   LiveStreamUnsupportedProcedureError,
@@ -16,6 +17,7 @@ import {
 } from "../errors.ts";
 import { BrowserOriginGuard } from "../policy/browser-origin.ts";
 import { registerRoutePolicy } from "../route-registry.ts";
+import { isOutdatedClientInput } from "./client-outdated.ts";
 
 /** How often the channel writes a comment so an idle proxy keeps it open. */
 const SSE_KEEPALIVE_INTERVAL_MS = 25_000;
@@ -107,6 +109,12 @@ export class SseLane {
 
     const inputParam = url.searchParams.get("input") ?? undefined;
     const input = inputParam ? (JSON.parse(inputParam) as unknown) : undefined;
+
+    if (isOutdatedClientInput(input)) {
+      this.logger.info({ path }, "An outdated client was told to reload");
+      throw new ClientOutdatedError();
+    }
+
     const caller = await this.members.createCaller({ request: raw, signal: raw.signal });
     const procedure = procedureAt(caller, path);
 

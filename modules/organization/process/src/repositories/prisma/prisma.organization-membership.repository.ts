@@ -5,7 +5,7 @@ import type {
   AuthzGrantsService,
   AuthzLedgerBindingAttach,
 } from "@langwatch/authz-contract";
-import { newAuthzGrantId } from "@langwatch/authz-contract";
+import { AuthzGrantNotConfirmedError, newAuthzGrantId } from "@langwatch/authz-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { readJoinerRole } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
@@ -23,6 +23,7 @@ import {
   MemberNotFoundError,
   OrganizationNotFoundError,
   OrganizationSlugTakenError,
+  ORGANIZATION_KIND,
   auditImpersonationMetadataSchema,
 } from "@langwatch/organization-contract";
 import type {
@@ -271,6 +272,17 @@ function revokesByReason(plans: ScopeBindingPlan[]): Map<string | undefined, str
  * Emits a batch of plans, revocations first: a crash mid-batch leaves the member with less
  * access than asked for, never more, and the retry converges.
  */
+/** False when the ledger kept the append but could not confirm it: durable, the fold converges. */
+async function landedInTime(write: () => Promise<unknown>): Promise<boolean> {
+  try {
+    await write();
+    return true;
+  } catch (error) {
+    if (error instanceof AuthzGrantNotConfirmedError) return false;
+    throw error;
+  }
+}
+
 async function emitScopeBindingPlans({
   writer,
   organizationId,
@@ -284,35 +296,52 @@ async function emitScopeBindingPlans({
   caller: AuthzGrantCaller;
   actor: LedgerActor;
 }): Promise<void> {
+  let unconfirmed = 0;
+  const land = async (write: () => Promise<unknown>) => {
+    if (!(await landedInTime(write))) unconfirmed += 1;
+  };
   for (const [reason, bindingIds] of revokesByReason(plans)) {
-    await writer.revokeBindings({
-      organizationId,
-      bindingIds,
-      actor,
-      ...(reason ? { reason } : {}),
-    });
+    await land(() =>
+      writer.revokeBindings({
+        organizationId,
+        bindingIds,
+        actor,
+        ...(reason ? { reason } : {}),
+      }),
+    );
   }
   for (const plan of plans) {
     if (!plan.change) continue;
-    await writer.changeBindingRole({
-      organizationId,
-      bindingId: plan.change.bindingId,
-      role: plan.change.role,
-      customRoleId: plan.change.customRoleId,
-      caller,
-      actor,
-    });
+    const change = plan.change;
+    await land(() =>
+      writer.changeBindingRole({
+        organizationId,
+        bindingId: change.bindingId,
+        role: change.role,
+        customRoleId: change.customRoleId,
+        caller,
+        actor,
+      }),
+    );
   }
   const attaches = plans.flatMap((plan) => (plan.attach ? [plan.attach] : []));
   if (attaches.length > 0) {
-    await writer.attachBindings({
-      organizationId,
-      bindings: attaches,
-      caller,
-      actor,
-      onDuplicate: "skip",
-    });
+    await land(() =>
+      writer.attachBindings({
+        organizationId,
+        bindings: attaches,
+        caller,
+        actor,
+        onDuplicate: "skip",
+      }),
+    );
   }
+  if (unconfirmed === 0) return;
+  logger.warn(
+    { organizationId, unconfirmed },
+    "seat change appended grants the projection had not landed yet; kept the change and invalidated the grant cache",
+  );
+  await writer.invalidateOrganization({ organizationId });
 }
 
 /**
@@ -1112,8 +1141,41 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     });
   }
 
+  async createSystemOrFind(
+    input: Omit<CreateForProvisioningInput, "pricingModel">,
+  ): Promise<{ id: string }> {
+    const where = { kind: ORGANIZATION_KIND.SYSTEM };
+    const existing = await this.prisma.organization.findFirst({ where, select: { id: true } });
+    if (existing) return existing;
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const organization = await tx.organization.create({
+          data: { id: input.orgId, name: input.orgName, slug: input.orgSlug, ...where },
+          select: { id: true },
+        });
+        await tx.team.create({
+          data: {
+            id: input.teamId,
+            name: input.orgName,
+            slug: input.teamSlug,
+            organizationId: organization.id,
+          },
+        });
+        return organization;
+      });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+        throw error;
+      }
+      const winner = await this.prisma.organization.findFirst({ where, select: { id: true } });
+      if (!winner) throw error;
+      return winner;
+    }
+  }
+
   async findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]> {
     const organizations = await this.prisma.organization.findMany({
+      where: { kind: { not: ORGANIZATION_KIND.SYSTEM } },
       select: { id: true, name: true, slug: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     });

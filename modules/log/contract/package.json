@@ -16,14 +16,13 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/otlp": "workspace:*",
-    "@langwatch/trace-contract": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

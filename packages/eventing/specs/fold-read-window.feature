@@ -41,6 +41,18 @@ Feature: Fold read windows are declared, not hand-rolled
     Then the windowed read and the unwindowed retry both find nothing
     And the fold starts from an empty state
 
+  Scenario: a bounded fallback widens back step by step instead of reading unbounded
+    Given the fold declares a read window with lookback steps for its fallback
+    When the windowed read misses
+    Then the platform re-reads windows reaching each step back from the event, narrowest first
+    And it stops at the first row found
+    And a miss at the widest step is final, so no read is ever unbounded
+
+  Scenario: a bounded fallback is declared only by a fold that rebuilds on a miss
+    Given a fold that declares lookback steps for its read-window fallback
+    When the platform registers it
+    Then the registration is refused unless the fold replays its history when the store misses
+
   Scenario: a fold without a declared window reads unbounded
     Given the fold declares no read window
     When an event is folded

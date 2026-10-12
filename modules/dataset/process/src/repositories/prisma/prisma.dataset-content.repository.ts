@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";
@@ -154,7 +155,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   async create(input: CreateDatasetInput): Promise<DatasetRow> {
     const client = this.prisma;
     return client.dataset.create({
-      data: input as Prisma.DatasetUncheckedCreateInput,
+      data: { id: generate("dataset").toString(), ...input } as Prisma.DatasetUncheckedCreateInput,
     });
   }
 

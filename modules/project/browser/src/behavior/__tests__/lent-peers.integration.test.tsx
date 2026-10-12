@@ -4,6 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { CustomGraphToken, type CustomGraphInput } from "@langwatch/analytics-client";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { InlineCommandPaletteToken } from "@langwatch/navigation-client";
+import { UpgradeActionNeededToken } from "@langwatch/ops-client";
 import {
   PendingJoinRequestsToken,
   ProjectDepartmentFieldToken,
@@ -27,6 +28,7 @@ import {
   InlineCommandPalette,
   PendingJoinRequests,
   ProjectDepartmentField,
+  UpgradeActionNeeded,
 } from "../lent-peers.tsx";
 
 const peerLends = uiDeclarations([
@@ -58,6 +60,18 @@ const peerLends = uiDeclarations([
               <input placeholder={placeholder} />
             ),
           }),
+        },
+      ],
+    },
+  },
+  {
+    name: "ops",
+    installation: {
+      capabilities: {},
+      lends: [
+        {
+          token: UpgradeActionNeededToken,
+          load: async () => ({ default: () => <span>action needed for updates</span> }),
         },
       ],
     },
@@ -155,6 +169,24 @@ describe("what navigation and organization lend project", () => {
     it("draws nothing in the card's place, and nothing fails", () => {
       declarations.current = uiDeclarations([]);
       const { container } = render(<PendingJoinRequests />);
+      expect(container).toBeEmptyDOMElement();
+    });
+  });
+
+  describe("given ops lends its action-needed card", () => {
+    /** @scenario Project's home renders ops' action-needed card through its client token */
+    it("draws the card where project's home places it", async () => {
+      declarations.current = peerLends;
+      render(<UpgradeActionNeeded />);
+      expect(await screen.findByText("action needed for updates")).toBeInTheDocument();
+    });
+  });
+
+  describe("given no installed module lends the action-needed token", () => {
+    /** @scenario An uninstalled ops leaves project's home without the action-needed card */
+    it("draws nothing in the card's place, and nothing fails", () => {
+      declarations.current = uiDeclarations([]);
+      const { container } = render(<UpgradeActionNeeded />);
       expect(container).toBeEmptyDOMElement();
     });
   });

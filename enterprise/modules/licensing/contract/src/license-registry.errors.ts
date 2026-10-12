@@ -23,6 +23,19 @@ export class LicenseSigningNotConfiguredError extends HandledError {
   }
 }
 
+/** A license asked to end at a moment already passed: 422, like a grant's past expiry. */
+export class LicenseExpiryInPastError extends HandledError {
+  declare readonly code: "license_expiry_in_past";
+
+  constructor() {
+    super("license_expiry_in_past", "A license's end date must be in the future", {
+      httpStatus: 422,
+      fault: "customer",
+    });
+    this.name = "LicenseExpiryInPastError";
+  }
+}
+
 /** The registry has no license with that id. */
 export class IssuedLicenseNotFoundError extends HandledError {
   declare readonly code: "issued_license_not_found";

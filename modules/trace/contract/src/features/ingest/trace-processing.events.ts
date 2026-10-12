@@ -1,4 +1,5 @@
 import type { Named } from "@langwatch/module";
+import { fixed64Schema } from "@langwatch/otlp/trace-request";
 import { z } from "zod";
 
 import {
@@ -18,7 +19,6 @@ import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
 } from "../../trace.constants.ts";
-import { fixed64Schema } from "../../trace.otlp.ts";
 import { logTraceContributionSchema } from "../span/trace-log-contribution.ts";
 import {
   isSpanReceivedEvent,

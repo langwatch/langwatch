@@ -92,12 +92,10 @@ export function AuthenticationSettings({
         </VStack>
       )}
 
-      <VStack align="stretch" gap={2} maxWidth="2xl" width="full">
-        <VStack align="stretch" gap={0.5}>
-          <Text as="h2" fontSize="sm" fontWeight="semibold">
-            Organization policies
-          </Text>
-          <Text color="fg.muted" fontSize="xs" lineHeight="short">
+      <VStack align="stretch" gap={4} width="full" paddingTop={2}>
+        <VStack align="stretch" gap={1}>
+          <Heading size="sm">Organization policies</Heading>
+          <Text color="fg.muted" fontSize="sm">
             Manage who can join and how accounts stay secure. These policies also apply when your
             organization uses password sign-in.
           </Text>

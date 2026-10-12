@@ -95,6 +95,14 @@ describe("defineRestRouter", () => {
       Reflect.apply(Reflect.get(route, "withInput"), route, [body]);
     }).toThrow(/declared by multiple sources/);
 
+    const reader = () => router().get("/annotations", "listAnnotations");
+    // @ts-expect-error a GET route carries no body
+    expect(() => reader().withInput(z.object({ id: z.string() }))).toThrow(
+      /cannot declare a JSON body/,
+    );
+    // @ts-expect-error a GET route carries no body
+    expect(() => reader().withRawBody("text")).toThrow(/cannot declare a JSON body/);
+
     expect(() => {
       const dynamicPath = "/:id" as string;
       const route = router().get(dynamicPath, "getAnnotation");

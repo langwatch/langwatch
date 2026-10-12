@@ -1,4 +1,5 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { HStack, IconButton, Table, Text } from "@langwatch/design-system/primitives";
 import type { Instant } from "@langwatch/time";
@@ -163,7 +164,7 @@ export function ScenarioTable({
   });
 
   return (
-    <Table.Root variant="line" width="full" size="md">
+    <ListTable width="full" size="md">
       <Table.Header>
         {table.getHeaderGroups().map((headerGroup) => (
           <Table.Row key={headerGroup.id}>
@@ -205,6 +206,6 @@ export function ScenarioTable({
           return renderRow(row.original, rowElement);
         })}
       </Table.Body>
-    </Table.Root>
+    </ListTable>
   );
 }

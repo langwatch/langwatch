@@ -1,8 +1,6 @@
+import type { OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
 import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import type {
-  OtlpKeyValue,
-  OtlpResource,
-  OtlpSpan,
   CustomMetadata,
   ReservedTraceMetadata,
   Span,

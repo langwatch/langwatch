@@ -74,8 +74,8 @@ https://hub.langwatch.localhost               every stack on the machine
 
 `https://<slug>.langwatch.localhost` (`apps/haven-web`) lists every surface with its status. A
 surface that is not live says why (what it waits for and its lane's last warning), and its row has
-Restart, or Start for a surface that was not selected. An api the stack refuses to serve because
-the database is below the LTS floor shows a database reset button. `haven db reset` migrates and
+Restart, or Start for a surface that was not selected.
+`haven db reset` migrates and
 seeds exactly the databases it dropped, also for a stack the hub does not know yet. The daemon
 trusts a pid only together with its process start time, holds its claim as a flock for its whole
 life, and writes stack records atomically, so a recycled pid or a second daemon cannot be mistaken

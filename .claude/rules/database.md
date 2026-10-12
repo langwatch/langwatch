@@ -10,7 +10,7 @@ paths:
 
 # Database
 
-Before any migration, load the `migration` skill; it routes to `postgres-migration`, `clickhouse-migration` or `migration-data-step`. Every release from the LTS floor to head must keep running on every later schema (dev/docs/plans/migrations-rethink-2026-10-06.md 6.12): add columns nullable or with `DEFAULT`; drop only what no release at or above the floor reads, with `-- contract: retired in <release>`; never rename in place. No new foreign keys and no new `@relation` (Alex, 2026-10-06); existing ones stay. Never edit a merged migration; write a new one.
+Before any migration, load the `migration` skill; it routes to `postgres-migration`, `clickhouse-migration` or `migration-data-step`. The previous release must keep running on every later schema, and no release is a required stop: any install rolls through every step (Alex, 2026-10-11). Add columns nullable or with `DEFAULT`; a DROP or contract waits until old writers are gone (`needsOldWritersGone`), with `-- contract: retired in <release>`, and the step that drops is kept, like every step; never rename in place. No new foreign keys and no new `@relation` (Alex, 2026-10-06); existing ones stay. Never edit a merged migration; write a new one.
 
 Read `dev/docs/best_practices/clickhouse-queries.md` before writing or changing a
 ClickHouse query.
