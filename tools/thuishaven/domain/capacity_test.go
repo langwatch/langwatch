@@ -41,6 +41,7 @@ func TestNextCapacityTier(t *testing.T) {
 	}
 }
 
+// @scenario "The capacity tier does not flap"
 func TestNextCapacityTierDoesNotFlap(t *testing.T) {
 	tier := CapacityNormal
 	flips := 0

@@ -48,7 +48,7 @@ describe("createShutdown", () => {
   });
 
   describe("when stopping a service fails", () => {
-    /** @scenario "A crashed service with no restart budget left emits \"crashed\" and the CLI tears down" */
+    /** @scenario A crashed service with no restart budget left emits "crashed" and the CLI tears down */
     it("still exits with the outcome's code", async () => {
       const { exit, shutdown } = harness({
         stopServices: async () => {
