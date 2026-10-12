@@ -9,13 +9,14 @@ import (
 	"sync"
 	"testing"
 
-	langwatch "github.com/langwatch/langwatch/sdks/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	collectortrace "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/protobuf/proto"
+
+	langwatch "github.com/langwatch/langwatch/sdks/go"
 )
 
 // protobufReceiver decodes OTLP/protobuf trace exports.
@@ -30,13 +31,18 @@ func (r *protobufReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var body io.Reader = req.Body
 	if req.Header.Get("Content-Encoding") == "gzip" {
 		zr, err := gzip.NewReader(req.Body)
-		require.NoError(r.t, err)
+		if !assert.NoError(r.t, err) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		body = zr
 	}
 	raw, err := io.ReadAll(body)
-	require.NoError(r.t, err)
 	var msg collectortrace.ExportTraceServiceRequest
-	require.NoError(r.t, proto.Unmarshal(raw, &msg))
+	if !assert.NoError(r.t, err) || !assert.NoError(r.t, proto.Unmarshal(raw, &msg)) {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
 	r.mu.Lock()
 	r.headers = append(r.headers, req.Header.Clone())
