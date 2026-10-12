@@ -988,9 +988,10 @@ jobs:
           CLICKHOUSE_PASSWORD: ci_password
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
 
-      # `prisma:migrate` runs `task upgrade`, which needs ClickHouse up first.
-      - name: Setup database
-        run: pnpm prisma:migrate
+      # Build only: the upgrade runs below without BUILD_TIME, which it reads as
+      # "no datastore here" (that made every package suite skip).
+      - name: Build workspace packages
+        run: pnpm run ensure:built
 
       - name: Run ClickHouse migrations
         working-directory: apps/tasks
