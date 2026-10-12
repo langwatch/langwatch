@@ -48,8 +48,12 @@ function projectNotice() {
   const notice = ProjectCreatedNoticeService.create({
     logger,
     projects: createApiFixture<
-      Pick<ProjectRepository, "findWithOrgAdmin" | "findIdsByOrganization" | "findWithTeam">
+      Pick<
+        ProjectRepository,
+        "findWithOrgAdmin" | "findIdsByOrganization" | "findWithTeam" | "findLiveWithTeamByIds"
+      >
     >({
+      findLiveWithTeamByIds: async () => [],
       findIdsByOrganization: async (organizationId) =>
         Object.keys(PROJECTS).filter((id) => PROJECTS[id] === organizationId),
       findWithOrgAdmin: async (id) => {

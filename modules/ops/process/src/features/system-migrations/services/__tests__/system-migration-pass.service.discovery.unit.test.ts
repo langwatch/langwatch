@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryMigrationLeaseRepository } from "../../../../repositories/memory/memory.migration-lease.repository.ts";
 import { MemorySystemMigrationStateRepository } from "../../../../repositories/memory/memory.system-migration-state.repository.ts";
 import { PostgresOpsRepositories } from "../../../../repositories/prisma/prisma.ops.repositories.ts";
+import { NullQueueRepository } from "../../../../repositories/queue.repository.ts";
 import { SystemMigrationPassService } from "../system-migration-pass.service.ts";
 
 const STEP = "prompt:seed-default-tags";
@@ -61,6 +62,7 @@ function gate({
       ...PostgresOpsRepositories.create({ prisma: prismaDouble({}) }),
       migrationState: state,
       migrationLease: MemoryMigrationLeaseRepository.create(),
+      queues: NullQueueRepository.create(),
     },
     isSaaS: () => isSaaS,
     migrations: () => migrations,

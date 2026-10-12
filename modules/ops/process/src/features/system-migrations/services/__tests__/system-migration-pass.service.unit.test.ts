@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PostgresOpsRepositories } from "../../../../repositories/prisma/prisma.ops.repositories.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "../../../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "../../../../repositories/prisma/prisma.system-migration-state.repository.ts";
+import { NullQueueRepository } from "../../../../repositories/queue.repository.ts";
 import { RedisMigrationLeaseRepository } from "../../../../repositories/redis/redis.migration-lease.repository.ts";
 import { SystemMigrationPassCohortService } from "../system-migration-pass-cohort.service.ts";
 import { SystemMigrationPassService } from "../system-migration-pass.service.ts";
@@ -96,6 +97,7 @@ function passRepositoriesOver(database: PrismaClient) {
   return {
     ...PostgresOpsRepositories.create({ prisma: database }),
     migrationLease: RedisMigrationLeaseRepository.create({ redis: null }),
+    queues: NullQueueRepository.create(),
   };
 }
 

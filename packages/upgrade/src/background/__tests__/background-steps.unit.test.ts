@@ -845,7 +845,7 @@ describe("BackgroundStepsService side by side", () => {
       let running = 0;
       let widest = 0;
       const leases: string[] = [];
-      const step = (id: string, after?: string[]) =>
+      const step = (id: string, after?: Parameters<typeof defineMigrationStep>[0]["after"]) =>
         defineMigrationStep({
           id,
           kind: "data",
@@ -874,9 +874,10 @@ describe("BackgroundStepsService side by side", () => {
         setStatus: async () => undefined,
         saveReport: async () => undefined,
       };
+      const independent = ids.map((id) => step(id));
       const service = BackgroundStepsService.create({
         ledger,
-        steps: [...ids.map((id) => step(id)), step("a:six", ["a:one"])],
+        steps: [...independent, step("a:six", [independent[0]!])],
         serving: () => true,
         oldWritersGoneFor: async () => true,
         identity: { owner: "worker-1", image: "3.21.0", host: "host" },

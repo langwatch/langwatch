@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MemorySystemMigrationStateRepository } from "../../../../repositories/memory/memory.system-migration-state.repository.ts";
 import { PostgresOpsRepositories } from "../../../../repositories/prisma/prisma.ops.repositories.ts";
+import { NullQueueRepository } from "../../../../repositories/queue.repository.ts";
 import { RedisMigrationLeaseRepository } from "../../../../repositories/redis/redis.migration-lease.repository.ts";
 import { SystemMigrationPassService } from "../system-migration-pass.service.ts";
 
@@ -42,6 +43,7 @@ function declaredPass({ held }: { held: Set<string> }) {
       ...PostgresOpsRepositories.create({ prisma: prismaDouble({}) }),
       migrationState: MemorySystemMigrationStateRepository.create(),
       migrationLease: RedisMigrationLeaseRepository.create({ redis: null }),
+      queues: NullQueueRepository.create(),
       organizationTenants: { ...everyOrganization, pendingFor: () => everyOrganization },
     },
     isSaaS: () => false,

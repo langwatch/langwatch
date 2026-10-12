@@ -20,6 +20,7 @@ import { MemoryOpsRepositories } from "../../../../repositories/memory/memory.op
 import { PostgresOpsRepositories } from "../../../../repositories/prisma/prisma.ops.repositories.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "../../../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "../../../../repositories/prisma/prisma.system-migration-state.repository.ts";
+import { NullQueueRepository } from "../../../../repositories/queue.repository.ts";
 import { SystemMigrationCohortService } from "../system-migration-cohort.service.ts";
 import {
   SystemMigrationPassService,
@@ -44,6 +45,7 @@ function console({
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
     }),
     migrationLease: MemoryMigrationLeaseRepository.create(),
+    queues: NullQueueRepository.create(),
   },
 }: {
   routes: ReadonlyMap<string, string>;
