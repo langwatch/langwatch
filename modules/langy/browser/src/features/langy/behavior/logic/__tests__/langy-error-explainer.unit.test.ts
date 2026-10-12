@@ -1027,6 +1027,30 @@ describe("resolveLiveTurnError", () => {
       });
     });
 
+    describe("when the live message is only the code the durable record explains", () => {
+      /** @scenario "A bare failure code still reads the reasons on the durable record" */
+      it("reads the durable record's reasons", () => {
+        const domain = resolveLiveTurnError({
+          error: new Error("langy_agent_errored"),
+          durableLastError: typedStreamError,
+        });
+
+        expect(explainLangyError(domain).kind).toBe("langy_codex_plan_limit");
+      });
+    });
+
+    describe("when a turn-start refusal arrives over an older durable failure", () => {
+      /** @scenario "A bare failure code still reads the reasons on the durable record" */
+      it("keeps the live refusal", () => {
+        const domain = resolveLiveTurnError({
+          error: new Error("langy_agent_not_configured"),
+          durableLastError: typedStreamError,
+        });
+
+        expect(domain.code).toBe("langy_agent_not_configured");
+      });
+    });
+
     describe("when the durable record is empty too", () => {
       it("falls back to unknown", () => {
         const domain = resolveLiveTurnError({

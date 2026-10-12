@@ -178,6 +178,22 @@ const seedOneDependency = ({
   }
 };
 
+/** Cells of an evaluator scope that come with no saved output, so the target runs again. */
+const cellsRerunByEvaluatorScope = ({
+  scope,
+  scoped,
+}: {
+  scope: Extract<ExecutionScope, { type: "evaluator" | "evaluator-all-rows" }>;
+  scoped: CellId[];
+}): CellId[] => {
+  if (scope.type === "evaluator") {
+    return scope.targetOutput === undefined
+      ? [{ rowIndex: scope.rowIndex, targetId: scope.targetId }]
+      : [];
+  }
+  return scoped.filter((cell) => scope.precomputedTargetOutputs[cell.rowIndex] === undefined);
+};
+
 /**
  * What a run produces itself, so the carry leaves it behind. An evaluator-only
  * scope reuses its cells' outputs, so it covers only the scoped evaluator's
@@ -202,7 +218,7 @@ const coveredByRun = ({
         ? [{ rowIndex: scope.rowIndex, targetId: scope.targetId }]
         : scoped;
     return {
-      cells: new Set(extraCells.map(keyOf)),
+      cells: new Set([...extraCells, ...cellsRerunByEvaluatorScope({ scope, scoped })].map(keyOf)),
       verdicts: new Set(rerun.map((cell) => `${keyOf(cell)}:${scope.evaluatorId}`)),
     };
   }

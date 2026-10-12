@@ -506,3 +506,10 @@ Feature: Langy recovers from a failed turn without making the user re-ask
   Scenario: Refusals that answer the same way every time offer no retry
     Given a turn refused with langy_not_enabled, langy_skill_not_available or langy_dispatch_rejected
     Then the card shows that code's registered copy and no "Try again" action
+
+  @unit
+  Scenario: A bare failure code still reads the reasons on the durable record
+    Given a turn failed and its typed failure is on the durable record
+    When the live error carries only the code langy_agent_errored
+    Then the card is chosen from the durable record's reasons
+    But a turn-start refusal with a different code is shown ahead of an older durable failure

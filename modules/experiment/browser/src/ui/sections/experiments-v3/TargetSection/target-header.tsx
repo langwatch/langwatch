@@ -226,7 +226,6 @@ const useShowsOlderVersion = (target: TargetConfig): boolean => {
   );
 };
 
-/** The header's accent: prompts and evaluators green, a comparison purple, agents cyan. */
 const targetPaletteOf = (target: TargetConfig): StudioPalette => {
   if (target.type === "evaluator") return isComparisonEvaluator(target) ? "purple" : "green";
   if (target.type === "prompt") return "green";

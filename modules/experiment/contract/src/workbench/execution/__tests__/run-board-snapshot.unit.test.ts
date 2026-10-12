@@ -203,7 +203,6 @@ describe("given a board with no results at all", () => {
   });
 });
 
-/** The full board, with a second evaluator scoring target-A. */
 const boardWithTwoEvaluators = (): Partial<BoardResults> => {
   const board = fullBoard();
   return {
@@ -257,6 +256,43 @@ describe("given a board scored by two evaluators", () => {
         evaluatorId: "exact",
         result: { status: "processed", passed: false, score: 0 },
       });
+    });
+  });
+
+  describe("when one evaluator is rerun on a cell with no saved output to reuse", () => {
+    const rerun = () =>
+      carryOver({
+        scope: { type: "evaluator", rowIndex: 0, targetId: "target-A", evaluatorId: "exact" },
+        results: boardWithTwoEvaluators(),
+      });
+
+    /** @scenario "Rerunning an evaluator without a saved output leaves that cell to the run" */
+    it("does not carry that cell", () => {
+      expect(cellAt(rerun(), { rowIndex: 0, targetId: "target-A" })).toBeUndefined();
+    });
+
+    /** @scenario "Rerunning an evaluator without a saved output leaves that cell to the run" */
+    it("still carries the column's other rows", () => {
+      expect(cellAt(rerun(), { rowIndex: 1, targetId: "target-A" })?.output).toBe("A two");
+    });
+  });
+
+  describe("when one evaluator is run on all rows and one row has no saved output", () => {
+    /** @scenario "Rerunning an evaluator without a saved output leaves that cell to the run" */
+    it("carries only the rows whose output is reused", () => {
+      const carried = carryOver({
+        scope: {
+          type: "evaluator-all-rows",
+          targetId: "target-A",
+          evaluatorId: "exact",
+          precomputedTargetOutputs: { 0: "A one" },
+          traceIds: {},
+        },
+        results: boardWithTwoEvaluators(),
+      });
+
+      expect(cellAt(carried, { rowIndex: 0, targetId: "target-A" })?.output).toBe("A one");
+      expect(cellAt(carried, { rowIndex: 1, targetId: "target-A" })).toBeUndefined();
     });
   });
 

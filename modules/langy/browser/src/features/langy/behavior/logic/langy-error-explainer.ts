@@ -371,11 +371,15 @@ export function resolveLiveTurnError({
   error: { message: string } & object;
   durableLastError: string | null | undefined;
 }): LangyDomainError {
+  const durable = durableLastError ? readLangyStreamError(durableLastError) : null;
+  const slug = readLangyCodeSlug(error.message);
+  // A bare code names the same failure as the durable record, which holds its reasons.
+  const bareCode = slug && durable?.code === slug.code ? durable : slug;
   return (
     readLangyTrpcError(error) ??
     readLangyStreamError(error.message) ??
-    readLangyCodeSlug(error.message) ??
-    (durableLastError ? readLangyStreamError(durableLastError) : null) ?? {
+    bareCode ??
+    durable ?? {
       code: "unknown",
       meta: {},
       httpStatus: 500,

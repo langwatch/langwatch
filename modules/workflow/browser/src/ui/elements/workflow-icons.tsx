@@ -162,7 +162,6 @@ export const ComponentIcon = ({
   return <ColorfulBlockIcon colorPalette={kind.palette} size={size} icon={icon} />;
 };
 
-/** A variable source's icon: a dataset blue, a prompt or agent target (signature) green. */
 export function renderSourceTypeIcon(type: SourceType): React.ReactNode {
   if (type === "dataset") {
     return <ColorfulBlockIcon colorPalette="blue" size="xs" icon={<Database />} />;

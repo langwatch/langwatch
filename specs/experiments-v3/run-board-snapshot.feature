@@ -71,6 +71,13 @@ Feature: A run carries a snapshot of the board
     And it carries no verdict of the evaluator being rerun for that cell
 
   @unit
+  Scenario: Rerunning an evaluator without a saved output leaves that cell to the run
+    Given a board with two columns that both have results
+    When I rerun one evaluator on a cell whose output is not reused
+    Then the run does not carry that cell, because the target answers it again
+    And it still carries the other rows of that column
+
+  @unit
   Scenario: Running an evaluator on all rows carries every row's output
     Given a board with two columns that both have results
     When I run one evaluator on all rows of one column

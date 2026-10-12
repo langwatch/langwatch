@@ -322,7 +322,6 @@ type IsVerdictCarried = (verdict: {
   evaluatorId: string;
 }) => boolean;
 
-/** One evaluator's verdicts on one column, each onto its carried cell. */
 const carryEvaluatorVerdicts = ({
   targetId,
   evaluatorId,
