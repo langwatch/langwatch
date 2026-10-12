@@ -260,7 +260,7 @@ func TestExporter_RefusesAfterShutdown(t *testing.T) {
 
 	require.NoError(t, exp.Shutdown(context.Background()))
 	require.NoError(t, exp.Shutdown(context.Background()), "shutdown is idempotent")
-	assert.ErrorIs(t, exp.ExportSpans(context.Background(), oneSpan()), ErrShutdown)
+	require.ErrorIs(t, exp.ExportSpans(context.Background(), oneSpan()), ErrShutdown)
 	assert.EqualValues(t, 0, rec.calls.Load())
 }
 
@@ -279,7 +279,7 @@ func TestExporter_ShutdownCancelsInFlightRetries(t *testing.T) {
 	assert.Less(t, time.Since(start), 5*time.Second, "shutdown does not sit out the backoff")
 	select {
 	case err := <-exported:
-		assert.ErrorIs(t, err, ErrShutdown, "Shutdown returned only once the export had")
+		require.ErrorIs(t, err, ErrShutdown, "Shutdown returned only once the export had")
 	default:
 		t.Fatal("Shutdown returned before the in-flight export did")
 	}

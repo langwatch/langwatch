@@ -96,7 +96,7 @@ func (c RetryConfig) do(ctx context.Context, attempt func(context.Context) error
 	case errors.As(err, &retryable):
 		return fmt.Errorf("otlpjson: retry budget of %s exhausted: %w", c.MaxElapsedTime, retryable.err)
 	case last != nil && errors.Is(err, context.Cause(ctx)):
-		return fmt.Errorf("%w (last attempt: %v)", err, last.err)
+		return fmt.Errorf("%w (last attempt: %w)", err, last.err)
 	default:
 		return err
 	}

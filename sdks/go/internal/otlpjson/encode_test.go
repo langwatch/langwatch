@@ -140,10 +140,10 @@ func TestMarshal_SpanFields(t *testing.T) {
 	})
 	t.Run("attribute values take their OTLP/JSON shapes", func(t *testing.T) {
 		attrs := sp["attributes"]
-		assert.Equal(t, `{"q":"hi"}`, attr(t, attrs, "langwatch.input")["stringValue"])
+		assert.JSONEq(t, `{"q":"hi"}`, attr(t, attrs, "langwatch.input")["stringValue"].(string))
 		assert.Equal(t, true, attr(t, attrs, "flag")["boolValue"])
 		assert.Equal(t, "9223372036854775807", attr(t, attrs, "tokens")["intValue"], "int64 travels as a string")
-		assert.Equal(t, 0.25, attr(t, attrs, "cost")["doubleValue"])
+		assert.InEpsilon(t, 0.25, attr(t, attrs, "cost")["doubleValue"], 1e-12)
 		assert.Equal(t, "NaN", attr(t, attrs, "nan")["doubleValue"])
 		assert.Equal(t, "b", path(t, attr(t, attrs, "tags"), "arrayValue", "values", 1, "stringValue"))
 		assert.Equal(t, "2", path(t, attr(t, attrs, "ints"), "arrayValue", "values", 1, "intValue"))

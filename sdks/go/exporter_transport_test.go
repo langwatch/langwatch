@@ -11,10 +11,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/langwatch/langwatch/sdks/go/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/langwatch/langwatch/sdks/go/internal/testutil"
 )
 
 // otlpJSONReceiver stands in for LangWatch's /api/otel/v1/traces route,
@@ -31,11 +32,17 @@ func (r *otlpJSONReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var body io.Reader = req.Body
 	if req.Header.Get("Content-Encoding") == "gzip" {
 		zr, err := gzip.NewReader(req.Body)
-		require.NoError(r.t, err)
+		if !assert.NoError(r.t, err) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		body = zr
 	}
 	var payload map[string]any
-	require.NoError(r.t, json.NewDecoder(body).Decode(&payload))
+	if !assert.NoError(r.t, json.NewDecoder(body).Decode(&payload)) {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
 	r.mu.Lock()
 	r.paths = append(r.paths, req.URL.Path)

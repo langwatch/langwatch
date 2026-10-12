@@ -8,9 +8,10 @@ package otlp
 import (
 	"context"
 
-	langwatch "github.com/langwatch/langwatch/sdks/go"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	langwatch "github.com/langwatch/langwatch/sdks/go"
 )
 
 // Transport returns a langwatch.ExporterTransport that builds an
