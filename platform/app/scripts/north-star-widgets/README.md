@@ -85,4 +85,3 @@ GROUP BY outcome
 - `platform/app/src/server/analytics/lwql/catalog/lwqlViews.ts` — `traces` (~89-322), `trace_metrics` (~819-1053), `evaluation_metrics` (~1349-1531).
 - `platform/app/src/features/custom-chart-playground/presets.ts` — reserved `{dashboard_context_period_start}` / `{dashboard_context_period_end}` parameter contract.
 - `skills/recipes/dashboard-widgets/SKILL.mdx` — worked widget example and hook contract.
-- `platform/app/scripts/legacy-parity-widgets/` — sibling golden set (per-legacy-chart, rather than per-primitive) this set mirrors in structure.

@@ -8,6 +8,7 @@ import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawe
 import { havenHmrGate } from "./vite/havenHmrGate";
 import { ASSET_URL_GLOBAL } from "./src/server/asset-base";
 import { ROOT_DISCOVERY_PROXY_PATTERN } from "./src/server/openapi/discovery-locations";
+import { CHART_FRAME_PATH } from "./src/features/custom-chart-playground/bridge/bridgeProtocol";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
@@ -330,6 +331,13 @@ export default defineConfig(async (): Promise<UserConfig> => {
         ws: true,
         // Self-signed dev cert — don't fail the proxy on cert verification.
         // No-op when API is on plain HTTP.
+        secure: false,
+      },
+      // The API serves the sandboxed chart frame with its own CSP, so the dev
+      // server must not answer it with the SPA shell.
+      [`^${CHART_FRAME_PATH}(?:\\?.*)?$`]: {
+        target: API_TARGET,
+        changeOrigin: true,
         secure: false,
       },
       // An exporter given the site root as its OTLP endpoint posts to
