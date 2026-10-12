@@ -56,10 +56,34 @@ export type SpanIngestionStatus =
   // "dropped" (parse/age failures) so the counts stay legible.
   | "filtered";
 
+/**
+ * Why a span was rejected at ingestion. Used to break the rejected count down
+ * by parser reason on the ingestion tracer span (issue #5898 acceptance
+ * criterion 5). Only meaningful for `dropped`/`failed` statuses; absent on
+ * success/dedup/filtered paths.
+ */
+export type SpanDropReason = "validation" | "age" | "queue";
+
 export interface SpanIngestionResult {
   status: SpanIngestionStatus;
   error?: string;
+  dropReason?: SpanDropReason;
 }
+
+/**
+ * Stable, public-safe messages surfaced in `partialSuccess.errorMessage` per
+ * rejection reason. Raw exception messages (Redis/queue `error.message`, Zod
+ * parse diagnostics) are intentionally NOT reflected here — a customer holding
+ * an ingest key can deliberately trigger queue failures and would otherwise
+ * receive infrastructure/library details. The raw error is retained in
+ * `this.logger.error` and `otelSpanRef.addEvent("span_ingestion_error")` for
+ * server-side debugging.
+ */
+const PUBLIC_REJECTION_MESSAGE: Record<SpanDropReason, string> = {
+  validation: "span validation failed",
+  age: "span start time is more than 31 days in the past",
+  queue: "ingestion queue error",
+};
 
 /** An OtlpSpan whose ID fields have been normalized to hex strings. */
 type NormalizedIdSpan = OtlpSpan & { traceId: string; spanId: string };
@@ -313,7 +337,8 @@ export class TraceRequestCollectionService {
       );
       return {
         status: "failed",
-        error: error instanceof Error ? error.message : String(error),
+        error: PUBLIC_REJECTION_MESSAGE.queue,
+        dropReason: "queue",
       };
     }
   }
@@ -348,9 +373,19 @@ export class TraceRequestCollectionService {
       );
     }
     if (!spanParseResult.data) {
+      const fieldPaths = [
+        ...new Set(
+          (spanParseResult.error?.issues ?? [])
+            .map((issue) => issue.path.join("."))
+            .filter((path) => path.length > 0),
+        ),
+      ].sort();
       return {
         status: "dropped",
-        error: `span validation failed: ${spanParseResult.error?.message ?? "unknown"}`,
+        error: fieldPaths.length
+          ? `${PUBLIC_REJECTION_MESSAGE.validation}: ${fieldPaths.join(", ")}`
+          : PUBLIC_REJECTION_MESSAGE.validation,
+        dropReason: "validation",
       };
     }
 
@@ -371,7 +406,8 @@ export class TraceRequestCollectionService {
     if (startTimeUnixMs < Date.now() - SPAN_MAX_PAST_MS) {
       return {
         status: "dropped",
-        error: "span start time is more than 31 days in the past",
+        error: PUBLIC_REJECTION_MESSAGE.age,
+        dropReason: "age",
       };
     }
 
