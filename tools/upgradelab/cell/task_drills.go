@@ -34,8 +34,11 @@ func DrillCommand(ctx context.Context, args []string, stdout io.Writer) (int, er
 	var options Options
 	flags := cellFlags("drill", &options)
 	flags.StringVar(&options.FromSnapshot, "from-snapshot", "", "a produce entry directory or cache key (required)")
-	name := flags.String("drill", "", "kill-blocking | two-runners | held-lock")
+	name := flags.String("drill", "", "kill-blocking | kill-mid-step | two-runners | held-lock | first-install-fail")
 	table := flags.String("lock-table", "", "held-lock: the table to hold (default: the first ALTER TABLE of the next pending Prisma folder)")
+	midStep := defaultMidStep
+	flags.StringVar(&midStep.step, "step", midStep.step, "kill-mid-step: the checkpointing background step to kill head's worker in")
+	flags.IntVar(&midStep.plantUsers, "plant-users", midStep.plantUsers, "kill-mid-step: accounts planted on main so the step runs for seconds")
 	holdFor := flags.Duration("hold-for", 90*time.Second, "held-lock: how long the lock is held; it must outlast the task's boot (about 20 s) and three attempts")
 	if err := flags.Parse(args); err != nil {
 		return 2, err
@@ -43,6 +46,7 @@ func DrillCommand(ctx context.Context, args []string, stdout io.Writer) (int, er
 	if options.FromSnapshot == "" {
 		return 2, errors.New("drill needs -from-snapshot")
 	}
+	options.TaskDrill = *name
 	options, err := withDefaults(options)
 	if err != nil {
 		return 2, err
@@ -64,6 +68,8 @@ func DrillCommand(ctx context.Context, args []string, stdout io.Writer) (int, er
 	switch *name {
 	case TaskDrillKill:
 		result, err = cell.killBlockingDrill(ctx)
+	case TaskDrillKillMidStep:
+		result, err = cell.killMidStepDrill(ctx, midStep)
 	case TaskDrillTwoRunners:
 		result, err = cell.twoRunnersDrill(ctx)
 	case TaskDrillHeldLock:
@@ -71,7 +77,7 @@ func DrillCommand(ctx context.Context, args []string, stdout io.Writer) (int, er
 	case TaskDrillFirstFail:
 		result, err = cell.firstInstallFailDrill(ctx)
 	default:
-		return 2, fmt.Errorf("unknown drill %q: want %s, %s, %s or %s", *name, TaskDrillKill, TaskDrillTwoRunners, TaskDrillHeldLock, TaskDrillFirstFail)
+		return 2, fmt.Errorf("unknown drill %q: want %s, %s, %s, %s or %s", *name, TaskDrillKill, TaskDrillKillMidStep, TaskDrillTwoRunners, TaskDrillHeldLock, TaskDrillFirstFail)
 	}
 	if err != nil {
 		cell.report.Error = err.Error()

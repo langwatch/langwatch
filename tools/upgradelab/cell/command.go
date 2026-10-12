@@ -51,7 +51,7 @@ func parse(args []string) (Options, error) {
 	flags := cellFlags("cell", &options)
 	flags.StringVar(&options.FromSnapshot, "from-snapshot", "", "a produce entry directory or cache key: restore it instead of seeding")
 	ledger := flags.String("ledger", "", "comma-separated #8553 rows (UP-04, UD-7, ...) to claim at start and report at the end")
-	drills := flags.String("drills", "", "comma-separated drills on top of the profile: api-early (switch on /healthz), worker-restart, retry, private-down, route-broken (hybrid)")
+	drills := flags.String("drills", "", "comma-separated drills on top of the profile: api-early (switch on /healthz), worker-restart, retry, private-down, route-broken (hybrid), old-worker-lingers (main's worker runs 5 min past the switch)")
 	overlays := flags.String("overlays", "", "comma-separated overlays planted on main: retention (aged telemetry under three retention rules), tenant-oddities (held organization, plaintext keys, Postgres dataset rows, untagged prompts; SSO deployments), operator-damage (a failed _prisma_migrations row and a hand-built index under a head migration's name; the cell does each refusal's fix), held-tenants (tenant-oddities' held organization alone; SSO deployments), upcast-events (main's stored types under head's upcast steps, judged V1), queued-jobs-v1 (main's queued jobs by id at the cut, judged Q1)")
 	if err := flags.Parse(args); err != nil {
 		return options, err
@@ -119,10 +119,10 @@ func withDrills(options Options, ledger, drills string) (Options, error) {
 			options.SwitchOn = "/healthz"
 			options.Hold = max(options.Hold, options.WorkerDelay+apiEarlyUpgradeAllowance)
 			options.Drills = append(options.Drills, drill)
-		case DrillWorkerRestart, DrillRetry, DrillPrivateDown, DrillRouteBroken:
+		case DrillWorkerRestart, DrillRetry, DrillPrivateDown, DrillRouteBroken, DrillOldWorker:
 			options.Drills = append(options.Drills, drill)
 		default:
-			return options, fmt.Errorf("unknown drill %q: want %s, %s, %s, %s or %s", drill, DrillAPIEarly, DrillWorkerRestart, DrillRetry, DrillPrivateDown, DrillRouteBroken)
+			return options, fmt.Errorf("unknown drill %q: want %s, %s, %s, %s, %s or %s", drill, DrillAPIEarly, DrillWorkerRestart, DrillRetry, DrillPrivateDown, DrillRouteBroken, DrillOldWorker)
 		}
 	}
 	return withDefaults(options)

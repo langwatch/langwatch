@@ -44,6 +44,7 @@ type Options struct {
 	DrainNear, Trickle, PaceAbove    int           // produce: depth that counts as drained; spans sent live before the cut
 	SwitchOn, ServiceBin             string
 	Drills                           []string // DrillAPIEarly, DrillWorkerRestart, DrillRetry
+	TaskDrill                        string   // upgradelab drill's -drill; it names the stores
 	Ledger                           []string // #8553 rows this cell claims and reports to
 	FromSnapshot                     string   // a produce entry directory or cache key: restore instead of seeding
 	Overlays                         []string // planted on top of the shape (OverlayRetention)
@@ -78,6 +79,9 @@ type run struct {
 	otherPrivateLabel  string
 	routeRecords       string // H7: the organizations head's worker recorded as privately routed
 	drills             drillState
+	oldWorker          oldWorkerState // the old-worker-lingers drill
+	fromMetricsPort    int            // main's worker metrics door
+	fromMetricsKey     string         // a per-cell key for it: a production worker refuses its door without one
 	poller             *Poller
 	queue              []QueueSample
 	queueMu            sync.Mutex
@@ -132,6 +136,9 @@ func (options Options) Name() string {
 	name := fmt.Sprintf("%s_%s_%s_%d", options.Deployment, options.Tier, options.Shape, options.Seed)
 	for _, overlay := range options.Overlays {
 		name += "_" + overlay
+	}
+	if options.TaskDrill != "" { // a task drill beside a cell of the same seed must not empty its stores
+		name += "_" + options.TaskDrill
 	}
 	return strings.ToLower(strings.ReplaceAll(name, "-", "_"))
 }
@@ -452,7 +459,8 @@ func (cell *run) fromSchema(ctx context.Context) error {
 func (cell *run) fromUp(ctx context.Context) error {
 	dir := filepath.Join(cell.options.FromDir, "platform", "app")
 	base := map[string]string{"PORT": itoa(cell.fromPort)}
-	worker := map[string]string{"PORT": itoa(cell.fromPort), "WORKER_METRICS_PORT": itoa(mustPort())}
+	cell.fromMetricsPort, cell.fromMetricsKey = mustPort(), labMetricsKey()
+	worker := map[string]string{"PORT": itoa(cell.fromPort), "WORKER_METRICS_PORT": itoa(cell.fromMetricsPort), "METRICS_API_KEY": cell.fromMetricsKey}
 	for _, spec := range []ProcSpec{
 		{Name: "from-app", Args: FromAppArgs, Env: cell.fromEnvWith(base)},
 		{Name: "from-worker", Args: FromWorkerArgs, Env: cell.fromEnvWith(worker)},
@@ -758,7 +766,9 @@ func (cell *run) switchToHead(ctx context.Context) error {
 	if err := sleep(ctx, cell.options.WorkerDelay-time.Since(apiStarted)); err != nil {
 		return err
 	}
-	cell.proc("from-worker").Stop(20 * time.Second)
+	if !cell.keepOldWorker(ctx) {
+		cell.proc("from-worker").Stop(20 * time.Second)
+	}
 	cell.mark("headWorkerStarted")
 	if len(cell.gates) > 0 {
 		cell.downWG.Add(1)
@@ -818,7 +828,9 @@ func (cell *run) switchEarly(ctx context.Context) error {
 
 func (cell *run) stopFrom() {
 	cell.proc("from-app").Stop(20 * time.Second)
-	cell.proc("from-worker").Stop(20 * time.Second)
+	if !cell.drill(DrillOldWorker) { // the drill stops it oldWorkerLinger after the switch
+		cell.proc("from-worker").Stop(20 * time.Second)
+	}
 	cell.stopVia()
 	cell.mark("fromStopped")
 }
@@ -886,6 +898,7 @@ func (cell *run) awaitReady(ctx context.Context) error {
 		cell.emptyAccount(ctx)
 	}
 	cell.grantOperator(ctx)
+	cell.lingerOldWorker(ctx)
 	cell.assertOldWritersGone(ctx)
 	cell.headTask(ctx, "upgrade-status-at-ready", "upgrade", "status")
 	cell.noteStores(ctx, "at ready")
