@@ -43,11 +43,13 @@ describe("DashboardWidgetAccessService", () => {
   });
 
   describe("given only the custom chart playground is on", () => {
-    /** @scenario "The custom chart playground still opens widgets for the legacy reports page" */
-    it("admits the project", async () => {
+    /** @scenario "The custom chart playground alone does not open dashboard widgets" */
+    it("refuses the project", async () => {
+      const code = new CustomChartPlaygroundNotEnabledError().code;
+
       await expect(
         accessWith("release_custom_chart_playground").assertEnabled(PROJECT),
-      ).resolves.toBeUndefined();
+      ).rejects.toMatchObject({ code });
     });
   });
 });

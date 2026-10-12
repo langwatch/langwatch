@@ -9,11 +9,10 @@ Feature: Dashboard widgets placed on a dashboard
   gate, gives the grid a renderer for the kind, and lets a member edit the
   widget in place from the card's menu.
 
-  Dashboard widgets, their REST/CLI surface included, open with two flags:
-  `release_dashboards` and `release_lwql_workbench`. The custom chart
-  playground flag (`release_custom_chart_playground`) keeps one job: the
-  widget drawer on the legacy Analytics reports page, so it still opens the
-  widget surface on its own for that page.
+  Dashboard widgets open with exactly two flags, everywhere: `release_dashboards`
+  and `release_lwql_workbench`. That covers boards, the REST/CLI surface and the
+  legacy Analytics reports page's widget drawer. The custom chart playground
+  flag (`release_custom_chart_playground`) opens none of them.
 
   Placement is not mutually exclusive: a project can carry `workbench_sql`
   rows placed before widgets shipped and `dashboard_srcdoc` rows side by
@@ -109,7 +108,14 @@ Feature: Dashboard widgets placed on a dashboard
     Then it is refused with the widget surface's own error code
 
   @unit
-  Scenario: The custom chart playground still opens widgets for the legacy reports page
+  Scenario: The custom chart playground alone does not open dashboard widgets
     Given a project with only `release_custom_chart_playground` on
     When the widget surface asks whether the project may use it
-    Then the project is admitted, so the legacy reports page's widget drawer keeps working
+    Then it is refused with the widget surface's own error code
+
+  @integration
+  Scenario: The legacy reports page offers the widget drawer only with Dashboards and LangWatchQL on
+    Given the legacy Analytics reports page
+    When `release_dashboards` and `release_lwql_workbench` are both on
+    Then "Add chart" opens the widget drawer
+    And with either flag off, or with only `release_custom_chart_playground` on, "Add chart" links to the chart builder instead

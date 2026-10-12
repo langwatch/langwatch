@@ -32,6 +32,17 @@ import { FilterSidebar } from "../filter-sidebar.tsx";
 import { ReportGrid } from "../report-grid.tsx";
 import { DashboardRefreshedAtContext } from "../use-dashboard-auto-refresh.ts";
 
+/**
+ * Widgets need Dashboards and LangWatchQL, the server's rule (DashboardWidgetAccessService).
+ * `enabled` defaults false while loading, so the button starts as the legacy link.
+ */
+function useDashboardWidgetsEnabled(projectId?: string, organizationId?: string): boolean {
+  const scope = { projectId, organizationId, enabled: !!projectId && !!organizationId };
+  const { enabled: dashboardsOn } = useFeatureFlag(FrontendFlags.release_dashboards, scope);
+  const { enabled: lwqlOn } = useFeatureFlag(FrontendFlags.release_lwql_workbench, scope);
+  return dashboardsOn && lwqlOn;
+}
+
 function ReportsContent() {
   const { project, organization } = useOrganizationTeamProject();
   const host = useAnalyticsHost();
@@ -53,17 +64,7 @@ function ReportsContent() {
 
   const [isAddChartOpen, setIsAddChartOpen] = useState(false);
 
-  // Gates the "Add chart" widget drawer; the server admits widgets for this flag too
-  // (DashboardWidgetAccessService). `enabled` defaults false while loading, so the
-  // button starts as the legacy link, never flashing open.
-  const { enabled: customChartPlaygroundEnabled } = useFeatureFlag(
-    FrontendFlags.release_custom_chart_playground,
-    {
-      projectId: project?.id,
-      organizationId: organization?.id,
-      enabled: !!project?.id && !!organization?.id,
-    },
-  );
+  const widgetsEnabled = useDashboardWidgetsEnabled(project?.id, organization?.id);
 
   // Scheduled refresh: builder graphs poll on the chosen refetchInterval; widgets that run
   // through a mutation or a frame follow refreshedAt.
@@ -85,7 +86,7 @@ function ReportsContent() {
   // `graphs.getAll` answers builder rows only; the placed widgets come from their own list.
   const widgetsQuery = useDashboardWidgets({
     projectId,
-    enabled: !!activeDashboardId && customChartPlaygroundEnabled,
+    enabled: !!activeDashboardId && widgetsEnabled,
   });
   const widgets = (widgetsQuery.data ?? []).filter(
     (widget) => widget.dashboardId === activeDashboardId,
@@ -223,7 +224,7 @@ function ReportsContent() {
             />
             {project && canAddChart ? (
               <AddChartButton
-                opensDrawer={customChartPlaygroundEnabled}
+                opensDrawer={widgetsEnabled}
                 href={addChartUrl}
                 onOpenDrawer={() => setIsAddChartOpen(true)}
               />
@@ -232,9 +233,8 @@ function ReportsContent() {
         ),
       }}
     >
-      {/* The custom chart playground flag's one remaining job: this page's
-          widget drawer, which lands the new widget on this dashboard. */}
-      {project && canAddChart && customChartPlaygroundEnabled && (
+      {/* Lands the new widget on this dashboard. */}
+      {project && canAddChart && widgetsEnabled && (
         <CreateDashboardWidgetDrawer
           open={isAddChartOpen}
           onClose={() => setIsAddChartOpen(false)}
