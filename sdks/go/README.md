@@ -106,17 +106,23 @@ exporter, err := langwatch.NewDefaultExporter(ctx)
 ```
 
 The exporter sends gzipped OTLP/JSON to `<endpoint>/api/otel/v1/traces`,
-retrying throttled (429) and unavailable (502, 503, 504) requests with exponential backoff
-(honouring `Retry-After`) for up to a minute, bounded by the export context.
-Wrap it in `sdktrace.NewBatchSpanProcessor` (or `sdktrace.WithBatcher`) to
-batch spans. It is built on the standard library, so importing the root
-package does not link gRPC or the generated OTLP protobuf packages.
+retrying throttled (429) and unavailable (502, 503, 504) requests and
+transient network errors with exponential backoff (honoring `Retry-After`)
+for up to a minute, bounded by the export context. Wrap it in
+`sdktrace.NewBatchSpanProcessor` (or `sdktrace.WithBatcher`) to batch spans.
+It is built on the standard library, so the root module does not depend on
+gRPC or the generated OTLP protobuf packages.
 
 ### OTLP/protobuf transport
 
 To send through the official `otlptracehttp` exporter instead (OTLP/protobuf,
-honouring the `OTEL_EXPORTER_OTLP_*` environment variables), use the
-`exporter/otlp` package. It links gRPC and protobuf, as `otlptracehttp` does:
+honoring the `OTEL_EXPORTER_OTLP_*` environment variables), use the
+`exporter/otlp` module. It is a **separate Go module**, so only programs that
+import it link gRPC and protobuf, as `otlptracehttp` does:
+
+```bash
+go get github.com/langwatch/langwatch/sdks/go/exporter/otlp
+```
 
 ```go
 import lwotlp "github.com/langwatch/langwatch/sdks/go/exporter/otlp"
@@ -517,7 +523,7 @@ langwatch.WithHTTPClient(client *http.Client)              // default transport 
 langwatch.WithCompression(enabled bool)                    // gzip, on by default
 langwatch.WithTransport(transport ExporterTransport)       // replace the OTLP/JSON transport
 
-// OTLP/protobuf via otlptracehttp (links gRPC)
+// OTLP/protobuf via otlptracehttp (separate module, links gRPC)
 lwotlp.NewExporter(ctx, opts...)
 lwotlp.WithTransport(extra ...otlptracehttp.Option)
 
