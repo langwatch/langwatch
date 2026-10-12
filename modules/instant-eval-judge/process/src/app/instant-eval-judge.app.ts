@@ -11,6 +11,7 @@ import {
   type InstantEvalJudgeSpendRecord,
   type InstantEvalJudgement,
   instantEvalSkipped,
+  isLangWatchJudgeHost,
 } from "@langwatch/instant-eval-judge-contract";
 import { generate } from "@langwatch/ksuid";
 import type { FeatureSetup } from "@langwatch/process";
@@ -57,7 +58,7 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
   static readonly contract = InstantEvalJudgeApi;
   static readonly dependencies = {};
   static readonly config = instantEvalJudgeConfig;
-  /** LangWatch's own classifier key, read on LangWatch Cloud only; elsewhere nothing classifies. */
+  /** LangWatch's classifier key, read only where LangWatch runs the install. */
   static readonly secrets = { classifierApiKey } as const;
 
   readonly #facts: InstantEvalJudgeFactsService;
@@ -75,7 +76,7 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
       repositories: setup.repositories,
       classifier,
       limiter: this.#limiter,
-      isCloud: setup.config.isSaas,
+      isCloud: isLangWatchJudgeHost(setup.config),
       recordSpendPriced: async (fact) => {
         if (!this.#spendCommands) {
           throw new Error("the Instant Evals judge spend pipeline is not connected");

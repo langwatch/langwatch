@@ -31,6 +31,7 @@ import {
   type InstantEvalClassifierLimits,
   type InstantEvalJudgement,
   type InstantEvalQuestion,
+  isLangWatchJudgeHost,
 } from "@langwatch/instant-eval-judge-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -202,9 +203,10 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     const access = InstantEvalAccessService.create({
       flags: setup.dependencies.featureFlags,
       projects,
-      // Off cloud the judge never holds a key (ADR-174 d. 14): the key-less kind is exact.
+      // Where LangWatch does not run the install its judge holds no key (ADR-174 d. 14): the
+      // key-less kind is exact there.
       judgesThroughConnect:
-        !setup.config.isSaas &&
+        !isLangWatchJudgeHost(setup.config) &&
         instantEvalJudgeKind({
           classifier: setup.config.classifier,
           hasCloudKey: false,
