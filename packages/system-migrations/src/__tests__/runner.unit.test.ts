@@ -908,6 +908,7 @@ describe("SystemMigrationRunnerService over a finished fleet", () => {
           migrationName,
           tenantId,
           status: "finalized",
+          report: null,
         });
       }
     }
