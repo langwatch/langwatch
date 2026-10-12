@@ -64,7 +64,7 @@ haven restart ui                  # same on a still or --watch stack (no backend
 ```bash
 haven up                          # still: built UI served by the api, no Vite, nothing reloads
 haven up --watch                  # UI one-shot builds (open pages reload once idle), Node reload, Go rebuild
-haven up --hmr                    # as --watch, but the UI is Vite 8 bundled dev with HMR
+haven up --hmr                    # as --watch, but the UI is the plain Vite dev server with HMR
 ```
 
 `haven status` names the mode (`refresh still|watch|hmr`, `"refresh"` in `--json`).

@@ -96,7 +96,7 @@ type Selection struct {
 
 // RefreshMode is the one stack mode switch: still (the zero value, `haven up`),
 // watch (`--watch`: one-shot UI builds, Node reload, Go rebuild) or hmr
-// (`--hmr`: the same with Vite bundledDev and HMR for the UI).
+// (`--hmr`: the same with the plain Vite dev server and HMR for the UI).
 type RefreshMode string
 
 const (

@@ -270,7 +270,7 @@ switching needs no `--force` (ADR-064 amendment 2026-10-10 b). `haven status` na
 | ------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `haven up` (still) | the api serves `apps/ui/dist/client`, no Vite, built once at `up` | nothing reloads; `haven reload [app\|api\|worker\|ui]` applies changes on demand     |
 | `haven up --watch` | the same, plus a `ui` lane, `haven ui-watch`                      | one UI build that exits, swapped in, open pages reload once idle; Node and Go reload |
-| `haven up --hmr`   | a `ui` lane: Vite 8 `bundledDev`, bundles rebuilt in memory       | HMR updates the page in place; Node and Go reload                                    |
+| `haven up --hmr`   | a `ui` lane: the plain Vite dev server                            | HMR updates the page in place; Node and Go reload                                    |
 
 Commits and cherry-picks would reload the backend under anyone using the stack, so the default
 is still: `LANGWATCH_DEV_WATCH=0` in the Node lane and no Go rebuilds. `haven reload
