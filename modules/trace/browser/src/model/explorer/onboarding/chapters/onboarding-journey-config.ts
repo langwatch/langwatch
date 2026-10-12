@@ -1,3 +1,5 @@
+import { createLogger } from "@langwatch/observability/browser";
+
 const logger = createLogger("langwatch:trace:onboarding-journey");
 /**
  * The empty-state onboarding journey, as one editable config.
