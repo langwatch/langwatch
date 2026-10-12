@@ -24,6 +24,13 @@ describe("parseRowQueryParam", () => {
       expect(parseRowQueryParam(["0", "1"])).toBeUndefined();
     });
   });
+
+  describe("given a digit string past Number.MAX_SAFE_INTEGER", () => {
+    it("returns undefined rather than a rounded or infinite index", () => {
+      expect(parseRowQueryParam("9007199254740993")).toBeUndefined();
+      expect(parseRowQueryParam("9".repeat(400))).toBeUndefined();
+    });
+  });
 });
 
 describe("datasetEntryDeepLinkHref", () => {

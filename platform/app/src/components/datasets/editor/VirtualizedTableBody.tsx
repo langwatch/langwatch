@@ -73,11 +73,31 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
   // `rows` only changes identity when the underlying data actually does, so
   // this does not re-fire on every unrelated render (same contract as
   // useScrollSelectedSpanIntoView, the trace waterfall's equivalent).
+  //
+  // The virtualizer is disabled below MAX_ROWS_WITHOUT_VIRTUALIZATION (100) —
+  // which a saved dataset's default 50-row page always is — so scrollToIndex
+  // on a disabled virtualizer silently does nothing. Scroll the rendered
+  // <tr> directly in that case instead.
   useEffect(() => {
     if (highlightedRowIndex == null) return;
     if (!rows[highlightedRowIndex]) return;
+    if (disableVirtualization || !shouldVirtualize) {
+      scrollContainer
+        ?.querySelector<HTMLTableRowElement>(
+          `tr[data-index="${highlightedRowIndex}"]`,
+        )
+        ?.scrollIntoView({ block: "nearest" });
+      return;
+    }
     rowVirtualizer.scrollToIndex(highlightedRowIndex, { align: "auto" });
-  }, [highlightedRowIndex, rows, rowVirtualizer]);
+  }, [
+    disableVirtualization,
+    highlightedRowIndex,
+    rowVirtualizer,
+    rows,
+    scrollContainer,
+    shouldVirtualize,
+  ]);
 
   // Render all rows without virtualization when:
   // - Test mode (disableVirtualization prop)

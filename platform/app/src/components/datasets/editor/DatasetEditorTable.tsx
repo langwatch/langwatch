@@ -227,11 +227,6 @@ export function DatasetEditorTable({
         }).indexOnPage
       : null,
   );
-  useEffect(() => {
-    if (highlightedRowIndex == null) return;
-    const timeout = setTimeout(() => setHighlightedRowIndex(null), 2500);
-    return () => clearTimeout(timeout);
-  }, [highlightedRowIndex]);
 
   // ── Row search ────────────────────────────────────────────────────
   //
@@ -367,6 +362,18 @@ export function DatasetEditorTable({
   // same-dataset page switch this just holds the current page until the next one
   // lands.
   const holdingPreviousData = databaseDataset.isPlaceholderData;
+
+  // Clears the deep-link highlight on a timer — but only once the target
+  // row has actually been shown, not from the moment the editor mounted.
+  // Starting it at mount meant a paginated read slower than 2.5s cleared
+  // `highlightedRowIndex` before the row it names ever rendered, so the
+  // row below (which gates on `holdingPreviousData` too) never scrolled to
+  // or highlighted it at all.
+  useEffect(() => {
+    if (highlightedRowIndex == null || holdingPreviousData) return;
+    const timeout = setTimeout(() => setHighlightedRowIndex(null), 2500);
+    return () => clearTimeout(timeout);
+  }, [highlightedRowIndex, holdingPreviousData]);
   // Only ever remembered from a SETTLED read of the dataset being shown. Held
   // over from a placeholder, the number belongs to whichever dataset was open
   // before, and a later search would report "3 of 679" about a dataset with 3

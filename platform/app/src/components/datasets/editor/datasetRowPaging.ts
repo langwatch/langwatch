@@ -22,13 +22,18 @@ export function datasetEntryDeepLinkHref({
  * failure mode here, not an error — a link the user didn't follow (a bare
  * `/datasets/:id` visit, or a stray `?row=` from somewhere unrelated)
  * should land on page 1 rather than surface a parsing complaint.
+ *
+ * `Number.isSafeInteger` rather than just checking the regex matched:
+ * a long enough digit string still passes `/^\d+$/` but rounds (or hits
+ * `Infinity`) once converted, which would hand `pageForRowIndex` a value
+ * that resolves to the wrong page rather than failing closed.
  */
 export function parseRowQueryParam(
   rowParam: string | string[] | undefined,
 ): number | undefined {
-  return typeof rowParam === "string" && /^\d+$/.test(rowParam)
-    ? Number(rowParam)
-    : undefined;
+  if (typeof rowParam !== "string" || !/^\d+$/.test(rowParam)) return undefined;
+  const parsed = Number(rowParam);
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
 }
 
 /**
