@@ -10,6 +10,15 @@
 #   CLUSTER_NAME       — Kind cluster name (default: lw-test)
 #   TIMEOUT            — helm --wait timeout in seconds (default: 480)
 #   KEEP_CLUSTER and CLUSTER_NAME are passed through to test-helpers.sh
+#
+# Usage:
+#   e2e.sh                       run today's full suite list in order
+#   e2e.sh <suite> [suite ...]   run exactly the named suites, in the given order
+#   e2e.sh --list [suite ...]    print the suites that would run and exit (no cluster)
+#
+# Suite names are the test_* function names below. An unknown name exits 2.
+# The workflow's matrix legs pass a subset each; run with no arguments (or the
+# whole list) reproduces the single-leg behaviour byte for byte.
 
 set -euo pipefail
 
@@ -1307,33 +1316,11 @@ RUSTFS_EOF
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-main() {
-  local ch_values="${CHART_DIR}/../clickhouse-serverless/values.yaml"
-  setup_kind "$ch_values"
-
-  # Build and load the app image into Kind. Read helm's (multi-KB) output ONCE
-  # into a variable, then extract images.app.{repository,tag} — the first
-  # repository/tag pair — with here-strings. Piping straight into an early-exit
-  # `awk '...exit'`/`head -1` closes the pipe while helm is still writing, and
-  # under pipefail the SIGPIPE fails the $(...) and set -e aborts (exit 141).
-  local app_repo app_tag app_image values
-  values=$(helm show values "$CHART_DIR" 2>/dev/null) || values=""
-  app_repo=$(awk '/^ *repository:/{print $2; exit}' <<<"$values")
-  app_tag=$(awk '/^ *tag:/{print $2; exit}' <<<"$values")
-  app_image="${app_repo}:${app_tag}"
-  if ! docker image inspect "$app_image" &>/dev/null 2>&1; then
-    local repo_root="${CHART_DIR}/../.."
-    if [[ -f "$repo_root/infra/docker/Dockerfile" ]]; then
-      info "Building app image: $app_image"
-      docker build -t "$app_image" -f "$repo_root/infra/docker/Dockerfile" "$repo_root"
-    fi
-  fi
-  if docker image inspect "$app_image" &>/dev/null 2>&1; then
-    info "Loading app image into Kind: $app_image"
-    kind load docker-image "$app_image" --name "$CLUSTER_NAME"
-  fi
-  wait_api
-
+# Suite registry — today's full list in today's order. This is the single
+# source of truth for both the default run and `--list`, and it is what the
+# workflow-shape assertion (tests/chart-workflow-matrix.sh) checks the matrix
+# legs' arguments against: every name here must appear in exactly one leg.
+ALL_SUITES=(
   test_install
   test_clickhouse
   test_clickhouse_url_secret
@@ -1353,9 +1340,79 @@ main() {
   # Runs last: the real first-upgrade-from-pre-LWQL path (AC3 upgrade), which
   # does its own clean install first.
   test_lwql_upgrade_from_main
+)
+
+is_known_suite() {
+  local candidate="$1" s
+  for s in "${ALL_SUITES[@]}"; do
+    [[ "$s" == "$candidate" ]] && return 0
+  done
+  return 1
+}
+
+# Resolve the run list from the argument vector into SUITES: no arguments means
+# the full list; otherwise exactly the names given, in order, each validated
+# against ALL_SUITES. An unknown name is a hard error (exit 2) — a silent skip
+# would let a matrix leg drop a suite and still go green.
+resolve_suites() {
+  SUITES=()
+  if [[ $# -eq 0 ]]; then
+    SUITES=("${ALL_SUITES[@]}")
+    return
+  fi
+  local s
+  for s in "$@"; do
+    if ! is_known_suite "$s"; then
+      echo "e2e.sh: unknown suite '$s'" >&2
+      echo "known suites: ${ALL_SUITES[*]}" >&2
+      exit 2
+    fi
+    SUITES+=("$s")
+  done
+}
+
+main() {
+  resolve_suites "$@"
+
+  local ch_values="${CHART_DIR}/../clickhouse-serverless/values.yaml"
+  setup_kind "$ch_values"
+
+  # Build and load the app image into Kind. Under the workflow the build-images
+  # job supplies every image and each leg loads it, so the image is already
+  # present and nothing is rebuilt here. A local run builds it on demand.
+  local app_image
+  app_image="$("$(dirname "$0")/app-image.sh" "$CHART_DIR")"
+  if ! docker image inspect "$app_image" &>/dev/null 2>&1; then
+    local repo_root="${CHART_DIR}/../.."
+    if [[ -f "$repo_root/infra/docker/Dockerfile" ]]; then
+      info "Building app image: $app_image"
+      docker build -t "$app_image" -f "$repo_root/infra/docker/Dockerfile" "$repo_root"
+    fi
+  fi
+  if docker image inspect "$app_image" &>/dev/null 2>&1; then
+    info "Loading app image into Kind: $app_image"
+    kind load docker-image "$app_image" --name "$CLUSTER_NAME"
+  fi
+  wait_api
+
+  local suite
+  for suite in "${SUITES[@]}"; do
+    "$suite"
+  done
 
   sep
   pass "All langwatch chart tests passed"
 }
+
+# `--list` enumerates the resolved run order without touching a cluster, so CI
+# and check-feature-parity can read what would run. Clear the cleanup trap first
+# — there is no cluster to delete and `kind` need not even be installed here.
+if [[ "${1:-}" == "--list" ]]; then
+  trap - EXIT
+  shift
+  resolve_suites "$@"
+  printf '%s\n' "${SUITES[@]}"
+  exit 0
+fi
 
 main "$@"

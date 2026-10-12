@@ -62,8 +62,10 @@ template: deps
 # ── Testing ──────────────────────────────────────────────────────────────────
 
 ## Deploy to Kind and run functional tests (CI)
+## Pass a subset with E2E_SUITES: make test-e2e E2E_SUITES="test_install test_clickhouse"
+## Empty (the default) runs today's full suite list in order.
 test-e2e: deps
-	bash tests/e2e.sh
+	bash tests/e2e.sh $(E2E_SUITES)
 
 ## Test overlay combinations (template rendering + live installs)
 test-e2e-overlays: deps
