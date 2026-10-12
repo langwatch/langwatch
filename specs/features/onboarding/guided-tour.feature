@@ -2,7 +2,7 @@
 # sign-up lands, and again on request from the "Guided tour" card in the panel.
 #
 # The tour is deterministic app UI, not agent output: a collaborator cursor
-# tagged "(langy)", a spotlight around the current target, and a caption card
+# tagged "Langy", a spotlight around the current target, and a caption card
 # with the step text. Each step reads for `(2800 + words * 330) * 3` ms and
 # then advances on its own. Targets are `data-tour` attributes on the real
 # navigation and pages; steps that need the page to do something (fold a

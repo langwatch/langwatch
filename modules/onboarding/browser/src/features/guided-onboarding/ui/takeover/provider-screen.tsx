@@ -62,13 +62,7 @@ export function ProviderScreen({
 
   return (
     <TakeoverRow fading={fading} maxWidth={720}>
-      <Box
-        minH="68px"
-        fontFamily="display"
-        textStyle="pageTitle"
-        color="fg"
-        data-testid="provider-line"
-      >
+      <Box minH="68px" textStyle="takeoverPrompt" color="fg" data-testid="provider-line">
         <Typewriter segments={segments} speed={19} onDone={() => setTyped(true)} />
       </Box>
       <Box
@@ -103,7 +97,9 @@ export function ProviderScreen({
                 border="1px solid"
                 borderColor={isSelected ? "fg" : "border"}
                 bg={isSelected ? "bg.panel" : "bg.panel/60"}
-                boxShadow={isSelected ? "xs" : "none"}
+                boxShadow={
+                  isSelected ? "0 2px 8px var(--chakra-colors-takeover-lift-soft)" : "none"
+                }
                 px={3}
                 py={2}
                 cursor="pointer"

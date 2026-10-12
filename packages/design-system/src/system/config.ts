@@ -12,7 +12,7 @@ import { optionItemRecipe, optionListContent, optionListSizes } from "./option-l
 import { PRODUCT_COLOURS, productColourTokens } from "./product-colours.ts";
 import { sectionNavigationRailRecipe } from "./section-navigation.recipe.ts";
 import { segmentGroupSlotRecipe } from "./segment-group.recipe.ts";
-import { productTextStyles } from "./text-styles.ts";
+import { productTextStyles, takeoverTextStyles } from "./text-styles.ts";
 
 // Inter and JetBrains Mono are loaded by the CSS @import in the application's
 // globals.scss. This file names the families, it does not fetch them.
@@ -92,7 +92,7 @@ export const designSystemConfig = defineConfig({
     },
   },
   theme: {
-    textStyles: productTextStyles,
+    textStyles: { ...productTextStyles, ...takeoverTextStyles },
     keyframes: {
       // A toast rises a few pixels into place and fades out where it is: no blur, no scale.
       "toast-in": {
@@ -636,6 +636,21 @@ export const designSystemConfig = defineConfig({
           },
           // The development badge: a dark pill over the top bar's glow, in both modes.
           devBadge: { value: "{colors.blackAlpha.600}" },
+        },
+        // Guided onboarding takeover: the warm glow it stands on, its card shadows and the white-on
+        // pick-order badge (4.5:1). Fixed values, the same on both grounds, as the brand cut them.
+        takeover: {
+          glowPeach: { value: "rgba(255, 232, 204, 0.9)" },
+          glowApricot: { value: "rgba(253, 214, 166, 0.75)" },
+          glowOrange: { value: "rgba(237, 137, 38, 0.10)" },
+          glowSoft: { value: "rgba(237, 137, 38, 0.06)" },
+          glowFaint: { value: "rgba(237, 137, 38, 0.02)" },
+          lift: { value: "rgba(26, 26, 46, 0.10)" },
+          liftSoft: { value: "rgba(26, 26, 46, 0.08)" },
+          badge: { value: "#c2510a" },
+          // The guided tour's dim around its spotlight, deeper while a finished step stays lit.
+          tourDim: { value: "rgba(15, 15, 30, 0.35)" },
+          tourDimLit: { value: "rgba(15, 15, 30, 0.5)" },
         },
         // Avatar fills under `fg.onColor` initials: each step keeps white at 3:1 or more.
         avatar: {

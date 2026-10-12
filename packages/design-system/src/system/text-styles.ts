@@ -72,6 +72,37 @@ export const productTextStyles = defineTextStyles({
   },
 });
 
+/**
+ * The guided onboarding takeover: Langy's Sentient lines and the value cards, cut as the brand
+ * screens were. A documented exception to the product scale above, used nowhere else.
+ */
+export const takeoverTextStyles = defineTextStyles({
+  takeoverHello: {
+    description: "Langy's greeting on the takeover's first screen",
+    value: { fontFamily: "display", fontSize: "36px", lineHeight: "1.25", fontWeight: "400" },
+  },
+  takeoverQuestion: {
+    description: "Langy's question over the takeover's value cards",
+    value: { fontFamily: "display", fontSize: "30px", lineHeight: "1.25", fontWeight: "400" },
+  },
+  takeoverPrompt: {
+    description: "Langy's line over the takeover's provider connect",
+    value: { fontFamily: "display", fontSize: "24px", lineHeight: "1.375", fontWeight: "400" },
+  },
+  takeoverCardTitle: {
+    description: "A takeover value card's title",
+    value: { fontSize: "14.5px", fontWeight: "600" },
+  },
+  takeoverCardBody: {
+    description: "A takeover value card's description",
+    value: { fontSize: "12px", lineHeight: "1.6" },
+  },
+  takeoverBadge: {
+    description: "The pick-order digit on a takeover value card",
+    value: { fontSize: "10.5px", fontWeight: "600" },
+  },
+});
+
 /** The scale in pixels, for surfaces that take a number (chart ticks, editor options). */
 export const TYPE_SCALE_PX = {
   micro: 11,
