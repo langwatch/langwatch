@@ -149,6 +149,8 @@ export function Row({
           // Pinned cells paint the tint as an image, which cannot fade: the row changes at once.
           "&, & > td": { transition: "none" },
           "&:hover": { bg: HOVER, "--list-table-row-ground": HOVER },
+          // An id chip shares the row's tint instead of standing out as a white patch.
+          "&:hover [data-id-cell] code": { bg: "transparent" },
           "&[data-expanded]": { bg: "bg.subtle", "--list-table-row-ground": EXPANDED },
           ...(tone
             ? { bg: TONES[tone], "&, &:hover": { "--list-table-row-ground": TONE_GROUND[tone] } }
@@ -260,7 +262,7 @@ export interface ListTableColumnHeaderProps extends DataAttributes {
   "aria-colindex"?: number;
 }
 
-/** A column header: 12px medium, muted, sentence case, set by the table. */
+/** A column header: 12px semibold, muted, uppercase, set by the table. */
 export function ColumnHeader({
   children,
   label,

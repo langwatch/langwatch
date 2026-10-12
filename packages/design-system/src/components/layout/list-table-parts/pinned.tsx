@@ -49,7 +49,7 @@ export interface ListTableIdCellProps extends Omit<ListTableCellProps, "children
 /** A cell holding an identifier: IdText, cut in the middle, with a copy button. */
 export function IdCell({ value, label, tail, copyable, ...cell }: ListTableIdCellProps) {
   return (
-    <Cell {...cell}>
+    <Cell data-id-cell="" {...cell}>
       <IdText value={value} label={label} tail={tail} copyable={copyable} />
     </Cell>
   );
