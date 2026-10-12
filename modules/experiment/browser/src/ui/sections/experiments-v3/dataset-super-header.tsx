@@ -68,7 +68,7 @@ export const DatasetSuperHeader = React.memo(function DatasetSuperHeader({
   isLoading,
 }: DatasetSuperHeaderProps) {
   return (
-    <SuperHeader colSpan={colSpan} icon={<Database size={14} />}>
+    <SuperHeader colSpan={colSpan} colorPalette="blue" icon={<Database size={14} />}>
       <DatasetSuperHeaderBody
         activeDataset={activeDataset}
         datasetHandlers={datasetHandlers}
