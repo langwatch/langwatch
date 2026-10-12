@@ -2,10 +2,13 @@ import {
   ApiKeyPermissionDeniedError,
   WORKFLOW_RUN_API_KEY_NAME,
   mintRunKeyInputSchema,
-  type ApiKeyApi,
   type MintRunKeyInput,
 } from "@langwatch/api-key-contract";
-import type { AuthzApi, AuthzPrincipalRef } from "@langwatch/authz-contract";
+import {
+  AuthzGrantNotConfirmedError,
+  type AuthzApi,
+  type AuthzPrincipalRef,
+} from "@langwatch/authz-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
 import {
@@ -14,8 +17,15 @@ import {
   runKeyCacheKey,
   runKeyLifetimeMs,
 } from "../rules/run-key.rules.ts";
+import type { DisabledApiKey } from "./api-key-lifecycle.service.ts";
+import type { ApiKeyService } from "./api-key.service.ts";
 
 type HeldRunKey = { token: string; expiresAtMs: number };
+type WrittenRunKey = { key: DisabledApiKey; expiresAtMs: number };
+type RunKeyWriter = {
+  writeDisabled: ApiKeyService["writeDisabled"];
+  grantAndActivate(key: DisabledApiKey): Promise<{ token: string }>;
+};
 
 /**
  * The one place a run's key is minted (ARCHITECTURE.md §10): the starter's or the starting key's,
@@ -24,7 +34,7 @@ type HeldRunKey = { token: string; expiresAtMs: number };
  */
 export class RunKeyMintService {
   static create(options: {
-    apiKeys: Pick<ApiKeyApi, "create">;
+    apiKeys: RunKeyWriter;
     authz: Pick<AuthzApi, "getScope" | "effectivePermissions">;
   }): RunKeyMintService {
     return new RunKeyMintService(options);
@@ -32,10 +42,12 @@ export class RunKeyMintService {
 
   // ponytail: one entry per user, project and permission set, replaced on re-mint; no eviction.
   readonly #held = new Map<string, Promise<HeldRunKey>>();
+  // A key written whose grants had not landed: the next request grants it again, not a new one.
+  readonly #written = new Map<string, WrittenRunKey>();
 
   private constructor(
     private readonly options: {
-      apiKeys: Pick<ApiKeyApi, "create">;
+      apiKeys: RunKeyWriter;
       authz: Pick<AuthzApi, "getScope" | "effectivePermissions">;
     },
   ) {}
@@ -59,7 +71,7 @@ export class RunKeyMintService {
       }
     }
 
-    const pending = this.mint({ ...input, organizationId });
+    const pending = this.mint({ ...input, organizationId, cacheKey });
     this.#held.set(cacheKey, pending);
     try {
       return (await pending).token;
@@ -87,9 +99,34 @@ export class RunKeyMintService {
     return scope.organizationId;
   }
 
-  private async mint(input: MintRunKeyInput & { organizationId: string }): Promise<HeldRunKey> {
-    const expiresAt = nowInstant().add({ milliseconds: runKeyLifetimeMs(input.minRemainingMs) });
-    const { token } = await this.options.apiKeys.create({
+  private async mint(
+    input: MintRunKeyInput & { organizationId: string; cacheKey: string },
+  ): Promise<HeldRunKey> {
+    const written = await this.writtenKey(input);
+    try {
+      const { token } = await this.options.apiKeys.grantAndActivate(written.key);
+      this.forgetWritten({ cacheKey: input.cacheKey, written });
+      return { token, expiresAtMs: written.expiresAtMs };
+    } catch (error) {
+      // Still folding: the caller is told so, and its retry waits on this key's grants.
+      if (!AuthzGrantNotConfirmedError.is(error)) this.forgetWritten({ ...input, written });
+      throw error;
+    }
+  }
+
+  /** The key an earlier request wrote for this run while it still has the life, else a new one. */
+  private async writtenKey(
+    input: MintRunKeyInput & { organizationId: string; cacheKey: string },
+  ): Promise<WrittenRunKey> {
+    const earlier = this.#written.get(input.cacheKey);
+    const nowMs = nowInstant().epochMilliseconds;
+    const { minRemainingMs } = input;
+    if (earlier && isRunKeyReusable({ expiresAtMs: earlier.expiresAtMs, nowMs, minRemainingMs })) {
+      return earlier;
+    }
+
+    const expiresAt = nowInstant().add({ milliseconds: runKeyLifetimeMs(minRemainingMs) });
+    const key = await this.options.apiKeys.writeDisabled({
       isSystemManaged: true,
       name: WORKFLOW_RUN_API_KEY_NAME,
       description:
@@ -105,7 +142,13 @@ export class RunKeyMintService {
       bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: input.projectId }],
       expiresAt: toDate(expiresAt),
     });
+    const written = { key, expiresAtMs: expiresAt.epochMilliseconds };
+    this.#written.set(input.cacheKey, written);
 
-    return { token, expiresAtMs: expiresAt.epochMilliseconds };
+    return written;
+  }
+
+  private forgetWritten({ cacheKey, written }: { cacheKey: string; written: WrittenRunKey }) {
+    if (this.#written.get(cacheKey) === written) this.#written.delete(cacheKey);
   }
 }

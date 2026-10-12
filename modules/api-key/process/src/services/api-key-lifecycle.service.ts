@@ -71,6 +71,17 @@ function actor(userId: string | null | undefined): {
   return userId ? { type: "user", id: userId } : { type: "system", id: null };
 }
 
+/** A key written revoked and not yet granted and activated: its token lives only here. */
+export type DisabledApiKey = Readonly<{
+  id: string;
+  token: string;
+  organizationId: string;
+  bindings: ApiKeyScope[];
+  permissions: string[] | undefined;
+  actor: ReturnType<typeof actor>;
+  caller: AuthzGrantCaller;
+}>;
+
 export class ApiKeyLifecycleService {
   static create(
     options: ApiKeyDependencies & { repository: ApiKeyRepository },
@@ -111,6 +122,11 @@ export class ApiKeyLifecycleService {
   }
 
   async create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
+    return this.grantAndActivate(await this.writeDisabled(input));
+  }
+
+  /** Validates and writes the key's row revoked; nothing is granted and no token is live yet. */
+  async writeDisabled(input: CreateApiKeyInput): Promise<DisabledApiKey> {
     const parsed = createApiKeyInputSchema.parse(input);
     if (!parsed.isSystemManaged && RESERVED_NAMES.has(parsed.name)) {
       throw new ApiKeyReservedNameError(parsed.name);
@@ -156,8 +172,10 @@ export class ApiKeyLifecycleService {
         grants: effectiveBindings,
       }),
     );
-    await this.grants.writeBindings({
-      apiKeyId: row.id,
+
+    return {
+      id: row.id,
+      token: generated.token,
       organizationId: parsed.organizationId,
       bindings: effectiveBindings,
       permissions,
@@ -166,13 +184,28 @@ export class ApiKeyLifecycleService {
         userId: parsed.createdByUserId ?? parsed.userId,
         apiKeyId: parsed.callerApiKeyId,
       }),
-      roleId: `apikey:${row.id}`,
+    };
+  }
+
+  /**
+   * Grants a written key and activates it. A grant that has not landed leaves the row revoked and
+   * throws, so the same key may be granted again: its role id and binding identities are its own.
+   */
+  async grantAndActivate(key: DisabledApiKey): Promise<{ token: string; apiKey: ApiKey }> {
+    await this.grants.writeBindings({
+      apiKeyId: key.id,
+      organizationId: key.organizationId,
+      bindings: key.bindings,
+      permissions: key.permissions,
+      actor: key.actor,
+      caller: key.caller,
+      roleId: `apikey:${key.id}`,
     });
 
     return {
-      token: generated.token,
+      token: key.token,
       apiKey: publicApiKey(
-        await this.bindings.attachOne(await this.repository.activate({ id: row.id })),
+        await this.bindings.attachOne(await this.repository.activate({ id: key.id })),
       ),
     };
   }

@@ -279,3 +279,28 @@ Feature: API key lifecycle
     When it is sent as a bearer, as basic auth, or as X-Auth-Token
     Then it authenticates as that project's legacy API key
     And it is matched as an opaque string, never verified as a JWT
+
+  # A run key's grants are ledger commands the worker folds. When the worker is behind, the first
+  # mint cannot confirm them in time; a retry must wait on that same key, not write another one,
+  # or it never catches up while the worker is behind.
+  @unit
+  Scenario: A run key whose grants have not landed answers that access is still processing
+    Given the grants projection is behind
+    When a run key is minted
+    Then the mint fails with "authz_grant_not_confirmed" and status 503
+    And no token is returned
+
+  @unit
+  Scenario: A retried run key mint waits on the key the first attempt wrote
+    Given a run key mint failed with "authz_grant_not_confirmed"
+    When the same starter mints a key for the same project and permissions again
+    Then no second key is written
+    And the first attempt's key is granted again
+
+  @unit
+  Scenario: A retried run key mint succeeds with the first attempt's key once its grants land
+    Given a run key mint failed with "authz_grant_not_confirmed"
+    And the grants have since landed in the projection
+    When the same starter mints a key for the same project and permissions again
+    Then the first attempt's token is returned
+    And no second key is written
