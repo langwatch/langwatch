@@ -272,7 +272,11 @@ const clearTimer = (ref: { current: ReturnType<typeof setTimeout> | null }): voi
   ref.current = null;
 };
 
-/** The server's copy of an experiment, taken into the store over whatever it held. */
+/**
+ * The server's copy of an experiment, taken into the store. A different experiment
+ * starts from a clean store, so nothing of the previous one is carried over; the
+ * same experiment is laid over what the store holds.
+ */
 const loadExperimentIntoStore = (data: {
   id: string;
   slug: string;
@@ -280,6 +284,11 @@ const loadExperimentIntoStore = (data: {
   workbenchState?: unknown;
 }): void => {
   const store = useEvaluationsV3Store.getState();
+  if (store.experimentId !== data.id) {
+    store.reset();
+    // loadState clears history only when there is a state to load.
+    useEvaluationsV3Store.temporal.getState().clear();
+  }
   store.setExperimentId(data.id);
   store.setExperimentSlug(data.slug);
   store.setWorkbenchVersion(data.version);

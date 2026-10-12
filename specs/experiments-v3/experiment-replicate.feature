@@ -26,6 +26,26 @@ Feature: Replicating an experiment creates an independent copy
     And the copy's saved state has the edits
 
   @integration
+  Scenario: A copy of a copy and a second copy are independent of the original
+    Given an original whose saved state holds its own id and slug
+    And a copy, a second copy and a copy of the first copy
+    When the copy of the copy is opened in the editor and saved with edits
+    Then the original and the other copies are unchanged
+
+  @integration
+  Scenario: A save is written to the experiment it is addressed to
+    Given a copy
+    When a save addressed to the copy carries the original's id and slug in its state
+    Then the original's saved state and update time are unchanged
+    And the copy's saved state has the edits
+
+  @integration
+  Scenario: Opening a copy in the editor saves to the copy
+    Given a copy, saved by the fixed server or made before the fix
+    When it is opened in the editor, edited and autosaved
+    Then every save is addressed to the copy's id
+
+  @integration
   Scenario: A replicated experiment in another project can be saved
     Given an experiment replicated into another project
     When the copy is opened in the editor and saved in that project
@@ -71,3 +91,17 @@ Feature: Replicating an experiment creates an independent copy
     Given the replicate dialog is opened on a workflow-based experiment
     When a target project is picked
     Then no note about prompts, evaluators and agents is shown
+
+  @integration
+  Scenario: Opening another experiment starts from a clean editor
+    Given the editor holds an experiment with run results
+    When another experiment without results is opened in the same editor
+    Then the editor holds no results
+    And its saves are addressed to the other experiment
+
+  @integration
+  Scenario: Opening an experiment with no saved state does not keep the previous one's content
+    Given the editor holds an experiment with content
+    When an experiment with no saved state is opened in the same editor
+    Then the editor holds none of the previous experiment's content
+    And nothing of the previous experiment is saved into it
