@@ -248,6 +248,22 @@ func TestExporter_RefusesAfterShutdown(t *testing.T) {
 	assert.EqualValues(t, 0, rec.calls.Load())
 }
 
+// idleTracker records whether CloseIdleConnections reached the transport.
+type idleTracker struct {
+	http.RoundTripper
+	closed atomic.Bool
+}
+
+func (t *idleTracker) CloseIdleConnections() { t.closed.Store(true) }
+
+func TestExporter_ShutdownLeavesACallerClientOpen(t *testing.T) {
+	tracker := &idleTracker{RoundTripper: http.DefaultTransport}
+	exp := New(Config{URL: "http://example.test", HTTPClient: &http.Client{Transport: tracker}})
+
+	require.NoError(t, exp.Shutdown(context.Background()))
+	assert.False(t, tracker.closed.Load(), "a shared client's pool belongs to the caller")
+}
+
 func TestExporter_UnderBatchSpanProcessor(t *testing.T) {
 	rec := &recorder{}
 	exp := newTestExporter(t, rec, nil)
