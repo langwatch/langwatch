@@ -889,10 +889,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       }),
     );
 
-    await Promise.all(jobsToStage.map((job) => this.registerPreflightGroup(job.groupId)));
+    // One registration per batch, before and after staging, as send() makes for its one job.
+    const stagedGroupIds = () => [...new Set(jobsToStage.map((job) => job.groupId))];
+    await this.registerPreflightGroups(stagedGroupIds);
 
     const { newStagedCount } = await this.scripts.stageBatch(jobsToStage);
-    await Promise.all(jobsToStage.map((job) => this.activatePreflightGroup(job.groupId)));
+    await this.registerPreflightGroups(stagedGroupIds);
 
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
@@ -1184,11 +1186,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
 
     // Opt-in batch coalescing drains additional staged DUE jobs from the same
     // group into one handler call; the group's active key makes the drain
-    // exclusive. A preflight scope must propagate through every causal chain, so
-    // coalescing across two concurrent scopes would drop the second one's fan-out.
-    const maxBatch = contextMetadata?.queueDispatchScopeKey
-      ? 1
-      : (this.coalesceMaxBatch?.(payload) ?? 1);
+    // exclusive. Only siblings sent under the same dispatch scope join the batch
+    // (coalescedBatch restages the rest), so every scope's fan-out stays its own.
+    const maxBatch = this.coalesceMaxBatch?.(payload) ?? 1;
     const base = {
       groupId,
       stagedJobId,
