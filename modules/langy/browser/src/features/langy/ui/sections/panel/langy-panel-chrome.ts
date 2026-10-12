@@ -151,7 +151,8 @@ const FLUSH_DOCK_CHROME = {
 
 /**
  * Floating reads as glass, anchored in a bottom corner and growing UPWARD under a viewport cap;
- * the inset hairline gives its top edge a lit rim on the dark ground.
+ * the inset hairline gives its top edge a lit rim on the dark ground. Nearly opaque: at 85% the
+ * page's own text (a table's numbers) read through the composer footer as part of the panel.
  */
 function floatingChrome({
   dodgesDrawer,
@@ -167,14 +168,14 @@ function floatingChrome({
     height: "auto",
     minHeight: `min(${minHeightPx}px, ${FLOATING_MAX_HEIGHT})`,
     maxHeight: FLOATING_MAX_HEIGHT,
-    background: "bg.card/85",
+    background: "bg.card/95",
     backdropFilter: "blur(8px)",
     borderWidth: "1px",
     borderRadius: "20px",
     boxShadow:
       "0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 4%, transparent), 0 12px 28px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent), 0 32px 64px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent)",
     _dark: {
-      background: "bg.card/88",
+      background: "bg.card/95",
       backdropFilter: "blur(16px) saturate(1.1)",
       boxShadow:
         "0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 40%, transparent), 0 12px 28px color-mix(in srgb, var(--chakra-colors-bg-scrim) 50%, transparent), 0 32px 64px color-mix(in srgb, var(--chakra-colors-bg-scrim) 50%, transparent), inset 0 1px 0 color-mix(in srgb, var(--chakra-colors-fg) 12%, transparent)",

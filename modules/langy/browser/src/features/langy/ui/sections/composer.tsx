@@ -111,7 +111,7 @@ function turnLock({ turnActive }: { turnActive: boolean }) {
 
 function composerGutter({ hero, floating }: { hero: boolean; floating: boolean }) {
   if (hero) return 0;
-  return floating ? 2 : 3.5;
+  return floating ? 3 : 3.5;
 }
 
 /**
@@ -427,33 +427,32 @@ function ComposerImpl({
           </HStack>
         </Box>
       </Box>
-      {floating ? (
+      {floating || isSaaS ? (
+        // One caption line, not two stacked whispers: the floating panel's
+        // "you review and apply" and the Cloud data use note share a row.
         <Text
-          marginTop={1.5}
+          marginTop={2.5}
+          paddingX={2}
           textStyle="2xs"
           color="fg.subtle"
           textAlign="center"
           letterSpacing="0.01em"
-          lineHeight="1.2"
-          css={{
-            "@media (max-height: 520px)": { display: "none" },
-          }}
+          lineHeight="1.4"
         >
-          {/* House style rules out the em dash anywhere in user-facing copy
-              (dev/docs/best_practices/copywriting.md). */}
-          Langy proposes, you review and apply.
-        </Text>
-      ) : null}
-      {isSaaS ? (
-        <Text
-          marginTop={1.5}
-          textStyle="2xs"
-          color="fg.subtle"
-          textAlign="center"
-          letterSpacing="0.01em"
-          lineHeight="1.2"
-        >
-          {COMPOSER_DATA_USE_NOTICE}
+          {floating ? (
+            <Box
+              as="span"
+              css={{
+                "@media (max-height: 520px)": { display: "none" },
+              }}
+            >
+              {/* House style rules out the em dash anywhere in user-facing copy
+                  (dev/docs/best_practices/copywriting.md). */}
+              Langy proposes, you review and apply.
+              {isSaaS ? " " : null}
+            </Box>
+          ) : null}
+          {isSaaS ? <span>{COMPOSER_DATA_USE_NOTICE}</span> : null}
         </Text>
       ) : null}
     </Box>
