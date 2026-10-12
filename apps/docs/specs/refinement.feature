@@ -92,3 +92,17 @@ Feature: Actionable documentation and restrained reading surfaces
     And full skill prompts can be viewed and copied
     And sidebar selection moves between pages with reduced motion respected
     And the language preference is visibly labelled on desktop
+  @unit
+  Scenario: Read skill prompts as Markdown while preserving the copied source
+    Given a skill prompt includes headings, emphasis, code and HTML-like text
+    Then it renders as Markdown rather than one plain-text fence
+    And its prompt text remains unchanged for copying
+    And prompt prose cannot execute MDX or raw HTML
+  @e2e
+  Scenario: Read rendered skill prompts and use setup buttons with flat tabs
+    Given the skill directory and coding-agent overview
+    Then expanded skill prompts have headings, inline code and highlighted code fences
+    And copying preserves the full authored Markdown
+    And setup actions have labelled buttons with icons and working destinations
+    And tab strips have no top gap or rounded top corners
+    And both light and dark captures show the rendered prompt and actions

@@ -34,6 +34,7 @@ const FRAMED_TABS = {
   borderWidth: "1px",
   borderColor: "border",
   borderRadius: "xl",
+  borderTopRadius: "0",
   bg: "docs.raised",
   overflow: "hidden",
   boxShadow: "0 1px 2px var(--chakra-colors-docs-shadow)",
@@ -47,7 +48,7 @@ const FRAMED_LIST = {
   paddingBottom: "0",
   borderBottomWidth: "1px",
   borderColor: "border",
-  "& > [role=tab]": { borderTopRadius: "md", marginTop: "1.5" },
+  "& > [role=tab]": { borderTopRadius: "0", marginTop: "0" },
   "& > [role=tab][data-selected]": {
     bg: "docs.raised",
     boxShadow:

@@ -54,6 +54,7 @@ await it("keeps agent commands deliberate and setup prompts complete in both the
           await page.locator('#content a[href="/integration/quick-start"]').first().click();
           await page.waitForURL("**/integration/quick-start");
           assert.equal(await select.inputValue(), "opencode");
+          await page.emulateMedia({ reducedMotion: "reduce" });
           await page.goto(base + "introduction");
           await page.getByRole("button", { name: "Copy setup prompt" }).waitFor();
           await launcher.screenshot({ path: path.join(shots, `docs-agent-command-${theme}.png`) });
@@ -142,7 +143,7 @@ await it("makes API data, skill actions and selection movement readable", async 
             await tracingPrompt({ outDir }),
           );
           await card.locator("summary").click();
-          assert.ok(await card.locator(".docs-code-region").isVisible());
+          assert.ok(await card.locator(".docs-code-region").first().isVisible());
           await card.locator("summary").click();
           await card.screenshot({ path: path.join(shots, `docs-skill-card-${theme}.png`) });
           await page.goto(base + "integration/cli");
@@ -182,6 +183,75 @@ await it("makes API data, skill actions and selection movement readable", async 
         assert.ok(await error.locator(".docs-field").first().isVisible());
       } finally {
         await page.close();
+      }
+    },
+  });
+});
+
+/** @scenario "Read rendered skill prompts and use setup buttons with flat tabs" */
+await it("renders Markdown prompts and joins the setup tabs flush to the frame", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      for (const theme of ["light", "dark"]) {
+        const page = await browser.newPage({
+          viewport: { width: 1440, height: 1000 },
+          permissions: ["clipboard-read", "clipboard-write"],
+        });
+        try {
+          page.setDefaultTimeout(60000);
+          await page.emulateMedia({ reducedMotion: "reduce" });
+          await page.addInitScript((mode) => localStorage.setItem("theme", mode), theme);
+          await page.goto(base + "skills/directory");
+          const card = page.locator(".docs-skill-card").first();
+          await card.locator("summary").click();
+          assert.ok((await card.locator(".docs-skill-body h4").count()) > 0);
+          assert.ok((await card.locator(".docs-inline-code").count()) > 0);
+          assert.ok(await card.locator(".docs-code-region").first().isVisible());
+          assert.ok((await card.locator('.docs-code-region span[style*="--sl"]').count()) > 0);
+          await card.getByRole("button", { name: "Copy full prompt", exact: true }).click();
+          await card.getByRole("button", { name: "Copied", exact: true }).waitFor();
+          assert.equal(
+            await page.evaluate(() => navigator.clipboard.readText()),
+            await tracingPrompt({ outDir }),
+          );
+          await card.screenshot({ path: path.join(shots, `docs-skill-markdown-${theme}.png`) });
+          await page.goto(base + "coding-agents/overview");
+          const launch = page.getByRole("link", { name: "Launch your agent", exact: true });
+          const quick = page.getByRole("link", { name: "Follow the quickstart", exact: true });
+          assert.equal(await launch.locator("svg").count(), 1);
+          assert.equal(await quick.locator("svg").count(), 1);
+          assert.ok(await launch.evaluate((node) => node.getBoundingClientRect().height >= 44));
+          const tabs = page.locator(".docs-tabs").first();
+          const geometry = await page.waitForFunction(() => {
+            const root = document.querySelector(".docs-tabs");
+            const tab = root?.querySelector('[role="tab"][aria-selected="true"]');
+            if (!root?.isConnected || !tab?.isConnected) return false;
+            const tabStyle = getComputedStyle(tab);
+            const rootStyle = getComputedStyle(root);
+            const result = {
+              gap: tabStyle.marginTop,
+              tabRadius: tabStyle.borderTopLeftRadius,
+              frameRadius: rootStyle.borderTopLeftRadius,
+            };
+            return Object.values(result).every(Boolean) ? result : false;
+          });
+          assert.deepEqual(await geometry.jsonValue(), {
+            gap: "0px",
+            tabRadius: "0px",
+            frameRadius: "0px",
+          });
+          await tabs.screenshot({ path: path.join(shots, `docs-flat-tabs-${theme}.png`) });
+          await launch
+            .locator("..")
+            .screenshot({ path: path.join(shots, `docs-agent-actions-${theme}.png`) });
+          await launch.click();
+          assert.equal(new URL(page.url()).hash, "#getting-started");
+          await quick.click();
+          await page.waitForURL("**/coding-agents/quickstart");
+        } finally {
+          await page.close();
+        }
       }
     },
   });

@@ -47,7 +47,9 @@
     "remark-frontmatter": "catalog:",
     "remark-gfm": "catalog:",
     "remark-mdx-frontmatter": "catalog:",
+    "remark-parse": "catalog:",
     "typescript": "catalog:",
+    "unified": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
     "yaml": "catalog:"

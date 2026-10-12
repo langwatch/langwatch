@@ -1327,3 +1327,15 @@ body {
   max-height: 28rem;
   font-size: 14px;
 }
+
+.docs-skill-body .docs-heading {
+  font-size: 16px;
+  line-height: 26px;
+  margin-block: 20px 8px;
+}
+.docs-skill-body > :first-child {
+  margin-top: 8px;
+}
+.docs-skill-body p {
+  overflow-wrap: anywhere;
+}

@@ -18930,7 +18930,7 @@ keywords:
   - opentelemetry coding agents
 ---
 
-[Launch your agent](#getting-started) · [Follow the quickstart](/coding-agents/quickstart)
+<AgentActions />
 
 <figure>
   <img className="docs-product-shot" src="/images/coding-agents/optimized/session-detail-1024.webp" srcSet="/images/coding-agents/optimized/session-detail-640.webp 640w, /images/coding-agents/optimized/session-detail-1024.webp 1024w, /images/coding-agents/optimized/session-detail-1560.webp 1560w" sizes="(min-width: 1280px) calc(100vw - 620px), (min-width: 1024px) calc(100vw - 380px), calc(100vw - 40px)" width="1560" height="900" loading="eager" fetchPriority="high" alt="Claude Code session in LangWatch: model calls, tools, cost, compactions and cache health." />

@@ -1,7 +1,29 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import remarkGfm from "remark-gfm";
+import remarkParse from "remark-parse";
+import { unified } from "unified";
+
 import type { TreeAttribute, TreeNode } from "../../../lib/syntax-tree.ts";
+
+const markdown = unified().use(remarkParse).use(remarkGfm);
+
+type MarkdownNode = { type: string; data?: object; children?: MarkdownNode[] };
+
+/** Prompt prose is Markdown, never executable MDX. Headings stay local to the disclosure. */
+function promptContent(prompt: string): TreeNode[] {
+  const adapt = (node: MarkdownNode): TreeNode => {
+    const { data, children, ...fields } = node;
+    return {
+      ...fields,
+      type: node.type === "html" ? "text" : node.type,
+      data: node.type === "heading" ? { ...data, hName: "h4" } : { ...data },
+      children: children?.map(adapt),
+    };
+  };
+  return markdown.parse(prompt).children.map(adapt);
+}
 
 function classOf({ node }: { node: TreeNode }) {
   const value = node.attributes?.find((attribute) => attribute.name === "className")?.value;
@@ -53,7 +75,7 @@ function skillCard({ node }: { node: TreeNode }): TreeNode {
   return {
     type: "mdxJsxFlowElement",
     name: "SkillCard",
-    children: [],
+    children: promptContent(code?.value ?? ""),
     attributes: [
       attribute({ name: "title", value: title ? literalText({ node: title }) : "Skill" }),
       attribute({ name: "install", value: values[0] ?? "" }),

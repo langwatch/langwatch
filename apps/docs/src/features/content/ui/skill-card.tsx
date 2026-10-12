@@ -1,7 +1,8 @@
 import { Box, Flex, Text } from "@langwatch/design-system/primitives";
 import { Sparkles, Terminal, ChevronDown } from "lucide-react";
+import type { ReactNode } from "react";
 
-import { CodeBody, CopyAction } from "../../code/ui/code-parts.tsx";
+import { CopyAction } from "../../code/ui/code-parts.tsx";
 
 function Command({ label, value }: { label: string; value: string }) {
   if (!value) return null;
@@ -42,11 +43,13 @@ export function SkillCard({
   install,
   command,
   prompt,
+  children,
 }: {
   title: string;
   install: string;
   command: string;
   prompt: string;
+  children?: ReactNode;
 }) {
   return (
     <Box
@@ -92,18 +95,14 @@ export function SkillCard({
             <summary>
               View prompt <ChevronDown size={16} aria-hidden="true" />
             </summary>
-            <CodeBody
-              source={{
-                lang: "text",
-                title: "Prompt",
-                code: prompt,
-                lines: prompt
-                  .split("\n")
-                  .map((line) => line.replaceAll("&", "&amp;").replaceAll("<", "&lt;")),
-                numbered: false,
-                highlight: [],
-              }}
-            />
+            <Box
+              className="docs-skill-body docs-prose"
+              fontSize="14px"
+              lineHeight="24px"
+              overflowWrap="anywhere"
+            >
+              {children}
+            </Box>
           </details>
         </Box>
       ) : null}
