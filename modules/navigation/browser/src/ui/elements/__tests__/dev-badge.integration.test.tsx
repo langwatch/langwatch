@@ -47,6 +47,17 @@ describe("given a development build on a haven stack", () => {
   });
 });
 
+describe("given a keyboard reader", () => {
+  it("reaches the badge with Tab and shows the full slug in the tooltip", async () => {
+    renderBadge(LONG_SLUG);
+
+    await userEvent.tab();
+
+    expect(badge()).toHaveFocus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(LONG_SLUG);
+  });
+});
+
 describe("given a development build outside haven", () => {
   /** @scenario "a development build outside haven still reads DEV" */
   it("reads DEV", async () => {

@@ -24,6 +24,14 @@ export function DevBadge({ label }: { label?: string }) {
         maxWidth={LABEL_MAX_WIDTH}
         flexShrink={0}
         truncate
+        // Focusable so keyboard readers reach the tooltip that holds a truncated slug.
+        tabIndex={0}
+        aria-label={tooltip}
+        _focusVisible={{
+          outline: "2px solid",
+          outlineColor: "colorPalette.focusRing",
+          outlineOffset: "2px",
+        }}
       >
         <Text as="span" letterSpacing="wider">
           DEV
