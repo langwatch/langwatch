@@ -128,7 +128,6 @@ export function SuiteRail(props: SuiteRailProps) {
         label: set.setId,
         href: hrefOf(selection),
         icon: iconOf(FolderCode, "Runs from code"),
-        badge: iconOf(FolderCode, "Runs from code"),
         testId: `suite-rail-item-${set.setId}`,
       },
     };
@@ -158,6 +157,7 @@ export function SuiteRail(props: SuiteRailProps) {
       <SectionNavigationRail
         label="Agent testing"
         showTitle={false}
+        showIcons
         groups={[
           {
             label: "Test suites",

@@ -60,11 +60,14 @@ export function SectionNavigationItem({
   link,
   activeHref,
   collapsed = false,
+  showIcon = false,
   onNavigate,
 }: {
   link: SectionNavigationLink;
   activeHref: string;
   collapsed?: boolean;
+  /** Leads the open entry with its icon too; a folded entry always shows it. */
+  showIcon?: boolean;
   onNavigate: (href: string) => void;
 }) {
   const active = link.href === activeHref;
@@ -105,7 +108,7 @@ export function SectionNavigationItem({
         }}
       >
         <HStack gap={2} minWidth={0} flex={1}>
-          {collapsed && link.icon ? (
+          {(collapsed || showIcon) && link.icon ? (
             <Box as="span" display="flex" flexShrink={0} color="inherit">
               {link.icon}
             </Box>
@@ -195,6 +198,7 @@ export function SectionNavigationRail({
   collapsed = false,
   footer,
   showTitle = true,
+  showIcons = false,
 }: SectionNavigationRailProps) {
   const runs: readonly SectionNavigationGroup[] = [{ links }, ...groups].filter(
     (run) => run.links.length > 0 || (!collapsed && (run.extra !== void 0 || run.add !== void 0)),
@@ -296,6 +300,7 @@ export function SectionNavigationRail({
                     link={link}
                     activeHref={activeHref}
                     collapsed={collapsed}
+                    showIcon={showIcons}
                     onNavigate={onNavigate}
                   />
                 ))}
@@ -329,6 +334,8 @@ type SectionNavigationRailProps = {
   footer?: ReactNode;
   /** False when a page header above the rail already names the section. */
   showTitle?: boolean;
+  /** Leads every open entry with its icon, for a list whose entries differ by kind. */
+  showIcons?: boolean;
 };
 
 const SECTION_HEADER_HEIGHT = "pageHeader.lg";
