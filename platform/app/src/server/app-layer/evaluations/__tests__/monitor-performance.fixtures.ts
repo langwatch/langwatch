@@ -22,6 +22,8 @@ export interface SeededEvaluation {
   evaluatorId: string;
   score: number | null;
   passed: number | null;
+  /** The category a classifying evaluator decided on, if it decided one. */
+  label?: string | null;
   status?: string;
   evaluationId?: string;
   updatedAtMs?: number;
@@ -79,6 +81,7 @@ export const evaluationRunRow = ({
     evaluatorId,
     score,
     passed,
+    label = null,
     status = "processed",
     evaluationId = `eval-${nanoid()}`,
     updatedAtMs = scheduledAtMs,
@@ -97,7 +100,7 @@ export const evaluationRunRow = ({
   Status: status,
   Score: score,
   Passed: passed,
-  Label: null,
+  Label: label,
   ScheduledAt: new Date(scheduledAtMs),
   UpdatedAt: new Date(updatedAtMs),
   LastProcessedEventId: `event-${nanoid()}`,

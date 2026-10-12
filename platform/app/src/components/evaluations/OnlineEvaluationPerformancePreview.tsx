@@ -1,17 +1,35 @@
 import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 
-export type OnlineEvaluationPerformance = {
-  metric: "score" | "pass_rate";
-  points: number[];
-  current: number | null;
-  previous: number | null;
+import { getHexColorForString } from "~/utils/rotatingColors";
+
+export type LabelShare = {
+  label: string;
+  count: number;
+  share: number;
 };
+
+export type OnlineEvaluationPerformance =
+  | {
+      metric: "score" | "pass_rate";
+      points: number[];
+      current: number | null;
+      previous: number | null;
+    }
+  | {
+      metric: "label";
+      labels: LabelShare[];
+      current: number | null;
+      previous: number | null;
+    };
 
 type PerformanceRow = {
   name: string;
   performance?: OnlineEvaluationPerformance;
   hasPerformanceError?: boolean;
 };
+
+const CHART_WIDTH = 112;
+const CHART_HEIGHT = 38;
 
 export const PerformancePreview = ({ row }: { row: PerformanceRow }) => {
   const performance = row.performance;
@@ -27,7 +45,7 @@ export const PerformancePreview = ({ row }: { row: PerformanceRow }) => {
   if (!performance) {
     return (
       <HStack width="full" gap={4}>
-        <Skeleton width="112px" height="38px" />
+        <Skeleton width={`${CHART_WIDTH}px`} height={`${CHART_HEIGHT}px`} />
         <VStack align="start" gap={1}>
           <Skeleton width="48px" height="18px" />
           <Skeleton width="64px" height="14px" />
@@ -36,7 +54,7 @@ export const PerformancePreview = ({ row }: { row: PerformanceRow }) => {
     );
   }
 
-  const { current, previous, metric, points } = performance;
+  const { current, previous, metric } = performance;
   const delta =
     current !== null && previous !== null ? current - previous : null;
   const trend =
@@ -55,9 +73,29 @@ export const PerformancePreview = ({ row }: { row: PerformanceRow }) => {
     );
   }
 
+  // A classifier's period is a distribution, not an average: every result
+  // carries a label and neither a score nor a pass flag, so there is nothing
+  // to average and a single number would say less than the split does.
+  if (metric === "label") {
+    const leading = performance.labels[0];
+    return (
+      <HStack width="full" gap={4} justify="space-between">
+        <LabelDistribution labels={performance.labels} name={row.name} />
+        <VStack minWidth="82px" align="start" gap={0}>
+          <Text fontWeight="semibold" lineClamp={1} title={leading?.label}>
+            {leading?.label}
+          </Text>
+          <Text textStyle="xs" color={trendColor} data-trend={trend}>
+            {formatLabelShare(current, delta)}
+          </Text>
+        </VStack>
+      </HStack>
+    );
+  }
+
   return (
     <HStack width="full" gap={4} justify="space-between">
-      <Sparkline points={points} trend={trend} name={row.name} />
+      <Sparkline points={performance.points} trend={trend} name={row.name} />
       <VStack minWidth="82px" align="start" gap={0}>
         <Text fontWeight="semibold">
           {metric === "pass_rate"
@@ -72,10 +110,16 @@ export const PerformancePreview = ({ row }: { row: PerformanceRow }) => {
   );
 };
 
-const formatTrend = (
-  metric: OnlineEvaluationPerformance["metric"],
-  delta: number | null,
-) => {
+const percent = (share: number) => `${Math.round(share * 100)}%`;
+
+const formatLabelShare = (current: number, delta: number | null) => {
+  if (delta === null) return `${percent(current)} of results`;
+  if (delta === 0) return `${percent(current)}, no change`;
+  const arrow = delta > 0 ? "↑" : "↓";
+  return `${percent(current)}, ${arrow} ${Math.round(Math.abs(delta) * 100)} pp`;
+};
+
+const formatTrend = (metric: "score" | "pass_rate", delta: number | null) => {
   if (delta === null) return "No comparison";
   if (delta === 0) return "No change";
 
@@ -87,6 +131,66 @@ const formatTrend = (
     : `${arrow} ${difference.toFixed(2)}`;
 };
 
+/**
+ * The period's labels as one strip, each segment sized by its share.
+ *
+ * Every segment carries its own accessible name and hover title, so the split
+ * is readable without a legend the column has no room for.
+ */
+const LabelDistribution = ({
+  labels,
+  name,
+}: {
+  labels: LabelShare[];
+  name: string;
+}) => {
+  const height = 14;
+  const gap = 1;
+  const radius = 2;
+
+  let offset = 0;
+  const segments = labels.map((entry) => {
+    const width = Math.max(entry.share * CHART_WIDTH - gap, 1);
+    const segment = { ...entry, x: offset, width };
+    offset += entry.share * CHART_WIDTH;
+    return segment;
+  });
+
+  return (
+    <Box
+      width={`${CHART_WIDTH}px`}
+      height={`${CHART_HEIGHT}px`}
+      flexShrink={0}
+      display="flex"
+      alignItems="center"
+    >
+      <svg
+        role="group"
+        aria-label={`Label distribution for ${name}`}
+        viewBox={`0 0 ${CHART_WIDTH} ${height}`}
+        width="100%"
+        height={height}
+      >
+        {segments.map((segment) => (
+          <rect
+            key={segment.label}
+            role="img"
+            aria-label={`${segment.label}, ${percent(segment.share)}`}
+            x={segment.x}
+            y={0}
+            width={segment.width}
+            height={height}
+            rx={radius}
+            fill={getHexColorForString(segment.label)}
+          >
+            <title>{`${segment.label}: ${percent(segment.share)} (${segment.count})`}</title>
+          </rect>
+        ))}
+      </svg>
+    </Box>
+  );
+};
+
 const Sparkline = ({
   points,
   trend,
@@ -96,8 +200,8 @@ const Sparkline = ({
   trend: "up" | "down" | "neutral";
   name: string;
 }) => {
-  const width = 112;
-  const height = 38;
+  const width = CHART_WIDTH;
+  const height = CHART_HEIGHT;
   const padding = 3;
   const finitePoints = points.filter(Number.isFinite);
   const min = finitePoints.length > 0 ? Math.min(...finitePoints) : 0;
