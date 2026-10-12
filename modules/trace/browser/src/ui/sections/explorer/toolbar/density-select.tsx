@@ -80,30 +80,38 @@ export const DensitySelect: React.FC<{ compact?: boolean }> = ({ compact = false
           </MenuTrigger>
         </TriggerAnchor>
       </Tooltip>
-      <MenuContent minWidth="240px" maxWidth="280px">
-        <MenuRadioItemGroup
-          value={density}
-          onValueChange={(e) => {
-            if (isDensity(e.value)) setDensity(e.value);
-          }}
-        >
-          {OPTIONS.map(({ density: value, label, hint, Icon }) => (
-            <MenuRadioItem key={value} value={value}>
-              <HStack align="flex-start" gap={2}>
-                <Box paddingTop="3px" flexShrink={0}>
-                  <Icon size={14} aria-hidden="true" />
-                </Box>
-                <VStack align="start" gap={0.5}>
-                  <Text>{label}</Text>
-                  <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
-                    {hint}
-                  </Text>
-                </VStack>
-              </HStack>
-            </MenuRadioItem>
-          ))}
-        </MenuRadioItemGroup>
-      </MenuContent>
+      <DensityMenuContent density={density} onSelect={setDensity} />
     </MenuRoot>
   );
 };
+
+/** The two densities as radio items, each with the hint that says what it changes. */
+const DensityMenuContent: React.FC<{
+  density: Density;
+  onSelect: (density: Density) => void;
+}> = ({ density, onSelect }) => (
+  <MenuContent minWidth="240px" maxWidth="280px">
+    <MenuRadioItemGroup
+      value={density}
+      onValueChange={(e) => {
+        if (isDensity(e.value)) onSelect(e.value);
+      }}
+    >
+      {OPTIONS.map(({ density: value, label, hint, Icon }) => (
+        <MenuRadioItem key={value} value={value}>
+          <HStack align="flex-start" gap={2}>
+            <Box paddingTop="3px" flexShrink={0}>
+              <Icon size={14} aria-hidden="true" />
+            </Box>
+            <VStack align="start" gap={0.5}>
+              <Text>{label}</Text>
+              <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
+                {hint}
+              </Text>
+            </VStack>
+          </HStack>
+        </MenuRadioItem>
+      ))}
+    </MenuRadioItemGroup>
+  </MenuContent>
+);

@@ -127,6 +127,7 @@ describe("the Filters button", () => {
 describe("the toolbar actions", () => {
   /** @scenario "The toolbar keeps its actions in sight" */
   it("shows Automate and the shortcuts button in the bar, with no overflow menu", async () => {
+    useExplorerStore.getState().applyQueryText("status:error");
     const { getByRole, queryByRole } = renderWithDesignSystem(<Toolbar />);
 
     const automate = getByRole("button", { name: "Create an automation from the current filter" });
@@ -137,7 +138,7 @@ describe("the toolbar actions", () => {
     automate.click();
     expect(drawer.openDrawer).toHaveBeenCalledWith(
       "automation",
-      expect.objectContaining({ initialSource: "trace" }),
+      expect.objectContaining({ initialSource: "trace", initialFilterQuery: "status:error" }),
     );
   });
 });
