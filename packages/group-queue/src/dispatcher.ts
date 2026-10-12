@@ -201,20 +201,32 @@ export class GroupQueueDispatcher {
 
   /** One claim over the allow-list, or over each open list in turn while slots remain. */
   private async claim(maxJobs: number): Promise<DispatchResult[]> {
-    const claimFrom = (allowedGroupsKey: string | undefined, jobs: number) =>
+    const claimFrom = ({
+      allowedGroupsKey,
+      jobs,
+      listKey,
+    }: {
+      allowedGroupsKey: string | undefined;
+      jobs: number;
+      listKey?: string;
+    }) =>
       this.params.scripts.dispatchBatch({
         nowMs: nowInstant().epochMilliseconds,
         activeTtlSec: this.params.activeTtlSec,
         maxJobs: jobs,
         allowedGroupsKey,
+        ...(listKey ? { listKey } : {}),
       });
     if (!this.params.listedGroupsKeys) {
-      return claimFrom(this.params.dispatchGroupAllowListKey, maxJobs);
+      return claimFrom({ allowedGroupsKey: this.params.dispatchGroupAllowListKey, jobs: maxJobs });
     }
     const results: DispatchResult[] = [];
     for (const listKey of await this.params.listedGroupsKeys()) {
       if (results.length >= maxJobs) break;
-      results.push(...(await claimFrom(`${listKey}:candidates`, maxJobs - results.length)));
+      const jobs = maxJobs - results.length;
+      results.push(
+        ...(await claimFrom({ allowedGroupsKey: `${listKey}:candidates`, jobs, listKey })),
+      );
     }
     return results;
   }
