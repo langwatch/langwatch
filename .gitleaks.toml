@@ -515,8 +515,6 @@ paths = [
   '''^packages/mail/src/templates/__tests__/reset-password-email\.unit\.test\.tsx$''',
   '''^packages/mail/src/templates/reset-password-email\.tsx$''',
   '''^specs/langy/langy-frame-auth\.vectors\.gen\.mjs$''',
-  '''^tools/visualdiff/publish_test\.go$''',
-  '''^tools/visualdiff/runner/src/__tests__/totp\.unit\.test\.ts$''',
 ]
 
 # Placeholder JWTs with an invented `.signature` or `abcDEF123456` tail: the

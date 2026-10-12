@@ -18346,59 +18346,6 @@ importers:
         specifier: workspace:*
         version: link:../../packages/vitest-config
 
-  tools/fuzz/runner:
-    dependencies:
-      '@langwatch/visual-diff-runner':
-        specifier: workspace:*
-        version: link:../../visualdiff/runner
-      playwright:
-        specifier: 'catalog:'
-        version: 1.63.0
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
-    devDependencies:
-      '@langwatch/vitest-config':
-        specifier: workspace:*
-        version: link:../../../packages/vitest-config
-      '@types/node':
-        specifier: ^26.0.1
-        version: 26.2.0
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.1(patch_hash=2921221142707f0afee9faf1cba6c6fea7201f30a6ddf42aaf4c420be2067eb3)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  tools/interactionsimulator:
-    dependencies:
-      '@langwatch/visual-diff-runner':
-        specifier: workspace:*
-        version: link:../visualdiff/runner
-      js-yaml:
-        specifier: 'catalog:'
-        version: 5.2.2
-      playwright:
-        specifier: 'catalog:'
-        version: 1.63.0
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
-    devDependencies:
-      '@langwatch/vitest-config':
-        specifier: workspace:*
-        version: link:../../packages/vitest-config
-      '@types/node':
-        specifier: ^26.0.1
-        version: 26.2.0
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.1(patch_hash=2921221142707f0afee9faf1cba6c6fea7201f30a6ddf42aaf4c420be2067eb3)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
   tools/seedgen/runner:
     dependencies:
       '@langwatch/authz-contract':
@@ -18459,34 +18406,6 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(patch_hash=2921221142707f0afee9faf1cba6c6fea7201f30a6ddf42aaf4c420be2067eb3)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  tools/visualdiff/runner:
-    dependencies:
-      pixelmatch:
-        specifier: ^7.2.0
-        version: 7.2.0
-      playwright:
-        specifier: 'catalog:'
-        version: 1.63.0
-      pngjs:
-        specifier: ^7.0.0
-        version: 7.0.0
-    devDependencies:
-      '@langwatch/vitest-config':
-        specifier: workspace:*
-        version: link:../../../packages/vitest-config
-      '@types/node':
-        specifier: ^26.0.1
-        version: 26.2.0
-      '@types/pngjs':
-        specifier: ^6.0.5
-        version: 6.0.5
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.1(patch_hash=2921221142707f0afee9faf1cba6c6fea7201f30a6ddf42aaf4c420be2067eb3)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
 packages:
 
@@ -23435,9 +23354,6 @@ packages:
   '@types/picomatch@4.0.3':
     resolution: {integrity: sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ==}
 
-  '@types/pngjs@6.0.5':
-    resolution: {integrity: sha512-0k5eKfrA83JOZPppLtS2C7OUtyNAl2wKNxfyYl9Q5g9lPkgBl/9hNyAu6HuEH2J4XmIv2znEpkDd0SaZVxW6iQ==}
-
   '@types/prompts@2.4.9':
     resolution: {integrity: sha512-qTxFi6Buiu8+50/+3DGIWLHM6QuWsEKugJnnP6iv2Mc4ncxE4A/OJkjuVOA+5X0X1S/nq5VJRa8Lu+nwcvbrKA==}
 
@@ -27556,10 +27472,6 @@ packages:
   pirates@4.0.7:
     resolution: {integrity: sha512-TfySrs/5nm8fQJDcBDuUng3VOUKsd7S+zqvbOTiGXHfxX4wK31ard+hoNuvkicM/2YFzlpDgABOevKSsB4G/FA==}
     engines: {node: '>= 6'}
-
-  pixelmatch@7.2.0:
-    resolution: {integrity: sha512-xhcb4yHu9sM/G7foGzoLtXYcC0zHEaOXXjRKhGup0fw78Nf2Tkiapv4EQyMzrbcmQPsllAI7DbFY2UT7PlI9Pg==}
-    hasBin: true
 
   pkce-challenge@5.0.1:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
@@ -34757,10 +34669,6 @@ snapshots:
 
   '@types/picomatch@4.0.3': {}
 
-  '@types/pngjs@6.0.5':
-    dependencies:
-      '@types/node': 26.2.0
-
   '@types/prompts@2.4.9':
     dependencies:
       '@types/node': 26.2.0
@@ -39937,10 +39845,6 @@ snapshots:
       thread-stream: 4.2.0
 
   pirates@4.0.7: {}
-
-  pixelmatch@7.2.0:
-    dependencies:
-      pngjs: 7.0.0
 
   pkce-challenge@5.0.1: {}
 

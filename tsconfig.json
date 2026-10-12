@@ -793,16 +793,7 @@
       "path": "./tools/dev-runtime"
     },
     {
-      "path": "./tools/fuzz/runner"
-    },
-    {
-      "path": "./tools/interactionsimulator"
-    },
-    {
       "path": "./tools/seedgen/runner"
-    },
-    {
-      "path": "./tools/visualdiff/runner"
     },
     {
       "path": "./modules/ops/client"

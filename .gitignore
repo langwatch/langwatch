@@ -187,22 +187,12 @@ server.log
 /migrationorder
 /openapidiff
 /service
-/visualdiff
 
 # apidiff scratch: worktrees, instance logs, generated compose overrides
 .apidiff/
 
-# visualdiff run directories: worktrees, screenshots, reports
-.visualdiff/
-
-# fuzz and interactionsimulator run directories: findings, screenshots, coverage
-.fuzz/
-.interactionsimulator/
 # diff tool binaries a bare `go build ./cmd/<tool>` drops at the root (build into .bin/ instead)
 /apidiff
-/visualdiff
-/fuzz
-/interactionsimulator
 
 # Prisma client output: prepare regenerates it (pnpm start:prepare:files), never commit it
 packages/prisma-client/src/generated/

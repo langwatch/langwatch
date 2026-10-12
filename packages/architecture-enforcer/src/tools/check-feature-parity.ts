@@ -138,13 +138,6 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // this root, every scenario describing what the published plugin does could
   // only be @unimplemented.
   "plugins",
-  // The capture half of visualdiff (@langwatch/visual-diff-runner): the settle
-  // and per-step recording scenarios are proved by its vitest suite, which
-  // lives beside it under tools/ rather than in packages/.
-  "tools/visualdiff/runner/src",
-  // The fuzz browser runner (@langwatch/fuzz-runner): its vision judge's
-  // scenarios are proved by its vitest suite and by nothing else.
-  "tools/fuzz/runner/src",
   // The seed runner's tests bind specs/setup/seedgen-runner.feature.
   "tools/seedgen/runner/src",
   // The contributor-only backend launcher (tools/dev-runtime): the API and the
@@ -250,8 +243,6 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "services/sims/githubsim",
   // The Go scenario runner: its child-contract and fence scenarios bind only from Go tests.
   "services/scenariorunner",
-  "tools/diffsuite",
-  "tools/fuzz",
   "tools/workerrun",
   "tools/seedgen",
   // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
@@ -280,10 +271,6 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // identity each keeps and which address variable each binds are asserted
   // here and nowhere else.
   "cmd/service",
-  // visualdiff: the boot, classification and teardown rules in
-  // specs/tooling/visual-diff.feature are asserted by these Go tests and by
-  // nothing else. Its Playwright half binds from the TS roots below.
-  "tools/visualdiff",
   // apidiff: how it boots its two instances - one haven stack per instance
   // under its own run-scoped slug, and a teardown that can only reach the
   // slugs it started (specs/tooling/apidiff-on-haven.feature) - is asserted by
