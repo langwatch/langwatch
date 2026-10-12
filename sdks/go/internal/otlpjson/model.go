@@ -6,12 +6,9 @@ import (
 	"strconv"
 )
 
-// The types below mirror the OTLP/JSON shape of an
-// ExportTraceServiceRequest (opentelemetry-proto, trace/v1 and common/v1),
-// following the OTLP/JSON rules: lowerCamelCase field names, trace and span
-// ids as lower-case hex, 64-bit integers as decimal strings and enums as
-// integers. They exist so the SDK can speak OTLP without linking the
-// generated protobuf packages (and, through them, gRPC).
+// The types below mirror the OTLP/JSON ExportTraceServiceRequest
+// (opentelemetry-proto trace/v1, common/v1): lowerCamelCase names, hex trace
+// and span ids, 64-bit integers as decimal strings, enums as integers.
 
 type exportRequest struct {
 	ResourceSpans []resourceSpans `json:"resourceSpans"`

@@ -1,9 +1,7 @@
 // Package otlpjson encodes OpenTelemetry spans as an OTLP/JSON
-// ExportTraceServiceRequest and sends them over OTLP/HTTP.
-//
-// It depends only on the standard library and the OpenTelemetry API and SDK,
-// so a program that exports through it links neither gRPC nor the generated
-// OTLP protobuf packages.
+// ExportTraceServiceRequest and sends them over OTLP/HTTP. It depends only on
+// the standard library and the OpenTelemetry API and SDK, so it links neither
+// gRPC nor the generated OTLP protobuf packages.
 package otlpjson
 
 import (
@@ -197,12 +195,9 @@ func keyValues(kvs []attribute.KeyValue) []keyValue {
 	return out
 }
 
-// value converts an attribute value to an AnyValue.
-//
-// Byte slices are sent as a base64 stringValue rather than a bytesValue: the
-// LangWatch receiver reads an OTLP/JSON body as plain JSON and accepts
-// bytesValue only in its protobuf-decoded shapes, so a spec base64 bytesValue
-// would fail validation and drop the span.
+// value converts an attribute value to an AnyValue. Byte slices go as a
+// base64 stringValue: the LangWatch receiver accepts bytesValue only from
+// protobuf bodies, so an OTLP/JSON bytesValue would drop the span.
 func value(v attribute.Value) anyValue {
 	switch v.Type() {
 	case attribute.BOOL:
