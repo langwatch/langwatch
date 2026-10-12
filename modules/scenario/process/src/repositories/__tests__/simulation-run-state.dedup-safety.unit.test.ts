@@ -9,14 +9,7 @@ import { describe, expect, it } from "vitest";
 
 describe("simulationRunState.clickhouse.repository findProjection OOM safety", () => {
   const source = fs.readFileSync(
-    path.resolve(
-      __dirname,
-      "..",
-      "src",
-      "repositories",
-      "clickhouse",
-      "clickhouse.simulation-run-state.repository.ts",
-    ),
+    path.resolve(__dirname, "..", "clickhouse", "clickhouse.simulation-run-state.repository.ts"),
     "utf-8",
   );
 

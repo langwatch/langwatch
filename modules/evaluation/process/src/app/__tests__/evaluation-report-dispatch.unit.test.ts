@@ -1,19 +1,21 @@
-import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { DatasetApi } from "@langwatch/dataset-contract";
+import { AnalyticsApi } from "@langwatch/analytics-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluationApi, type ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands, EventingCommandSender } from "@langwatch/eventing";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
-import { createApp } from "@langwatch/process";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { TraceApi } from "@langwatch/trace-contract";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import type { EvaluationProcessingPipeline } from "../../eventing/evaluation-processing-definition.pipeline.ts";
@@ -32,24 +34,26 @@ const REPORT: ReportEvaluationCommandData = {
 };
 
 async function installed() {
-  return createApp({ role: "api" })
-    .withModules([installableEvaluation])
-    .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
-    .withStores(memoryStores())
-    .provide({
-      workflow: createApiFixture<WorkflowApi>(),
-      trace: createApiFixture<TraceApi>(),
-      "model-provider": createApiFixture<ModelProviderApi>(),
-      "feature-flag": createApiFixture<FeatureFlagApi>(),
-      evaluator: createApiFixture<EvaluatorApi>(),
-      monitor: createApiFixture<MonitorApi>(),
-      dataset: createApiFixture<DatasetApi>(),
-      "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>(),
-      analytics: createApiFixture<AnalyticsApi>(),
-      project: createApiFixture<ProjectApi>(),
-      "data-retention": createApiFixture<DataRetentionApi>(),
-    })
-    .boot();
+  return bootInstalledProcess({
+    role: "api",
+    modules: [installableEvaluation],
+    config: { evaluation: EVALUATION_TEST_CONFIG },
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),
+      testPeer({ token: WorkflowApi, instance: createApiFixture<WorkflowApi>() }),
+      testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
+      testPeer({ token: ModelProviderApi, instance: createApiFixture<ModelProviderApi>() }),
+      testPeer({ token: FeatureFlagApi, instance: createApiFixture<FeatureFlagApi>() }),
+      testPeer({ token: EvaluatorApi, instance: createApiFixture<EvaluatorApi>() }),
+      testPeer({ token: MonitorApi, instance: createApiFixture<MonitorApi>() }),
+      testPeer({ token: DatasetApi, instance: createApiFixture<DatasetApi>() }),
+      testPeer({ token: InstantEvalJudgeApi, instance: createApiFixture<InstantEvalJudgeApi>() }),
+      testPeer({ token: AnalyticsApi, instance: createApiFixture<AnalyticsApi>() }),
+      testPeer({ token: ProjectApi, instance: createApiFixture<ProjectApi>() }),
+      testPeer({ token: DataRetentionApi, instance: createApiFixture<DataRetentionApi>() }),
+    ],
+  });
 }
 
 describe("given the evaluation_processing command dispatcher", () => {

@@ -6,7 +6,7 @@ import { Tabs } from "@langwatch/design-system/primitives";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../src/behavior/analytics-api.ts", () => ({
+vi.mock("../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
     analytics: {
       getTimeseries: {
@@ -23,15 +23,15 @@ vi.mock("../../src/behavior/analytics-api.ts", () => ({
   },
 }));
 
-vi.mock("../../src/behavior/use-filter-params.ts", () => ({
+vi.mock("../../../behavior/use-filter-params.ts", () => ({
   useFilterParams: () => ({
     filterParams: { projectId: "project-1", startDate: 0, endDate: 1, filters: {} },
     queryOpts: { enabled: true },
   }),
 }));
 
-import { AnalyticsTestHarness, StubAnalyticsHost } from "../../src/testing.tsx";
-import { CustomGraph, type CustomGraphInput } from "../../src/ui/sections/custom-graph.tsx";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
+import { CustomGraph, type CustomGraphInput } from "../custom-graph.tsx";
 
 afterEach(cleanup);
 

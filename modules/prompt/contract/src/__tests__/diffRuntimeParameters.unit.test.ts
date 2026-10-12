@@ -1,5 +1,6 @@
-import { diffRuntimeParameters } from "@langwatch/prompt-contract";
 import { describe, expect, it } from "vitest";
+
+import { diffRuntimeParameters } from "../index.ts";
 
 describe("diffRuntimeParameters()", () => {
   describe("when comparing local and remote runtime parameters", () => {

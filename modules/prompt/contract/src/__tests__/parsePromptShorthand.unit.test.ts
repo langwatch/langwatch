@@ -1,5 +1,6 @@
-import { type PromptShorthand, parsePromptShorthand } from "@langwatch/prompt-contract";
 import { describe, expect, it } from "vitest";
+
+import { type PromptShorthand, parsePromptShorthand } from "../index.ts";
 
 describe("parsePromptShorthand()", () => {
   describe("when input is slug:tag format", () => {

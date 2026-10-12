@@ -5,7 +5,7 @@
 import { SessionReader } from "@langwatch/api/hosting";
 import { TrpcHost } from "@langwatch/api/trpc";
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
-import { createApp } from "@langwatch/process";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
@@ -19,11 +19,12 @@ const PROJECT_ID = "project_1";
 const PERMITTED = { permitted: true, organizationRole: null };
 
 async function installed() {
-  const runtime = await createApp({ role: "api" })
-    .withModules([auditLogProcessModule])
-    .withStores(memoryStores())
-    .withConfig({ "audit-log": undefined })
-    .boot();
+  const runtime = await bootInstalledProcess({
+    role: "api",
+    modules: [auditLogProcessModule],
+    config: { "audit-log": undefined },
+    stores: memoryStores(),
+  });
   const host = TrpcHost.create({
     sessions: SessionReader.create({ verify: async () => ({ userId: ACTOR.id }) }),
     authz: {

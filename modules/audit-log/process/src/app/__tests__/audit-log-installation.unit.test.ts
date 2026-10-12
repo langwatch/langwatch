@@ -1,15 +1,17 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { createApp } from "@langwatch/process";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
 import { auditLogProcessModule } from "../../audit-log.module.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({ role })
-    .withModules([auditLogProcessModule])
-    .withStores(memoryStores())
-    .withConfig({ "audit-log": { maxArgsBytes: 4 * 1024 } });
+  return bootInstalledProcess({
+    role,
+    modules: [auditLogProcessModule],
+    config: { "audit-log": { maxArgsBytes: 4 * 1024 } },
+    stores: memoryStores(),
+  });
 }
 
 const command = {
@@ -23,7 +25,7 @@ describe("given a process that installed the audit log", () => {
   describe("when a management write is recorded", () => {
     /** @scenario "A recorded entry is readable as the entity's history" */
     it.each(["api", "worker"] as const)("reads it back as history in the %s role", async (role) => {
-      const runtime = await process(role).boot();
+      const runtime = await process(role);
 
       try {
         const app = runtime.service(AuditLogApi);
@@ -47,7 +49,7 @@ describe("given a process that installed the audit log", () => {
 
     /** @scenario "An installation with no Enterprise module still records management writes" */
     it("records and reads back with the audit log module as the only installed module", async () => {
-      const runtime = await process("api").boot();
+      const runtime = await process("api");
 
       try {
         const app = runtime.service(AuditLogApi);
@@ -69,7 +71,7 @@ describe("given a process that installed the audit log", () => {
 
     /** @scenario "Entity history stays inside the requested project and action family" */
     it("answers nothing for another project or another action family", async () => {
-      const runtime = await process("api").boot();
+      const runtime = await process("api");
 
       try {
         const app = runtime.service(AuditLogApi);
@@ -105,7 +107,7 @@ describe("given a process that installed the audit log", () => {
     it.each(["api", "worker"] as const)(
       "lists them by target kind in the %s role",
       async (role) => {
-        const runtime = await process(role).boot();
+        const runtime = await process(role);
 
         try {
           const app = runtime.service(AuditLogApi);

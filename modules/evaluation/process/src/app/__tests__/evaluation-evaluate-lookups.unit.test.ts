@@ -1,6 +1,7 @@
-import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { BatchEvaluationEntry, Dataset, DatasetApi } from "@langwatch/dataset-contract";
+import { AnalyticsApi } from "@langwatch/analytics-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { type BatchEvaluationEntry, type Dataset, DatasetApi } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment node
  * What the public evaluate doors read beyond the module, composed by the real
@@ -8,17 +9,18 @@ import type { BatchEvaluationEntry, Dataset, DatasetApi } from "@langwatch/datas
  * @see modules/evaluation/specs/evaluation-service.feature
  */
 import { EvaluationApi } from "@langwatch/evaluation-contract";
-import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { MonitorApi, MonitorWithEvaluator } from "@langwatch/monitor-contract";
-import { createApp } from "@langwatch/process";
+import { EvaluatorNotFoundError, EvaluatorApi } from "@langwatch/evaluator-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi, type MonitorWithEvaluator } from "@langwatch/monitor-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
-import type { Workflow, WorkflowApi, WorkflowVersion } from "@langwatch/workflow-contract";
+import { TraceApi } from "@langwatch/trace-contract";
+import { type Workflow, WorkflowApi, type WorkflowVersion } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
@@ -59,26 +61,31 @@ async function boot({
   workflows?: WorkflowApi;
   datasets?: DatasetApi;
 } = {}) {
-  const runtime = await createApp({ role: "api" })
-    .withModules([installableEvaluation])
-    .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
-    .withStores(memoryStores())
-    .provide({
-      workflow: workflows,
-      trace: createApiFixture<TraceApi>(),
-      "model-provider": modelProviders,
-      "feature-flag": createApiFixture<FeatureFlagApi>(),
-      evaluator: evaluators,
-      monitor: monitors,
-      dataset: datasets,
-      "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>(),
-      analytics: createApiFixture<AnalyticsApi>(),
-      project: createApiFixture<ProjectApi>(),
-      "data-retention": createApiFixture<DataRetentionApi>({
-        getPlatformDefaultRetentionDays: () => 30,
+  const runtime = await bootInstalledProcess({
+    role: "api",
+    modules: [installableEvaluation],
+    config: { evaluation: EVALUATION_TEST_CONFIG },
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),
+      testPeer({ token: WorkflowApi, instance: workflows }),
+      testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
+      testPeer({ token: ModelProviderApi, instance: modelProviders }),
+      testPeer({ token: FeatureFlagApi, instance: createApiFixture<FeatureFlagApi>() }),
+      testPeer({ token: EvaluatorApi, instance: evaluators }),
+      testPeer({ token: MonitorApi, instance: monitors }),
+      testPeer({ token: DatasetApi, instance: datasets }),
+      testPeer({ token: InstantEvalJudgeApi, instance: createApiFixture<InstantEvalJudgeApi>() }),
+      testPeer({ token: AnalyticsApi, instance: createApiFixture<AnalyticsApi>() }),
+      testPeer({ token: ProjectApi, instance: createApiFixture<ProjectApi>() }),
+      testPeer({
+        token: DataRetentionApi,
+        instance: createApiFixture<DataRetentionApi>({
+          getPlatformDefaultRetentionDays: () => 30,
+        }),
       }),
-    })
-    .boot();
+    ],
+  });
 
   return { runtime, evaluation: runtime.service(EvaluationApi) };
 }

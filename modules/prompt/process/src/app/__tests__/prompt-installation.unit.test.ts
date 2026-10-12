@@ -1,32 +1,36 @@
 /**
  * @vitest-environment node
  */
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { createApp } from "@langwatch/process";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { isTenantMigrationStep } from "@langwatch/upgrade/step";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
 import { promptProcessModule } from "../../prompt.module.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({ role })
-    .withModules([promptProcessModule])
-    .withStores(memoryStores())
-    .withConfig({ prompt: { publicBaseUrl: undefined } })
-    .provide({
-      project: createApiFixture<ProjectApi>({}),
-      authz: createApiFixture<AuthzApi>({}),
-      entitlement: createApiFixture<EntitlementApi>({}),
-      workflow: createApiFixture<WorkflowApi>({}),
-      "model-provider": defaultModelFixture(),
-    });
+  return bootInstalledProcess({
+    role,
+    modules: [promptProcessModule],
+    config: { prompt: { publicBaseUrl: undefined } },
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: ProjectApi, instance: createApiFixture<ProjectApi>({}) }),
+      testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>({}) }),
+      testPeer({ token: EntitlementApi, instance: createApiFixture<EntitlementApi>({}) }),
+      testPeer({ token: WorkflowApi, instance: createApiFixture<WorkflowApi>({}) }),
+      testPeer({ token: ModelProviderApi, instance: defaultModelFixture() }),
+    ],
+  });
 }
 
 describe("prompt app installation", () => {
@@ -34,7 +38,7 @@ describe("prompt app installation", () => {
   it.each(["api", "worker"] as const)(
     "installs a working memory app in the %s role",
     async (role) => {
-      const runtime = await process(role).boot();
+      const runtime = await process(role);
 
       try {
         const app = runtime.service(PromptApi);
@@ -53,8 +57,8 @@ describe("prompt app installation", () => {
 
   /** @scenario "Prompt memory repository bundles stay isolated per installation" */
   it("allocates independent memory repository bundles for each installation", async () => {
-    const first = await process("api").boot();
-    const second = await process("api").boot();
+    const first = await process("api");
+    const second = await process("api");
 
     try {
       await first.service(PromptApi).createTag({
@@ -72,7 +76,7 @@ describe("prompt app installation", () => {
 
   /** @scenario "A worker collects the tag backfill as an organization tenant step" */
   it("collects the tag backfill as an organization tenant step that proves by held tags", async () => {
-    const runtime = await process("worker").boot();
+    const runtime = await process("worker");
 
     try {
       const [step] = runtime

@@ -30,8 +30,8 @@ import {
   INVALID_VEGA_FIXTURES,
   LWQL_FIXTURE_COLUMNS,
   VALID_VEGA_FIXTURES,
-} from "../../src/__tests__/lwql-fixtures.ts";
-import { ThemedLangWatchQLVegaLiteChart } from "../../src/features/dashboard-widget/ui/sections/themed-langwatch-ql-vega-lite-chart.tsx";
+} from "../../../../../__tests__/lwql-fixtures.ts";
+import { ThemedLangWatchQLVegaLiteChart } from "../themed-langwatch-ql-vega-lite-chart.tsx";
 
 /**
  * Small datasets on purpose: the row ceilings are maxima, and what is under
