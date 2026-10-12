@@ -106,7 +106,7 @@ exporter, err := langwatch.NewDefaultExporter(ctx)
 ```
 
 The exporter sends gzipped OTLP/JSON to `<endpoint>/api/otel/v1/traces`,
-retrying throttled (429) and failed (5xx) requests with exponential backoff
+retrying throttled (429) and unavailable (502, 503, 504) requests with exponential backoff
 (honouring `Retry-After`) for up to a minute, bounded by the export context.
 Wrap it in `sdktrace.NewBatchSpanProcessor` (or `sdktrace.WithBatcher`) to
 batch spans. It is built on the standard library, so importing the root
