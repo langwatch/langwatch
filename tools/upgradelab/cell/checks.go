@@ -246,13 +246,16 @@ func accepts(line string, switched, ready int64, origin time.Time) (acceptedLog,
 // downSignatures: what a line says when it met the private target H8's gate held closed.
 var downSignatures = []string{"ClickHouseUnavailableError", "clickhouse_unavailable", "Cannot connect to ClickHouse at", "[@clickhouse/client][Connection]", "read ECONNRESET"}
 
+// downWindowGrace: a query held at the closed gate fails as it reopens, so its line lands just after upAt.
+const downWindowGrace = int64(5_000)
+
 // inDownWindow: a ClickHouse-unavailable error line logged while H8's gate held the private target closed (as N2 does).
 func inDownWindow(line string, downAt, upAt int64, origin time.Time) bool {
 	if upAt <= 0 || !slices.ContainsFunc(downSignatures, func(each string) bool { return strings.Contains(line, each) }) {
 		return false
 	}
 	epoch, ok := lineEpochMs(line)
-	return ok && epoch-origin.UnixMilli() >= downAt && epoch-origin.UnixMilli() <= upAt
+	return ok && epoch-origin.UnixMilli() >= downAt && epoch-origin.UnixMilli() <= upAt+downWindowGrace
 }
 
 // logVerdict counts error lines in head's logs: new ones fail I9, accepted ones are counted apart with their reason.

@@ -191,8 +191,9 @@ func TestInDownWindowLeavesOnlyUnavailableLinesInsideTheWindowToH8(t *testing.T)
 	inside := `{"level":"error","time":"2026-10-11T18:46:47.693Z","error":{"type":"ClickHouseUnavailableError"}}`
 	after := `{"level":"error","time":"2026-10-11T18:47:30.000Z","error":{"type":"ClickHouseUnavailableError"}}`
 	unknown := `{"level":"error","time":"2026-10-11T18:46:47.693Z","error":{"type":"UNKNOWN_TABLE"}}`
-	if !inDownWindow(inside, 95_000, 146_000, origin) {
-		t.Fatal("an unavailable line inside the window must go to H8")
+	reopening := `{"level":"error","time":"2026-10-11T18:46:58.300Z","error":{"type":"ClickHouseUnavailableError"}}`
+	if !inDownWindow(inside, 95_000, 146_000, origin) || !inDownWindow(reopening, 95_000, 146_000, origin) {
+		t.Fatal("an unavailable line inside the window, or just as the gate reopens, must go to H8")
 	}
 	if inDownWindow(after, 95_000, 146_000, origin) || inDownWindow(unknown, 95_000, 146_000, origin) || inDownWindow(inside, 0, 0, origin) {
 		t.Fatal("only unavailable lines inside a real window go to H8")
