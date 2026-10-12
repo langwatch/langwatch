@@ -540,3 +540,53 @@ paths = [
   '''^services/(sims/)?paymentsim/paymentsim_test\.go$''',
   '''^enterprise/modules/billing/process/src/__tests__/billing-paymentsim\.integration\.test\.ts$''',
 ]
+
+# Values that are not credentials at all: the pinned SHA-256 digests of the
+# tiktoken encoding files, and a doc comment in the web-push simulator.
+# Scoped to `generic-api-key` and to each exact file.
+[[allowlists]]
+description = "Pinned file digests and a doc comment that generic-api-key reads as keys"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^dev/scripts/download-tiktoken-encodings\.mjs$''',
+  '''^services/sims/outboundsim/webpush\.go$''',
+]
+
+# The GitHub App overlay test asserts that a generated key starts with the PEM
+# header; the header string literal is all the file carries, no key material.
+[[allowlists]]
+description = "PEM header literal in a single-line PEM assertion, no key material"
+targetRules = ["private-key"]
+paths = ['''^tools/thuishaven/domain/overlay_github_test\.go$''']
+
+# Invented test values issued by nobody: `tok_live_*` and `tok-*` HTTP-agent
+# secrets, an `lw-revoked-*` key, a sequential `sk-proj-` redaction sample, an
+# `sk-lw-` prefix with no secret half in a design-system story, the haven API
+# test key, and an e2e licence signed by the checked-in test keypair.
+[[allowlists]]
+description = "Invented credentials in test fixtures and stories, issued by nobody"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^dev/tests/agentic-e2e/tests/license\.fixture\.ts$''',
+  '''^modules/agent/process/src/services/__tests__/agent-http-secrets\.integration\.test\.ts$''',
+  '''^modules/api-key/process/src/services/__tests__/api-key-token-resolution-cache\.unit\.test\.ts$''',
+  '''^modules/data-privacy/process/src/services/__tests__/otlp-span-pii-redaction\.native-scoped-policy\.unit\.test\.ts$''',
+  '''^modules/workflow/process/src/channels/__tests__/staged-run-body-seal\.unit\.test\.ts$''',
+  '''^modules/workflow/process/src/services/__tests__/workflow-http-secrets\.service\.unit\.test\.ts$''',
+  '''^packages/design-system/src/components/display/code-preview\.stories\.tsx$''',
+  '''^services/scenariorunner/runner_test\.go$''',
+  '''^services/scenariorunner/targets/targets_test\.go$''',
+  '''^tools/thuishaven/cmd/api_test\.go$''',
+]
+
+# A pre-2025 legacy API key is an opaque `eyJ` value; these suites prove it is
+# never verified as a JWT. The fixture is {"projectId":"project-1"} with the
+# word "signature" as its signature. Both rules read the same literal, so the
+# entry names both; scoped to the two files.
+[[allowlists]]
+description = "Legacy eyJ API-key fixture whose signature is a plain word"
+targetRules = ["jwt", "generic-api-key"]
+paths = [
+  '''^modules/api-key/process/src/services/__tests__/api-key-token-resolution\.service\.unit\.test\.ts$''',
+  '''^modules/auth/process/src/services/__tests__/api-rest-credentials\.service\.unit\.test\.ts$''',
+]
