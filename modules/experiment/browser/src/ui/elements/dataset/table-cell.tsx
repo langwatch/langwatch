@@ -1,3 +1,6 @@
+// TanStack mutates one table instance, so React Compiler caches would serve stale cells.
+"use no memo";
+
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { type Cell, flexRender, type RowData } from "@tanstack/react-table";
