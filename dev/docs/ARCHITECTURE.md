@@ -102,8 +102,8 @@ eventing, so a contract keys a map by an event table without naming it (Alex, 20
   vocabulary: `Server` (signals, fatal handlers, ordered teardown, hosted
   components, `/healthz`, `/metrics`), `GracefulShutdown`, the container
   (§4), boot and transport hosting — plus
-  `defineProcessModule`, `defineRepositories`, `FeatureSetup`,
-  `definePipeline` and the channel registry types. A module's process half
+  `defineProcessModule`, `defineRepositories`, `FeatureSetup` and the
+  channel registry types (`definePipeline` is `@langwatch/eventing`'s). A module's process half
   imports its vocabulary from the thing that installs it. Depends on
   `module`.
 - **`@langwatch/process-stores`** — materializes storage from config:
@@ -3235,9 +3235,7 @@ the left, the target.
 | host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers)                                    | "capabilities" (§3.5 reserves the word for the four layers)                                                                                                                                        |
 | `enterprise/modules/audit-log` (§4)                                                                                         | `modules/audit-log`                                                                                                                                                                                |
 | `processFacts` in `@langwatch/config`, picked by each slice (§6)                                                            | single leaves in `deployment-facts.ts` picked by name (`publicBaseUrl`, `isSaas`, `nlpServiceUrl`, `serviceVersion`, `otelResourceAttributes`, `nodeEnvironment`, `outboundProxy`; §6, 2026-10-05) |
-| store clients reach registries only; every channel registry installed by `.withChannels(registry)` (§5)                     | registries' `.live.create` called by hand in billing, nurturing and 14 more modules (round 33 ST-1)                                                                                                |
 | `secrets.into({ … }, build)` (§6)                                                                                           | nested `secrets.into(handle, …)`                                                                                                                                                                   |
-| `hostedStores(stores)` (§4)                                                                                                 | `hostedMembers(stores)`                                                                                                                                                                            |
 | "store client" (`the clickhouse client`)                                                                                    | "member" in §7, §9 and §13 prose, and `bootInstalledProcess({ members })`                                                                                                                          |
 | "Admin" (`ssoAdmin()`; Alex 2026-10-08, round 39 DS-A)                                                                      | the "backoffice" spelling §15 deletes, still in the UI shell route table and billing                                                                                                               |
 | the licence in a licensing-owned table, cleared through `LicensingApi.removeLicense` (Alex 2026-10-08, rounds 37 D6 and 42) | `OrganizationApi.setLicense` / `clearLicense` over organization's columns (`organization.api.ts:565-574`)                                                                                          |
