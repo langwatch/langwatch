@@ -1,0 +1,196 @@
+package langwatch
+
+import (
+	"compress/gzip"
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"testing"
+
+	"github.com/langwatch/langwatch/sdks/go/internal/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+)
+
+// otlpJSONReceiver stands in for LangWatch's /api/otel/v1/traces route,
+// decoding each gzipped OTLP/JSON body it receives.
+type otlpJSONReceiver struct {
+	t       *testing.T
+	mu      sync.Mutex
+	paths   []string
+	headers []http.Header
+	bodies  []map[string]any
+}
+
+func (r *otlpJSONReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	var body io.Reader = req.Body
+	if req.Header.Get("Content-Encoding") == "gzip" {
+		zr, err := gzip.NewReader(req.Body)
+		require.NoError(r.t, err)
+		body = zr
+	}
+	var payload map[string]any
+	require.NoError(r.t, json.NewDecoder(body).Decode(&payload))
+
+	r.mu.Lock()
+	r.paths = append(r.paths, req.URL.Path)
+	r.headers = append(r.headers, req.Header.Clone())
+	r.bodies = append(r.bodies, payload)
+	r.mu.Unlock()
+	w.WriteHeader(http.StatusOK)
+}
+
+// spans returns every exported span object across the received bodies.
+func (r *otlpJSONReceiver) spans() []map[string]any {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []map[string]any
+	for _, b := range r.bodies {
+		for _, rs := range b["resourceSpans"].([]any) {
+			for _, ss := range rs.(map[string]any)["scopeSpans"].([]any) {
+				for _, sp := range ss.(map[string]any)["spans"].([]any) {
+					out = append(out, sp.(map[string]any))
+				}
+			}
+		}
+	}
+	return out
+}
+
+func startReceiver(t *testing.T) (*otlpJSONReceiver, string) {
+	t.Helper()
+	rec := &otlpJSONReceiver{t: t}
+	srv := httptest.NewServer(rec)
+	t.Cleanup(srv.Close)
+	return rec, srv.URL
+}
+
+func spanAttrKeys(sp map[string]any) []string {
+	var keys []string
+	for _, kv := range sp["attributes"].([]any) {
+		keys = append(keys, kv.(map[string]any)["key"].(string))
+	}
+	return keys
+}
+
+func TestNewExporter_DefaultTransportSendsOTLPJSON(t *testing.T) {
+	rec, endpoint := startReceiver(t)
+
+	exporter, err := NewExporter(context.Background(),
+		WithAPIKey("pat-lw-secret"),
+		WithProjectID("project-9"),
+		WithEndpoint(endpoint),
+	)
+	require.NoError(t, err)
+	defer exporter.Shutdown(context.Background())
+
+	require.NoError(t, exporter.ExportSpans(context.Background(), []sdktrace.ReadOnlySpan{
+		richSpanStub("llm.chat", "openai", "llm").Snapshot(),
+	}))
+
+	require.Len(t, rec.headers, 1)
+	assert.Equal(t, TracesPath, rec.paths[0])
+	h := rec.headers[0]
+	assert.Equal(t, "application/json", h.Get("Content-Type"))
+	assert.Equal(t, "gzip", h.Get("Content-Encoding"))
+	assert.Equal(t, "Bearer pat-lw-secret", h.Get("Authorization"))
+	assert.Equal(t, "project-9", h.Get("X-Project-Id"))
+	assert.Equal(t, "langwatch-sdk-go", h.Get("X-Langwatch-Sdk-Name"))
+	assert.Equal(t, "go", h.Get("X-Langwatch-Sdk-Language"))
+	assert.Equal(t, Version, h.Get("X-Langwatch-Sdk-Version"))
+
+	spans := rec.spans()
+	require.Len(t, spans, 1)
+	assert.Equal(t, "llm.chat", spans[0]["name"])
+	assert.Contains(t, spanAttrKeys(spans[0]), "langwatch.input")
+}
+
+func TestNewExporter_DefaultTransportAppliesFiltersAndDataCapture(t *testing.T) {
+	rec, endpoint := startReceiver(t)
+
+	exporter, err := NewDefaultExporter(context.Background(),
+		WithAPIKey("sk-lw-test"),
+		WithEndpoint(endpoint),
+		WithDataCapture(DataCaptureNone),
+	)
+	require.NoError(t, err)
+	defer exporter.Shutdown(context.Background())
+
+	require.NoError(t, exporter.ExportSpans(context.Background(), []sdktrace.ReadOnlySpan{
+		richSpanStub("GET /api/users", "net/http", "span").Snapshot(),
+		richSpanStub("llm.chat", "openai", "llm").Snapshot(),
+	}))
+
+	spans := rec.spans()
+	require.Len(t, spans, 1, "the HTTP span is filtered before it is encoded")
+	assert.Equal(t, "llm.chat", spans[0]["name"])
+	keys := spanAttrKeys(spans[0])
+	assert.NotContains(t, keys, "langwatch.input")
+	assert.NotContains(t, keys, "langwatch.output")
+}
+
+func TestNewExporter_WithCompressionOff(t *testing.T) {
+	t.Setenv("LANGWATCH_API_KEY", "")
+	rec, endpoint := startReceiver(t)
+
+	exporter, err := NewExporter(context.Background(),
+		WithEndpoint(endpoint),
+		WithCompression(false),
+		WithHTTPClient(&http.Client{}),
+	)
+	require.NoError(t, err)
+	defer exporter.Shutdown(context.Background())
+
+	require.NoError(t, exporter.ExportSpans(context.Background(), []sdktrace.ReadOnlySpan{
+		richSpanStub("llm.chat", "openai", "llm").Snapshot(),
+	}))
+	require.Len(t, rec.headers, 1)
+	assert.Empty(t, rec.headers[0].Get("Content-Encoding"))
+	assert.Empty(t, rec.headers[0].Get("Authorization"), "no API key, no auth header")
+}
+
+func TestNewExporter_WithTransport(t *testing.T) {
+	t.Run("the transport receives the traces URL and headers and is wrapped", func(t *testing.T) {
+		mock := testutil.NewMockExporter()
+		var gotURL string
+		var gotHeaders map[string]string
+
+		exporter, err := NewExporter(context.Background(),
+			WithAPIKey("sk-lw-test"),
+			WithEndpoint("https://example.test/base"),
+			WithFilters(ExcludeHTTPRequests()),
+			WithTransport(func(_ context.Context, endpointURL string, headers map[string]string) (sdktrace.SpanExporter, error) {
+				gotURL, gotHeaders = endpointURL, headers
+				return mock, nil
+			}),
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t, "https://example.test/base"+TracesPath, gotURL)
+		assert.Equal(t, "Bearer sk-lw-test", gotHeaders["Authorization"])
+		assert.Equal(t, "langwatch-sdk-go", gotHeaders["x-langwatch-sdk-name"])
+
+		require.NoError(t, exporter.ExportSpans(context.Background(), []sdktrace.ReadOnlySpan{
+			testutil.CreateMockSpan("GET /api", "net/http"),
+			testutil.CreateMockSpan("llm.chat", "openai"),
+		}))
+		require.Len(t, mock.GetSpans(), 1)
+		assert.Equal(t, "llm.chat", mock.GetSpans()[0].Name())
+	})
+
+	t.Run("a transport error is returned", func(t *testing.T) {
+		boom := errors.New("boom")
+		exporter, err := NewExporter(context.Background(),
+			WithTransport(func(context.Context, string, map[string]string) (sdktrace.SpanExporter, error) {
+				return nil, boom
+			}),
+		)
+		require.ErrorIs(t, err, boom)
+		assert.Nil(t, exporter)
+	})
+}
