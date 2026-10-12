@@ -36,7 +36,6 @@ async function appWith(organizations: OrganizationApi): Promise<AuthModule> {
       trustedIdpOrigins: undefined,
       idpSimulatorUrl: undefined,
       localPasswords: false,
-      auth0ManagementClientId: undefined,
       socialProviderBases: {
         google: undefined,
         github: undefined,

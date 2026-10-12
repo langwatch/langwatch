@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Everything the auth module does for a caller: the signed-in browser session, and the signed-out front door that stands before they have one — one interface because it is one module, meeting at the same person.
 
-Peers call these through the token, declared at `../contract/src/auth.api.ts:108`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/auth.api.ts:104`; nothing else in this package is public.
 
 #### `offersPasskeys`
 
@@ -416,14 +416,6 @@ Which identity providers this person holds an account through, each named once. 
 
 ```typescript
 findFederatedAccountProviders(input: { userId: string }): Promise<string[]>;
-```
-
-#### `changeFederatedPassword`
-
-Changes the password the Auth0 tenant holds for this person's database identity: the current one is proven first. Main's `changeFederatedPassword`; whether a tenant is configured is decided on each call.
-
-```typescript
-changeFederatedPassword(input: AuthFederatedPasswordChange): Promise<AuthFederatedPasswordOutcome>;
 ```
 
 #### `getSsoSetupStatus`
@@ -925,7 +917,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                                          |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:272`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:269`                            |
 | secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:52` |
 | secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:53` |
 | secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:54` |
@@ -935,21 +927,20 @@ Run by the tasks process, before serve.
 | secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:58` |
 | secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:59` |
 | secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET`                | `src/app/auth.app.ts:275`                            |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:277`                            |
-| config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:21`                  |
-| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:23`                  |
-| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:24`                  |
-| config | `passkeyHandleSecret`         | `PASSKEY_HANDLE_SECRET`                   | `../contract/src/auth.config.ts:26`                  |
-| config | `trustedIdpOrigins`           | `SSO_TRUSTED_IDP_ORIGINS`                 | `../contract/src/auth.config.ts:28`                  |
-| config | `idpSimulatorUrl`             | `LANGWATCH_IDPSIM_URL`                    | `../contract/src/auth.config.ts:29`                  |
-| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`                 | `../contract/src/auth.config.ts:31`                  |
-| config | `auth0ManagementClientId`     | `AUTH0_MGMT_CLIENT_ID`                    | `../contract/src/auth.config.ts:36`                  |
-| config | `signInProviders`             | `AUTH_PROVIDER`                           | `../contract/src/auth.config.ts:38`                  |
-| config | `isSaas`                      | `IS_SAAS`                                 | `../contract/src/auth.config.ts:40`                  |
-| config | `signUpMode`                  | `SIGN_UP_MODE`                            | `../contract/src/auth.config.ts:42`                  |
-| config | `publicBaseUrl`               | `BASE_HOST`                               | `../contract/src/auth.config.ts:44`                  |
-| config | `nodeEnvironment`             | `NODE_ENV`                                | `../contract/src/auth.config.ts:45`                  |
-| config | `cliRefreshTokenTtlSeconds`   | `LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS` | `../contract/src/auth.config.ts:50`                  |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:272`                            |
+| config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:39`                  |
+| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:41`                  |
+| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:42`                  |
+| config | `passkeyHandleSecret`         | `PASSKEY_HANDLE_SECRET`                   | `../contract/src/auth.config.ts:44`                  |
+| config | `trustedIdpOrigins`           | `SSO_TRUSTED_IDP_ORIGINS`                 | `../contract/src/auth.config.ts:46`                  |
+| config | `idpSimulatorUrl`             | `LANGWATCH_IDPSIM_URL`                    | `../contract/src/auth.config.ts:47`                  |
+| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`                 | `../contract/src/auth.config.ts:49`                  |
+| config | `signInProviders`             | `AUTH_PROVIDER`                           | `../contract/src/auth.config.ts:51`                  |
+| config | `socialProviderBases`         | `GOOGLE_SIGN_IN_BASE`                     | `../contract/src/auth.config.ts:52`                  |
+| config | `isSaas`                      | `IS_SAAS`                                 | `../contract/src/auth.config.ts:54`                  |
+| config | `signUpMode`                  | `SIGN_UP_MODE`                            | `../contract/src/auth.config.ts:56`                  |
+| config | `publicBaseUrl`               | `BASE_HOST`                               | `../contract/src/auth.config.ts:58`                  |
+| config | `nodeEnvironment`             | `NODE_ENV`                                | `../contract/src/auth.config.ts:59`                  |
+| config | `cliRefreshTokenTtlSeconds`   | `LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS` | `../contract/src/auth.config.ts:64`                  |
 
 <!-- readme:generated:end -->

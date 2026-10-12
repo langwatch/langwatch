@@ -79,7 +79,6 @@ async function appFor(
       trustedIdpOrigins: undefined,
       idpSimulatorUrl: undefined,
       localPasswords: false,
-      auth0ManagementClientId: undefined,
       socialProviderBases: {
         google: undefined,
         github: undefined,

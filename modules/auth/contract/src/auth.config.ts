@@ -47,11 +47,6 @@ export const authServerConfig = Config.define((c) => ({
   idpSimulatorUrl,
   /** D09: this deployment issues its own passwords beside a federated provider. */
   localPasswords,
-  /**
-   * The Auth0 Machine-to-Machine app a password change goes through; absent,
-   * the login app's `AUTH0_CLIENT_ID` stands in, as main's did.
-   */
-  auth0ManagementClientId: c.env("AUTH0_MGMT_CLIENT_ID", z.string().min(1).optional()),
   /** The shared leaves sso reads too: which provider is named and its public half. */
   signInProviders,
   socialProviderBases,

@@ -72,16 +72,6 @@ const CODEX_AUTH_FAILURE_COPY: Partial<Record<string, { title: string; descripti
   },
 };
 
-/** The Auth0 settings an operator must change, keyed by `meta.reason`; main's wording. */
-const AUTH0_PASSWORD_MISCONFIGURATIONS: Partial<Record<string, string>> = {
-  insufficient_scope:
-    "Auth0 is not authorized to update users. Ask an administrator to enable the update:users scope on the Auth0 Management M2M application.",
-  password_grant_not_enabled:
-    "Auth0 Password grant is not enabled on the Management M2M application. Ask an administrator to enable it under that application's Advanced Settings → Grant Types.",
-  not_configured:
-    "Auth0 is not configured on the server. Set AUTH0_ISSUER plus AUTH0_MGMT_CLIENT_ID/SECRET (or AUTH0_CLIENT_ID/SECRET).",
-};
-
 /** Reads a string out of `meta` without trusting it. */
 const str = (error: HandledErrorShape, key: string, fallback: string): string => {
   const value = error.meta[key];
@@ -1139,21 +1129,6 @@ const presentations = {
   linked_account_not_found: {
     title: "That sign-in method is already gone",
     describe: () => "Reload to see the ones still on your account.",
-  },
-  federated_password_account_missing: {
-    // The person holds only social identities, whose passwords live with the
-    // upstream provider. Nothing here can change one, and nothing they do in
-    // this app will add one.
-    title: "There's no password on this account",
-    describe: () => "You sign in through another provider, so change your password with them.",
-  },
-  federated_password_change_unavailable: {
-    // fault: platform. The identity provider refused for a reason only whoever
-    // configured it can fix; a known `meta.reason` names the setting, as main did.
-    title: "We couldn't change your password",
-    describe: (error) =>
-      AUTH0_PASSWORD_MISCONFIGURATIONS[str(error, "reason", "")] ??
-      "Ask whoever set up LangWatch here to check the sign-in configuration.",
   },
   prompt_not_found: {
     title: "Prompt not found",

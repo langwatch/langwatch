@@ -180,7 +180,6 @@ func (s *Server) handleControlConfig(w http.ResponseWriter, r *http.Request) {
 		SkewSeconds   *int      `json:"skewSeconds"`
 		Amr           *[]string `json:"amr"`
 		EmailVerified *string   `json:"emailVerified"`
-		Auth0Scopes   *[]string `json:"auth0Scopes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "unparseable config body", http.StatusBadRequest)
@@ -204,13 +203,9 @@ func (s *Server) handleControlConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		s.record(t, Event{Kind: "config.email_verified", Outcome: OutcomeOK, Detail: "ID tokens carry email_verified " + *body.EmailVerified})
 	}
-	if body.Auth0Scopes != nil {
-		t.SetAuth0ManagementScopes(*body.Auth0Scopes)
-		s.record(t, Event{Kind: "config.auth0", Outcome: OutcomeOK, Detail: "Management tokens carry " + strings.Join(t.Auth0ManagementScopes(), ",")})
-	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"samlpSubjects": t.SamlpSubjects(), "skewSeconds": int(t.Skew() / time.Second),
-		"amr": t.Amr(), "emailVerified": t.EmailVerifiedSetting(), "auth0Scopes": t.Auth0ManagementScopes(),
+		"amr": t.Amr(), "emailVerified": t.EmailVerifiedSetting(),
 	})
 }
 
