@@ -88,8 +88,9 @@ func havenOnPath() bool {
 // instance-admin operations comparable rather than symmetrically unauthorized.
 func havenEnv(inherit []string, slug string) []string {
 	return havenrun.Env(inherit, slug, havenrun.EnvOptions{
-		ExtraManagedKeys: []string{"LANGWATCH_INSTANCE_ADMIN_API_KEY", "FEATURE_FLAG_FORCE_ENABLE", "API_RATE_LIMIT_REQUESTS", "API_RATE_LIMIT_SECONDS"},
+		ExtraManagedKeys: []string{"LANGWATCH_INSTANCE_ADMIN_API_KEY", "FEATURE_FLAG_FORCE_ENABLE", "API_RATE_LIMIT_REQUESTS", "API_RATE_LIMIT_SECONDS", "HAVEN_AUTO_SEED"},
 		Extra: []string{
+			havenNoAutoSeed,
 			"LANGWATCH_INSTANCE_ADMIN_API_KEY=" + throwawayInstanceAdminKey,
 			"FEATURE_FLAG_FORCE_ENABLE=" + forcedFeatureFlags,
 			"API_RATE_LIMIT_REQUESTS=" + raisedRateLimitRequests,
@@ -201,6 +202,9 @@ func (state *bootState) bootThroughHaven(ctx context.Context, booted *Booted) er
 		if err := state.havenWaitReady(ctx, instance); err != nil {
 			return err
 		}
+		if err := state.havenWaitSeeded(ctx, instance); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -240,6 +244,9 @@ func (state *bootState) havenPrepareInstance(ctx context.Context, instance Insta
 		return fmt.Errorf("prepare %s: copy env: %w", instance.Name, err)
 	}
 	state.logf("prepare %s: copy .env files exit=ok (copied %d)", instance.Name, copied)
+	if err := enableMonolithWorkers(instance); err != nil {
+		return fmt.Errorf("prepare %s: enable the monolith's workers: %w", instance.Name, err)
+	}
 	if state.prepared {
 		state.logf("prepare %s: the parity phase prepared this worktree", instance.Name)
 		return nil
@@ -421,4 +428,5 @@ func (state *bootState) destroyHavenStacks(ctx context.Context) {
 			state.logf("teardown: haven down --destroy --stack %s: %v", slug, err)
 		}
 	}
+	state.flushHavenRedis(ctx)
 }

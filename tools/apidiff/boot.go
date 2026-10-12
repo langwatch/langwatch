@@ -575,6 +575,12 @@ type bootState struct {
 	// havenSlugs are the stacks this run started, in order. The teardown
 	// destroys these and nothing else.
 	havenSlugs []string
+	// seedProbe answers the status the seeded project key gets on a base URL;
+	// nil (tests) skips the wait for haven's identity seed (haven-seed.go).
+	seedProbe func(ctx context.Context, baseURL string) int
+	// havenRedis are the Redis databases the run's stacks held, emptied once
+	// they are destroyed (haven-seed.go).
+	havenRedis []havenRedisSlot
 	// inherit overrides the process environment the child commands are
 	// composed from; nil means os.Environ(). Tests supply their own.
 	inherit []string
