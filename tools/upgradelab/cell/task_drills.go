@@ -51,10 +51,8 @@ func DrillCommand(ctx context.Context, args []string, stdout io.Writer) (int, er
 	if err != nil {
 		return 2, err
 	}
-	if options.PostgresBase == "" || options.ClickHouseBase == "" {
-		if options.PostgresBase, options.ClickHouseBase, err = HavenServers(ctx); err != nil {
-			return 2, err
-		}
+	if options, err = withHavenServers(ctx, options); err != nil {
+		return 2, err
 	}
 	cell, err := prepare(options)
 	if err != nil {

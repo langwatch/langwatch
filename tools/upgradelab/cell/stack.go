@@ -61,6 +61,24 @@ func (stores Stores) queryURL(label string) string {
 // RedisURL is the cell's own redis-server; the branch reads no db index, so no shared server is safe.
 func (stores Stores) RedisURL() string { return "redis://127.0.0.1:" + stores.RedisPort }
 
+// withHavenServers fills only the server URLs no flag named, so -clickhouse-base alone keeps its replica.
+func withHavenServers(ctx context.Context, options Options) (Options, error) {
+	if options.PostgresBase != "" && options.ClickHouseBase != "" {
+		return options, nil
+	}
+	postgres, clickhouse, err := HavenServers(ctx)
+	if err != nil {
+		return options, err
+	}
+	if options.PostgresBase == "" {
+		options.PostgresBase = postgres
+	}
+	if options.ClickHouseBase == "" {
+		options.ClickHouseBase = clickhouse
+	}
+	return options, nil
+}
+
 // HavenServers reads `haven db url`: this checkout's native Postgres and ClickHouse, database stripped.
 func HavenServers(ctx context.Context) (postgres, clickhouse string, err error) {
 	out, err := exec.CommandContext(ctx, "haven", "db", "url").Output()

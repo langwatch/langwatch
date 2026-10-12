@@ -85,10 +85,8 @@ func ProduceCommand(ctx context.Context, args []string, stdout io.Writer) (int, 
 		return 2, err
 	}
 	options.Shots, options.Stdout = false, stdout
-	if options.PostgresBase == "" || options.ClickHouseBase == "" {
-		if options.PostgresBase, options.ClickHouseBase, err = HavenServers(ctx); err != nil {
-			return 2, err
-		}
+	if options.Options, err = withHavenServers(ctx, options.Options); err != nil {
+		return 2, err
 	}
 	dir, err := Produce(ctx, options)
 	if err != nil {
