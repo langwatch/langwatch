@@ -101,14 +101,14 @@ func enableMonolithWorkers(instance Instance) error {
 		return nil
 	}
 	path := filepath.Join(instance.Dir, "platform", "app", ".env")
-	existing, err := os.ReadFile(path) //nolint:gosec // the run's own worktree
+	existing, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	if strings.Contains(string(existing), "\n"+monolithWorkersInProcess+"\n") {
 		return nil
 	}
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec // the run's own worktree
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}

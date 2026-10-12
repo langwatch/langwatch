@@ -179,7 +179,7 @@ func (engine *probeEngine) entitledProbe(operation Operation) []Finding {
 // signed for another key. No licence stored means no keys: main's is cleared
 // too, so an entitled main is never compared against an unentitled branch.
 
-// licensePublicKeyEnv is the key both sides verify licences with.
+// licensePublicKeyEnv is the key both sides verify licenses with.
 const licensePublicKeyEnv = "LANGWATCH_LICENSE_PUBLIC_KEY"
 
 // licensePublicKey is the invoking shell's value, else the root .env's, else
@@ -214,8 +214,8 @@ func (state *bootState) buildEntitlementActivator(ctx context.Context, booted *B
 	}
 	sql := activateEntitlementSQL(licenseKey)
 	activate := func(ctx context.Context) error {
-		for _, instance := range []Instance{booted.A, booted.B} {
-			if _, err := state.sideSQL(ctx, instance, sql); err != nil {
+		for _, instance := range []*Instance{&booted.A, &booted.B} {
+			if _, err := state.sideSQL(ctx, *instance, sql); err != nil {
 				return fmt.Errorf("activate entitlement %s: %w", instance.Name, err)
 			}
 		}

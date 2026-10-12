@@ -73,8 +73,8 @@ func (exec *scenarioExec) analyticsAttempt(label, base string, want *scenarioAna
 		return failure
 	}
 	found := false
-	for _, record := range records {
-		found = found || analyticssim.HasProperties(record, properties)
+	for i := range records {
+		found = found || analyticssim.HasProperties(records[i], properties)
 	}
 	what := fmt.Sprintf("%s %s %q for %q with %v", want.Provider, want.Kind, want.Name, id, properties)
 	if want.Absent && found {

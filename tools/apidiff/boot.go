@@ -307,7 +307,7 @@ type instanceEnvSpec struct {
 	redisURL      string
 	redisDBIndex  string
 	storagePath   string   // LANGWATCH_LOCAL_STORAGE_PATH: where each side stores dataset files
-	publicKey     string   // LANGWATCH_LICENSE_PUBLIC_KEY both sides verify licences with (see licensePublicKey)
+	publicKey     string   // LANGWATCH_LICENSE_PUBLIC_KEY both sides verify licenses with (see licensePublicKey)
 	collaborators []string // collaboratorEnv: LangWatchQL, the judge, the Langy agent stub
 }
 

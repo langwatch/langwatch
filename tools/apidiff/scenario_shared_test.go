@@ -109,7 +109,7 @@ func TestPlaceholdersCarryTimeAndHexIDs(t *testing.T) {
 	}
 	runner := newScenarioRunner(context.Background(), scenarioOptions{A: "http://x", Concurrency: 1})
 	vars := runner.varsFor(runner.sides[0], sharedShard(Keys{}), &scenarioResult{order: 7})
-	if len(vars["uidHex16"]) != 16 || len(vars["uidHex32"]) != 32 || vars["UID"] != strings.ToUpper(vars["uid"]) || vars["userId"] == "" {
+	if len(vars["uidHex16"]) != 16 || len(vars["uidHex32"]) != 32 || !strings.EqualFold(vars["UID"], vars["uid"]) || vars["userId"] == "" {
 		t.Errorf("vars %v", vars)
 	}
 }

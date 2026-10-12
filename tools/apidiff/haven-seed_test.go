@@ -81,7 +81,7 @@ func TestEnableMonolithWorkers(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		written, err := os.ReadFile(filepath.Join(appDir, ".env")) //nolint:gosec // test temp dir
+		written, err := os.ReadFile(filepath.Join(appDir, ".env"))
 		if err != nil {
 			t.Fatal(err)
 		}

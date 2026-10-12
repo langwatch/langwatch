@@ -186,7 +186,7 @@ type stepCheck struct {
 // judge holds a response to an expect and, when it holds, files the captures.
 func (exec *scenarioExec) judge(label string, check stepCheck, result SideResult) *stepError {
 	expect, captures := check.expect, check.captures
-	detail := ""
+	var detail string
 	if expect == nil || expect.empty() {
 		detail = successDetail(result)
 	} else {

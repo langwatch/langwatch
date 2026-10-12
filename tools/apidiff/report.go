@@ -139,8 +139,8 @@ func WriteHumanSummary(writer io.Writer, report Report) error {
 	var output strings.Builder
 	output.WriteString("spec changes:\n")
 	raw := make([]openapidiff.Change, 0, len(report.SpecChanges))
-	for _, change := range report.SpecChanges {
-		raw = append(raw, change.raw)
+	for i := range report.SpecChanges {
+		raw = append(raw, report.SpecChanges[i].raw)
 	}
 	output.WriteString(openapidiff.Render(raw))
 	writeFindingsSection(&output, report.Findings)

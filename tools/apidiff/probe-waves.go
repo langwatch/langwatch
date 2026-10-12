@@ -111,7 +111,8 @@ func (engine *probeEngine) runStage(selected []Operation, lanes [][]int, results
 	}
 	engine.lanes = nil
 	for _, index := range inProbeOrder(lanes) {
-		for _, transcript := range results[index].transcripts {
+		for i := range results[index].transcripts {
+			transcript := &results[index].transcripts[i]
 			captureSucceeded(engine.symbolsA, selected[index].Path, transcript.A)
 			captureSucceeded(engine.symbolsB, selected[index].Path, transcript.B)
 		}
@@ -166,10 +167,10 @@ func (engine *probeEngine) probeAt(selected []Operation, index int) opResult {
 func (engine *probeEngine) fileResults(selected []Operation, results []opResult, stages ...[][]int) ([]Finding, int) {
 	findings, probed := make([]Finding, 0), 0
 	for _, index := range inProbeOrder(slices.Concat(stages...)) {
-		result := results[index]
-		for _, transcript := range result.transcripts {
-			engine.recordOwnerIDs(selected[index], transcript)
-			engine.captureMutation(selected[index], transcript)
+		result := &results[index]
+		for i := range result.transcripts {
+			engine.recordOwnerIDs(selected[index], result.transcripts[i])
+			engine.captureMutation(selected[index], result.transcripts[i])
 		}
 		engine.transcripts = append(engine.transcripts, result.transcripts...)
 		findings = append(findings, result.findings...)

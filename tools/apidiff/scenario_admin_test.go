@@ -165,7 +165,7 @@ func sessionStack(t *testing.T) string {
 		case request.URL.Path == "/api/organizations":
 			writer.WriteHeader(http.StatusNotFound)
 		case request.URL.Path == "/api/auth/sign-in/email":
-			http.SetCookie(writer, &http.Cookie{Name: "session", Value: "admin"})
+			http.SetCookie(writer, &http.Cookie{Name: "session", Value: "admin", Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 		case known && request.Method == http.MethodPost:
 			writer.Header().Set("Content-Type", "application/json")
 			_, _ = writer.Write([]byte(body))

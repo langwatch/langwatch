@@ -256,7 +256,8 @@ func repeatScenarios(items []scenario, count int) []scenario {
 	}
 	repeated := make([]scenario, 0, len(items)*count)
 	for round := 1; round <= count; round++ {
-		for _, item := range items {
+		for i := range items {
+			item := items[i]
 			item.ID = fmt.Sprintf("%s-x%d", item.ID, round)
 			repeated = append(repeated, item)
 		}
