@@ -1,8 +1,17 @@
 import { FullLogo } from "@langwatch/design-system/full-logo";
 import { Kbd } from "@langwatch/design-system/kbd";
-import { Box, Button, Flex, IconButton, Link, Text } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Button,
+  Flex,
+  IconButton,
+  Link,
+  NativeSelect,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { ArrowUpRight, Command, Menu as MenuIcon, Search } from "lucide-react";
 
+import { pagePath } from "../../../lib/site-path.ts";
 import { site } from "../../navigation/ui/site-nav.ts";
 import { GithubLink } from "./github-link.tsx";
 import { ThemeMenu } from "./theme-menu.tsx";
@@ -44,7 +53,11 @@ export function Header({ kind, onMenu }: { kind: PageKind; onMenu: () => void })
         height={{ base: "56px", lg: "72px" }}
         gridTemplateColumns={{ lg: "1fr minmax(15rem, 28rem) 1fr" }}
       >
-        <Flex alignItems="center" gap="3" paddingInlineStart={{ base: "0", lg: "4" }}>
+        <Flex
+          alignItems="center"
+          gap={{ base: "1", lg: "3" }}
+          paddingInlineStart={{ base: "0", lg: "4" }}
+        >
           <IconButton
             variant="ghost"
             colorPalette="gray"
@@ -59,11 +72,12 @@ export function Header({ kind, onMenu }: { kind: PageKind; onMenu: () => void })
             <MenuIcon size={20} aria-hidden="true" />
           </IconButton>
           <Link
-            href="/introduction"
+            href={pagePath({ slug: "introduction" })}
             aria-label="LangWatch documentation"
             display="inline-flex"
             alignItems="center"
             minHeight="44px"
+            css={{ "& > svg": { width: { base: "96px", lg: "128px" }, height: "auto" } }}
             _hover={{ textDecoration: "none" }}
           >
             <FullLogo width={128} height={31.38} />
@@ -78,6 +92,36 @@ export function Header({ kind, onMenu }: { kind: PageKind; onMenu: () => void })
           >
             Docs
           </Text>
+          <Box
+            display="flex"
+            alignItems="center"
+            gap="2"
+            title="Preferred language for code examples"
+          >
+            <Text
+              as="span"
+              fontSize="12px"
+              color="docs.body"
+              display={{ base: "none", xl: "inline" }}
+            >
+              Examples
+            </Text>
+            <NativeSelect.Root size="sm" width={{ base: "7rem", lg: "8rem" }} disabled>
+              <NativeSelect.Field
+                fontSize={{ base: "12px", lg: "14px" }}
+                aria-label="Preferred code language"
+                data-docs-language-preference=""
+                defaultValue="Python"
+              >
+                {["Python", "TypeScript", "JavaScript", "Go", "Java", "curl"].map((language) => (
+                  <option key={language} value={language}>
+                    {language}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+          </Box>
         </Flex>
         <Button
           type="button"

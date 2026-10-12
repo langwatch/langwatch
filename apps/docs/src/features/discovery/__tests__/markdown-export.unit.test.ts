@@ -1,5 +1,9 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
+import { docsRoot } from "../../../paths.ts";
 import { docsFixture } from "../../../testing/docs-fixture.ts";
 import { pageMarkdown } from "../compile/markdown-export.ts";
 
@@ -79,10 +83,81 @@ describe("when a guide declares its title and description", () => {
     });
     try {
       expect(pageMarkdown({ docsRoot: fixture.docsRoot, slug: "guide" })).toBe(
-        `# Agent setup\n\nConnect your coding agent.\n\n${body}\n`,
+        `# Agent setup\n\nConnect your coding agent.\n\n> Page: https://docs.langwatch.ai/guide\n> Source: https://github.com/langwatch/langwatch/blob/main/docs/guide.mdx\n> Index of all pages: https://docs.langwatch.ai/llms.txt\n\n${body}\n`,
       );
     } finally {
       fixture.dispose();
+    }
+  });
+});
+
+/** Every fenced code block in a source, byte for byte. */
+function fencedBlocks({ source }: { source: string }) {
+  return [...source.matchAll(/^(`{3,})[^\n]*\n[\s\S]*?\n\1[ \t]*$/gm)].map((match) => match[0]);
+}
+
+describe("when a guide imports snippets", () => {
+  /** @scenario "Export complete guides with their snippets" */
+  it("inlines an own-line snippet and keeps code, unknown components and odd usages", () => {
+    const fixture = docsFixture({
+      config: {},
+      pages: {
+        "snippets/setup.mdx":
+          "---\ntitle: ignored\n---\n<Tip>Install it.</Tip>\n\n```sh\npip install langwatch\n```",
+        "snippets/inline.mdx": "inline text",
+        "guide.mdx": [
+          'import Setup from "/snippets/setup.mdx";',
+          'import Inline from "/snippets/inline.mdx";',
+          'import Gone from "/snippets/gone.mdx";',
+          "",
+          "See [quick start](/integration/quick-start) and [anchor](#here) and [external](https://x.dev/a).",
+          "",
+          "<Setup />",
+          "",
+          "Text with <Inline /> mid-sentence and <Gone />.",
+          "",
+          "<Unknown prop={1}>kept</Unknown>",
+          "",
+          "```mdx",
+          'import Setup from "/snippets/setup.mdx";',
+          "<Setup />",
+          "[raw](/stays-relative)",
+          "```",
+        ].join("\n"),
+      },
+    });
+    try {
+      const markdown = pageMarkdown({ docsRoot: fixture.docsRoot, slug: "guide" });
+      expect(markdown).toContain("<Tip>Install it.</Tip>\n\n```sh\npip install langwatch\n```");
+      expect(markdown).not.toContain("title: ignored");
+      expect(markdown.split("```mdx")[0]).not.toMatch(/^import Setup/m);
+      expect(markdown).toContain('import Inline from "/snippets/inline.mdx";');
+      expect(markdown).toContain('import Gone from "/snippets/gone.mdx";');
+      expect(markdown).toContain(
+        "[quick start](https://docs.langwatch.ai/integration/quick-start)",
+      );
+      expect(markdown).toContain("[anchor](#here) and [external](https://x.dev/a)");
+      expect(markdown).toContain("<Unknown prop={1}>kept</Unknown>");
+      expect(markdown).toContain(
+        '```mdx\nimport Setup from "/snippets/setup.mdx";\n<Setup />\n[raw](/stays-relative)\n```',
+      );
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  /** @scenario "Export complete guides with their snippets" */
+  it("exports real guides with their snippet content and every code block intact", () => {
+    for (const [slug, snippet] of [
+      ["concepts", "agent-report-notice"],
+      ["api-reference/evaluators/overview", "evaluators-list"],
+    ]) {
+      const source = readFileSync(path.join(docsRoot, `${slug}.mdx`), "utf8");
+      const markdown = pageMarkdown({ docsRoot, slug });
+      const snippetSource = readFileSync(path.join(docsRoot, `snippets/${snippet}.mdx`), "utf8");
+      expect(markdown).toContain(snippetSource.trim().split("\n")[0]);
+      expect(markdown).not.toContain(`/snippets/${snippet}.mdx`);
+      for (const block of fencedBlocks({ source })) expect(markdown).toContain(block);
     }
   });
 });

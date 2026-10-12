@@ -35,4 +35,34 @@ describe("when built pages contain local links and redirects", () => {
       fixture.dispose();
     }
   });
+
+  /** @scenario "Build the documentation under a base path" */
+  it("checks a /docs build against its mount and flags links that escape it", () => {
+    const fixture = docsFixture({ config: {} });
+    try {
+      mkdirSync(path.join(fixture.docsRoot, "guide"));
+      writeFileSync(
+        path.join(fixture.docsRoot, "redirects.json"),
+        JSON.stringify({ "/old": "/guide#install" }),
+      );
+      writeFileSync(
+        path.join(fixture.docsRoot, "guide/index.html"),
+        '<h1 id="install">Install</h1>',
+      );
+      writeFileSync(
+        path.join(fixture.docsRoot, "index.html"),
+        '<link rel="canonical" href="https://docs.langwatch.ai/"><a href="/docs/old">Old</a><a href="/docs/guide#install">Guide</a><a href="guide">Relative</a><a href="/guide">Unprefixed</a><a href="/docs/missing">Missing</a>' +
+          '<video src="/media/x.mp4" poster="/docs/media/x.jpg"></video><img src="https://cdn.example/a.png" srcset="/docs/a-1.webp 1x, /images/a-2.webp 2x">',
+      );
+      const report = checkLinks({ outDir: fixture.docsRoot, basePath: "/docs" });
+      expect(report.issues).toEqual([
+        { source: "/", href: "/media/x.mp4", code: "outside-base-path" },
+        { source: "/", href: "/images/a-2.webp", code: "outside-base-path" },
+        { source: "/", href: "/guide", code: "outside-base-path" },
+        { source: "/", href: "/docs/missing", code: "missing-target" },
+      ]);
+    } finally {
+      fixture.dispose();
+    }
+  });
 });

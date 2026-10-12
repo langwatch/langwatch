@@ -1,5 +1,5 @@
-import { Box, Button, Flex, Text } from "@langwatch/design-system/primitives";
-import { Play } from "lucide-react";
+import { Box, Button, Flex, Text, chakra } from "@langwatch/design-system/primitives";
+import { ChevronDown, Play } from "lucide-react";
 
 import { TypeRegion } from "../../../lib/type-mode.tsx";
 import { DocsField } from "../../content/ui/fields.tsx";
@@ -109,8 +109,22 @@ export function Responses({ operation }: { operation: Operation }) {
   return (
     <Section title="Responses">
       {operation.responses.map((response) => (
-        <Box key={response.status} paddingY="3" borderBottomWidth="1px" borderColor="border.muted">
-          <Flex gap="3" alignItems="baseline">
+        <chakra.details
+          className="docs-response-schema"
+          key={response.status}
+          open={response.status.startsWith("2")}
+          paddingY="2"
+          borderBottomWidth="1px"
+          borderColor="border"
+        >
+          <Flex
+            as="summary"
+            gap="3"
+            alignItems="baseline"
+            cursor="pointer"
+            listStyleType="none"
+            minHeight="36px"
+          >
             <Box
               as="code"
               fontFamily="mono"
@@ -122,6 +136,7 @@ export function Responses({ operation }: { operation: Operation }) {
             <Text margin="0" fontSize="14px" lineHeight="22px" color="docs.body">
               {response.description}
             </Text>
+            <ChevronDown size={16} aria-hidden="true" />
           </Flex>
           {response.contents.map((content) =>
             content.schema ? (
@@ -133,7 +148,7 @@ export function Responses({ operation }: { operation: Operation }) {
               </Box>
             ) : null,
           )}
-        </Box>
+        </chakra.details>
       ))}
     </Section>
   );
@@ -159,7 +174,7 @@ export function EndpointReference({
   ].filter((group) => group.params.length > 0);
   const bodyContent = operation.body?.contents[0];
   return (
-    <TypeRegion mode="productive">
+    <TypeRegion mode="productive" className="docs-api-reference">
       {operation.schemes.length > 0 ? (
         <Section title="Authorisation">
           {operation.schemes.map((scheme) => (

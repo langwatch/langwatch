@@ -1,9 +1,11 @@
+import { sitePath } from "../../../lib/site-path.ts";
+
 async function copyText({ button }: { button: HTMLButtonElement }) {
   const agent = button.closest(".docs-agent-launcher")?.querySelector<HTMLSelectElement>("select");
   if (agent) return `npx langwatch ${agent.value}`;
   const slug = button.dataset.docsPageCopy;
   if (slug) {
-    const response = await fetch(`/${slug}.md`, { credentials: "omit" });
+    const response = await fetch(sitePath({ path: `/${slug}.md` }), { credentials: "omit" });
     if (!response.ok) throw new Error("Markdown unavailable");
     return response.text();
   }
@@ -23,7 +25,7 @@ async function copy({ button }: { button: HTMLButtonElement }) {
   const original = button.innerHTML;
   const label = button.getAttribute("aria-label");
   const output =
-    button.closest(".docs-agent-start")?.querySelector("output") ??
+    button.closest(".docs-agent-start, .docs-agent-launcher")?.querySelector("output") ??
     button.parentElement?.querySelector("output");
   try {
     await navigator.clipboard.writeText(await copyText({ button }));

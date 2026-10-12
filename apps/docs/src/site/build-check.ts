@@ -21,7 +21,7 @@ function configuredSlugs({ items }: { items: DocsItem[] }): string[] {
 }
 
 /** The published inventory matches the configuration: pages, redirects, exports, search. */
-export async function checkBuild({ outDir }: { outDir: string }) {
+export async function assertBuild({ outDir }: { outDir: string }) {
   const anchors = readDocsConfig({ docsRoot }).navigation?.anchors ?? [];
   const slugs = [
     ...new Set(

@@ -26,21 +26,26 @@ const STEPS_CSS = {
       alignItems: "center",
       justifyContent: "center",
       borderRadius: "full",
-      bg: "bg.subtle",
-      color: "fg",
+      bg: "accent.solid",
+      color: "docs.primaryText",
+      boxShadow:
+        "0 0 0 4px var(--chakra-colors-accent-subtle), 0 2px 6px color-mix(in srgb, var(--chakra-colors-accent-solid) 35%, transparent)",
       fontFamily: "body",
       fontSize: "14px",
       lineHeight: "20px",
-      fontWeight: "600",
+      fontWeight: "700",
+      fontVariantNumeric: "tabular-nums",
     },
     "&:not(:last-of-type)::after": {
       content: '""',
       position: "absolute",
-      insetInlineStart: "13.5px",
-      top: "36px",
+      insetInlineStart: "13px",
+      top: "40px",
       bottom: "8px",
-      width: "1px",
-      bg: "border.muted",
+      width: "2px",
+      borderRadius: "full",
+      background:
+        "linear-gradient(to bottom, color-mix(in srgb, var(--chakra-colors-accent-solid) 55%, transparent), var(--chakra-colors-border) 85%)",
     },
     "&:last-of-type": { paddingBottom: "0" },
   },
@@ -78,9 +83,9 @@ export function Step({
           margin="0"
           marginBottom="3"
           paddingTop="0"
-          fontSize="16px"
+          fontSize="17px"
           lineHeight="28px"
-          fontWeight="var(--docs-weight-heading)"
+          fontWeight="600"
           fontFamily="var(--docs-font-heading)"
         >
           {icon ? <Icon icon={icon} size={18} /> : null}

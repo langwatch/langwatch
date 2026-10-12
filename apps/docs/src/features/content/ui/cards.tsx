@@ -4,6 +4,7 @@ import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { Children, isValidElement } from "react";
 import type { ReactNode } from "react";
 
+import { sitePath } from "../../../lib/site-path.ts";
 import { Icon } from "./icon.tsx";
 import { DocsLink } from "./prose.tsx";
 
@@ -26,7 +27,7 @@ type CardProps = {
 };
 
 const STRETCH = {
-  "&::after": { content: '""', position: "absolute", inset: "0", borderRadius: "sm" },
+  "&::after": { content: '""', position: "absolute", inset: "-1px", borderRadius: "2xl" },
   "&:focus-visible": { outline: "none" },
   "&:focus-visible::after": {
     outline: "2px solid",
@@ -48,14 +49,45 @@ function CardHeading({
 }) {
   const Direction = external ? ArrowUpRight : ArrowRight;
   return (
-    <Flex alignItems="center" gap="1" fontSize="16px" lineHeight="24px" fontWeight="600" color="fg">
-      <span>{title}</span>
-      {href && showArrow ? <Direction size={16} aria-hidden="true" /> : null}
+    <Flex
+      alignItems="center"
+      gap="3"
+      minWidth="0"
+      width="100%"
+      fontSize="16px"
+      lineHeight="24px"
+      fontWeight="600"
+      color="fg"
+    >
+      <Text as="span" flex="1" minWidth="0">
+        {title}
+      </Text>
+      {href && showArrow ? (
+        <Flex
+          as="span"
+          className="docs-card-action"
+          alignItems="center"
+          justifyContent="center"
+          flexShrink={0}
+          width="28px"
+          height="28px"
+          borderRadius="full"
+          bg="accent.subtle"
+          color="accent.fg"
+        >
+          <Direction className="docs-card-arrow" size={18} aria-hidden="true" />
+        </Flex>
+      ) : null}
     </Flex>
   );
 }
 
-/** A linked reading row; authored links inside keep their own targets. */
+/** An asset path is a third-party logo; it sits on a light chip so dark marks stay visible. */
+function isLogo(icon: string) {
+  return /^(\/|https?:)/.test(icon);
+}
+
+/** A bordered card at rest; a link adds a hover lift and accent edge, never the card itself. */
 export function Card({
   title,
   description,
@@ -69,6 +101,7 @@ export function Card({
   const stretch = Boolean(href) && !containsLink({ node: children });
   const compact = Boolean(icon && !description && !Children.toArray(children).length);
   const showArrow = Boolean(href) && arrow !== false && arrow !== "false";
+  const logo = Boolean(icon && isLogo(icon));
   const heading = (
     <CardHeading title={title} href={href} external={external} showArrow={showArrow} />
   );
@@ -76,38 +109,39 @@ export function Card({
     <Box
       className="docs-card"
       data-compact={compact}
+      data-linked={Boolean(href) || void 0}
       position="relative"
       display="flex"
       flexDirection="row"
       alignItems={compact ? "center" : "flex-start"}
-      gap="4"
-      paddingY="4"
-      paddingX="2"
+      gap={compact ? "3" : "4"}
+      padding={compact ? "3" : "5"}
       minHeight={compact ? "64px" : void 0}
-      borderTopWidth="1px"
-      borderColor="border"
-      borderRadius="sm"
-      bg="transparent"
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      borderRadius="2xl"
+      bg="docs.raised"
       minWidth="0"
     >
       {icon ? (
         <Flex
+          className={logo ? "docs-card-logo" : "docs-card-icon"}
           alignItems="center"
           justifyContent="center"
           flexShrink={0}
-          width="2.25rem"
-          height="2.25rem"
+          width="2.5rem"
+          height="2.5rem"
           borderRadius="lg"
-          bg="transparent"
+          borderWidth="1px"
           color="accent.fg"
         >
-          <Icon icon={icon} size={compact ? 24 : 20} />
+          <Icon icon={icon} size={logo ? 24 : 20} />
         </Flex>
       ) : null}
-      <Flex direction="column" gap="2" minWidth="0" flex="1">
+      <Flex direction="column" gap="1.5" minWidth="0" flex="1">
         {title && href ? (
           <Link
-            href={href}
+            href={sitePath({ path: href })}
             color="fg"
             textDecoration="none"
             _hover={{ textDecoration: "none" }}
@@ -118,7 +152,7 @@ export function Card({
         ) : null}
         {title && !href ? heading : null}
         {description ? (
-          <Text fontSize="14px" lineHeight="24px" color="fg.muted" margin="0">
+          <Text fontSize="14px" lineHeight="24px" color="docs.body" margin="0">
             {description}
           </Text>
         ) : null}
@@ -127,7 +161,7 @@ export function Card({
             className="docs-card-body"
             fontSize="14px"
             lineHeight="24px"
-            color="fg.muted"
+            color="docs.body"
             minWidth="0"
           >
             {children}
@@ -153,8 +187,7 @@ export function CardGroup({
         className="docs-card-grid"
         display="grid"
         alignItems="stretch"
-        columnGap="8"
-        rowGap="0"
+        gap="3"
         css={{
           gridTemplateColumns: "minmax(0, 1fr)",
           "@container (min-width: 480px)": {

@@ -1,5 +1,6 @@
 import { Box, Button } from "@langwatch/design-system/primitives";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { createDesignSystem } from "@langwatch/design-system/system";
 import { MDXProvider } from "@mdx-js/react";
 import { Search } from "lucide-react";
 import nav from "virtual:docs-nav";
@@ -13,9 +14,12 @@ import { mdxComponents } from "../features/content/ui/mdx-components.ts";
 import { DocsShell } from "../features/shell/ui/shell.tsx";
 import { TypeRegion } from "../lib/type-mode.tsx";
 import type { PageModule } from "./pages.ts";
-import { docsSystem } from "./theme.ts";
+import { docsTheme } from "./theme-config.ts";
 
 import "./docs.css";
+
+/** Every recipe, for the prerender; browser islands use `docsIslandSystem` instead. */
+const docsSystem = createDesignSystem(docsTheme);
 
 export type AppProps = {
   slug: string;

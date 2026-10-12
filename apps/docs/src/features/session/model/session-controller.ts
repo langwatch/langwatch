@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/mini";
 
 import type { RequestState } from "../../api-reference/model/codegen.ts";
 import { liveRequest } from "../../api-reference/model/codegen.ts";

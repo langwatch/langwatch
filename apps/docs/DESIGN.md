@@ -59,11 +59,13 @@ Native links and disclosure elements remain usable without JavaScript.
 
 A small hand-written service worker is worthwhile for repeat/offline reading,
 not as a prerequisite for fast navigation. It precaches the bootstrap, extracted
-styles, reading fonts and a standalone offline page. React, playground code, images and video
+styles, the Latin reading font and a standalone offline page. Other font faces cache on demand. React, playground code, images and video
 are not precached. Public page HTML and search use stale-while-revalidate for at
 most 60 seconds, then network-first with cached offline fallback. Page caches are
 bounded to 40 entries. Hashed assets are cache-first. Non-GET, cross-origin,
-query-bearing, API, tRPC and authentication-header requests bypass caching;
+arbitrary query-bearing, API, tRPC and authentication-header requests bypass caching;
+the public index's build-version query supports offline search. The worker is
+scoped to the mount and bounds both page and demand-loaded asset caches;
 private/no-store responses are not stored.
 
 The worker version hashes the rendered documents, including hashed CSS/JS
@@ -78,20 +80,32 @@ See [MDN lifecycle guidance](https://developer.mozilla.org/en-US/docs/Web/API/Se
 
 The page has three document-flow regions: sticky header, a floating paper panel,
 and a full-width footer outside that panel. A 32-pixel desktop gap exposes the
-ambient ground above rounded paper corners. Tall navigation and contents rails
-flow with the document; only rails that fit the available viewport become sticky.
+ambient ground above rounded paper corners. The navigation rail stays below the
+header and scrolls on its own; a tall contents rail flows with the document and
+only one that fits the available viewport becomes sticky.
 Code, tables, prompts and API responses have no vertical scroll limit. The sidebar is 280 pixels
 wide with compact method badges. Operation labels occupy at most two lines, with
-full text retained for assistive technology and in the title. Only the current navigation branch starts expanded. Initial loading keeps the
-article and top gap in view; deeper active links remain in their expanded branch
-without moving the document away from its heading. The mobile drawer and command
-bar are overlays with bounded scrolling.
+full text retained for assistive technology and in the title.
+
+The page tree draws a faint guide line down every open group, at every depth, and
+marks the current page on it. Group headers are links (an authored `root`, else the
+group's first page) with a separate chevron that opens the group. Groups start open
+when they hold the current page, are authored `expanded` (the integration
+categories and their providers), hold a single page, or are endpoint groups of
+four or fewer; endpoint groups show their endpoint count. Integration pages show
+the brand logo their overview card uses, on a light chip so dark marks stay
+legible. Client navigation carries the rail's scroll and open groups to the next
+page and compensates for the document scrolling to the top, so no link moves
+under the pointer. Initial loading keeps the article and top gap in view; the
+rail, never the document, scrolls to an active link outside its view. The
+mobile drawer and command bar are overlays with bounded scrolling.
 
 ## Verification and budgets
 
 `pnpm --filter @langwatch/docs-site size --out-dir <build> --before <baseline>`
-reports raw and gzipped sizes and fails if bootstrap plus idle controls exceed
-15,000 gzipped bytes. `test:performance` exercises zero-JavaScript styling,
+reports raw and gzipped sizes and fails above 3,000 bytes for initial reading or
+15,000 bytes for bootstrap plus idle controls. It also reports deferred reading,
+shader and interaction costs separately. `test:performance` exercises zero-JavaScript styling,
 client navigation, prefetch reuse, worker updates/offline fallback and a lazy API
 request. `test:layout` checks 1280/1440/1670/390 widths in both themes. Existing
 smoke and mock-session tests continue to cover the interactive surface.
@@ -101,7 +115,11 @@ smoke and mock-session tests continue to cover the interactive surface.
 Search uses the published CommandBarSurface, Input, Group, Item and Footer from
 the design system. The portal-based surface cannot be extracted as a closed
 static frame, so its React/Chakra runtime loads only when search is requested.
-The contextual Menu surfaces share that deferred runtime. No navigation-module
+The contextual Menu surfaces share that deferred runtime. Their explicit design-system
+provider uses the five recipes those islands render and the shared semantic foundation;
+it does not pull in a second full theme or next-themes. Prerendering keeps the
+full system. A new interactive Chakra component needs its recipe added to
+`src/app/island-theme.ts` and covered in the island parity checks. No navigation-module
 browser code is imported. A docs-local result/action model leaves room for a
 future search mode without enabling Langy. Keyboard navigation keeps the caret
 in the search field and identifies its active result; Enter opens it, modifier
@@ -134,9 +152,14 @@ controls remember dismissal by version, so another release is visible again.
 There is no fetch or rendering runtime for the strip. Missing or invalid notes
 omit it. The two newest releases are injected into the existing releases page
 and its Markdown output at build time, above the authored support policy.
-Sidebars and mobile navigation expose the supported CLI command selector and
-setup-guide link on every page.
+Sidebars and mobile navigation show the CLI command as one terminal line, with a
+setup-guide link, on every page. The command prefix stays readable;
+the idle reading script types successive supported agent names. It pauses while
+hovered or focused, stops on a deliberate choice, and stays still for reduced
+motion. The picker has a visible chevron and copies its complete command. A
+manual choice is retained across client navigation. Its caption reads “Trace any
+coding agent”.
 
-The reading surface uses compact linked rows instead of repeated raised cards. Coding-agent setup is a real CLI command selector in every sidebar, with direct setup links on its overview. The overview's existing product capture supplies visual context; it remains a screenshot, not an interactive demo. The wider contents rail highlights only the active heading. Overflowing tab strips show a scrolling hint, reveal keyboard-selected tabs horizontally, and preserve document scroll. The footer and document overscroll share opaque paper.
+Linked cards are real cards at rest: a raised surface with a full border, an outline icon or a light logo chip (so dark third-party marks stay visible in both themes), title and description; hover only adds lift and an accent edge. Steps use solid accent number markers joined by an accent line, and authored tabs sit in one framed panel with a raised active tab. Coding-agent setup is a real CLI command line in every sidebar, with direct setup links on its overview. The overview's existing product capture supplies visual context; it remains a screenshot, not an interactive demo. The contents rail curves between nesting levels and animates the active segment; reduced motion disables the animation. Overflowing tab strips show a scrolling hint, reveal keyboard-selected tabs horizontally, and preserve document scroll. The footer and document overscroll share opaque paper.
 
 Design-system ownership remains tokens, primitives, accessible menus/dialogs/tabs, brand assets, command bar and ambient rendering. Documentation owns its page grid, navigation tree, ToC, prose/MDX adapters, release strip, agent setup composition, copy controls and exports.

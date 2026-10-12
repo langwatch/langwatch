@@ -25,7 +25,12 @@ export function docsMdxPlugin({ docsRoot }: { docsRoot: string }): Plugin {
       remarkDocsContent,
       [remarkDocsLinks, { docsRoot }],
     ],
-    rehypePlugins: [rehypeSlug, rehypeDocsMedia, rehypeDocsCode, rehypeDocsHeadings],
+    rehypePlugins: [
+      rehypeSlug,
+      [rehypeDocsMedia, { docsRoot }],
+      rehypeDocsCode,
+      rehypeDocsHeadings,
+    ],
   });
   const compile = inner.transform;
   if (typeof compile !== "function") throw new Error("@mdx-js/rollup exposes no transform");

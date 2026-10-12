@@ -2,7 +2,17 @@ import type { Release } from "../../releases/model/release.ts";
 
 export type NavItem =
   | { type: "page"; slug: string; title: string }
-  | { type: "group"; title: string; children: NavItem[] };
+  | {
+      type: "group";
+      title: string;
+      children: NavItem[];
+      /** The group's own page, `slug` or `slug#heading`; its first page otherwise. */
+      root?: string;
+      /** Authored `expanded: true`: the group starts open on every page. */
+      expanded?: boolean;
+      /** An icon name or logo path, authored or taken from its first page with a logo. */
+      icon?: string;
+    };
 
 export type PageMeta = {
   title: string;
@@ -11,6 +21,8 @@ export type PageMeta = {
   openapi: string;
   mode: string;
   icon: string;
+  /** A brand logo path from an overview card linking here, e.g. /images/logos/mastra.svg. */
+  logo: string;
 };
 
 export type SiteMeta = {
@@ -48,6 +60,50 @@ export function firstSlug({ items }: { items: NavItem[] }): string {
 
 export function ownsSlug({ items, slug }: { items: NavItem[]; slug: string }): boolean {
   return flatPages({ items }).some((page) => page.slug === slug);
+}
+
+type Group = Extract<NavItem, { type: "group" }>;
+const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+/** Endpoint groups this small start open, so short API lists need no extra click. */
+export const SMALL_ENDPOINT_GROUP = 4;
+
+/** "GET" for an `openapi: GET /path` page; null for prose pages and bare-path references. */
+export function methodOf({ meta }: { meta: PageMeta | undefined }): string | null {
+  const first = meta?.openapi.split(/\s+/)[0]?.toUpperCase() ?? "";
+  return METHODS.includes(first) ? first : null;
+}
+
+/** How many endpoint pages the group holds at any depth. */
+export function endpointCount({
+  group,
+  pages,
+}: {
+  group: Group;
+  pages: Record<string, PageMeta>;
+}): number {
+  return flatPages({ items: group.children }).filter((page) => methodOf({ meta: pages[page.slug] }))
+    .length;
+}
+
+/** Where a group header links: its authored root, otherwise its first page. */
+export function groupTarget({ group }: { group: Group }): string {
+  return group.root ?? firstSlug({ items: group.children });
+}
+
+/** Authored-open groups, the current branch, single pages and small endpoint lists start open. */
+export function startsOpen({
+  group,
+  slug,
+  pages,
+}: {
+  group: Group;
+  slug: string;
+  pages: Record<string, PageMeta>;
+}): boolean {
+  if (group.expanded || ownsSlug({ items: group.children, slug })) return true;
+  const size = flatPages({ items: group.children }).length;
+  const endpoints = endpointCount({ group, pages });
+  return size === 1 || (endpoints === size && endpoints <= SMALL_ENDPOINT_GROUP);
 }
 
 /** Group titles from the section root down to the page. */

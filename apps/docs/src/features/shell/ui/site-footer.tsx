@@ -3,6 +3,7 @@ import { GitHubIcon } from "@langwatch/design-system/icons";
 import { Box, Flex, Link, Text } from "@langwatch/design-system/primitives";
 import { ArrowUpRight } from "lucide-react";
 
+import { sitePath } from "../../../lib/site-path.ts";
 import { site } from "../../navigation/ui/site-nav.ts";
 
 const FOOTER_GROUPS = [
@@ -84,7 +85,7 @@ export function SiteFooter() {
               {group.links.map((link) => (
                 <Link
                   key={link.href}
-                  href={link.href}
+                  href={sitePath({ path: link.href })}
                   fontSize="14px"
                   minHeight={{ base: "44px", md: "32px" }}
                   color="docs.body"

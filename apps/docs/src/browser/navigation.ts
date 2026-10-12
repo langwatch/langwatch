@@ -1,8 +1,12 @@
+import { docsBasePath } from "../config.ts";
+
 const pages = new Map<string, { at: number; html: Promise<string> }>();
 const positions = new Map<string, number>();
 let current = location.href;
 let navigating = 0;
-let prefetchObserver: IntersectionObserver | null = null;
+
+/** The deferred prefetch island asks for a page; `result` settles once its HTML is cached. */
+export type PrefetchRequest = { anchor: HTMLAnchorElement; result?: Promise<void> };
 
 function pageUrl({ anchor }: { anchor: HTMLAnchorElement }): URL | null {
   const url = new URL(anchor.href);
@@ -10,6 +14,8 @@ function pageUrl({ anchor }: { anchor: HTMLAnchorElement }): URL | null {
     return null;
   if (url.origin !== location.origin || url.search || /\.[a-z0-9]+$/i.test(url.pathname))
     return null;
+  // Only this site's pages swap in place; the app beside a /docs mount is a full load.
+  if (!`${url.pathname}/`.startsWith(`${docsBasePath}/`)) return null;
   if (url.pathname === location.pathname && url.hash) return null;
   return url;
 }
@@ -36,24 +42,10 @@ async function fetchPage({ url }: { url: URL }) {
   }
 }
 
-function prefetch({ anchor }: { anchor: HTMLAnchorElement }) {
-  const url = pageUrl({ anchor });
-  if (url && navigator.onLine) void fetchPage({ url }).catch(() => {});
-}
-
-function observeLinks() {
-  prefetchObserver?.disconnect();
-  let count = 0;
-  prefetchObserver = new IntersectionObserver((entries) => {
-    for (const entry of entries) {
-      if (!entry.isIntersecting || !(entry.target instanceof HTMLAnchorElement)) continue;
-      prefetchObserver?.unobserve(entry.target);
-      if (count++ < 3) prefetch({ anchor: entry.target });
-    }
-  });
-  document
-    .querySelectorAll<HTMLAnchorElement>("#content a[href^='/']")
-    .forEach((anchor) => prefetchObserver?.observe(anchor));
+function prefetch({ event }: { event: Event }) {
+  const request = (event as CustomEvent<PrefetchRequest>).detail;
+  const url = pageUrl({ anchor: request.anchor });
+  if (url) request.result = fetchPage({ url }).then(() => {});
 }
 
 async function installStyles({ next }: { next: Document }) {
@@ -111,7 +103,6 @@ function finishNavigation({ url, restored }: { url: URL; restored: boolean }) {
   else window.scrollTo({ top: restored ? (positions.get(url.href) ?? 0) : 0, behavior: "instant" });
   const announcement = document.getElementById("docs-navigation-status");
   if (announcement) announcement.textContent = document.title;
-  observeLinks();
 }
 
 async function navigate({ url, restored = false }: { url: URL; restored?: boolean }) {
@@ -167,21 +158,10 @@ export function startNavigation() {
     event.preventDefault();
     void navigate({ url });
   });
-  document.addEventListener(
-    "pointerover",
-    (event) => {
-      const anchor = event.target instanceof Element ? event.target.closest("a") : null;
-      if (anchor) prefetch({ anchor });
-    },
-    { passive: true },
-  );
-  document.addEventListener("focusin", (event) => {
-    if (event.target instanceof HTMLAnchorElement) prefetch({ anchor: event.target });
-  });
+  document.addEventListener("docs:prefetch", (event) => prefetch({ event }));
   window.addEventListener("popstate", () => {
     void navigate({ url: new URL(location.href), restored: true });
   });
-  observeLinks();
 }
 
 function modifiedClick({ event }: { event: MouseEvent }) {

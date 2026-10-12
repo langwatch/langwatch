@@ -26,6 +26,14 @@ function useActiveId({ entries }: { entries: TocEntry[] }) {
   return active;
 }
 
+/** An entry indents only beneath a shallower heading, so a page that opens with h3s and closes
+    with an h2 keeps every entry on one edge. */
+export function nestedEntries({ entries }: { entries: TocEntry[] }): boolean[] {
+  return entries.map((entry, index) =>
+    entries.slice(0, index).some((earlier) => earlier.depth < entry.depth),
+  );
+}
+
 function TocLinks({
   entries,
   active,
@@ -35,26 +43,32 @@ function TocLinks({
   active: string;
   onChoose?: () => void;
 }) {
+  const nested = nestedEntries({ entries });
   return (
     <Box as="ul" margin="0" padding="0">
-      {entries.map((entry) => {
+      {entries.map((entry, index) => {
         const current = entry.id === active;
         return (
           <Box as="li" key={entry.id} listStyleType="none">
             <chakra.a
               href={`#${entry.id}`}
               data-depth={entry.depth}
+              data-nested={nested[index] ? "true" : void 0}
               onClick={onChoose}
               aria-current={current ? "location" : undefined}
               display="block"
               paddingY="1"
+              paddingInlineStart={nested[index] ? "3" : "0"}
               fontSize="13px"
               lineHeight="21px"
+              fontWeight="450"
               textDecoration="none"
-              color={current ? "accent.fg" : "docs.contents"}
-              fontWeight={current ? "600" : "400"}
-              _hover={{ color: "fg", textDecoration: "none" }}
-              paddingInlineStart={entry.depth > 2 ? "3" : "0"}
+              color="docs.body"
+              transition="color 120ms ease"
+              _hover={{ color: "nav.fg", textDecoration: "none" }}
+              css={{
+                "&[aria-current=location], &[aria-current=location]:hover": { color: "accent.fg" },
+              }}
             >
               {entry.text}
             </chakra.a>
@@ -75,6 +89,7 @@ export function TocRail({ entries }: { entries: TocEntry[] }) {
       </Text>
       <Box className="docs-toc-track">
         <svg className="docs-toc-progress" aria-hidden="true" focusable="false">
+          <path className="docs-toc-guide" />
           <path className="docs-toc-path" />
         </svg>
         <TocLinks entries={entries} active={active} />

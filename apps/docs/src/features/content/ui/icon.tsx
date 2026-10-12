@@ -2,6 +2,7 @@ import { GitHubIcon, Python, TypeScript } from "@langwatch/design-system/icons";
 import { Box, Image } from "@langwatch/design-system/primitives";
 
 import { GenericIcon, ICONS } from "../../../lib/icon-registry.tsx";
+import { sitePath } from "../../../lib/site-path.ts";
 
 const BRAND_ICONS = { github: GitHubIcon, python: Python, typescript: TypeScript };
 
@@ -13,7 +14,7 @@ export function Icon({ icon, size = 20 }: IconProps) {
   if (icon && /^(\/|https?:)/.test(icon)) {
     return (
       <Image
-        src={icon}
+        src={sitePath({ path: icon })}
         alt=""
         width={`${pixels}px`}
         height={`${pixels}px`}

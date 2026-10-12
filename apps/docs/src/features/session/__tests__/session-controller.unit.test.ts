@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod/mini";
 
 import type { Operation } from "../../api-reference/model/operation.ts";
 import { MockDocsTokenProvider } from "../model/mock-token-provider.ts";
 import { createDocsSession } from "../model/session-config.ts";
 import { DocsSessionController } from "../model/session-controller.ts";
+import { docsSessionTokenSchema } from "../model/token-provider.ts";
 
 function traceOperation(): Operation {
   return {
@@ -118,11 +120,18 @@ describe("when a session receives an unsupported request or credential", () => {
       { expiresAt: now() },
       { expiresAt: now() + 300_001 },
       { expiresAt: NaN },
+      { expiresAt: now() + 1_000.5 },
       { permissions: [] },
+      { permissions: [""] },
+      { grantId: "" },
+      { apiOrigin: "not a url" },
+      { scope: "all" },
     ]) {
       acquire.mockResolvedValueOnce({ ...valid, ...change });
       await expect(controller.connect({ signal })).rejects.toMatchObject({ code: "invalid" });
       expect(controller.snapshot()).toEqual({ kind: "disconnected" });
     }
+    expect(z.validate(docsSessionTokenSchema, { ...valid, purpose: "app" })).toBe(false);
+    expect(docsSessionTokenSchema.parse({ ...valid })).toEqual(valid);
   });
 });

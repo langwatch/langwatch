@@ -8,39 +8,42 @@ import { Box, Button, Text } from "@langwatch/design-system/primitives";
 import { ArrowUpRight, FileText, Hash, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import { z } from "zod";
 
-import { searchEntrySchema, searchIndex } from "../model/search-entry.ts";
-import type { SearchEntry } from "../model/search-entry.ts";
+import { pagePath } from "../../../lib/site-path.ts";
+import { searchIndex } from "../model/search-entry.ts";
+import type { IndexedEntry } from "../model/search-entry.ts";
 import { QUICK_ACTIONS, runQuickAction } from "./search-actions.ts";
+import { currentBuild, loadSearchIndex } from "./search-index-store.ts";
 
 function useSearchIndex() {
-  const [index, setIndex] = useState<SearchEntry[]>([]);
+  const [index, setIndex] = useState<IndexedEntry[]>([]);
   const [state, setState] = useState("loading");
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    const controller = new AbortController();
+    let current = true;
     setState("loading");
-    void fetch("/search-index.json", { credentials: "omit", signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Search unavailable");
-        setIndex(z.array(searchEntrySchema).parse(await response.json()));
+    loadSearchIndex({ build: currentBuild() })
+      .then((entries) => {
+        if (!current) return;
+        setIndex(entries);
         setState("ready");
       })
       .catch(() => {
-        if (!controller.signal.aborted) setState("failed");
+        if (current) setState("failed");
       });
-    return () => controller.abort();
+    return () => {
+      current = false;
+    };
   }, [attempt]);
   return { index, state, retry: () => setAttempt(attempt + 1) };
 }
-function commandRows({ index, query }: { index: SearchEntry[]; query: string }) {
+function commandRows({ index, query }: { index: IndexedEntry[]; query: string }) {
   const results = searchIndex({ index, query });
   const pages = results.map(({ entry, heading }) => ({
     id: `${entry.slug}#${heading?.id ?? ""}`,
     title: entry.title,
     description: heading ? `↳ ${heading.text}` : entry.description,
-    href: `/${entry.slug}${heading ? `#${heading.id}` : ""}`,
+    href: `${pagePath({ slug: entry.slug })}${heading ? `#${heading.id}` : ""}`,
     group: entry.section,
     method: entry.method,
     heading: Boolean(heading),

@@ -95,7 +95,9 @@ await it("keeps releases readable without scripts and can dismiss when storage i
         await staticPage.goto(base + "self-hosting/releases");
         const strip = staticPage.getByRole("complementary", { name: "Latest release" });
         const version = await strip.locator(".docs-release-version").textContent();
-        await staticPage.getByRole("heading", { name: `Release ${version}` }).waitFor();
+        const heading = staticPage.getByRole("heading", { name: `Release ${version}` });
+        await heading.waitFor();
+        assert.equal(await heading.count(), 1, "the latest release reads without scripts");
         await deniedContext.addInitScript(() => {
           Storage.prototype.getItem = () => {
             throw new Error("Storage denied");
@@ -107,9 +109,9 @@ await it("keeps releases readable without scripts and can dismiss when storage i
         const page = await deniedContext.newPage();
         await page.goto(base + "support");
         await page.getByRole("button", { name: "Dismiss announcement" }).click();
-        await page
-          .getByRole("complementary", { name: "Latest release" })
-          .waitFor({ state: "detached" });
+        const announcement = page.getByRole("complementary", { name: "Latest release" });
+        await announcement.waitFor({ state: "detached" });
+        assert.equal(await announcement.count(), 0, "dismissal works when storage is denied");
       } finally {
         await staticContext.close();
         await deniedContext.close();

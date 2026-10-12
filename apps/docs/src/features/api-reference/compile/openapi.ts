@@ -79,16 +79,22 @@ const summaryShape = z.looseObject({
 export type OperationSummary = z.infer<typeof summaryShape>;
 
 type Spec = { root: Json; document: z.infer<typeof documentShape> };
-const specCache = new Map<string, { revision: number; spec: Spec }>();
+const specCache = new Map<string, { revision: string; spec: Spec }>();
 
 function isObject(node: Json | undefined): node is JsonObject {
   return typeof node === "object" && node !== null && !Array.isArray(node);
 }
 
+/** A file's revision: its change time moves on every write, even one that keeps the mtime. */
+function revisionOf({ filename }: { filename: string }) {
+  const stats = statSync(filename, { bigint: true });
+  return `${stats.ino}:${stats.size}:${stats.mtimeNs}:${stats.ctimeNs}`;
+}
+
 /** Reads one spec, reparsing only when the file changed (dev watches both documents). */
 function loadSpec({ docsRoot, file }: { docsRoot: string; file: string }): Spec {
   const filename = path.join(docsRoot, file);
-  const revision = statSync(filename).mtimeMs;
+  const revision = revisionOf({ filename });
   const cached = specCache.get(filename);
   if (cached?.revision === revision) return cached.spec;
   const root = json.parse(JSON.parse(readFileSync(filename, "utf8")));
@@ -142,7 +148,7 @@ function contentsOf({ content }: { content: z.infer<typeof contentShape> }) {
 
 /** Checked against the operation model; the resolved value is kept so key order is preserved. */
 function isOperation(value: unknown): value is Operation {
-  return operationSchema.validate(value);
+  return z.validate(operationSchema, value);
 }
 
 /** Resolves `openapi: <METHOD> <path>` frontmatter to one self-contained operation. */
@@ -206,19 +212,38 @@ export function resolveOperation({
   return null;
 }
 
+function indexRoute({
+  index,
+  route,
+  methods,
+}: {
+  index: Map<string, OperationSummary>;
+  route: string;
+  methods: Record<string, Json>;
+}) {
+  for (const verb of VERBS) {
+    const parsed = summaryShape.safeParse(methods[verb]);
+    if (!parsed.success || !parsed.data.responses) continue;
+    index.set(`${verb.toUpperCase()} ${route}`, parsed.data);
+    if (!index.has(route)) index.set(route, parsed.data);
+  }
+}
+
+const indexCache = new Map<string, { revisions: string; index: Map<string, OperationSummary> }>();
+
 /** Operations by `METHOD /route` and the first method by bare route, for navigation titles. */
 export function operationIndex({ docsRoot }: { docsRoot: string }) {
+  const revisions = SPEC_FILES.map((file) =>
+    revisionOf({ filename: path.join(docsRoot, file) }),
+  ).join();
+  const cached = indexCache.get(docsRoot);
+  if (cached?.revisions === revisions) return cached.index;
   const index = new Map<string, OperationSummary>();
   for (const file of SPEC_FILES) {
-    for (const [route, methods] of Object.entries(loadSpec({ docsRoot, file }).document.paths)) {
-      for (const verb of VERBS) {
-        const parsed = summaryShape.safeParse(methods[verb]);
-        if (!parsed.success || !parsed.data.responses) continue;
-        index.set(`${verb.toUpperCase()} ${route}`, parsed.data);
-        if (!index.has(route)) index.set(route, parsed.data);
-      }
-    }
+    for (const [route, methods] of Object.entries(loadSpec({ docsRoot, file }).document.paths))
+      indexRoute({ index, route, methods });
   }
+  indexCache.set(docsRoot, { revisions, index });
   return index;
 }
 

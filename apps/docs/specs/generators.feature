@@ -90,3 +90,12 @@ Feature: Generate documentation data from authored sources
     When the page is compiled
     Then those links become absolute documentation paths
     And external links and fragment links remain unchanged
+
+  @unit
+  Scenario: Export complete guides with their snippets
+    Given a guide imports a snippet and uses it on its own line
+    When its Markdown export is generated
+    Then the snippet's content stands in its place and the resolved import line is gone
+    And root-relative links become https://docs.langwatch.ai addresses outside code
+    And the page, source file and llms.txt addresses follow the description
+    But fenced code, unknown components and any other snippet usage are kept as authored

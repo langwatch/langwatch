@@ -1,22 +1,46 @@
-import { z } from "zod";
+import { z } from "zod/mini";
 
 export const searchEntrySchema = z.object({
   slug: z.string(),
-  method: z.string().default(""),
+  method: z._default(z.string(), ""),
   title: z.string(),
   section: z.string(),
   description: z.string(),
-  trail: z.string().default(""),
-  body: z.string().default(""),
+  trail: z._default(z.string(), ""),
+  body: z._default(z.string(), ""),
   headings: z.array(z.object({ id: z.string(), text: z.string() })),
 });
 export type SearchEntry = z.infer<typeof searchEntrySchema>;
 /** An entry as published in search-index.json, before defaults are applied. */
 export type PublishedSearchEntry = z.input<typeof searchEntrySchema>;
 
-type Result = { entry: SearchEntry; heading?: { id: string; text: string }; score: number };
+/** An entry with its text lowercased once at load, so a keystroke never lowercases the corpus. */
+export type IndexedEntry = SearchEntry & {
+  match: { title: string; description: string; body: string; headings: string[]; words: string[] };
+};
+
+type Result = { entry: IndexedEntry; heading?: { id: string; text: string }; score: number };
 
 const MAX_RESULTS = 20;
+const STOP_WORDS = new Set(["how", "do", "i", "a", "the", "to", "is"]);
+
+export function indexEntries({ entries }: { entries: SearchEntry[] }): IndexedEntry[] {
+  return entries.map((entry) => {
+    const title = entry.title.toLowerCase();
+    const description = entry.description.toLowerCase();
+    const words = `${title} ${description} ${entry.trail.toLowerCase()}`.split(/[^a-z0-9_]+/);
+    return {
+      ...entry,
+      match: {
+        title,
+        description,
+        body: entry.body.toLowerCase(),
+        headings: entry.headings.map((heading) => heading.text.toLowerCase()),
+        words: [...new Set(words)].filter((word) => word.length >= 4),
+      },
+    };
+  });
+}
 
 function similarWord({ word, term }: { word: string; term: string }) {
   if (term.length < 5 || Math.abs(word.length - term.length) > 1) return false;
@@ -34,24 +58,23 @@ function similarWord({ word, term }: { word: string; term: string }) {
   return word.slice(left) === term.slice(left + 1);
 }
 
-function scoreTerm({ entry, term }: { entry: SearchEntry; term: string }): {
+function scoreTerm({ entry, term }: { entry: IndexedEntry; term: string }): {
   score: number;
   heading?: Result["heading"];
 } {
-  const title = entry.title.toLowerCase();
-  if (title === term) return { score: 100 };
-  if (title.startsWith(term)) return { score: 60 };
-  if (title.includes(term)) return { score: 40 };
-  const heading = entry.headings.find((candidate) => candidate.text.toLowerCase().includes(term));
-  if (heading) return { score: 25, heading };
-  if (entry.description.toLowerCase().includes(term)) return { score: 10 };
+  const { match } = entry;
+  if (match.title === term) return { score: 100 };
+  if (match.title.startsWith(term)) return { score: 60 };
+  if (match.title.includes(term)) return { score: 40 };
+  const heading = match.headings.findIndex((text) => text.includes(term));
+  if (heading >= 0) return { score: 25, heading: entry.headings[heading] };
+  if (match.description.includes(term)) return { score: 10 };
   if (entry.slug.includes(term)) return { score: 8 };
-  if (entry.body.toLowerCase().includes(term)) return { score: 5 };
-  const words = `${title} ${entry.description} ${entry.trail}`.toLowerCase().split(/[^a-z0-9_]+/);
-  return { score: words.some((word) => similarWord({ word, term })) ? 3 : 0 };
+  if (match.body.includes(term)) return { score: 5 };
+  return { score: match.words.some((word) => similarWord({ word, term })) ? 3 : 0 };
 }
 
-function scoreEntry({ entry, terms }: { entry: SearchEntry; terms: string[] }): Result | null {
+function scoreEntry({ entry, terms }: { entry: IndexedEntry; terms: string[] }): Result | null {
   let score = 0;
   let heading: Result["heading"];
   for (const term of terms) {
@@ -63,11 +86,11 @@ function scoreEntry({ entry, terms }: { entry: SearchEntry; terms: string[] }): 
   return { entry, heading, score };
 }
 
-export function searchIndex({ index, query }: { index: SearchEntry[]; query: string }): Result[] {
+export function searchIndex({ index, query }: { index: IndexedEntry[]; query: string }): Result[] {
   const terms = query
     .toLowerCase()
     .split(/\s+/)
-    .filter((term) => term && !["how", "do", "i", "a", "the", "to", "is"].includes(term));
+    .filter((term) => term && !STOP_WORDS.has(term));
   if (terms.length === 0) return [];
   return index
     .map((entry) => scoreEntry({ entry, terms }))

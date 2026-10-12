@@ -58,25 +58,60 @@ func (p *childPlan) mailRoomChild() Child {
 	}
 }
 
-// DocsPackage is the public docs site, run on its Vite dev server.
+// DocsPackage is the public docs site, built to static files and served by haven.
 const DocsPackage = "@langwatch/docs-site"
 
-// docsChild is the docs lane: the docs site's own `vite` dev server on the port
-// haven allocated, hot reloading through the proxy like the --hmr ui lane.
+// DocsBasePath is where haven mounts the docs: app.<slug>.langwatch.localhost/docs.
+// Production stays at the root of docs.langwatch.ai; only haven's build takes it.
+const DocsBasePath = "/docs"
+
+// docsOutDir is haven's docs build, beside the production dist/ and ignored with
+// node_modules, so a CI-shaped `pnpm build` never collides with it.
+const docsOutDir = "apps/docs/node_modules/.cache/haven-docs"
+
+// docsBuildShell checks the live build against the sources by content
+// (build-status.ts: 0 current, 3 stale) and only then builds under DocsBasePath
+// into a staging directory and swaps it in, so the mount never serves a
+// half-written tree. Unchanged pages come from the build's render cache.
+func docsBuildShell(repoDir string) string {
+	d := shQuote(filepath.Join(repoDir, docsOutDir))
+	return "d=" + d + "; n=$d.next.$$; o=$d.old.$$; " +
+		"node apps/docs/src/site/build-status.ts --out-dir \"$d\" --base-path " + DocsBasePath + " && exit 0; " +
+		"rm -rf \"$n\"; pnpm --silent --filter " + DocsPackage + " build --out-dir \"$n\" --base-path " + DocsBasePath +
+		" && { ! test -d \"$d\" || mv \"$d\" \"$o\"; } && mv \"$n\" \"$d\" && rm -rf \"$o\""
+}
+
+// docsMountShell serves the docs natively under DocsBasePath on port at once and
+// builds beside it, so the app behind the mount never waits on a docs build. With
+// app set (a stack) every other path on the app hostname goes to the app's own
+// listener; alone the root sends readers to the docs. Until the first build
+// lands the mount shows a building page; a failed build keeps the last good tree.
+func (o *Orchestrator) docsMountShell(repoDir string, port int, app *docsApp) string {
+	serve := fmt.Sprintf("exec %s docs-mount %s %d %s", shQuote(o.havenExecutable()),
+		shQuote(filepath.Join(repoDir, docsOutDir)), port, DocsBasePath)
+	if app != nil {
+		serve += fmt.Sprintf(" http://127.0.0.1:%d %s", app.port, shQuote(app.host))
+	}
+	return "{ (" + docsBuildShell(repoDir) + ") || echo 'the docs did not build; serving the last good build'; } & " + serve
+}
+
+// docsApp is the app a stack's docs mount hands every non-docs path to.
+type docsApp struct {
+	port int
+	host string
+}
+
+// docsChild is the docs lane of a stack: built and mounted at /docs on the app
+// hostname, which routes to this lane (see provision); docs.<slug> serves it too.
 func (p *childPlan) docsChild() Child {
 	port := p.port(domain.DocsService)
+	app := &docsApp{port: p.port("app"), host: p.o.cfg.Naming.Hostname("app", p.st.Slug)}
 	return Child{
 		Name: domain.DocsService, Dir: p.repoDir, Color: palette[4],
 		LogPath: p.logPath(domain.DocsService),
-		Shell:   docsShell(port),
+		Shell:   p.o.docsMountShell(p.repoDir, port, app),
 		Env:     append(append([]string{}, p.base...), domain.LaneEnv(domain.DocsService)),
 	}
-}
-
-// docsShell runs the docs site's dev server on port; `haven up +docs` and
-// `haven up --only docs` both run it.
-func docsShell(port int) string {
-	return fmt.Sprintf("pnpm --silent --filter %s dev --host 127.0.0.1 --port %d --strictPort", DocsPackage, port)
 }
 
 // havenExecutable is this haven binary, the first word of the simulator command.

@@ -39,15 +39,16 @@ export function ThemeMenu({ initialOpen = false }: { initialOpen?: boolean }) {
       <Menu.Trigger asChild>
         <IconButton
           data-docs-theme=""
-          variant="outline"
+          variant="ghost"
           colorPalette="gray"
           aria-label="Colour theme"
           width="40px"
           minWidth="40px"
           height="40px"
-          borderRadius="lg"
-          bg="docs.raised"
-          color="fg.muted"
+          borderRadius="full"
+          bg="transparent"
+          color="fg"
+          title="Choose light, dark, or system theme"
         >
           <Sun size={18} className="docs-light-only" aria-hidden="true" />
           <Moon size={18} className="docs-dark-only" aria-hidden="true" />

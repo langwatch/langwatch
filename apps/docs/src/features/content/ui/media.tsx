@@ -3,6 +3,24 @@ import { Play } from "lucide-react";
 import { Children, isValidElement, useEffect, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 
+import { sitePath } from "../../../lib/site-path.ts";
+
+/** A local media URL under the site's base path; external and relative URLs pass through. */
+function mediaPath({ path }: { path?: string }) {
+  return path ? sitePath({ path }) : path;
+}
+
+/** Prefixes each candidate URL of a `srcset`, keeping its width or density descriptor. */
+function mediaSrcSet({ srcSet }: { srcSet?: string }) {
+  return srcSet
+    ?.split(",")
+    .map((candidate) => {
+      const [url = "", ...descriptors] = candidate.trim().split(/\s+/);
+      return [sitePath({ path: url }), ...descriptors].join(" ");
+    })
+    .join(", ");
+}
+
 function themeClass({ className }: { className?: string }): string {
   if (!className) return "";
   if (className.includes("dark:hidden")) return "docs-light-only";
@@ -11,11 +29,16 @@ function themeClass({ className }: { className?: string }): string {
 }
 
 /** Broken images retain their authored alternative text. */
-export function DocsImage({ className, alt, src, width, ...rest }: ComponentProps<"img">) {
+export function DocsImage({ className, alt, src, srcSet, width, ...rest }: ComponentProps<"img">) {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
-      <Link href={src} fontSize="14px" color="blue.fg" className={themeClass({ className })}>
+      <Link
+        href={mediaPath({ path: src })}
+        fontSize="14px"
+        color="blue.fg"
+        className={themeClass({ className })}
+      >
         {alt || "Image unavailable"}
       </Link>
     );
@@ -23,7 +46,8 @@ export function DocsImage({ className, alt, src, width, ...rest }: ComponentProp
   return (
     <img
       className={`docs-img ${themeClass({ className })} ${className ?? ""}`.trim()}
-      src={src}
+      src={mediaPath({ path: src })}
+      srcSet={mediaSrcSet({ srcSet })}
       alt={alt ?? ""}
       loading="lazy"
       decoding="async"
@@ -39,7 +63,7 @@ export function DocsImage({ className, alt, src, width, ...rest }: ComponentProp
   );
 }
 
-export function DocsVideo({ autoPlay, children, ...rest }: ComponentProps<"video">) {
+export function DocsVideo({ autoPlay, children, src, poster, ...rest }: ComponentProps<"video">) {
   const ref = useRef<HTMLVideoElement>(null);
   const [started, setStarted] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -57,6 +81,23 @@ export function DocsVideo({ autoPlay, children, ...rest }: ComponentProps<"video
       ref.current?.play().catch(() => {});
     }
   }, [autoPlay, introduction]);
+  if ("data-docs-clip" in rest) {
+    return (
+      <video
+        {...rest}
+        src={mediaPath({ path: src })}
+        poster={mediaPath({ path: poster })}
+        style={{ display: "block", maxWidth: "100%", height: "auto" }}
+        controls
+        muted
+        loop
+        playsInline
+        preload="none"
+      >
+        {children}
+      </video>
+    );
+  }
   const playbackFailed = () => {
     setStarted(false);
     setFailed(true);
@@ -78,7 +119,8 @@ export function DocsVideo({ autoPlay, children, ...rest }: ComponentProps<"video
           ref={ref}
           playsInline
           preload={introduction ? "none" : "metadata"}
-          poster={introduction ? "/media/posters/introduction.jpg" : rest.poster}
+          src={mediaPath({ path: src })}
+          poster={mediaPath({ path: introduction ? "/media/posters/introduction.jpg" : poster })}
           style={{
             display: "block",
             width: "100%",
@@ -131,7 +173,12 @@ export function DocsVideo({ autoPlay, children, ...rest }: ComponentProps<"video
   );
 }
 
-export function DocsIframe({ title, ...rest }: ComponentProps<"iframe">) {
+/** A video source under the site's base path; MDX `<source>` tags compile to this. */
+export function DocsSource({ src, srcSet, ...rest }: ComponentProps<"source">) {
+  return <source {...rest} src={mediaPath({ path: src })} srcSet={mediaSrcSet({ srcSet })} />;
+}
+
+export function DocsIframe({ title, src, ...rest }: ComponentProps<"iframe">) {
   return (
     <Box
       marginY="6"
@@ -146,6 +193,7 @@ export function DocsIframe({ title, ...rest }: ComponentProps<"iframe">) {
         loading="lazy"
         style={{ width: "100%", height: "100%", border: 0 }}
         {...rest}
+        src={mediaPath({ path: src })}
       />
     </Box>
   );

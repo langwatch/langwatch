@@ -2,6 +2,7 @@ import { Accordion, Badge, Box, Flex } from "@langwatch/design-system/primitives
 import type { ReactNode } from "react";
 
 import { TypeRegion } from "../../../lib/type-mode.tsx";
+import { DocsInlineCode } from "./prose.tsx";
 
 type FieldProps = {
   path?: string;
@@ -43,23 +44,8 @@ export function DocsField({
       css={{ "&:last-of-type": { borderBottomWidth: "0" } }}
     >
       <Flex alignItems="center" gap="2" wrap="wrap" rowGap="1">
-        <Box
-          as="code"
-          fontFamily="mono"
-          fontSize="13px"
-          lineHeight="24px"
-          fontWeight="600"
-          color="fg"
-          wordBreak="break-word"
-          overflowWrap="anywhere"
-        >
-          {name}
-        </Box>
-        {props.type ? (
-          <Box as="span" fontFamily="mono" fontSize="12px" lineHeight="20px" color="fg.muted">
-            {props.type}
-          </Box>
-        ) : null}
+        <DocsInlineCode>{name}</DocsInlineCode>
+        {props.type ? <DocsInlineCode>{props.type}</DocsInlineCode> : null}
         {kind === "param" && location ? (
           <Badge size="sm" variant="subtle" colorPalette="gray">
             {location}

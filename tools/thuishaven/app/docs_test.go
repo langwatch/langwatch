@@ -5,7 +5,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -59,15 +61,16 @@ func TestRunDocsSoloRunsOnlyTheDocsSite(t *testing.T) {
 	if err := o.RunDocsSolo(t.Context(), p); err != nil {
 		t.Fatalf("RunDocsSolo: %v", err)
 	}
-	if len(sup.lanes) != 1 || !strings.Contains(sup.lanes[0].Shell, "--filter @langwatch/docs-site dev") {
-		t.Fatalf("supervised %v, want the docs dev server alone", sup.lanes)
+	if len(sup.lanes) != 1 || !strings.Contains(sup.lanes[0].Shell, "--base-path /docs") ||
+		!strings.HasSuffix(sup.lanes[0].Shell, " /docs") {
+		t.Fatalf("supervised %v, want the docs built and mounted alone, with no app behind them", sup.lanes)
 	}
 	logDir, _ := domain.StackLogPaths(p.WorktreeDir, "feat-x")
 	if sup.lanes[0].LogPath != filepath.Join(logDir, "docs.log") {
 		t.Errorf("docs lane captures to %q, want docs.log in the worktree's log directory", sup.lanes[0].LogPath)
 	}
-	if len(proxy.registered) != 1 || proxy.registered[0] != "docs|feat-x" || len(proxy.removed) != 1 {
-		t.Errorf("registered %v removed %v, want docs.feat-x routed and removed on exit", proxy.registered, proxy.removed)
+	if !slices.Equal(proxy.registered, []string{"docs|feat-x", "app|feat-x"}) || len(proxy.removed) != 2 {
+		t.Errorf("registered %v removed %v, want docs.feat-x and app.feat-x routed and removed on exit", proxy.registered, proxy.removed)
 	}
 	if _, ok := o.DocsOnly(p); ok {
 		t.Error("the docs-only record outlived the run")
@@ -162,7 +165,7 @@ func TestRunDocsSoloRemovesRouteBeforeStartupRecord(t *testing.T) {
 	if err := o.RunDocsSolo(t.Context(), p); err != nil {
 		t.Fatal(err)
 	}
-	if !proxy.recordPresentAtRemoval || len(proxy.removed) != 1 {
+	if !proxy.recordPresentAtRemoval || len(proxy.removed) != 2 {
 		t.Fatalf("removed %v with startup record present = %v, want the solo claim held through route cleanup", proxy.removed, proxy.recordPresentAtRemoval)
 	}
 	if _, ok := o.DocsOnly(p); ok {
@@ -197,5 +200,49 @@ func TestStopDocsOnlyTerminatesTheRun(t *testing.T) {
 	}
 	if len(sys.terminated) != 1 || sys.terminated[0] != 7 {
 		t.Errorf("terminated %v, want the docs-only launcher", sys.terminated)
+	}
+}
+
+// docsRouteProxy records where each hostname was last routed; provision routes in parallel.
+type docsRouteProxy struct {
+	fakeProxy
+	mu     sync.Mutex
+	routes map[string]int
+}
+
+func (p *docsRouteProxy) Register(service, slug string, port int) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.routes[service+"|"+slug] = port
+	return nil
+}
+
+// @scenario "The docs site is built and mounted at /docs on the app"
+func TestAppHostnameRoutesThroughTheDocsMountOnlyWithTheDocsOn(t *testing.T) {
+	for _, docs := range []bool{false, true} {
+		proxy := &docsRouteProxy{routes: map[string]int{}}
+		o := &Orchestrator{
+			cfg:   Config{Naming: domain.DefaultNaming("")},
+			store: &fakeStore{slugCache: map[string]string{"/wt/x": "x"}}, sys: &playPortSystem{}, proxy: proxy, log: zap.NewNop(),
+		}
+		sel := domain.DefaultSelection()
+		sel.Docs = docs
+		st, cleanup, err := o.provision(t.Context(), UpParams{WorktreeDir: "/wt/x", IsLinkedWorktree: true, Branch: "x"}, PlanOptions{Selection: sel}, false)
+		if err != nil {
+			t.Fatalf("provision: %v", err)
+		}
+		cleanup()
+		app, _ := serviceByName(st.Services, "app")
+		docsSvc, _ := serviceByName(st.Services, domain.DocsService)
+		want := app.Port
+		if docs {
+			want = docsSvc.Port
+		}
+		if got := proxy.routes["app|x"]; got != want || app.RouteTarget() != want || want == 0 {
+			t.Errorf("docs on = %v: app.x routes to %d (target %d), want %d", docs, got, app.RouteTarget(), want)
+		}
+		if docs && app.Port == docsSvc.Port {
+			t.Error("the mount must hand app paths to the app's own port, not itself")
+		}
 	}
 }

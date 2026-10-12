@@ -32,12 +32,20 @@ const VERB_NAMES: Record<string, string> = {
   delete: "Delete",
 };
 const MAX_SUMMARY = 70;
+const CARD = /<Card\b([^>]*?)\/?>/g;
+const LOGO_DIRECTORY = "/images/logos/";
 
-export type DocsItem = string | { group?: string; pages?: DocsItem[] } | null;
+export type DocsItem =
+  | string
+  | { group?: string; pages?: DocsItem[]; root?: string; expanded?: boolean; icon?: string }
+  | null;
 const docsItem: z.ZodType<DocsItem> = z.union([
   z.string(),
   z.looseObject({
     group: z.string().optional(),
+    root: z.string().optional(),
+    expanded: z.boolean().optional(),
+    icon: z.string().optional(),
     get pages() {
       return z.array(docsItem).optional();
     },
@@ -139,10 +147,12 @@ function buildPage({
   item,
   docsRoot,
   pages,
+  logos,
 }: {
   item: string;
   docsRoot: string;
   pages: Record<string, PageMeta>;
+  logos: Map<string, string>;
 }): NavItem {
   const file = path.join(docsRoot, `${item}.mdx`);
   if (!existsSync(file)) {
@@ -150,7 +160,9 @@ function buildPage({
       code: "docs_page_missing",
     });
   }
-  const meta = readFrontmatter({ source: readFileSync(file, "utf8") });
+  const source = readFileSync(file, "utf8");
+  const meta = readFrontmatter({ source });
+  collectLogos({ source, logos });
   const operation = meta.openapi
     ? operationIndex({ docsRoot }).get(operationKey({ openapi: meta.openapi }))
     : undefined;
@@ -164,39 +176,121 @@ function buildPage({
     openapi: meta.openapi ?? "",
     mode: meta.mode ?? "",
     icon: meta.icon ?? "",
+    logo: "",
   };
   return { type: "page", slug: item, title: pages[item].sidebarTitle };
+}
+
+/** Overview cards pair a page link with its brand logo; the first card for a page wins. */
+function collectLogos({ source, logos }: { source: string; logos: Map<string, string> }) {
+  for (const [, attributes] of source.matchAll(CARD)) {
+    const icon = /\bicon="([^"]+)"/.exec(attributes)?.[1] ?? "";
+    const slug = /\bhref="\/([^"#?]+)/.exec(attributes)?.[1];
+    if (slug && icon.startsWith(LOGO_DIRECTORY) && !logos.has(slug)) logos.set(slug, icon);
+  }
 }
 
 function buildItem({
   item,
   docsRoot,
   pages,
+  logos,
 }: {
   item: DocsItem;
   docsRoot: string;
   pages: Record<string, PageMeta>;
+  logos: Map<string, string>;
 }): NavItem | null {
-  if (typeof item === "string") return buildPage({ item, docsRoot, pages });
+  if (typeof item === "string") return buildPage({ item, docsRoot, pages, logos });
   if (item?.group) {
     const children = (item.pages ?? [])
-      .map((child) => buildItem({ item: child, docsRoot, pages }))
+      .map((child) => buildItem({ item: child, docsRoot, pages, logos }))
       .filter((child) => child !== null);
-    return { type: "group", title: item.group, children };
+    return {
+      type: "group",
+      title: item.group,
+      children,
+      ...(item.root ? { root: item.root } : {}),
+      ...(item.expanded ? { expanded: true } : {}),
+      ...(item.icon ? { icon: item.icon } : {}),
+    };
   }
   return null;
+}
+
+/** A heading's id as rehype-slug (github-slugger) writes it. */
+const headingId = ({ text }: { text: string }) =>
+  text
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
+    .replace(/\s/g, "-");
+
+/**
+ * Where a group header links. docs.json (Mintlify) takes only a page as a group's
+ * root, so a root page with a heading named like the group links to that heading.
+ */
+function rootHref({ docsRoot, root, title }: { docsRoot: string; root: string; title: string }) {
+  if (root.includes("#")) return root;
+  const source = readFileSync(path.join(docsRoot, `${root}.mdx`), "utf8");
+  const wanted = headingId({ text: title });
+  const found = [...source.matchAll(/^#{2,6}\s+(.+)$/gm)].some(
+    ([, text]) => headingId({ text }) === wanted,
+  );
+  return found ? `${root}#${wanted}` : root;
+}
+
+function sharedLogo({ items, pages }: { items: NavItem[]; pages: Record<string, PageMeta> }) {
+  const logos = new Set<string>();
+  for (const item of items) {
+    if (item.type !== "page") continue;
+    const logo = pages[item.slug].logo;
+    if (logo) logos.add(logo);
+  }
+  return logos.size === 1 ? [...logos][0] : "";
+}
+
+/** Checks group roots; a group without an icon takes the one logo its own pages share. */
+function finishGroups({
+  items,
+  pages,
+  docsRoot,
+}: {
+  items: NavItem[];
+  pages: Record<string, PageMeta>;
+  docsRoot: string;
+}): NavItem[] {
+  return items.map((item) => {
+    if (item.type === "page") return item;
+    const rootSlug = item.root?.split("#")[0];
+    if (rootSlug !== undefined && !pages[rootSlug]) {
+      throw Object.assign(new Error(`Group "${item.title}" has an unlisted root: ${item.root}`), {
+        code: "docs_group_root_missing",
+      });
+    }
+    const root = item.root ? rootHref({ docsRoot, root: item.root, title: item.title }) : undefined;
+    const children = finishGroups({ items: item.children, pages, docsRoot });
+    const icon = item.icon || sharedLogo({ items: children, pages });
+    return { ...item, children, ...(root ? { root } : {}), ...(icon ? { icon } : {}) };
+  });
 }
 
 /** docs.json as navigation, page inventory and site metadata; only listed pages publish. */
 export function buildNav({ docsRoot }: { docsRoot: string }): Nav {
   const config = readDocsConfig({ docsRoot });
   const pages: Record<string, PageMeta> = {};
-  const anchors = (config.navigation?.anchors ?? []).map((anchor) => {
+  const logos = new Map<string, string>();
+  const built = (config.navigation?.anchors ?? []).map((anchor) => {
     const children = [...(anchor.groups ?? []), ...(anchor.pages ?? [])]
-      .map((item) => buildItem({ item, docsRoot, pages }))
+      .map((item) => buildItem({ item, docsRoot, pages, logos }))
       .filter((child) => child !== null);
     return { title: anchor.anchor, icon: anchor.icon ?? "", children };
   });
+  for (const [slug, meta] of Object.entries(pages)) meta.logo = logos.get(slug) ?? "";
+  const anchors = built.map((anchor) => ({
+    ...anchor,
+    children: finishGroups({ items: anchor.children, pages, docsRoot }),
+  }));
   const support = (config.navigation?.global?.anchors ?? []).map((anchor) => ({
     title: anchor.anchor,
     icon: anchor.icon ?? "",

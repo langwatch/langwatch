@@ -8,8 +8,15 @@ import { Expandable, ParamField, ResponseField } from "./fields.tsx";
 import { Frame } from "./frame.tsx";
 import { Icon } from "./icon.tsx";
 import { LegacyContent } from "./legacy-content.tsx";
-import { DocsIframe, DocsImage, DocsVideo } from "./media.tsx";
-import { DocsInlineCode, DocsTable, makeHeading, DocsLink } from "./prose.tsx";
+import { DocsIframe, DocsImage, DocsSource, DocsVideo } from "./media.tsx";
+import {
+  DocsAnchor,
+  DocsInlineCode,
+  DocsTable,
+  DocsTableCell,
+  makeHeading,
+  DocsLink,
+} from "./prose.tsx";
 import { SkillCard } from "./skill-card.tsx";
 import { Step, Steps } from "./steps.tsx";
 import { Tab, Tabs } from "./tabs.tsx";
@@ -41,6 +48,8 @@ export const mdxComponents = {
   Tooltip,
   Warning,
   a: DocsLink,
+  DocsAnchor,
+  DocsInlineCode,
   code: DocsInlineCode,
   h1: makeHeading({ level: 1 }),
   h2: makeHeading({ level: 2 }),
@@ -50,10 +59,12 @@ export const mdxComponents = {
   h6: makeHeading({ level: 6 }),
   DocsIframe,
   DocsImg: DocsImage,
+  DocsSource,
   DocsVideo,
   iframe: DocsIframe,
   img: DocsImage,
   pre: DocsCodeBlock,
   table: DocsTable,
+  td: DocsTableCell,
   video: DocsVideo,
 };

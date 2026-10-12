@@ -1,6 +1,7 @@
 import { Box, IconButton, Link } from "@langwatch/design-system/primitives";
 import { ArrowRight, X } from "lucide-react";
 
+import { sitePath } from "../../../lib/site-path.ts";
 import { site } from "../../navigation/ui/site-nav.ts";
 
 export function SiteBanner() {
@@ -13,7 +14,7 @@ export function SiteBanner() {
       className="docs-banner docs-release-strip"
       data-docs-banner={`release:${release.version}`}
     >
-      <Link className="docs-release-link" href={release.href}>
+      <Link className="docs-release-link" href={sitePath({ path: release.href })}>
         <Box as="span" className="docs-release-label">
           What’s new
         </Box>

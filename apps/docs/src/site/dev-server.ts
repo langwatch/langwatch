@@ -11,7 +11,7 @@ import {
   PAGE_EXPORT_EXTENSIONS,
 } from "../features/discovery/compile/discovery-files.ts";
 import { pageMarkdown } from "../features/discovery/compile/markdown-export.ts";
-import { pageHead } from "../features/discovery/compile/page-head.ts";
+import { breadcrumbTrail, pageHead } from "../features/discovery/compile/page-head.ts";
 import { buildNav } from "../features/navigation/compile/nav.ts";
 import { readRedirects, resolveRedirect } from "../features/navigation/compile/redirects.ts";
 import { sourceSearchIndex } from "../features/search/compile/search-index.ts";
@@ -100,8 +100,10 @@ async function serveDocument({
     const render: typeof renderPage = entry.render;
     const result = await render({ slug: known ? slug : "404" });
     const styled = extractStyles({ html: result.html });
+    const { anchors } = buildNav({ docsRoot });
+    const trail = breadcrumbTrail({ sections: anchors, slug, title: result.title });
     const head = known
-      ? pageHead({ slug, title: result.title, description: result.description })
+      ? pageHead({ slug, title: result.title, description: result.description, trail })
       : NOT_FOUND_HEAD;
     const html = composeDocument({
       template: readFileSync(path.join(appRoot, "index.html"), "utf8"),

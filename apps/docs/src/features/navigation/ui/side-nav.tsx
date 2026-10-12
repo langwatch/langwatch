@@ -19,7 +19,9 @@ export function SideNav({
       <AgentLauncher />
       <SectionAnchors active={active} />
       <Box marginTop="5" paddingTop="5" borderTopWidth="1px" borderColor="border">
-        {active ? <NavTree items={active.children} current={slug} id={treeId} /> : null}
+        {active ? (
+          <NavTree items={active.children} current={slug} section={active.title} id={treeId} />
+        ) : null}
       </Box>
     </>
   );

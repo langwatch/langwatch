@@ -1,6 +1,8 @@
 import { Box, Flex, Tabs, Text } from "@langwatch/design-system/primitives";
+import { FileCode } from "lucide-react";
 
 import { usePreference, writePreference } from "../../../lib/storage.ts";
+import { CodeBar } from "../../code/ui/code-block.tsx";
 import { CodeBody, CopyAction } from "../../code/ui/code-parts.tsx";
 import type { CodeSource } from "../../code/ui/code-parts.tsx";
 import { readingTabList, readingTabTrigger } from "../../content/ui/tabs.tsx";
@@ -10,6 +12,8 @@ import type { Operation } from "../model/operation.ts";
 import { plainSource } from "../model/playground-source.ts";
 import { useEndpointState } from "./endpoint-state.tsx";
 import { Panel } from "./panel.tsx";
+
+const REQUEST_FILES = { python: "request.py", typescript: "request.ts", curl: "request.sh" };
 
 export function RequestExamples({ examples }: { examples: Record<string, CodeSource> }) {
   const stored = usePreference({ key: "api-language" });
@@ -29,6 +33,13 @@ export function RequestExamples({ examples }: { examples: Record<string, CodeSou
         minWidth="0"
         maxWidth="100%"
       >
+        <CodeBar>
+          <FileCode size={16} aria-hidden="true" />
+          <Text as="span" data-docs-code-title="" flex="1" fontFamily="mono" fontSize="13px">
+            {REQUEST_FILES[language]}
+          </Text>
+          <CopyAction code={examples[language].code} />
+        </CodeBar>
         <Flex
           alignItems="center"
           borderBottomWidth="1px"
@@ -51,7 +62,6 @@ export function RequestExamples({ examples }: { examples: Record<string, CodeSou
               </Tabs.Trigger>
             ))}
           </Tabs.List>
-          <CopyAction code={examples[language].code} />
         </Flex>
         {EXAMPLE_LANGUAGES.map((entry) => (
           <Tabs.Content
@@ -59,6 +69,7 @@ export function RequestExamples({ examples }: { examples: Record<string, CodeSou
             value={entry.label}
             padding="0"
             data-docs-panel=""
+            data-code-title={REQUEST_FILES[entry.id]}
             bg="bg.nested"
             minWidth="0"
             maxWidth="100%"

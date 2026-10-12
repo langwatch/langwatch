@@ -69,7 +69,7 @@ func TestDeletedCommandsSaySo(t *testing.T) {
 // @scenario "Hidden internals dispatch but stay out of help"
 func TestHiddenInternalsStayOutOfHelp(t *testing.T) {
 	help := commandsHelp()
-	for _, name := range []string{"simulator", "static", "go-watch", "ui-watch", "keep", "daemon", "gate"} {
+	for _, name := range []string{"simulator", "static", "docs-mount", "go-watch", "ui-watch", "keep", "daemon", "gate"} {
 		spec, ok := tableByName[name]
 		if !ok || !spec.hidden {
 			t.Errorf("%s must stay dispatchable and hidden", name)

@@ -50,19 +50,34 @@ async function measure({ directory }) {
   );
   const worker = gzipSync(await readFile(path.join(directory, "sw.js"))).length;
   const initial = entryFiles({ name: "index" });
-  const idle = [...entryFiles({ name: "tabs" }), ...entryFiles({ name: "toc" })];
+  /* Islands every page loads at idle without a reader action; the shader is counted apart. */
+  const idle = ["tabs", "toc", "reading"].flatMap((name) => entryFiles({ name }));
+  const shader = entryFiles({ name: "ground" });
+  const index = await readFile(path.join(directory, "search-index.json"));
   return {
     initialGzip: inline + (await gzipFiles({ directory, files: initial })),
     serviceWorkerGzip: worker,
     withIdleControlsGzip:
       inline + worker + (await gzipFiles({ directory, files: [...initial, ...idle] })),
+    withIdleControlsAndShaderGzip:
+      inline + worker + (await gzipFiles({ directory, files: [...initial, ...idle, ...shader] })),
+    deferredReadingGzip: await gzipFiles({ directory, files: entryFiles({ name: "reading" }) }),
     simpleIslandsGzip: await gzipFiles({
       directory,
-      files: ["controls", "copy", "tabs", "menus", "media", "toc", "disclosures"].flatMap((name) =>
-        entryFiles({ name }),
-      ),
+      files: [
+        "controls",
+        "copy",
+        "tabs",
+        "menus",
+        "media",
+        "toc",
+        "disclosures",
+        "reading",
+      ].flatMap((name) => entryFiles({ name })),
     }),
-    ambientEnhancementGzip: await gzipFiles({ directory, files: entryFiles({ name: "ground" }) }),
+    ambientEnhancementGzip: await gzipFiles({ directory, files: shader }),
+    searchIndexBytes: index.length,
+    searchIndexGzip: gzipSync(index).length,
     contextMenusInteractionGzip: await gzipFiles({
       directory,
       files: entryFiles({ name: "context-menus" }),
@@ -77,10 +92,6 @@ async function measure({ directory }) {
   };
 }
 const after = await measure({ directory: outDir });
-if (after.initialGzip > 3_000)
-  throw new Error(`Initial reading budget exceeded: ${after.initialGzip}`);
-if (after.withIdleControlsGzip >= 15_000)
-  throw new Error(`Initial JS budget exceeded: ${after.withIdleControlsGzip}`);
 const before = values.before
   ? await measure({ directory: path.resolve(values.before) })
   : undefined;
@@ -88,7 +99,12 @@ const report = {
   before,
   after,
   pageTypes: ["home", "guide", "API reference"],
-  note: "All page types share the same bootstrap. Interaction sizes include shared React/Zod chunks once. Assets and total sizes are uncompressed.",
+  note: "All page types share the same bootstrap. Idle controls are tabs, toc and reading, loaded on every page; the shader (ground) loads too when motion is allowed and is counted in withIdleControlsAndShaderGzip. Search index JSON is reported apart from search JS. Interaction sizes include shared React/Zod chunks once. Assets and total sizes are uncompressed.",
 };
 console.log(JSON.stringify(report, null, 2));
 if (values.report) await writeFile(values.report, JSON.stringify(report, null, 2));
+/* Budgets fail the run only after the full report is printed and written, for review. */
+if (after.initialGzip > 3_000)
+  throw new Error(`Initial reading budget exceeded: ${after.initialGzip}`);
+if (after.withIdleControlsGzip >= 15_000)
+  throw new Error(`Initial JS budget exceeded: ${after.withIdleControlsGzip}`);

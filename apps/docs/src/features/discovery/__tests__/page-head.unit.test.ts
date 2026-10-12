@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canonicalUrl, pageHead } from "../compile/page-head.ts";
+import { breadcrumbTrail, canonicalUrl, pageHead } from "../compile/page-head.ts";
 
 describe("static documentation metadata", () => {
   /** @scenario "Discover page exports and crawlable documentation" */
@@ -33,5 +33,47 @@ describe("static documentation metadata", () => {
     );
     expect(head).toContain('name="twitter:card" content="summary_large_image"');
     expect(head).not.toContain('name="description"');
+  });
+
+  /** @scenario "Discover page exports and crawlable documentation" */
+  it("describes the trail the site shows, with real pages only", () => {
+    const sections = [
+      {
+        title: "Guides",
+        icon: "",
+        children: [
+          { type: "page" as const, slug: "integration/quick-start", title: "Quick start" },
+          {
+            type: "group" as const,
+            title: "Tracing",
+            children: [{ type: "page" as const, slug: "tracing/spans", title: "Spans" }],
+          },
+        ],
+      },
+    ];
+    const trail = breadcrumbTrail({ sections, slug: "tracing/spans", title: "Spans" });
+    expect(trail).toEqual([
+      { title: "Documentation", slug: "introduction" },
+      { title: "Guides", slug: "integration/quick-start" },
+      { title: "Spans", slug: "tracing/spans" },
+    ]);
+    const head = pageHead({ slug: "tracing/spans", title: "Spans", trail });
+    const scripts = [...head.matchAll(/<script[^>]+>([\s\S]+?)<\/script>/g)].map((match) =>
+      JSON.parse(match[1]),
+    );
+    expect(scripts[1]).toMatchObject({
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { position: 1, name: "Documentation", item: "https://docs.langwatch.ai/" },
+        { position: 2, name: "Guides", item: "https://docs.langwatch.ai/integration/quick-start" },
+        { position: 3, name: "Spans", item: "https://docs.langwatch.ai/tracing/spans" },
+      ],
+    });
+    expect(
+      breadcrumbTrail({ sections, slug: "integration/quick-start", title: "Quick start" }),
+    ).toHaveLength(2);
+    expect(pageHead({ slug: "introduction", title: "Home", trail: [] })).not.toContain(
+      "BreadcrumbList",
+    );
   });
 });

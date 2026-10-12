@@ -1,3 +1,7 @@
+import { installSidebar } from "../../navigation/browser/sidebar.ts";
+
+installSidebar();
+
 let observer: ResizeObserver | null = null;
 function measureRails() {
   const header = document.querySelector("header")?.getBoundingClientRect().height ?? 72;

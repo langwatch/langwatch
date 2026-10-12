@@ -1,4 +1,5 @@
-import { Box, Flex, Tabs } from "@langwatch/design-system/primitives";
+import { Box, Flex, Tabs, Text } from "@langwatch/design-system/primitives";
+import { FileCode } from "lucide-react";
 import { Children, isValidElement, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -6,7 +7,7 @@ import { usePreference, writePreference } from "../../../lib/storage.ts";
 import { CodeBar, CodeFrame } from "../../code/ui/code-block.tsx";
 import { CodeBody, CopyAction, sourceFromProps } from "../../code/ui/code-parts.tsx";
 import type { CodeSource } from "../../code/ui/code-parts.tsx";
-import { languageName, preferenceGroupFor } from "../../code/ui/languages.ts";
+import { codeFilename, languageName, preferenceGroupFor } from "../../code/ui/languages.ts";
 import { readingTabList, readingTabTrigger } from "./tabs.tsx";
 
 type Item = { label: string; source?: CodeSource; content?: ReactNode };
@@ -27,12 +28,27 @@ function itemsOf({ children }: { children: ReactNode }): Item[] {
 /** One frame, authored tabs, one copy action; recognised label sets share a stored choice. */
 export function CodeGroup({ children }: { children?: ReactNode }) {
   const items = itemsOf({ children });
-  const group = preferenceGroupFor({ labels: items.map((item) => item.label) });
+  const authoredGroup = preferenceGroupFor({ labels: items.map((item) => item.label) });
+  const group =
+    authoredGroup ??
+    preferenceGroupFor({
+      labels: items.map((item) =>
+        item.source ? languageName({ lang: item.source.lang }) : item.label,
+      ),
+    });
+  const languageVariants = group === "sdk-language" || group === "api-language";
+  const choiceOf = (item: Item) => {
+    if (authoredGroup) return item.label;
+    if (!languageVariants || !item.source) return item.label;
+    return languageName({ lang: item.source.lang });
+  };
   const stored = usePreference({ key: group });
   const [local, setLocal] = useState<string | null>(null);
   const labels = items.map((item) => item.label);
   const wanted = group ? stored : local;
-  const active = labels.find((label) => label.toLowerCase() === wanted?.toLowerCase()) ?? labels[0];
+  const active =
+    items.find((item) => choiceOf(item).toLowerCase() === wanted?.toLowerCase())?.label ??
+    labels[0];
   const current = items.find((item) => item.label === active) ?? items[0];
   if (!current) return null;
   return (
@@ -41,13 +57,34 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
         data-docs-preference={group ?? void 0}
         value={active}
         onValueChange={({ value }) => {
-          if (group) writePreference({ key: group, value });
-          else setLocal(value);
+          if (group) {
+            const selected = items.find((item) => item.label === value);
+            writePreference({
+              key: group,
+              value: selected ? choiceOf(selected) : value,
+            });
+          } else setLocal(value);
         }}
         variant="line"
         colorPalette="accent"
         size="md"
       >
+        <CodeBar>
+          <FileCode size={16} aria-hidden="true" />
+          <Text
+            as="span"
+            data-docs-code-title=""
+            fontSize="12px"
+            fontFamily="mono"
+            minWidth="0"
+            flex="1"
+          >
+            {current.source ? codeFilename(current.source) : current.label}
+          </Text>
+          <Flex alignItems="center" flexShrink={0}>
+            {current.source ? <CopyAction code={current.source.code} /> : null}
+          </Flex>
+        </CodeBar>
         <CodeBar>
           <Tabs.List
             css={{
@@ -62,18 +99,22 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
               <Tabs.Trigger
                 key={item.label}
                 value={item.label}
+                data-docs-language={choiceOf(item)}
                 css={{ ...readingTabTrigger, minHeight: "44px" }}
               >
-                {item.label}
+                {choiceOf(item)}
               </Tabs.Trigger>
             ))}
           </Tabs.List>
-          <Flex alignItems="center" flexShrink={0}>
-            {current.source ? <CopyAction code={current.source.code} /> : null}
-          </Flex>
         </CodeBar>
         {items.map((item) => (
-          <Tabs.Content key={item.label} value={item.label} padding="0" data-docs-panel="">
+          <Tabs.Content
+            key={item.label}
+            value={item.label}
+            padding="0"
+            data-docs-panel=""
+            data-code-title={item.source ? codeFilename(item.source) : item.label}
+          >
             {item.source ? (
               <CodeBody source={item.source} />
             ) : (

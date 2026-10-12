@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { z } from "zod";
+import { z } from "zod/mini";
 
 const PREFIX = "lw-docs:";
 const EVENT = "lw-docs-pref";

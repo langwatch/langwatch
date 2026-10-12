@@ -1,4 +1,4 @@
-import { isProduction } from "../config.ts";
+import { docsBasePath, isProduction } from "../config.ts";
 import { startNavigation } from "./navigation.ts";
 
 import "./islands.css";
@@ -81,13 +81,16 @@ document.addEventListener("keydown", (event) => {
 });
 if ("serviceWorker" in navigator && isProduction) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch(() => {});
+    void navigator.serviceWorker
+      .register(`${docsBasePath}/sw.js`, { scope: `${docsBasePath}/`, updateViaCache: "none" })
+      .catch(() => {});
   });
 }
 
 const enhanceReading = () => {
   loadIsland({ name: "toc" });
   loadIsland({ name: "tabs" });
+  loadIsland({ name: "reading" });
   if (matchMedia("(prefers-reduced-motion: no-preference)").matches) loadIsland({ name: "ground" });
 };
 if ("requestIdleCallback" in window) window.requestIdleCallback(enhanceReading, { timeout: 1000 });

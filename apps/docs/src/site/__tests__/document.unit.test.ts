@@ -25,7 +25,7 @@ describe("when configured pages include a section index", () => {
         },
       }),
     ).toBe(
-      "# Docs\n\n## Documentation\n\n- [Governance](https://docs.langwatch.ai/governance/index.md): Control access\n",
+      "# Docs\n\n> Every page below is plain Markdown. Report outdated or broken pages as a GitHub issue: https://github.com/langwatch/langwatch/issues\n\n## Documentation\n\n- [Governance](https://docs.langwatch.ai/governance/index.md): Control access\n",
     );
   });
 });

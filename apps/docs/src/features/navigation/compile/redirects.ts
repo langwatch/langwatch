@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { z } from "zod";
 
+import { sitePath, stripBasePath, withBasePath } from "../../../lib/site-path.ts";
 import { DOCS_ORIGIN } from "../../discovery/compile/page-head.ts";
 import { readDocsConfig } from "./nav.ts";
 
@@ -31,19 +32,23 @@ export function resolveRedirect({
   pathname,
   search,
   redirects,
+  basePath = "",
 }: {
   pathname: string;
   search: string;
   redirects: Redirects;
+  basePath?: string;
 }) {
-  const destination = redirects[pathname.replace(/\/$/, "")];
+  const sitePathname = stripBasePath({ pathname, basePath });
+  if (sitePathname === null) return null;
+  const destination = redirects[sitePathname.replace(/\/$/, "")];
   if (!destination) return null;
   const target = new URL(destination, "http://docs.local");
   for (const [key, value] of new URLSearchParams(search)) {
     if (!target.searchParams.has(key)) target.searchParams.append(key, value);
   }
   if (/^https?:\/\//.test(destination)) return target.href;
-  return `${target.pathname}${target.search}${target.hash}`;
+  return withBasePath({ basePath, path: `${target.pathname}${target.search}${target.hash}` });
 }
 
 function escapeAttribute(text: string) {
@@ -62,7 +67,7 @@ export function isStaticRedirect({ source }: { source: string }) {
 
 /** A redirect any static host can serve: refresh to the destination, canonical, noindex, a link. */
 export function redirectPage({ destination }: { destination: string }) {
-  const href = escapeAttribute(destination);
+  const href = escapeAttribute(sitePath({ path: destination }));
   const canonical = escapeAttribute(new URL(destination, DOCS_ORIGIN).href);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Moved | LangWatch Docs</title><meta name="robots" content="noindex"><link rel="canonical" href="${canonical}"><meta http-equiv="refresh" content="0; url=${href}"></head><body><p>This page moved to <a href="${href}">${href}</a>.</p></body></html>`;
 }

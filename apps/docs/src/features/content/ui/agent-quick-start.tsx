@@ -1,8 +1,10 @@
 import { Box, Button, Flex, Link, Text } from "@langwatch/design-system/primitives";
-import { ArrowRight, Check, ChevronDown, Copy, Terminal } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Copy, FileText, Terminal } from "lucide-react";
 import { useState } from "react";
+import type { ReactNode } from "react";
 
 import { useCopy } from "../../../lib/clipboard.ts";
+import { pagePath, sitePath } from "../../../lib/site-path.ts";
 
 const AGENTS = [
   { name: "Claude Code", logo: "claude-code" },
@@ -10,30 +12,21 @@ const AGENTS = [
   { name: "Cursor", logo: "cursor" },
 ];
 
-function PromptPreview({ prompt }: { prompt: string }) {
+function PromptPreview({ prompt, action }: { prompt: string; action: ReactNode }) {
   return (
-    <Box borderWidth="1px" borderColor="border" borderRadius="lg" overflow="hidden" bg="bg.subtle">
-      <Box padding="4" className="docs-prompt-terminal">
-        <Flex gap="2" alignItems="center" marginBottom="3" color="docs.lede" fontSize="12px">
-          <Terminal size={14} /> SETUP.md{" "}
-          <Text as="span" marginInlineStart="auto">
-            Ready for your agent
-          </Text>
+    <Box borderWidth="1px" borderColor="border" borderRadius="xl" overflow="hidden" bg="bg.subtle">
+      <Flex padding="4" gap="3" alignItems="center" justifyContent="space-between" wrap="wrap">
+        <Flex gap="2" alignItems="center" color="fg" fontSize="14px" fontWeight="600">
+          <FileText size={16} aria-hidden="true" /> Setup prompt
         </Flex>
-        <Text as="div" fontSize="15px" lineHeight="26px" color="fg" fontWeight="500">
-          <code>
-            <span className="docs-prompt-heading">{prompt.split("\n")[0]}</span>
-          </code>
+        {action}
+      </Flex>
+      <Box paddingX="4" paddingBottom="4">
+        <Text as="div" fontSize="16px" lineHeight="26px" color="fg" fontWeight="600">
+          {prompt.split("\n")[0]}
         </Text>
-        <Text as="div" fontSize="14px" lineHeight="24px" color="docs.lede" marginTop="1">
-          <code>
-            <span className="docs-prompt-command">Instrument</span> this project with{" "}
-            <span className="docs-prompt-brand">LangWatch</span>.
-            <br />
-            <span className="docs-prompt-comment">
-              # Detect the SDK · add tracing · verify a trace
-            </span>
-          </code>
+        <Text as="div" fontSize="14px" lineHeight="24px" color="docs.body" marginTop="1">
+          Find the right SDK, add tracing, and verify a trace in your project.
         </Text>
       </Box>
       <Box
@@ -57,7 +50,7 @@ function PromptPreview({ prompt }: { prompt: string }) {
           color="fg"
           listStyleType="none"
         >
-          Read the full prompt <ChevronDown size={16} aria-hidden="true" />
+          View full prompt <ChevronDown size={16} aria-hidden="true" />
         </Flex>
         <Box
           as="pre"
@@ -124,7 +117,7 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
               _hover={{ bg: agent === name ? "docs.body" : "bg.hover" }}
             >
               <img
-                src={`/images/logos/${logo}.svg`}
+                src={sitePath({ path: `/images/logos/${logo}.svg` })}
                 width={20}
                 height={20}
                 alt=""
@@ -135,33 +128,27 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
             </Button>
           ))}
         </Flex>
-        <PromptPreview prompt={prompt} />
-        <Flex marginTop="5" gap="4" alignItems="center" justifyContent="space-between" wrap="wrap">
-          <Text
-            as="div"
-            fontSize="13px"
-            lineHeight="22px"
-            color="docs.lede"
-            margin="0"
-            maxWidth="32ch"
-          >
-            Open your project in <span data-docs-agent-name="">{agent}</span>, then paste the full
-            setup prompt.
-          </Text>
-          <Button
-            width={{ base: "100%", md: "auto" }}
-            minHeight="44px"
-            bg="docs.primary"
-            color="docs.primaryText"
-            _hover={{ bg: "docs.primaryHover" }}
-            disabled={!ready}
-            data-docs-prompt=""
-            onClick={() => copy({ text: prompt })}
-          >
-            {state === "copied" ? <Check size={16} /> : <Copy size={16} />}
-            {state === "copied" ? "Prompt copied" : "Copy setup prompt"}
-          </Button>
-        </Flex>
+        <PromptPreview
+          prompt={prompt}
+          action={
+            <Button
+              size="sm"
+              minHeight="40px"
+              bg="docs.primary"
+              color="docs.primaryText"
+              _hover={{ bg: "docs.primaryHover" }}
+              disabled={!ready}
+              data-docs-prompt=""
+              onClick={() => copy({ text: prompt })}
+            >
+              {state === "copied" ? <Check size={16} /> : <Copy size={16} />}
+              {state === "copied" ? "Prompt copied" : "Copy setup prompt"}
+            </Button>
+          }
+        />
+        <Text as="div" fontSize="14px" lineHeight="24px" color="docs.body" marginTop="4">
+          Open your project in <span data-docs-agent-name="">{agent}</span>, then paste the prompt.
+        </Text>
         <Text
           as="output"
           aria-live="polite"
@@ -169,12 +156,12 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
           color={state === "failed" ? "red.fg" : "docs.lede"}
           display="block"
           marginTop="3"
-          minHeight="20px"
+          minHeight="0"
           marginBottom="0"
         >
           {state === "failed"
             ? "Copy failed. Open the skills directory to select the full prompt."
-            : "Copies the full tracing skill, including setup and verification steps."}
+            : ""}
         </Text>
       </Box>
       <Flex
@@ -187,10 +174,10 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
         wrap="wrap"
         fontSize="14px"
       >
-        <Link href="/integration/quick-start" color="fg" gap="2">
+        <Link href={pagePath({ slug: "integration/quick-start" })} color="fg" gap="2">
           Set up manually <ArrowRight size={14} />
         </Link>
-        <Link href="/skills/directory" color="fg" gap="2">
+        <Link href={pagePath({ slug: "skills/directory" })} color="fg" gap="2">
           Explore all skills <ArrowRight size={14} />
         </Link>
       </Flex>

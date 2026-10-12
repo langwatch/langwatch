@@ -187,21 +187,24 @@ Feature: haven service selection
       And the Storybook's output appears in "haven logs design-system"
       And the mail studio's output appears in "haven logs mail-room"
 
-    # The docs site is the one developer tool run on its own dev server: the
-    # person writing docs wants each edit on screen, so it hot reloads.
-    Scenario: The docs site is a developer tool served with hot reload
+    # Like the design system, the docs are built to static files and served by
+    # haven itself, at a real address under the app: no frame, no dev server.
+    # Hot reload while writing stays "pnpm --filter @langwatch/docs-site dev".
+    Scenario: The docs site is built and mounted at /docs on the app
       When the developer runs "haven up +docs"
-      Then the docs site's Vite dev server runs on the port haven allocated
-      And it is served at "docs.<slug>.langwatch.localhost"
+      Then the docs lane builds the site with "--base-path /docs" unless its content check finds the last build current
+      And haven serves that build natively at "app.<slug>.langwatch.localhost/docs/"
+      And every other path on the app hostname, websockets and streams included, reaches the app unchanged
+      And "docs.<slug>.langwatch.localhost" serves the same build and sends its root to "/docs/"
       And its output appears in "haven logs docs"
-      And a later "haven up -docs" stops it
+      And a later "haven up -docs" stops it and the app hostname routes straight to the app again
 
     # Writing docs needs none of the product: no app, api, worker, databases,
     # migrations or simulators. The docs run alone, the way "haven sim idp" does.
     Scenario: The docs site runs alone without the stack
       When the developer runs "haven up --only docs -d"
-      Then only the docs site's dev server runs, in the background
-      And it is served at "docs.<slug>.langwatch.localhost"
+      Then only the docs lane runs, in the background, building and serving the docs natively
+      And it is served at "app.<slug>.langwatch.localhost/docs/" and "docs.<slug>.langwatch.localhost", whose roots go to "/docs/"
       And its output appears in "haven logs docs" and "haven status" reports it
       And "haven browser open" reaches it with no app to wait on
       And "haven down" stops it and removes the route

@@ -7,7 +7,12 @@ import { chromium } from "playwright";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../../..");
 
-const out = process.env.DOCS_SHOTS_DIR ?? path.join(root, ".claude/tmp/docs-site/shots");
+const out =
+  process.env.DOCS_SHOTS_DIR ??
+  path.join(
+    process.env.TMPDIR ?? path.join(root, "apps/docs/node_modules/.cache"),
+    "docs-site-shots",
+  );
 const showBanner = process.env.DOCS_SHOW_BANNER === "1";
 mkdirSync(out, { recursive: true });
 
@@ -19,7 +24,7 @@ const sizes = [
   { name: "1440", width: 1440, height: 1100 },
   { name: "390", width: 390, height: 844 },
 ];
-const modes = (process.argv[3] ?? "light,dark").split(",");
+const modes = ["light", "dark"];
 const bannerContent = JSON.parse(readFileSync(path.join(root, "docs/docs.json"), "utf8")).banner
   .content;
 let hash = 0;

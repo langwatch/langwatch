@@ -21,13 +21,42 @@ function updateToc() {
 function updateProgress(rail: HTMLElement) {
   const track = rail.querySelector<HTMLElement>(".docs-toc-track");
   const svg = rail.querySelector<SVGSVGElement>(".docs-toc-progress");
-  const path = svg?.querySelector<SVGPathElement>("path");
-  const active = track?.querySelector<HTMLElement>('[aria-current="location"]');
-  if (!track || !svg || !path || !active) return;
+  const path = svg?.querySelector<SVGPathElement>(".docs-toc-path");
+  const guide = svg?.querySelector<SVGPathElement>(".docs-toc-guide");
+  if (!track || !svg || !path || !guide) return;
+  const links = [...track.querySelectorAll<HTMLElement>("a")];
   const bounds = track.getBoundingClientRect();
-  const top = active.getBoundingClientRect().top - bounds.top + 4;
-  svg.setAttribute("viewBox", `0 0 14 ${bounds.height}`);
-  path.setAttribute("d", `M 4 ${top} L 4 ${top + active.offsetHeight - 8}`);
+  if (bounds.height <= 0) return;
+  const entries = links.map((link) => ({
+    x: link.dataset.nested === "true" ? 16 : 4,
+    y: link.getBoundingClientRect().top - bounds.top + 4,
+    height: Math.max(0, link.offsetHeight - 8),
+  }));
+  let previous: { x: number; y: number } | null = null;
+  let activeStartShape = "";
+  let activeEndShape = "";
+  const commands: string[] = [];
+  entries.forEach((entry, index) => {
+    if (previous) {
+      const middle = (previous.y + entry.y) / 2;
+      commands.push(`C ${previous.x} ${middle} ${entry.x} ${middle} ${entry.x} ${entry.y}`);
+    } else commands.push(`M ${entry.x} ${entry.y}`);
+    const active = links[index].getAttribute("aria-current") === "location";
+    if (active) activeStartShape = commands.join(" ");
+    commands.push(`L ${entry.x} ${entry.y + entry.height}`);
+    if (active) activeEndShape = commands.join(" ");
+    previous = { x: entry.x, y: entry.y + entry.height };
+  });
+  svg.setAttribute("viewBox", `0 0 28 ${bounds.height}`);
+  const shape = commands.join(" ");
+  guide.setAttribute("d", activeStartShape);
+  const activeStart = activeStartShape ? guide.getTotalLength() : 0;
+  guide.setAttribute("d", activeEndShape);
+  const activeEnd = activeEndShape ? guide.getTotalLength() : 0;
+  guide.setAttribute("d", shape);
+  if (path.getAttribute("d") !== shape) path.setAttribute("d", shape);
+  path.style.strokeDasharray = `0 ${activeStart} ${activeEnd - activeStart} ${guide.getTotalLength()}`;
+  path.style.strokeDashoffset = "0";
 }
 
 export function installToc() {
@@ -48,6 +77,7 @@ export function installToc() {
     link?.closest("details")?.removeAttribute("open");
   });
   updateToc();
+  void document.fonts.ready.then(updateToc);
 }
 
 installToc();

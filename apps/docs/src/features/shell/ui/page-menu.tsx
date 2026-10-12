@@ -4,6 +4,8 @@ import { Check, ChevronDown, Copy, FileText, Link2 } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 
+import { sitePath } from "../../../lib/site-path.ts";
+
 function MenuLabel({
   icon,
   title,
@@ -37,7 +39,7 @@ export function PageMenu({ slug, initialOpen = false }: { slug: string; initialO
     try {
       let text = url;
       if (kind === "page") {
-        const response = await fetch(`/${slug}.md`, { credentials: "omit" });
+        const response = await fetch(sitePath({ path: `/${slug}.md` }), { credentials: "omit" });
         if (!response.ok) throw new Error("Markdown unavailable");
         text = await response.text();
       }
@@ -88,7 +90,7 @@ export function PageMenu({ slug, initialOpen = false }: { slug: string; initialO
           />
         </Menu.Item>
         <Menu.Item value="view" asChild>
-          <a href={`/${slug}.md`}>
+          <a href={sitePath({ path: `/${slug}.md` })}>
             <MenuLabel
               icon={<FileText size={16} />}
               title="View as Markdown"
@@ -98,7 +100,7 @@ export function PageMenu({ slug, initialOpen = false }: { slug: string; initialO
         </Menu.Item>
         {["claude", "agent"].map((extension) => (
           <Menu.Item key={extension} value={`source-${extension}`} asChild>
-            <a href={`/${slug}.${extension}`}>
+            <a href={sitePath({ path: `/${slug}.${extension}` })}>
               <MenuLabel
                 icon={<FileText size={16} />}
                 title={`View .${extension}`}
@@ -124,7 +126,14 @@ export function PageMenu({ slug, initialOpen = false }: { slug: string; initialO
           <Menu.Item key={id} value={id} asChild>
             <a href={href} target="_blank" rel="noopener noreferrer">
               <MenuLabel
-                icon={<img src={`/images/logos/${logo}.svg`} alt="" width={16} height={16} />}
+                icon={
+                  <img
+                    src={sitePath({ path: `/images/logos/${logo}.svg` })}
+                    alt=""
+                    width={16}
+                    height={16}
+                  />
+                }
                 title={`Open in ${title}`}
                 description="Ask questions about this page"
               />

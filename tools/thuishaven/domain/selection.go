@@ -51,9 +51,9 @@ type Selection struct {
 	// a tool for the person writing an email template, not a service the
 	// application talks to, so nothing else in the stack degrades without it.
 	MailRoom bool `json:"mail-room"`
-	// Docs is the public docs site's Vite dev server, off by default for the
-	// same reason as DesignSystem: a tool for whoever is writing the docs.
-	// `haven up +docs` once, and docs.<slug> serves it with hot reload.
+	// Docs is the public docs site, built and mounted at app.<slug>/docs; off by
+	// default for the same reason as DesignSystem: a tool for whoever is
+	// writing the docs. `haven up +docs` once.
 	Docs bool `json:"docs"`
 	// Langevals is the evaluator service monitors and evaluations call. Off by
 	// default like Langy: it is a Python process whose imports alone hold a

@@ -112,7 +112,7 @@ await it("copies supported agent commands on guides, overview and API pages", as
               `npx langwatch ${agent}`,
             );
           }
-          const report = page.getByRole("link", { name: "Report outdated or broken docs" });
+          const report = page.getByRole("link", { name: "Report a problem" });
           const issue = new URL(await report.getAttribute("href"));
           assert.match(issue.searchParams.get("body"), new RegExp(slug));
         }

@@ -1,46 +1,46 @@
-import { z } from "zod";
+import { z } from "zod/mini";
 
 import type { Schema } from "./operation.ts";
 
-const schema: z.ZodType<Schema> = z.object({
-  type: z.union([z.string(), z.array(z.string())]).optional(),
-  format: z.string().optional(),
-  description: z.string().optional(),
+const schema: z.ZodMiniType<Schema> = z.object({
+  type: z.optional(z.union([z.string(), z.array(z.string())])),
+  format: z.optional(z.string()),
+  description: z.optional(z.string()),
   get properties() {
-    return z.record(z.string(), schema).optional();
+    return z.optional(z.record(z.string(), schema));
   },
-  required: z.array(z.string()).optional(),
+  required: z.optional(z.array(z.string())),
   get items() {
-    return schema.optional();
+    return z.optional(schema);
   },
-  enum: z.array(z.unknown()).optional(),
-  default: z.unknown().optional(),
-  example: z.unknown().optional(),
-  nullable: z.boolean().optional(),
-  deprecated: z.boolean().optional(),
+  enum: z.optional(z.array(z.unknown())),
+  default: z.optional(z.unknown()),
+  example: z.optional(z.unknown()),
+  nullable: z.optional(z.boolean()),
+  deprecated: z.optional(z.boolean()),
   get additionalProperties() {
-    return z.union([z.boolean(), schema]).optional();
+    return z.optional(z.union([z.boolean(), schema]));
   },
   get allOf() {
-    return z.array(schema).optional();
+    return z.optional(z.array(schema));
   },
   get oneOf() {
-    return z.array(schema).optional();
+    return z.optional(z.array(schema));
   },
   get anyOf() {
-    return z.array(schema).optional();
+    return z.optional(z.array(schema));
   },
-  minLength: z.number().optional(),
-  maxLength: z.number().optional(),
-  minimum: z.number().optional(),
-  maximum: z.number().optional(),
-  pattern: z.string().optional(),
-  $recursive: z.string().optional(),
+  minLength: z.optional(z.number()),
+  maxLength: z.optional(z.number()),
+  minimum: z.optional(z.number()),
+  maximum: z.optional(z.number()),
+  pattern: z.optional(z.string()),
+  $recursive: z.optional(z.string()),
 });
 const content = z.object({
   type: z.string(),
-  schema: schema.nullable(),
-  example: z.unknown().optional(),
+  schema: z.nullable(schema),
+  example: z.optional(z.unknown()),
 });
 export const operationSchema = z.object({
   method: z.string(),
@@ -52,11 +52,11 @@ export const operationSchema = z.object({
   schemes: z.array(
     z.object({
       id: z.string(),
-      type: z.string().optional(),
-      in: z.string().optional(),
-      name: z.string().optional(),
-      scheme: z.string().optional(),
-      description: z.string().optional(),
+      type: z.optional(z.string()),
+      in: z.optional(z.string()),
+      name: z.optional(z.string()),
+      scheme: z.optional(z.string()),
+      description: z.optional(z.string()),
     }),
   ),
   parameters: z.array(
@@ -69,9 +69,9 @@ export const operationSchema = z.object({
       schema,
     }),
   ),
-  body: z
-    .object({ required: z.boolean(), description: z.string(), contents: z.array(content) })
-    .nullable(),
+  body: z.nullable(
+    z.object({ required: z.boolean(), description: z.string(), contents: z.array(content) }),
+  ),
   responses: z.array(
     z.object({ status: z.string(), description: z.string(), contents: z.array(content) }),
   ),

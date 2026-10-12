@@ -1,4 +1,5 @@
 import { Box, Flex, Text } from "@langwatch/design-system/primitives";
+import { Sparkles, Terminal, ChevronDown } from "lucide-react";
 
 import { CodeBody, CopyAction } from "../../code/ui/code-parts.tsx";
 
@@ -6,10 +7,20 @@ function Command({ label, value }: { label: string; value: string }) {
   if (!value) return null;
   return (
     <Box minWidth="0">
-      <Text margin="0" marginBottom="2" fontSize="12px" color="fg.muted">
+      <Text margin="0" marginBottom="1" fontSize="12px" color="docs.body">
         {label}
       </Text>
-      <Flex alignItems="center" bg="bg.subtle" borderRadius="lg" paddingStart="3" minHeight="40px">
+      <Flex
+        alignItems="center"
+        gap="2"
+        bg="bg.subtle"
+        borderWidth="1px"
+        borderColor="border"
+        borderRadius="lg"
+        paddingStart="3"
+        minHeight="40px"
+      >
+        <Terminal size={14} aria-hidden="true" />
         <Box
           as="code"
           flex="1"
@@ -41,21 +52,25 @@ export function SkillCard({
     <Box
       className="docs-skill-card"
       borderWidth="1px"
-      borderColor="border"
+      borderColor="border.emphasized"
       borderRadius="xl"
-      padding="5"
+      padding="4"
+      bg="docs.raised"
       marginY="4"
     >
       <Text
         as="h3"
         margin="0"
-        marginBottom="4"
+        marginBottom="3"
         fontSize="16px"
         lineHeight="24px"
         fontWeight="600"
         color="fg"
+        display="flex"
+        alignItems="center"
+        gap="2"
       >
-        {title}
+        <Sparkles size={18} aria-hidden="true" /> {title}
       </Text>
       <Box
         display="grid"
@@ -66,16 +81,17 @@ export function SkillCard({
         <Command label="Skill command" value={command} />
       </Box>
       {prompt ? (
-        <Box marginTop="4" borderTopWidth="1px" borderColor="border.muted" paddingTop="2">
+        <Box marginTop="4" borderTopWidth="1px" borderColor="border" paddingTop="3">
           <Flex alignItems="center" justifyContent="space-between" fontSize="13px">
-            <span>Run without installing</span>
+            <span>Or paste the prompt into your agent</span>
             <Flex alignItems="center">
-              <span>Copy full prompt</span>
-              <CopyAction code={prompt} label="Copy full prompt" />
+              <CopyAction code={prompt} label="Copy full prompt" showLabel />
             </Flex>
           </Flex>
-          <details>
-            <summary>View prompt</summary>
+          <details className="docs-skill-prompt">
+            <summary>
+              View prompt <ChevronDown size={16} aria-hidden="true" />
+            </summary>
             <CodeBody
               source={{
                 lang: "text",

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
-import { z } from "zod";
+import { z } from "zod/mini";
 
 import { SessionViewContent } from "../../session/browser/session-view.tsx";
 import { useDocsSession } from "../../session/ui/use-docs-session.ts";

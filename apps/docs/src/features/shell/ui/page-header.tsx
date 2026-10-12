@@ -2,11 +2,12 @@ import { Box, Button, Flex, Heading, Text } from "@langwatch/design-system/primi
 import { Check, Copy } from "lucide-react";
 
 import { useCopy } from "../../../lib/clipboard.ts";
+import { sitePath } from "../../../lib/site-path.ts";
 import type { PageKind } from "./header.tsx";
 import { PageMenu } from "./page-menu.tsx";
 
 async function readMarkdown({ slug }: { slug: string }): Promise<string> {
-  const response = await fetch(`/${slug}.md`);
+  const response = await fetch(sitePath({ path: `/${slug}.md` }));
   if (!response.ok) throw new Error("markdown unavailable");
   return response.text();
 }

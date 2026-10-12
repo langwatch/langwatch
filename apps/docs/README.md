@@ -52,7 +52,8 @@ page into `apps/docs/dist`. It emits:
   Configured `section/index` pages also have a `/section` alias.
 - Identical `/path.md`, `/path.claude` and `/path.agent` content exports.
 - Hashed JavaScript and CSS under `assets/`, fonts, posters and docs media.
-- `search-index.json` with article text, navigation trails and headings.
+- `search-index.json` with article text, navigation trails and headings, plus
+  lossless `.br` and `.gz` variants for hosts supporting precompressed delivery.
 - `llms.txt`, a directory of configured pages linking to their Markdown.
 - `redirects.json` and noindex redirect pages for exact source paths from `docs.json`.
 - `404.html` with the documentation shell and recovery links.
@@ -63,6 +64,25 @@ fail. Do not publish output from a failed build. Each renderer uses its own temp
 directory under the system temporary root (`TMPDIR` when set), removed on completion
 or failure. Builds with different output directories do not share renderer output.
 No authored MDX or OpenAPI files are changed.
+
+The build caches rendered pages by their compiled inputs and combines their styles
+in navigation order. Renderer threads are bounded by available cores and memory.
+`--render-workers 1` selects one renderer; `--no-render-cache` disables cache reuse.
+An unchanged complete output is checked by content and reused without rebuilding.
+Caches live under `apps/docs/node_modules/.cache/docs-site` and are disposable.
+
+To emit URLs under a mount while retaining production canonical URLs:
+
+```sh
+pnpm --filter @langwatch/docs-site build --base-path /docs --out-dir "$TMPDIR/docs-mounted"
+pnpm --filter @langwatch/docs-site preview --base-path /docs --out-dir "$TMPDIR/docs-mounted" --port 4175
+```
+
+Haven's docs lane builds this mounted artifact and serves it natively at
+`app.<slug>.langwatch.localhost/docs/`. With a full stack, all other app routes
+still reach the app. `haven up --only docs` runs only the static docs server;
+both the app and docs hostnames open `/docs/`. Use the Vite command above for
+authoring with hot reload; Haven serves the compiled output.
 
 ## Preview
 
@@ -102,7 +122,7 @@ render at build time. Only interactive React islands need a browser runtime.
 ## Components and validation
 
 The shell, MDX components and API playground consume design-system exports;
-docs-specific semantic tokens live in `src/app/theme.ts`. Raw legacy skill markup is
+docs-specific semantic tokens live in `src/app/theme-config.ts`. Raw legacy skill markup is
 adapted during compilation. The current eight embedded product recordings have
 no audio streams; the video renderer explicitly mutes these silent demonstrations.
 Narrated media requires captions and a corresponding renderer before publication.
@@ -227,7 +247,7 @@ For a haven review in this worktree:
 
 ```sh
 VITE_DOCS_SESSION_AUTH=mock .bin/haven/haven up --only docs --agent -d
-.bin/haven/haven browser open https://docs.feat-docs-site.langwatch.localhost:1355/api-reference/traces/get-trace --lane docs
+.bin/haven/haven browser open https://app.feat-docs-site.langwatch.localhost:1355/docs/api-reference/traces/get-trace --lane docs
 .bin/haven/haven browser close --lane docs
 .bin/haven/haven down
 ```
@@ -247,15 +267,20 @@ lazy controls. Search and contextual menus load the shared design-system runtime
 on interaction; reading and the API island do not need that runtime.
 See [Revision 4: performance](./DESIGN.md) for the boundaries and alternatives.
 
-Internal links prefetch on hover/focus, with a small viewport prefetch allowance.
+Deferred reading enhancements prefetch internal links after deliberate hover or
+focus, with at most two requests in flight and a small viewport allowance. Offline
+and save-data readers do not trigger speculative requests.
 Navigation preserves the header and handles history, focus and announcements.
 A build change or a failed transition falls back to a normal document navigation.
 The dev server renders the same static page structure and reloads authored MDX.
 
-The production-only service worker precaches shell CSS/JS, reading fonts and an offline page.
+The production-only service worker precaches shell CSS/JS, the Latin reading font
+and an offline page. Other font faces are cached when requested.
 It revalidates public HTML/search, caps page caches at 40 entries, and expires the
 stale-while-revalidate window after 60 seconds. API requests, authentication
-headers, query strings and private/no-store responses bypass caching. Updates
+headers, arbitrary query strings and private/no-store responses bypass caching.
+The public search index's build-version query is cacheable for offline search.
+The worker stays within its registration scope, including a `/docs/` mount. Updates
 activate on successful installation without forcing a reload; subsequent document
 navigation adopts the new version. Future hosting should retain old hashed assets
 for open tabs and let `sw.js` revalidate promptly.
@@ -266,7 +291,7 @@ pnpm --filter @langwatch/docs-site test:performance --out-dir "$TMPDIR/docs-perf
 pnpm --filter @langwatch/docs-site test:layout --out-dir "$TMPDIR/docs-performance" --screenshots "$TMPDIR/docs-layout"
 ```
 
-`size` fails above 15 KB gzipped for the bootstrap, inline theme setup, idle
+`size` fails above 3 KB gzipped for initial reading and above 15 KB for the bootstrap, inline theme setup, idle
 controls and service worker combined. It separately reports the full search and
 playground interaction costs, including shared React/Zod. `test:performance`
 checks static reading, navigation, prefetch, worker replacement, offline fallback
@@ -315,6 +340,6 @@ New asset revisions are stored in LFS. Conversion in this branch does not rewrit
 
 ## Static search metadata
 
-Every page emits a canonical URL, description when provided, Open Graph/social metadata, a factual WebPage JSON-LD record, a Markdown alternate and an llms.txt discovery link during prerender. HTML aliases share one canonical URL; introduction uses the root URL. Client navigation updates the destination metadata together with its content. The custom 404 is marked noindex. Public OpenAPI documents are copied alongside the page exports.
+Every page emits a canonical URL, description when provided, Open Graph/social metadata, a factual WebPage JSON-LD record, breadcrumbs linking to real pages, a Markdown alternate and an llms.txt discovery link during prerender. HTML aliases share one canonical URL; introduction uses the root URL. Client navigation updates the destination metadata together with its content. The custom 404 is marked noindex. Public OpenAPI documents are copied alongside the page exports. Guide exports inline supported snippet imports and include provenance and absolute documentation links; fenced examples remain unchanged.
 
 These are discoverability and sharing features, not ranking guarantees. Validate production status codes, redirects and response headers against the future host; Markdown HTTP canonical/noindex response headers and production search analytics have not been configured here.

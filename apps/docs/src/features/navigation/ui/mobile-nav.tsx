@@ -1,5 +1,6 @@
 import { Box, Button, Flex, Link, Text } from "@langwatch/design-system/primitives";
 
+import { sitePath } from "../../../lib/site-path.ts";
 import { GithubLink } from "../../shell/ui/github-link.tsx";
 import type { Section } from "../model/nav.ts";
 import { SideNav } from "./side-nav.tsx";
@@ -43,7 +44,7 @@ export function MobileNav({
         <SideNav active={active} slug={slug} />
       </Box>
       <Flex padding="4" gap="3" borderTopWidth="1px" borderColor="border" wrap="wrap">
-        <Link href={site.llms}>Docs for agents</Link>
+        <Link href={sitePath({ path: site.llms })}>Docs for agents</Link>
         <Link href={site.signIn}>Open app</Link>
         <GithubLink compact />
       </Flex>

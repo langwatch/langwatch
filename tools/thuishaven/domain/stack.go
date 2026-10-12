@@ -36,6 +36,18 @@ type Service struct {
 	// hostname resolves to a shared baseline stack's copy instead. The hostname is
 	// always defined; only the backing port differs.
 	IsFallback bool `json:"fallback,omitempty"`
+	// RoutePort, when set, is where the hostname routes instead of Port: the app
+	// hostname goes to the docs lane's mount when this stack runs the docs, and
+	// the mount hands every non-docs path on to Port.
+	RoutePort int `json:"routePort,omitempty"`
+}
+
+// RouteTarget is the port this service's hostname routes to.
+func (s Service) RouteTarget() int {
+	if s.RoutePort != 0 {
+		return s.RoutePort
+	}
+	return s.Port
 }
 
 // Stack is one worktree's running set of services — the unit the dashboard lists,
@@ -216,8 +228,19 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{McpService, "MCP clients against hosted MCP (mcpsim)"},
 	{DesignSystemService, "Design system — Storybook"},
 	{MailRoomService, "Mail studio — transactional message preview"},
-	{DocsService, "Docs site — Vite dev server"},
+	{DocsService, "Docs site — built and mounted at app/docs"},
 	{LangevalsService, "Evaluators (Python)"},
+}
+
+// PerWorktreeIndex is name's position in PerWorktreeServices (its port's index
+// in a stack's allocation), or -1.
+func PerWorktreeIndex(name string) int {
+	for i, r := range PerWorktreeServices {
+		if r.Name == name {
+			return i
+		}
+	}
+	return -1
 }
 
 // ServiceHostAliases are extra hostnames routed to the same listener as a

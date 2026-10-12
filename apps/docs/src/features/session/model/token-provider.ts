@@ -1,17 +1,17 @@
-import { z } from "zod";
+import { z } from "zod/mini";
 
-export const docsSessionTokenSchema = z
-  .object({
-    token: z.string().min(1),
-    grantId: z.string().min(1),
-    projectId: z.string().min(1),
-    projectName: z.string().min(1),
-    apiOrigin: z.url(),
-    expiresAt: z.number().int().positive(),
-    purpose: z.literal("docs-playground"),
-    permissions: z.array(z.string().min(1)).min(1),
-  })
-  .strict();
+const text = () => z.string().check(z.minLength(1));
+
+export const docsSessionTokenSchema = z.strictObject({
+  token: text(),
+  grantId: text(),
+  projectId: text(),
+  projectName: text(),
+  apiOrigin: z.url(),
+  expiresAt: z.int().check(z.positive()),
+  purpose: z.literal("docs-playground"),
+  permissions: z.array(text()).check(z.minLength(1)),
+});
 export type DocsSessionToken = z.infer<typeof docsSessionTokenSchema>;
 
 export interface DocsTokenProvider {

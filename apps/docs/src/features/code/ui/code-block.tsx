@@ -1,8 +1,9 @@
 import { Box, Flex, Text } from "@langwatch/design-system/primitives";
+import { FileCode, Terminal } from "lucide-react";
 import { z } from "zod";
 
 import { CodeBody, CopyAction, sourceFromProps } from "./code-parts.tsx";
-import { languageName } from "./languages.ts";
+import { codeFilename, languageName } from "./languages.ts";
 
 const TERMINAL_LANGUAGES = ["bash", "sh", "shell", "zsh", "console", "terminal", "shellscript"];
 
@@ -44,29 +45,23 @@ export function DocsCodeBlock(props: Record<string, unknown>) {
   const source = sourceFromProps(props);
   if (source.lang === "mermaid") return <DocsMermaid {...props} />;
   const terminal = TERMINAL_LANGUAGES.includes(source.lang.toLowerCase());
-  const title = source.title || (terminal ? "Terminal" : languageName({ lang: source.lang }));
+  const title = codeFilename(source);
   return (
     <CodeFrame>
-      {source.title ? (
-        <CodeBar>
-          <Text
-            as="span"
-            flex="1"
-            minWidth="0"
-            fontSize="12px"
-            lineHeight="20px"
-            color="fg.muted"
-            fontFamily={source.title ? "mono" : "body"}
-          >
-            {title}
-          </Text>
-          <CopyAction code={source.code} />
-        </CodeBar>
-      ) : (
-        <Box className="docs-code-copy">
-          <CopyAction code={source.code} />
-        </Box>
-      )}
+      <CodeBar>
+        {terminal ? (
+          <Terminal size={16} aria-hidden="true" />
+        ) : (
+          <FileCode size={16} aria-hidden="true" />
+        )}
+        <Text as="span" flex="1" minWidth="0" fontSize="12px" fontFamily="mono">
+          {title}
+        </Text>
+        <Text as="span" fontSize="12px" color="fg.muted">
+          {languageName({ lang: source.lang })}
+        </Text>
+        <CopyAction code={source.code} />
+      </CodeBar>
       <CodeBody source={source} />
     </CodeFrame>
   );

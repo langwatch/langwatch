@@ -5,15 +5,15 @@ import path from "node:path";
 import { it } from "node:test";
 import { parseArgs } from "node:util";
 
-import { checkBuild } from "../src/site/build-check.ts";
+import { assertBuild } from "../src/site/build-check.ts";
 import { startPreview } from "../src/site/preview-server.ts";
 import {
-  checkAgentSetup,
-  checkCapabilityErrors,
-  checkClipboardReadiness,
-  checkMobileNavigation,
-  checkSkillCopy,
-  checkStaticDiagrams,
+  assertAgentSetup,
+  assertCapabilityErrors,
+  assertClipboardReadiness,
+  assertMobileNavigation,
+  assertSkillCopy,
+  assertStaticDiagrams,
   tracingPrompt,
 } from "./browser-checks.mjs";
 import { withPreviewBrowser, withReader } from "./browser-fixture.mjs";
@@ -104,7 +104,7 @@ async function checkVariant({ browser, base, width, mode }) {
  * @scenario "Publish only the configured API inventory"
  */
 await it("publishes exactly the configured inventory and its supporting files", async () => {
-  await checkBuild({ outDir });
+  await assertBuild({ outDir });
 });
 
 /**
@@ -127,33 +127,33 @@ await it("renders and operates the key pages at 1440 and 390 in light and dark",
 /** @scenario "Start with a coding agent" */
 await it("selects a coding agent and copies the complete authored setup prompt", async () => {
   const prompt = await tracingPrompt({ outDir });
-  await withReader({ outDir, run: ({ page, base }) => checkAgentSetup({ page, base, prompt }) });
+  await withReader({ outDir, run: ({ page, base }) => assertAgentSetup({ page, base, prompt }) });
 });
 
 /** @scenario "Keep clipboard controls unavailable before hydration" */
 await it("disables clipboard actions until their browser handlers are ready", async () => {
-  await withPreviewBrowser({ outDir, run: checkClipboardReadiness });
+  await withPreviewBrowser({ outDir, run: (context) => assertClipboardReadiness(context) });
 });
 
 /** @scenario "Copy a skill prompt" */
 await it("copies the full prompt from the generated skill card", async () => {
   const prompt = await tracingPrompt({ outDir });
-  await withReader({ outDir, run: ({ page, base }) => checkSkillCopy({ page, base, prompt }) });
+  await withReader({ outDir, run: ({ page, base }) => assertSkillCopy({ page, base, prompt }) });
 });
 
 /** @scenario "Navigate on a small screen" */
 await it("scrolls the mobile page tree and restores focus when dismissed", async () => {
-  await withReader({ outDir, run: checkMobileNavigation });
+  await withReader({ outDir, run: (context) => assertMobileNavigation(context) });
 });
 
 /** @scenario "Recover from unavailable browser capabilities" */
 await it("reports denied clipboard access and retries unavailable media", async () => {
-  await withReader({ outDir, run: checkCapabilityErrors });
+  await withReader({ outDir, run: (context) => assertCapabilityErrors(context) });
 });
 
 /** @scenario "Read diagrams without JavaScript" */
 await it("publishes both diagram themes and usable source without JavaScript", async () => {
-  await withPreviewBrowser({ outDir, run: checkStaticDiagrams });
+  await withPreviewBrowser({ outDir, run: (context) => assertStaticDiagrams(context) });
 });
 
 /** @scenario "Recover from an unknown route" */

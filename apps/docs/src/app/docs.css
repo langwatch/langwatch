@@ -287,6 +287,22 @@ body {
   font-size: 15px;
   line-height: 24px;
 }
+/* A solid semantic rule on the leading edge tells callout kinds apart at a glance. */
+.docs-shell .docs-callout[role="note"] {
+  border-inline-start: 4px solid var(--docs-callout-rule);
+}
+.docs-callout[data-palette="gray"] {
+  --docs-callout-rule: var(--chakra-colors-border-emphasized);
+}
+.docs-callout[data-palette="blue"] {
+  --docs-callout-rule: var(--chakra-colors-blue-solid);
+}
+.docs-callout[data-palette="green"] {
+  --docs-callout-rule: var(--chakra-colors-green-solid);
+}
+.docs-callout[data-palette="yellow"] {
+  --docs-callout-rule: var(--chakra-colors-yellow-solid);
+}
 .docs-callout a {
   color: inherit;
   text-decoration-color: currentColor;
@@ -324,7 +340,7 @@ body {
   color: var(--chakra-colors-docs-body);
 }
 .docs-field code {
-  color: var(--chakra-colors-fg);
+  color: var(--chakra-colors-blue-fg);
 }
 .docs-field-body {
   color: var(--chakra-colors-docs-body);
@@ -432,12 +448,24 @@ body {
 .docs-prose .docs-steps {
   list-style-type: none;
 }
+/* List markers carry the brand accent so sequences and bullets stand out from body text. */
+.docs-prose :is(ul, ol):not(.docs-steps) > li::marker {
+  color: var(--chakra-colors-accent-fg);
+}
+.docs-prose ol:not(.docs-steps) > li::marker {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .docs-prose table {
-  min-width: 600px;
+  min-width: 0;
+  table-layout: fixed;
+}
+.docs-prose :is(th, td) {
+  overflow-wrap: anywhere;
 }
 .docs-prose td code {
-  white-space: nowrap;
-  overflow-wrap: normal;
+  white-space: normal;
+  overflow-wrap: anywhere;
   word-break: normal;
 }
 .docs-table-scroll {
@@ -493,7 +521,8 @@ body {
     font-size: 12px;
   }
   .docs-prose .docs-steps > li::after {
-    inset-inline-start: 10.5px;
+    inset-inline-start: 10px;
+    top: 32px;
   }
   .docs-step-body > .docs-code-frame {
     margin-inline-start: -32px;
@@ -608,23 +637,74 @@ body {
 }
 
 .docs-card-grid:has(.docs-card[data-compact="true"]):not(:has(.docs-card[data-compact="false"])) {
-  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+}
+/* Logo-only grids keep two columns on phones instead of one long list. */
+@container (max-width: 599px) {
+  .docs-card-grid:has(.docs-card[data-compact="true"]):not(:has(.docs-card[data-compact="false"])) {
+    grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
+    gap: 8px;
+  }
+  .docs-card[data-compact="true"] {
+    gap: 10px;
+  }
 }
 .docs-card-grid > .docs-card:has(ul) {
   grid-column: 1 / -1;
 }
+/* Cards are cards at rest: raised surface, full border, soft shadow. Links only add lift. */
 .docs-card {
+  box-shadow: 0 1px 2px var(--chakra-colors-docs-shadow);
   transition:
     border-color 160ms,
     box-shadow 160ms,
-    background-color 160ms;
+    transform 160ms;
 }
-.docs-card:has(a):hover {
-  border-color: var(--chakra-colors-docs-control-border);
-  box-shadow: 0 4px 16px var(--chakra-colors-docs-shadow);
+.docs-card[data-linked]:hover,
+.docs-card[data-linked]:focus-within {
+  border-color: color-mix(
+    in srgb,
+    var(--chakra-colors-accent-solid) 55%,
+    var(--chakra-colors-border)
+  );
+  box-shadow: 0 6px 20px var(--chakra-colors-docs-shadow-strong);
+  transform: translateY(-1px);
 }
 .docs-card a::after {
   transform: none;
+}
+.docs-card-arrow {
+  flex-shrink: 0;
+  color: var(--chakra-colors-accent-fg);
+  transition:
+    transform 160ms,
+    color 160ms;
+}
+.docs-card[data-linked]:hover .docs-card-arrow {
+  color: var(--chakra-colors-accent-fg);
+  transform: translateX(2px);
+}
+.docs-card-icon {
+  background: transparent;
+  border-color: transparent;
+}
+/* Third-party marks are drawn for light backgrounds: one light chip in both themes. */
+.docs-card-logo {
+  background: #ffffff;
+  border-color: var(--chakra-colors-border);
+}
+.dark .docs-card-logo {
+  background: var(--chakra-colors-fg);
+  border-color: transparent;
+}
+/* The chip is light, so marks inverted for dark paper elsewhere keep their own colours here. */
+.dark .docs-card .docs-card-logo img {
+  filter: none;
+}
+.docs-card[data-compact="true"] .docs-card-logo,
+.docs-card[data-compact="true"] .docs-card-icon {
+  width: 2.25rem;
+  height: 2.25rem;
 }
 .docs-examples > summary {
   font-size: 14px;
@@ -654,16 +734,6 @@ body {
   background: var(--chakra-colors-docs-raised);
   box-shadow: 0 1px 3px var(--chakra-colors-docs-shadow);
 }
-.docs-shell .docs-card {
-  transition:
-    background-color 160ms,
-    border-color 160ms;
-}
-.docs-shell .docs-card:has(a):hover,
-.docs-shell .docs-card:focus-within {
-  background: var(--chakra-colors-bg-hover);
-  border-color: var(--chakra-colors-border-emphasized);
-}
 .docs-card-body > :last-child {
   margin-bottom: 0;
 }
@@ -682,8 +752,10 @@ body {
   line-height: 25px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .docs-shell .docs-card {
+  .docs-shell .docs-card,
+  .docs-shell .docs-card-arrow {
     transition: none;
+    transform: none !important;
   }
 }
 
@@ -703,6 +775,16 @@ body {
   [data-docs-rail][data-fits-viewport] {
     position: sticky;
     top: var(--docs-header-h);
+  }
+  /* The navigation rail scrolls on its own, so changing page never moves it. */
+  .docs-left-rail[data-docs-rail] {
+    position: sticky;
+    top: var(--docs-header-h);
+    max-height: calc(100dvh - var(--docs-header-h));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--chakra-colors-border) transparent;
   }
 }
 .docs-prose .docs-agent-start p {
@@ -761,17 +843,8 @@ body {
 }
 
 .docs-agent-start {
-  border: 1px solid transparent;
-  background:
-    linear-gradient(var(--chakra-colors-docs-paper), var(--chakra-colors-docs-paper)) padding-box,
-    linear-gradient(
-        120deg,
-        var(--chakra-colors-docs-mesh-blue),
-        var(--chakra-colors-docs-primary),
-        var(--chakra-colors-docs-mesh-rust)
-      )
-      border-box;
-  box-shadow: 0 8px 32px color-mix(in srgb, var(--chakra-colors-docs-mesh-warm) 14%, transparent);
+  background: var(--chakra-colors-docs-paper);
+  border-color: var(--chakra-colors-border-emphasized);
 }
 .docs-agent-start [data-docs-agent] {
   background: var(--chakra-colors-docs-paper);
@@ -799,24 +872,6 @@ body {
 .dark img[src$="/cursor.svg"],
 .dark img[src$="/openai.svg"] {
   filter: invert(1);
-}
-.docs-prompt-terminal {
-  background: var(--chakra-colors-bg-nested);
-}
-.docs-prompt-terminal code {
-  font: 13px/24px var(--chakra-fonts-mono);
-}
-.docs-prompt-heading {
-  color: var(--chakra-colors-docs-prompt-heading);
-}
-.docs-prompt-command {
-  color: var(--chakra-colors-docs-prompt-command);
-}
-.docs-prompt-brand {
-  color: var(--chakra-colors-accent-fg);
-}
-.docs-prompt-comment {
-  color: var(--chakra-colors-fg-muted);
 }
 .docs-agent-start [data-copied] {
   background: var(--chakra-colors-green-subtle);
@@ -931,6 +986,20 @@ body {
   position: relative;
   padding-inline-start: 16px;
 }
+/* Sidebar logos sit on a light chip, so marks inverted for dark paper keep their colours. */
+.dark .docs-nav-logo img {
+  filter: none;
+}
+/* The same faint guide line as the navigation tree; the active entry's mark runs over it. */
+.docs-toc-track::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 3.5px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--chakra-colors-border);
+}
 .docs-toc-progress {
   position: absolute;
   inset-inline-start: 0;
@@ -1004,22 +1073,87 @@ body {
   padding-bottom: 20px;
   margin-bottom: 20px;
 }
-.docs-agent-launcher select {
-  appearance: auto;
-  background: transparent;
-  color: var(--chakra-colors-accent-fg);
-  border: 0;
+.docs-agent-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px 6px 10px;
+  border: 1px solid var(--chakra-colors-border-emphasized);
+  border-radius: var(--chakra-radii-xl);
+  background: var(--chakra-colors-bg-subtle);
+  font-family: var(--chakra-fonts-mono);
+  font-size: 12px;
+  line-height: 20px;
+}
+.docs-agent-command {
+  white-space: nowrap;
   font: inherit;
+  color: var(--chakra-colors-fg);
+  background: none;
+  padding: 0;
+}
+.docs-agent-pick {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.docs-agent-pick select {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 16px 0 4px;
+  border: 0;
+  border-radius: var(--chakra-radii-md);
+  appearance: none;
+  font: inherit;
+  background: transparent;
+  color: transparent;
   cursor: pointer;
-  max-width: 100%;
+}
+.docs-agent-name {
+  position: absolute;
+  left: 4px;
+  top: 8px;
+  pointer-events: none;
+  color: var(--chakra-colors-accent-fg);
+}
+@media (scripting: none) {
+  .docs-agent-name {
+    display: none;
+  }
+  .docs-agent-pick select {
+    color: var(--chakra-colors-accent-fg);
+  }
+}
+.docs-agent-pick svg {
+  position: absolute;
+  right: 2px;
+  top: 12px;
+  pointer-events: none;
+  color: var(--chakra-colors-fg-muted);
 }
 .docs-agent-launcher option {
   background: var(--chakra-colors-docs-paper);
   color: var(--chakra-colors-fg);
 }
-.docs-agent-launcher code {
-  font-size: 13px;
-  white-space: nowrap;
+.docs-agent-line button {
+  flex-shrink: 0;
+  color: var(--chakra-colors-fg);
+}
+.docs-agent-line button[data-copied] {
+  color: var(--chakra-colors-green-fg);
+}
+.docs-agent-caption {
+  margin: 10px 0 0 2px;
+  font-size: 12px;
+  color: var(--chakra-colors-fg-muted);
+}
+.docs-agent-caption a {
+  color: var(--chakra-colors-fg);
+  font-weight: 500;
+}
+.docs-agent-caption a:hover {
+  color: var(--chakra-colors-accent-fg);
 }
 .docs-product-shot {
   display: block;
@@ -1038,4 +1172,158 @@ body {
 }
 [role="tablist"][data-overflow] + .docs-tab-hint {
   display: block;
+}
+
+.docs-prose .docs-inline-code {
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.docs-prose table:has(tr > :nth-child(2)):not(:has(tr > :nth-child(3))) :is(th, td):first-child {
+  width: 28%;
+}
+.docs-prose table:has(.docs-matrix-value) {
+  min-width: 42rem;
+}
+.docs-prose table:has(.docs-matrix-value) :is(th, td):first-child {
+  width: 32%;
+  font-weight: 600;
+}
+.docs-prose table:has(.docs-matrix-value) :is(th, td):not(:first-child) {
+  text-align: center;
+}
+.docs-matrix-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.docs-matrix-value[data-answer="yes"] {
+  color: var(--chakra-colors-green-fg);
+}
+.docs-matrix-value[data-answer="no"] {
+  color: var(--chakra-colors-fg-muted);
+}
+.docs-tabs > [role="tablist"] [role="tab"]::before {
+  bottom: -1px;
+  top: auto;
+}
+.docs-toc-track {
+  padding-inline-start: 28px;
+}
+.docs-toc-progress {
+  width: 28px;
+}
+.docs-toc-track::before {
+  display: none;
+}
+.docs-toc-guide {
+  fill: none;
+  stroke: var(--chakra-colors-border-emphasized);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+.docs-toc-path {
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .docs-toc-path {
+    transition:
+      stroke-dashoffset 180ms ease,
+      stroke-dasharray 180ms ease;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .docs-card,
+  .docs-card-arrow {
+    transition: none;
+  }
+}
+
+.docs-skill-card {
+  border-inline-start: 3px solid var(--chakra-colors-accent-fg);
+}
+.docs-skill-card h3 svg {
+  color: var(--chakra-colors-accent-fg);
+  flex-shrink: 0;
+}
+.docs-skill-prompt > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--chakra-colors-accent-fg);
+}
+.docs-skill-prompt > summary::-webkit-details-marker {
+  display: none;
+}
+.docs-skill-prompt[open] > summary svg {
+  transform: rotate(180deg);
+}
+.docs-api-reference .docs-field {
+  padding-block: 10px;
+}
+.docs-api-reference .docs-field-body p {
+  margin-bottom: 4px;
+}
+.docs-response-schema > summary::-webkit-details-marker {
+  display: none;
+}
+.docs-response-schema > summary > p {
+  flex: 1;
+}
+.docs-response-schema[open] > summary > svg {
+  transform: rotate(180deg);
+}
+.docs-response-schema > summary {
+  color: var(--chakra-colors-fg);
+}
+@container (min-width: 280px) {
+  .docs-request-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+#try-it-form {
+  --docs-input-height: 36px;
+}
+#try-it-form input {
+  height: var(--docs-input-height);
+  font-size: 13px;
+}
+#try-it-form label {
+  color: var(--chakra-colors-blue-fg);
+}
+#try-it-form > div {
+  gap: 12px;
+}
+.docs-json-key {
+  color: var(--chakra-colors-blue-fg);
+}
+.docs-json-string {
+  color: var(--chakra-colors-green-fg);
+}
+.docs-json-value {
+  color: var(--chakra-colors-accent-fg);
+}
+
+.docs-nav-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  border-radius: var(--chakra-radii-full);
+  background: var(--chakra-colors-accent-fg);
+  pointer-events: none;
+}
+.docs-nav-tree[data-indicator-ready] [aria-current="page"]::before {
+  display: none;
+}
+
+[data-docs-playground] .docs-code-region {
+  max-height: 28rem;
+  font-size: 14px;
 }

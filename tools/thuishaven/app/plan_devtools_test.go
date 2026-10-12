@@ -1,6 +1,7 @@
 package app
 
 import (
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -98,12 +99,13 @@ func TestDeveloperToolsDoNotDisturbTheThreeNodeLanes(t *testing.T) {
 	}
 }
 
-// @scenario "The docs site is a developer tool served with hot reload"
-func TestDocsLaneRunsTheDocsDevServerOnItsAllocatedPort(t *testing.T) {
-	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
-	st := domain.Stack{Slug: "test", Services: []domain.Service{{Name: domain.DocsService, Port: 45173}}}
+// @scenario "The docs site is built and mounted at /docs on the app"
+func TestDocsLaneBuildsAndMountsTheDocsOnTheApp(t *testing.T) {
+	o := &Orchestrator{cfg: Config{Home: t.TempDir(), Naming: domain.DefaultNaming("")}, proxy: stubProxy{}}
+	st := domain.Stack{Slug: "test", Services: []domain.Service{{Name: "app", Port: 45100}, {Name: domain.DocsService, Port: 45173}}}
+	repo := t.TempDir()
 	plan := func(sel domain.Selection) []Child {
-		return o.planChildren(st, PlanOptions{Selection: sel}, t.TempDir())
+		return o.planChildren(st, PlanOptions{Selection: sel}, repo)
 	}
 	if _, ok := findChild(plan(domain.DefaultSelection()), domain.DocsService); ok {
 		t.Fatal("the docs lane was planned for a worktree that never asked for it")
@@ -116,7 +118,13 @@ func TestDocsLaneRunsTheDocsDevServerOnItsAllocatedPort(t *testing.T) {
 	if !ok {
 		t.Fatal("no docs lane was planned for a worktree that selected it")
 	}
-	for _, want := range []string{"--filter @langwatch/docs-site dev", "--port 45173", "--strictPort"} {
+	for _, want := range []string{
+		"build-status.ts --out-dir", "&& exit 0;",
+		"--filter @langwatch/docs-site build --out-dir \"$n\" --base-path /docs",
+		"mv \"$n\" \"$d\"", filepath.Join(repo, docsOutDir),
+		"docs-mount", " 45173 /docs http://127.0.0.1:45100 'app.test.langwatch.localhost'",
+		"serving the last good build'; } & exec ",
+	} {
 		if !strings.Contains(child.Shell, want) {
 			t.Errorf("docs lane runs %q, want it to contain %q", child.Shell, want)
 		}

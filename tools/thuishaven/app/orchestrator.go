@@ -277,6 +277,11 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		if r.Name == "app" && opts.Selection.IsBuiltUI() && !st.Layout.IsMonolith() {
 			svc.Port = st.APIPort
 		}
+		// With the docs on, the app hostname routes to the docs lane's mount, which
+		// serves /docs and hands every other path to svc.Port (plan_devtools.go).
+		if r.Name == "app" && runsLocally(domain.DocsService, opts) && !st.Layout.IsMonolith() {
+			svc.RoutePort = ports[domain.PerWorktreeIndex(domain.DocsService)]
+		}
 		if r.Name == domain.LLMService && runsLocally(r.Name, opts) {
 			if port := o.stableLLMPort(slug); port != 0 {
 				svc.Port = port
@@ -313,9 +318,9 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		}
 		st.Services = append(st.Services, svc)
 		if svc.Port != 0 && !o.cfg.PortlessDisabled {
-			routes = append(routes, o.registerRoute(svc.Name, slug, svc.Port))
+			routes = append(routes, o.registerRoute(svc.Name, slug, svc.RouteTarget()))
 			for _, alias := range domain.ServiceHostAliases[r.Name] {
-				routes = append(routes, o.registerRoute(alias, slug, svc.Port))
+				routes = append(routes, o.registerRoute(alias, slug, svc.RouteTarget()))
 			}
 		}
 	}

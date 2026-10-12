@@ -27,8 +27,8 @@ type DocsOnlyRun struct {
 }
 
 // RunDocsSolo runs only the docs site: no app, no API, no worker, no databases,
-// no simulators. Like RunIdPSolo it allocates a port and routes this worktree's
-// docs.<slug>.langwatch.localhost at it (loopback without the proxy); the lane
+// no simulators. It builds the docs under /docs, serves them natively and routes
+// app.<slug> and docs.<slug> at the mount (loopback without the proxy); the lane
 // is supervised and captured to docs.log, as in a stack, until ctx ends.
 func (o *Orchestrator) RunDocsSolo(ctx context.Context, p UpParams) error {
 	slug, err := o.resolveSlug(p)
@@ -56,11 +56,11 @@ func (o *Orchestrator) RunDocsSolo(ctx context.Context, p UpParams) error {
 	defer removeRecord()
 	defer unroute()
 	endRegistration()
-	fmt.Printf("  docs  %s\n", docsURL)
+	fmt.Printf("  docs  %s%s/\n", docsURL, DocsBasePath)
 	o.sup.Supervise(ctx, []Child{{
 		Name: domain.DocsService, Dir: p.WorktreeDir, Color: palette[4],
 		LogPath: filepath.Join(logDir, domain.DocsService+".log"),
-		Shell:   docsShell(port), Env: []string{domain.LaneEnv(domain.DocsService)},
+		Shell:   o.docsMountShell(p.WorktreeDir, port, nil), Env: []string{domain.LaneEnv(domain.DocsService)},
 	}})
 	return nil
 }
@@ -81,8 +81,9 @@ func (o *Orchestrator) DocsSoloRefusal(p UpParams) error {
 	return nil
 }
 
-// routeDocs routes docs.<slug> at port when the proxy is available and returns
-// the URL to print, plus the removal; loopback otherwise.
+// routeDocs routes app.<slug> and docs.<slug> at the mount on port when the proxy
+// is available and returns the app URL to print, plus the removal; loopback otherwise.
+// A stack never runs beside it (DocsSoloRefusal), so the app hostname is free.
 func (o *Orchestrator) routeDocs(slug string, port int) (string, func()) {
 	loopback := fmt.Sprintf("http://127.0.0.1:%d", port)
 	if o.cfg.PortlessDisabled {
@@ -97,7 +98,14 @@ func (o *Orchestrator) routeDocs(slug string, port int) (string, func()) {
 		return loopback, func() {}
 	}
 	scheme, proxyPort := o.proxy.Endpoint()
-	return o.cfg.Naming.URL(domain.DocsService, slug, scheme, proxyPort), func() { o.proxy.Remove(domain.DocsService, slug) }
+	if err := o.proxy.Register("app", slug, port); err != nil {
+		o.log.Warn("could not route the app hostname to the docs", zapErr(err))
+		return o.cfg.Naming.URL(domain.DocsService, slug, scheme, proxyPort), func() { o.proxy.Remove(domain.DocsService, slug) }
+	}
+	return o.cfg.Naming.URL("app", slug, scheme, proxyPort), func() {
+		o.proxy.Remove("app", slug)
+		o.proxy.Remove(domain.DocsService, slug)
+	}
 }
 
 // recordDocsOnly writes the docs-only record and returns its removal.

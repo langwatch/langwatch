@@ -41,4 +41,39 @@ export function installMedia() {
   });
 }
 
+const motion = matchMedia("(prefers-reduced-motion: no-preference)");
+const pausedByReader = new WeakSet<HTMLVideoElement>();
+const pausing = new WeakSet<HTMLVideoElement>();
+let clipObserver: IntersectionObserver | null = null;
+
+function pauseClip({ video }: { video: HTMLVideoElement }) {
+  if (video.paused) return;
+  pausing.add(video);
+  video.pause();
+}
+
+/** GIF-replacement clips loop while visible when motion is allowed; a reader's pause sticks. */
+function watchClips() {
+  clipObserver?.disconnect();
+  clipObserver = new IntersectionObserver((entries) => {
+    for (const { target, isIntersecting } of entries) {
+      if (!(target instanceof HTMLVideoElement)) continue;
+      if (!isIntersecting || !motion.matches) pauseClip({ video: target });
+      else if (!pausedByReader.has(target)) void target.play().catch(() => {});
+    }
+  });
+  document.querySelectorAll<HTMLVideoElement>("video[data-docs-clip]").forEach((video) => {
+    clipObserver?.observe(video);
+    if (video.dataset.docsClipWatched) return;
+    video.dataset.docsClipWatched = "";
+    video.addEventListener("pause", () => {
+      if (!pausing.delete(video)) pausedByReader.add(video);
+    });
+    video.addEventListener("play", () => pausedByReader.delete(video));
+  });
+}
+
 installMedia();
+watchClips();
+document.addEventListener("docs:navigated", watchClips);
+motion.addEventListener("change", watchClips);

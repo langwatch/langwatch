@@ -21,7 +21,8 @@ export function Frame({
       borderRadius="showcase"
       minWidth="0"
       css={{
-        "& img, & video": { display: "block", margin: "0 auto", borderRadius: "md" },
+        "& img, & video": { margin: "0 auto", borderRadius: "md" },
+        "& img:not(.docs-light-only):not(.docs-dark-only), & video": { display: "block" },
         "& > p": { margin: "0" },
       }}
     >

@@ -142,11 +142,13 @@ export function SchemaFields({ schema, depth = 0 }: { schema: Schema; depth?: nu
               ))}
             </Flex>
           ) : null}
-          {constraints({ schema: child }).map((line) => (
-            <Box key={line} as="p" color="fg.muted">
-              {line}
-            </Box>
-          ))}
+          <Flex gap="2" wrap="wrap" fontSize="12px" color="docs.body">
+            {constraints({ schema: child }).map((line) => (
+              <Box key={line} as="span">
+                {line}
+              </Box>
+            ))}
+          </Flex>
           {hasChildren({ schema: child }) ? (
             <Expandable
               title={`${Object.keys(child.properties ?? child.items?.properties ?? {}).length || "nested"} child attributes`}
@@ -174,11 +176,13 @@ export function ParameterFields({ parameters }: { parameters: Parameter[] }) {
           deprecated={param.deprecated}
         >
           {param.description ? <p>{param.description}</p> : null}
-          {constraints({ schema: param.schema }).map((line) => (
-            <Box key={line} as="p" color="fg.muted">
-              {line}
-            </Box>
-          ))}
+          <Flex gap="2" wrap="wrap" fontSize="12px" color="docs.body">
+            {constraints({ schema: param.schema }).map((line) => (
+              <Box key={line} as="span">
+                {line}
+              </Box>
+            ))}
+          </Flex>
         </DocsField>
       ))}
     </Box>

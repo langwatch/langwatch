@@ -29,6 +29,67 @@ Feature: Static documentation with progressive interaction
     And API requests and credentials are never cached
 
   @unit
+  Scenario: Keep a network response when the offline cache cannot store it
+    Given the documentation worker controls a page under its scope
+    When storing a fetched page or asset fails because storage is full
+    Then the reader still receives the network response
+    And requests outside the worker's base path are left to the browser
+    And runtime pages and assets stay within their entry limits
+    And the Latin-ext reading font is cached only after a page requests it
+
+  @e2e
+  Scenario: Reopen search offline
+    Given a reader opened search while online
+    When the search index for the current build was fetched as search-index.json?v=<build>
+    And <build> is the version of the active documentation worker
+    Then the worker serves that index from its cache when the reader reopens search offline
+    But any other query string, another build's index or extra parameters beside v bypass the worker
+    And at most one search index is ever cached
+
+  @unit
+  Scenario: Reuse the parsed search index and retry a failed load
+    Given search loaded the index for the current build
+    When the reader closes and reopens search
+    Then the index is not fetched or parsed again
+    And after a failed load, Retry fetches it again
+
+  @unit
+  Scenario: Find titles, headings, body-only words, API paths and properties, and near misses
+    Given the loaded search index
+    When a reader searches a title, a heading, a word only in the body, an API path, a property or a misspelling
+    Then the page is found, with the heading anchor for heading matches
+
+  @e2e
+  Scenario: Hold back speculative prefetch
+    Given a reader has asked the browser to save data
+    When they hover or scroll past internal documentation links
+    Then no page is fetched until they follow a link
+    And without the preference a hover prefetches only after a short pause
+    And no more than two speculative fetches run at once
+
+  @unit
+  Scenario: Reserve space for authored images
+    Given a guide image from the docs media directories has no authored height
+    When the page is compiled
+    Then the image declares its intrinsic width and height
+    But an authored width keeps its value and percentage widths are left alone
+
+  @unit
+  Scenario: Serve authored media from the docs mount
+    Given the documentation is built under a base path
+    When a page renders an authored image, responsive image, video, poster, source or embed
+    Then each local URL, including every srcset candidate, carries the base path
+    But external URLs and srcset descriptors are unchanged
+
+  @e2e
+  Scenario: Play an instructional clip in place of an animated GIF
+    Given a guide shows a silent screen recording
+    Then it loads a compressed video with a poster instead of a GIF
+    And it plays muted and looped only while visible when motion is allowed
+    And reduced motion keeps it paused on its poster with playback controls
+    And without JavaScript the poster and controls remain available
+
+  @unit
   Scenario: Extract the exact server styles
     When a page is prerendered
     Then emitted style rules are extracted in order into a hashed stylesheet

@@ -1,3 +1,57 @@
+const preferences = new Map<string, string>();
+
+function preference(group: string): string | null {
+  try {
+    return preferences.get(group) ?? localStorage.getItem(`lw-docs:${group}`);
+  } catch {
+    return preferences.get(group) ?? null;
+  }
+}
+
+function tabLanguage(tab: HTMLElement): string {
+  return tab.dataset.docsLanguage ?? tab.textContent?.trim() ?? "";
+}
+
+function applyPreference(group: string, value: string) {
+  document.querySelectorAll<HTMLElement>("[data-docs-preference]").forEach((root) => {
+    if (root.dataset.docsPreference !== group) return;
+    const button = [...root.querySelectorAll<HTMLElement>('[role="tab"]')].find(
+      (tab) =>
+        tab.closest("[data-docs-preference]") === root &&
+        tabLanguage(tab).toLowerCase() === value.toLowerCase(),
+    );
+    if (button) selectTab({ button, remember: false });
+  });
+  if (group === "sdk-language") {
+    document
+      .querySelectorAll<HTMLSelectElement>("[data-docs-language-preference]")
+      .forEach((picker) => {
+        const option = [...picker.options].find(
+          (item) => item.value.toLowerCase() === value.toLowerCase(),
+        );
+        if (option) picker.value = option.value;
+      });
+  }
+}
+
+function savePreference(group: string, value: string) {
+  preferences.set(group, value);
+  try {
+    localStorage.setItem(`lw-docs:${group}`, value);
+  } catch {
+    // The in-memory choice still applies while navigating this tab.
+  }
+  window.dispatchEvent(new CustomEvent("lw-docs-pref", { detail: { key: group, value } }));
+  applyPreference(group, value);
+}
+
+function choosePreference(group: string, value: string) {
+  if (group === "sdk-language" || group === "api-language") {
+    savePreference("sdk-language", value);
+    savePreference("api-language", value);
+  } else savePreference(group, value);
+}
+
 function revealTab(button: HTMLElement) {
   const list = button.closest<HTMLElement>('[role="tablist"]');
   if (list) {
@@ -8,7 +62,7 @@ function revealTab(button: HTMLElement) {
   }
 }
 
-function selectTab({ button }: { button: HTMLElement }) {
+function selectTab({ button, remember = true }: { button: HTMLElement; remember?: boolean }) {
   const root = button.closest('[data-scope="tabs"][data-part="root"]');
   if (!root) return;
   root.querySelectorAll<HTMLElement>('[role="tab"]').forEach((tab) => {
@@ -38,14 +92,15 @@ function selectTab({ button }: { button: HTMLElement }) {
     responseCopy.hidden = !response?.querySelector(
       "[data-response-status]:not([hidden]) .docs-code-region",
     );
+  updateCodeTitle({ root, panelId: target });
   const group = root.getAttribute("data-docs-preference");
-  if (group) {
-    try {
-      localStorage.setItem(`lw-docs:${group}`, button.textContent?.trim() ?? "");
-    } catch {
-      /* Storage is optional. */
-    }
-  }
+  if (group && remember) choosePreference(group, tabLanguage(button));
+}
+
+function updateCodeTitle({ root, panelId }: { root: Element; panelId?: string }) {
+  const title = root.querySelector<HTMLElement>("[data-docs-code-title]");
+  const panel = panelId ? document.getElementById(panelId) : null;
+  if (title && panel?.dataset.codeTitle) title.textContent = panel.dataset.codeTitle;
 }
 
 function onTabClick(event: MouseEvent) {
@@ -82,23 +137,26 @@ function measureTabLists() {
 
 function restoreTabs() {
   measureTabLists();
-  document.querySelectorAll("[data-docs-preference]").forEach((root) => {
-    let stored;
-    try {
-      stored = localStorage.getItem(`lw-docs:${root.getAttribute("data-docs-preference")}`);
-    } catch {
-      return;
-    }
-    const button = [...root.querySelectorAll<HTMLElement>('[role="tab"]')].find(
-      (tab) => tab.textContent?.trim() === stored,
-    );
-    if (button) selectTab({ button });
-  });
+  document
+    .querySelectorAll<HTMLSelectElement>("[data-docs-language-preference]")
+    .forEach((picker) => {
+      picker.disabled = false;
+      picker.parentElement?.querySelector("[data-disabled]")?.removeAttribute("data-disabled");
+    });
+  for (const group of ["sdk-language", "api-language", "package-manager"]) {
+    const stored = preference(group);
+    if (stored) applyPreference(group, stored);
+  }
 }
 
 export function installTabs() {
   restoreTabs();
   document.addEventListener("docs:navigated", restoreTabs);
+  document.addEventListener("change", (event) => {
+    const picker = event.target;
+    if (picker instanceof HTMLSelectElement && picker.matches("[data-docs-language-preference]"))
+      choosePreference("sdk-language", picker.value);
+  });
   window.addEventListener("resize", measureTabLists);
   document.addEventListener("scroll", measureTabLists, { capture: true, passive: true });
   void document.fonts.ready.then(measureTabLists);

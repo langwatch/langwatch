@@ -17,11 +17,14 @@ import { runtimePlugin } from "./runtime-plugin.ts";
 export function createViteConfig({
   sourceRoot = docsRoot,
   outDir = "dist",
-}: { sourceRoot?: string; outDir?: string } = {}): InlineConfig {
+  basePath = "",
+}: { sourceRoot?: string; outDir?: string; basePath?: string } = {}): InlineConfig {
   let operationSlugs: Record<string, string> | undefined;
   const openapiBySlug = () => (operationSlugs ??= openapiPages({ docsRoot: sourceRoot }));
   return {
     root: appRoot,
+    base: `${basePath}/`,
+    define: { __DOCS_BASE_PATH__: JSON.stringify(basePath) },
     publicDir: "public",
     plugins: [
       runtimePlugin(),
@@ -43,7 +46,11 @@ export function createViteConfig({
         },
       }),
     ],
-    resolve: { alias: [{ find: /^\/snippets\//, replacement: `${sourceRoot}/snippets/` }] },
+    // Authored MDX lives outside the app, so resolve React and the MDX provider from here.
+    resolve: {
+      alias: [{ find: /^\/snippets\//, replacement: `${sourceRoot}/snippets/` }],
+      dedupe: ["react", "react-dom", "@mdx-js/react"],
+    },
     ssr: {
       noExternal: ["@langwatch/design-system"],
       external: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],

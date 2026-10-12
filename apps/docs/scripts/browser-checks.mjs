@@ -9,7 +9,7 @@ export async function tracingPrompt({ outDir }) {
   return prompt;
 }
 
-export async function checkAgentSetup({ page, base, prompt }) {
+export async function assertAgentSetup({ page, base, prompt }) {
   await page.goto(`${base}introduction`);
   const video = page.locator("video");
   const quickStart = page.getByRole("heading", { name: /^Quick Start/ });
@@ -23,17 +23,17 @@ export async function checkAgentSetup({ page, base, prompt }) {
     assert.equal(await setup.locator('[aria-pressed="true"]').count(), 1);
     assert.ok((await setup.textContent()).includes(`Open your project in ${agent}`));
   }
-  await setup.locator("summary").filter({ hasText: "Read the full prompt" }).click();
+  await setup.locator("summary").filter({ hasText: "View full prompt" }).click();
   const fullPrompt = setup.getByLabel("Full setup prompt");
   assert.ok(await fullPrompt.isVisible());
   assert.equal(await fullPrompt.textContent(), prompt);
-  await setup.locator("summary").filter({ hasText: "Read the full prompt" }).click();
+  await setup.locator("summary").filter({ hasText: "View full prompt" }).click();
   await setup.getByRole("button", { name: "Copy setup prompt" }).click();
   await setup.getByRole("button", { name: "Prompt copied" }).waitFor();
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), prompt);
 }
 
-export async function checkSkillCopy({ page, base, prompt }) {
+export async function assertSkillCopy({ page, base, prompt }) {
   await page.goto(`${base}skills/directory`);
   const card = page.locator(".docs-skill-card").first();
   await card.getByRole("button", { name: "Copy full prompt", exact: true }).click();
@@ -41,7 +41,7 @@ export async function checkSkillCopy({ page, base, prompt }) {
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), prompt);
 }
 
-export async function checkMobileNavigation({ page, base }) {
+export async function assertMobileNavigation({ page, base }) {
   await page.goto(`${base}introduction`);
   const trigger = page.getByRole("button", { name: "Open navigation" });
   await trigger.click();
@@ -66,7 +66,7 @@ export async function checkMobileNavigation({ page, base }) {
   assert.equal(await trigger.evaluate((element) => element === document.activeElement), true);
 }
 
-export async function checkCapabilityErrors({ page, base }) {
+export async function assertCapabilityErrors({ page, base }) {
   await page.addInitScript(() => {
     Object.defineProperty(navigator.clipboard, "writeText", {
       value: async () => {
@@ -90,7 +90,7 @@ export async function checkCapabilityErrors({ page, base }) {
   );
 }
 
-export async function checkStaticDiagrams({ browser, base }) {
+export async function assertStaticDiagrams({ browser, base }) {
   const context = await browser.newContext({ javaScriptEnabled: false });
   try {
     const page = await context.newPage();
@@ -106,7 +106,7 @@ export async function checkStaticDiagrams({ browser, base }) {
   }
 }
 
-export async function checkClipboardReadiness({ browser, base }) {
+export async function assertClipboardReadiness({ browser, base }) {
   const context = await browser.newContext({ javaScriptEnabled: false });
   try {
     const page = await context.newPage();

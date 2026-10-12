@@ -1,9 +1,9 @@
 import { CommandBarSurface } from "@langwatch/design-system/app-shell";
 import { DialogTitle } from "@langwatch/design-system/dialog";
-import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { SystemProvider } from "@langwatch/design-system/system-provider";
 import { createRoot } from "react-dom/client";
 
-import { docsSystem } from "../../../app/theme.ts";
+import { docsIslandSystem } from "../../../app/island-theme.ts";
 import { SearchContent } from "./search-content.tsx";
 
 const host = document.createElement("div");
@@ -21,12 +21,12 @@ function openSearch() {
   open = true;
   opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   root.render(
-    <DesignSystemProvider system={docsSystem}>
+    <SystemProvider system={docsIslandSystem}>
       <CommandBarSurface open onClose={closeSearch} maxWidth="680px" topMargin="12vh">
         <DialogTitle className="docs-sr-only">Search the LangWatch docs</DialogTitle>
         <SearchContent close={closeSearch} />
       </CommandBarSurface>
-    </DesignSystemProvider>,
+    </SystemProvider>,
   );
 }
 document.addEventListener("click", (event) => {

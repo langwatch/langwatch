@@ -41,7 +41,7 @@ function ParamInput({
 }) {
   const id = `pg-${param.in}-${param.name}`;
   return (
-    <Box>
+    <Box className="docs-request-field" title={param.description}>
       <chakra.label
         htmlFor={id}
         display="flex"
@@ -350,12 +350,12 @@ function ParameterFields({
     <>
       {" "}
       {required.length > 0 ? (
-        <Flex direction="column" gap="3">
+        <Flex className="docs-request-fields" direction="column" gap="3">
           {required.map(renderParam)}
         </Flex>
       ) : null}
       {optional.length > 0 ? (
-        <Flex direction="column" gap="3">
+        <Flex className="docs-request-fields" direction="column" gap="3">
           {optional.map(renderParam)}
         </Flex>
       ) : null}

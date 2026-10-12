@@ -11,7 +11,7 @@ type Kind = {
 };
 
 const KINDS = {
-  note: { heading: "Note", rule: "fg.muted", palette: "gray", glyph: StickyNote },
+  note: { heading: "Note", rule: "blue.fg", palette: "blue", glyph: StickyNote },
   info: { heading: "Info", rule: "blue.fg", palette: "blue", glyph: InfoGlyph },
   tip: { heading: "Tip", rule: "green.fg", palette: "green", glyph: Lightbulb },
   warning: {
@@ -37,14 +37,15 @@ function Callout({ kind, children }: { kind: keyof typeof KINDS; children?: Reac
       marginY="6"
       padding="4"
       borderWidth="1px"
-      borderColor={`${palette}.muted`}
+      borderColor={`${palette}.solid`}
       borderRadius="xl"
       bg={`${palette}.subtle`}
-      color={rule}
+      color="fg"
+      data-palette={palette}
       css={{
         _dark: {
-          background: `color-mix(in srgb, var(--chakra-colors-${palette}-solid) 10%, var(--chakra-colors-docs-paper))`,
-          borderColor: `color-mix(in srgb, var(--chakra-colors-${palette}-solid) 25%, var(--chakra-colors-docs-paper))`,
+          background: `color-mix(in srgb, var(--chakra-colors-${palette}-solid) 12%, var(--chakra-colors-docs-paper))`,
+          borderColor: `color-mix(in srgb, var(--chakra-colors-${palette}-solid) 30%, var(--chakra-colors-docs-paper))`,
         },
       }}
     >

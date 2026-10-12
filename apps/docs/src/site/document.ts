@@ -15,6 +15,7 @@ export const ISLANDS = {
   disclosures: "src/features/content/browser/disclosures.ts",
   search: "src/features/search/browser/search.tsx",
   playground: "src/features/api-reference/browser/playground.tsx",
+  reading: "src/browser/reading.ts",
 } as const;
 
 export type IslandName = keyof typeof ISLANDS;

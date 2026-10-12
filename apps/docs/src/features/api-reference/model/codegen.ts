@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/mini";
 
 import type { ExampleLanguage, Operation, Schema } from "./operation.ts";
 
@@ -141,7 +141,7 @@ const exampleRequestSchema = z.object({
   url: z.string(),
   origin: z.string(),
   method: z.string(),
-  auth: z.object({ name: z.string(), value: z.string() }).nullable(),
+  auth: z.nullable(z.object({ name: z.string(), value: z.string() })),
   allHeaders: z.array(z.tuple([z.string(), z.string()])),
   body: z.unknown(),
   needsBody: z.boolean(),

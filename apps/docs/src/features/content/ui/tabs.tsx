@@ -11,7 +11,7 @@ export const readingTabList = {
   overflowX: "auto",
   minWidth: 0,
   maxWidth: "100%",
-  paddingBottom: "2",
+  paddingBottom: "0",
   flexWrap: "nowrap",
   scrollbarWidth: "thin",
 } satisfies SystemStyleObject;
@@ -27,6 +27,42 @@ export const readingTabTrigger = {
   lineHeight: "20px",
   _hover: { color: "fg", bg: "bg.hover" },
   "&[data-selected]": { color: "fg", fontWeight: "600" },
+} satisfies SystemStyleObject;
+
+/** Authored tabs sit in one framed panel so their content reads as belonging to the strip. */
+const FRAMED_TABS = {
+  borderWidth: "1px",
+  borderColor: "border",
+  borderRadius: "xl",
+  bg: "docs.raised",
+  overflow: "hidden",
+  boxShadow: "0 1px 2px var(--chakra-colors-docs-shadow)",
+  "& > [data-docs-panel] > :first-child": { marginTop: "0" },
+  "& > [data-docs-panel] > :last-child": { marginBottom: "0" },
+} satisfies SystemStyleObject;
+
+const FRAMED_LIST = {
+  bg: "bg.subtle",
+  paddingX: "2",
+  paddingBottom: "0",
+  borderBottomWidth: "1px",
+  borderColor: "border",
+  "& > [role=tab]": { borderTopRadius: "md", marginTop: "1.5" },
+  "& > [role=tab][data-selected]": {
+    bg: "docs.raised",
+    boxShadow:
+      "inset 1px 0 0 var(--chakra-colors-border), inset -1px 0 0 var(--chakra-colors-border)",
+  },
+  "& > [role=tab][data-selected]::before": {
+    content: '""',
+    position: "absolute",
+    insetInline: "0",
+    top: "auto",
+    bottom: "-1px",
+    height: "2px",
+    borderRadius: "full",
+    bg: "accent.solid",
+  },
 } satisfies SystemStyleObject;
 
 type TabProps = { title?: string; children?: ReactNode };
@@ -61,9 +97,11 @@ export function Tabs({ children }: { children?: ReactNode }) {
       minWidth="0"
       maxWidth="100%"
       marginY="6"
+      className="docs-tabs"
+      css={FRAMED_TABS}
     >
       <ChakraTabs.List
-        css={readingTabList}
+        css={{ ...readingTabList, ...FRAMED_LIST }}
         aria-description="Scroll horizontally for more tabs. Use arrow keys to change the selected tab."
       >
         {tabs.map((tab) => (
@@ -78,6 +116,8 @@ export function Tabs({ children }: { children?: ReactNode }) {
         fontSize="12px"
         color="docs.lede"
         margin="0"
+        paddingX="4"
+        paddingTop="2"
       >
         Scroll for more →
       </Text>
@@ -85,9 +125,9 @@ export function Tabs({ children }: { children?: ReactNode }) {
         <ChakraTabs.Content
           key={tab.label}
           value={tab.label}
-          paddingX="0"
+          paddingX={{ base: "4", sm: "5" }}
           paddingTop="4"
-          paddingBottom="0"
+          paddingBottom={{ base: "4", sm: "5" }}
           data-docs-panel=""
         >
           {tab.content}

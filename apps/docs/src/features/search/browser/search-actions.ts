@@ -1,3 +1,5 @@
+import { sitePath } from "../../../lib/site-path.ts";
+
 export const QUICK_ACTIONS = [
   {
     id: "app",
@@ -28,7 +30,7 @@ export async function runQuickAction({ id }: { id: string }) {
   } else if (id === "copy") {
     const slug = document.querySelector<HTMLElement>("[data-docs-page-copy]")?.dataset.docsPageCopy;
     if (!slug) throw new Error("Page export unavailable");
-    const response = await fetch(`/${slug}.md`, { credentials: "omit" });
+    const response = await fetch(sitePath({ path: `/${slug}.md` }), { credentials: "omit" });
     if (!response.ok) throw new Error("Markdown unavailable");
     await navigator.clipboard.writeText(await response.text());
   }

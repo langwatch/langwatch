@@ -1,6 +1,7 @@
 import { Box, Link, Text } from "@langwatch/design-system/primitives";
 import {
   Activity,
+  ArrowUpRight,
   Blocks,
   BookOpen,
   Bot,
@@ -23,6 +24,7 @@ const SECTION_ICONS = {
   "API Reference": Braces,
   "Get Support": LifeBuoy,
 };
+import { pagePath } from "../../../lib/site-path.ts";
 import { firstSlug } from "../model/nav.ts";
 import type { Section } from "../model/nav.ts";
 import { sections, support } from "./site-nav.ts";
@@ -34,9 +36,11 @@ function SectionGlyph({ title }: { title: string }) {
 }
 
 function AnchorLink({ href, title, selected }: { href: string; title: string; selected: boolean }) {
+  const external = /^https?:/.test(href);
   return (
     <Link
       href={href}
+      aria-label={external ? `${title} (external site)` : title}
       aria-current={selected ? "true" : undefined}
       display="flex"
       alignItems="center"
@@ -47,15 +51,28 @@ function AnchorLink({ href, title, selected }: { href: string; title: string; se
       fontSize="14px"
       lineHeight="20px"
       textDecoration="none"
-      color={selected ? "accent.fg" : "nav.fg"}
+      color={selected ? "accent.fg" : "fg"}
       fontWeight={selected ? "600" : "450"}
       bg={selected ? "docs.raised" : "transparent"}
       marginBottom="0.5"
       boxShadow={selected ? "0 1px 3px var(--chakra-colors-docs-shadow)" : void 0}
       _hover={{ bg: selected ? "docs.raised" : "bg.hover", textDecoration: "none" }}
     >
-      <SectionGlyph title={title} />
-      <Text as="span">{title}</Text>
+      <Box
+        display="inline-flex"
+        alignItems="center"
+        justifyContent="center"
+        flexShrink={0}
+        width="20px"
+        height="24px"
+        color={selected ? "accent.fg" : "fg.muted"}
+      >
+        <SectionGlyph title={title} />
+      </Box>
+      <Text as="span" flex="1">
+        {title}
+      </Text>
+      {external ? <ArrowUpRight size={16} aria-hidden="true" /> : null}
     </Link>
   );
 }
@@ -69,7 +86,7 @@ export function SectionAnchors({ active }: { active: Section | undefined }) {
           {sections.map((section) => (
             <Box as="li" key={section.title} listStyleType="none">
               <AnchorLink
-                href={`/${firstSlug({ items: section.children })}`}
+                href={pagePath({ slug: firstSlug({ items: section.children }) })}
                 title={section.title}
                 selected={section === active}
               />

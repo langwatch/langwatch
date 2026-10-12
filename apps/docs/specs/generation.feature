@@ -8,6 +8,21 @@ Feature: Generate and run the documentation site
     And the build contains a search index, redirects and a 404 page
     And no unlisted API operation has a page
 
+  @unit
+  Scenario: Reuse a page rendered from unchanged inputs
+    Given a previous build rendered a page into the render cache
+    When the next build compiles the same page source, snippets, navigation, renderer and dependency versions
+    Then the page is taken from the cache instead of being rendered again
+    And the published files are byte-identical to a build without the cache
+    But a change to the page, an imported snippet, docs.json, CHANGELOG, the shared design system or a renderer dependency renders it again
+
+  @unit
+  Scenario: Render pages on a bounded number of workers
+    Given the machine has several cores and enough free memory
+    When the build renders every page
+    Then it renders on at most four independent workers, fewer when memory is short
+    And the stylesheet, search index, page files and offline cache version match a single-worker build
+
   @unimplemented
   Scenario: Reject invalid documentation
     Given a configured page has invalid MDX or cannot render

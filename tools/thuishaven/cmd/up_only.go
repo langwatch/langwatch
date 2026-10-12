@@ -29,7 +29,7 @@ func runUpOnly(ctx context.Context, d deps, inv invocation) error {
 		return err
 	}
 	fmt.Printf("docs for %q starting detached, alone (pid %d)\n", st.slug, st.pid)
-	fmt.Printf("  url:    docs.%s.langwatch.localhost (haven status)\n", st.slug)
+	fmt.Printf("  url:    app.%s.langwatch.localhost/docs/ (haven status)\n", st.slug)
 	fmt.Printf("  logs:   haven logs docs -f\n")
 	fmt.Printf("  stop:   haven down\n")
 	return nil

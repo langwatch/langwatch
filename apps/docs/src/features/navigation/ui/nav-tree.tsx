@@ -1,13 +1,14 @@
 import { Box, chakra, Text } from "@langwatch/design-system/primitives";
 import { ChevronRight } from "lucide-react";
-import { useState } from "react";
 import nav from "virtual:docs-nav";
 
+import { pagePath, sitePath } from "../../../lib/site-path.ts";
 import { Icon } from "../../content/ui/icon.tsx";
-import { ownsSlug } from "../model/nav.ts";
+import { endpointCount, groupTarget, methodOf, startsOpen } from "../model/nav.ts";
 import type { NavItem } from "../model/nav.ts";
 
-const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+type Group = Extract<NavItem, { type: "group" }>;
+
 const METHOD_PALETTE: Record<string, string> = {
   GET: "green",
   POST: "blue",
@@ -15,15 +16,10 @@ const METHOD_PALETTE: Record<string, string> = {
   PATCH: "yellow",
   DELETE: "red",
 };
-
-function methodOf({ slug }: { slug: string }): string | null {
-  const first = nav.pages[slug]?.openapi.split(/\s+/)[0]?.toUpperCase() ?? "";
-  return METHODS.includes(first) ? first : null;
-}
-
-function indent({ depth }: { depth: number }) {
-  return `calc(0.75rem + ${Math.min(Math.max(depth - 1, 0), 3) * 0.75}rem)`;
-}
+/* Rows keep one inline padding; nesting comes from panels, whose rule is the guide line. */
+const ROW_PADDING = "10px";
+const GUIDE_OFFSET = "13px";
+const GUIDE_GAP = "6px";
 
 function NavMethod({ method }: { method: string }) {
   const palette = METHOD_PALETTE[method] ?? "gray";
@@ -43,36 +39,74 @@ function NavMethod({ method }: { method: string }) {
       fontSize="10px"
       lineHeight="16px"
       fontWeight="600"
+      marginTop="2px"
     >
       {method === "DELETE" ? "DEL" : method}
     </Text>
   );
 }
 
+/** Brand logos sit on a light chip so dark marks stay legible on the dark sidebar. */
+function NavGlyph({ icon }: { icon: string }) {
+  if (!icon.startsWith("/")) {
+    return (
+      <Box as="span" display="inline-flex" marginTop="2px">
+        <Icon icon={icon} size={16} />
+      </Box>
+    );
+  }
+  return (
+    <Box
+      as="span"
+      className="docs-nav-logo"
+      display="inline-flex"
+      alignItems="center"
+      justifyContent="center"
+      flexShrink={0}
+      width="20px"
+      height="20px"
+      borderRadius="5px"
+      bg={{ base: "white", _dark: "#eeece8" }}
+      boxShadow="inset 0 0 0 1px rgba(32, 30, 27, 0.1)"
+    >
+      <img
+        src={sitePath({ path: icon })}
+        alt=""
+        width={16}
+        height={16}
+        loading="lazy"
+        decoding="async"
+        style={{ objectFit: "contain" }}
+      />
+    </Box>
+  );
+}
+
 function PageRow({
   item,
   current,
-  depth,
+  nested,
 }: {
   item: Extract<NavItem, { type: "page" }>;
   current: string;
-  depth: number;
+  nested: boolean;
 }) {
   const active = item.slug === current;
-  const method = methodOf({ slug: item.slug });
-  const icon = nav.pages[item.slug]?.icon;
+  const meta = nav.pages[item.slug];
+  const method = methodOf({ meta });
+  const glyph = meta?.icon || meta?.logo;
   return (
     <Box as="li" listStyleType="none">
       <chakra.a
-        href={`/${item.slug}`}
+        href={pagePath({ slug: item.slug })}
         aria-current={active ? "page" : undefined}
+        position="relative"
         display="flex"
         gap="2"
         alignItems="flex-start"
         minHeight={{ base: "44px", lg: "36px" }}
         paddingY="2"
-        paddingX="3"
-        paddingInlineStart={indent({ depth })}
+        paddingX={ROW_PADDING}
         borderRadius="sm"
         fontSize="14px"
         lineHeight="20px"
@@ -81,9 +115,23 @@ function PageRow({
         fontWeight={active ? "600" : "400"}
         bg={active ? "accent.subtle" : undefined}
         _hover={{ bg: active ? "accent.subtle" : "bg.hover", textDecoration: "none" }}
+        _before={
+          nested && active
+            ? {
+                content: '""',
+                position: "absolute",
+                insetInlineStart: `calc(-${GUIDE_GAP} - 2px)`,
+                top: "6px",
+                bottom: "6px",
+                width: "2px",
+                borderRadius: "full",
+                bg: "accent.fg",
+              }
+            : undefined
+        }
       >
         {method ? <NavMethod method={method} /> : null}
-        {!method && icon ? <Icon icon={icon} size={16} /> : null}
+        {!method && glyph ? <NavGlyph icon={glyph} /> : null}
         <span className="docs-nav-label" title={item.title}>
           {item.title}
         </span>
@@ -96,86 +144,153 @@ function GroupRow({
   item,
   current,
   depth,
+  trail,
 }: {
-  item: Extract<NavItem, { type: "group" }>;
+  item: Group;
   current: string;
   depth: number;
+  trail: string;
 }) {
-  const active = ownsSlug({ items: item.children, slug: current });
-  const [open, setOpen] = useState(active);
+  const open = startsOpen({ group: item, slug: current, pages: nav.pages });
+  const [slug = "", hash] = groupTarget({ group: item }).split("#");
+  const endpoints = endpointCount({ group: item, pages: nav.pages });
+  const key = `${trail}/${item.title}`;
   return (
-    <Box as="li" listStyleType="none" marginTop={depth === 0 ? "4" : "0"}>
-      <chakra.button
-        type="button"
+    <Box
+      as="li"
+      listStyleType="none"
+      display="grid"
+      gridTemplateColumns="minmax(0, 1fr) auto"
+      alignItems="start"
+      marginTop={depth === 0 ? "4" : "0"}
+    >
+      <chakra.a
+        href={`${pagePath({ slug })}${hash ? `#${hash}` : ""}`}
+        aria-current={item.root === current ? "page" : undefined}
         display="flex"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        width="100%"
-        alignItems="center"
-        justifyContent="space-between"
         gap="2"
+        alignItems="flex-start"
+        minWidth="0"
         minHeight={{ base: "44px", lg: "36px" }}
         paddingY="2"
-        paddingX="3"
-        paddingInlineStart={indent({ depth })}
+        paddingX={ROW_PADDING}
         borderRadius="sm"
         fontSize="14px"
         lineHeight="20px"
         fontWeight={depth === 0 ? "600" : "500"}
         color={depth === 0 ? "fg" : "nav.fg"}
-        textAlign="start"
-        cursor="pointer"
-        _hover={{ bg: "bg.hover" }}
+        textDecoration="none"
+        _hover={{ bg: "bg.hover", textDecoration: "none" }}
+        _currentPage={{ color: "accent.fg", bg: "accent.subtle" }}
       >
-        <span>{item.title}</span>
-        <ChevronRight
-          size={14}
-          aria-hidden="true"
-          style={{ transform: open ? "rotate(90deg)" : undefined, flexShrink: 0 }}
-        />
+        {item.icon ? <NavGlyph icon={item.icon} /> : null}
+        <span className="docs-nav-label">{item.title}</span>
+        {endpoints > 0 ? (
+          <Text
+            as="span"
+            title={`${endpoints} endpoints`}
+            marginInlineStart="auto"
+            marginTop="1px"
+            flexShrink={0}
+            minWidth="20px"
+            paddingX="1.5"
+            borderRadius="full"
+            bg="bg.subtle"
+            color="fg.muted"
+            fontFamily="mono"
+            fontSize="11px"
+            lineHeight="18px"
+            fontWeight="500"
+            textAlign="center"
+          >
+            {endpoints}
+          </Text>
+        ) : null}
+      </chakra.a>
+      <chakra.button
+        type="button"
+        aria-expanded={open}
+        aria-label={`${item.title} pages`}
+        data-docs-group={key}
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        width={{ base: "44px", lg: "28px" }}
+        minHeight={{ base: "44px", lg: "36px" }}
+        borderRadius="sm"
+        color="fg.muted"
+        cursor="pointer"
+        _hover={{ bg: "bg.hover", color: "fg" }}
+        css={{
+          "& svg": { transition: "transform 120ms ease" },
+          "&[aria-expanded=true] svg": { transform: "rotate(90deg)" },
+        }}
+      >
+        <ChevronRight size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
       </chakra.button>
       <Box
         hidden={!open}
         data-docs-panel=""
+        gridColumn="1 / -1"
         borderInlineStartWidth="1px"
         borderColor="border"
-        marginInlineStart="3"
-        marginTop="1"
-        marginBottom="2"
+        marginInlineStart={GUIDE_OFFSET}
+        paddingInlineStart={GUIDE_GAP}
+        marginTop="0.5"
+        marginBottom="1"
       >
-        <NavList items={item.children} current={current} depth={depth + 1} />
+        <NavList items={item.children} current={current} depth={depth + 1} trail={key} />
       </Box>
     </Box>
   );
 }
 
-function NavList({ items, current, depth }: { items: NavItem[]; current: string; depth: number }) {
+function NavList({
+  items,
+  current,
+  depth,
+  trail,
+}: {
+  items: NavItem[];
+  current: string;
+  depth: number;
+  trail: string;
+}) {
   return (
     <Box as="ul" margin="0" padding="0">
       {items.map((item) =>
         item.type === "page" ? (
-          <PageRow key={item.slug} item={item} current={current} depth={depth} />
+          <PageRow key={item.slug} item={item} current={current} nested={depth > 0} />
         ) : (
-          <GroupRow key={item.title} item={item} current={current} depth={depth} />
+          <GroupRow key={item.title} item={item} current={current} depth={depth} trail={trail} />
         ),
       )}
     </Box>
   );
 }
 
-/** The active section's tree; only groups holding the current page start open. */
+/** The active section's tree. Group headers link to their page; the chevron opens the group. */
 export function NavTree({
   items,
   current,
+  section,
   id,
 }: {
   items: NavItem[];
   current: string;
+  section: string;
   id?: string;
 }) {
   return (
-    <Box as="nav" id={id} tabIndex={id ? -1 : undefined} aria-label="Page navigation">
-      <NavList items={items} current={current} depth={0} />
+    <Box
+      as="nav"
+      className="docs-nav-tree"
+      position="relative"
+      id={id}
+      tabIndex={id ? -1 : undefined}
+      aria-label="Page navigation"
+    >
+      <NavList items={items} current={current} depth={0} trail={section} />
     </Box>
   );
 }

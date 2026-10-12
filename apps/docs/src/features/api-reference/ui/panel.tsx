@@ -26,6 +26,7 @@ export function Panel({
       bg="bg.panel"
       overflow="hidden"
       minWidth="0"
+      css={{ containerType: "inline-size" }}
     >
       {showHeader ? (
         <Flex
@@ -38,14 +39,7 @@ export function Panel({
           borderBottomWidth="1px"
           borderColor="border"
         >
-          <Text
-            as="h2"
-            margin="0"
-            fontSize="12px"
-            lineHeight="16px"
-            fontWeight="500"
-            color="fg.muted"
-          >
+          <Text as="h2" margin="0" fontSize="14px" lineHeight="16px" fontWeight="600" color="fg">
             {title}
           </Text>
           {aside}

@@ -12,15 +12,16 @@
     "build": "node src/site/build.ts",
     "preview": "node src/site/preview.ts",
     "test": "vitest run",
-    "test:smoke": "node scripts/smoke.mjs",
+    "test:smoke": "node scripts/smoke.test.mjs",
     "test:links": "node src/site/check-links.ts",
-    "test:session": "node scripts/session-smoke.mjs",
-    "test:performance": "node scripts/performance-smoke.mjs",
+    "test:session": "node scripts/session.smoke.test.mjs",
+    "test:performance": "node scripts/performance.smoke.test.mjs",
     "size": "node scripts/performance-report.mjs",
-    "test:layout": "node scripts/layout-smoke.mjs",
-    "test:polish": "node scripts/polish-smoke.mjs",
-    "test:news": "node scripts/news-smoke.mjs",
-    "test:refinement": "node scripts/refinement-smoke.mjs"
+    "test:layout": "node scripts/layout.smoke.test.mjs",
+    "test:polish": "node scripts/polish.smoke.test.mjs",
+    "test:news": "node scripts/news.smoke.test.mjs",
+    "test:refinement": "node scripts/refinement.smoke.test.mjs",
+    "test:mount": "node scripts/mount.smoke.test.mjs"
   },
   "dependencies": {
     "@langwatch/design-system": "workspace:*",

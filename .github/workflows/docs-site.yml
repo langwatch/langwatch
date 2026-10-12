@@ -45,6 +45,13 @@ jobs:
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: "@langwatch/docs-site..."
+      - name: Restore content-addressed docs caches
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/docs/node_modules/.cache/docs-site
+          key: docs-site-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            docs-site-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - name: Install build browser
         run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
       - name: Typecheck the docs app
@@ -53,8 +60,12 @@ jobs:
         run: VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/docs-site test
       - name: Build the documentation
         run: pnpm --filter @langwatch/docs-site build
+      - name: Enforce the browser size budget
+        run: pnpm --filter @langwatch/docs-site size
       - name: Test the built site
         run: pnpm --filter @langwatch/docs-site test:smoke
+      - name: Test static reading, navigation and offline delivery
+        run: pnpm --filter @langwatch/docs-site test:performance
       - name: Check internal links
         run: pnpm --filter @langwatch/docs-site test:links
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

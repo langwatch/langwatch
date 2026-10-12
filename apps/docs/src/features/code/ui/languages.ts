@@ -49,3 +49,39 @@ export function preferenceGroupFor({ labels }: { labels: string[] }): string | n
   if (lower.every((label) => PACKAGE_LABELS.includes(label))) return "package-manager";
   return null;
 }
+
+const EXTENSIONS: Record<string, string> = {
+  python: "py",
+  py: "py",
+  typescript: "ts",
+  ts: "ts",
+  tsx: "tsx",
+  javascript: "js",
+  js: "js",
+  jsx: "jsx",
+  go: "go",
+  java: "java",
+  json: "json",
+  jsonc: "jsonc",
+  yaml: "yaml",
+  yml: "yml",
+  sql: "sql",
+  toml: "toml",
+  markdown: "md",
+  md: "md",
+  bash: "sh",
+  sh: "sh",
+  shell: "sh",
+  zsh: "sh",
+  shellscript: "sh",
+  csv: "csv",
+  ini: "ini",
+};
+
+export function codeFilename({ lang, title }: { lang: string; title: string }): string {
+  if (title && /\.[a-z0-9]+$/i.test(title)) return title;
+  const filename = `example.${EXTENSIONS[lang.toLowerCase()] ?? "txt"}`;
+  const languageLabel = languageName({ lang }).toLowerCase();
+  if (!title || title.toLowerCase() === languageLabel) return filename;
+  return `${title} · ${filename}`;
+}

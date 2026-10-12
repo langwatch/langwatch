@@ -46,10 +46,12 @@ export function CopyAction({
   code,
   label = "Copy code",
   hidden = false,
+  showLabel = false,
 }: {
   code: string;
   label?: string;
   hidden?: boolean;
+  showLabel?: boolean;
 }) {
   const { state, copy, ready } = useCopy();
   return (
@@ -59,11 +61,11 @@ export function CopyAction({
         data-docs-copy={code}
         type="button"
         size="xs"
-        variant="ghost"
-        colorPalette="gray"
+        variant={showLabel ? "outline" : "ghost"}
+        colorPalette={showLabel ? "accent" : "gray"}
         minHeight={{ base: "44px", md: "40px" }}
         minWidth={{ base: "44px", md: "40px" }}
-        color="fg.muted"
+        color={showLabel ? "accent.fg" : "fg.muted"}
         aria-label={state === "copied" ? "Copied" : label}
         disabled={!ready}
         onClick={() => copy({ text: code })}
@@ -73,8 +75,8 @@ export function CopyAction({
         ) : (
           <Copy size={14} aria-hidden="true" />
         )}
-        <Text as="span" fontSize="12px" display="none">
-          {state === "copied" ? "Copied" : "Copy"}
+        <Text as="span" fontSize="12px" display={showLabel ? "inline" : "none"}>
+          {state === "copied" ? "Copied" : label}
         </Text>
       </Button>
       <VisuallyHidden as="output" aria-live="polite">
