@@ -1,4 +1,5 @@
 import { useNavigationHost } from "../model/navigation-host.ts";
+import { isOwnPersonalTeam } from "../model/personal-team.ts";
 import { navigationApi, type NavigationApiMap } from "./navigation-api.ts";
 
 /**
@@ -18,7 +19,7 @@ export function usePersonalProject(): { id: string; slug: string } | null {
   return (
     host
       .openableTeams()
-      .find((team) => team.isPersonal && team.ownerUserId === userId && !!team.projects[0])
+      .find((team) => isOwnPersonalTeam(team, userId) && !!team.projects[0])
       ?.projects[0] ?? null
   );
 }

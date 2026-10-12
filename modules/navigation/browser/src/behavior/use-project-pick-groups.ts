@@ -4,6 +4,7 @@ import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { useMemo } from "react";
 
 import { useOptionalNavigationHost } from "../model/navigation-host.ts";
+import { isListedInSwitcher } from "../model/personal-team.ts";
 import type { ProjectPickGroup } from "../model/project-pick-items.ts";
 
 /** Project pick destination: swap project segment, drop trailing dynamic segments */
@@ -53,6 +54,7 @@ export function useProjectPickGroups(): ProjectPickGroup[] {
   const project = host?.project();
   const pathname = host?.pathname() ?? "/";
   const routePattern = host?.routePattern();
+  const userId = host?.currentUser()?.id;
 
   const canCreateProject = host?.hasPermission("project:create") ?? false;
 
@@ -60,6 +62,7 @@ export function useProjectPickGroups(): ProjectPickGroup[] {
     if (!host || !organization) return [];
     return host
       .openableTeams()
+      .filter((team) => isListedInSwitcher(team, userId))
       .filter((team) => team.projects.length > 0 || canCreateProject)
       .map((team) => ({
         team: {
@@ -81,5 +84,5 @@ export function useProjectPickGroups(): ProjectPickGroup[] {
           }),
         })),
       }));
-  }, [host, organization, pathname, routePattern, project?.slug, canCreateProject]);
+  }, [host, organization, pathname, routePattern, project?.slug, canCreateProject, userId]);
 }
