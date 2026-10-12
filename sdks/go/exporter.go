@@ -165,9 +165,9 @@ func buildHeaders(apiKey, projectID string) map[string]string {
 // environment variables if not provided via options.
 //
 // Spans are sent as gzipped OTLP/JSON to endpoint + TracesPath, retrying
-// throttled (429) and failed (5xx) requests with exponential backoff for up
-// to a minute, bounded by the export context. Wrap the exporter in
-// sdktrace.NewBatchSpanProcessor to batch spans.
+// throttled (429) and unavailable (502/503/504) requests with exponential
+// backoff for up to a minute, bounded by the export context. Wrap the
+// exporter in sdktrace.NewBatchSpanProcessor to batch spans.
 func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporter, error) {
 	cfg := resolveConfig(opts...)
 
