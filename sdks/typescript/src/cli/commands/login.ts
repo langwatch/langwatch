@@ -15,6 +15,7 @@ import { runDeviceFlowLogin, runUnifiedLoginFlow } from "@/cli/utils/governance/
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
 import { mintProjectFullAccessKey, SessionApiError } from "@/cli/utils/governance/session-api";
 import { rememberProjectName } from "@/cli/utils/identityNotice";
+import { untrustedCertHint } from "@/cli/utils/localDevCa";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { normalizeEndpoint } from "@/internal/endpoint";
@@ -480,7 +481,13 @@ export const loginCommand = async (options?: {
     }
     return;
   } catch (error) {
-    console.error(chalk.red(`Error during login: ${formatApiErrorMessage({ error })}`));
+    printLoginError(error);
     process.exit(1);
   }
 };
+
+function printLoginError(error: unknown): void {
+  console.error(chalk.red(`Error during login: ${formatApiErrorMessage({ error })}`));
+  const certHint = untrustedCertHint(error);
+  if (certHint) console.error(chalk.yellow(certHint));
+}
