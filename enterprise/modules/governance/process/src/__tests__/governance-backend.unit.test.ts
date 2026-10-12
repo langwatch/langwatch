@@ -14,6 +14,9 @@ class MemoryPolicyRepository extends CostAttributionPolicyRepository {
   enabledCodingAssistantConfigs(): Promise<unknown[]> {
     return Promise.resolve(this.configs);
   }
+  findEnabledCodingAssistantConfigs(): Promise<{ organizationId: string; config: unknown }[]> {
+    return Promise.resolve([]);
+  }
   organizationsWithEnabledCodingAssistants(): Promise<string[]> {
     return Promise.resolve([]);
   }
