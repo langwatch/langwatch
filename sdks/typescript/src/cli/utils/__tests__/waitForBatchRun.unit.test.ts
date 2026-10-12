@@ -178,6 +178,110 @@ describe("waitForBatchRun()", () => {
     });
   });
 
+  describe("when a status read stalls", () => {
+    /** @scenario "The wait deadline also bounds a stalled status read" */
+    it.each(["request", "response body", "later page"])(
+      "bounds a stalled %s and keeps the last complete poll",
+      async (stage) => {
+        vi.useFakeTimers();
+        let calls = 0;
+        let pendingSignal: AbortSignal | null | undefined;
+        vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+          calls++;
+          if (calls === 1) {
+            return new Response(JSON.stringify({ runs: [passedRun] }));
+          }
+          if (stage === "later page" && calls === 2) {
+            return new Response(JSON.stringify({
+              runs: [failedRun],
+              hasMore: true,
+              nextCursor: "page_2",
+            }));
+          }
+          pendingSignal = init?.signal;
+          if (stage === "response body") {
+            return new Response(new ReadableStream({
+              start(controller) {
+                pendingSignal?.addEventListener(
+                  "abort",
+                  () => controller.error(new Error("read aborted")),
+                  { once: true },
+                );
+              },
+            }));
+          }
+          return new Promise<Response>((_resolve, reject) => {
+            pendingSignal?.addEventListener(
+              "abort",
+              () => reject(new Error("request aborted")),
+              { once: true },
+            );
+          });
+        });
+        const finished = vi.fn();
+        try {
+          const promise = waitForBatchRun({
+            batchRunId: "batch_123",
+            jobCount: 2,
+            subject: "run",
+            machine: true,
+            timeoutMs: 7000,
+          }).then(finished);
+          await vi.advanceTimersByTimeAsync(7000);
+
+          expect(finished).toHaveBeenCalledWith({
+            outcome: "timeout",
+            tallies: { total: 2, completed: 1, passed: 1, failed: 0 },
+            results: [{
+              scenarioRunId: "run_1",
+              scenarioId: "scenario_1",
+              status: "SUCCESS",
+              verdict: "success",
+            }],
+          });
+          await promise;
+          expect(pendingSignal?.aborted).toBe(true);
+          expect(process.exitCode).toBe(1);
+          expect(console.log).not.toHaveBeenCalled();
+          expect(vi.getTimerCount()).toBe(0);
+        } finally {
+          vi.clearAllTimers();
+          vi.useRealTimers();
+        }
+      },
+    );
+  });
+
+  describe("when the wait is shorter than the polling interval", () => {
+    /** @scenario "A short wait ends before the next poll" */
+    it("ends at the deadline without starting a status request", async () => {
+      vi.useFakeTimers();
+      const fetchSpy = answersWith([passedRun]);
+      const finished = vi.fn();
+      try {
+        const promise = waitForBatchRun({
+          batchRunId: "batch_123",
+          jobCount: 1,
+          subject: "run",
+          machine: true,
+          timeoutMs: 1000,
+        }).then(finished);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(finished).toHaveBeenCalledWith(
+          expect.objectContaining({ outcome: "timeout" }),
+        );
+        await promise;
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(process.exitCode).toBe(1);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.clearAllTimers();
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("when the status endpoint keeps failing", () => {
     /** @scenario "A dead status endpoint still emits the machine-readable document" */
     it("gives up after five reads in a row and answers with the poll failure outcome", async () => {
