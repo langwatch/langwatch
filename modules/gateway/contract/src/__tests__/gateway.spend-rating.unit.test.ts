@@ -99,8 +99,8 @@ describe("findSpendRatingFaults", () => {
 });
 
 describe("given a router the catalog prices at -1 per token", () => {
-  // A router is priced by the model it picks. Read as a rate, -1 billed a refund of $1500
-  // for a million tokens each way.
+  // A router is priced by the model it picks. Read as a rate, -1 per token billed a refund of
+  // $2,000,000 for a million tokens each way.
   const routerIds = Object.values(getAllModels())
     .filter((entry) => isVariablePriceRouter(entry))
     .map((entry) => entry.id);

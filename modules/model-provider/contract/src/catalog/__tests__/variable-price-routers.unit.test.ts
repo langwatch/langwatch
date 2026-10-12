@@ -1,7 +1,7 @@
 /**
  * Routers are priced by whatever model they pick, and the upstream sources mark that with -1 per
- * token. Read as a rate, -1 bills a refund: a million-token call through one came out at -1500
- * dollars. These pin that no cost reader takes the marker as a price.
+ * token. Read as a rate, -1 bills a refund: a million tokens each way through one came out at
+ * -2,000,000 dollars. These pin that no cost reader takes the marker as a price.
  */
 import { describe, expect, it } from "vitest";
 
