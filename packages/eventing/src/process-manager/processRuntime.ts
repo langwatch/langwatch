@@ -65,7 +65,7 @@ export function buildIntentHandlers(
 ): Record<string, IntentHandler> {
   const handlers: Record<string, IntentHandler> = {};
   for (const [intentType, spec] of Object.entries(config.intents)) {
-    handlers[intentType] = async ({ message }) => {
+    handlers[intentType] = async ({ message, heartbeat }) => {
       await spec.run(spec.schema.parse(message.payload), {
         processName: message.processName,
         projectId: message.projectId,
@@ -74,6 +74,7 @@ export function buildIntentHandlers(
         messageKey: message.messageKey,
         attempt: message.attempt,
         leaseExpiresAt: message.leaseExpiresAt,
+        heartbeat,
       });
     };
   }
@@ -485,6 +486,7 @@ export class ProcessRuntime {
       handlers: buildIntentHandlers(config),
       maxAttempts: config.outbox?.maxAttempts,
       leaseDurationMs: config.outbox?.leaseDurationMs,
+      maxSilenceMs: config.outbox?.maxSilenceMs,
       retryDelayMs: config.outbox?.retryDelayMs,
       concurrency: config.outbox?.concurrency,
       processNames: [config.name],

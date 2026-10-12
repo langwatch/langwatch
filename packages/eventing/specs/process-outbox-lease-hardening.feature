@@ -84,10 +84,20 @@ Feature: Process outbox lease hardening
   @unit @lease-renewal
   Scenario: A long-running intent keeps its lease while it runs
     Given a dispatcher delivering a message whose handler runs for an hour on a short lease
+    And the handler sends a heartbeat every minute
     When other dispatchers poll while the handler runs
     Then the holder renews its lease every third of the lease length
     And no other dispatcher leases the message while the handler runs
     And the delivery is acknowledged as dispatched once the handler finishes
+
+  @unit @lease-renewal
+  Scenario: A handler silent past its limit loses its lease and the message is redelivered
+    Given a dispatcher delivering a message whose handler hangs without a heartbeat
+    And a silence limit of 5 minutes unless the process manager sets its own
+    When the silence limit passes
+    Then the holder stops renewing the lease and logs a warning naming the process and message
+    And once the lease lapses another dispatcher leases and delivers the message
+    And a handler that keeps sending heartbeats past the same limit keeps its lease
 
   @unit @lease-renewal
   Scenario: A crashed worker's intent is taken again within one short lease

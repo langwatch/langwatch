@@ -2290,6 +2290,11 @@ projection by a rebuild job in the aggregate's own ordered lane, so it cannot ra
 logged and dropped (Alex, 2026-09-29). A command job
 keys the events it appends on its stable queue job id, so a crash replay collapses onto the first
 append (Alex, 2026-09-29).
+An outbox delivery's lease is renewed while its handler runs, but only while the handler shows
+progress: past the process manager's `outbox.maxSilenceMs` (default 5 minutes) since the delivery
+started or its last `heartbeat()`, renewal stops with a warning, the lease lapses and the message is
+redelivered, retiring as dead once it has used its attempts. Long work calls the intent context's
+`heartbeat()` in its loop or sets a higher limit (Alex, 2026-10-12).
 `packages/group-queue` owns the per-tenant enqueue-rate counter, taken at enqueue, and ops reads it
 through the framework; no module scans queues or reads the `gq:parked-tenants` keys directly (Alex,
 2026-09-29). A tenant is parked only while

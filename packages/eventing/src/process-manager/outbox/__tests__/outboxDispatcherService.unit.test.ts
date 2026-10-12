@@ -1,4 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
+import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type * as metricsModule from "../../../metrics.ts";
@@ -14,6 +15,7 @@ import { InMemoryProcessStore } from "../../stores/inMemoryProcessStore.ts";
 import {
   type DispatchableMessage,
   type DispatchReport,
+  type IntentHandler,
   OutboxDispatcherService,
 } from "../outboxDispatcherService.ts";
 
@@ -33,6 +35,52 @@ function withoutRenewals(store: InMemoryProcessStore): InMemoryProcessStore {
       return Reflect.get(target, property, receiver);
     },
   });
+}
+
+/** A short lease and silence limit, polled in steps, so a test walks minutes in a few ticks. */
+const SILENCE = { leaseDurationMs: 30_000, maxSilenceMs: 60_000, stepMs: 10_000 } as const;
+
+/** Runs a holder for three minutes beside a polling rival; reports when the rival took over. */
+async function holdBesideRival({
+  store,
+  beating,
+}: {
+  store: InMemoryProcessStore;
+  beating: boolean;
+}) {
+  const { leaseDurationMs, maxSilenceMs, stepMs } = SILENCE;
+  const { logger, lines } = createTestLogger();
+  let finish: () => void = () => undefined;
+  let heartbeat: () => void = () => undefined;
+  const holder = new OutboxDispatcherService({
+    store,
+    handlers: {
+      "worker-dispatch": (params) => {
+        heartbeat = params.heartbeat;
+        return new Promise<void>((resolve) => (finish = resolve));
+      },
+    },
+    leaseDurationMs,
+    maxSilenceMs,
+    logger,
+  });
+  const rivalHandler = vi.fn().mockResolvedValue(undefined);
+  const rival = new OutboxDispatcherService({
+    store,
+    handlers: { "worker-dispatch": rivalHandler },
+    leaseDurationMs,
+  });
+  const startedAt = Date.now();
+  const run = holder.runOnce({ now: startedAt });
+  let takenAfterMs: number | null = null;
+  for (let elapsed = stepMs; elapsed <= 180_000; elapsed += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+    if (beating) heartbeat();
+    await rival.runOnce({ now: Date.now() });
+    takenAfterMs ??= rivalHandler.mock.calls.length > 0 ? Date.now() - startedAt : null;
+  }
+  finish();
+  return { report: await run, takenAfterMs, lines };
 }
 
 describe("OutboxDispatcherService", () => {
@@ -768,7 +816,11 @@ describe("OutboxDispatcherService", () => {
     /** @scenario "A long-running intent keeps its lease while it runs" */
     it("renews the lease so no other dispatcher takes the message for the whole hour", async () => {
       let finish: () => void = () => undefined;
-      const handler = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+      let heartbeat: () => void = () => undefined;
+      const handler = vi.fn<IntentHandler>((params) => {
+        heartbeat = params.heartbeat;
+        return new Promise<void>((resolve) => (finish = resolve));
+      });
       const holder = new OutboxDispatcherService({
         store,
         handlers: { "worker-dispatch": handler },
@@ -782,6 +834,7 @@ describe("OutboxDispatcherService", () => {
       const run = holder.runOnce({ now: Date.now() });
       for (let minute = 0; minute < 60; minute += 1) {
         await vi.advanceTimersByTimeAsync(60_000);
+        heartbeat();
         await rival.runOnce({ now: Date.now() });
       }
       // Each renewal counts as progress, so the worker never takes this drain for stuck.
@@ -795,6 +848,42 @@ describe("OutboxDispatcherService", () => {
       expect(await store.findMessagesByRef({ ref: pilotRef })).toEqual([
         expect.objectContaining({ status: "dispatched", attempts: 1 }),
       ]);
+    });
+  });
+
+  describe("given a handler that runs past its silence limit", () => {
+    const { leaseDurationMs, maxSilenceMs, stepMs } = SILENCE;
+
+    beforeEach(async () => {
+      vi.useFakeTimers({ now: T0 + 1 });
+      await commitStartedTurn();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
+    it("stops renewing once silent past the limit, so another dispatcher redelivers it", async () => {
+      const { report, takenAfterMs, lines } = await holdBesideRival({ store, beating: false });
+
+      expect(takenAfterMs).toBeGreaterThan(maxSilenceMs);
+      expect(takenAfterMs).toBeLessThanOrEqual(maxSilenceMs + 2 * stepMs + leaseDurationMs);
+      expect(report.fenced).toEqual(["dispatch:turn_1:1"]);
+      expect(lines.findLine("warn", "no heartbeat")).toEqual(
+        expect.objectContaining({
+          processName: pilotRef.processName,
+          messageKey: "dispatch:turn_1:1",
+          maxSilenceMs,
+        }),
+      );
+    });
+
+    /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
+    it("keeps the lease for a handler that sends heartbeats past the same limit", async () => {
+      const { report, takenAfterMs } = await holdBesideRival({ store, beating: true });
+
+      expect(takenAfterMs).toBeNull();
+      expect(report.dispatched).toEqual(["dispatch:turn_1:1"]);
     });
   });
 

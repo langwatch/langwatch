@@ -52,7 +52,11 @@ export interface DispatchableMessage {
  * markDispatched redelivers the same messageKey, so handlers must be
  * idempotent on it.
  */
-export type IntentHandler = (params: { message: DispatchableMessage }) => Promise<void>;
+export type IntentHandler = (params: {
+  message: DispatchableMessage;
+  /** Marks progress: the lease is renewed only while the last mark is within `maxSilenceMs`. */
+  heartbeat: () => void;
+}) => Promise<void>;
 
 export interface OutboxDispatcherServiceOptions {
   store: ProcessStore;
@@ -68,6 +72,12 @@ export interface OutboxDispatcherServiceOptions {
    * leasable again within one lease. Default 2 minutes.
    */
   leaseDurationMs?: number;
+  /**
+   * How long a handler may run without a heartbeat before its lease stops being
+   * renewed, lapses and the message is redelivered. Default 5 minutes, never
+   * below `leaseDurationMs`, the silence a lease already allowed before renewal.
+   */
+  maxSilenceMs?: number;
   /**
    * Which processNames this dispatcher serves. The outbox table is shared
    * across domains, so an unfiltered dispatcher leases other domains' intents
@@ -98,6 +108,7 @@ export interface DispatchReport {
 
 const DEFAULT_MAX_ATTEMPTS = 10;
 export const DEFAULT_LEASE_DURATION_MS = 2 * 60_000;
+export const DEFAULT_MAX_SILENCE_MS = 5 * 60_000;
 /** Renewals per lease length: two in a row can fail before the lease lapses. */
 const LEASE_RENEWALS_PER_LEASE = 3;
 const SLOW_OUTBOX_DELIVERY_MS = 10_000;
@@ -111,6 +122,7 @@ const LEASE_SAFETY_MARGIN_FRACTION = 0.2;
 /** One delivery's lease renewal; `isLost` once a renewal was refused. */
 interface LeaseRenewal {
   isLost: () => boolean;
+  heartbeat: () => void;
   stop: () => Promise<void>;
 }
 
@@ -173,6 +185,7 @@ export class OutboxDispatcherService {
   private readonly retryDelayMs: (params: { attempt: number }) => number;
   private readonly leaseDurationMs: number;
   private readonly leaseRenewalIntervalMs: number;
+  private readonly maxSilenceMs: number;
   private readonly processNames: readonly string[] | undefined;
   private readonly concurrency: number;
   private readonly clock: () => number;
@@ -192,6 +205,8 @@ export class OutboxDispatcherService {
       1,
       Math.floor(this.leaseDurationMs / LEASE_RENEWALS_PER_LEASE),
     );
+    this.maxSilenceMs =
+      options.maxSilenceMs ?? Math.max(DEFAULT_MAX_SILENCE_MS, this.leaseDurationMs);
     this.processNames = options.processNames;
     this.concurrency = Math.max(1, options.concurrency ?? 1);
     this.clock = options.clock ?? Date.now;
@@ -518,8 +533,9 @@ export class OutboxDispatcherService {
       const { leaseLost } = await this.runHoldingLease({
         message,
         now,
-        run: () =>
+        run: ({ heartbeat }) =>
           handler({
+            heartbeat,
             message: {
               processName: message.processName,
               projectId: message.projectId,
@@ -593,12 +609,12 @@ export class OutboxDispatcherService {
   }: {
     message: LeasedOutboxMessageRecord;
     now: number;
-    run: () => Promise<void>;
+    run: (params: { heartbeat: () => void }) => Promise<void>;
   }): Promise<{ leaseLost: boolean }> {
     const renewal = this.startLeaseRenewal({ message, now });
     let failure: { error: unknown } | null = null;
     try {
-      await run();
+      await run({ heartbeat: renewal.heartbeat });
     } catch (error) {
       failure = { error };
     } finally {
@@ -609,7 +625,11 @@ export class OutboxDispatcherService {
     return { leaseLost: false };
   }
 
-  /** Renewals stay in the store's frame: the drain's `now` advanced by the wall clock since. */
+  /**
+   * Renewals stay in the store's frame: the drain's `now` advanced by the wall clock since.
+   * A handler silent past `maxSilenceMs` is no longer renewed, so a hung one cannot hold
+   * its message forever: the lease lapses and the usual redelivery and retirement apply.
+   */
   private startLeaseRenewal({
     message,
     now,
@@ -618,6 +638,7 @@ export class OutboxDispatcherService {
     now: number;
   }): LeaseRenewal {
     const startedAt = this.clock();
+    let lastHeartbeatAt = startedAt;
     let lost = false;
     let stopped = false;
     let timer: NodeJS.Timeout | null = null;
@@ -653,10 +674,22 @@ export class OutboxDispatcherService {
         );
       }
     };
+    const silentTooLong = (): boolean => {
+      const silenceMs = this.clock() - lastHeartbeatAt;
+      if (silenceMs <= this.maxSilenceMs) return false;
+      stopped = true;
+      this.logger.warn(
+        { ...fields, silenceMs: Math.round(silenceMs), maxSilenceMs: this.maxSilenceMs },
+        "Outbox handler sent no heartbeat within its silence limit; its lease is no " +
+          "longer renewed and will lapse, so the message is redelivered",
+      );
+      return true;
+    };
     const arm = (): void => {
       if (stopped || lost) return;
       timer = setTimeout(() => {
         timer = null;
+        if (silentTooLong()) return;
         renewing = renew().then(arm);
       }, this.leaseRenewalIntervalMs);
       timer.unref();
@@ -664,6 +697,9 @@ export class OutboxDispatcherService {
     arm();
     return {
       isLost: () => lost,
+      heartbeat: () => {
+        lastHeartbeatAt = this.clock();
+      },
       stop: async () => {
         stopped = true;
         if (timer) clearTimeout(timer);

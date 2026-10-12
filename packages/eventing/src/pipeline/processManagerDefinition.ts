@@ -79,6 +79,8 @@ export interface IntentContext {
   attempt: number;
   /** When the delivery's outbox lease lapses; absent where no dispatcher leased it. */
   leaseExpiresAt?: number;
+  /** Marks progress so the lease keeps being renewed past `maxSilenceMs`; absent as above. */
+  heartbeat?: () => void;
 }
 
 export type IntentExecutor<Payload> = (payload: Payload, context: IntentContext) => Promise<void>;
@@ -162,6 +164,8 @@ export interface ProcessManagerConfig<State, Intents, E extends Event = Event> {
   outbox?: {
     maxAttempts?: number;
     leaseDurationMs?: number;
+    /** Silence before a running handler's lease stops renewing: 5 minutes, at least the lease. */
+    maxSilenceMs?: number;
     retryDelayMs?: (params: { attempt: number }) => number;
     /** In-flight dispatches per loop. Default 1 (sequential). */
     concurrency?: number;
