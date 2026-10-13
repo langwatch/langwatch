@@ -416,6 +416,15 @@
           "documentation": "What the sign-in that minted this session PROVED, as RFC 8176 method\nreferences (D06). Empty on every session minted before the column, and\non any ordinary password sign-in. An organization that requires a second\nfactor reads this when a member reaches its data; it is never read at\nmint and never ends a session."
         },
         {
+          "name": "startedBySignUp",
+          "columnName": "startedBySignUp",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Minted while the account had never signed in: the session its sign-up\nstarted, which skips the secure-account offer. False on every later one\nand on every session that predates the column (specs/identity/passkeys.feature)."
+        },
+        {
           "name": "impersonating",
           "columnName": "impersonating",
           "type": "Json",
@@ -1300,7 +1309,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": ""
+          "documentation": "Not unique alone: better-auth stores plain values here (a user id, a counter). See WEB-19201."
         },
         {
           "name": "expires",
@@ -3800,6 +3809,33 @@
           "isList": false,
           "isOptional": true,
           "documentation": "The largest file a dataset image or file cell accepts for this\norganization, in mebibytes. Null means the default. Set by an operator\nfrom the back office only; every other dataset size limit scales with it."
+        },
+        {
+          "name": "privateClickHouseLabel",
+          "columnName": "privateClickHouseLabel",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The label of this organization's `CLICKHOUSE_URL__<label>__<id>` route, recorded by the\norganization module the first time it is seen. Once set, a missing route refuses the\norganization instead of serving it from the shared ClickHouse. Null: never private.\nSpec: specs/private-dataplane/clickhouse-routing.feature."
+        },
+        {
+          "name": "privateS3Label",
+          "columnName": "privateS3Label",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The same for `DATAPLANE_S3__<label>__<id>`. Spec: specs/private-dataplane/s3-routing.feature."
+        },
+        {
+          "name": "privateDataplaneSeenAt",
+          "columnName": "privateDataplaneSeenAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When either label was first recorded."
         },
         {
           "name": "maxSessionDurationDays",

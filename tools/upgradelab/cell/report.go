@@ -190,19 +190,20 @@ func Summarize(calls []Call, timeline []PhaseChange, visible map[string]bool) ([
 	kinds := map[string]*KindSummary{}
 	phases := map[string]map[string]int{}
 	var order []string
-	for _, call := range calls {
+	for i := range calls {
+		call := &calls[i]
 		summary := kinds[call.Kind]
 		if summary == nil {
 			summary = &KindSummary{Kind: call.Kind, Write: call.Write, Unchecked: visible == nil}
 			kinds[call.Kind] = summary
 		}
-		summary.add(call, visible)
+		summary.add(*call, visible)
 		phase := PhaseAt(timeline, call.AtMs)
 		if phases[phase] == nil {
 			phases[phase] = map[string]int{}
 			order = append(order, phase)
 		}
-		phases[phase][statusName(call)]++
+		phases[phase][statusName(*call)]++
 	}
 	var summaries []KindSummary
 	for _, name := range slices.Sorted(maps.Keys(kinds)) {
@@ -260,9 +261,10 @@ func (report *Report) Markdown() string {
 		fmt.Fprintf(&text, "| %s | %s | %s | %s | %s |\n", each.ID, strings.Join(each.Scenarios, ", "), each.Name, each.Result, strings.ReplaceAll(each.Detail, "|", "/"))
 	}
 	text.WriteString("\n| Kind | Sent | 2xx (final) | Failed | Visible | Lost | Non-2xx seen | upgrade_in_progress | Retries | Max retry window ms | Max latency ms |\n|" + strings.Repeat(" --- |", 11) + "\n")
-	for _, each := range report.Traffic {
+	for i := range report.Traffic {
+		each := &report.Traffic[i]
 		fmt.Fprintf(&text, "| %s | %d | %d | %d | %s | %s | %d | %d | %d | %d | %d |\n", each.Kind, each.Sent, each.OK, each.Failed,
-			writeCell(each, each.Visible), writeCell(each, each.Lost), each.NonOK, each.UpgradeInProgress, each.Retries, each.MaxRetryWindowMs, each.MaxLatency)
+			writeCell(*each, each.Visible), writeCell(*each, each.Lost), each.NonOK, each.UpgradeInProgress, each.Retries, each.MaxRetryWindowMs, each.MaxLatency)
 	}
 	report.writeTimeline(&text)
 	if report.Ribbon != "" {
@@ -279,7 +281,8 @@ func (report *Report) Markdown() string {
 	for _, shot := range report.Shots {
 		fmt.Fprintf(&text, "- shot %s at %d ms: %s state %q %s\n", shot.Phase, shot.AtMs, shot.File, shot.State, shot.Error)
 	}
-	for _, each := range report.Traffic {
+	for i := range report.Traffic {
+		each := &report.Traffic[i]
 		if each.FirstError != "" {
 			fmt.Fprintf(&text, "- first failure %s: %s\n", each.Kind, strings.ReplaceAll(each.FirstError, "\n", " "))
 		}

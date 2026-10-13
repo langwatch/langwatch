@@ -38,7 +38,7 @@ export const userAvatarRest = defineRestRouter(UserAvatarFileApi)
   .withVersion(MANAGEMENT_API_VERSION)
   // REST is the API key's (ARCHITECTURE.md §8): the UI reads avatars through tRPC.
   .withCredential("project")
-  .withAddressing("literal", { v1Twin: false })
+  .withAddressing("literal", { v1Twin: true })
 
   .get("/api/user-avatar/:projectId/:userAvatarId", "readUserAvatarBytes")
   .withParams(userAvatarRestParamsSchema)

@@ -23,7 +23,7 @@ async function offerFor({
   twoStepEnabled = false,
   dismissedDaysAgo = null,
   signedInWith = "password",
-  sessionStartedAfterSignUpMs = DAY_MS,
+  startedBySignUp = false,
 }: {
   passkeys?: boolean;
   twoStep?: boolean;
@@ -31,7 +31,7 @@ async function offerFor({
   twoStepEnabled?: boolean;
   dismissedDaysAgo?: number | null;
   signedInWith?: "password" | "passkey" | "federated" | "unknown";
-  sessionStartedAfterSignUpMs?: number;
+  startedBySignUp?: boolean;
 } = {}) {
   const database = MemoryUserDatabase.create({
     processStore: InMemoryProcessStore.createForTesting(),
@@ -56,8 +56,7 @@ async function offerFor({
   });
   if (holdsPasskey) database.writePasskey({ id: "passkey-1", userId: id });
 
-  const { accountCreatedAt } = await users.findPasskeyNudgeStatus(id);
-  const signedInAt = new Date(accountCreatedAt.getTime() + sessionStartedAfterSignUpMs);
+  const signedInAt = new Date(NOW.getTime() - 1_000);
   const auth = Object.assign(createUserTestAuth(), {
     getSignedInWith: vi.fn(async () => signedInWith),
     listBrowserSessions: vi.fn(async () => [
@@ -71,6 +70,7 @@ async function offerFor({
         signedInAt: signedInAt.toISOString(),
         lastActiveAt: signedInAt.toISOString(),
         expiresAt: new Date(signedInAt.getTime() + 30 * DAY_MS).toISOString(),
+        startedBySignUp,
         current: true,
       },
     ]),
@@ -142,11 +142,14 @@ describe("the account-security offer", () => {
 
   describe("given the session the sign-up itself started", () => {
     /** @scenario "The offer waits past the sign-up session" */
-    it("offers nothing until a later sign-in", async () => {
-      await expect(offerFor({ sessionStartedAfterSignUpMs: 300 })).resolves.toMatchObject({
+    it("offers nothing on that session", async () => {
+      await expect(offerFor({ startedBySignUp: true })).resolves.toMatchObject({
         offer: { offer: false, passkey: true, twoStep: true },
       });
-      await expect(offerFor({ sessionStartedAfterSignUpMs: DAY_MS })).resolves.toMatchObject({
+    });
+
+    it("offers it on a sign-in seconds later, which the sign-up did not start", async () => {
+      await expect(offerFor({ startedBySignUp: false })).resolves.toMatchObject({
         offer: { offer: true },
       });
     });

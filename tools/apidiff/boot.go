@@ -307,7 +307,7 @@ type instanceEnvSpec struct {
 	redisURL      string
 	redisDBIndex  string
 	storagePath   string   // LANGWATCH_LOCAL_STORAGE_PATH: where each side stores dataset files
-	publicKey     string   // LANGWATCH_LICENSE_PUBLIC_KEY both sides verify licences with (see licensePublicKey)
+	publicKey     string   // LANGWATCH_LICENSE_PUBLIC_KEY both sides verify licenses with (see licensePublicKey)
 	collaborators []string // collaboratorEnv: LangWatchQL, the judge, the Langy agent stub
 }
 
@@ -486,12 +486,7 @@ func PlanBoot(cfg BootConfig) (DryRunPlan, error) {
 	}
 	release := "release both persistent worktrees for the next run, deleting the env overlay (a worktree another live run held is <work-root>/<side>, moved aside and deleted in the background)"
 	if !cfg.UseHaven {
-		plan.Commands = append(plan.Commands,
-			"pnpm install / migrate / seed / start, both instances (see README: Boot details)",
-			"drop the run's databases; the compose project stays up for the next run", release)
-		if !cfg.ComposePostgres && cfg.PGURL == "" {
-			plan.Commands = append(plan.Commands, "postgres: haven's host server "+redactURL(hostPostgresURL)+", databases "+DatabaseName(runID, "branch")+" and "+DatabaseName(runID, "main"))
-		}
+		plan.Commands = append(plan.Commands, composePlanCommands(cfg, runID, release)...)
 		return plan, nil
 	}
 	plan.MainSlug = HavenSlug(runID, "main")
@@ -509,6 +504,18 @@ func PlanBoot(cfg BootConfig) (DryRunPlan, error) {
 		release,
 	)
 	return plan, nil
+}
+
+// composePlanCommands is the plan's tail on the -no-haven path.
+func composePlanCommands(cfg BootConfig, runID, release string) []string {
+	commands := []string{
+		"pnpm install / migrate / seed / start, both instances (see README: Boot details)",
+		"drop the run's databases; the compose project stays up for the next run", release,
+	}
+	if !cfg.ComposePostgres && cfg.PGURL == "" {
+		commands = append(commands, "postgres: haven's host server "+redactURL(hostPostgresURL)+", databases "+DatabaseName(runID, "branch")+" and "+DatabaseName(runID, "main"))
+	}
+	return commands
 }
 
 // checkoutPlanLine is how a side's persistent worktree reaches ref's commit.
@@ -575,6 +582,12 @@ type bootState struct {
 	// havenSlugs are the stacks this run started, in order. The teardown
 	// destroys these and nothing else.
 	havenSlugs []string
+	// seedProbe answers the status the seeded project key gets on a base URL;
+	// nil (tests) skips the wait for haven's identity seed (haven-seed.go).
+	seedProbe func(ctx context.Context, baseURL string) int
+	// havenRedis are the Redis databases the run's stacks held, emptied once
+	// they are destroyed (haven-seed.go).
+	havenRedis []havenRedisSlot
 	// inherit overrides the process environment the child commands are
 	// composed from; nil means os.Environ(). Tests supply their own.
 	inherit []string
@@ -1317,19 +1330,24 @@ func (state *bootState) prepareDatabases(ctx context.Context) error {
 		return nil
 	}
 	for _, instance := range []string{"branch", "main"} {
-		database := DatabaseName(state.runID, instance)
-		state.logf("databases: recreate %s", database)
-		if err := state.pgAdmin(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", database)); err != nil {
-			return err
-		}
-		if err := state.pgAdmin(ctx, "CREATE DATABASE "+database); err != nil {
-			return err
-		}
-		if err := state.chAdmin(ctx, "DROP DATABASE IF EXISTS "+database); err != nil {
+		if err := state.recreateDatabase(ctx, DatabaseName(state.runID, instance)); err != nil {
 			return err
 		}
 	}
 	return state.flushRedis(ctx)
+}
+
+// recreateDatabase drops and recreates one instance's Postgres database and
+// drops its ClickHouse one.
+func (state *bootState) recreateDatabase(ctx context.Context, database string) error {
+	state.logf("databases: recreate %s", database)
+	if err := state.pgAdmin(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", database)); err != nil {
+		return err
+	}
+	if err := state.pgAdmin(ctx, "CREATE DATABASE "+database); err != nil {
+		return err
+	}
+	return state.chAdmin(ctx, "DROP DATABASE IF EXISTS "+database)
 }
 
 // flushRedis empties both instances' logical databases. Without it a

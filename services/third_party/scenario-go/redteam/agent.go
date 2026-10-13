@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand/v2"
 	"reflect"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -220,24 +221,26 @@ func (a *Agent) Extension() scenario.Extension { return reportExtension{agent: a
 // models resolves the attacker and metaprompt models against the current
 // default model.
 func (a *Agent) models() (attacker, metaprompt scenario.ModelConfig) {
-	attacker = a.cfg.ModelConfig
-	if attacker.LLM == nil || attacker.Model == "" || attacker.MaxTokens == nil {
-		defaults := scenario.CurrentSettings().DefaultModel
-		if attacker.LLM == nil {
-			attacker.LLM = defaults.LLM
-		}
-		if attacker.Model == "" {
-			attacker.Model = defaults.Model
-		}
-		if attacker.MaxTokens == nil {
-			attacker.MaxTokens = defaults.MaxTokens
-		}
+	// The default's temperature is not inherited: the attacker defaults to
+	// DefaultTemperature instead.
+	temperature := a.cfg.ModelConfig.Temperature
+	attacker = a.cfg.ModelConfig.WithDefaults(scenario.CurrentSettings().DefaultModel)
+	attacker.Temperature = temperature
+	// A "provider/model" string resolves to its registered provider; when it
+	// cannot, LLM stays nil and the calls report scenario.ErrNoModel.
+	if resolved, err := attacker.Resolve(); err == nil {
+		attacker = resolved
 	}
 	if attacker.Temperature == nil {
 		t := DefaultTemperature
 		attacker.Temperature = &t
 	}
 	metaprompt = a.cfg.MetapromptModel
+	if metaprompt.LLM == nil && registeredModel(metaprompt.Model) {
+		if resolved, err := metaprompt.Resolve(); err == nil {
+			metaprompt = resolved
+		}
+	}
 	if metaprompt.LLM == nil {
 		metaprompt.LLM = attacker.LLM
 	}
@@ -248,6 +251,13 @@ func (a *Agent) models() (attacker, metaprompt scenario.ModelConfig) {
 		metaprompt.Temperature = attacker.Temperature
 	}
 	return attacker, metaprompt
+}
+
+// registeredModel reports whether model is a "provider/model" string naming
+// a registered provider.
+func registeredModel(model string) bool {
+	p, _ := scenario.SplitModel(model)
+	return p != "" && slices.Contains(scenario.RegisteredProviders(), p)
 }
 
 // Call implements scenario.AgentAdapter: it generates the next attack.
@@ -374,7 +384,7 @@ func (a *Agent) plan(ctx context.Context, model scenario.ModelConfig, descriptio
 	if ends, ok := phaseEndsOf(a.cfg.Strategy, a.cfg.TotalTurns); ok {
 		params.PhaseEnds = &ends
 	}
-	res, err := model.LLM.Inference(ctx, scenario.InferenceParams{
+	res, err := scenario.TraceInference(ctx, model.LLM, scenario.InferenceParams{
 		Model:       model.Model,
 		Messages:    []scenario.Message{scenario.UserMsg(RenderMetapromptTemplate(a.cfg.MetapromptTemplate, params))},
 		Temperature: model.Temperature,
@@ -385,6 +395,7 @@ func (a *Agent) plan(ctx context.Context, model scenario.ModelConfig, descriptio
 	}
 	text := res.Message.Text()
 	if text == "" {
+		//lint:ignore ST1005 same message as the JS and Python SDKs
 		return "", errors.New("Metaprompt model returned no content")
 	}
 	a.attackPlan = text
@@ -473,7 +484,7 @@ func (a *Agent) askScorer(ctx context.Context, model scenario.ModelConfig, respo
 		return fallback
 	}
 	zero, maxTokens := 0.0, int64(scorerMaxTokens)
-	res, err := model.LLM.Inference(ctx, scenario.InferenceParams{
+	res, err := scenario.TraceInference(ctx, model.LLM, scenario.InferenceParams{
 		Model:       model.Model,
 		Messages:    []scenario.Message{scenario.UserMsg(buildScorePrompt(a.cfg.Target, response))},
 		Temperature: &zero,
@@ -499,7 +510,7 @@ func (a *Agent) callAttacker(ctx context.Context, model scenario.ModelConfig) (s
 	messages := make([]scenario.Message, 0, len(a.history)+1)
 	messages = append(messages, scenario.SystemMsg(a.systemPrompt))
 	messages = append(messages, a.history...)
-	res, err := model.LLM.Inference(ctx, scenario.InferenceParams{
+	res, err := scenario.TraceInference(ctx, model.LLM, scenario.InferenceParams{
 		Model:       model.Model,
 		Messages:    messages,
 		Temperature: model.Temperature,
@@ -510,6 +521,7 @@ func (a *Agent) callAttacker(ctx context.Context, model scenario.ModelConfig) (s
 	}
 	text := res.Message.Text()
 	if text == "" {
+		//lint:ignore ST1005 same message as the JS and Python SDKs
 		return "", errors.New("Attacker model returned no content")
 	}
 	return text, nil

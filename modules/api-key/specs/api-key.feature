@@ -279,3 +279,69 @@ Feature: API key lifecycle
     When it is sent as a bearer, as basic auth, or as X-Auth-Token
     Then it authenticates as that project's legacy API key
     And it is matched as an opaque string, never verified as a JWT
+
+  # A run key's grants are ledger commands the worker folds. When the worker is behind, the first
+  # mint cannot confirm them in time; a retry must wait on that same key, not write another one,
+  # or it never catches up while the worker is behind.
+  @unit
+  Scenario: A run key whose grants have not landed answers that access is still processing
+    Given the grants projection is behind
+    When a run key is minted
+    Then the mint fails with "authz_grant_not_confirmed" and status 503, marked retryable
+    And no token is returned
+
+  @unit
+  Scenario: A retried run key mint waits on the key the first attempt wrote
+    Given a run key mint failed with "authz_grant_not_confirmed"
+    When the same starter mints a key for the same project and permissions again
+    Then no second key is written
+    And the first attempt's key is granted again
+
+  @unit
+  Scenario: A retried run key mint succeeds with the first attempt's key once its grants land
+    Given a run key mint failed with "authz_grant_not_confirmed"
+    And the grants have since landed in the projection
+    When the same starter mints a key for the same project and permissions again
+    Then the first attempt's token is returned
+    And no second key is written
+
+  # A run's key is minted once across every api server: the server that claims it shares the
+  # token sealed in Redis, and every other server reads that same token (ARCHITECTURE.md §7,
+  # "mint once, share sealed").
+  @unit
+  Scenario: Two api servers minting the same run key at once get one key and the same token
+    Given the grants projection is up to date
+    When two api servers mint a key for the same starter, project and permissions at once
+    Then both return the same token
+    And only one key is written
+
+  @unit
+  Scenario: Two first attempts on two servers for one run end with one key
+    Given the grants projection is behind
+    When two api servers mint a key for the same starter, project and permissions at once
+    Then both answer "authz_grant_not_confirmed", marked retryable
+    And only one key is written
+    And a retry once the grants land activates that key
+
+  @unit
+  Scenario: A server minting after another activated the run's key gets that key
+    Given one api server minted a run's key and its grants landed
+    When another api server mints a key for the same starter, project and permissions
+    Then it returns the first server's token
+    And no second key is written
+
+  @unit
+  Scenario: A retried run key mint on another server succeeds with the first attempt's key
+    Given a run key mint failed with "authz_grant_not_confirmed" on one api server
+    And the grants have since landed in the projection
+    When the retry reaches another api server
+    Then it returns the first attempt's token for the first attempt's key
+    And no second key is written
+
+  @unit
+  Scenario: A pending run key past its usefulness is replaced, never activated
+    Given a run key mint failed with "authz_grant_not_confirmed"
+    And the pending key no longer has the life the run needs
+    When the run key is minted again
+    Then a new key is written and returned
+    And the old pending key stays revoked, never activated

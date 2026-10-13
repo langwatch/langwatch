@@ -36,9 +36,10 @@ Every read is filtered to this worktree and prints a Grafana deep link (`grafana
 `--trace <id>`, `--stack <slug>`, `--raw` (the child's own bytes), `--json` (one object per line,
 lane stamped). `haven obs traces` also takes `--since` (default 10m).
 
-- Services are lanes: `ui`, `api`, `go`, `sims`, `langy`, or a simulator name (`haven logs mail`).
-  The api lane hosts the worker, so `haven logs api` and `haven logs worker` each show half of it.
-  Under the default one-process mode the lane is `app` (`dev-runtime`).
+- Services are lanes: `ui` (under `--watch` and `--hmr`), `api`, `go`, `langy`, or a simulator name
+  (`haven logs mail`). The api lane hosts the worker, so `haven logs api` and `haven logs worker`
+  each show half of it (one Node process by default: `dev-runtime`). The simulators run in the `go`
+  lane by default, so `haven logs go` shows them with the gateway; `haven logs <sim>` reads one.
 - `--loki` and `--trace` need the observability stack (on by default with `haven up`); services match
   as substrings of the OTel service name.
 - `--trace` finds only lines whose structured metadata carries `trace_id`; when none do it is

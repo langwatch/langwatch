@@ -1,26 +1,27 @@
-import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import { AnalyticsApi } from "@langwatch/analytics-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 /**
  * @vitest-environment node
  */
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { DatasetApi } from "@langwatch/dataset-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluationApi, type EvaluationRunData } from "@langwatch/evaluation-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp } from "@langwatch/process";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores, type ObjectStorage } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
-import type { TraceApi } from "@langwatch/trace-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { TraceApi } from "@langwatch/trace-contract";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
@@ -65,29 +66,39 @@ describe("given a process that installs the evaluation module over its repositor
   describe("when a run is upserted for a trace", () => {
     /** @scenario "An installed evaluation module reads back the runs it wrote" */
     it("reads the run back by id, by trace and among the trace's evaluations", async () => {
-      const runtime = await createApp({ role: "worker" })
-        .withModules([installableEvaluation])
-        .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
-        .withStores(memoryStores())
-        .provide({
-          workflow: createApiFixture<WorkflowApi>(),
-          trace: createApiFixture<TraceApi>(),
-          "model-provider": createApiFixture<ModelProviderApi>(),
-          "feature-flag": createApiFixture<FeatureFlagApi>(),
-          evaluator: createApiFixture<EvaluatorApi>(),
-          monitor: createApiFixture<MonitorApi>(),
-          dataset: createApiFixture<DatasetApi>(),
-          "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>(),
-          analytics: createApiFixture<AnalyticsApi>(),
-          authz: createApiFixture<AuthzApi>({
-            authorizeInternal: async ({ projectId }) => ownProof({ projectId }),
+      const runtime = await bootInstalledProcess({
+        role: "worker",
+        modules: [installableEvaluation],
+        config: { evaluation: EVALUATION_TEST_CONFIG },
+        stores: memoryStores(),
+        peers: [
+          testPeer({ token: WorkflowApi, instance: createApiFixture<WorkflowApi>() }),
+          testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
+          testPeer({ token: ModelProviderApi, instance: createApiFixture<ModelProviderApi>() }),
+          testPeer({ token: FeatureFlagApi, instance: createApiFixture<FeatureFlagApi>() }),
+          testPeer({ token: EvaluatorApi, instance: createApiFixture<EvaluatorApi>() }),
+          testPeer({ token: MonitorApi, instance: createApiFixture<MonitorApi>() }),
+          testPeer({ token: DatasetApi, instance: createApiFixture<DatasetApi>() }),
+          testPeer({
+            token: InstantEvalJudgeApi,
+            instance: createApiFixture<InstantEvalJudgeApi>(),
           }),
-          project: createApiFixture<ProjectApi>(),
-          "data-retention": createApiFixture<DataRetentionApi>({
-            getPlatformDefaultRetentionDays: () => 30,
+          testPeer({ token: AnalyticsApi, instance: createApiFixture<AnalyticsApi>() }),
+          testPeer({
+            token: AuthzApi,
+            instance: createApiFixture<AuthzApi>({
+              authorizeInternal: async ({ projectId }) => ownProof({ projectId }),
+            }),
           }),
-        })
-        .boot();
+          testPeer({ token: ProjectApi, instance: createApiFixture<ProjectApi>() }),
+          testPeer({
+            token: DataRetentionApi,
+            instance: createApiFixture<DataRetentionApi>({
+              getPlatformDefaultRetentionDays: () => 30,
+            }),
+          }),
+        ],
+      });
 
       try {
         const app = runtime.service(EvaluationApi);

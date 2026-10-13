@@ -522,6 +522,14 @@ export const createAuthOptions = ({
       amr: { type: "string[]", required: false, input: false },
       // Which of the person's identifiers minted it (D06), written by the same hook only.
       identifierId: { type: "string", required: false, input: false },
+      // The account's first session (specs/identity/passkeys.feature), written by the same hook
+      // only; hidden so get-session stays unchanged.
+      startedBySignUp: {
+        type: "boolean",
+        defaultValue: false,
+        input: false,
+        returned: false,
+      },
     },
     // Preserve NextAuth's 30-day session TTL. BetterAuth defaults to 7 days,
     // which would force users to re-auth more often than before. Match the

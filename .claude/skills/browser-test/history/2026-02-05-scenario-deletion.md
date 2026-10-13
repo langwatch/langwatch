@@ -1,3 +1,5 @@
+> Archive note: dated run, kept as history. Its sign-in provider and compose setup no longer exist; current setup is in `../HOW_TO.md` and `haven-browser`.
+
 # Browser Test Run — Scenario Deletion
 
 **Date:** 2026-02-05

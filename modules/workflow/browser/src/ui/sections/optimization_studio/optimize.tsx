@@ -1,4 +1,5 @@
 import { toaster } from "@langwatch/browser-host/toaster";
+import { Dialog } from "@langwatch/design-system/dialog";
 import {
   Alert,
   Button,
@@ -15,7 +16,6 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import type { Entry } from "@langwatch/workflow-contract";

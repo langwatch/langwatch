@@ -5,9 +5,8 @@ import {
   MAX_CALL_TIMEOUT_MS,
   STICKY_PIN_TTL_SECONDS,
 } from "@langwatch/agent-contract";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 
-import { instanceOwnerKey } from "../rules/connected-agent-keys.rules.ts";
+import type { ConnectedAgentStateRepository } from "../repositories/connected-agent-state.repository.ts";
 
 // Ownership outlives sessions, pending calls and sticky pins, including after disconnect.
 const CLAIM_TTL_SECONDS =
@@ -18,14 +17,14 @@ const CLAIM_TTL_SECONDS =
   ) + CALL_KEY_SLACK_SECONDS;
 
 export class ConnectedAgentInstanceOwnershipService {
-  readonly #store: SessionStateStore;
+  readonly #state: ConnectedAgentStateRepository;
 
-  private constructor(store: SessionStateStore) {
-    this.#store = store;
+  private constructor(state: ConnectedAgentStateRepository) {
+    this.#state = state;
   }
 
-  static create(store: SessionStateStore): ConnectedAgentInstanceOwnershipService {
-    return new ConnectedAgentInstanceOwnershipService(store);
+  static create(state: ConnectedAgentStateRepository): ConnectedAgentInstanceOwnershipService {
+    return new ConnectedAgentInstanceOwnershipService(state);
   }
 
   async claim(input: {
@@ -33,11 +32,12 @@ export class ConnectedAgentInstanceOwnershipService {
     instanceId: string;
     principalId: string;
   }): Promise<void> {
-    const claimed = await this.#store.setIfAbsentOrEqual(
-      instanceOwnerKey(input.projectId, input.instanceId),
-      input.principalId,
-      CLAIM_TTL_SECONDS,
-    );
+    const claimed = await this.#state.claimInstanceOwner({
+      projectId: input.projectId,
+      instanceId: input.instanceId,
+      principalId: input.principalId,
+      ttlSeconds: CLAIM_TTL_SECONDS,
+    });
     if (!claimed) {
       throw new AgentRegisterRefusedError({
         reason: "permission_denied",

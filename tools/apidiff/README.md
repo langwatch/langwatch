@@ -86,6 +86,23 @@ left alone. The same prefix, shape, age and live-run rules apply to both.
   `-no-haven` boots the old way; `-env-file` is refused alongside haven,
   because pointing the instances at the servers a dotenv names is the thing
   haven exists to stop.
+- **Ready means seeded.** A modular stack's identity seed (the admin, the
+  project key, the licence) runs only after its api answers, so a listening
+  lane is not yet a usable one: on 2026-10-12 every branch fixture and sign-in
+  answered 401, and the licence copy found none and left main unentitled while
+  the branch later was. After the lane listens, the run polls
+  `GET /api/prompts` with the seeded project key until it answers anything but
+  no answer, 401 or a 5xx, then reloads a modular stack's worker (haven's own
+  auto-seed does the same, so the LangWatchQL key-map fill sees the seeded
+  project). Both stacks boot with `HAVEN_AUTO_SEED=0`: the tiny-tier auto-seed
+  only ever reached the modular side, and its organizations surfaced as list
+  differences (`haven-seed.go`).
+- **Teardown empties the stacks' Redis databases.** `haven down --destroy`
+  left both full on 2026-10-12, the next run got the same two indices, and
+  the earlier run's span dedup keys dropped the fixed fixture trace as a
+  duplicate, so neither side ever projected it. The run records each stack's
+  `redisDb` from `haven status` and, after the destroy, runs `FLUSHDB` on each
+  one no live stack holds.
 - **A fresh worktree is prepared before either stack boots.** haven's own
   automatic prep is migrate-and-seed, not install-and-build: a worktree
   `git worktree add` just created carries none of a developer checkout's

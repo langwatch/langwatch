@@ -12,7 +12,7 @@ nothing, whatever the recipient domain. Code: `services/sims/mailsim`, console
 
 ## Run it
 
-- On by default in haven (`haven up`; `-mail` turns it off). Hosted in the `sims` lane.
+- On by default in haven (`haven up`; `-mail` turns it off). Runs in the `go` lane by default (see `sims`).
 - URL: `https://mail.<slug>.langwatch.localhost` (console); `haven status` shows the
   loopback HTTP port (`MAILSIM_HTTP_ADDR`) and the SMTP port (`MAILSIM_SMTP_ADDR`).
 - The app's own mail is routed at it (`SMTP_HOST=127.0.0.1`) unless `.env` names a provider.

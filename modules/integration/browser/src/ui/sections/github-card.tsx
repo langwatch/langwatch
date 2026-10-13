@@ -4,8 +4,9 @@
  * Spec: modules/integration/specs/github-connection.feature.
  */
 
-import { Badge, Box, Button, Text } from "@langwatch/design-system/primitives";
-import { SettingList, SettingsCard } from "@langwatch/design-system/settings-card";
+import { Card } from "@langwatch/design-system/card";
+import { Badge, Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { SettingList } from "@langwatch/design-system/settings-card";
 import { useState } from "react";
 import { GitHub } from "react-feather";
 
@@ -69,10 +70,10 @@ export function GithubCard({ organizationId }: { organizationId: string }) {
 
   return (
     <Box id="github" width="full">
-      <SettingsCard
+      <Card
         data-testid="github-connection-card"
         title="GitHub"
-        leading={<GitHub size={18} />}
+        icon={<GitHub size={18} />}
         badge={
           installations.length > 0 ? (
             <Badge colorPalette="green" variant="subtle">
@@ -80,36 +81,38 @@ export function GithubCard({ organizationId }: { organizationId: string }) {
             </Badge>
           ) : null
         }
-        hint="Lets LangWatch open pull requests on the repositories you choose, and link coding agent sessions to the pull requests they produced. Pull requests are made by the LangWatch app and credit you as the requester."
-        actions={connectAction}
+        description="Lets LangWatch open pull requests on the repositories you choose, and link coding agent sessions to the pull requests they produced. Pull requests are made by the LangWatch app and credit you as the requester."
+        footer={connectAction}
       >
-        {!configured && (
-          <Text textStyle="body" color="fg.muted" data-testid="github-not-configured">
-            The GitHub integration is not available on this instance.
-          </Text>
-        )}
-        {showInstallations && (
-          <SettingList>
-            {installations.map((installation) => (
-              <GithubInstallationRow
-                key={installation.installationId}
-                installation={installation}
-                disconnecting={
-                  disconnect.isPending && disconnectingId === installation.installationId
-                }
-                uninstallStarted={uninstallStartedFor === installation.installationId}
-                onDisconnect={(installationId) => {
-                  setDisconnectingId(installationId);
-                  disconnect.mutate({ organizationId, installationId });
-                }}
-              />
-            ))}
-          </SettingList>
-        )}
+        <VStack align="stretch" gap={2}>
+          {!configured && (
+            <Text textStyle="body" color="fg.muted" data-testid="github-not-configured">
+              The GitHub integration is not available on this instance.
+            </Text>
+          )}
+          {showInstallations && (
+            <SettingList>
+              {installations.map((installation) => (
+                <GithubInstallationRow
+                  key={installation.installationId}
+                  installation={installation}
+                  disconnecting={
+                    disconnect.isPending && disconnectingId === installation.installationId
+                  }
+                  uninstallStarted={uninstallStartedFor === installation.installationId}
+                  onDisconnect={(installationId) => {
+                    setDisconnectingId(installationId);
+                    disconnect.mutate({ organizationId, installationId });
+                  }}
+                />
+              ))}
+            </SettingList>
+          )}
 
-        {/* How Langy reaches this person's code, once they chose (ADR-129). */}
-        <LangyCodeAccess />
-      </SettingsCard>
+          {/* How Langy reaches this person's code, once they chose (ADR-129). */}
+          <LangyCodeAccess />
+        </VStack>
+      </Card>
     </Box>
   );
 }

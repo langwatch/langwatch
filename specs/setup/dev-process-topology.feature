@@ -74,7 +74,7 @@ Feature: The local development process topology
   Scenario: Each lane is told the port that was derived for it
     Given a dev launcher deriving its ports from PORT
     When it starts the lanes
-    Then the API is given PORT + 1000, not the browser application's port
+    Then under --hmr the API is given PORT + 1000, not the browser application's port
     And the worker is given the metrics port the pre-flight reserved
     And the AI Gateway is given the port the launcher announced
 
@@ -386,8 +386,8 @@ Feature: The local development process topology
 
   # Still and watch serve the built UI: one backend-only Node lane, no Vite;
   # the api serves apps/ui/dist/client, built once at up and on `haven reload
-  # ui`. watch rebuilds it with `haven ui-watch` on a change. hmr runs Vite
-  # bundledDev with HMR in its own lane. Outside haven `pnpm dev` matches still
+  # ui`. watch rebuilds it with `haven ui-watch` on a change. hmr runs the plain
+  # Vite dev server with HMR in its own lane. Outside haven `pnpm dev` matches still
   # and watch (the UI built once, the backend lane serving it on PORT and
   # reloading) and `pnpm dev:hmr` adds the Vite ui lane.
   @unit
@@ -418,7 +418,7 @@ Feature: The local development process topology
   Scenario: An hmr stack runs Vite as its own ui lane beside the backend
     Given a stack started with "haven up --hmr"
     When haven plans the Node lanes
-    Then a ui lane runs the UI's Vite dev server with LANGWATCH_UI_BUNDLED=1
+    Then a ui lane runs the UI's plain Vite dev server, not Vite's bundled dev mode
     And a separate api lane hosts the api and the worker and reloads on a change
     And no lane hosts Vite inside the backend process
     And "haven reload ui" is refused, because Vite reloads itself

@@ -59,3 +59,19 @@ Feature: The workflow studio shows one quiet connection status
     Then its Run button is disabled with the tooltip "Waiting for the engine to connect"
     And "Reconnecting…" shows beside the button
     And no toast is raised
+
+  # A run's access (its short-lived key) is set up by the worker; while the worker catches up the
+  # api answers "authz_grant_not_confirmed". That is pending too: wait and send again, never flash an error.
+  @integration
+  Scenario: The studio resends a run whose access is still being set up
+    Given starting a run answers "authz_grant_not_confirmed"
+    When the studio sends the run
+    Then the same event is sent again every 5 seconds
+    And no error toast is raised
+
+  @integration
+  Scenario: The studio stops resending after a minute and shows the error
+    Given starting a run keeps answering "authz_grant_not_confirmed"
+    When the studio has sent the same event again 12 times
+    Then it stops resending
+    And the usual error for a run that could not start is shown

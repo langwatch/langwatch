@@ -1,4 +1,6 @@
-import type { ExhaustedOutcome } from "@langwatch/group-queue";
+import type { ExhaustedOutcome, ListedRun } from "@langwatch/group-queue";
+
+export type { ListedRun };
 import type { SemConvAttributes } from "langwatch/observability";
 
 export interface EventSourcedQueueProcessorOptions {
@@ -6,7 +8,7 @@ export interface EventSourcedQueueProcessorOptions {
   /**
    * Maximum number of groups that can be processed in parallel.
    * Only used by GroupQueueProcessor.
-   * @default 100 (or the GLOBAL_QUEUE_CONCURRENCY env var)
+   * @default 1000 (or the GLOBAL_QUEUE_CONCURRENCY env var)
    */
   globalConcurrency?: number;
 }
@@ -179,5 +181,6 @@ export interface EventSourcedQueueProcessor<Payload extends Record<string, unkno
 export type ListedWork<Result> = Readonly<{
   name: string;
   timeoutMs: number;
-  work: () => Promise<Result>;
+  /** `list` is absent where no queue runs the work: nothing then paces it. */
+  work: (list?: ListedRun) => Promise<Result>;
 }>;

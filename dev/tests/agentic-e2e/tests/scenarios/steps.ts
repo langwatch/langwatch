@@ -62,12 +62,14 @@ export async function whenIOpenTheSimulationsScenariosAddress(page: Page) {
 
 /**
  * Then I see the Agent Testing page
+ * The title names the open suite or tab (page-structure.feature); the tabs are links.
  */
 export async function thenISeeTheAgentTestingPage(page: Page) {
   await expect(page).toHaveURL(/\/agent-testing/);
-  await expect(page.getByTestId("agent-testing-title")).toHaveText(/agent testing/i);
-  await expect(page.getByRole("tab", { name: /scenarios/i })).toBeVisible();
-  await expect(page.getByRole("tab", { name: /results/i })).toBeVisible();
+  await expect(page.getByTestId("agent-testing-title")).toBeVisible();
+  const tabs = page.getByRole("navigation", { name: "Agent testing pages" });
+  await expect(tabs.getByRole("link", { name: /scenarios/i })).toBeVisible();
+  await expect(tabs.getByRole("link", { name: /results/i })).toBeVisible();
 }
 
 /**
@@ -111,7 +113,7 @@ export async function givenTheProjectHasAnAgent(page: Page) {
     .catch(() => false);
   if (!needsAgent) return;
 
-  await connectEmpty.getByRole("button", { name: /setup agent/i }).click();
+  await connectEmpty.getByRole("button", { name: /set ?up agent/i }).click();
   await page.getByTestId("agent-type-http").click();
 
   const nameInput = page.getByTestId("agent-name-input");

@@ -6,13 +6,7 @@
 
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
-import {
-  Button,
-  createListCollection,
-  Field,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { createListCollection, Field, Text, VStack } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { useState } from "react";
 
@@ -69,77 +63,64 @@ export function WorkflowReplicateDialog({
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={({ open: isOpen }) => !isOpen && onClose()}>
-      <Dialog.Content onClick={(event) => event.stopPropagation()}>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Replicate Workflow</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body paddingBottom={6}>
-          <VStack gap={4} align="start">
-            <Field.Root>
-              <Field.Label>Target Project</Field.Label>
-              <Select.Root
-                collection={collection}
-                value={selected}
-                onValueChange={(event) => {
-                  const target = targets.find((candidate) => candidate.id === event.value[0]);
-                  if (target?.canCreate) setSelected(event.value);
-                }}
-              >
-                <Select.Trigger>
-                  <Select.ValueText placeholder="Select project" />
-                </Select.Trigger>
-                <Select.Content paddingY={2}>
-                  {collection.items.map((item) => {
-                    const canCreate =
-                      targets.find((target) => target.id === item.value)?.canCreate ?? false;
-                    return (
-                      <Select.Item
-                        key={item.value}
-                        item={item}
-                        opacity={canCreate ? 1 : 0.5}
-                        cursor={canCreate ? "pointer" : "not-allowed"}
-                      >
-                        {item.label}
-                        {!canCreate && (
-                          <Text
-                            display="inline-block"
-                            fontSize="sm"
-                            color="fg.subtle"
-                            marginLeft={2}
-                          >
-                            (no permission)
-                          </Text>
-                        )}
-                      </Select.Item>
-                    );
-                  })}
-                </Select.Content>
-              </Select.Root>
-            </Field.Root>
-            <Checkbox
-              checked={copyDatasets}
-              onCheckedChange={(event) => setCopyDatasets(!!event.checked)}
-            >
-              Replicate associated dataset
-            </Checkbox>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="orange"
-            onClick={() => void replicate()}
-            loading={copyWorkflow.isPending}
-            disabled={selected.length === 0 || !chosen?.canCreate}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Replicate Workflow"
+      primaryAction={{
+        label: "Replicate",
+        onClick: () => void replicate(),
+        loading: copyWorkflow.isPending,
+        disabledReason:
+          selected.length === 0 || !chosen?.canCreate
+            ? "Choose a project you have permission to create workflows in"
+            : undefined,
+      }}
+    >
+      <VStack gap={4} align="start">
+        <Field.Root>
+          <Field.Label>Target Project</Field.Label>
+          <Select.Root
+            collection={collection}
+            value={selected}
+            onValueChange={(event) => {
+              const target = targets.find((candidate) => candidate.id === event.value[0]);
+              if (target?.canCreate) setSelected(event.value);
+            }}
           >
-            Replicate
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+            <Select.Trigger>
+              <Select.ValueText placeholder="Select project" />
+            </Select.Trigger>
+            <Select.Content paddingY={2}>
+              {collection.items.map((item) => {
+                const canCreate =
+                  targets.find((target) => target.id === item.value)?.canCreate ?? false;
+                return (
+                  <Select.Item
+                    key={item.value}
+                    item={item}
+                    opacity={canCreate ? 1 : 0.5}
+                    cursor={canCreate ? "pointer" : "not-allowed"}
+                  >
+                    {item.label}
+                    {!canCreate && (
+                      <Text display="inline-block" fontSize="sm" color="fg.subtle" marginLeft={2}>
+                        (no permission)
+                      </Text>
+                    )}
+                  </Select.Item>
+                );
+              })}
+            </Select.Content>
+          </Select.Root>
+        </Field.Root>
+        <Checkbox
+          checked={copyDatasets}
+          onCheckedChange={(event) => setCopyDatasets(!!event.checked)}
+        >
+          Replicate associated dataset
+        </Checkbox>
+      </VStack>
+    </Dialog>
   );
 }

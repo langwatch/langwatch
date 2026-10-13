@@ -1,13 +1,17 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DataRetentionApi,
   PLATFORM_DEFAULT_RETENTION_DAYS,
 } from "@langwatch/data-retention-contract";
-import { createApp } from "@langwatch/process";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { testPeer } from "@langwatch/process/testing";
 import { isMigrationStep } from "@langwatch/upgrade/step";
+import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { dataRetentionProcessModule } from "../../data-retention.module.ts";
@@ -22,26 +26,28 @@ function process(
   role: "api" | "worker",
   config: { platformDefaultDays?: string; nodeEnvironment?: string } = {},
 ) {
-  return createApp({ role })
-    .withModules([dataRetentionProcessModule])
-    .withStores(memoryStores())
-    .withConfig({
+  return bootInstalledProcess({
+    role,
+    modules: [dataRetentionProcessModule],
+    config: {
       "data-retention": {
         platformDefaultDays: config.platformDefaultDays,
         isSaas: true,
         nodeEnvironment: config.nodeEnvironment,
       },
-    })
-    .provide({
-      authz: createDataRetentionTestAuthz(),
-      user: createDataRetentionTestUsers(),
-      entitlement: createDataRetentionTestEntitlement(),
-    });
+    },
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: AuthzApi, instance: createDataRetentionTestAuthz() }),
+      testPeer({ token: UserApi, instance: createDataRetentionTestUsers() }),
+      testPeer({ token: EntitlementApi, instance: createDataRetentionTestEntitlement() }),
+    ],
+  });
 }
 
 describe("data retention app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process(role).boot();
+    const runtime = await process(role);
 
     try {
       const app = runtime.service(DataRetentionApi);
@@ -70,7 +76,7 @@ describe("data retention app installation", () => {
   describe("when a worker installs data retention", () => {
     /** @scenario "Data retention installs no project-scope fold and no replay step" */
     it("hosts no project-scope pipeline and collects no project-scope replay step", async () => {
-      const runtime = await process("worker").boot();
+      const runtime = await process("worker");
 
       try {
         const steps = runtime.migrationSteps(isMigrationStep).map(({ id }) => id);
@@ -94,7 +100,7 @@ describe("data retention app installation", () => {
       const runtime = await process("api", {
         platformDefaultDays: "7",
         nodeEnvironment: "test",
-      }).boot();
+      });
 
       try {
         await expect(

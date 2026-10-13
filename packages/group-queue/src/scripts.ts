@@ -11,7 +11,7 @@ import {
 } from "./blobConstants.ts";
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua.ts";
 import { CachedLuaScript } from "./cachedLuaScript.ts";
-import { gqJobsDispatchedOverrideTotal } from "./metrics.ts";
+import { gqJobsDispatchedOverrideTotal, gqJobsRecoveredTotal } from "./metrics.ts";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -24,6 +24,9 @@ export const PARK_RECONCILE_MAX_DRAIN = 1000;
 
 /** Reconcile cadence (ms); defines dynamic-cap TTL and claimant window multiples. */
 export const RECONCILE_INTERVAL_MS = 2000;
+
+/** How far back a listed run's jobless group that stays (a failure, say) goes in its candidates. */
+const SETTLED_CANDIDATE_DELAY_MS = 3_600_000;
 
 /** Dynamic cap TTL (5x RECONCILE_INTERVAL_MS); fails safe to static cap if stale. */
 export const DYNAMIC_CAP_TTL_MS = 5 * RECONCILE_INTERVAL_MS;
@@ -492,6 +495,92 @@ local function gqMarkPending(keyPrefix, groupId)
 end
 `;
 
+/**
+ * A claim's record, `group:<id>:claimed`: "token", plus "s:<id>" score and "d:<id>" body per job
+ * the claim holds. A later claim that finds it with the active key gone puts the jobs back
+ * (specs/claimed-job-recovery.feature). No token means a caller from before the record existed.
+ */
+export const CLAIMED_RECORD_HELPER_LUA = `
+local function gqOwnsClaim(claimedKey, activeKey, stagedJobId, claimToken)
+  local currentActive = redis.call("GET", activeKey)
+  if claimToken == nil or claimToken == "" then
+    return currentActive == stagedJobId
+  end
+  if redis.call("HGET", claimedKey, "token") ~= claimToken then return false end
+  return currentActive == false or currentActive == stagedJobId
+end
+
+local function gqHoldClaimedJob(claimedKey, stagedJobId, score, body)
+  redis.call("HSET", claimedKey, "s:" .. stagedJobId, score, "d:" .. stagedJobId, body)
+  redis.call("PEXPIRE", claimedKey, ${GROUP_KEY_TTL_MS})
+end
+
+-- Back to the front of the group in their original order; one INCR per job re-entering jobs.
+local function gqRecoverClaimedJobs(claimedKey, jobsKey, dataKey, totalPendingKey)
+  local flat = redis.call("HGETALL", claimedKey)
+  if #flat == 0 then return 0 end
+  local scores = {}
+  local bodies = {}
+  for i = 1, #flat, 2 do
+    local kind = string.sub(flat[i], 1, 2)
+    if kind == "s:" then scores[string.sub(flat[i], 3)] = flat[i + 1] end
+    if kind == "d:" then bodies[string.sub(flat[i], 3)] = flat[i + 1] end
+  end
+  local recovered = 0
+  for stagedJobId, score in pairs(scores) do
+    local body = bodies[stagedJobId]
+    if body and redis.call("ZADD", jobsKey, "NX", score, stagedJobId) == 1 then
+      redis.call("HSET", dataKey, stagedJobId, body)
+      redis.call("INCR", totalPendingKey)
+      recovered = recovered + 1
+    end
+  end
+  redis.call("DEL", claimedKey)
+  return recovered
+end
+`;
+
+/**
+ * A group's failure state as one token: its error timestamp and whether it is blocked.
+ * Stored at registration and compared at inspection, which separates this preflight's own
+ * damage from an earlier release's wedge (specs/event-sourcing/migration-preflight-barrier).
+ */
+const PREFLIGHT_GROUP_STATE_LUA = `
+local function gqPreflightGroupState(keyPrefix, blockedKey, groupId)
+  local errorKey = keyPrefix .. "group:" .. groupId .. ":error"
+  local stamp = ""
+  if redis.call("EXISTS", errorKey) == 1 then
+    stamp = redis.call("HGET", errorKey, "timestamp") or "present"
+  end
+  return stamp .. "|" .. redis.call("SISMEMBER", blockedKey, groupId)
+end
+`;
+
+/**
+ * Forgets a target holding nothing the barrier counts: no job, no claim, no new failure, never
+ * blocked. Staging re-registers it, so a list keeps only its outstanding groups however long it
+ * runs (specs/listed-run-memory.feature). Its keys sit beside `targetKey`, in the same slot.
+ */
+const SETTLED_TARGET_HELPER_LUA =
+  PREFLIGHT_GROUP_STATE_LUA +
+  `
+local function gqForgetSettledTarget(keyPrefix, blockedKey, targetKey, groupId)
+  local groupPrefix = keyPrefix .. "group:" .. groupId
+  if redis.call("ZCARD", groupPrefix .. ":jobs") > 0 then return false end
+  if redis.call("EXISTS", groupPrefix .. ":active", groupPrefix .. ":claimed") > 0 then return false end
+  local baselineKey = targetKey .. ":baseline"
+  local baseStamp, baseBlocked = string.match(redis.call("HGET", baselineKey, groupId) or "|0", "^(.*)|([01])$")
+  if baseBlocked ~= "0" then return false end
+  local stamp, isBlocked = string.match(gqPreflightGroupState(keyPrefix, blockedKey, groupId), "^(.*)|([01])$")
+  if isBlocked ~= "0" or (stamp ~= "" and stamp ~= baseStamp) then return false end
+  redis.call("SREM", targetKey, groupId)
+  redis.call("HDEL", baselineKey, groupId)
+  redis.call("ZREM", targetKey .. ":candidates", groupId)
+  redis.call("SREM", targetKey .. ":live", groupId)
+  return true
+end
+`;
+
 const STAGE_LUA =
   PENDING_INDEX_HELPER_LUA +
   BLOB_LEASE_HELPER_LUA +
@@ -506,6 +595,7 @@ local dataKey         = KEYS[5]
 local totalPendingKey = KEYS[6]
 local activeKey       = KEYS[7]
 local blockedKey      = KEYS[8]
+local claimedKey      = KEYS[9]
 
 local stagedJobId    = ARGV[1]
 local groupId        = ARGV[2]
@@ -523,6 +613,11 @@ local nowMs          = tonumber(ARGV[9])
 -- a tenant that stops enqueuing ages out of the window even while it drains, so
 -- a bursted-then-idle tenant cannot linger as a phantom claimant.
 local globalBudget   = tonumber(ARGV[10]) or 0
+-- A claim re-staging what it holds; a worker whose claim another worker recovered stages nothing.
+local claimToken     = ARGV[12] or ""
+if claimToken ~= "" and redis.call("HGET", claimedKey, "token") ~= claimToken then
+  return {-1, ""}
+end
 if globalBudget > 0 then
   redis.call("ZADD", parkKeyPrefixOf(readyKey) .. "demanding-tenants", nowMs, parkTenantOf(groupId))
 end
@@ -778,10 +873,22 @@ return {newStagedCount, orphanedValues}
 `;
 
 const DISPATCH_BATCH_LUA =
+  PENDING_INDEX_HELPER_LUA +
+  TTL_HELPER_LUA +
   PARK_HELPER_LUA +
   WATER_LEVEL_HELPER_LUA +
   ROUTING_META_HELPER_LUA +
+  CLAIMED_RECORD_HELPER_LUA +
+  SETTLED_TARGET_HELPER_LUA +
   `
+local function gqCandidateScore(keyPrefix, groupId, readyScore, nowMs)
+  local groupPrefix = keyPrefix .. "group:" .. groupId
+  if redis.call("EXISTS", groupPrefix .. ":active") == 1 then return nowMs end
+  if redis.call("ZCARD", groupPrefix .. ":jobs") == 0 then return nowMs + ${SETTLED_CANDIDATE_DELAY_MS} end
+  if readyScore and tonumber(readyScore) > nowMs then return tonumber(readyScore) end
+  return nowMs
+end
+
 local readyKey         = KEYS[1]
 local blockedKey       = KEYS[2]
 local pausedJobKey     = KEYS[3]
@@ -802,10 +909,15 @@ local staticCap      = tonumber(ARGV[5]) or 0
 -- 0 = dynamic disabled, dispatch uses the static cap unchanged (back-compat).
 local globalBudget   = tonumber(ARGV[6]) or 0
 local restrictedDispatch = ARGV[7] == "1"
+-- A listed run's group set, whose settled groups leave it as the scan meets them.
+local settledTargetKey = nil
+if restrictedDispatch and ARGV[8] and ARGV[8] ~= "" then settledTargetKey = ARGV[8] end
 
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local activeUntil = nowMs + activeTtlSec * 1000
 local results = {}
+-- Jobs put back from a dead worker's claimed record, reported for gq_jobs_recovered_total.
+local recoveredTotal = 0
 
 -- Restore parked over-cap groups + recompute the water-level on a cadence (TRAP 2
 -- orphan recovery + cap=0 drain). COMPLETE-unpark handles the normal slot-freeing
@@ -887,21 +999,21 @@ local function scanBatch(effCap, bypassPark, dispatched)
     for _, groupId in ipairs(groups) do
       if dispatched >= maxJobs then break end
 
-      -- A preflight's complete target set is registered before its root command.
-      -- Keep every target in the candidate index until the preflight key expires:
-      -- an older worker may enqueue a downstream job without knowing how to add
-      -- it back. Moving examined targets to the tail gives pending targets a
-      -- bounded path through a set that also contains not-yet-enqueued groups.
-      if restrictedDispatch then
-        redis.call("ZADD", allowedGroupsKey, nowMs, groupId)
-        removedAllowed = removedAllowed + 1
-      end
-
+      -- A listed run's target holding nothing leaves it (staging a job re-registers it); moving
+      -- the other examined ones to the tail gives waiting targets a bounded path through them.
       local readyScore = nil
       local groupDue = true
       if restrictedDispatch then
         readyScore = redis.call("ZSCORE", readyKey, groupId)
         groupDue = readyScore and tonumber(readyScore) <= nowMs
+        if settledTargetKey and gqForgetSettledTarget(keyPrefix, blockedKey, settledTargetKey, groupId) then
+          groupDue = false
+        else
+          -- Re-queued by when it can next run: a waiting group at its due time, a failed one an
+          -- hour back, so a retried job is not stuck behind every group the run already finished.
+          redis.call("ZADD", allowedGroupsKey, gqCandidateScore(keyPrefix, groupId, readyScore, nowMs), groupId)
+        end
+        removedAllowed = removedAllowed + 1
       end
       if groupDue then
 
@@ -946,6 +1058,16 @@ local function scanBatch(effCap, bypassPark, dispatched)
 
           if not activeJob then
           local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
+          local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+          local claimedKey = keyPrefix .. "group:" .. groupId .. ":claimed"
+          -- No active key but a claimed record: the worker that claimed died. Its
+          -- jobs go back to the front of the group before anything is claimed.
+          local recovered = gqRecoverClaimedJobs(claimedKey, jobsKey, dataKey, totalPendingKey)
+          if recovered > 0 then
+            recoveredTotal = recoveredTotal + recovered
+            gqMarkPending(keyPrefix, groupId)
+            refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
+          end
           local jobResults = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
 
           if #jobResults >= 2 then
@@ -956,7 +1078,6 @@ local function scanBatch(effCap, bypassPark, dispatched)
             -- out of ready under the matched entry (specs/queue-pausing).
             local paused = false
             if hasPauses then
-              local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
               local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
               if jobDataJson then
                 local p, t, n = gqRoutingMeta(jobDataJson)
@@ -993,14 +1114,23 @@ local function scanBatch(effCap, bypassPark, dispatched)
                 tenantCapCache[capTenantId] = nil
               end
 
-              local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
               local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
               redis.call("HDEL", dataKey, stagedJobId)
+              -- The body moves into this claim's record rather than being deleted, so
+              -- a death before completion cannot lose it.
+              local claimToken = tostring(nowMs) .. "." .. tostring(redis.call("INCR", keyPrefix .. "claim-seq"))
+              redis.call("DEL", claimedKey)
+              redis.call("HSET", claimedKey, "token", claimToken)
+              redis.call("PEXPIRE", claimedKey, ${GROUP_KEY_TTL_MS})
+              if jobDataJson then
+                gqHoldClaimedJob(claimedKey, stagedJobId, originalScore, jobDataJson)
+              end
 
               results[#results + 1] = stagedJobId
               results[#results + 1] = groupId
               results[#results + 1] = jobDataJson or ""
               results[#results + 1] = tostring(originalScore)
+              results[#results + 1] = claimToken
               dispatched = dispatched + 1
               -- The activeUntil re-score above moved the group out of the due
               -- window: it no longer occupies a slot in the next page read.
@@ -1063,7 +1193,7 @@ if globalBudget > 0 and tenantCap > 0 and dispatched < maxJobs and redis.call("S
   overrideDispatched = dispatched - beforeOverride
 end
 
-return {results, overrideDispatched}
+return {results, overrideDispatched, recoveredTotal}
 `;
 
 /**
@@ -1073,18 +1203,25 @@ return {results, overrideDispatched}
  */
 const DRAIN_GROUP_LUA =
   PAYLOAD_SIZE_HELPER_LUA +
+  CLAIMED_RECORD_HELPER_LUA +
   `
 local jobsKey         = KEYS[1]
 local dataKey         = KEYS[2]
 local totalPendingKey = KEYS[3]
+local claimedKey      = KEYS[4]
 
 local nowMs        = tonumber(ARGV[1])
 local maxJobs      = tonumber(ARGV[2])
 local maxBytes     = tonumber(ARGV[3]) or 0
 local initialBytes = tonumber(ARGV[4]) or 0
+local claimToken   = ARGV[5] or ""
 
 local results = {}
 if maxJobs <= 0 then
+  return results
+end
+-- A worker whose claim was recovered by another drains nothing into it.
+if claimToken ~= "" and redis.call("HGET", claimedKey, "token") ~= claimToken then
   return results
 end
 
@@ -1121,6 +1258,9 @@ while i < #entries do
   redis.call("ZREM", jobsKey, stagedJobId)
   redis.call("HDEL", dataKey, stagedJobId)
   redis.call("DECR", totalPendingKey)
+  if claimToken ~= "" and jobDataJson then
+    gqHoldClaimedJob(claimedKey, stagedJobId, originalScore, jobDataJson)
+  end
 
   results[#results + 1] = stagedJobId
   results[#results + 1] = jobDataJson or ""
@@ -1133,6 +1273,7 @@ return results
 const COMPLETE_LUA =
   PARK_HELPER_LUA +
   WATER_LEVEL_HELPER_LUA +
+  CLAIMED_RECORD_HELPER_LUA +
   `
 local activeKey       = KEYS[1]
 local jobsKey         = KEYS[2]
@@ -1140,6 +1281,7 @@ local readyKey        = KEYS[3]
 local signalKey       = KEYS[4]
 local statsKey        = KEYS[5]
 local errorKey        = KEYS[6]
+local claimedKey      = KEYS[7]
 
 local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
@@ -1161,12 +1303,15 @@ local nowMs = tonumber(ARGV[6])
 -- counters and must not clear the group's stored error. Absent/"" = a genuine
 -- success, so older call sites keep their exact behaviour.
 local isDropped = ARGV[7] == "1"
+-- The claim's token. A former owner whose claim another worker recovered no
+-- longer matches, so its late completion changes nothing (no double-complete).
+local claimToken = ARGV[8] or ""
 
-local currentActive = redis.call("GET", activeKey)
-if currentActive ~= stagedJobId then
+if not gqOwnsClaim(claimedKey, activeKey, stagedJobId, claimToken) then
   return 0
 end
 
+redis.call("DEL", claimedKey)
 redis.call("DEL", activeKey)
 
 -- Free the tenant in-flight slot when the soft-cap is enabled.
@@ -1233,9 +1378,11 @@ return 1
 
 const REFRESH_LUA =
   TTL_HELPER_LUA +
+  CLAIMED_RECORD_HELPER_LUA +
   `
 local activeKey    = KEYS[1]
 local readyKey     = KEYS[2]
+local claimedKey   = KEYS[3]
 local stagedJobId           = ARGV[1]
 local activeTtlSec          = tonumber(ARGV[2])
 local groupId               = ARGV[3]
@@ -1245,10 +1392,14 @@ local nowMs                 = tonumber(ARGV[4])
 -- groups keep counting against the cap mid-execution (a stale-scored slot
 -- would lapse out of the live count and let the same tenant grab another).
 local tenantCountKeyPrefix  = ARGV[5]
+local claimToken            = ARGV[6] or ""
 
-local currentActive = redis.call("GET", activeKey)
-if currentActive == stagedJobId then
-  redis.call("EXPIRE", activeKey, activeTtlSec)
+-- SET, not EXPIRE: an owner whose key lapsed before anyone recovered its claim takes it back.
+if gqOwnsClaim(claimedKey, activeKey, stagedJobId, claimToken) then
+  redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
+  if claimToken ~= "" then
+    redis.call("PEXPIRE", claimedKey, ${GROUP_KEY_TTL_MS})
+  end
   -- Keep the pending-sibling jobs/data keys alive while this group is actively
   -- processing: a long-running active job must not let staged siblings expire
   -- under the safety-net TTL. Derive the group keys from activeKey (strip the
@@ -1280,6 +1431,7 @@ const RESTAGE_AND_BLOCK_LUA =
   PENDING_INDEX_HELPER_LUA +
   BLOB_LEASE_HELPER_LUA +
   ROUTING_META_HELPER_LUA +
+  CLAIMED_RECORD_HELPER_LUA +
   `
 local blockedKey      = KEYS[1]
 local readyKey        = KEYS[2]
@@ -1298,10 +1450,19 @@ local errorStack            = ARGV[7]
 -- leak slots when a group exhausts retries. Without this the slot would
 -- count against the cap until its expiry score lapses on its own.
 local tenantCountKeyPrefix  = ARGV[8]
+-- The claim's token; empty (an older caller) blocks unconditionally, as before.
+local claimToken            = ARGV[9] or ""
 
 local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
 local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
 local activeKey    = keyPrefix .. "group:" .. groupId .. ":active"
+local claimedKey   = keyPrefix .. "group:" .. groupId .. ":claimed"
+
+-- 0. A former owner whose claim another worker recovered blocks nothing.
+if claimToken ~= "" and not gqOwnsClaim(claimedKey, activeKey, newStagedJobId, claimToken) then
+  return 0
+end
+redis.call("DEL", claimedKey)
 
 -- 1. Block the group — prevents dispatcher from re-dispatching
 redis.call("SADD", blockedKey, groupId)
@@ -1428,6 +1589,7 @@ const RETRY_RESTAGE_LUA =
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
   WATER_LEVEL_HELPER_LUA +
+  CLAIMED_RECORD_HELPER_LUA +
   `
 local activeKey       = KEYS[1]
 local totalPendingKey = KEYS[2]
@@ -1456,12 +1618,15 @@ local attempt               = ARGV[10]
 local attemptTtlSec         = tonumber(ARGV[11])
 -- Static operator soft-cap, as COMPLETE_LUA reads it. 0 = cap disabled.
 local staticCap             = tonumber(ARGV[12]) or 0
+local claimToken            = ARGV[13] or ""
+local claimedKey            = keyPrefix .. "group:" .. groupId .. ":claimed"
 
--- 1. Validate active key matches
-local currentActive = redis.call("GET", activeKey)
-if currentActive ~= stagedJobId then
+-- 1. Validate this worker still owns the claim; the job goes back to jobs below,
+--    so the claimed record is done with.
+if not gqOwnsClaim(claimedKey, activeKey, stagedJobId, claimToken) then
   return 0
 end
+redis.call("DEL", claimedKey)
 
 -- 1b. Record the attempt on the group's retry chain. After the guard, so a
 --     worker that has lost the slot cannot advance a chain it no longer owns.
@@ -1537,6 +1702,8 @@ export interface DispatchResult {
   groupId: string;
   jobDataJson: string;
   originalScore: number;
+  /** Names this claim alone; every outcome passes it so a former owner changes nothing. */
+  claimToken: string;
 }
 
 /**
@@ -1551,8 +1718,8 @@ export interface DrainedJob {
 }
 
 /**
- * Default tenant soft-cap: half a worker pod's default concurrency
- * (GLOBAL_QUEUE_CONCURRENCY, 100), protecting against noisy-neighbour
+ * Default tenant soft-cap: half the 100 slots a worker pod held before the
+ * default rose to 1,000 (2026-10-12), protecting against noisy-neighbour
  * starvation while still bounding a runaway on a single-pod install.
  */
 export const DEFAULT_TENANT_CAP = 50;
@@ -1636,22 +1803,6 @@ const stageScript = new CachedLuaScript(STAGE_LUA);
 const stageBatchScript = new CachedLuaScript(STAGE_BATCH_LUA);
 const dispatchBatchScript = new CachedLuaScript(DISPATCH_BATCH_LUA);
 
-/**
- * A group's failure state as one token: its error timestamp and whether it is blocked.
- * Stored at registration and compared at inspection, which separates this preflight's own
- * damage from an earlier release's wedge (specs/event-sourcing/migration-preflight-barrier).
- */
-const PREFLIGHT_GROUP_STATE_LUA = `
-local function gqPreflightGroupState(keyPrefix, blockedKey, groupId)
-  local errorKey = keyPrefix .. "group:" .. groupId .. ":error"
-  local stamp = ""
-  if redis.call("EXISTS", errorKey) == 1 then
-    stamp = redis.call("HGET", errorKey, "timestamp") or "present"
-  end
-  return stamp .. "|" .. redis.call("SISMEMBER", blockedKey, groupId)
-end
-`;
-
 const REGISTER_PREFLIGHT_TARGETS_LUA =
   PREFLIGHT_GROUP_STATE_LUA +
   `
@@ -1661,16 +1812,21 @@ local signalKey = KEYS[3]
 local blockedKey = KEYS[4]
 local baselineKey = KEYS[5]
 local registrationsKey = KEYS[6]
+local liveKey = KEYS[7]
+local openListsKey = KEYS[8]
 local keyPrefix = ARGV[1]
 local ttlSec = tonumber(ARGV[2])
 local scoreBase = tonumber(ARGV[3])
-for index = 4, #ARGV do
+local openUntilMs = tonumber(ARGV[4])
+for index = 5, #ARGV do
   local groupId = ARGV[index]
   redis.call("SADD", targetKey, groupId)
+  -- The groups that may still hold work, pruned as they settle, so pacing counts only those.
+  redis.call("SADD", liveKey, groupId)
   -- Registration puts a target ahead of the dispatch loop's wall-clock
   -- rotation scores. This also re-activates a target when an older worker
   -- stages it without knowing the preflight protocol.
-  redis.call("ZADD", candidatesKey, scoreBase + index - 3, groupId)
+  redis.call("ZADD", candidatesKey, scoreBase + index - 4, groupId)
   -- HSETNX: only the first registration may say what was already wedged here.
   redis.call("HSETNX", baselineKey, groupId, gqPreflightGroupState(keyPrefix, blockedKey, groupId))
 end
@@ -1681,9 +1837,13 @@ redis.call("EXPIRE", targetKey, ttlSec)
 redis.call("EXPIRE", candidatesKey, ttlSec)
 redis.call("EXPIRE", baselineKey, ttlSec)
 redis.call("EXPIRE", registrationsKey, ttlSec)
+redis.call("EXPIRE", liveKey, ttlSec)
+-- An open list lapses with its groups, an hour after its last registration, not its opening;
+-- XX never reopens a closed list, nor lists a preflight's allow-list.
+redis.call("ZADD", openListsKey, "XX", "GT", openUntilMs, targetKey)
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
-return #ARGV - 3
+return #ARGV - 4
 `;
 const registerPreflightTargetsScript = new CachedLuaScript(REGISTER_PREFLIGHT_TARGETS_LUA);
 
@@ -1755,6 +1915,31 @@ end
 return {pending, active, failed, blocked, #groups, held, pendingGroups, failedIds, blockedIds, pendingIds, heldIds}
 `;
 const inspectPreflightPageScript = new CachedLuaScript(INSPECT_PREFLIGHT_PAGE_LUA);
+
+/** One slice of a list's live groups: their waiting and running jobs; settled groups leave. */
+const COUNT_LISTED_OUTSTANDING_LUA =
+  SETTLED_TARGET_HELPER_LUA +
+  `
+local liveKey = KEYS[1]
+local blockedKey = KEYS[2]
+local targetKey = KEYS[3]
+local keyPrefix = ARGV[1]
+local outstanding = 0
+for index = 2, #ARGV do
+  local groupId = ARGV[index]
+  local groupPrefix = keyPrefix .. "group:" .. groupId
+  local pending = redis.call("ZCARD", groupPrefix .. ":jobs")
+  local active = redis.call("EXISTS", groupPrefix .. ":active")
+  if pending == 0 and active == 0 then
+    redis.call("SREM", liveKey, groupId)
+    gqForgetSettledTarget(keyPrefix, blockedKey, targetKey, groupId)
+  elseif redis.call("SISMEMBER", blockedKey, groupId) == 0 then
+    outstanding = outstanding + pending + active
+  end
+end
+return outstanding
+`;
+const countListedOutstandingScript = new CachedLuaScript(COUNT_LISTED_OUTSTANDING_LUA);
 
 /** The most target groups one inspection or registration script call touches. */
 export const PREFLIGHT_GROUPS_PER_CALL = 500;
@@ -1882,6 +2067,7 @@ export class GroupStagingScripts {
     shouldExtend = true,
     shouldReplace = true,
     shouldSurviveDispatch = false,
+    claimToken = "",
   }: {
     stagedJobId: string;
     groupId: string;
@@ -1892,7 +2078,9 @@ export class GroupStagingScripts {
     shouldExtend?: boolean;
     shouldReplace?: boolean;
     shouldSurviveDispatch?: boolean;
-  }): Promise<{ isNew: boolean; orphanedValue: string }> {
+    /** A claim re-staging a job it holds; staged only while the claim is still this worker's. */
+    claimToken?: string;
+  }): Promise<{ isNew: boolean; orphanedValue: string; claimLost: boolean }> {
     const groupJobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
@@ -1903,10 +2091,11 @@ export class GroupStagingScripts {
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const blockedKey = `${this.keyPrefix}blocked`;
+    const claimedKey = `${this.keyPrefix}group:${groupId}:claimed`;
 
     const result = await stageScript.run(
       this.redis,
-      8,
+      9,
       groupJobsKey,
       readyKey,
       signalKey,
@@ -1915,6 +2104,7 @@ export class GroupStagingScripts {
       totalPendingKey,
       activeKey,
       blockedKey,
+      claimedKey,
       stagedJobId,
       groupId,
       String(dispatchAfterMs),
@@ -1927,6 +2117,7 @@ export class GroupStagingScripts {
       String(this.globalConcurrencyBudget),
       // ARGV[11] — appended after globalBudget so no existing index shifts.
       String(shouldSurviveDispatch ? 1 : 0),
+      claimToken,
     );
 
     // STAGE_LUA returns [code, orphanedValue]. Tolerate a bare
@@ -1937,6 +2128,7 @@ export class GroupStagingScripts {
       : [result as number, ""];
     return {
       isNew: Number(code) === 1,
+      claimLost: Number(code) === -1,
       orphanedValue:
         typeof orphanedValue === "string" || typeof orphanedValue === "number"
           ? String(orphanedValue)
@@ -2046,11 +2238,14 @@ export class GroupStagingScripts {
     activeTtlSec,
     maxJobs,
     allowedGroupsKey,
+    listKey,
   }: {
     nowMs: number;
     activeTtlSec: number;
     maxJobs: number;
     allowedGroupsKey?: string;
+    /** The listed run whose candidates these are: the scan forgets its settled groups. */
+    listKey?: string;
   }): Promise<DispatchResult[]> {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
@@ -2077,6 +2272,7 @@ export class GroupStagingScripts {
       String(tenantCap),
       String(this.globalConcurrencyBudget),
       allowedGroupsKey ? "1" : "",
+      listKey ?? "",
     );
 
     // The script returns [flatResults, overrideDispatched]. The count rides
@@ -2088,12 +2284,16 @@ export class GroupStagingScripts {
       return [];
     }
 
-    const [rawResults, rawOverride] = result as [unknown, unknown];
+    const [rawResults, rawOverride, rawRecovered] = result as [unknown, unknown, unknown];
+    const recovered = Number(rawRecovered);
+    if (Number.isSafeInteger(recovered) && recovered > 0) {
+      gqJobsRecoveredTotal.inc({ queue_name: this.queueName }, recovered);
+    }
     const flat = Array.isArray(rawResults) ? rawResults : [];
 
     // A layout the script cannot produce (partial tuples) means the reply is
     // corrupt: don't count anything from it, and dispatch nothing.
-    if (flat.length % 4 !== 0) {
+    if (flat.length % 5 !== 0) {
       return [];
     }
 
@@ -2103,7 +2303,7 @@ export class GroupStagingScripts {
     if (
       Number.isSafeInteger(overrideDispatched) &&
       overrideDispatched > 0 &&
-      overrideDispatched <= flat.length / 4
+      overrideDispatched <= flat.length / 5
     ) {
       gqJobsDispatchedOverrideTotal.inc({ queue_name: this.queueName }, overrideDispatched);
     }
@@ -2113,12 +2313,13 @@ export class GroupStagingScripts {
     }
 
     const dispatched: DispatchResult[] = [];
-    for (let i = 0; i < flat.length; i += 4) {
+    for (let i = 0; i < flat.length; i += 5) {
       dispatched.push({
         stagedJobId: String(flat[i]),
         groupId: String(flat[i + 1]),
         jobDataJson: String(flat[i + 2]),
         originalScore: Number(flat[i + 3]),
+        claimToken: String(flat[i + 4]),
       });
     }
 
@@ -2135,10 +2336,13 @@ export class GroupStagingScripts {
     stagedJobId,
     jobName,
     dropped = false,
+    claimToken = "",
   }: {
     groupId: string;
     stagedJobId: string;
     jobName?: string;
+    /** The dispatch's token; without it the active key alone decides ownership, as before. */
+    claimToken?: string;
     /**
      * The slot is being freed because the job was DISCARDED, not processed
      * (#5538) — keeps the group advancing while withholding the completed
@@ -2155,13 +2359,14 @@ export class GroupStagingScripts {
 
     const result = await completeScript.run(
       this.redis,
-      6,
+      7,
       activeKey,
       jobsKey,
       readyKey,
       signalKey,
       statsKey,
       errorKey,
+      this.claimedKey(groupId),
       groupId,
       stagedJobId,
       jobName ?? "",
@@ -2169,6 +2374,7 @@ export class GroupStagingScripts {
       String(this.tenantConcurrencyCap),
       String(nowInstant().epochMilliseconds),
       dropped ? "1" : "",
+      claimToken,
     );
 
     return result === 1;
@@ -2185,12 +2391,15 @@ export class GroupStagingScripts {
     maxJobs,
     maxBytes = 0,
     initialBytes = 0,
+    claimToken = "",
   }: {
     groupId: string;
     nowMs: number;
     maxJobs: number;
     maxBytes?: number;
     initialBytes?: number;
+    /** Siblings join this claim's record; a lost claim drains nothing. */
+    claimToken?: string;
   }): Promise<DrainedJob[]> {
     if (maxJobs <= 0) return [];
 
@@ -2200,14 +2409,16 @@ export class GroupStagingScripts {
 
     const result = await drainGroupScript.run(
       this.redis,
-      3,
+      4,
       jobsKey,
       dataKey,
       totalPendingKey,
+      this.claimedKey(groupId),
       String(nowMs),
       String(maxJobs),
       String(maxBytes),
       String(initialBytes),
+      claimToken,
     );
 
     if (!result || !Array.isArray(result) || result.length < 3) {
@@ -2236,10 +2447,13 @@ export class GroupStagingScripts {
     stagedJobId,
     activeTtlSec,
     isCancelled,
+    claimToken = "",
   }: {
     groupId: string;
     stagedJobId: string;
     activeTtlSec: number;
+    /** With it, a lapsed key is taken back while the claim is still this worker's. */
+    claimToken?: string;
     /**
      * Withdraws the refresh if the caller stops wanting it mid-flight. Only
      * the NOSCRIPT fallback can be withdrawn — see
@@ -2253,14 +2467,16 @@ export class GroupStagingScripts {
     const result = await refreshScript.runCancellable(
       this.redis,
       isCancelled ?? null,
-      2,
+      3,
       activeKey,
       readyKey,
+      this.claimedKey(groupId),
       stagedJobId,
       String(activeTtlSec),
       groupId,
       String(nowInstant().epochMilliseconds),
       `${this.keyPrefix}tenant_active_z:`,
+      claimToken,
     );
 
     return result === 1;
@@ -2277,6 +2493,7 @@ export class GroupStagingScripts {
     jobDataJson,
     errorMessage,
     errorStack,
+    claimToken = "",
   }: {
     groupId: string;
     newStagedJobId: string;
@@ -2284,13 +2501,15 @@ export class GroupStagingScripts {
     jobDataJson: string;
     errorMessage?: string;
     errorStack?: string;
-  }): Promise<void> {
+    /** With it, a former owner whose claim was recovered blocks nothing. */
+    claimToken?: string;
+  }): Promise<boolean> {
     const blockedKey = `${this.keyPrefix}blocked`;
     const readyKey = `${this.keyPrefix}ready`;
     const statsKey = `${this.keyPrefix}stats:failed`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
-    await restageAndBlockScript.run(
+    const result = await restageAndBlockScript.run(
       this.redis,
       4,
       blockedKey,
@@ -2305,7 +2524,9 @@ export class GroupStagingScripts {
       errorMessage ?? "",
       errorStack ?? "",
       `${this.keyPrefix}tenant_active_z:`,
+      claimToken,
     );
+    return result === 1;
   }
 
   /**
@@ -2322,6 +2543,7 @@ export class GroupStagingScripts {
     backoffMs,
     attempt,
     attemptTtlSec,
+    claimToken = "",
   }: {
     groupId: string;
     stagedJobId: string;
@@ -2329,6 +2551,8 @@ export class GroupStagingScripts {
     dispatchAfterMs: number;
     jobDataJson: string;
     backoffMs: number;
+    /** The dispatch's token; without it the active key alone decides ownership, as before. */
+    claimToken?: string;
     /** Recorded on the group's retry chain in the same atomic step. */
     attempt: number;
     attemptTtlSec: number;
@@ -2357,6 +2581,7 @@ export class GroupStagingScripts {
       String(attempt),
       String(attemptTtlSec),
       String(this.tenantConcurrencyCap),
+      claimToken,
     );
 
     return result === 1;
@@ -2381,6 +2606,10 @@ export class GroupStagingScripts {
    */
   async removePauseKey(key: string): Promise<void> {
     await this.redis.srem(`${this.keyPrefix}paused-jobs`, key);
+  }
+
+  private claimedKey(groupId: string): string {
+    return `${this.keyPrefix}group:${groupId}:claimed`;
   }
 
   private claimMarkerKey(groupId: string): string {
@@ -2607,22 +2836,25 @@ export class GroupStagingScripts {
     for (let start = 0; start < groupIds.length; start += PREFLIGHT_GROUPS_PER_CALL) {
       await registerPreflightTargetsScript.run(
         this.redis,
-        6,
+        8,
         targetKey,
         `${targetKey}:candidates`,
         this.getSignalKey(),
         `${this.keyPrefix}blocked`,
         `${targetKey}:baseline`,
         `${targetKey}:registrations`,
+        `${targetKey}:live`,
+        this.openGroupListsKey(),
         this.keyPrefix,
         String(LISTED_GROUPS_TTL_SEC),
         String(start),
+        String(nowInstant().epochMilliseconds + LISTED_GROUPS_TTL_SEC * 1000),
         ...groupIds.slice(start, start + PREFLIGHT_GROUPS_PER_CALL),
       );
     }
   }
 
-  /** Opens a list for a `dispatchListed` consumer; it lapses with its groups' own expiry. */
+  /** Opens a list for a `dispatchListed` consumer; every registration keeps it open. */
   async openGroupList({ listKey, nowMs }: { listKey: string; nowMs: number }): Promise<void> {
     await this.redis.zadd(this.openGroupListsKey(), nowMs + LISTED_GROUPS_TTL_SEC * 1000, listKey);
   }
@@ -2643,7 +2875,40 @@ export class GroupStagingScripts {
       `${listKey}:candidates`,
       `${listKey}:baseline`,
       `${listKey}:registrations`,
+      `${listKey}:live`,
     );
+  }
+
+  /**
+   * The jobs a list's groups still hold, waiting or running, blocked groups aside (they never
+   * drain on their own; the run's closing wait names them). Prunes the groups that settled.
+   */
+  async countListedOutstanding(listKey: string): Promise<number> {
+    const liveKey = `${listKey}:live`;
+    let outstanding = 0;
+    let cursor = "0";
+    do {
+      const [next, members] = await this.redis.sscan(
+        liveKey,
+        cursor,
+        "COUNT",
+        PREFLIGHT_GROUPS_PER_CALL,
+      );
+      cursor = next;
+      for (let start = 0; start < members.length; start += PREFLIGHT_GROUPS_PER_CALL) {
+        const reply: unknown = await countListedOutstandingScript.run(
+          this.redis,
+          3,
+          liveKey,
+          `${this.keyPrefix}blocked`,
+          listKey,
+          this.keyPrefix,
+          ...members.slice(start, start + PREFLIGHT_GROUPS_PER_CALL),
+        );
+        outstanding += Number(reply) || 0;
+      }
+    } while (cursor !== "0");
+    return outstanding;
   }
 
   private openGroupListsKey(): string {

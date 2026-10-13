@@ -273,7 +273,10 @@ jobs:
           LANGWATCH_TEST_REDIS_URL: ${{ env.REDIS_URL }}
           LANGWATCH_TEST_CLICKHOUSE_URL: ${{ env.CLICKHOUSE_BASE_URL }}
           NO_PROXY: "127.0.0.1,localhost"
-          VITEST_MAX_WORKERS: "2"
+          # One suite at a time: each test process runs its own upgrade of the one
+          # database in its 120s boot hook, and two at once queue on the upgrade
+          # lease until one of them times out.
+          VITEST_MAX_WORKERS: "1"
           SUITES: ${{ steps.layout.outputs.suites }}
         run: |
           set -euo pipefail

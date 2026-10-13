@@ -19,6 +19,7 @@ import {
   type SimulationSetData,
   type SimulationExportRun,
 } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 
 import {
   EVALUATION_COLUMNS_SQL,
@@ -1127,7 +1128,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // (scanning every partition, including cold storage) is never acceptable
     // here — floor the window at 30 days when the caller omits it.
     const dateFilter = SimulationClickHouseRepository.buildDateFilter({
-      startDate: startDate ?? Date.now() - 30 * 24 * 60 * 60 * 1000,
+      startDate: startDate ?? nowInstant().subtract({ hours: 30 * 24 }).epochMilliseconds,
       endDate,
     });
     const setFilter = scenarioSetId ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})" : "";

@@ -1,3 +1,4 @@
+import type { ListedRun, ListedWork } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 
 import type { UpgradeStep } from "../ledger.ts";
@@ -101,15 +102,17 @@ export interface BackgroundStepsOptions {
 
 /** The job queue's listed runs: a run's jobs, and the jobs they cause, run ahead of any backlog. */
 export interface BackgroundStepsQueue {
-  runListedWork<Result>(input: {
-    name: string;
-    timeoutMs: number;
-    work: () => Promise<Result>;
-  }): Promise<Result>;
+  runListedWork<Result>(input: ListedWork<Result>): Promise<Result>;
 }
 
 /** How long a step waits for its queue work unless it declares `queueWaitMs`. */
-export const BACKGROUND_STEP_QUEUE_WAIT_MS = 60_000;
+export const BACKGROUND_STEP_QUEUE_WAIT_MS = 5 * 60_000;
+
+/**
+ * A step's own jobs left waiting or running before its next checkpoint saves: the page it sent
+ * must mostly run first, so a backfill never floods the queue ahead of live work (2026-10-12).
+ */
+export const BACKGROUND_STEP_MAX_OUTSTANDING_JOBS = 1_000;
 
 type StepOutcome = "done" | "failed" | "retrying" | "held" | "waiting" | "skipped";
 
@@ -234,11 +237,15 @@ export class BackgroundStepsService {
       log("info", "background step started", { step: step.id, module, resumed: !!resumeFrom });
       run = this.runQueueWork({
         step,
-        work: () =>
+        work: (list) =>
           step.run({
             checkpoint: {
               resumeFrom,
               save: async ({ report: saved }) => {
+                await list?.waitForRoom({
+                  maxOutstanding: BACKGROUND_STEP_MAX_OUTSTANDING_JOBS,
+                  signal: held.signal,
+                });
                 if (held.lost())
                   throw new Error(`the lease of ${step.id} was lost; checkpoint refused`);
                 if (held.expired())
@@ -274,7 +281,7 @@ export class BackgroundStepsService {
     work,
   }: {
     step: MigrationStep;
-    work: () => Promise<Result>;
+    work: (list?: ListedRun) => Promise<Result>;
   }): Promise<Result> {
     const queue = this.options.queue;
     if (!queue) return work();

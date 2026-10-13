@@ -6,7 +6,7 @@ import { identityPatchData } from "@langwatch/gateway-contract";
  * enforces every where-clause carries organizationId, an id, a secret, or scopes.
  */
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { fromDate, type Instant, toDate } from "@langwatch/time";
+import { type Instant, fromDate, nowInstant, toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import {
@@ -110,7 +110,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
             { hashedSecret },
             {
               previousHashedSecret: hashedSecret,
-              previousSecretValidUntil: { gt: new Date() },
+              previousSecretValidUntil: { gt: toDate(nowInstant()) },
             },
           ],
         },
@@ -412,7 +412,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
         where: { id, organizationId },
         data: {
           status: "REVOKED",
-          revokedAt: new Date(),
+          revokedAt: toDate(nowInstant()),
           revokedById,
           previousHashedSecret: null,
           previousSecretValidUntil: null,
@@ -440,7 +440,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
         data: data.disabled
           ? {
               status: "DISABLED",
-              disabledAt: new Date(),
+              disabledAt: toDate(nowInstant()),
               disabledReason: data.reason,
               revision: { increment: 1n },
             }

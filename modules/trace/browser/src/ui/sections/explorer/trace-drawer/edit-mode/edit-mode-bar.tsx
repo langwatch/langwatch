@@ -1,6 +1,7 @@
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Button, HStack, Icon, Spinner, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
+import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LuFileOutput, LuPencil } from "react-icons/lu";
 
@@ -19,6 +20,8 @@ import {
   useTraceEditStore,
 } from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { showErrorToast } from "../../../errors/index.ts";
+
+const logger = createLogger("langwatch:trace:edit-mode");
 
 /** "3 fields changed, 1 span deleted", with only the non-zero parts. */
 function describeEdit({
@@ -89,9 +92,7 @@ function useTraceEditDraft() {
  */
 function holdsSessionFor(traceId: string): boolean {
   if (useTraceEditStore.getState().editingTraceId === traceId) return true;
-  console.warn(
-    "[traces-v2] trace edit save skipped: the session in the store belongs to another trace",
-  );
+  logger.warn("trace edit save skipped: the session in the store belongs to another trace");
   return false;
 }
 

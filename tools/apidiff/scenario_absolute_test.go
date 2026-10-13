@@ -21,6 +21,7 @@ type uploadStack struct {
 }
 
 func (stack *uploadStack) handlers(t *testing.T) http.Handler {
+	t.Helper()
 	store := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		raw, _ := io.ReadAll(request.Body)
 		stack.mu.Lock()

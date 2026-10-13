@@ -12,7 +12,7 @@ import {
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { ATTR_KEYS } from "@langwatch/span-normalisation";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 import {
   type DerivedTraceEvent,
   type NormalizedAttributes,
@@ -1863,8 +1863,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       DroppedLinksCount: 0,
       Cost: span.cost,
       NonBilledCost: span.nonBilledCost,
-      CreatedAt: new Date(),
-      UpdatedAt: new Date(),
+      CreatedAt: toDate(nowInstant()),
+      UpdatedAt: toDate(nowInstant()),
       _retention_days: span.retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
     } satisfies ClickHouseSpanWriteRecord;
   }

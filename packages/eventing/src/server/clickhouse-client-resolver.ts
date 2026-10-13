@@ -9,12 +9,16 @@ export interface EventingClickHouseClient {
     format: "JSONEachRow";
     /** Set when the read must walk every partition; see the member's cold-scan warning. */
     SKIP_COLD_SCAN_CHECK?: true | undefined;
+    /** The tenant set a `TenantId IN {...:Array(String)}` read binds, resolving tenant included. */
+    tenantIds?: readonly string[] | undefined;
   }) => Promise<EventingClickHouseQueryResult>;
   insert(request: {
     table: string;
     values: readonly Record<string, unknown>[];
     format: "JSONEachRow";
     clickhouse_settings: Record<string, number>;
+    /** The tenant set a batch of several tenants' rows declares, resolving tenant included. */
+    tenantIds?: readonly string[] | undefined;
   }): Promise<unknown>;
 }
 

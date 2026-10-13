@@ -11,7 +11,7 @@ def _get_kwargs() -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/langy/ui/actions",
+        "url": "/api/v1/langy/ui/actions",
     }
 
     return _kwargs

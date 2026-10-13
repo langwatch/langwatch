@@ -613,6 +613,25 @@ export class PrismaProcessStore implements ProcessStore {
     return { applied: updated === 1 };
   }
 
+  async renewLease(params: {
+    identity: OutboxMessageIdentity;
+    leaseToken: string;
+    now: number;
+    leaseDurationMs: number;
+  }): Promise<{ applied: boolean }> {
+    const updated = await this.#prisma.$executeRaw`
+      UPDATE "ProcessManagerOutbox"
+         SET "leasedUntil" = ${asDate(params.now + params.leaseDurationMs)},
+             "updatedAt" = ${asDate(params.now)}
+       WHERE "processName" = ${params.identity.processName}
+         AND "projectId" = ${params.identity.projectId}
+         AND "messageKey" = ${params.identity.messageKey}
+         AND "leaseToken" = ${params.leaseToken}
+         AND "status" = 'pending'
+    `;
+    return { applied: updated === 1 };
+  }
+
   async markFailed(params: {
     identity: OutboxMessageIdentity;
     leaseToken: string;

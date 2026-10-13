@@ -130,7 +130,6 @@ export const reads = {
   ],
   "@langwatch/instant-eval-process": ["docs/pricing.mdx"],
   "@langwatch/langyworker": ["skills/guided-onboarding/SKILL.mdx"],
-  "@langwatch/visual-diff-runner": ["tools/visualdiff/config.go"],
   "@langwatch/experiment-browser": [
     "services/langevals/evaluators/langevals/langevals_langevals/select_best_compare.py",
   ],
@@ -192,8 +191,6 @@ export const reads = {
     "services/langyworker/package.json",
     "skills/{package.json,tsconfig*.json}",
     "tools/dev-runtime/package.json",
-    "tools/interactionsimulator/package.json",
-    "tools/{fuzz,visualdiff}/runner/package.json",
     "tools/devscripts/ensurebuilt.go",
     "dev/dogfood/acme-support/typescript/package.json",
     "dev/scripts/**/*",

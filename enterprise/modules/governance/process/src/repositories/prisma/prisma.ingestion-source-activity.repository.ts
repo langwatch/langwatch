@@ -1,11 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-/**
- * PrismaActivityMonitorRepository - the activity monitor's own rows: sources, anomalies and
- * departments in Postgres, and a source's pulled OCSF events and pushed log records in
- * ClickHouse. Trace spend is trace's, read through TraceApi by ActivityMonitorService.
- * Spec: specs/ai-gateway/governance/folds.feature
- */
 import {
   type ActivityEventDetailRow,
   GOVERNANCE_ATTR,
@@ -14,6 +8,13 @@ import {
   type RecentAnomalyRow,
 } from "@langwatch/enterprise-governance-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+/**
+ * PrismaActivityMonitorRepository - the activity monitor's own rows: sources, anomalies and
+ * departments in Postgres, and a source's pulled OCSF events and pushed log records in
+ * ClickHouse. Trace spend is trace's, read through TraceApi by ActivityMonitorService.
+ * Spec: specs/ai-gateway/governance/folds.feature
+ */
+import { nowInstant, toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import type {
@@ -135,10 +136,9 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       where: { id: input.sourceId, organizationId: input.organizationId },
       select: { errorCount: true, lastSuccessAt: true },
     });
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    const today = nowInstant().toZonedDateTimeISO("UTC").startOfDay();
     const days = Array.from({ length: input.windowDays }, (_, index) => {
-      const day = new Date(today.getTime() - (input.windowDays - index - 1) * 86_400_000);
+      const day = toDate(today.subtract({ days: input.windowDays - index - 1 }));
       return {
         dayStartIso: day.toISOString(),
         covered: source.lastSuccessAt !== null && day.getTime() <= source.lastSuccessAt.getTime(),

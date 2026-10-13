@@ -1,21 +1,20 @@
 /**
  * @vitest-environment node
- * AuthzApi answers the migrations authz owns, so the migrations runner composes them through the
- * contract rather than importing the process package.
+ * Authz declares its engine migration as the `authz:engine` tenant step, which ops' pass collects
+ * from the installed list rather than asking AuthzApi or importing the process package.
  * Spec: specs/migration/system-migrations-runner.feature
  */
-import { AuthzApi } from "@langwatch/authz-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { isDeclaredMigrationStep, isTenantMigrationStep } from "@langwatch/upgrade/step";
 import { describe, expect, it } from "vitest";
 
 import { authzProcessModule } from "../../authz.module.ts";
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
 import { createAuthzTestApp } from "./authz.fixture.ts";
 
 function process() {
-  return createApp({ role: "api" })
+  return createApp({ role: "worker" })
     .withModules([authzProcessModule])
     .withConfig({
       authz: {
@@ -32,19 +31,22 @@ function process() {
     .provide({});
 }
 
-describe("AuthzApi.registeredMigrations", () => {
+describe("authz's declared engine step", () => {
   describe("given a process that installed authz", () => {
     /** @scenario "The authorization engine answers the migration it registers" */
-    it("answers the grant import under its existing name", async () => {
+    it("declares the grant import as the authz:engine organization step, after old writers", async () => {
       const runtime = await process().boot();
 
       try {
-        const names = runtime
-          .service(AuthzApi)
-          .registeredMigrations()
-          .map((migration) => migration.name);
+        const steps = runtime.migrationSteps(isDeclaredMigrationStep).filter(isTenantMigrationStep);
 
-        expect(names).toEqual([AUTHZ_ENGINE_MIGRATION_NAME]);
+        expect(steps.map(({ id }) => id)).toEqual(["authz:engine"]);
+        expect(steps[0]).toMatchObject({
+          tenants: "organization",
+          title: "Authorization engine",
+          requiresOperatorConfirmation: true,
+          needsOldWritersGone: true,
+        });
       } finally {
         await runtime.stop();
       }
@@ -53,8 +55,8 @@ describe("AuthzApi.registeredMigrations", () => {
 
   describe("given an app composed from already-built services", () => {
     /** @scenario "An authorization app composed without its migration refuses to answer one" */
-    it("refuses by name rather than answering an empty registry", () => {
-      expect(() => createAuthzTestApp().registeredMigrations()).toThrow(/holds no migration/);
+    it("refuses by name rather than declaring an empty step", () => {
+      expect(() => createAuthzTestApp().engineMigration()).toThrow(/holds no migration/);
     });
   });
 });

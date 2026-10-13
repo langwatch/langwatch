@@ -103,8 +103,8 @@ func idParam() []Param {
 
 func transcriptKeys(transcripts []Transcript) []string {
 	keys := make([]string, 0, len(transcripts))
-	for _, transcript := range transcripts {
-		keys = append(keys, transcript.Method+" "+transcript.RequestPathA)
+	for i := range transcripts {
+		keys = append(keys, transcripts[i].Method+" "+transcripts[i].RequestPathA)
 	}
 	return keys
 }

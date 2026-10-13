@@ -52,7 +52,7 @@ type parityPhase struct {
 // background; finish waits for them. Unless the run stops after parity, the
 // managed infrastructure starts at once and is up when the trees are ready.
 func runParityPhase(ctx context.Context, boot BootConfig, stderr io.Writer) (*parityPhase, error) {
-	state := &bootState{cfg: boot, stderr: &lockedWriter{out: stderr}, run: execRunner}
+	state := &bootState{cfg: boot, stderr: &lockedWriter{out: stderr}, run: execRunner, seedProbe: projectKeyStatus}
 	phase := &parityPhase{state: state, modules: map[string]string{}}
 	if err := phase.prepare(ctx, !boot.ParityOnly); err != nil {
 		phase.cleanup()

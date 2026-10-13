@@ -41,6 +41,7 @@ const WORKER: BetterAuthHookUser = {
   deactivatedAt: null,
   pendingSsoSetup: false,
   signupConfirmationPending: false,
+  lastLoginAt: null,
   emailVerified: true,
 };
 

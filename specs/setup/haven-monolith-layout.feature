@@ -66,6 +66,12 @@ Feature: Booting a monolith checkout through haven
       And haven starts each Go service on the port it allocated for that service's hostname
 
     @unit
+    Scenario: The app lane hosts the workers, as that checkout's dev script does
+      Given a monolith stack
+      When the app lane is planned
+      Then it is given WORKERS_IN_PROCESS=1, so the app starts its workers and projects traces
+
+    @unit
     Scenario: The app lane writes its own log capture
       Given a monolith stack
       When the app lane is planned

@@ -17,7 +17,7 @@ func fakeStack(t *testing.T) *httptest.Server {
 	trpc := func(w http.ResponseWriter, json string) { writeString(w, `{"result":{"data":{"json":`+json+`}}}`) }
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/auth/sign-in/email", func(w http.ResponseWriter, r *http.Request) {
-		http.SetCookie(w, &http.Cookie{Name: "better-auth.session_token", Value: "session1", Path: "/"})
+		http.SetCookie(w, &http.Cookie{Name: "better-auth.session_token", Value: "session1", Path: "/"}) //nolint:gosec // G124: a plain-HTTP test server; a Secure cookie would never come back
 		writeString(w, `{}`)
 	})
 	mux.HandleFunc("/api/auth/session", func(w http.ResponseWriter, r *http.Request) {

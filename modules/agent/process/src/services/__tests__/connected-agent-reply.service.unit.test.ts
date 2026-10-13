@@ -1,50 +1,75 @@
-import { memorySessionState } from "@langwatch/process-stores";
 import { describe, expect, it, vi } from "vitest";
 
-import { INSTANCE_GONE_CHANNEL, replyChannel } from "../../rules/connected-agent-keys.rules.ts";
+import { MemoryConnectedAgentRelayChannel } from "../../channels/memory/memory.connected-agent-relay.channel.ts";
+import { MemoryConnectedAgentStateRepository } from "../../repositories/memory/memory.connected-agent-state.repository.ts";
 import { ConnectedAgentReplyService } from "../connected-agent-reply.service.ts";
+
+/** A relay whose listeners report when they are released. */
+function watchedRelay() {
+  const relay = MemoryConnectedAgentRelayChannel.create();
+  const released = { replies: 0, gone: 0 };
+  const listenForReplies = relay.listenForReplies.bind(relay);
+  const listenForInstanceGone = relay.listenForInstanceGone.bind(relay);
+  const replies = vi.spyOn(relay, "listenForReplies").mockImplementation(async (input) => {
+    const unsubscribe = await listenForReplies(input);
+    return async () => {
+      released.replies += 1;
+      await unsubscribe();
+    };
+  });
+  const gone = vi.spyOn(relay, "listenForInstanceGone").mockImplementation(async (onGone) => {
+    const unsubscribe = await listenForInstanceGone(onGone);
+    return async () => {
+      released.gone += 1;
+      await unsubscribe();
+    };
+  });
+  return { relay, released, spies: { replies, gone } };
+}
+
+function repliesOver(relay: MemoryConnectedAgentRelayChannel) {
+  return ConnectedAgentReplyService.create({
+    podId: "pod",
+    state: MemoryConnectedAgentStateRepository.create(),
+    relay,
+    pollMs: 10,
+  });
+}
 
 describe("ConnectedAgentReplyService lifecycle", () => {
   it("shares concurrent startup and releases both subscriptions on close", async () => {
-    const store = memorySessionState();
-    const subscribe = vi.spyOn(store, "subscribe");
-    const replies = ConnectedAgentReplyService.create({ podId: "pod", store, pollMs: 10 });
+    const { relay, released, spies } = watchedRelay();
+    const replies = repliesOver(relay);
 
     await Promise.all([replies.start(), replies.start(), replies.start()]);
-    expect(subscribe).toHaveBeenCalledTimes(2);
-    expect(await store.publish(replyChannel("pod"), "{}")).toBe(1);
+    expect(spies.replies).toHaveBeenCalledTimes(1);
+    expect(spies.gone).toHaveBeenCalledTimes(1);
 
     await replies.close();
-    expect(await store.publish(replyChannel("pod"), "{}")).toBe(0);
-    expect(await store.publish(INSTANCE_GONE_CHANNEL, "{}")).toBe(0);
-    await store.close();
+    expect(released).toEqual({ replies: 1, gone: 1 });
+    await relay.close();
   });
 
   it("rolls back the first subscription when the second fails and can start again", async () => {
-    const store = memorySessionState();
-    const subscribe = store.subscribe.bind(store);
+    const { relay, released, spies } = watchedRelay();
     const failure = new Error("subscription failed");
-    const subscribeSpy = vi
-      .spyOn(store, "subscribe")
-      .mockImplementation(async (channel, handler) => {
-        if (channel === INSTANCE_GONE_CHANNEL) throw failure;
-        return subscribe(channel, handler);
-      });
-    const replies = ConnectedAgentReplyService.create({ podId: "pod", store, pollMs: 10 });
+    spies.gone.mockRejectedValueOnce(failure);
+    const replies = repliesOver(relay);
 
     await expect(replies.start()).rejects.toBe(failure);
-    expect(await store.publish(replyChannel("pod"), "{}")).toBe(0);
+    expect(released).toEqual({ replies: 1, gone: 0 });
 
-    subscribeSpy.mockImplementation(subscribe);
     await replies.start();
-    expect(await store.publish(INSTANCE_GONE_CHANNEL, "{}")).toBe(1);
+    expect(spies.replies).toHaveBeenCalledTimes(2);
+    expect(spies.gone).toHaveBeenCalledTimes(2);
     await replies.close();
-    await store.close();
+    expect(released).toEqual({ replies: 2, gone: 1 });
+    await relay.close();
   });
 
   it("settles an already cancelled call without waiting for its deadline", async () => {
-    const store = memorySessionState();
-    const replies = ConnectedAgentReplyService.create({ podId: "pod", store, pollMs: 10 });
+    const relay = MemoryConnectedAgentRelayChannel.create();
+    const replies = repliesOver(relay);
     const controller = new AbortController();
     controller.abort();
 
@@ -57,6 +82,6 @@ describe("ConnectedAgentReplyService lifecycle", () => {
         signal: controller.signal,
       }),
     ).resolves.toEqual({ kind: "aborted" });
-    await store.close();
+    await relay.close();
   });
 });

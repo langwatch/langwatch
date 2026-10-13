@@ -39,6 +39,7 @@ function makeStubStore(overrides: Partial<ProcessStore> = {}): ProcessStore {
     findMessagesByRef: async () => [],
     leaseDueMessages: async () => [],
     markDispatched: async () => ({ applied: true }),
+    renewLease: async () => ({ applied: true }),
     markFailed: async () => ({ applied: true }),
     recordFailedAttempt: async () => undefined,
     releaseLease: async () => ({ applied: true }),

@@ -285,12 +285,13 @@ func loadScenarios(pattern string) ([]scenario, error) {
 		if loadErr != nil {
 			problems = append(problems, loadErr)
 		}
-		for _, item := range loaded {
-			if first, dup := seen[item.ID]; dup {
-				problems = append(problems, fmt.Errorf("%s: scenario %q: id already used in %s", file, item.ID, first))
+		for i := range loaded {
+			id := loaded[i].ID
+			if first, dup := seen[id]; dup {
+				problems = append(problems, fmt.Errorf("%s: scenario %q: id already used in %s", file, id, first))
 			}
-			seen[item.ID] = file
-			all = append(all, item)
+			seen[id] = file
+			all = append(all, loaded[i])
 		}
 	}
 	return all, errors.Join(problems...)
@@ -480,9 +481,9 @@ func selectScenarios(all []scenario, patterns []string) []scenario {
 		return all
 	}
 	kept := make([]scenario, 0, len(all))
-	for _, item := range all {
-		if matchesAnyID(item.ID, patterns) {
-			kept = append(kept, item)
+	for i := range all {
+		if matchesAnyID(all[i].ID, patterns) {
+			kept = append(kept, all[i])
 		}
 	}
 	return kept

@@ -10,4 +10,11 @@ export abstract class IdentityMigrationRepository {
    * second run finds nothing; `rolled_back` and every other status are never touched.
    */
   abstract reopenUnprovenAccounts(args: { dryRun: boolean }): Promise<number>;
+
+  /**
+   * Copies the identifier-backfill state rows into identity's own sign-in switch where the switch
+   * has no row or an older one: finalized is on, rolled back is pinned off, any newer row is
+   * copied as it reads. Answers how many it copied (or would, on a dry run).
+   */
+  abstract carryOverSignInSwitch(args: { dryRun: boolean }): Promise<number>;
 }

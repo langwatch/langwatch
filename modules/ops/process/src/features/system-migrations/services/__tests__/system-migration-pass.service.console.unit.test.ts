@@ -1,40 +1,51 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { AutomationApi } from "@langwatch/automation-contract";
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { clickhouseRoutesOf } from "@langwatch/process-stores";
-import type { SystemMigration } from "@langwatch/system-migrations";
 /**
  * @vitest-environment node
- * The migrations console as ops composes it: authz's and identity's registries in main's order,
+ * The migrations console as ops composes it: the declared tenant steps in installation order,
  * and the cohort exclusion read off the ClickHouse member's routing table.
  * Spec: specs/migration/system-migrations-runner.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
+import { MemoryTenantStepStateRepository } from "@langwatch/upgrade/step/tenant-state";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryMigrationLeaseRepository } from "../../../../repositories/memory/memory.migration-lease.repository.ts";
 import { MemoryOpsRepositories } from "../../../../repositories/memory/memory.ops.repositories.ts";
 import { PostgresOpsRepositories } from "../../../../repositories/prisma/prisma.ops.repositories.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "../../../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
-import { PrismaSystemMigrationStateRepository } from "../../../../repositories/prisma/prisma.system-migration-state.repository.ts";
+import { NullQueueRepository } from "../../../../repositories/queue.repository.ts";
 import { SystemMigrationCohortService } from "../system-migration-cohort.service.ts";
 import {
   SystemMigrationPassService,
   type SystemMigrationPassRepositories,
 } from "../system-migration-pass.service.ts";
 
-const migration = (name: string): SystemMigration => ({
-  name,
-  title: name,
-  description: `${name}, as its owner describes it.`,
-  requiresOperatorConfirmation: false,
-  runsAutomaticallyOnSelfHosted: true,
-  enrolledAutomatically: false,
-  migrateTenant: async () => ({ status: "finalized" }),
-});
+const step = (id: string, tenants: "organization" | "user" | "project" = "organization") =>
+  defineMigrationStep({
+    id,
+    kind: "tenant",
+    mode: "background",
+    tenants,
+    title: `${id} title`,
+    description: `${id}, as its owner describes it.`,
+    requiresOperatorConfirmation: false,
+    runsAutomaticallyOnSelfHosted: true,
+    enrolledAutomatically: false,
+    migrateTenant: async () => ({ status: "finalized" }),
+  });
+
+/** Installation order: authz installs ahead of identity, as main's registry listed them. */
+const STEPS = [
+  step("authz:engine"),
+  step("identity:sso-domain-ownership-backfill"),
+  step("identity:identifier-backfill", "user"),
+  step("stored-object:import-from-clickhouse", "project"),
+];
 
 function console({
   routes,
@@ -44,6 +55,7 @@ function console({
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
     }),
     migrationLease: MemoryMigrationLeaseRepository.create(),
+    queues: NullQueueRepository.create(),
   },
 }: {
   routes: ReadonlyMap<string, string>;
@@ -54,15 +66,13 @@ function console({
     repositories,
     isSaaS: () => isSaaS,
     routes: () => routes,
+    declared: {
+      steps: () => STEPS,
+      state: MemoryTenantStepStateRepository.create(),
+      settle: { settle: async () => [] },
+    },
     dependencies: {
-      authz: createApiFixture<AuthzApi>({
-        registeredMigrations: () => [migration("authz-grants-genesis-import")],
-      }),
-      identity: createApiFixture<IdentityApi>({
-        registeredMigrations: () => [migration("sso-domain-ownership")],
-        userMigrations: () => [],
-      }),
-      automations: createApiFixture<AutomationApi>({}),
+      identity: createApiFixture<IdentityApi>({}),
       auditLog: createApiFixture<AuditLogApi>({
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
@@ -82,7 +92,7 @@ function cohortPool() {
 }
 
 const COHORT = {
-  migrationName: "authz-grants-genesis-import",
+  migrationName: "authz:engine",
   sampleSize: 5,
   actorUserId: "user_ops",
   includeEnterprise: false,
@@ -94,24 +104,43 @@ afterEach(() => {
 });
 
 describe("SystemMigrationPassService.runner", () => {
-  describe("given authz and identity each register an organization-rooted migration", () => {
+  describe("given authz and identity each declare an organization step", () => {
     /** @scenario "The authorization engine's migration runs ahead of identity's, as on main" */
-    it("lists authz's grant import first, then identity's D04", async () => {
-      vi.spyOn(
-        PrismaSystemMigrationStateRepository.prototype,
-        "findStatusCounts",
-      ).mockResolvedValue({ migrated: 0, finalized: 0, parked: 0, rolled_back: 0 });
-      vi.spyOn(
-        PrismaSystemMigrationStateRepository.prototype,
-        "findRecordsByStatus",
-      ).mockResolvedValue([]);
-
+    it("lists authz's engine step first, then identity's", async () => {
       const overview = await console({ routes: new Map(), isSaaS: false }).getOverview();
 
-      expect(overview.map((migration) => migration.name)).toEqual([
-        "authz-grants-genesis-import",
-        "sso-domain-ownership",
+      expect(overview.map((migration) => migration.name).slice(0, 2)).toEqual([
+        "authz:engine",
+        "identity:sso-domain-ownership-backfill",
       ]);
+    });
+  });
+
+  describe("given installed modules declare organization, user and project steps", () => {
+    /** @scenario "The tenant migrations tab lists every registered migration when served by the api role" */
+    /** @scenario "A migration registered by a peer module appears on the page with its title and description" */
+    it("lists each organization and user step with its owner's title, description and axis", async () => {
+      const overview = await console({ routes: new Map(), isSaaS: false }).getOverview();
+
+      expect(
+        overview.map(({ name, title, description, tenant }) => ({
+          name,
+          title,
+          description,
+          tenant,
+        })),
+      ).toEqual(
+        [
+          "authz:engine",
+          "identity:sso-domain-ownership-backfill",
+          "identity:identifier-backfill",
+        ].map((name) => ({
+          name,
+          title: `${name} title`,
+          description: `${name}, as its owner describes it.`,
+          tenant: name === "identity:identifier-backfill" ? "user" : "organization",
+        })),
+      );
     });
   });
 
@@ -164,7 +193,7 @@ describe("SystemMigrationPassService.runner", () => {
       for (const organizationId of ["org_1", "org_2"]) {
         await runner.runForOrganization({
           organizationId,
-          migrationName: "authz-grants-genesis-import",
+          migrationName: "authz:engine",
           actorUserId: "user_ops",
         });
       }

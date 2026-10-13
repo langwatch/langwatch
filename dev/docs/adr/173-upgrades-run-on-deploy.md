@@ -165,7 +165,7 @@ F-6). The operator override of §3 is wired into `oldWritersGoneFor` (Alex, 2026
   `_langwatch_serving_roster_override` table.
 - **Who records it.** `pnpm task upgrade old-writers-gone` asserts and `pnpm task upgrade
 pre-roster-rollback` records a rollback and reopens done background steps. Both stay reads and
-writes of the tasks app, not runs; only a run starts the worker (2026-10-11). The cloud deploy
+  writes of the tasks app, not runs; only a run starts the worker (2026-10-11). The cloud deploy
   asserts after its rollout; the chart's post-upgrade hook does so once the rollout has finished,
   opt-in because it needs RBAC and its own ServiceAccount token; docker compose recreates the app
   and workers independently and relies on the grace. Ops' `assertSystemMigrationLegacyWritersDrained`

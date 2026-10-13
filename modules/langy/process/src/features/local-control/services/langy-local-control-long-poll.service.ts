@@ -23,9 +23,9 @@ import {
   type RegisterFrame,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { Unsubscribe } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
 
+import type { Unsubscribe } from "../../../channels/langy-local-workspace.channel.ts";
 import type { ControlSession } from "../../../rules/langy-local-session-contract.rules.ts";
 import { DeliveredCallsService } from "./langy-local-delivered-calls.service.ts";
 import type { LocalControlSessionCoreService } from "./langy-local-session.service.ts";

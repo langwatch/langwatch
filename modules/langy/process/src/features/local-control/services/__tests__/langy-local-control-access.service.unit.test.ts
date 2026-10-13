@@ -4,9 +4,9 @@
  * @see specs/langy/langy-local-control.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { memorySessionState } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { LangyLocalControlRequestMemoryRepository } from "../../../../repositories/memory/memory.langy-local-control-request.repository.ts";
 import { ControlRequestAccessService } from "../langy-local-control-access.service.ts";
 import { ControlRequestService } from "../langy-local-control-request.service.ts";
 
@@ -38,7 +38,7 @@ function raise({ projectId, conversationId }: { projectId: string; conversationI
 beforeEach(() => {
   granted = new Set();
   requests = ControlRequestService.create({
-    store: memorySessionState({ now: () => now }),
+    requests: LangyLocalControlRequestMemoryRepository.create({ now: () => now }),
     projects: { getOrganizationId: async () => "org_1", getSlug: async () => "team-shop" },
     now: () => now,
     mintSessionKey: async () => ({ token: "sk-lw-minted", apiKeyId: "key_1" }),

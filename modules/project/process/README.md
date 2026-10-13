@@ -392,21 +392,21 @@ findCandidateMembers(input: { organizationId: string }): Promise<AggregateMember
 
 ### `projectRest`
 
-|             |                                     |
-| ----------- | ----------------------------------- |
-| Declared at | `src/transport/project.rest.ts:109` |
-| Base URL    | `/api/projects`                     |
-| Addressing  | dated                               |
-| Credential  | organization                        |
-| Versions    | `2026-08-07`                        |
+|             |                                          |
+| ----------- | ---------------------------------------- |
+| Declared at | `src/transport/project.rest.ts:109`      |
+| Base URL    | `/api/projects`, twin `/api/v1/projects` |
+| Addressing  | dated                                    |
+| Credential  | organization                             |
+| Versions    | `2026-08-07`                             |
 
 #### `GET /:id` · `getProject`
 
 Get a project
 
-Permission `project:view`. Declared at `src/transport/project.rest.ts:116`.
+Permission `project:view`. Declared at `src/transport/project.rest.ts:115`.
 
-Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
+Answers at `/api/projects/:id`, `/api/v1/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/v1/projects/2026-08-07/:id`, `/api/projects/latest/:id`, `/api/v1/projects/latest/:id`.
 
 ```typescript
 // Params: projectRestParamsSchema, ../contract/src/project.ts:395
@@ -431,9 +431,9 @@ interface Response {
 
 Update a project
 
-Permission `project:update`. Declared at `src/transport/project.rest.ts:140`.
+Permission `project:update`. Declared at `src/transport/project.rest.ts:139`.
 
-Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
+Answers at `/api/projects/:id`, `/api/v1/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/v1/projects/2026-08-07/:id`, `/api/projects/latest/:id`, `/api/v1/projects/latest/:id`.
 
 ```typescript
 type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:395
@@ -452,9 +452,9 @@ type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/proj
 
 Archive a project
 
-Permission `project:delete`. Declared at `src/transport/project.rest.ts:168`.
+Permission `project:delete`. Declared at `src/transport/project.rest.ts:167`.
 
-Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
+Answers at `/api/projects/:id`, `/api/v1/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/v1/projects/2026-08-07/:id`, `/api/projects/latest/:id`, `/api/v1/projects/latest/:id`.
 
 ```typescript
 type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:395
@@ -470,9 +470,9 @@ interface Response {
 
 Get the project API key
 
-Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:193`.
+Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:192`.
 
-Answers at `/api/projects/:id/api-key`; also, undocumented, `/api/projects/2026-08-07/:id/api-key`, `/api/projects/latest/:id/api-key`.
+Answers at `/api/projects/:id/api-key`, `/api/v1/projects/:id/api-key`; also, undocumented, `/api/projects/2026-08-07/:id/api-key`, `/api/v1/projects/2026-08-07/:id/api-key`, `/api/projects/latest/:id/api-key`, `/api/v1/projects/latest/:id/api-key`.
 
 ```typescript
 type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:395
@@ -486,9 +486,9 @@ interface Response {
 
 Regenerate the project API key
 
-Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:212`.
+Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:211`.
 
-Answers at `/api/projects/:id/regenerate-api-key`; also, undocumented, `/api/projects/2026-08-07/:id/regenerate-api-key`, `/api/projects/latest/:id/regenerate-api-key`.
+Answers at `/api/projects/:id/regenerate-api-key`, `/api/v1/projects/:id/regenerate-api-key`; also, undocumented, `/api/projects/2026-08-07/:id/regenerate-api-key`, `/api/v1/projects/2026-08-07/:id/regenerate-api-key`, `/api/projects/latest/:id/regenerate-api-key`, `/api/v1/projects/latest/:id/regenerate-api-key`.
 
 ```typescript
 type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:395

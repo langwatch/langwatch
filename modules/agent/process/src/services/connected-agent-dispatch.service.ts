@@ -17,19 +17,17 @@ import {
 } from "@langwatch/agent-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
 
+import type { ConnectedAgentRelayChannel } from "../channels/connected-agent-relay.channel.ts";
+import type {
+  ConnectedAgentStateRepository,
+  ThreadPinLookup,
+} from "../repositories/connected-agent-state.repository.ts";
 import {
   pinnedInstance,
   chooseInstance,
 } from "../rules/connected-agent-instance-selection.rules.ts";
-import {
-  callKey,
-  instanceChannel,
-  pendingKey,
-  threadPinKey,
-} from "../rules/connected-agent-keys.rules.ts";
 import { ConnectedAgentAnswerService } from "./connected-agent-answer.service.ts";
 import type { ConnectedAgentRegistryService } from "./connected-agent-registry.service.ts";
 import { ConnectedAgentReplyService } from "./connected-agent-reply.service.ts";
@@ -46,7 +44,8 @@ const CALL_KSUID_RESOURCE = "call";
 
 interface CallDispatcherOptions {
   podId: string;
-  store: SessionStateStore;
+  state: ConnectedAgentStateRepository;
+  relay: ConnectedAgentRelayChannel;
   registry: ConnectedAgentRegistryService;
   /** Test knob: how long the first turn waits for an instance. */
   firstTurnGraceMs?: number;
@@ -60,7 +59,8 @@ export class ConnectedAgentDispatchService {
   }
 
   readonly #podId: string;
-  readonly #store: SessionStateStore;
+  readonly #state: ConnectedAgentStateRepository;
+  readonly #relay: ConnectedAgentRelayChannel;
   readonly #registry: ConnectedAgentRegistryService;
   readonly #firstTurnGraceMs: number;
   readonly #firstTurnPollMs: number;
@@ -69,16 +69,18 @@ export class ConnectedAgentDispatchService {
 
   private constructor(options: CallDispatcherOptions) {
     this.#podId = options.podId;
-    this.#store = options.store;
+    this.#state = options.state;
+    this.#relay = options.relay;
     this.#registry = options.registry;
     this.#firstTurnGraceMs = options.firstTurnGraceMs ?? FIRST_TURN_GRACE_MS;
     this.#firstTurnPollMs = options.firstTurnPollMs ?? FIRST_TURN_POLL_MS;
     this.#replies = ConnectedAgentReplyService.create({
       podId: options.podId,
-      store: options.store,
+      state: options.state,
+      relay: options.relay,
       pollMs: options.resultPollMs ?? RESULT_POLL_MS,
     });
-    this.#answers = ConnectedAgentAnswerService.create({ store: options.store });
+    this.#answers = ConnectedAgentAnswerService.create({ state: options.state });
   }
 
   start(): Promise<void> {
@@ -173,8 +175,10 @@ export class ConnectedAgentDispatchService {
     excluded: string[];
     now: () => number;
   }): Promise<LiveInstance> {
-    const pinKey = threadPinKey(projectId, agent.id, call.threadId);
-    const pinned = agent.isSticky ? await this.#store.tryGet(pinKey) : null;
+    const thread = { projectId, agentId: agent.id, threadId: call.threadId };
+    const pin: ThreadPinLookup = agent.isSticky
+      ? await this.#state.readThreadPin(thread)
+      : { kind: "unpinned" };
 
     const waitUntil = now() + this.#firstTurnGraceMs;
     const findLive = (): Promise<LiveInstance[]> => {
@@ -184,12 +188,12 @@ export class ConnectedAgentDispatchService {
     let live = await findLive();
     // The first turn of a thread waits for a process that is still
     // starting; later turns hit the same wait, which is short.
-    while (!pinned && live.length === 0 && now() < waitUntil) {
+    while (pin.kind === "unpinned" && live.length === 0 && now() < waitUntil) {
       await sleep(Math.min(this.#firstTurnPollMs, waitUntil - now()), signal);
       live = await findLive();
     }
 
-    if (pinned) return pinnedInstance(live, pinned);
+    if (pin.kind === "pinned") return pinnedInstance(live, pin.instanceId);
     if (live.length === 0) {
       throw new AgentOfflineError({
         agentName: agent.name,
@@ -200,7 +204,7 @@ export class ConnectedAgentDispatchService {
     const chosen = chooseInstance(live, call.threadId);
     await this.#answers.pinThread({
       isSticky: agent.isSticky,
-      pinKey,
+      ...thread,
       instanceId: chosen.instanceId,
     });
     return chosen;
@@ -268,7 +272,7 @@ export class ConnectedAgentDispatchService {
         envelope,
         now,
       });
-      if (receivers === 0 && this.#store.shared) {
+      if (receivers === 0 && this.#relay.shared) {
         // Nothing holds that instance's socket on any pod: the presence
         // entry outlived the process. Retire it and try another.
         await this.#retire({ projectId, instance, agentId: envelope.agentId });
@@ -309,7 +313,7 @@ export class ConnectedAgentDispatchService {
         projectId,
         instanceId: instance.instanceId,
       });
-      await this.#store.zrem(pendingKey(projectId, instance.instanceId), callId);
+      await this.#state.removePendingCall({ projectId, instanceId: instance.instanceId, callId });
     }
   }
 
@@ -337,17 +341,19 @@ export class ConnectedAgentDispatchService {
       instanceId: instance.instanceId,
     };
 
-    await this.#store.set(callKey(projectId, callId), JSON.stringify(stored), ttlSeconds);
-    await this.#store.zadd({
-      key: pendingKey(projectId, instance.instanceId),
-      score: deadlineAt,
-      member: callId,
+    await this.#state.saveCall({ call: stored, ttlSeconds });
+    await this.#state.addPendingCall({
+      projectId,
+      instanceId: instance.instanceId,
+      callId,
+      deadlineAt,
       ttlSeconds,
     });
-    return this.#store.publish(
-      instanceChannel(projectId, instance.instanceId),
-      JSON.stringify({ call: callId } satisfies InstanceNudge),
-    );
+    return this.#relay.nudgeInstance({
+      projectId,
+      instanceId: instance.instanceId,
+      nudge: { call: callId } satisfies InstanceNudge,
+    });
   }
 
   /** Tells the instance to stop, and forgets the call. */
@@ -360,11 +366,12 @@ export class ConnectedAgentDispatchService {
     callId: string;
     instanceId: string;
   }): Promise<void> {
-    await this.#store.publish(
-      instanceChannel(projectId, instanceId),
-      JSON.stringify({ cancel: callId } satisfies InstanceNudge),
-    );
-    await this.#store.del(callKey(projectId, callId));
+    await this.#relay.nudgeInstance({
+      projectId,
+      instanceId,
+      nudge: { cancel: callId } satisfies InstanceNudge,
+    });
+    await this.#state.deleteCall({ projectId, callId });
   }
 
   /** Drops an instance the dispatcher found gone from presence. */

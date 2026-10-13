@@ -1,14 +1,15 @@
-import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
+import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import {
   type IssuedLicenseView,
   issueLicenseInputSchema,
-  type LicensingApi,
+  LicensingApi,
   listActivationCodesInputSchema,
 } from "@langwatch/enterprise-licensing-contract";
 import { EnterpriseOpsApi } from "@langwatch/enterprise-ops-contract";
-import { AdminSurfaceHiddenError, type OpsApi, type OpsOperator } from "@langwatch/ops-contract";
-import { createApp } from "@langwatch/process";
+import { AdminSurfaceHiddenError, OpsApi, type OpsOperator } from "@langwatch/ops-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { testPeer } from "@langwatch/process/testing";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The Cloud admin license registry: a non-operator is answered with a
@@ -104,11 +105,17 @@ async function build(registry: Partial<Registry> = {}) {
     },
     ...registry,
   });
-  const runtime = await createApp({ role: "api" })
-    .withModules([enterpriseOpsProcessModule])
-    .withStores(memoryStores())
-    .provide({ ops, licensing, "audit-log": auditLog })
-    .boot();
+  const runtime = await bootInstalledProcess({
+    role: "api",
+    modules: [enterpriseOpsProcessModule],
+    config: {},
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: OpsApi, instance: ops }),
+      testPeer({ token: LicensingApi, instance: licensing }),
+      testPeer({ token: AuditLogApi, instance: auditLog }),
+    ],
+  });
   const app = runtime.service(EnterpriseOpsApi);
   return { app, entries, commanded };
 }

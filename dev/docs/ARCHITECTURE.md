@@ -102,8 +102,8 @@ eventing, so a contract keys a map by an event table without naming it (Alex, 20
   vocabulary: `Server` (signals, fatal handlers, ordered teardown, hosted
   components, `/healthz`, `/metrics`), `GracefulShutdown`, the container
   (§4), boot and transport hosting — plus
-  `defineProcessModule`, `defineRepositories`, `FeatureSetup`,
-  `definePipeline` and the channel registry types. A module's process half
+  `defineProcessModule`, `defineRepositories`, `FeatureSetup` and the
+  channel registry types (`definePipeline` is `@langwatch/eventing`'s). A module's process half
   imports its vocabulary from the thing that installs it. Depends on
   `module`.
 - **`@langwatch/process-stores`** — materializes storage from config:
@@ -1507,10 +1507,10 @@ raw SQL that interpolates `skipTenantCheck({ SKIP_TENANT_CHECK: true })` under a
 `needsOldWritersGone` in place of a writer-drain proof; its legacy reads stay (Alex, 2026-10-09). Ops keeps the pass for
 now, fed that one list, paging tenant ids through the framework's `TenantSource`, and composes the
 migrations page, enrolment, the targeted run and the pass over its Redis lease, never importing a peer's
-process package. Until their owners move, identity, authz and automation still answer
-`registeredMigrations()` (identity's `userMigrations()` beside it) over ops' `SystemMigration*` tables;
-before an owner moves, its `finalized` and `rolled_back` rows are copied, never moved, into the
-framework table by a one-time expand step. The api serves the page and awaits a targeted run
+process package. Identity, authz and automation have moved: each declares its tenant steps, and ops
+reads its old `SystemMigration*` tables only to copy them; when an owner moved, its `finalized` and
+`rolled_back` rows and enrolments were copied, never moved, into the framework table by a background
+step, and copied again once no older image writes the old table, withdrawn enrolments included (Alex, 2026-10-12). Until a later release stops it, ops also writes each moved step's finished and rolled-back tenants, enrolments and withdrawals to the old tables under the old names, so a rollback to the older image reads them (expand then contract; Alex, 2026-10-12). The api serves the page and awaits a targeted run
 in-request, as main did; passes run on a worker (§9); apps/tasks keeps the startup convergence
 (Alex, 2026-09-28). Automation's Slack connection migration is one such pass per organization, with
 no manual task (Alex, 2026-09-30).
@@ -1602,6 +1602,18 @@ stays. `packages/architecture-enforcer/tests/redis-cache-ttl.unit.test.ts` refus
 A deployment may split cache from durable queues when measured pressure warrants it: expiry bounds a
 key's age, not the key count or memory, so headroom alerts are required either way (Alex, 2026-10-01).
 
+**A credential every server hands out is minted once and shared sealed** (Alex, 2026-10-12: "exactly one
+key per run across all api servers, never an extra key", "make this a shared design thing"). `mintOnce` in
+`@langwatch/secrets/shared-credential` is the one way: the first caller claims the address (`SET NX PX`,
+held longer than any mint runs), mints, and holds the value sealed with the stores' `encryption` client under
+`<prefix><tenantId>[:<contentKey>]`, never longer than the credential lives; every other caller on every
+server waits up to the 10 s read-your-writes window (§9) for that same value, then answers pending. A
+half-done value (a key whose grants have not folded) is held before the slow step, so a retry on any server
+resumes it instead of minting another. A module reaches it only as a repository: its `repositories/redis/`
+builds `RedisSharedCredentialStore` (`@langwatch/redis-client/shared-credential`) from `redis` and
+`encryption`, `MemorySharedCredentialStore` is the twin, and a service passes that repository to `mintOnce`,
+never seeing Redis. Api-key's agent sandbox keys and run keys use it; a table of pending mints is not the way.
+
 **Object storage is a store, like the other three** (ruled 2026-09-24,
 ADR-158). The `objectStorage` member is one client over S3, Azure Blob and the
 local filesystem. It routes per project inside the client, as the ClickHouse
@@ -1662,7 +1674,10 @@ answered on that organization's server, never a skipped tenant check (Alex, 2026
 also be one `Array(String)` parameter holding exactly that set, as the proof fence binds it, and an `OR`
 bracketed beneath that set does not weaken it (M8487-GUARD-ARRAY, Alex, 2026-10-09); an `OR` in a
 subquery beneath the set, and a `NOT` in front of any tenant predicate, are refused (GUARD-FOLLOWUPS,
-Alex, 2026-10-09). Eventing's replay
+Alex, 2026-10-09). An insert declares a tenant set the same way (Alex, 2026-10-12): its rows'
+`TenantId`s are exactly the set, its `tenantId` among them, and the router refuses a set spanning
+organisations; eventing folds event appends waiting on one organisation's server into such
+inserts, each still flushed before it answers, and retries a failed one as each append alone. Eventing's replay
 reads through the member's own surface (`query`, `stream`, `command`); `stream` yields a large read
 batch by batch under the tenant guard and the route, holding no slot and never retried.
 
@@ -1761,7 +1776,7 @@ Only ops and identity grant or revoke; listing takes no caller, and user reads i
 seed runs once behind a marker, never again because the live list is empty. Authz learns who is
 deactivated or erased from user's and identity's facts into its own table, never from the User table
 (Alex, 2026-10-01). A standing change an old image made without its fact is repaired by user's
-`user:record-standing-facts` step: each deactivated account re-stated at its stored stamp, and each
+`user:record-created-facts` step: each deactivated account re-stated at its stored stamp, and each
 active account its own log still holds deactivated recorded reactivated at the run's start
 (Alex, 2026-10-09). The page reaches them through three OpsApi pass-throughs (`listPlatformOperators`,
 `grantPlatformOperator`, `revokePlatformOperator`) gated `ops:manage`; the seed does not latch while the
@@ -2284,12 +2299,23 @@ retries with backoff without blocking neighbours; a group waiting out its backof
 soft-cap slot and keeps its active lock, so its order holds while it runs nothing (Alex, 2026-09-30);
 projections fold from the
 same ordered stream; every consumer registers drain-first on the server.
+There is one kind of event: an event an upgrade step records goes to every projection, subscriber
+and process manager like any other, whatever its data says (a `backfilled` field is data a consumer
+may read, never routing); the queue carries the volume (Alex, 2026-10-12).
+A request that needs its own write folded (a grant before a run key is issued) waits at most
+10 seconds for the projection, the same wait everywhere, then answers pending and the caller retries;
+no write jumps the queue and no projection is folded inline (Alex, 2026-10-12).
 The hand-off from an append to its projections, subscribers and process managers is durable: a
 lane that cannot be staged is recorded in the process store's outbox and re-driven, a fold or state
 projection by a rebuild job in the aggregate's own ordered lane, so it cannot race live folds, never
 logged and dropped (Alex, 2026-09-29). A command job
 keys the events it appends on its stable queue job id, so a crash replay collapses onto the first
 append (Alex, 2026-09-29).
+An outbox delivery's lease is renewed while its handler shows progress: any call through its
+module's dependencies (repositories, channels, peers' `*Api`, store clients), which a worker hands
+out tracked, so business code never calls a heartbeat. Past `outbox.maxSilenceMs` (default 5 minutes)
+without one, renewal stops with a warning, the lease lapses and the message is redelivered, dead after
+its attempts. Only a single call that may run longer raises the limit (Alex, 2026-10-12).
 `packages/group-queue` owns the per-tenant enqueue-rate counter, taken at enqueue, and ops reads it
 through the framework; no module scans queues or reads the `gq:parked-tenants` keys directly (Alex,
 2026-09-29). A tenant is parked only while
@@ -3227,9 +3253,7 @@ the left, the target.
 | host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers)                                    | "capabilities" (§3.5 reserves the word for the four layers)                                                                                                                                        |
 | `enterprise/modules/audit-log` (§4)                                                                                         | `modules/audit-log`                                                                                                                                                                                |
 | `processFacts` in `@langwatch/config`, picked by each slice (§6)                                                            | single leaves in `deployment-facts.ts` picked by name (`publicBaseUrl`, `isSaas`, `nlpServiceUrl`, `serviceVersion`, `otelResourceAttributes`, `nodeEnvironment`, `outboundProxy`; §6, 2026-10-05) |
-| store clients reach registries only; every channel registry installed by `.withChannels(registry)` (§5)                     | registries' `.live.create` called by hand in billing, nurturing and 14 more modules (round 33 ST-1)                                                                                                |
 | `secrets.into({ … }, build)` (§6)                                                                                           | nested `secrets.into(handle, …)`                                                                                                                                                                   |
-| `hostedStores(stores)` (§4)                                                                                                 | `hostedMembers(stores)`                                                                                                                                                                            |
 | "store client" (`the clickhouse client`)                                                                                    | "member" in §7, §9 and §13 prose, and `bootInstalledProcess({ members })`                                                                                                                          |
 | "Admin" (`ssoAdmin()`; Alex 2026-10-08, round 39 DS-A)                                                                      | the "backoffice" spelling §15 deletes, still in the UI shell route table and billing                                                                                                               |
 | the licence in a licensing-owned table, cleared through `LicensingApi.removeLicense` (Alex 2026-10-08, rounds 37 D6 and 42) | `OrganizationApi.setLicense` / `clearLicense` over organization's columns (`organization.api.ts:565-574`)                                                                                          |

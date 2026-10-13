@@ -12,10 +12,19 @@ import type { UserFactIntent } from "../rules/user-lifecycle-outbox.rules.ts";
 type Change = { userId: string; actor: LedgerActor; at: Instant };
 
 export type UserLifecycleSenders = Readonly<{
-  recordUserDeactivated: Pick<EventingCommandSender<RecordUserLifecycleCommandData>, "send">;
-  recordUserReactivated: Pick<EventingCommandSender<RecordUserLifecycleCommandData>, "send">;
+  recordUserDeactivated: Pick<
+    EventingCommandSender<RecordUserLifecycleCommandData>,
+    "send" | "sendBatch"
+  >;
+  recordUserReactivated: Pick<
+    EventingCommandSender<RecordUserLifecycleCommandData>,
+    "send" | "sendBatch"
+  >;
   recordUserRegistered: Pick<EventingCommandSender<RecordUserRegisteredCommandData>, "send">;
-  recordUserCreated: Pick<EventingCommandSender<RecordUserCreatedCommandData>, "send">;
+  recordUserCreated: Pick<
+    EventingCommandSender<RecordUserCreatedCommandData>,
+    "send" | "sendBatch"
+  >;
   recordUserErased: Pick<EventingCommandSender<RecordUserLifecycleCommandData>, "send">;
 }>;
 
@@ -61,6 +70,44 @@ export class UserLifecycleNoticeService {
       occurredAt: at.epochMilliseconds,
       ...(backfilled ? { backfilled } : {}),
     });
+  }
+
+  /**
+   * One backfill page: every created fact, then the page's deactivations and reactivations, so
+   * an account's created fact is sent before its standing. Each kind goes as one batch.
+   */
+  async recordBackfillPage({
+    created,
+    deactivated,
+    reactivated,
+    actor,
+  }: {
+    created: readonly { userId: string; at: Instant }[];
+    deactivated: readonly { userId: string; at: Instant }[];
+    reactivated: readonly { userId: string; at: Instant }[];
+    actor: LedgerActor;
+  }): Promise<void> {
+    const senders = this.#connected();
+    if (created.length > 0) {
+      await senders.recordUserCreated.sendBatch(
+        created.map(({ userId, at }) => ({
+          tenantId: userId,
+          userId,
+          occurredAt: at.epochMilliseconds,
+          backfilled: true,
+        })),
+      );
+    }
+    if (deactivated.length > 0) {
+      await senders.recordUserDeactivated.sendBatch(
+        deactivated.map(({ userId, at }) => this.#data({ userId, actor, at })),
+      );
+    }
+    if (reactivated.length > 0) {
+      await senders.recordUserReactivated.sendBatch(
+        reactivated.map(({ userId, at }) => this.#data({ userId, actor, at })),
+      );
+    }
   }
 
   /**

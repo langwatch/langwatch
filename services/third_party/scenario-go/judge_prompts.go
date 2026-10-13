@@ -129,18 +129,12 @@ Your goal is to deliver the final verdict of the scenario below with the finish_
 `)
 }
 
-// buildJudgeContent is the user message the judge evaluates.
-func buildJudgeContent(transcript, digest, additionalContextSection string) string {
-	var b strings.Builder
-	b.Grow(len(transcript) + len(digest) + len(additionalContextSection) + 128)
-	b.WriteString("\n    <transcript>\n    ")
-	b.WriteString(transcript)
-	b.WriteString("\n    </transcript>\n    <opentelemetry_traces>\n    ")
-	b.WriteString(digest)
-	b.WriteString("\n    </opentelemetry_traces>")
-	b.WriteString(additionalContextSection)
-	b.WriteString("\n    ")
-	return b.String()
+// judgeContentFrame is the user message the judge evaluates, around the
+// trace digest: the parts before it and the parts after it.
+func judgeContentFrame(transcript, additionalContextSection string) (head, tail []string) {
+	head = []string{"\n    <transcript>\n    ", transcript, "\n    </transcript>\n    <opentelemetry_traces>\n    "}
+	tail = []string{"\n    </opentelemetry_traces>", additionalContextSection, "\n    "}
+	return head, tail
 }
 
 func additionalContextSection(text string) string {

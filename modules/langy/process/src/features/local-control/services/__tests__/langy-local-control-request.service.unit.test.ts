@@ -9,11 +9,10 @@ import type { SessionStateStore } from "@langwatch/redis-client/session-state";
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { StoredControlRequest } from "../../../../repositories/langy-local-control-request.repository.ts";
+import { LangyLocalControlRequestRedisRepository } from "../../../../repositories/redis/redis.langy-local-control-request.repository.ts";
 import { controlRequestKey } from "../../../../rules/langy-local-control-keys.rules.ts";
-import {
-  ControlRequestService,
-  type StoredControlRequest,
-} from "../langy-local-control-request.service.ts";
+import { ControlRequestService } from "../langy-local-control-request.service.ts";
 
 const projectId = "proj_1";
 const userId = "user_1";
@@ -48,7 +47,7 @@ beforeEach(() => {
   store = memorySessionState({ now: () => now });
   mint = vi.fn(async () => ({ token: "sk-lw-minted", apiKeyId: "key_1" }));
   service = ControlRequestService.create({
-    store,
+    requests: LangyLocalControlRequestRedisRepository.create({ store }),
     projects,
     now: () => now,
     mintSessionKey: mint as never,
@@ -281,7 +280,7 @@ describe("given a request in the caller's index that cannot be read", () => {
       },
     };
     const brokenService = ControlRequestService.create({
-      store: brokenStore,
+      requests: LangyLocalControlRequestRedisRepository.create({ store: brokenStore }),
       projects,
       now: () => now,
       mintSessionKey: mint as never,

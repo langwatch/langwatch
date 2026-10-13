@@ -14,12 +14,14 @@ import {
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
+import { InstantEvalNotEnabledError } from "@langwatch/instant-eval-contract";
 import { Temporal } from "@langwatch/time";
 
 import {
   INSTANT_EVAL_TRACE_COLUMN,
   instantEvalSampleBuckets,
 } from "../rules/instant-eval-composition.rules.ts";
+import { isInstantEvalQueryIdentityRefused } from "../rules/instant-eval-query-identity.rules.ts";
 import {
   instantEvalRowText,
   type InstantEvalCursor,
@@ -206,14 +208,21 @@ export class InstantEvalRowSourceService {
     maxRows: number;
     name?: string;
   }): Promise<LangWatchQLQueryResult> {
-    const execution = await this.analytics.executeLangWatchQLPass({
-      project: caller,
-      protections,
-      sql,
-      ...(parameters && Object.keys(parameters).length > 0 ? { parameters } : {}),
-      pass,
-      isInstantEvalsEnabled: await this.access.isEnabled({ projectId: caller.id }),
-    });
+    const isInstantEvalsEnabled = await this.access.isEnabled({ projectId: caller.id });
+    let execution: LangWatchQLQueryResult;
+    try {
+      execution = await this.analytics.executeLangWatchQLPass({
+        project: caller,
+        protections,
+        sql,
+        ...(parameters && Object.keys(parameters).length > 0 ? { parameters } : {}),
+        pass,
+        isInstantEvalsEnabled,
+      });
+    } catch (error) {
+      if (isInstantEvalQueryIdentityRefused(error)) throw new InstantEvalNotEnabledError();
+      throw error;
+    }
     const isTruncated = execution.rows.length > maxRows;
     if (isTruncated && name !== undefined) throw new InstantEvalResultTruncatedError(name);
 

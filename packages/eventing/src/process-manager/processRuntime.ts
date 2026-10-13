@@ -485,6 +485,7 @@ export class ProcessRuntime {
       handlers: buildIntentHandlers(config),
       maxAttempts: config.outbox?.maxAttempts,
       leaseDurationMs: config.outbox?.leaseDurationMs,
+      maxSilenceMs: config.outbox?.maxSilenceMs,
       retryDelayMs: config.outbox?.retryDelayMs,
       concurrency: config.outbox?.concurrency,
       processNames: [config.name],

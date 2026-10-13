@@ -152,12 +152,12 @@ func writeTrpcSections(output *strings.Builder, trpc TrpcParity, module string) 
 	writeSection(output, "Ruled owner moves, not defects", ownerMoveLines(trpc.OwnerMoves, module))
 	retired := []string{}
 	for _, gap := range filterGaps(trpc.Retired, module) {
-		retired = append(retired, fmt.Sprintf("- `%s` (%s) %s\n", gap.Path, gap.Kind, gap.Source))
+		retired = append(retired, fmt.Sprintf("- %#q (%s) %s\n", gap.Path, gap.Kind, gap.Source))
 	}
 	writeSection(output, "Ruled retired, not defects", retired)
 	extra := []string{}
 	for _, gap := range filterGaps(trpc.Extra, module) {
-		extra = append(extra, fmt.Sprintf("- `%s` (%s) %s\n", gap.Path, gap.Kind, gap.Source))
+		extra = append(extra, fmt.Sprintf("- %#q (%s) %s\n", gap.Path, gap.Kind, gap.Source))
 	}
 	writeSection(output, "Extra on branch, not defects", extra)
 }
@@ -179,7 +179,7 @@ func writeBreakingProcedures(output *strings.Builder, diffs []ProcedureDiff, mod
 		if diff.Module != module {
 			continue
 		}
-		lines = append(lines, fmt.Sprintf("- `%s` (branch %s, main %s)\n", diff.Path, diff.BranchSource, diff.MainSource))
+		lines = append(lines, fmt.Sprintf("- %#q (branch %s, main %s)\n", diff.Path, diff.BranchSource, diff.MainSource))
 		for _, change := range diff.Changes {
 			lines = append(lines, fmt.Sprintf("  - %s\n", change))
 		}
@@ -201,7 +201,7 @@ func pairLines(pairs []ProcedurePair, module string) []string {
 	lines := []string{}
 	for _, pair := range pairs {
 		if pair.Module == module {
-			lines = append(lines, fmt.Sprintf("- main `%s` may be branch `%s` (%s)\n", pair.Main, pair.Branch, pair.Reason))
+			lines = append(lines, fmt.Sprintf("- main %#q may be branch %#q (%s)\n", pair.Main, pair.Branch, pair.Reason))
 		}
 	}
 	return lines
@@ -212,7 +212,7 @@ func ownerMoveLines(pairs []ProcedurePair, module string) []string {
 	lines := []string{}
 	for _, pair := range pairs {
 		if pair.Module == module || pair.MainModule == module {
-			lines = append(lines, fmt.Sprintf("- main `%s` (%s) is served as branch `%s` (%s)\n", pair.Main, pair.MainModule, pair.Branch, pair.Module))
+			lines = append(lines, fmt.Sprintf("- main %#q (%s) is served as branch %#q (%s)\n", pair.Main, pair.MainModule, pair.Branch, pair.Module))
 		}
 	}
 	return lines

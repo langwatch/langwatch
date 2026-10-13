@@ -131,17 +131,18 @@ func reap(ctx context.Context, pgid int, limits app.ReapLimits, reaped chan<- st
 }
 
 // groupRSSBytes sums RSS (in bytes) across every process in the group. Shells
-// out to `ps` rather than reading /proc (this runs on macOS, which has none) —
+// out to `ps -axo` (portable: Linux `ps -g` selects by session, not group) —
 // the same "ask the OS's own tool" approach adapters/system already uses.
 func groupRSSBytes(pgid int) int64 {
-	out, err := exec.Command("ps", "-o", "rss=", "-g", fmt.Sprint(pgid)).Output()
+	out, err := exec.Command("ps", "-axo", "pgid=,rss=").Output()
 	if err != nil {
 		return 0
 	}
 	var total int64
-	for _, line := range strings.Fields(string(out)) {
+	for _, line := range strings.Split(string(out), "\n") {
+		var g int
 		var kb int64
-		if _, err := fmt.Sscanf(line, "%d", &kb); err == nil {
+		if _, err := fmt.Sscanf(line, "%d %d", &g, &kb); err == nil && g == pgid {
 			total += kb * 1024
 		}
 	}

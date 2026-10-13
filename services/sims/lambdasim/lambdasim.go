@@ -201,9 +201,10 @@ func (s *Server) handleCalls(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleCall(w http.ResponseWriter, r *http.Request) {
-	for _, c := range s.calls.newest() {
-		if c.ID == r.PathValue("id") {
-			writeJSON(w, http.StatusOK, c)
+	calls := s.calls.newest()
+	for i := range calls {
+		if calls[i].ID == r.PathValue("id") {
+			writeJSON(w, http.StatusOK, calls[i])
 			return
 		}
 	}

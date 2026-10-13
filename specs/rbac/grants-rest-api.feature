@@ -401,10 +401,12 @@ Feature: Roles and grants REST API, and the role bindings API it supersedes
   # ============================================================================
 
   @integration
-  Scenario: The role list includes the built-in roles unless filtered
-    When I list roles without a builtIn filter
-    Then "admin", "member" and "viewer" are listed and marked built in
-    And the custom roles are listed after them, not built in
+  Scenario: With no filter, the REST role list returns custom roles only, as before built-ins were listed
+    Given the organization defines the custom role "Auditor"
+    When I list roles at "/api/v1/roles" without a builtIn filter
+    Then only "Auditor" is listed, not built in
+    And "admin", "member" and "viewer" are not listed
+    And the bare "/api/roles" path answers the same list
 
   @integration
   Scenario: The role list filters to the built-in roles

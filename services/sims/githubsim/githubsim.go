@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -143,17 +142,6 @@ func (s *Server) id() int64 {
 }
 
 func (s *Server) stamp() string { return s.now().Format(time.RFC3339) }
-
-func (s *Server) baseURL(r *http.Request) string {
-	if s.cfg.PublicURL != "" {
-		return strings.TrimRight(s.cfg.PublicURL, "/")
-	}
-	scheme := "http"
-	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
-		scheme = "https"
-	}
-	return scheme + "://" + r.Host
-}
 
 func randomHex(n int) string {
 	b := make([]byte, n)

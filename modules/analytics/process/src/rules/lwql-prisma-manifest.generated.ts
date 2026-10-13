@@ -44,6 +44,7 @@ export interface LwqlPrismaRows {
     readonly userAgent: "String?";
     readonly identifierId: "String?";
     readonly amr: "String[]";
+    readonly startedBySignUp: "Boolean";
     readonly impersonating: "Json?";
     readonly actorUserId: "String?";
     readonly subjectUserId: "String?";
@@ -338,6 +339,9 @@ export interface LwqlPrismaRows {
     readonly updatedAt: "DateTime";
     readonly usageSpendingMaxLimit: "Int?";
     readonly datasetAttachmentMaxMb: "Int?";
+    readonly privateClickHouseLabel: "String?";
+    readonly privateS3Label: "String?";
+    readonly privateDataplaneSeenAt: "DateTime?";
     readonly maxSessionDurationDays: "Int";
     readonly mfaRequired: "Boolean";
     readonly lockoutAfterFailedAttempts: "Int";

@@ -6,6 +6,7 @@ export const prismaTableCatalogue = {
   "User": "User",
   "VerificationToken": "VerificationToken",
   "Identifier": "Identifier",
+  "IdentitySignInSwitch": "IdentitySignInSwitch",
   "IdentifierReservation": "IdentifierReservation",
   "IdentityProjectionCursor": "IdentityProjectionCursor",
   "TwoFactor": "TwoFactor",
@@ -114,6 +115,7 @@ export const prismaTableCatalogue = {
   "Group": "Group",
   "GroupMembership": "GroupMembership",
   "AuthzUserStanding": "AuthzUserStanding",
+  "AuthzEngineSwitch": "AuthzEngineSwitch",
   "RoleBinding": "RoleBinding",
   "Grant": "Grant",
   "GrantUsage": "GrantUsage",
@@ -222,6 +224,7 @@ export const prismaModelFieldCatalogue = {
     "userAgent",
     "identifierId",
     "amr",
+    "startedBySignUp",
     "impersonating",
     "actorUserId",
     "subjectUserId",
@@ -321,6 +324,14 @@ export const prismaModelFieldCatalogue = {
     "detachedAt",
     "lastUsedAt",
     "createdAt",
+    "updatedAt"
+  ],
+  "IdentitySignInSwitch": [
+    "userId",
+    "onIdentifiers",
+    "pinned",
+    "switchedAt",
+    "lastAppliedEventId",
     "updatedAt"
   ],
   "IdentifierReservation": [
@@ -1995,6 +2006,14 @@ export const prismaModelFieldCatalogue = {
     "erasedAt",
     "standingChangedAt"
   ],
+  "AuthzEngineSwitch": [
+    "organizationId",
+    "onEngine",
+    "pinned",
+    "switchedAt",
+    "lastAppliedEventId",
+    "updatedAt"
+  ],
   "RoleBinding": [
     "id",
     "organizationId",
@@ -2909,6 +2928,7 @@ export const prismaRelationCatalogue = {
   },
   "VerificationToken": {},
   "Identifier": {},
+  "IdentitySignInSwitch": {},
   "IdentifierReservation": {},
   "IdentityProjectionCursor": {},
   "TwoFactor": {
@@ -3314,6 +3334,7 @@ export const prismaRelationCatalogue = {
     "group": "Group"
   },
   "AuthzUserStanding": {},
+  "AuthzEngineSwitch": {},
   "RoleBinding": {
     "organization": "Organization",
     "user": "User",

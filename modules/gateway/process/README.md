@@ -797,7 +797,7 @@ interface Response {
 
 Public: ElevenLabs delivers this callback publicly; the application verifies the raw bytes against the provider row's stored HMAC secret. Declared at `src/transport/elevenlabs-webhook.rest.ts:27`.
 
-Answers at `/api/elevenlabs/webhook/:modelProviderId`.
+Answers at `/api/elevenlabs/webhook/:modelProviderId`, `/api/v1/elevenlabs/webhook/:modelProviderId`.
 
 ```typescript
 // Params: gatewayElevenLabsWebhookParamsSchema, ../contract/src/gateway-elevenlabs-webhook.schemas.ts:11

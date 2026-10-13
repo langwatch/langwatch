@@ -2,7 +2,7 @@ import type { GithubUsageCount } from "@langwatch/github-contract";
 import { generate } from "@langwatch/ksuid";
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { fromDate, toDate, type Instant } from "@langwatch/time";
+import { type Instant, fromDate, nowInstant, toDate } from "@langwatch/time";
 
 import {
   GithubPullRequestsRepository,
@@ -116,7 +116,7 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
       prClosedAt: pullRequest.prClosedAt && toDate(pullRequest.prClosedAt),
       prMergedAt: pullRequest.prMergedAt && toDate(pullRequest.prMergedAt),
       prUpdatedAt: pullRequest.prUpdatedAt && toDate(pullRequest.prUpdatedAt),
-      lastCheckedAt: new Date(),
+      lastCheckedAt: toDate(nowInstant()),
     };
     const guard = PrismaGithubPullRequestsRepository.freshnessGuard(pullRequest.prUpdatedAt);
 
@@ -245,7 +245,7 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
         prClosedAt: input.prClosedAt && toDate(input.prClosedAt),
         prMergedAt: input.prMergedAt && toDate(input.prMergedAt),
         prUpdatedAt: toDate(input.prUpdatedAt),
-        lastCheckedAt: new Date(),
+        lastCheckedAt: toDate(nowInstant()),
       },
     });
   }

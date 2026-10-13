@@ -155,6 +155,8 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		if v := h.Get(headerVertexLocation); v != "" {
 			cred.Extra["vertex_location"] = v
 		}
+	default:
+		// No inline credentials to map (see the comment above the switch).
 	}
 
 	// Populate the Azure / Bedrock / Vertex deployment map from the requested

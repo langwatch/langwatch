@@ -119,6 +119,24 @@ func TestMonolithAppLaneLeavesTheGoServicesToHaven(t *testing.T) {
 	})
 }
 
+// That checkout's own `dev` script sets WORKERS_IN_PROCESS=1 before `dev:app`.
+// The lane runs `dev:app` directly, so without it the app starts no workers
+// and never projects a trace.
+//
+// @scenario "The app lane hosts the workers, as that checkout's dev script does"
+func TestMonolithAppLaneHostsTheWorkers(t *testing.T) {
+	t.Run("given a monolith stack", func(t *testing.T) {
+		t.Run("when the app lane is planned, it is told to host the workers in process", func(t *testing.T) {
+			children, _ := planMonolith(t, domain.Selection{})
+			app, _ := findChild(children, domain.MonolithAppLane)
+
+			if !hasEnv(app.Env, "WORKERS_IN_PROCESS=1") {
+				t.Errorf("app lane env %v is missing WORKERS_IN_PROCESS=1, so the app starts no workers", app.Env)
+			}
+		})
+	})
+}
+
 // @scenario "The app lane writes its own log capture"
 func TestMonolithAppLaneCapturesItsOwnLog(t *testing.T) {
 	t.Run("given a monolith stack", func(t *testing.T) {

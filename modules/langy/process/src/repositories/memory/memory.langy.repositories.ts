@@ -1,5 +1,3 @@
-import { memorySessionState } from "@langwatch/process-stores";
-
 import type { LangyRepositories } from "../langy-repositories.registry.ts";
 import { LangyMemoryStore } from "./langy-memory.store.ts";
 import { LangyAnalyticsEventMemoryRepository } from "./memory.langy-analytics-event.repository.ts";
@@ -15,7 +13,10 @@ import {
   LangyTurnAccessMemoryRepository,
   LangyTurnHandoffMemoryRepository,
 } from "./memory.langy-live-turn.repository.ts";
+import { LangyLocalCallMemoryRepository } from "./memory.langy-local-call.repository.ts";
+import { LangyLocalControlRequestMemoryRepository } from "./memory.langy-local-control-request.repository.ts";
 import { LangyLocalPresenceMemoryRepository } from "./memory.langy-local-presence.repository.ts";
+import { LangyLocalUserWaitMemoryRepository } from "./memory.langy-local-user-wait.repository.ts";
 import { MemoryLangyMessageProjectionRepository } from "./memory.langy-message-projection.repository.ts";
 import { MemoryLangyMessageRepository } from "./memory.langy-message.repository.ts";
 import { MemoryLangyRateLimitRepository } from "./memory.langy-rate-limit.repository.ts";
@@ -48,7 +49,9 @@ export class MemoryLangyRepositories {
       frameDedup: LangyFrameDedupMemoryRepository.create(store),
       resourceLinks: LangyResourceLinksMemoryRepository.create(store),
       localPresence: LangyLocalPresenceMemoryRepository.create(store),
-      sessionState: memorySessionState(),
+      localCalls: LangyLocalCallMemoryRepository.create(),
+      localUserWaits: LangyLocalUserWaitMemoryRepository.create(),
+      localControlRequests: LangyLocalControlRequestMemoryRepository.create(),
       githubPrCounts: LangyGithubPrCountMemoryRepository.create(),
       feedbackPrompts: LangyFeedbackPromptMemoryRepository.create(),
       // Every call returns the twin over the SAME shared store, the way one

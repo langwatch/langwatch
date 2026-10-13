@@ -7,9 +7,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { Temporal, nowInstant } from "@langwatch/time";
-import { z } from "zod";
 
 /** The stored epoch millis as the ISO string the wire has always carried. */
 function isoOf(epochMs: number): string {
@@ -26,29 +24,14 @@ import {
 } from "@langwatch/langy-contract";
 
 import { LANGY_ID_RESOURCES } from "../../../eventing/langy-conversation-process.schemas.ts";
-import {
-  controlRequestClaimKey,
-  controlRequestKey,
-  conversationKeyBindingsKey,
-  sessionKeyBindingKey,
-  userRequestsKey,
-} from "../../../rules/langy-local-control-keys.rules.ts";
+import type { LocalRecordLookup } from "../../../repositories/langy-local-call.repository.ts";
+import type {
+  LangyLocalControlRequestRepository,
+  SessionKeyBinding,
+  StoredControlRequest,
+} from "../../../repositories/langy-local-control-request.repository.ts";
 
 const logger = createLogger("langwatch:langy:local-control:requests");
-
-const storedControlRequestSchema = z.object({
-  id: z.string(),
-  conversationId: z.string(),
-  conversationTitle: z.string(),
-  conversationUrl: z.string(),
-  projectId: z.string(),
-  projectName: z.string(),
-  userId: z.string(),
-  createdAt: z.number(),
-  expiresAt: z.number(),
-  command: z.string(),
-});
-export type StoredControlRequest = z.infer<typeof storedControlRequestSchema>;
 
 /** How long a minted session key may control its conversation. */
 const KEY_BINDING_TTL_SECONDS = 6 * 60 * 60;
@@ -58,15 +41,6 @@ const KEY_BINDING_TTL_SECONDS = 6 * 60 * 60;
  * approval reads "that request expired" rather than "not found".
  */
 const RECORD_GRACE_MS = 30 * 60 * 1000;
-
-/** What the socket reads to know which conversation a key answers for. */
-const sessionKeyBindingSchema = z.object({
-  conversationId: z.string(),
-  projectId: z.string(),
-  userId: z.string(),
-  requestId: z.string(),
-});
-type SessionKeyBinding = z.infer<typeof sessionKeyBindingSchema>;
 
 /** What approving one request hands back to the command line. */
 interface ApprovedControlRequest {
@@ -94,7 +68,7 @@ export type ControlRequestProjects = Readonly<{
 }>;
 
 interface ControlRequestServiceOptions {
-  store: SessionStateStore;
+  requests: LangyLocalControlRequestRepository;
   projects: ControlRequestProjects;
   /** Mints the per-conversation session key the command line authenticates with. */
   mintSessionKey: ControlRequestKeyMinter;
@@ -103,7 +77,7 @@ interface ControlRequestServiceOptions {
 }
 
 export class ControlRequestService {
-  private readonly store: SessionStateStore;
+  private readonly requests: LangyLocalControlRequestRepository;
   private readonly projects: ControlRequestProjects;
   private readonly ttlMs: number;
   private readonly mintSessionKey: ControlRequestKeyMinter;
@@ -132,7 +106,7 @@ export class ControlRequestService {
   }
 
   private constructor(options: ControlRequestServiceOptions) {
-    this.store = options.store;
+    this.requests = options.requests;
     this.projects = options.projects;
     this.now = options.now ?? (() => nowInstant().epochMilliseconds);
     this.ttlMs = options.ttlMs ?? CONTROL_REQUEST_TTL_MS;
@@ -179,17 +153,16 @@ export class ControlRequestService {
       expiresAt: createdAt + this.ttlMs,
       command: SHARE_CONTROL_COMMAND,
     };
-    await this.store.set(
-      controlRequestKey(request.id),
-      JSON.stringify(request),
-      Math.ceil((this.ttlMs + RECORD_GRACE_MS) / 1000),
-    );
+    await this.requests.saveRequest({
+      request,
+      ttlSeconds: Math.ceil((this.ttlMs + RECORD_GRACE_MS) / 1000),
+    });
     // The index is scored by expiry, so the list read drops a request that is
     // over even while the record it points at is still there to explain why.
-    await this.store.zadd({
-      key: userRequestsKey(userId),
-      score: request.expiresAt,
-      member: request.id,
+    await this.requests.indexOpenRequest({
+      userId,
+      requestId: request.id,
+      expiresAt: request.expiresAt,
       ttlSeconds: Math.ceil((this.ttlMs + RECORD_GRACE_MS) / 1000),
     });
 
@@ -208,10 +181,9 @@ export class ControlRequestService {
     userId: string;
     projectId?: string;
   }): Promise<StoredControlRequest[]> {
-    const key = userRequestsKey(userId);
     const now = this.now();
-    await this.store.zremrangebyscore(key, now);
-    const ids = await this.store.zrangebyscore(key, now);
+    await this.requests.dropLapsedRequests({ userId, lapsedAt: now });
+    const ids = await this.requests.findOpenRequestIds({ userId, from: now });
     const requests: StoredControlRequest[] = [];
     for (const id of ids) {
       let request: StoredControlRequest;
@@ -263,18 +235,7 @@ export class ControlRequestService {
    * raises under a code rather than reading back as a key that controls nothing.
    */
   async getKeyBinding(apiKeyId: string): Promise<SessionKeyBinding> {
-    const raw = await this.store.tryGet(sessionKeyBindingKey(apiKeyId));
-    if (!raw) {
-      throw new LangyLocalRecordNotFoundError();
-    }
-
-    try {
-      return sessionKeyBindingSchema.parse(JSON.parse(raw));
-    } catch (error) {
-      throw new LangyLocalRecordUnreadableError({
-        reasons: error instanceof Error ? [error] : [],
-      });
-    }
+    return found(await this.requests.findKeyBinding(apiKeyId));
   }
 
   /** Drops the binding, so the key stops answering for the conversation. */
@@ -285,9 +246,9 @@ export class ControlRequestService {
       }
       throw error;
     });
-    await this.store.del(sessionKeyBindingKey(apiKeyId));
+    await this.requests.deleteKeyBinding(apiKeyId);
     if (binding) {
-      await this.store.zrem(conversationKeyBindingsKey(binding.conversationId), apiKeyId);
+      await this.requests.unindexKeyBinding({ conversationId: binding.conversationId, apiKeyId });
     }
   }
 
@@ -297,11 +258,10 @@ export class ControlRequestService {
    * @returns the keys that were revoked
    */
   async revokeConversationBindings(conversationId: string): Promise<string[]> {
-    const key = conversationKeyBindingsKey(conversationId);
-    const apiKeyIds = await this.store.zrangebyscore(key, 0);
+    const apiKeyIds = await this.requests.findKeyBindingIds(conversationId);
     for (const apiKeyId of apiKeyIds) {
-      await this.store.del(sessionKeyBindingKey(apiKeyId));
-      await this.store.zrem(key, apiKeyId);
+      await this.requests.deleteKeyBinding(apiKeyId);
+      await this.requests.unindexKeyBinding({ conversationId, apiKeyId });
     }
 
     return apiKeyIds;
@@ -313,23 +273,12 @@ export class ControlRequestService {
    * raises under a code that tells the person to ask for the code change again.
    */
   async getRequest(requestId: string): Promise<StoredControlRequest> {
-    const raw = await this.store.tryGet(controlRequestKey(requestId));
-    if (!raw) {
-      throw new LangyLocalRecordNotFoundError();
-    }
-
-    try {
-      return storedControlRequestSchema.parse(JSON.parse(raw));
-    } catch (error) {
-      throw new LangyLocalRecordUnreadableError({
-        reasons: error instanceof Error ? [error] : [],
-      });
-    }
+    return found(await this.requests.findRequest(requestId));
   }
 
   /** Whether an approval spent this request. The mark outlives the request. */
   async wasApproved(requestId: string): Promise<boolean> {
-    return (await this.store.tryGet(controlRequestClaimKey(requestId))) !== null;
+    return this.requests.isClaimed(requestId);
   }
 
   /**
@@ -350,11 +299,11 @@ export class ControlRequestService {
     projectId?: string;
   }): Promise<ApprovedControlRequest> {
     const request = await this.requireOwn({ requestId, userId, projectId });
-    const claimed = await this.store.setIfAbsent(
-      controlRequestClaimKey(requestId),
+    const claimed = await this.requests.claimRequest({
+      requestId,
       userId,
-      Math.ceil(this.ttlMs / 1000),
-    );
+      ttlSeconds: Math.ceil(this.ttlMs / 1000),
+    });
     if (!claimed) {
       throw new LangyLocalRequestInvalidError({ requestId });
     }
@@ -365,22 +314,22 @@ export class ControlRequestService {
       projectId: request.projectId,
       organizationId: project.organizationId,
     });
-    await this.store.set(
-      sessionKeyBindingKey(minted.apiKeyId),
-      JSON.stringify({
+    await this.requests.saveKeyBinding({
+      apiKeyId: minted.apiKeyId,
+      binding: {
         conversationId: request.conversationId,
         projectId: request.projectId,
         userId: request.userId,
         requestId: request.id,
-      } satisfies SessionKeyBinding),
-      KEY_BINDING_TTL_SECONDS,
-    );
+      },
+      ttlSeconds: KEY_BINDING_TTL_SECONDS,
+    });
     // The reverse index: the panel disconnects a CONVERSATION, and this is how
     // it finds the keys that control it.
-    await this.store.zadd({
-      key: conversationKeyBindingsKey(request.conversationId),
-      score: this.now() + KEY_BINDING_TTL_SECONDS * 1000,
-      member: minted.apiKeyId,
+    await this.requests.indexKeyBinding({
+      conversationId: request.conversationId,
+      apiKeyId: minted.apiKeyId,
+      lapsesAt: this.now() + KEY_BINDING_TTL_SECONDS * 1000,
       ttlSeconds: KEY_BINDING_TTL_SECONDS,
     });
     await this.forget(request);
@@ -444,8 +393,7 @@ export class ControlRequestService {
   }
 
   private async forget(request: StoredControlRequest): Promise<void> {
-    await this.store.del(controlRequestKey(request.id));
-    await this.store.zrem(userRequestsKey(request.userId), request.id);
+    await this.requests.forgetRequest({ requestId: request.id, userId: request.userId });
   }
 
   /**
@@ -460,4 +408,19 @@ export class ControlRequestService {
     ]);
     return { slug, organizationId };
   }
+}
+
+/**
+ * The stored record; `langy_local_record_not_found` when absent, and the unreadable
+ * code when a record we wrote no longer decodes.
+ */
+function found<T>(lookup: LocalRecordLookup<T>): T {
+  if (lookup.kind === "miss") {
+    throw new LangyLocalRecordNotFoundError();
+  }
+  if (lookup.kind === "unreadable") {
+    throw new LangyLocalRecordUnreadableError({ reasons: lookup.reasons });
+  }
+
+  return lookup.value;
 }

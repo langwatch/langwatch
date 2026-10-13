@@ -66,7 +66,7 @@ func Build(request Request) (Plan, error) {
 		return Plan{}, fmt.Errorf("volume %q: only S and M here; L and XL land with the scale generator (lane L4)", request.Volume)
 	case cloud && !mainRelease.MatchString(request.Release):
 		return Plan{}, fmt.Errorf("release %q: cloud shapes come from main@<sha>, cloud never runs a release tag", request.Release)
-	case !cloud && !tagRelease.MatchString(request.Release) && !(request.Checkout && mainRelease.MatchString(request.Release)):
+	case !cloud && !tagRelease.MatchString(request.Release) && (!request.Checkout || !mainRelease.MatchString(request.Release)):
 		return Plan{}, fmt.Errorf("release %q: self-hosted shapes come from a release tag", request.Release)
 	}
 	tenancy := seed.BuildTenancy(seed.TenancyInput{Shape: request.Shape, Seed: request.Seed, Anchor: request.Anchor, Cloud: cloud})

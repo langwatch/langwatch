@@ -26,6 +26,7 @@ import { ChevronDown, Copy, Pencil, Plus, Table as TableIcon, Trash2, Upload } f
 import { type ReactNode, useMemo, useState } from "react";
 
 import { datasetApi } from "../../behavior/dataset-api.ts";
+import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { DeleteDatasetDialog } from "../../ui/blocks/delete-dataset-dialog.tsx";
 import { AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer.tsx";
@@ -389,6 +390,7 @@ export default function DatasetsScreen() {
           description:
             "Upload or create datasets on your messages to do further analysis or to train your own models.",
           icon: <TableIcon size={24} />,
+          secondaryAction: <SetupWithAgentButton surface="datasets" size="md" />,
           next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
         }}
         noResults={{

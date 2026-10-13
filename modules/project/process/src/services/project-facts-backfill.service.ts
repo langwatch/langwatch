@@ -1,126 +1,74 @@
 /**
- * The project fact steps' backfill: each organization's existing projects recorded as one fact
- * (created, department or presence), a page of organizations at a time, resuming after the last
- * page saved. Spec: modules/project/specs/project-service.feature
+ * The project facts step: one pass over the projects table, a page at a time in id order, each
+ * page's created facts, then department assignments, then presence settings sent as one batch
+ * each. Spec: modules/project/specs/project-service.feature
  */
-import { ORGANIZATION_ID_PAGE_LIMIT, type OrganizationApi } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 
-type ProjectFactsBackfillPeers = Readonly<{
-  organizations: Pick<OrganizationApi, "listAllIds">;
-  /** Records one organization's projects' fact; answers how many projects it recorded. */
-  record: (input: { organizationId: string }) => Promise<number>;
-  /** Counts what `record` would record, writing nothing; absent, a dry run counts no projects. */
-  preview?: (input: { organizationId: string }) => Promise<number>;
-}>;
+import type { ProjectBackfillRow, ProjectRepository } from "../repositories/project.repository.ts";
+import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 
-/** How many of a page's organizations record at once; the checkpoint still waits for the page. */
-const ORGANIZATION_WIDTH = 8;
+const PAGE_SIZE = 2000;
 
-type ProjectFactsBackfillReport = {
-  afterOrganizationId: string | null;
-  organizations: number;
+export type ProjectFactsBackfillReport = {
   projects: number;
+  departmentAssignments: number;
+  presenceSettings: number;
 };
 
+export type ProjectFactsBackfillRun = Readonly<{
+  dryRun: boolean;
+  signal: AbortSignal;
+  afterProjectId: string | null;
+  /** What the run this one resumes had counted, so the report totals every attempt. */
+  countedBefore: ProjectFactsBackfillReport;
+  onPageDone: (input: {
+    afterProjectId: string;
+    report: ProjectFactsBackfillReport;
+  }) => Promise<void>;
+}>;
+
+type Dependencies = Readonly<{
+  projects: Pick<ProjectRepository, "findBackfillPage">;
+  lifecycle: Pick<ProjectCreatedNoticeService, "recordBackfillPage">;
+}>;
+
+/**
+ * Every project is recorded as created, archived ones included; a live project also has its
+ * department and presence setting recorded. Keyed per project, so a rerun adds nothing new.
+ */
 export class ProjectFactsBackfillService {
-  private constructor(private readonly peers: ProjectFactsBackfillPeers) {}
+  private constructor(private readonly deps: Dependencies) {}
 
-  static create({ peers }: { peers: ProjectFactsBackfillPeers }): ProjectFactsBackfillService {
-    return new ProjectFactsBackfillService(peers);
+  static create(deps: Dependencies): ProjectFactsBackfillService {
+    return new ProjectFactsBackfillService(deps);
   }
 
-  /**
-   * Each organization after `after`, a page at a time; `onPage` hears the last organization of
-   * each completed page, never on a dry run. Stops between organizations on abort.
-   */
-  async backfill({
-    after,
+  async recordExisting({
     dryRun,
     signal,
-    onPage,
-  }: {
-    after: string | undefined;
-    dryRun: boolean;
-    signal: AbortSignal;
-    onPage: (page: { afterOrganizationId: string }) => Promise<void>;
-  }): Promise<ProjectFactsBackfillReport> {
-    const totals = { organizations: 0, projects: 0 };
-    let cursor = after;
-    let hasMore = true;
-    while (hasMore && !signal.aborted) {
-      const page = await this.peers.organizations.listAllIds({
-        after: cursor,
-        limit: ORGANIZATION_ID_PAGE_LIMIT,
-      });
-      const completed = await this.recordPage({ ids: page.ids, dryRun, signal, totals });
-      const last = page.ids.at(-1);
-      if (completed && last !== undefined) {
-        cursor = last;
-        if (!dryRun) await onPage({ afterOrganizationId: last });
+    afterProjectId,
+    countedBefore,
+    onPageDone,
+  }: ProjectFactsBackfillRun): Promise<ProjectFactsBackfillReport> {
+    const report: ProjectFactsBackfillReport = { ...countedBefore };
+    let cursor = afterProjectId;
+    while (!signal.aborted) {
+      // Taken before the read, so a change saved meanwhile is the newer fact.
+      const occurredAt = nowInstant().epochMilliseconds;
+      const page = await this.deps.projects.findBackfillPage({ afterId: cursor, limit: PAGE_SIZE });
+      const last = page.at(-1);
+      if (!last) break;
+      const live: ProjectBackfillRow[] = page.filter((project) => !project.isArchived);
+      if (!dryRun) {
+        await this.deps.lifecycle.recordBackfillPage({ created: page, live, occurredAt });
       }
-      hasMore = completed && page.next !== null;
+      report.projects += page.length;
+      report.departmentAssignments += live.length;
+      report.presenceSettings += live.length;
+      cursor = last.id;
+      if (!dryRun) await onPageDone({ afterProjectId: cursor, report: { ...report } });
     }
-    return { afterOrganizationId: cursor ?? null, ...totals };
+    return report;
   }
-
-  /** One page's organizations, a few at a time; false when the signal stopped it part way. */
-  private async recordPage({
-    ids,
-    dryRun,
-    signal,
-    totals,
-  }: {
-    ids: readonly string[];
-    dryRun: boolean;
-    signal: AbortSignal;
-    totals: { organizations: number; projects: number };
-  }): Promise<boolean> {
-    let done = 0;
-    let failure: { error: unknown } | undefined;
-    await eachInLanes({
-      items: ids,
-      width: ORGANIZATION_WIDTH,
-      stop: () => signal.aborted || failure !== undefined,
-      each: async (organizationId) => {
-        let projects: number;
-        try {
-          projects = dryRun
-            ? ((await this.peers.preview?.({ organizationId })) ?? 0)
-            : await this.peers.record({ organizationId });
-        } catch (error) {
-          failure ??= { error };
-          return;
-        }
-        // Added after the await: `+=` across an await would drop another lane's count.
-        totals.projects += projects;
-        totals.organizations += 1;
-        done += 1;
-      },
-    });
-    // Every lane has stopped before the step hears the failure, so none writes after it.
-    if (failure) throw failure.error;
-    return done === ids.length;
-  }
-}
-
-/** Runs `each` over the items in order, at most `width` at once, taking none once `stop` says so. */
-async function eachInLanes<Item>({
-  items,
-  width,
-  stop,
-  each,
-}: {
-  items: readonly Item[];
-  width: number;
-  stop: () => boolean;
-  each: (item: Item) => Promise<void>;
-}): Promise<void> {
-  const pending = [...items];
-  const lane = async (): Promise<void> => {
-    while (pending.length > 0 && !stop()) {
-      const item = pending.shift();
-      if (item !== undefined) await each(item);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(width, items.length) }, lane));
 }

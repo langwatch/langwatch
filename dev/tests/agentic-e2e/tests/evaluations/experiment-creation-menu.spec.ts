@@ -22,10 +22,10 @@ test("experiment creation keeps the SDK workflow discoverable", async ({ page },
   });
 
   await page.goto(`/${projectSlug}/online-evaluations`);
-  await expect(page.getByRole("button", { name: "Set up Guardrail" }).first()).toHaveCSS(
-    "background-color",
-    "rgb(255, 255, 255)",
-  );
+  // A secondary header action: it takes the design system's quiet tone, never the primary's.
+  const guardrail = page.getByRole("button", { name: "Set up guardrail" }).first();
+  await expect(guardrail).toBeVisible();
+  await expect(guardrail).not.toHaveCSS("background-color", "rgb(237, 137, 38)");
   // The page's one solid primary action (D63), orange as New Experiment above.
   await expect(page.getByRole("button", { name: "New Online Evaluation" }).first()).toHaveCSS(
     "background-color",

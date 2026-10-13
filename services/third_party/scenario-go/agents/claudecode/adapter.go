@@ -1,24 +1,3 @@
-// Package claudecode runs the Claude Code CLI (`claude -p --output-format
-// stream-json --verbose`) as the agent under test of a scenario.
-//
-// Each turn flattens the conversation into one prompt, runs the CLI in a
-// working directory, decodes its stream-json stdout as it arrives, and
-// returns the turn as the assistant-visible text (the default) or as
-// messages carrying the tool calls and tool results (OutputMessages).
-//
-// Session continuation: `claude -p` is one-shot, but the CLI keeps
-// server-side session state keyed by a session id. The adapter keeps one
-// session per thread. A thread's first turn sends the full history and
-// captures the session id the CLI reports; later turns pass --resume <id>
-// and send only the new messages, since the resumed session already holds
-// the rest. When a resumed session has vanished server-side the id is
-// evicted and the turn fails with a *LostSessionError, or, with
-// Config.ReplayOnLostSession, is rebuilt in place from the full history into
-// a fresh session (losing server-side state such as the context cache).
-//
-// Process lifecycle: the CLI leads its own process group, a detached
-// watchdog kills that group if the harness dies first, and a timeout or a
-// cancelled context terminates the whole group (SIGTERM, then SIGKILL).
 package claudecode
 
 import (

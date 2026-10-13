@@ -27,6 +27,7 @@ func TestClickHouseWorkloads(t *testing.T) {
 				"GRANT ALL ON `lw_feat_x`.* TO `lw_feat_x_app` WITH GRANT OPTION",
 				"GRANT SELECT ON system.* TO `lw_feat_x_app`",
 				"GRANT ACCESS MANAGEMENT ON *.* TO `lw_feat_x_app` WITH GRANT OPTION",
+				"GRANT CREATE FUNCTION, DROP FUNCTION ON *.* TO `lw_feat_x_app`",
 			} {
 				if !strings.Contains(got, want) {
 					t.Errorf("missing %q in:\n%s", want, got)

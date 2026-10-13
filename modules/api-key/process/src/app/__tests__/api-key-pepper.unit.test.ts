@@ -3,6 +3,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
 /**
  * The pepper chain main hashed every key under: API_KEY_PEPPER, else CREDENTIALS_SECRET, else
  * NEXTAUTH_SECRET, refusing the boot when none is set (Alex, 2026-09-28).
@@ -10,7 +11,6 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryAgentSandboxKeyRepository } from "../../repositories/memory/memory.agent-sandbox-key.repository.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
@@ -60,7 +60,8 @@ async function appAndKeysOver({
     repositories: {
       apiKeys,
       answers: MemoryApiKeyAnswerCacheRepository.create(),
-      sandboxKeys: MemoryAgentSandboxKeyRepository.create(),
+      sandboxKeys: MemorySharedCredentialStore.create(),
+      runKeys: MemorySharedCredentialStore.create(),
     },
     dependencies: {
       authorization: createApiFixture<AuthzApi>({

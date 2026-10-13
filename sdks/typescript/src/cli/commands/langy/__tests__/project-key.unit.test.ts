@@ -36,10 +36,10 @@ function fakePlatform({ forkStatus = 200 }: { forkStatus?: number } = {}) {
           status,
           headers: { "Content-Type": "application/json" },
         });
-      if (method === "GET" && url.pathname === "/api/projects/project_acme") {
+      if (method === "GET" && url.pathname === "/api/v1/projects/project_acme") {
         return json(200, { id: "project_acme", slug: "acme-shop", name: "Acme Shop" });
       }
-      if (url.pathname === "/api/projects/project_acme/api-key") {
+      if (url.pathname === "/api/v1/projects/project_acme/api-key") {
         return json(403, {
           error: "A signed-in project administrator must manage the base API key in the browser",
         });
@@ -111,7 +111,7 @@ describe("platformProjectKeyReader", () => {
       ).toMatchObject({ method: "POST", authorization: "Bearer lw_at_child" });
       expect(platform.seen.map((call) => call.path)).toContain("/api/auth/cli/logout");
       expect(platform.seen.map((call) => call.path)).not.toContain(
-        "/api/projects/project_acme/api-key",
+        "/api/v1/projects/project_acme/api-key",
       );
     });
   });

@@ -151,8 +151,8 @@ func TestEachInstanceGetsARunScopedSlug(t *testing.T) {
 				if !ok {
 					t.Fatalf("no up carried LANGWATCH_SLUG=%s; ups were %v", slug, ups)
 				}
-				if got := argv(spec); got != "haven up --agent --detach" {
-					t.Errorf("%s ran %q, want the agent-mode non-attached up", slug, got)
+				if got := argv(spec); got != "haven up --agent --detach +analytics" {
+					t.Errorf("%s ran %q, want the agent-mode non-attached up with analyticssim selected", slug, got)
 				}
 			}
 			if got := ups["apidiff-20260909t2230-branch"].dir; got != "/repos/langwatch/.apidiff/run/branch" {

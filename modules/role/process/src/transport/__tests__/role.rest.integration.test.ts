@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * `/api/roles` on the real declaration over a real role application: the
+ * `/api/v1/roles` on the real declaration over a real role application: the
  * grants ledger is a small stand-in that writes the rows a ledger would.
  * @see specs/rbac/roles-rest-api.feature
  */
@@ -137,7 +137,7 @@ const roleIdsOf = (body: unknown) =>
     .parse(body)
     .roles.map((role) => role.id);
 
-describe("given the /api/roles family", () => {
+describe("given the /api/v1/roles family", () => {
   describe("when the organization is below Enterprise", () => {
     /** @scenario The roles family answers 402 below Enterprise, naming RBAC */
     /** @scenario "The roles API requires an Enterprise plan" */
@@ -145,8 +145,8 @@ describe("given the /api/roles family", () => {
       const { send, ledger } = world({ enterprise: false });
 
       const answers = await Promise.all([
-        send("/api/roles"),
-        send("/api/roles", {
+        send("/api/v1/roles"),
+        send("/api/v1/roles", {
           method: "POST",
           body: { name: "Ops", permissions: ["project:view"] },
         }),
@@ -165,24 +165,67 @@ describe("given the /api/roles family", () => {
 
   describe("when the organization's roles are listed", () => {
     /** @scenario Listing custom roles returns the organization's roles */
+    /** @scenario With no filter, the REST role list returns custom roles only, as before built-ins were listed */
     it("answers its own roles with their permissions and none from another organization", async () => {
       const { send, state } = world();
       state(stored({ id: "role-a", name: "Release Manager", permissions: ["project:view"] }));
       state(stored({ id: "role-b", name: "Auditor", permissions: ["traces:view"] }));
       state(stored({ id: "role-c", name: "Elsewhere", organizationId: OTHER_ORGANIZATION_ID }));
 
-      const response = await send("/api/roles");
+      const response = await send("/api/v1/roles");
 
       expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({
+      expect(await response.json()).toEqual({
         roles: [
-          { id: "admin", builtIn: true },
-          { id: "member", builtIn: true },
-          { id: "viewer", builtIn: true },
-          { id: "role-a", name: "Release Manager", permissions: ["project:view"], builtIn: false },
-          { id: "role-b", name: "Auditor", permissions: ["traces:view"], builtIn: false },
+          {
+            id: "role-a",
+            name: "Release Manager",
+            description: null,
+            permissions: ["project:view"],
+            builtIn: false,
+            createdAt: "1970-01-01T00:00:00.000Z",
+            updatedAt: "1970-01-01T00:00:00.000Z",
+          },
+          {
+            id: "role-b",
+            name: "Auditor",
+            description: null,
+            permissions: ["traces:view"],
+            builtIn: false,
+            createdAt: "1970-01-01T00:00:00.000Z",
+            updatedAt: "1970-01-01T00:00:00.000Z",
+          },
         ],
       });
+    });
+  });
+
+  describe("when the bare /api/roles compatibility path is listed", () => {
+    /** @scenario With no filter, the REST role list returns custom roles only, as before built-ins were listed */
+    it("answers the same custom-only default as /api/v1/roles", async () => {
+      const { send, state } = world();
+      state(stored({ id: "role-a", name: "Auditor", permissions: ["traces:view"] }));
+
+      const bare = await send("/api/roles");
+      const versioned = await send("/api/v1/roles");
+
+      const expected = {
+        roles: [
+          {
+            id: "role-a",
+            name: "Auditor",
+            description: null,
+            permissions: ["traces:view"],
+            builtIn: false,
+            createdAt: "1970-01-01T00:00:00.000Z",
+            updatedAt: "1970-01-01T00:00:00.000Z",
+          },
+        ],
+      };
+      expect(bare.status).toBe(200);
+      expect(await bare.json()).toEqual(expected);
+      expect(versioned.status).toBe(200);
+      expect(await versioned.json()).toEqual(expected);
     });
   });
 
@@ -191,7 +234,7 @@ describe("given the /api/roles family", () => {
     it("answers 201 with the id, name, description and both permissions", async () => {
       const { send } = world();
 
-      const response = await send("/api/roles", {
+      const response = await send("/api/v1/roles", {
         method: "POST",
         body: {
           name: "Release Manager",
@@ -213,7 +256,7 @@ describe("given the /api/roles family", () => {
     it("refuses an unknown permission key as a validation error and writes nothing", async () => {
       const { send, ledger } = world();
 
-      const response = await send("/api/roles", {
+      const response = await send("/api/v1/roles", {
         method: "POST",
         body: { name: "Teleporter", permissions: ["project:teleport"] },
       });
@@ -228,7 +271,7 @@ describe("given the /api/roles family", () => {
       const { send, state, ledger } = world();
       state(stored({ id: "role-a", name: "Release Manager" }));
 
-      const response = await send("/api/roles", {
+      const response = await send("/api/v1/roles", {
         method: "POST",
         body: { name: "Release Manager", permissions: ["project:view"] },
       });
@@ -247,14 +290,14 @@ describe("given the /api/roles family", () => {
       const { send } = world();
       const { id } = z.object({ id: z.string() }).parse(
         await (
-          await send("/api/roles", {
+          await send("/api/v1/roles", {
             method: "POST",
             body: { name: "Auditor", description: "Reads", permissions: ["traces:view"] },
           })
         ).json(),
       );
 
-      const response = await send(`/api/roles/${id}`);
+      const response = await send(`/api/v1/roles/${id}`);
 
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
@@ -270,7 +313,7 @@ describe("given the /api/roles family", () => {
       const { send, state } = world();
       state(stored({ id: "role-x", name: "Elsewhere", organizationId: OTHER_ORGANIZATION_ID }));
 
-      const response = await send("/api/roles/role-x");
+      const response = await send("/api/v1/roles/role-x");
 
       expect(response.status).toBe(404);
       expect(await response.json()).toMatchObject({ code: "custom_role_not_found" });
@@ -289,11 +332,11 @@ describe("given the /api/roles family", () => {
         }),
       );
 
-      const updated = await send("/api/roles/role-a", {
+      const updated = await send("/api/v1/roles/role-a", {
         method: "PATCH",
         body: { permissions: ["project:view"] },
       });
-      const fetched = await send("/api/roles/role-a");
+      const fetched = await send("/api/v1/roles/role-a");
 
       expect(updated.status).toBe(200);
       expect(await fetched.json()).toMatchObject({ permissions: ["project:view"] });
@@ -306,8 +349,8 @@ describe("given the /api/roles family", () => {
       const { send, state } = world();
       state(stored({ id: "role-a", name: "Release Manager" }));
 
-      const deleted = await send("/api/roles/role-a", { method: "DELETE" });
-      const fetched = await send("/api/roles/role-a");
+      const deleted = await send("/api/v1/roles/role-a", { method: "DELETE" });
+      const fetched = await send("/api/v1/roles/role-a");
 
       expect(deleted.status).toBe(200);
       expect(fetched.status).toBe(404);
@@ -321,14 +364,14 @@ describe("given the /api/roles family", () => {
       });
       state(stored({ id: "role-a", name: "Release Manager" }));
 
-      const response = await send("/api/roles/role-a", { method: "DELETE" });
+      const response = await send("/api/v1/roles/role-a", { method: "DELETE" });
 
       expect(response.status).toBe(409);
       expect(await response.json()).toMatchObject({
         code: "custom_role_in_use",
         meta: { bindingCount: 1 },
       });
-      expect((await send("/api/roles/role-a")).status).toBe(200);
+      expect((await send("/api/v1/roles/role-a")).status).toBe(200);
     });
   });
 
@@ -337,7 +380,7 @@ describe("given the /api/roles family", () => {
     it("groups permissions by resource and marks the organization-only ones", async () => {
       const { send } = world();
 
-      const response = await send("/api/roles/permissions");
+      const response = await send("/api/v1/roles/permissions");
       const catalog = catalogSchema.parse(await response.json());
 
       expect(response.status).toBe(200);
@@ -352,21 +395,16 @@ describe("given the /api/roles family", () => {
   });
 
   describe("when the built-in roles are addressed", () => {
-    /** @scenario The role list includes the built-in roles unless filtered */
-    it("lists admin, member and viewer first, marked built in, even with no custom roles", async () => {
+    it("lists no roles with no filter when there are no custom roles", async () => {
       const { send } = world();
 
-      const response = await send("/api/roles");
+      const response = await send("/api/v1/roles");
 
       expect(response.status).toBe(200);
       const body = z
         .object({ roles: z.array(z.object({ id: z.string(), builtIn: z.boolean() })) })
         .parse(await response.json());
-      expect(body.roles).toEqual([
-        { ...body.roles[0], id: "admin", builtIn: true },
-        { ...body.roles[1], id: "member", builtIn: true },
-        { ...body.roles[2], id: "viewer", builtIn: true },
-      ]);
+      expect(body.roles).toEqual([]);
     });
 
     /** @scenario The role list filters to the built-in roles */
@@ -374,7 +412,7 @@ describe("given the /api/roles family", () => {
       const { send, state } = world();
       state(stored({ id: "role-a", name: "Auditor" }));
 
-      const response = await send("/api/roles?builtIn=true");
+      const response = await send("/api/v1/roles?builtIn=true");
 
       expect(response.status).toBe(200);
       expect(roleIdsOf(await response.json())).toEqual(["admin", "member", "viewer"]);
@@ -385,7 +423,7 @@ describe("given the /api/roles family", () => {
       const { send, state } = world();
       state(stored({ id: "role-a", name: "Auditor" }));
 
-      const response = await send("/api/roles?builtIn=false");
+      const response = await send("/api/v1/roles?builtIn=false");
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
@@ -397,7 +435,7 @@ describe("given the /api/roles family", () => {
     it("refuses builtIn=yes as a validation error", async () => {
       const { send } = world();
 
-      const response = await send("/api/roles?builtIn=yes");
+      const response = await send("/api/v1/roles?builtIn=yes");
 
       expect(response.status).toBe(422);
       expect(await response.json()).toMatchObject({ code: "validation_error" });
@@ -407,7 +445,7 @@ describe("given the /api/roles family", () => {
     it("answers the admin role by its stable id with its permissions", async () => {
       const { send } = world();
 
-      const response = await send("/api/roles/admin");
+      const response = await send("/api/v1/roles/admin");
 
       expect(response.status).toBe(200);
       const body = z
@@ -422,11 +460,11 @@ describe("given the /api/roles family", () => {
     it("refuses a change or a delete of a built-in role with role_is_built_in", async () => {
       const { send } = world();
 
-      const patched = await send("/api/roles/viewer", {
+      const patched = await send("/api/v1/roles/viewer", {
         method: "PATCH",
         body: { name: "Reader" },
       });
-      const deleted = await send("/api/roles/viewer", { method: "DELETE" });
+      const deleted = await send("/api/v1/roles/viewer", { method: "DELETE" });
 
       for (const response of [patched, deleted]) {
         expect(response.status).toBe(409);
@@ -441,11 +479,11 @@ describe("given the /api/roles family", () => {
       const { send, state, ledger } = world({ callerLacks: ["secrets:manage"] });
       state(stored({ id: "role-a", name: "Release Manager", permissions: ["project:view"] }));
 
-      const created = await send("/api/roles", {
+      const created = await send("/api/v1/roles", {
         method: "POST",
         body: { name: "Vault", permissions: ["secrets:manage"] },
       });
-      const widened = await send("/api/roles/role-a", {
+      const widened = await send("/api/v1/roles/role-a", {
         method: "PATCH",
         body: { permissions: ["project:view", "secrets:manage"] },
       });
@@ -466,7 +504,7 @@ describe("given the /api/roles family", () => {
       const { send, state } = world({ callerLacks: ["secrets:manage"] });
       state(stored({ id: "role-v", name: "Vault", permissions: ["secrets:manage"] }));
 
-      const response = await send("/api/roles/role-v", {
+      const response = await send("/api/v1/roles/role-v", {
         method: "PATCH",
         body: { name: "Vault keepers" },
       });

@@ -324,8 +324,11 @@ export class LangyModule implements LangyApiContract {
     });
     const buffer = setup.repositories.tokenBuffer.open();
     const runtime = LangyLocalControlRuntimeService.create({
-      store: setup.repositories.sessionState,
+      calls: setup.repositories.localCalls,
+      userWaits: setup.repositories.localUserWaits,
+      controlRequests: setup.repositories.localControlRequests,
       presence: setup.repositories.localPresence,
+      workspace: setup.channels.workspace,
       projects: workspace,
       mintSessionKey: (input) => sessionKeys.mintForUser(input),
       events: commands,
@@ -336,7 +339,7 @@ export class LangyModule implements LangyApiContract {
       readCredential: readSessionKeyCredential,
       actors: setup.dependencies.users,
       baseHost: setup.config.publicBaseUrl,
-      store: runtime.store,
+      workspace: runtime.workspace,
       presence: runtime.presence,
       dispatcher: runtime.dispatcher,
       waits: runtime.waits,
@@ -399,8 +402,8 @@ export class LangyModule implements LangyApiContract {
     });
     const longPoll = LocalControlLongPollService.create({ core });
     const sockets = LocalControlConnectionService.create({ core });
-    setup.resources.own("Langy local-control session state", () =>
-      setup.repositories.sessionState.close(),
+    setup.resources.own("Langy local-control workspace channel", () =>
+      setup.channels.workspace.close(),
     );
     setup.resources.own("Langy local-control long-poll sessions", () => longPoll.close());
     setup.resources.own("Langy local-control sockets", () => sockets.close());

@@ -404,13 +404,13 @@ func (e SpanInputOutput1ValueContent14Type) Valid() bool {
 
 // Defines values for SpanInputOutput1ValueContent15Type.
 const (
-	SpanInputOutput1ValueContent15TypeBinary SpanInputOutput1ValueContent15Type = "binary"
+	SpanInputOutput1ValueContent15TypeToolCall SpanInputOutput1ValueContent15Type = "tool-call"
 )
 
 // Valid indicates whether the value is a known member of the SpanInputOutput1ValueContent15Type enum.
 func (e SpanInputOutput1ValueContent15Type) Valid() bool {
 	switch e {
-	case SpanInputOutput1ValueContent15TypeBinary:
+	case SpanInputOutput1ValueContent15TypeToolCall:
 		return true
 	default:
 		return false
@@ -419,43 +419,13 @@ func (e SpanInputOutput1ValueContent15Type) Valid() bool {
 
 // Defines values for SpanInputOutput1ValueContent16Type.
 const (
-	SpanInputOutput1ValueContent16TypeInputAudio SpanInputOutput1ValueContent16Type = "input_audio"
+	SpanInputOutput1ValueContent16TypeToolResult SpanInputOutput1ValueContent16Type = "tool-result"
 )
 
 // Valid indicates whether the value is a known member of the SpanInputOutput1ValueContent16Type enum.
 func (e SpanInputOutput1ValueContent16Type) Valid() bool {
 	switch e {
-	case SpanInputOutput1ValueContent16TypeInputAudio:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for SpanInputOutput1ValueContent17SourceType0.
-const (
-	SpanInputOutput1ValueContent17SourceType0Url SpanInputOutput1ValueContent17SourceType0 = "url"
-)
-
-// Valid indicates whether the value is a known member of the SpanInputOutput1ValueContent17SourceType0 enum.
-func (e SpanInputOutput1ValueContent17SourceType0) Valid() bool {
-	switch e {
-	case SpanInputOutput1ValueContent17SourceType0Url:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for SpanInputOutput1ValueContent17SourceType1.
-const (
-	SpanInputOutput1ValueContent17SourceType1Data SpanInputOutput1ValueContent17SourceType1 = "data"
-)
-
-// Valid indicates whether the value is a known member of the SpanInputOutput1ValueContent17SourceType1 enum.
-func (e SpanInputOutput1ValueContent17SourceType1) Valid() bool {
-	switch e {
-	case SpanInputOutput1ValueContent17SourceType1Data:
+	case SpanInputOutput1ValueContent16TypeToolResult:
 		return true
 	default:
 		return false
@@ -464,13 +434,13 @@ func (e SpanInputOutput1ValueContent17SourceType1) Valid() bool {
 
 // Defines values for SpanInputOutput1ValueContent17Type.
 const (
-	SpanInputOutput1ValueContent17TypeAudio SpanInputOutput1ValueContent17Type = "audio"
+	SpanInputOutput1ValueContent17TypeBinary SpanInputOutput1ValueContent17Type = "binary"
 )
 
 // Valid indicates whether the value is a known member of the SpanInputOutput1ValueContent17Type enum.
 func (e SpanInputOutput1ValueContent17Type) Valid() bool {
 	switch e {
-	case SpanInputOutput1ValueContent17TypeAudio:
+	case SpanInputOutput1ValueContent17TypeBinary:
 		return true
 	default:
 		return false
@@ -479,13 +449,43 @@ func (e SpanInputOutput1ValueContent17Type) Valid() bool {
 
 // Defines values for SpanInputOutput1ValueContent18Type.
 const (
-	SpanInputOutput1ValueContent18TypeImage SpanInputOutput1ValueContent18Type = "image"
+	SpanInputOutput1ValueContent18TypeInputAudio SpanInputOutput1ValueContent18Type = "input_audio"
 )
 
 // Valid indicates whether the value is a known member of the SpanInputOutput1ValueContent18Type enum.
 func (e SpanInputOutput1ValueContent18Type) Valid() bool {
 	switch e {
-	case SpanInputOutput1ValueContent18TypeImage:
+	case SpanInputOutput1ValueContent18TypeInputAudio:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SpanInputOutput1ValueContent19SourceType0.
+const (
+	SpanInputOutput1ValueContent19SourceType0Url SpanInputOutput1ValueContent19SourceType0 = "url"
+)
+
+// Valid indicates whether the value is a known member of the SpanInputOutput1ValueContent19SourceType0 enum.
+func (e SpanInputOutput1ValueContent19SourceType0) Valid() bool {
+	switch e {
+	case SpanInputOutput1ValueContent19SourceType0Url:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SpanInputOutput1ValueContent19SourceType1.
+const (
+	SpanInputOutput1ValueContent19SourceType1Data SpanInputOutput1ValueContent19SourceType1 = "data"
+)
+
+// Valid indicates whether the value is a known member of the SpanInputOutput1ValueContent19SourceType1 enum.
+func (e SpanInputOutput1ValueContent19SourceType1) Valid() bool {
+	switch e {
+	case SpanInputOutput1ValueContent19SourceType1Data:
 		return true
 	default:
 		return false
@@ -494,13 +494,13 @@ func (e SpanInputOutput1ValueContent18Type) Valid() bool {
 
 // Defines values for SpanInputOutput1ValueContent19Type.
 const (
-	SpanInputOutput1ValueContent19TypeFile SpanInputOutput1ValueContent19Type = "file"
+	SpanInputOutput1ValueContent19TypeAudio SpanInputOutput1ValueContent19Type = "audio"
 )
 
 // Valid indicates whether the value is a known member of the SpanInputOutput1ValueContent19Type enum.
 func (e SpanInputOutput1ValueContent19Type) Valid() bool {
 	switch e {
-	case SpanInputOutput1ValueContent19TypeFile:
+	case SpanInputOutput1ValueContent19TypeAudio:
 		return true
 	default:
 		return false
@@ -509,13 +509,43 @@ func (e SpanInputOutput1ValueContent19Type) Valid() bool {
 
 // Defines values for SpanInputOutput1ValueContent110Type.
 const (
-	SpanInputOutput1ValueContent110TypeFile SpanInputOutput1ValueContent110Type = "file"
+	SpanInputOutput1ValueContent110TypeImage SpanInputOutput1ValueContent110Type = "image"
 )
 
 // Valid indicates whether the value is a known member of the SpanInputOutput1ValueContent110Type enum.
 func (e SpanInputOutput1ValueContent110Type) Valid() bool {
 	switch e {
-	case SpanInputOutput1ValueContent110TypeFile:
+	case SpanInputOutput1ValueContent110TypeImage:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SpanInputOutput1ValueContent111Type.
+const (
+	SpanInputOutput1ValueContent111TypeFile SpanInputOutput1ValueContent111Type = "file"
+)
+
+// Valid indicates whether the value is a known member of the SpanInputOutput1ValueContent111Type enum.
+func (e SpanInputOutput1ValueContent111Type) Valid() bool {
+	switch e {
+	case SpanInputOutput1ValueContent111TypeFile:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SpanInputOutput1ValueContent112Type.
+const (
+	SpanInputOutput1ValueContent112TypeFile SpanInputOutput1ValueContent112Type = "file"
+)
+
+// Valid indicates whether the value is a known member of the SpanInputOutput1ValueContent112Type enum.
+func (e SpanInputOutput1ValueContent112Type) Valid() bool {
+	switch e {
+	case SpanInputOutput1ValueContent112TypeFile:
 		return true
 	default:
 		return false
@@ -629,13 +659,13 @@ func (e SpanInputOutput1ValueParts4Type) Valid() bool {
 
 // Defines values for SpanInputOutput1ValueParts5Type.
 const (
-	SpanInputOutput1ValueParts5TypeBinary SpanInputOutput1ValueParts5Type = "binary"
+	SpanInputOutput1ValueParts5TypeToolCall SpanInputOutput1ValueParts5Type = "tool-call"
 )
 
 // Valid indicates whether the value is a known member of the SpanInputOutput1ValueParts5Type enum.
 func (e SpanInputOutput1ValueParts5Type) Valid() bool {
 	switch e {
-	case SpanInputOutput1ValueParts5TypeBinary:
+	case SpanInputOutput1ValueParts5TypeToolCall:
 		return true
 	default:
 		return false
@@ -644,43 +674,13 @@ func (e SpanInputOutput1ValueParts5Type) Valid() bool {
 
 // Defines values for SpanInputOutput1ValueParts6Type.
 const (
-	SpanInputOutput1ValueParts6TypeInputAudio SpanInputOutput1ValueParts6Type = "input_audio"
+	SpanInputOutput1ValueParts6TypeToolResult SpanInputOutput1ValueParts6Type = "tool-result"
 )
 
 // Valid indicates whether the value is a known member of the SpanInputOutput1ValueParts6Type enum.
 func (e SpanInputOutput1ValueParts6Type) Valid() bool {
 	switch e {
-	case SpanInputOutput1ValueParts6TypeInputAudio:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for SpanInputOutput1ValueParts7SourceType0.
-const (
-	SpanInputOutput1ValueParts7SourceType0Url SpanInputOutput1ValueParts7SourceType0 = "url"
-)
-
-// Valid indicates whether the value is a known member of the SpanInputOutput1ValueParts7SourceType0 enum.
-func (e SpanInputOutput1ValueParts7SourceType0) Valid() bool {
-	switch e {
-	case SpanInputOutput1ValueParts7SourceType0Url:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for SpanInputOutput1ValueParts7SourceType1.
-const (
-	SpanInputOutput1ValueParts7SourceType1Data SpanInputOutput1ValueParts7SourceType1 = "data"
-)
-
-// Valid indicates whether the value is a known member of the SpanInputOutput1ValueParts7SourceType1 enum.
-func (e SpanInputOutput1ValueParts7SourceType1) Valid() bool {
-	switch e {
-	case SpanInputOutput1ValueParts7SourceType1Data:
+	case SpanInputOutput1ValueParts6TypeToolResult:
 		return true
 	default:
 		return false
@@ -689,13 +689,13 @@ func (e SpanInputOutput1ValueParts7SourceType1) Valid() bool {
 
 // Defines values for SpanInputOutput1ValueParts7Type.
 const (
-	SpanInputOutput1ValueParts7TypeAudio SpanInputOutput1ValueParts7Type = "audio"
+	SpanInputOutput1ValueParts7TypeBinary SpanInputOutput1ValueParts7Type = "binary"
 )
 
 // Valid indicates whether the value is a known member of the SpanInputOutput1ValueParts7Type enum.
 func (e SpanInputOutput1ValueParts7Type) Valid() bool {
 	switch e {
-	case SpanInputOutput1ValueParts7TypeAudio:
+	case SpanInputOutput1ValueParts7TypeBinary:
 		return true
 	default:
 		return false
@@ -704,13 +704,43 @@ func (e SpanInputOutput1ValueParts7Type) Valid() bool {
 
 // Defines values for SpanInputOutput1ValueParts8Type.
 const (
-	SpanInputOutput1ValueParts8TypeImage SpanInputOutput1ValueParts8Type = "image"
+	SpanInputOutput1ValueParts8TypeInputAudio SpanInputOutput1ValueParts8Type = "input_audio"
 )
 
 // Valid indicates whether the value is a known member of the SpanInputOutput1ValueParts8Type enum.
 func (e SpanInputOutput1ValueParts8Type) Valid() bool {
 	switch e {
-	case SpanInputOutput1ValueParts8TypeImage:
+	case SpanInputOutput1ValueParts8TypeInputAudio:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SpanInputOutput1ValueParts9SourceType0.
+const (
+	SpanInputOutput1ValueParts9SourceType0Url SpanInputOutput1ValueParts9SourceType0 = "url"
+)
+
+// Valid indicates whether the value is a known member of the SpanInputOutput1ValueParts9SourceType0 enum.
+func (e SpanInputOutput1ValueParts9SourceType0) Valid() bool {
+	switch e {
+	case SpanInputOutput1ValueParts9SourceType0Url:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SpanInputOutput1ValueParts9SourceType1.
+const (
+	SpanInputOutput1ValueParts9SourceType1Data SpanInputOutput1ValueParts9SourceType1 = "data"
+)
+
+// Valid indicates whether the value is a known member of the SpanInputOutput1ValueParts9SourceType1 enum.
+func (e SpanInputOutput1ValueParts9SourceType1) Valid() bool {
+	switch e {
+	case SpanInputOutput1ValueParts9SourceType1Data:
 		return true
 	default:
 		return false
@@ -719,13 +749,13 @@ func (e SpanInputOutput1ValueParts8Type) Valid() bool {
 
 // Defines values for SpanInputOutput1ValueParts9Type.
 const (
-	SpanInputOutput1ValueParts9TypeFile SpanInputOutput1ValueParts9Type = "file"
+	SpanInputOutput1ValueParts9TypeAudio SpanInputOutput1ValueParts9Type = "audio"
 )
 
 // Valid indicates whether the value is a known member of the SpanInputOutput1ValueParts9Type enum.
 func (e SpanInputOutput1ValueParts9Type) Valid() bool {
 	switch e {
-	case SpanInputOutput1ValueParts9TypeFile:
+	case SpanInputOutput1ValueParts9TypeAudio:
 		return true
 	default:
 		return false
@@ -734,13 +764,43 @@ func (e SpanInputOutput1ValueParts9Type) Valid() bool {
 
 // Defines values for SpanInputOutput1ValueParts10Type.
 const (
-	SpanInputOutput1ValueParts10TypeFile SpanInputOutput1ValueParts10Type = "file"
+	SpanInputOutput1ValueParts10TypeImage SpanInputOutput1ValueParts10Type = "image"
 )
 
 // Valid indicates whether the value is a known member of the SpanInputOutput1ValueParts10Type enum.
 func (e SpanInputOutput1ValueParts10Type) Valid() bool {
 	switch e {
-	case SpanInputOutput1ValueParts10TypeFile:
+	case SpanInputOutput1ValueParts10TypeImage:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SpanInputOutput1ValueParts11Type.
+const (
+	SpanInputOutput1ValueParts11TypeFile SpanInputOutput1ValueParts11Type = "file"
+)
+
+// Valid indicates whether the value is a known member of the SpanInputOutput1ValueParts11Type enum.
+func (e SpanInputOutput1ValueParts11Type) Valid() bool {
+	switch e {
+	case SpanInputOutput1ValueParts11TypeFile:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SpanInputOutput1ValueParts12Type.
+const (
+	SpanInputOutput1ValueParts12TypeFile SpanInputOutput1ValueParts12Type = "file"
+)
+
+// Valid indicates whether the value is a known member of the SpanInputOutput1ValueParts12Type enum.
+func (e SpanInputOutput1ValueParts12Type) Valid() bool {
+	switch e {
+	case SpanInputOutput1ValueParts12TypeFile:
 		return true
 	default:
 		return false
@@ -6510,201 +6570,6 @@ const (
 func (e IngestTurnResult202JSONResponseBodyStatus) Valid() bool {
 	switch e {
 	case Accepted:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for LangyLocalReadCall200JSONResponseBodyErrorCode.
-const (
-	LangyLocalReadCall200JSONResponseBodyErrorCodeCancelled         LangyLocalReadCall200JSONResponseBodyErrorCode = "cancelled"
-	LangyLocalReadCall200JSONResponseBodyErrorCodeCommandRefused    LangyLocalReadCall200JSONResponseBodyErrorCode = "command_refused"
-	LangyLocalReadCall200JSONResponseBodyErrorCodeExecFailed        LangyLocalReadCall200JSONResponseBodyErrorCode = "exec_failed"
-	LangyLocalReadCall200JSONResponseBodyErrorCodeKeyRefused        LangyLocalReadCall200JSONResponseBodyErrorCode = "key_refused"
-	LangyLocalReadCall200JSONResponseBodyErrorCodeNotFound          LangyLocalReadCall200JSONResponseBodyErrorCode = "not_found"
-	LangyLocalReadCall200JSONResponseBodyErrorCodePathRefused       LangyLocalReadCall200JSONResponseBodyErrorCode = "path_refused"
-	LangyLocalReadCall200JSONResponseBodyErrorCodePermissionDenied  LangyLocalReadCall200JSONResponseBodyErrorCode = "permission_denied"
-	LangyLocalReadCall200JSONResponseBodyErrorCodePermissionExpired LangyLocalReadCall200JSONResponseBodyErrorCode = "permission_expired"
-	LangyLocalReadCall200JSONResponseBodyErrorCodeTimeout           LangyLocalReadCall200JSONResponseBodyErrorCode = "timeout"
-)
-
-// Valid indicates whether the value is a known member of the LangyLocalReadCall200JSONResponseBodyErrorCode enum.
-func (e LangyLocalReadCall200JSONResponseBodyErrorCode) Valid() bool {
-	switch e {
-	case LangyLocalReadCall200JSONResponseBodyErrorCodeCancelled:
-		return true
-	case LangyLocalReadCall200JSONResponseBodyErrorCodeCommandRefused:
-		return true
-	case LangyLocalReadCall200JSONResponseBodyErrorCodeExecFailed:
-		return true
-	case LangyLocalReadCall200JSONResponseBodyErrorCodeKeyRefused:
-		return true
-	case LangyLocalReadCall200JSONResponseBodyErrorCodeNotFound:
-		return true
-	case LangyLocalReadCall200JSONResponseBodyErrorCodePathRefused:
-		return true
-	case LangyLocalReadCall200JSONResponseBodyErrorCodePermissionDenied:
-		return true
-	case LangyLocalReadCall200JSONResponseBodyErrorCodePermissionExpired:
-		return true
-	case LangyLocalReadCall200JSONResponseBodyErrorCodeTimeout:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for LangyLocalReadCall200JSONResponseBodyState.
-const (
-	LangyLocalReadCall200JSONResponseBodyStateAwaitingPermission LangyLocalReadCall200JSONResponseBodyState = "awaiting_permission"
-	LangyLocalReadCall200JSONResponseBodyStateDone               LangyLocalReadCall200JSONResponseBodyState = "done"
-	LangyLocalReadCall200JSONResponseBodyStatePending            LangyLocalReadCall200JSONResponseBodyState = "pending"
-	LangyLocalReadCall200JSONResponseBodyStateRunning            LangyLocalReadCall200JSONResponseBodyState = "running"
-)
-
-// Valid indicates whether the value is a known member of the LangyLocalReadCall200JSONResponseBodyState enum.
-func (e LangyLocalReadCall200JSONResponseBodyState) Valid() bool {
-	switch e {
-	case LangyLocalReadCall200JSONResponseBodyStateAwaitingPermission:
-		return true
-	case LangyLocalReadCall200JSONResponseBodyStateDone:
-		return true
-	case LangyLocalReadCall200JSONResponseBodyStatePending:
-		return true
-	case LangyLocalReadCall200JSONResponseBodyStateRunning:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for LangyLocalCancelCall200JSONResponseBodyCancelled.
-const (
-	LangyLocalCancelCall200JSONResponseBodyCancelledTrue LangyLocalCancelCall200JSONResponseBodyCancelled = true
-)
-
-// Valid indicates whether the value is a known member of the LangyLocalCancelCall200JSONResponseBodyCancelled enum.
-func (e LangyLocalCancelCall200JSONResponseBodyCancelled) Valid() bool {
-	switch e {
-	case LangyLocalCancelCall200JSONResponseBodyCancelledTrue:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference.
-const (
-	Github LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference = "github"
-)
-
-// Valid indicates whether the value is a known member of the LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference enum.
-func (e LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference) Valid() bool {
-	switch e {
-	case Github:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for LangyLocalStartWaitJSONBodyKind.
-const (
-	Question LangyLocalStartWaitJSONBodyKind = "question"
-)
-
-// Valid indicates whether the value is a known member of the LangyLocalStartWaitJSONBodyKind enum.
-func (e LangyLocalStartWaitJSONBodyKind) Valid() bool {
-	switch e {
-	case Question:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for LangyLocalReadWait200JSONResponseBodyState.
-const (
-	LangyLocalReadWait200JSONResponseBodyStateAnswered  LangyLocalReadWait200JSONResponseBodyState = "answered"
-	LangyLocalReadWait200JSONResponseBodyStateCancelled LangyLocalReadWait200JSONResponseBodyState = "cancelled"
-	LangyLocalReadWait200JSONResponseBodyStateExpired   LangyLocalReadWait200JSONResponseBodyState = "expired"
-	LangyLocalReadWait200JSONResponseBodyStatePending   LangyLocalReadWait200JSONResponseBodyState = "pending"
-)
-
-// Valid indicates whether the value is a known member of the LangyLocalReadWait200JSONResponseBodyState enum.
-func (e LangyLocalReadWait200JSONResponseBodyState) Valid() bool {
-	switch e {
-	case LangyLocalReadWait200JSONResponseBodyStateAnswered:
-		return true
-	case LangyLocalReadWait200JSONResponseBodyStateCancelled:
-		return true
-	case LangyLocalReadWait200JSONResponseBodyStateExpired:
-		return true
-	case LangyLocalReadWait200JSONResponseBodyStatePending:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetProject200JSONResponseBodyPiiRedactionLevel.
-const (
-	GetProject200JSONResponseBodyPiiRedactionLevelDISABLED  GetProject200JSONResponseBodyPiiRedactionLevel = "DISABLED"
-	GetProject200JSONResponseBodyPiiRedactionLevelESSENTIAL GetProject200JSONResponseBodyPiiRedactionLevel = "ESSENTIAL"
-	GetProject200JSONResponseBodyPiiRedactionLevelSTRICT    GetProject200JSONResponseBodyPiiRedactionLevel = "STRICT"
-)
-
-// Valid indicates whether the value is a known member of the GetProject200JSONResponseBodyPiiRedactionLevel enum.
-func (e GetProject200JSONResponseBodyPiiRedactionLevel) Valid() bool {
-	switch e {
-	case GetProject200JSONResponseBodyPiiRedactionLevelDISABLED:
-		return true
-	case GetProject200JSONResponseBodyPiiRedactionLevelESSENTIAL:
-		return true
-	case GetProject200JSONResponseBodyPiiRedactionLevelSTRICT:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for UpdateProjectJSONBodyPiiRedactionLevel.
-const (
-	UpdateProjectJSONBodyPiiRedactionLevelDISABLED  UpdateProjectJSONBodyPiiRedactionLevel = "DISABLED"
-	UpdateProjectJSONBodyPiiRedactionLevelESSENTIAL UpdateProjectJSONBodyPiiRedactionLevel = "ESSENTIAL"
-	UpdateProjectJSONBodyPiiRedactionLevelSTRICT    UpdateProjectJSONBodyPiiRedactionLevel = "STRICT"
-)
-
-// Valid indicates whether the value is a known member of the UpdateProjectJSONBodyPiiRedactionLevel enum.
-func (e UpdateProjectJSONBodyPiiRedactionLevel) Valid() bool {
-	switch e {
-	case UpdateProjectJSONBodyPiiRedactionLevelDISABLED:
-		return true
-	case UpdateProjectJSONBodyPiiRedactionLevelESSENTIAL:
-		return true
-	case UpdateProjectJSONBodyPiiRedactionLevelSTRICT:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for UpdateProject200JSONResponseBodyPiiRedactionLevel.
-const (
-	UpdateProject200JSONResponseBodyPiiRedactionLevelDISABLED  UpdateProject200JSONResponseBodyPiiRedactionLevel = "DISABLED"
-	UpdateProject200JSONResponseBodyPiiRedactionLevelESSENTIAL UpdateProject200JSONResponseBodyPiiRedactionLevel = "ESSENTIAL"
-	UpdateProject200JSONResponseBodyPiiRedactionLevelSTRICT    UpdateProject200JSONResponseBodyPiiRedactionLevel = "STRICT"
-)
-
-// Valid indicates whether the value is a known member of the UpdateProject200JSONResponseBodyPiiRedactionLevel enum.
-func (e UpdateProject200JSONResponseBodyPiiRedactionLevel) Valid() bool {
-	switch e {
-	case UpdateProject200JSONResponseBodyPiiRedactionLevelDISABLED:
-		return true
-	case UpdateProject200JSONResponseBodyPiiRedactionLevelESSENTIAL:
-		return true
-	case UpdateProject200JSONResponseBodyPiiRedactionLevelSTRICT:
 		return true
 	default:
 		return false
@@ -15306,6 +15171,138 @@ func (e ContinueLangyConversationTurnJSONBodyMessagesRole) Valid() bool {
 	}
 }
 
+// Defines values for LangyLocalReadCall200JSONResponseBodyErrorCode.
+const (
+	LangyLocalReadCall200JSONResponseBodyErrorCodeCancelled         LangyLocalReadCall200JSONResponseBodyErrorCode = "cancelled"
+	LangyLocalReadCall200JSONResponseBodyErrorCodeCommandRefused    LangyLocalReadCall200JSONResponseBodyErrorCode = "command_refused"
+	LangyLocalReadCall200JSONResponseBodyErrorCodeExecFailed        LangyLocalReadCall200JSONResponseBodyErrorCode = "exec_failed"
+	LangyLocalReadCall200JSONResponseBodyErrorCodeKeyRefused        LangyLocalReadCall200JSONResponseBodyErrorCode = "key_refused"
+	LangyLocalReadCall200JSONResponseBodyErrorCodeNotFound          LangyLocalReadCall200JSONResponseBodyErrorCode = "not_found"
+	LangyLocalReadCall200JSONResponseBodyErrorCodePathRefused       LangyLocalReadCall200JSONResponseBodyErrorCode = "path_refused"
+	LangyLocalReadCall200JSONResponseBodyErrorCodePermissionDenied  LangyLocalReadCall200JSONResponseBodyErrorCode = "permission_denied"
+	LangyLocalReadCall200JSONResponseBodyErrorCodePermissionExpired LangyLocalReadCall200JSONResponseBodyErrorCode = "permission_expired"
+	LangyLocalReadCall200JSONResponseBodyErrorCodeTimeout           LangyLocalReadCall200JSONResponseBodyErrorCode = "timeout"
+)
+
+// Valid indicates whether the value is a known member of the LangyLocalReadCall200JSONResponseBodyErrorCode enum.
+func (e LangyLocalReadCall200JSONResponseBodyErrorCode) Valid() bool {
+	switch e {
+	case LangyLocalReadCall200JSONResponseBodyErrorCodeCancelled:
+		return true
+	case LangyLocalReadCall200JSONResponseBodyErrorCodeCommandRefused:
+		return true
+	case LangyLocalReadCall200JSONResponseBodyErrorCodeExecFailed:
+		return true
+	case LangyLocalReadCall200JSONResponseBodyErrorCodeKeyRefused:
+		return true
+	case LangyLocalReadCall200JSONResponseBodyErrorCodeNotFound:
+		return true
+	case LangyLocalReadCall200JSONResponseBodyErrorCodePathRefused:
+		return true
+	case LangyLocalReadCall200JSONResponseBodyErrorCodePermissionDenied:
+		return true
+	case LangyLocalReadCall200JSONResponseBodyErrorCodePermissionExpired:
+		return true
+	case LangyLocalReadCall200JSONResponseBodyErrorCodeTimeout:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LangyLocalReadCall200JSONResponseBodyState.
+const (
+	LangyLocalReadCall200JSONResponseBodyStateAwaitingPermission LangyLocalReadCall200JSONResponseBodyState = "awaiting_permission"
+	LangyLocalReadCall200JSONResponseBodyStateDone               LangyLocalReadCall200JSONResponseBodyState = "done"
+	LangyLocalReadCall200JSONResponseBodyStatePending            LangyLocalReadCall200JSONResponseBodyState = "pending"
+	LangyLocalReadCall200JSONResponseBodyStateRunning            LangyLocalReadCall200JSONResponseBodyState = "running"
+)
+
+// Valid indicates whether the value is a known member of the LangyLocalReadCall200JSONResponseBodyState enum.
+func (e LangyLocalReadCall200JSONResponseBodyState) Valid() bool {
+	switch e {
+	case LangyLocalReadCall200JSONResponseBodyStateAwaitingPermission:
+		return true
+	case LangyLocalReadCall200JSONResponseBodyStateDone:
+		return true
+	case LangyLocalReadCall200JSONResponseBodyStatePending:
+		return true
+	case LangyLocalReadCall200JSONResponseBodyStateRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LangyLocalCancelCall200JSONResponseBodyCancelled.
+const (
+	LangyLocalCancelCall200JSONResponseBodyCancelledTrue LangyLocalCancelCall200JSONResponseBodyCancelled = true
+)
+
+// Valid indicates whether the value is a known member of the LangyLocalCancelCall200JSONResponseBodyCancelled enum.
+func (e LangyLocalCancelCall200JSONResponseBodyCancelled) Valid() bool {
+	switch e {
+	case LangyLocalCancelCall200JSONResponseBodyCancelledTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference.
+const (
+	Github LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference = "github"
+)
+
+// Valid indicates whether the value is a known member of the LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference enum.
+func (e LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference) Valid() bool {
+	switch e {
+	case Github:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LangyLocalStartWaitJSONBodyKind.
+const (
+	Question LangyLocalStartWaitJSONBodyKind = "question"
+)
+
+// Valid indicates whether the value is a known member of the LangyLocalStartWaitJSONBodyKind enum.
+func (e LangyLocalStartWaitJSONBodyKind) Valid() bool {
+	switch e {
+	case Question:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LangyLocalReadWait200JSONResponseBodyState.
+const (
+	LangyLocalReadWait200JSONResponseBodyStateAnswered  LangyLocalReadWait200JSONResponseBodyState = "answered"
+	LangyLocalReadWait200JSONResponseBodyStateCancelled LangyLocalReadWait200JSONResponseBodyState = "cancelled"
+	LangyLocalReadWait200JSONResponseBodyStateExpired   LangyLocalReadWait200JSONResponseBodyState = "expired"
+	LangyLocalReadWait200JSONResponseBodyStatePending   LangyLocalReadWait200JSONResponseBodyState = "pending"
+)
+
+// Valid indicates whether the value is a known member of the LangyLocalReadWait200JSONResponseBodyState enum.
+func (e LangyLocalReadWait200JSONResponseBodyState) Valid() bool {
+	switch e {
+	case LangyLocalReadWait200JSONResponseBodyStateAnswered:
+		return true
+	case LangyLocalReadWait200JSONResponseBodyStateCancelled:
+		return true
+	case LangyLocalReadWait200JSONResponseBodyStateExpired:
+		return true
+	case LangyLocalReadWait200JSONResponseBodyStatePending:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiModelDefaults200JSONResponseBodyConfigsScopesType.
 const (
 	GetApiModelDefaults200JSONResponseBodyConfigsScopesTypeORGANIZATION GetApiModelDefaults200JSONResponseBodyConfigsScopesType = "ORGANIZATION"
@@ -16722,6 +16719,69 @@ func (e GetPlatformHealthSubsystem503JSONResponseBodyStatus) Valid() bool {
 	case GetPlatformHealthSubsystem503JSONResponseBodyStatusHealthy:
 		return true
 	case GetPlatformHealthSubsystem503JSONResponseBodyStatusUnhealthy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetProject200JSONResponseBodyPiiRedactionLevel.
+const (
+	GetProject200JSONResponseBodyPiiRedactionLevelDISABLED  GetProject200JSONResponseBodyPiiRedactionLevel = "DISABLED"
+	GetProject200JSONResponseBodyPiiRedactionLevelESSENTIAL GetProject200JSONResponseBodyPiiRedactionLevel = "ESSENTIAL"
+	GetProject200JSONResponseBodyPiiRedactionLevelSTRICT    GetProject200JSONResponseBodyPiiRedactionLevel = "STRICT"
+)
+
+// Valid indicates whether the value is a known member of the GetProject200JSONResponseBodyPiiRedactionLevel enum.
+func (e GetProject200JSONResponseBodyPiiRedactionLevel) Valid() bool {
+	switch e {
+	case GetProject200JSONResponseBodyPiiRedactionLevelDISABLED:
+		return true
+	case GetProject200JSONResponseBodyPiiRedactionLevelESSENTIAL:
+		return true
+	case GetProject200JSONResponseBodyPiiRedactionLevelSTRICT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateProjectJSONBodyPiiRedactionLevel.
+const (
+	UpdateProjectJSONBodyPiiRedactionLevelDISABLED  UpdateProjectJSONBodyPiiRedactionLevel = "DISABLED"
+	UpdateProjectJSONBodyPiiRedactionLevelESSENTIAL UpdateProjectJSONBodyPiiRedactionLevel = "ESSENTIAL"
+	UpdateProjectJSONBodyPiiRedactionLevelSTRICT    UpdateProjectJSONBodyPiiRedactionLevel = "STRICT"
+)
+
+// Valid indicates whether the value is a known member of the UpdateProjectJSONBodyPiiRedactionLevel enum.
+func (e UpdateProjectJSONBodyPiiRedactionLevel) Valid() bool {
+	switch e {
+	case UpdateProjectJSONBodyPiiRedactionLevelDISABLED:
+		return true
+	case UpdateProjectJSONBodyPiiRedactionLevelESSENTIAL:
+		return true
+	case UpdateProjectJSONBodyPiiRedactionLevelSTRICT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateProject200JSONResponseBodyPiiRedactionLevel.
+const (
+	UpdateProject200JSONResponseBodyPiiRedactionLevelDISABLED  UpdateProject200JSONResponseBodyPiiRedactionLevel = "DISABLED"
+	UpdateProject200JSONResponseBodyPiiRedactionLevelESSENTIAL UpdateProject200JSONResponseBodyPiiRedactionLevel = "ESSENTIAL"
+	UpdateProject200JSONResponseBodyPiiRedactionLevelSTRICT    UpdateProject200JSONResponseBodyPiiRedactionLevel = "STRICT"
+)
+
+// Valid indicates whether the value is a known member of the UpdateProject200JSONResponseBodyPiiRedactionLevel enum.
+func (e UpdateProject200JSONResponseBodyPiiRedactionLevel) Valid() bool {
+	switch e {
+	case UpdateProject200JSONResponseBodyPiiRedactionLevelDISABLED:
+		return true
+	case UpdateProject200JSONResponseBodyPiiRedactionLevelESSENTIAL:
+		return true
+	case UpdateProject200JSONResponseBodyPiiRedactionLevelSTRICT:
 		return true
 	default:
 		return false
@@ -20976,6 +21036,30 @@ func (e PostApiV1Query403JSONResponseBodyFault) Valid() bool {
 	}
 }
 
+// Defines values for PostApiV1Query404JSONResponseBodyFault.
+const (
+	PostApiV1Query404JSONResponseBodyFaultCustomer         PostApiV1Query404JSONResponseBodyFault = "customer"
+	PostApiV1Query404JSONResponseBodyFaultPlatform         PostApiV1Query404JSONResponseBodyFault = "platform"
+	PostApiV1Query404JSONResponseBodyFaultPresumedPlatform PostApiV1Query404JSONResponseBodyFault = "presumed_platform"
+	PostApiV1Query404JSONResponseBodyFaultProvider         PostApiV1Query404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1Query404JSONResponseBodyFault enum.
+func (e PostApiV1Query404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiV1Query404JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiV1Query404JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1Query404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiV1Query404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiV1Query422JSONResponseBodyFault.
 const (
 	PostApiV1Query422JSONResponseBodyFaultCustomer         PostApiV1Query422JSONResponseBodyFault = "customer"
@@ -23486,22 +23570,22 @@ func (e GetApiV1QuerySchema403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiV1QuerySchema500JSONResponseBodyFault.
 const (
-	GetApiV1QuerySchema500JSONResponseBodyFaultCustomer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
-	GetApiV1QuerySchema500JSONResponseBodyFaultPlatform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
-	GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
-	GetApiV1QuerySchema500JSONResponseBodyFaultProvider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
+	Customer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
+	Platform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
+	PresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
+	Provider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QuerySchema500JSONResponseBodyFault enum.
 func (e GetApiV1QuerySchema500JSONResponseBodyFault) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema500JSONResponseBodyFaultCustomer:
+	case Customer:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultPlatform:
+	case Platform:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform:
+	case PresumedPlatform:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultProvider:
+	case Provider:
 		return true
 	default:
 		return false
@@ -25373,13 +25457,13 @@ func (e PostApiScenarioEventsJSONBody2Messages2Role5) Valid() bool {
 
 // Defines values for PostApiScenarioEventsJSONBody2Messages2Role6.
 const (
-	Unknown PostApiScenarioEventsJSONBody2Messages2Role6 = "unknown"
+	PostApiScenarioEventsJSONBody2Messages2Role6Unknown PostApiScenarioEventsJSONBody2Messages2Role6 = "unknown"
 )
 
 // Valid indicates whether the value is a known member of the PostApiScenarioEventsJSONBody2Messages2Role6 enum.
 func (e PostApiScenarioEventsJSONBody2Messages2Role6) Valid() bool {
 	switch e {
-	case Unknown:
+	case PostApiScenarioEventsJSONBody2Messages2Role6Unknown:
 		return true
 	default:
 		return false
@@ -31196,13 +31280,13 @@ func (e PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0Operator) Valid()
 
 // Defines values for PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0.
 const (
-	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0N1 PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0 = 1
+	N1 PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0 = 1
 )
 
 // Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0 enum.
 func (e PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0) Valid() bool {
 	switch e {
-	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0N1:
+	case N1:
 		return true
 	default:
 		return false
@@ -31658,13 +31742,13 @@ func (e PostApiWebhooksV1Endpoints201JSONResponseBodyData1Status) Valid() bool {
 
 // Defines values for DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived.
 const (
-	True DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived = true
+	DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchivedTrue DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived = true
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived enum.
 func (e DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived) Valid() bool {
 	switch e {
-	case True:
+	case DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchivedTrue:
 		return true
 	default:
 		return false
@@ -31883,22 +31967,22 @@ func (e PatchApiWebhooksV1EndpointsById200JSONResponseBodyData1Status) Valid() b
 
 // Defines values for GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome.
 const (
-	GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomePending   GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "pending"
-	GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeRetryable GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "retryable"
-	GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeSuccess   GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "success"
-	GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeTerminal  GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "terminal"
+	Pending   GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "pending"
+	Retryable GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "retryable"
+	Success   GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "success"
+	Terminal  GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "terminal"
 )
 
 // Valid indicates whether the value is a known member of the GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome enum.
 func (e GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome) Valid() bool {
 	switch e {
-	case GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomePending:
+	case Pending:
 		return true
-	case GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeRetryable:
+	case Retryable:
 		return true
-	case GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeSuccess:
+	case Success:
 		return true
-	case GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcomeTerminal:
+	case Terminal:
 		return true
 	default:
 		return false
@@ -32944,12 +33028,10 @@ type SpanInputOutput1ValueContent14Type string
 
 // SpanInputOutput1ValueContent15 defines model for .
 type SpanInputOutput1ValueContent15 struct {
-	Data     *string                            `json:"data,omitempty"`
-	Filename *string                            `json:"filename,omitempty"`
-	Id       *string                            `json:"id,omitempty"`
-	MimeType string                             `json:"mimeType"`
-	Type     SpanInputOutput1ValueContent15Type `json:"type"`
-	Url      *string                            `json:"url,omitempty"`
+	Input      interface{}                        `json:"input,omitempty"`
+	ToolCallId *string                            `json:"toolCallId,omitempty"`
+	ToolName   *string                            `json:"toolName,omitempty"`
+	Type       SpanInputOutput1ValueContent15Type `json:"type"`
 }
 
 // SpanInputOutput1ValueContent15Type defines model for SpanInputOutput.1.Value.Content.1.5.Type.
@@ -32957,14 +33039,10 @@ type SpanInputOutput1ValueContent15Type string
 
 // SpanInputOutput1ValueContent16 defines model for .
 type SpanInputOutput1ValueContent16 struct {
-	InputAudio struct {
-		Data     *string `json:"data,omitempty"`
-		Format   *string `json:"format,omitempty"`
-		Id       *string `json:"id,omitempty"`
-		MimeType *string `json:"mimeType,omitempty"`
-		Url      *string `json:"url,omitempty"`
-	} `json:"input_audio"`
-	Type SpanInputOutput1ValueContent16Type `json:"type"`
+	Output     interface{}                        `json:"output,omitempty"`
+	ToolCallId *string                            `json:"toolCallId,omitempty"`
+	ToolName   *string                            `json:"toolName,omitempty"`
+	Type       SpanInputOutput1ValueContent16Type `json:"type"`
 }
 
 // SpanInputOutput1ValueContent16Type defines model for SpanInputOutput.1.Value.Content.1.6.Type.
@@ -32972,23 +33050,12 @@ type SpanInputOutput1ValueContent16Type string
 
 // SpanInputOutput1ValueContent17 defines model for .
 type SpanInputOutput1ValueContent17 struct {
-	Source struct {
-		MimeType *string                                         `json:"mimeType,omitempty"`
-		Type     SpanInputOutput_1_Value_Content_1_7_Source_Type `json:"type"`
-		Value    string                                          `json:"value"`
-	} `json:"source"`
-	Type SpanInputOutput1ValueContent17Type `json:"type"`
-}
-
-// SpanInputOutput1ValueContent17SourceType0 defines model for SpanInputOutput.1.Value.Content.1.7.Source.Type.0.
-type SpanInputOutput1ValueContent17SourceType0 string
-
-// SpanInputOutput1ValueContent17SourceType1 defines model for SpanInputOutput.1.Value.Content.1.7.Source.Type.1.
-type SpanInputOutput1ValueContent17SourceType1 string
-
-// SpanInputOutput_1_Value_Content_1_7_Source_Type defines model for SpanInputOutput.1.Value.Content.1.7.Source.Type.
-type SpanInputOutput_1_Value_Content_1_7_Source_Type struct {
-	union json.RawMessage
+	Data     *string                            `json:"data,omitempty"`
+	Filename *string                            `json:"filename,omitempty"`
+	Id       *string                            `json:"id,omitempty"`
+	MimeType string                             `json:"mimeType"`
+	Type     SpanInputOutput1ValueContent17Type `json:"type"`
+	Url      *string                            `json:"url,omitempty"`
 }
 
 // SpanInputOutput1ValueContent17Type defines model for SpanInputOutput.1.Value.Content.1.7.Type.
@@ -32996,9 +33063,14 @@ type SpanInputOutput1ValueContent17Type string
 
 // SpanInputOutput1ValueContent18 defines model for .
 type SpanInputOutput1ValueContent18 struct {
-	Image     string                             `json:"image"`
-	MediaType *string                            `json:"mediaType,omitempty"`
-	Type      SpanInputOutput1ValueContent18Type `json:"type"`
+	InputAudio struct {
+		Data     *string `json:"data,omitempty"`
+		Format   *string `json:"format,omitempty"`
+		Id       *string `json:"id,omitempty"`
+		MimeType *string `json:"mimeType,omitempty"`
+		Url      *string `json:"url,omitempty"`
+	} `json:"input_audio"`
+	Type SpanInputOutput1ValueContent18Type `json:"type"`
 }
 
 // SpanInputOutput1ValueContent18Type defines model for SpanInputOutput.1.Value.Content.1.8.Type.
@@ -33006,11 +33078,23 @@ type SpanInputOutput1ValueContent18Type string
 
 // SpanInputOutput1ValueContent19 defines model for .
 type SpanInputOutput1ValueContent19 struct {
-	Data      *string                            `json:"data,omitempty"`
-	Filename  *string                            `json:"filename,omitempty"`
-	MediaType string                             `json:"mediaType"`
-	Type      SpanInputOutput1ValueContent19Type `json:"type"`
-	Url       *string                            `json:"url,omitempty"`
+	Source struct {
+		MimeType *string                                         `json:"mimeType,omitempty"`
+		Type     SpanInputOutput_1_Value_Content_1_9_Source_Type `json:"type"`
+		Value    string                                          `json:"value"`
+	} `json:"source"`
+	Type SpanInputOutput1ValueContent19Type `json:"type"`
+}
+
+// SpanInputOutput1ValueContent19SourceType0 defines model for SpanInputOutput.1.Value.Content.1.9.Source.Type.0.
+type SpanInputOutput1ValueContent19SourceType0 string
+
+// SpanInputOutput1ValueContent19SourceType1 defines model for SpanInputOutput.1.Value.Content.1.9.Source.Type.1.
+type SpanInputOutput1ValueContent19SourceType1 string
+
+// SpanInputOutput_1_Value_Content_1_9_Source_Type defines model for SpanInputOutput.1.Value.Content.1.9.Source.Type.
+type SpanInputOutput_1_Value_Content_1_9_Source_Type struct {
+	union json.RawMessage
 }
 
 // SpanInputOutput1ValueContent19Type defines model for SpanInputOutput.1.Value.Content.1.9.Type.
@@ -33018,16 +33102,38 @@ type SpanInputOutput1ValueContent19Type string
 
 // SpanInputOutput1ValueContent110 defines model for .
 type SpanInputOutput1ValueContent110 struct {
+	Image     string                              `json:"image"`
+	MediaType *string                             `json:"mediaType,omitempty"`
+	Type      SpanInputOutput1ValueContent110Type `json:"type"`
+}
+
+// SpanInputOutput1ValueContent110Type defines model for SpanInputOutput.1.Value.Content.1.10.Type.
+type SpanInputOutput1ValueContent110Type string
+
+// SpanInputOutput1ValueContent111 defines model for .
+type SpanInputOutput1ValueContent111 struct {
+	Data      *string                             `json:"data,omitempty"`
+	Filename  *string                             `json:"filename,omitempty"`
+	MediaType string                              `json:"mediaType"`
+	Type      SpanInputOutput1ValueContent111Type `json:"type"`
+	Url       *string                             `json:"url,omitempty"`
+}
+
+// SpanInputOutput1ValueContent111Type defines model for SpanInputOutput.1.Value.Content.1.11.Type.
+type SpanInputOutput1ValueContent111Type string
+
+// SpanInputOutput1ValueContent112 defines model for .
+type SpanInputOutput1ValueContent112 struct {
 	File struct {
 		FileData *string `json:"file_data,omitempty"`
 		FileId   *string `json:"file_id,omitempty"`
 		Filename *string `json:"filename,omitempty"`
 	} `json:"file"`
-	Type SpanInputOutput1ValueContent110Type `json:"type"`
+	Type SpanInputOutput1ValueContent112Type `json:"type"`
 }
 
-// SpanInputOutput1ValueContent110Type defines model for SpanInputOutput.1.Value.Content.1.10.Type.
-type SpanInputOutput1ValueContent110Type string
+// SpanInputOutput1ValueContent112Type defines model for SpanInputOutput.1.Value.Content.1.12.Type.
+type SpanInputOutput1ValueContent112Type string
 
 // SpanInputOutput_1_Value_Content_1_Item defines model for SpanInputOutput.1.Value.Content.1.Item.
 type SpanInputOutput_1_Value_Content_1_Item struct {
@@ -33104,12 +33210,10 @@ type SpanInputOutput1ValueParts4Type string
 
 // SpanInputOutput1ValueParts5 defines model for .
 type SpanInputOutput1ValueParts5 struct {
-	Data     *string                         `json:"data,omitempty"`
-	Filename *string                         `json:"filename,omitempty"`
-	Id       *string                         `json:"id,omitempty"`
-	MimeType string                          `json:"mimeType"`
-	Type     SpanInputOutput1ValueParts5Type `json:"type"`
-	Url      *string                         `json:"url,omitempty"`
+	Input      interface{}                     `json:"input,omitempty"`
+	ToolCallId *string                         `json:"toolCallId,omitempty"`
+	ToolName   *string                         `json:"toolName,omitempty"`
+	Type       SpanInputOutput1ValueParts5Type `json:"type"`
 }
 
 // SpanInputOutput1ValueParts5Type defines model for SpanInputOutput.1.Value.Parts.5.Type.
@@ -33117,14 +33221,10 @@ type SpanInputOutput1ValueParts5Type string
 
 // SpanInputOutput1ValueParts6 defines model for .
 type SpanInputOutput1ValueParts6 struct {
-	InputAudio struct {
-		Data     *string `json:"data,omitempty"`
-		Format   *string `json:"format,omitempty"`
-		Id       *string `json:"id,omitempty"`
-		MimeType *string `json:"mimeType,omitempty"`
-		Url      *string `json:"url,omitempty"`
-	} `json:"input_audio"`
-	Type SpanInputOutput1ValueParts6Type `json:"type"`
+	Output     interface{}                     `json:"output,omitempty"`
+	ToolCallId *string                         `json:"toolCallId,omitempty"`
+	ToolName   *string                         `json:"toolName,omitempty"`
+	Type       SpanInputOutput1ValueParts6Type `json:"type"`
 }
 
 // SpanInputOutput1ValueParts6Type defines model for SpanInputOutput.1.Value.Parts.6.Type.
@@ -33132,23 +33232,12 @@ type SpanInputOutput1ValueParts6Type string
 
 // SpanInputOutput1ValueParts7 defines model for .
 type SpanInputOutput1ValueParts7 struct {
-	Source struct {
-		MimeType *string                                     `json:"mimeType,omitempty"`
-		Type     SpanInputOutput_1_Value_Parts_7_Source_Type `json:"type"`
-		Value    string                                      `json:"value"`
-	} `json:"source"`
-	Type SpanInputOutput1ValueParts7Type `json:"type"`
-}
-
-// SpanInputOutput1ValueParts7SourceType0 defines model for SpanInputOutput.1.Value.Parts.7.Source.Type.0.
-type SpanInputOutput1ValueParts7SourceType0 string
-
-// SpanInputOutput1ValueParts7SourceType1 defines model for SpanInputOutput.1.Value.Parts.7.Source.Type.1.
-type SpanInputOutput1ValueParts7SourceType1 string
-
-// SpanInputOutput_1_Value_Parts_7_Source_Type defines model for SpanInputOutput.1.Value.Parts.7.Source.Type.
-type SpanInputOutput_1_Value_Parts_7_Source_Type struct {
-	union json.RawMessage
+	Data     *string                         `json:"data,omitempty"`
+	Filename *string                         `json:"filename,omitempty"`
+	Id       *string                         `json:"id,omitempty"`
+	MimeType string                          `json:"mimeType"`
+	Type     SpanInputOutput1ValueParts7Type `json:"type"`
+	Url      *string                         `json:"url,omitempty"`
 }
 
 // SpanInputOutput1ValueParts7Type defines model for SpanInputOutput.1.Value.Parts.7.Type.
@@ -33156,9 +33245,14 @@ type SpanInputOutput1ValueParts7Type string
 
 // SpanInputOutput1ValueParts8 defines model for .
 type SpanInputOutput1ValueParts8 struct {
-	Image     string                          `json:"image"`
-	MediaType *string                         `json:"mediaType,omitempty"`
-	Type      SpanInputOutput1ValueParts8Type `json:"type"`
+	InputAudio struct {
+		Data     *string `json:"data,omitempty"`
+		Format   *string `json:"format,omitempty"`
+		Id       *string `json:"id,omitempty"`
+		MimeType *string `json:"mimeType,omitempty"`
+		Url      *string `json:"url,omitempty"`
+	} `json:"input_audio"`
+	Type SpanInputOutput1ValueParts8Type `json:"type"`
 }
 
 // SpanInputOutput1ValueParts8Type defines model for SpanInputOutput.1.Value.Parts.8.Type.
@@ -33166,11 +33260,23 @@ type SpanInputOutput1ValueParts8Type string
 
 // SpanInputOutput1ValueParts9 defines model for .
 type SpanInputOutput1ValueParts9 struct {
-	Data      *string                         `json:"data,omitempty"`
-	Filename  *string                         `json:"filename,omitempty"`
-	MediaType string                          `json:"mediaType"`
-	Type      SpanInputOutput1ValueParts9Type `json:"type"`
-	Url       *string                         `json:"url,omitempty"`
+	Source struct {
+		MimeType *string                                     `json:"mimeType,omitempty"`
+		Type     SpanInputOutput_1_Value_Parts_9_Source_Type `json:"type"`
+		Value    string                                      `json:"value"`
+	} `json:"source"`
+	Type SpanInputOutput1ValueParts9Type `json:"type"`
+}
+
+// SpanInputOutput1ValueParts9SourceType0 defines model for SpanInputOutput.1.Value.Parts.9.Source.Type.0.
+type SpanInputOutput1ValueParts9SourceType0 string
+
+// SpanInputOutput1ValueParts9SourceType1 defines model for SpanInputOutput.1.Value.Parts.9.Source.Type.1.
+type SpanInputOutput1ValueParts9SourceType1 string
+
+// SpanInputOutput_1_Value_Parts_9_Source_Type defines model for SpanInputOutput.1.Value.Parts.9.Source.Type.
+type SpanInputOutput_1_Value_Parts_9_Source_Type struct {
+	union json.RawMessage
 }
 
 // SpanInputOutput1ValueParts9Type defines model for SpanInputOutput.1.Value.Parts.9.Type.
@@ -33178,16 +33284,38 @@ type SpanInputOutput1ValueParts9Type string
 
 // SpanInputOutput1ValueParts10 defines model for .
 type SpanInputOutput1ValueParts10 struct {
+	Image     string                           `json:"image"`
+	MediaType *string                          `json:"mediaType,omitempty"`
+	Type      SpanInputOutput1ValueParts10Type `json:"type"`
+}
+
+// SpanInputOutput1ValueParts10Type defines model for SpanInputOutput.1.Value.Parts.10.Type.
+type SpanInputOutput1ValueParts10Type string
+
+// SpanInputOutput1ValueParts11 defines model for .
+type SpanInputOutput1ValueParts11 struct {
+	Data      *string                          `json:"data,omitempty"`
+	Filename  *string                          `json:"filename,omitempty"`
+	MediaType string                           `json:"mediaType"`
+	Type      SpanInputOutput1ValueParts11Type `json:"type"`
+	Url       *string                          `json:"url,omitempty"`
+}
+
+// SpanInputOutput1ValueParts11Type defines model for SpanInputOutput.1.Value.Parts.11.Type.
+type SpanInputOutput1ValueParts11Type string
+
+// SpanInputOutput1ValueParts12 defines model for .
+type SpanInputOutput1ValueParts12 struct {
 	File struct {
 		FileData *string `json:"file_data,omitempty"`
 		FileId   *string `json:"file_id,omitempty"`
 		Filename *string `json:"filename,omitempty"`
 	} `json:"file"`
-	Type SpanInputOutput1ValueParts10Type `json:"type"`
+	Type SpanInputOutput1ValueParts12Type `json:"type"`
 }
 
-// SpanInputOutput1ValueParts10Type defines model for SpanInputOutput.1.Value.Parts.10.Type.
-type SpanInputOutput1ValueParts10Type string
+// SpanInputOutput1ValueParts12Type defines model for SpanInputOutput.1.Value.Parts.12.Type.
+type SpanInputOutput1ValueParts12Type string
 
 // SpanInputOutput_1_Value_Parts_Item defines model for SpanInputOutput.1.Value.parts.Item.
 type SpanInputOutput_1_Value_Parts_Item struct {
@@ -34010,9 +34138,6 @@ type GetApiCodingAgentPullRequestUsageParams struct {
 	// Host The repository's host, e.g. github.com.
 	Host *string `form:"host,omitempty" json:"host,omitempty"`
 }
-
-// ReceiveElevenLabsWebhookTextBody defines parameters for ReceiveElevenLabsWebhook.
-type ReceiveElevenLabsWebhookTextBody interface{}
 
 // GetApiGatewayV1BudgetsParams defines parameters for GetApiGatewayV1Budgets.
 type GetApiGatewayV1BudgetsParams struct {
@@ -35474,106 +35599,6 @@ type IngestTurnResultJSONBodyStatus string
 
 // IngestTurnResult202JSONResponseBodyStatus defines parameters for IngestTurnResult.
 type IngestTurnResult202JSONResponseBodyStatus string
-
-// LangyLocalStartCallTextBody defines parameters for LangyLocalStartCall.
-type LangyLocalStartCallTextBody interface{}
-
-// LangyLocalReadCall200JSONResponseBodyErrorCode defines parameters for LangyLocalReadCall.
-type LangyLocalReadCall200JSONResponseBodyErrorCode string
-
-// LangyLocalReadCall200JSONResponseBodyState defines parameters for LangyLocalReadCall.
-type LangyLocalReadCall200JSONResponseBodyState string
-
-// LangyLocalCancelCall200JSONResponseBodyCancelled defines parameters for LangyLocalCancelCall.
-type LangyLocalCancelCall200JSONResponseBodyCancelled bool
-
-// LangyLocalCreateRequestJSONBody defines parameters for LangyLocalCreateRequest.
-type LangyLocalCreateRequestJSONBody struct {
-	ConversationId string `json:"conversationId"`
-}
-
-// LangyLocalWorkspaceParams defines parameters for LangyLocalWorkspace.
-type LangyLocalWorkspaceParams struct {
-	ConversationId *string `form:"conversationId,omitempty" json:"conversationId,omitempty"`
-}
-
-// LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference defines parameters for LangyLocalWorkspace.
-type LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference string
-
-// LangyUiActionsDispatchTextBody defines parameters for LangyUiActionsDispatch.
-type LangyUiActionsDispatchTextBody interface{}
-
-// LangyLocalStartWaitJSONBody defines parameters for LangyLocalStartWait.
-type LangyLocalStartWaitJSONBody struct {
-	ConversationId string                          `json:"conversationId"`
-	Kind           LangyLocalStartWaitJSONBodyKind `json:"kind"`
-	Questions      []struct {
-		AllowOther *bool   `json:"allowOther,omitempty"`
-		Bare       *bool   `json:"bare,omitempty"`
-		Header     *string `json:"header,omitempty"`
-		Multiple   *bool   `json:"multiple,omitempty"`
-		Options    []struct {
-			Description *string `json:"description,omitempty"`
-			Label       string  `json:"label"`
-			Quiet       *bool   `json:"quiet,omitempty"`
-		} `json:"options"`
-		Question string `json:"question"`
-	} `json:"questions"`
-	ToolCallId *string `json:"toolCallId,omitempty"`
-	TurnId     string  `json:"turnId"`
-}
-
-// LangyLocalStartWaitJSONBodyKind defines parameters for LangyLocalStartWait.
-type LangyLocalStartWaitJSONBodyKind string
-
-// LangyLocalReadWait200JSONResponseBodyState defines parameters for LangyLocalReadWait.
-type LangyLocalReadWait200JSONResponseBodyState string
-
-// ListProjectsParams defines parameters for ListProjects.
-type ListProjectsParams struct {
-	Page  *int `form:"page,omitempty" json:"page,omitempty"`
-	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
-}
-
-// CreateProjectJSONBody defines parameters for CreateProject.
-type CreateProjectJSONBody struct {
-	// Framework Framework in use, such as langchain or openai
-	Framework string `json:"framework"`
-
-	// Language Programming language, such as python or typescript
-	Language string `json:"language"`
-
-	// Name Project name
-	Name string `json:"name"`
-
-	// NewTeamName Create a team with this name and put the project in it
-	NewTeamName *string `json:"newTeamName,omitempty"`
-
-	// TeamId Id of an existing team to put the project in
-	TeamId *string `json:"teamId,omitempty"`
-}
-
-// GetProject200JSONResponseBodyPiiRedactionLevel defines parameters for GetProject.
-type GetProject200JSONResponseBodyPiiRedactionLevel string
-
-// UpdateProjectJSONBody defines parameters for UpdateProject.
-type UpdateProjectJSONBody struct {
-	Framework *string `json:"framework,omitempty"`
-	Language  *string `json:"language,omitempty"`
-	Name      *string `json:"name,omitempty"`
-
-	// PiiRedactionLevel The PII level the project's traces are redacted at
-	PiiRedactionLevel *UpdateProjectJSONBodyPiiRedactionLevel `json:"piiRedactionLevel,omitempty"`
-
-	// TeamId Moves the project to this team
-	TeamId *string `json:"teamId,omitempty"`
-}
-
-// UpdateProjectJSONBodyPiiRedactionLevel defines parameters for UpdateProject.
-type UpdateProjectJSONBodyPiiRedactionLevel string
-
-// UpdateProject200JSONResponseBodyPiiRedactionLevel defines parameters for UpdateProject.
-type UpdateProject200JSONResponseBodyPiiRedactionLevel string
 
 // IngestBrowserTracesTextBody defines parameters for IngestBrowserTraces.
 type IngestBrowserTracesTextBody interface{}
@@ -37895,10 +37920,11 @@ type PostApiAnalyticsJSONBody struct {
 		} `json:"pipeline,omitempty"`
 		Subkey *string `json:"subkey,omitempty"`
 	} `json:"series"`
-	StartDate PostApiAnalyticsJSONBody_StartDate  `json:"startDate"`
-	TimeScale *PostApiAnalyticsJSONBody_TimeScale `json:"timeScale,omitempty"`
-	TimeZone  string                              `json:"timeZone"`
-	TraceIds  *[]string                           `json:"traceIds,omitempty"`
+	ShouldSkipPreviousPeriod *bool                               `json:"shouldSkipPreviousPeriod,omitempty"`
+	StartDate                PostApiAnalyticsJSONBody_StartDate  `json:"startDate"`
+	TimeScale                *PostApiAnalyticsJSONBody_TimeScale `json:"timeScale,omitempty"`
+	TimeZone                 string                              `json:"timeZone"`
+	TraceIds                 *[]string                           `json:"traceIds,omitempty"`
 }
 
 // PostApiAnalyticsJSONBodyEndDate0 defines parameters for PostApiAnalytics.
@@ -38842,10 +38868,11 @@ type PostApiAnalyticsTimeseriesJSONBody struct {
 		} `json:"pipeline,omitempty"`
 		Subkey *string `json:"subkey,omitempty"`
 	} `json:"series"`
-	StartDate PostApiAnalyticsTimeseriesJSONBody_StartDate  `json:"startDate"`
-	TimeScale *PostApiAnalyticsTimeseriesJSONBody_TimeScale `json:"timeScale,omitempty"`
-	TimeZone  string                                        `json:"timeZone"`
-	TraceIds  *[]string                                     `json:"traceIds,omitempty"`
+	ShouldSkipPreviousPeriod *bool                                         `json:"shouldSkipPreviousPeriod,omitempty"`
+	StartDate                PostApiAnalyticsTimeseriesJSONBody_StartDate  `json:"startDate"`
+	TimeScale                *PostApiAnalyticsTimeseriesJSONBody_TimeScale `json:"timeScale,omitempty"`
+	TimeZone                 string                                        `json:"timeZone"`
+	TraceIds                 *[]string                                     `json:"traceIds,omitempty"`
 }
 
 // PostApiAnalyticsTimeseriesJSONBodyEndDate0 defines parameters for PostApiAnalyticsTimeseries.
@@ -40540,6 +40567,9 @@ type PostApiDspyLogStepsJSONBody_Predictors_Predictor struct {
 	UnderscoreUnderscoreClass *string                `json:"__class__,omitempty"`
 	AdditionalProperties      map[string]interface{} `json:"-"`
 }
+
+// ReceiveElevenLabsWebhookTextBody defines parameters for ReceiveElevenLabsWebhook.
+type ReceiveElevenLabsWebhookTextBody interface{}
 
 // PostApiEvaluationsBatchLogResultsJSONBody defines parameters for PostApiEvaluationsBatchLogResults.
 type PostApiEvaluationsBatchLogResultsJSONBody struct {
@@ -42279,6 +42309,60 @@ type ContinueLangyConversationTurnJSONBody struct {
 // ContinueLangyConversationTurnJSONBodyMessagesRole defines parameters for ContinueLangyConversationTurn.
 type ContinueLangyConversationTurnJSONBodyMessagesRole string
 
+// LangyLocalStartCallTextBody defines parameters for LangyLocalStartCall.
+type LangyLocalStartCallTextBody interface{}
+
+// LangyLocalReadCall200JSONResponseBodyErrorCode defines parameters for LangyLocalReadCall.
+type LangyLocalReadCall200JSONResponseBodyErrorCode string
+
+// LangyLocalReadCall200JSONResponseBodyState defines parameters for LangyLocalReadCall.
+type LangyLocalReadCall200JSONResponseBodyState string
+
+// LangyLocalCancelCall200JSONResponseBodyCancelled defines parameters for LangyLocalCancelCall.
+type LangyLocalCancelCall200JSONResponseBodyCancelled bool
+
+// LangyLocalCreateRequestJSONBody defines parameters for LangyLocalCreateRequest.
+type LangyLocalCreateRequestJSONBody struct {
+	ConversationId string `json:"conversationId"`
+}
+
+// LangyLocalWorkspaceParams defines parameters for LangyLocalWorkspace.
+type LangyLocalWorkspaceParams struct {
+	ConversationId *string `form:"conversationId,omitempty" json:"conversationId,omitempty"`
+}
+
+// LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference defines parameters for LangyLocalWorkspace.
+type LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference string
+
+// LangyUiActionsDispatchTextBody defines parameters for LangyUiActionsDispatch.
+type LangyUiActionsDispatchTextBody interface{}
+
+// LangyLocalStartWaitJSONBody defines parameters for LangyLocalStartWait.
+type LangyLocalStartWaitJSONBody struct {
+	ConversationId string                          `json:"conversationId"`
+	Kind           LangyLocalStartWaitJSONBodyKind `json:"kind"`
+	Questions      []struct {
+		AllowOther *bool   `json:"allowOther,omitempty"`
+		Bare       *bool   `json:"bare,omitempty"`
+		Header     *string `json:"header,omitempty"`
+		Multiple   *bool   `json:"multiple,omitempty"`
+		Options    []struct {
+			Description *string `json:"description,omitempty"`
+			Label       string  `json:"label"`
+			Quiet       *bool   `json:"quiet,omitempty"`
+		} `json:"options"`
+		Question string `json:"question"`
+	} `json:"questions"`
+	ToolCallId *string `json:"toolCallId,omitempty"`
+	TurnId     string  `json:"turnId"`
+}
+
+// LangyLocalStartWaitJSONBodyKind defines parameters for LangyLocalStartWait.
+type LangyLocalStartWaitJSONBodyKind string
+
+// LangyLocalReadWait200JSONResponseBodyState defines parameters for LangyLocalReadWait.
+type LangyLocalReadWait200JSONResponseBodyState string
+
 // GetApiMeUsageParams defines parameters for GetApiMeUsage.
 type GetApiMeUsageParams struct {
 	WindowStartMs *int `form:"windowStartMs,omitempty" json:"windowStartMs,omitempty"`
@@ -42425,8 +42509,8 @@ type PostApiMonitorsJSONBody struct {
 	ExecutionMode *PostApiMonitorsJSONBodyExecutionMode `json:"executionMode,omitempty"`
 	Level         *PostApiMonitorsJSONBodyLevel         `json:"level,omitempty"`
 	Mappings      *struct {
-		Expansions *[]string               `json:"expansions,omitempty"`
-		Mapping    *map[string]interface{} `json:"mapping,omitempty"`
+		Expansions []string               `json:"expansions"`
+		Mapping    map[string]interface{} `json:"mapping"`
 	} `json:"mappings,omitempty"`
 	Name              string                 `json:"name"`
 	Parameters        *map[string]*JsonValue `json:"parameters,omitempty"`
@@ -42455,8 +42539,8 @@ type PatchApiMonitorsByIdJSONBody struct {
 	ExecutionMode *PatchApiMonitorsByIdJSONBodyExecutionMode `json:"executionMode,omitempty"`
 	Level         *PatchApiMonitorsByIdJSONBodyLevel         `json:"level,omitempty"`
 	Mappings      *struct {
-		Expansions *[]string               `json:"expansions,omitempty"`
-		Mapping    *map[string]interface{} `json:"mapping,omitempty"`
+		Expansions []string               `json:"expansions"`
+		Mapping    map[string]interface{} `json:"mapping"`
 	} `json:"mappings,omitempty"`
 	Name              *string                `json:"name,omitempty"`
 	Parameters        *map[string]*JsonValue `json:"parameters,omitempty"`
@@ -42638,6 +42722,52 @@ type GetPlatformHealthSubsystem503JSONResponseBodyChecksStatus string
 
 // GetPlatformHealthSubsystem503JSONResponseBodyStatus defines parameters for GetPlatformHealthSubsystem.
 type GetPlatformHealthSubsystem503JSONResponseBodyStatus string
+
+// ListProjectsParams defines parameters for ListProjects.
+type ListProjectsParams struct {
+	Page  *int `form:"page,omitempty" json:"page,omitempty"`
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CreateProjectJSONBody defines parameters for CreateProject.
+type CreateProjectJSONBody struct {
+	// Framework Framework in use, such as langchain or openai
+	Framework string `json:"framework"`
+
+	// Language Programming language, such as python or typescript
+	Language string `json:"language"`
+
+	// Name Project name
+	Name string `json:"name"`
+
+	// NewTeamName Create a team with this name and put the project in it
+	NewTeamName *string `json:"newTeamName,omitempty"`
+
+	// TeamId Id of an existing team to put the project in
+	TeamId *string `json:"teamId,omitempty"`
+}
+
+// GetProject200JSONResponseBodyPiiRedactionLevel defines parameters for GetProject.
+type GetProject200JSONResponseBodyPiiRedactionLevel string
+
+// UpdateProjectJSONBody defines parameters for UpdateProject.
+type UpdateProjectJSONBody struct {
+	Framework *string `json:"framework,omitempty"`
+	Language  *string `json:"language,omitempty"`
+	Name      *string `json:"name,omitempty"`
+
+	// PiiRedactionLevel The PII level the project's traces are redacted at
+	PiiRedactionLevel *UpdateProjectJSONBodyPiiRedactionLevel `json:"piiRedactionLevel,omitempty"`
+
+	// TeamId Moves the project to this team
+	TeamId *string `json:"teamId,omitempty"`
+}
+
+// UpdateProjectJSONBodyPiiRedactionLevel defines parameters for UpdateProject.
+type UpdateProjectJSONBodyPiiRedactionLevel string
+
+// UpdateProject200JSONResponseBodyPiiRedactionLevel defines parameters for UpdateProject.
+type UpdateProject200JSONResponseBodyPiiRedactionLevel string
 
 // GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsCharts.
 type GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault string
@@ -43459,8 +43589,11 @@ type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyScope string
 type PostApiV1QueryJSONBody struct {
 	GranularitySeconds *PostApiV1QueryJSONBody_GranularitySeconds                          `json:"granularitySeconds,omitempty"`
 	Parameters         *map[string]*PostApiV1QueryJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
-	Sql                string                                                              `json:"sql"`
-	TimeWindow         *struct {
+
+	// ProjectId Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read.
+	ProjectId  *string `json:"projectId,omitempty"`
+	Sql        string  `json:"sql"`
+	TimeWindow *struct {
 		End   PostApiV1QueryJSONBody_TimeWindow_End   `json:"end"`
 		Start PostApiV1QueryJSONBody_TimeWindow_Start `json:"start"`
 	} `json:"timeWindow,omitempty"`
@@ -43533,6 +43666,9 @@ type PostApiV1Query401JSONResponseBodyFault string
 
 // PostApiV1Query403JSONResponseBodyFault defines parameters for PostApiV1Query.
 type PostApiV1Query403JSONResponseBodyFault string
+
+// PostApiV1Query404JSONResponseBodyFault defines parameters for PostApiV1Query.
+type PostApiV1Query404JSONResponseBodyFault string
 
 // PostApiV1Query422JSONResponseBodyFault defines parameters for PostApiV1Query.
 type PostApiV1Query422JSONResponseBodyFault string
@@ -50312,9 +50448,6 @@ type GetApiWebhooksV1EventsParams struct {
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
-// ReceiveElevenLabsWebhookTextRequestBody defines body for ReceiveElevenLabsWebhook for text/plain ContentType.
-type ReceiveElevenLabsWebhookTextRequestBody ReceiveElevenLabsWebhookTextBody
-
 // PostApiGatewayV1BudgetsJSONRequestBody defines body for PostApiGatewayV1Budgets for application/json ContentType.
 type PostApiGatewayV1BudgetsJSONRequestBody PostApiGatewayV1BudgetsJSONBody
 
@@ -50347,24 +50480,6 @@ type RevokeWorkerSessionKeyJSONRequestBody RevokeWorkerSessionKeyJSONBody
 
 // IngestTurnResultJSONRequestBody defines body for IngestTurnResult for application/json ContentType.
 type IngestTurnResultJSONRequestBody IngestTurnResultJSONBody
-
-// LangyLocalStartCallTextRequestBody defines body for LangyLocalStartCall for text/plain ContentType.
-type LangyLocalStartCallTextRequestBody LangyLocalStartCallTextBody
-
-// LangyLocalCreateRequestJSONRequestBody defines body for LangyLocalCreateRequest for application/json ContentType.
-type LangyLocalCreateRequestJSONRequestBody LangyLocalCreateRequestJSONBody
-
-// LangyUiActionsDispatchTextRequestBody defines body for LangyUiActionsDispatch for text/plain ContentType.
-type LangyUiActionsDispatchTextRequestBody LangyUiActionsDispatchTextBody
-
-// LangyLocalStartWaitJSONRequestBody defines body for LangyLocalStartWait for application/json ContentType.
-type LangyLocalStartWaitJSONRequestBody LangyLocalStartWaitJSONBody
-
-// CreateProjectJSONRequestBody defines body for CreateProject for application/json ContentType.
-type CreateProjectJSONRequestBody CreateProjectJSONBody
-
-// UpdateProjectJSONRequestBody defines body for UpdateProject for application/json ContentType.
-type UpdateProjectJSONRequestBody UpdateProjectJSONBody
 
 // IngestBrowserTracesTextRequestBody defines body for IngestBrowserTraces for text/plain ContentType.
 type IngestBrowserTracesTextRequestBody IngestBrowserTracesTextBody
@@ -50531,6 +50646,9 @@ type PostApiDatasetBySlugOrIdUploadMultipartRequestBody PostApiDatasetBySlugOrId
 // PostApiDspyLogStepsJSONRequestBody defines body for PostApiDspyLogSteps for application/json ContentType.
 type PostApiDspyLogStepsJSONRequestBody = PostApiDspyLogStepsJSONBody
 
+// ReceiveElevenLabsWebhookTextRequestBody defines body for ReceiveElevenLabsWebhook for text/plain ContentType.
+type ReceiveElevenLabsWebhookTextRequestBody ReceiveElevenLabsWebhookTextBody
+
 // PostApiEvaluationsBatchLogResultsJSONRequestBody defines body for PostApiEvaluationsBatchLogResults for application/json ContentType.
 type PostApiEvaluationsBatchLogResultsJSONRequestBody PostApiEvaluationsBatchLogResultsJSONBody
 
@@ -50618,6 +50736,18 @@ type StartLangyConversationTurnJSONRequestBody StartLangyConversationTurnJSONBod
 // ContinueLangyConversationTurnJSONRequestBody defines body for ContinueLangyConversationTurn for application/json ContentType.
 type ContinueLangyConversationTurnJSONRequestBody ContinueLangyConversationTurnJSONBody
 
+// LangyLocalStartCallTextRequestBody defines body for LangyLocalStartCall for text/plain ContentType.
+type LangyLocalStartCallTextRequestBody LangyLocalStartCallTextBody
+
+// LangyLocalCreateRequestJSONRequestBody defines body for LangyLocalCreateRequest for application/json ContentType.
+type LangyLocalCreateRequestJSONRequestBody LangyLocalCreateRequestJSONBody
+
+// LangyUiActionsDispatchTextRequestBody defines body for LangyUiActionsDispatch for text/plain ContentType.
+type LangyUiActionsDispatchTextRequestBody LangyUiActionsDispatchTextBody
+
+// LangyLocalStartWaitJSONRequestBody defines body for LangyLocalStartWait for application/json ContentType.
+type LangyLocalStartWaitJSONRequestBody LangyLocalStartWaitJSONBody
+
 // PostApiModelDefaultsJSONRequestBody defines body for PostApiModelDefaults for application/json ContentType.
 type PostApiModelDefaultsJSONRequestBody PostApiModelDefaultsJSONBody
 
@@ -50653,6 +50783,12 @@ type UpdateOrganizationMemberJSONRequestBody UpdateOrganizationMemberJSONBody
 
 // ProvisionOrganizationJSONRequestBody defines body for ProvisionOrganization for application/json ContentType.
 type ProvisionOrganizationJSONRequestBody ProvisionOrganizationJSONBody
+
+// CreateProjectJSONRequestBody defines body for CreateProject for application/json ContentType.
+type CreateProjectJSONRequestBody CreateProjectJSONBody
+
+// UpdateProjectJSONRequestBody defines body for UpdateProject for application/json ContentType.
+type UpdateProjectJSONRequestBody UpdateProjectJSONBody
 
 // PostApiV1ProjectsByProjectIdAnalyticsChartsJSONRequestBody defines body for PostApiV1ProjectsByProjectIdAnalyticsCharts for application/json ContentType.
 type PostApiV1ProjectsByProjectIdAnalyticsChartsJSONRequestBody PostApiV1ProjectsByProjectIdAnalyticsChartsJSONBody
@@ -64354,22 +64490,22 @@ func (t *SpanInputOutput_1_Value_Content_1_2_ImageUrl_Detail) UnmarshalJSON(b []
 	return err
 }
 
-// AsSpanInputOutput1ValueContent17SourceType0 returns the union data inside the SpanInputOutput_1_Value_Content_1_7_Source_Type as a SpanInputOutput1ValueContent17SourceType0
-func (t SpanInputOutput_1_Value_Content_1_7_Source_Type) AsSpanInputOutput1ValueContent17SourceType0() (SpanInputOutput1ValueContent17SourceType0, error) {
-	var body SpanInputOutput1ValueContent17SourceType0
+// AsSpanInputOutput1ValueContent19SourceType0 returns the union data inside the SpanInputOutput_1_Value_Content_1_9_Source_Type as a SpanInputOutput1ValueContent19SourceType0
+func (t SpanInputOutput_1_Value_Content_1_9_Source_Type) AsSpanInputOutput1ValueContent19SourceType0() (SpanInputOutput1ValueContent19SourceType0, error) {
+	var body SpanInputOutput1ValueContent19SourceType0
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSpanInputOutput1ValueContent17SourceType0 overwrites any union data inside the SpanInputOutput_1_Value_Content_1_7_Source_Type as the provided SpanInputOutput1ValueContent17SourceType0
-func (t *SpanInputOutput_1_Value_Content_1_7_Source_Type) FromSpanInputOutput1ValueContent17SourceType0(v SpanInputOutput1ValueContent17SourceType0) error {
+// FromSpanInputOutput1ValueContent19SourceType0 overwrites any union data inside the SpanInputOutput_1_Value_Content_1_9_Source_Type as the provided SpanInputOutput1ValueContent19SourceType0
+func (t *SpanInputOutput_1_Value_Content_1_9_Source_Type) FromSpanInputOutput1ValueContent19SourceType0(v SpanInputOutput1ValueContent19SourceType0) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSpanInputOutput1ValueContent17SourceType0 performs a merge with any union data inside the SpanInputOutput_1_Value_Content_1_7_Source_Type, using the provided SpanInputOutput1ValueContent17SourceType0
-func (t *SpanInputOutput_1_Value_Content_1_7_Source_Type) MergeSpanInputOutput1ValueContent17SourceType0(v SpanInputOutput1ValueContent17SourceType0) error {
+// MergeSpanInputOutput1ValueContent19SourceType0 performs a merge with any union data inside the SpanInputOutput_1_Value_Content_1_9_Source_Type, using the provided SpanInputOutput1ValueContent19SourceType0
+func (t *SpanInputOutput_1_Value_Content_1_9_Source_Type) MergeSpanInputOutput1ValueContent19SourceType0(v SpanInputOutput1ValueContent19SourceType0) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -64380,22 +64516,22 @@ func (t *SpanInputOutput_1_Value_Content_1_7_Source_Type) MergeSpanInputOutput1V
 	return err
 }
 
-// AsSpanInputOutput1ValueContent17SourceType1 returns the union data inside the SpanInputOutput_1_Value_Content_1_7_Source_Type as a SpanInputOutput1ValueContent17SourceType1
-func (t SpanInputOutput_1_Value_Content_1_7_Source_Type) AsSpanInputOutput1ValueContent17SourceType1() (SpanInputOutput1ValueContent17SourceType1, error) {
-	var body SpanInputOutput1ValueContent17SourceType1
+// AsSpanInputOutput1ValueContent19SourceType1 returns the union data inside the SpanInputOutput_1_Value_Content_1_9_Source_Type as a SpanInputOutput1ValueContent19SourceType1
+func (t SpanInputOutput_1_Value_Content_1_9_Source_Type) AsSpanInputOutput1ValueContent19SourceType1() (SpanInputOutput1ValueContent19SourceType1, error) {
+	var body SpanInputOutput1ValueContent19SourceType1
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSpanInputOutput1ValueContent17SourceType1 overwrites any union data inside the SpanInputOutput_1_Value_Content_1_7_Source_Type as the provided SpanInputOutput1ValueContent17SourceType1
-func (t *SpanInputOutput_1_Value_Content_1_7_Source_Type) FromSpanInputOutput1ValueContent17SourceType1(v SpanInputOutput1ValueContent17SourceType1) error {
+// FromSpanInputOutput1ValueContent19SourceType1 overwrites any union data inside the SpanInputOutput_1_Value_Content_1_9_Source_Type as the provided SpanInputOutput1ValueContent19SourceType1
+func (t *SpanInputOutput_1_Value_Content_1_9_Source_Type) FromSpanInputOutput1ValueContent19SourceType1(v SpanInputOutput1ValueContent19SourceType1) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSpanInputOutput1ValueContent17SourceType1 performs a merge with any union data inside the SpanInputOutput_1_Value_Content_1_7_Source_Type, using the provided SpanInputOutput1ValueContent17SourceType1
-func (t *SpanInputOutput_1_Value_Content_1_7_Source_Type) MergeSpanInputOutput1ValueContent17SourceType1(v SpanInputOutput1ValueContent17SourceType1) error {
+// MergeSpanInputOutput1ValueContent19SourceType1 performs a merge with any union data inside the SpanInputOutput_1_Value_Content_1_9_Source_Type, using the provided SpanInputOutput1ValueContent19SourceType1
+func (t *SpanInputOutput_1_Value_Content_1_9_Source_Type) MergeSpanInputOutput1ValueContent19SourceType1(v SpanInputOutput1ValueContent19SourceType1) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -64406,12 +64542,12 @@ func (t *SpanInputOutput_1_Value_Content_1_7_Source_Type) MergeSpanInputOutput1V
 	return err
 }
 
-func (t SpanInputOutput_1_Value_Content_1_7_Source_Type) MarshalJSON() ([]byte, error) {
+func (t SpanInputOutput_1_Value_Content_1_9_Source_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
 }
 
-func (t *SpanInputOutput_1_Value_Content_1_7_Source_Type) UnmarshalJSON(b []byte) error {
+func (t *SpanInputOutput_1_Value_Content_1_9_Source_Type) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -64702,6 +64838,58 @@ func (t *SpanInputOutput_1_Value_Content_1_Item) MergeSpanInputOutput1ValueConte
 	return err
 }
 
+// AsSpanInputOutput1ValueContent111 returns the union data inside the SpanInputOutput_1_Value_Content_1_Item as a SpanInputOutput1ValueContent111
+func (t SpanInputOutput_1_Value_Content_1_Item) AsSpanInputOutput1ValueContent111() (SpanInputOutput1ValueContent111, error) {
+	var body SpanInputOutput1ValueContent111
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSpanInputOutput1ValueContent111 overwrites any union data inside the SpanInputOutput_1_Value_Content_1_Item as the provided SpanInputOutput1ValueContent111
+func (t *SpanInputOutput_1_Value_Content_1_Item) FromSpanInputOutput1ValueContent111(v SpanInputOutput1ValueContent111) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSpanInputOutput1ValueContent111 performs a merge with any union data inside the SpanInputOutput_1_Value_Content_1_Item, using the provided SpanInputOutput1ValueContent111
+func (t *SpanInputOutput_1_Value_Content_1_Item) MergeSpanInputOutput1ValueContent111(v SpanInputOutput1ValueContent111) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSpanInputOutput1ValueContent112 returns the union data inside the SpanInputOutput_1_Value_Content_1_Item as a SpanInputOutput1ValueContent112
+func (t SpanInputOutput_1_Value_Content_1_Item) AsSpanInputOutput1ValueContent112() (SpanInputOutput1ValueContent112, error) {
+	var body SpanInputOutput1ValueContent112
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSpanInputOutput1ValueContent112 overwrites any union data inside the SpanInputOutput_1_Value_Content_1_Item as the provided SpanInputOutput1ValueContent112
+func (t *SpanInputOutput_1_Value_Content_1_Item) FromSpanInputOutput1ValueContent112(v SpanInputOutput1ValueContent112) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSpanInputOutput1ValueContent112 performs a merge with any union data inside the SpanInputOutput_1_Value_Content_1_Item, using the provided SpanInputOutput1ValueContent112
+func (t *SpanInputOutput_1_Value_Content_1_Item) MergeSpanInputOutput1ValueContent112(v SpanInputOutput1ValueContent112) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t SpanInputOutput_1_Value_Content_1_Item) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -64862,22 +65050,22 @@ func (t *SpanInputOutput_1_Value_Parts_2_ImageUrl_Detail) UnmarshalJSON(b []byte
 	return err
 }
 
-// AsSpanInputOutput1ValueParts7SourceType0 returns the union data inside the SpanInputOutput_1_Value_Parts_7_Source_Type as a SpanInputOutput1ValueParts7SourceType0
-func (t SpanInputOutput_1_Value_Parts_7_Source_Type) AsSpanInputOutput1ValueParts7SourceType0() (SpanInputOutput1ValueParts7SourceType0, error) {
-	var body SpanInputOutput1ValueParts7SourceType0
+// AsSpanInputOutput1ValueParts9SourceType0 returns the union data inside the SpanInputOutput_1_Value_Parts_9_Source_Type as a SpanInputOutput1ValueParts9SourceType0
+func (t SpanInputOutput_1_Value_Parts_9_Source_Type) AsSpanInputOutput1ValueParts9SourceType0() (SpanInputOutput1ValueParts9SourceType0, error) {
+	var body SpanInputOutput1ValueParts9SourceType0
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSpanInputOutput1ValueParts7SourceType0 overwrites any union data inside the SpanInputOutput_1_Value_Parts_7_Source_Type as the provided SpanInputOutput1ValueParts7SourceType0
-func (t *SpanInputOutput_1_Value_Parts_7_Source_Type) FromSpanInputOutput1ValueParts7SourceType0(v SpanInputOutput1ValueParts7SourceType0) error {
+// FromSpanInputOutput1ValueParts9SourceType0 overwrites any union data inside the SpanInputOutput_1_Value_Parts_9_Source_Type as the provided SpanInputOutput1ValueParts9SourceType0
+func (t *SpanInputOutput_1_Value_Parts_9_Source_Type) FromSpanInputOutput1ValueParts9SourceType0(v SpanInputOutput1ValueParts9SourceType0) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSpanInputOutput1ValueParts7SourceType0 performs a merge with any union data inside the SpanInputOutput_1_Value_Parts_7_Source_Type, using the provided SpanInputOutput1ValueParts7SourceType0
-func (t *SpanInputOutput_1_Value_Parts_7_Source_Type) MergeSpanInputOutput1ValueParts7SourceType0(v SpanInputOutput1ValueParts7SourceType0) error {
+// MergeSpanInputOutput1ValueParts9SourceType0 performs a merge with any union data inside the SpanInputOutput_1_Value_Parts_9_Source_Type, using the provided SpanInputOutput1ValueParts9SourceType0
+func (t *SpanInputOutput_1_Value_Parts_9_Source_Type) MergeSpanInputOutput1ValueParts9SourceType0(v SpanInputOutput1ValueParts9SourceType0) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -64888,22 +65076,22 @@ func (t *SpanInputOutput_1_Value_Parts_7_Source_Type) MergeSpanInputOutput1Value
 	return err
 }
 
-// AsSpanInputOutput1ValueParts7SourceType1 returns the union data inside the SpanInputOutput_1_Value_Parts_7_Source_Type as a SpanInputOutput1ValueParts7SourceType1
-func (t SpanInputOutput_1_Value_Parts_7_Source_Type) AsSpanInputOutput1ValueParts7SourceType1() (SpanInputOutput1ValueParts7SourceType1, error) {
-	var body SpanInputOutput1ValueParts7SourceType1
+// AsSpanInputOutput1ValueParts9SourceType1 returns the union data inside the SpanInputOutput_1_Value_Parts_9_Source_Type as a SpanInputOutput1ValueParts9SourceType1
+func (t SpanInputOutput_1_Value_Parts_9_Source_Type) AsSpanInputOutput1ValueParts9SourceType1() (SpanInputOutput1ValueParts9SourceType1, error) {
+	var body SpanInputOutput1ValueParts9SourceType1
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSpanInputOutput1ValueParts7SourceType1 overwrites any union data inside the SpanInputOutput_1_Value_Parts_7_Source_Type as the provided SpanInputOutput1ValueParts7SourceType1
-func (t *SpanInputOutput_1_Value_Parts_7_Source_Type) FromSpanInputOutput1ValueParts7SourceType1(v SpanInputOutput1ValueParts7SourceType1) error {
+// FromSpanInputOutput1ValueParts9SourceType1 overwrites any union data inside the SpanInputOutput_1_Value_Parts_9_Source_Type as the provided SpanInputOutput1ValueParts9SourceType1
+func (t *SpanInputOutput_1_Value_Parts_9_Source_Type) FromSpanInputOutput1ValueParts9SourceType1(v SpanInputOutput1ValueParts9SourceType1) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSpanInputOutput1ValueParts7SourceType1 performs a merge with any union data inside the SpanInputOutput_1_Value_Parts_7_Source_Type, using the provided SpanInputOutput1ValueParts7SourceType1
-func (t *SpanInputOutput_1_Value_Parts_7_Source_Type) MergeSpanInputOutput1ValueParts7SourceType1(v SpanInputOutput1ValueParts7SourceType1) error {
+// MergeSpanInputOutput1ValueParts9SourceType1 performs a merge with any union data inside the SpanInputOutput_1_Value_Parts_9_Source_Type, using the provided SpanInputOutput1ValueParts9SourceType1
+func (t *SpanInputOutput_1_Value_Parts_9_Source_Type) MergeSpanInputOutput1ValueParts9SourceType1(v SpanInputOutput1ValueParts9SourceType1) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -64914,12 +65102,12 @@ func (t *SpanInputOutput_1_Value_Parts_7_Source_Type) MergeSpanInputOutput1Value
 	return err
 }
 
-func (t SpanInputOutput_1_Value_Parts_7_Source_Type) MarshalJSON() ([]byte, error) {
+func (t SpanInputOutput_1_Value_Parts_9_Source_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
 }
 
-func (t *SpanInputOutput_1_Value_Parts_7_Source_Type) UnmarshalJSON(b []byte) error {
+func (t *SpanInputOutput_1_Value_Parts_9_Source_Type) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -65200,6 +65388,58 @@ func (t *SpanInputOutput_1_Value_Parts_Item) FromSpanInputOutput1ValueParts10(v 
 
 // MergeSpanInputOutput1ValueParts10 performs a merge with any union data inside the SpanInputOutput_1_Value_Parts_Item, using the provided SpanInputOutput1ValueParts10
 func (t *SpanInputOutput_1_Value_Parts_Item) MergeSpanInputOutput1ValueParts10(v SpanInputOutput1ValueParts10) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSpanInputOutput1ValueParts11 returns the union data inside the SpanInputOutput_1_Value_Parts_Item as a SpanInputOutput1ValueParts11
+func (t SpanInputOutput_1_Value_Parts_Item) AsSpanInputOutput1ValueParts11() (SpanInputOutput1ValueParts11, error) {
+	var body SpanInputOutput1ValueParts11
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSpanInputOutput1ValueParts11 overwrites any union data inside the SpanInputOutput_1_Value_Parts_Item as the provided SpanInputOutput1ValueParts11
+func (t *SpanInputOutput_1_Value_Parts_Item) FromSpanInputOutput1ValueParts11(v SpanInputOutput1ValueParts11) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSpanInputOutput1ValueParts11 performs a merge with any union data inside the SpanInputOutput_1_Value_Parts_Item, using the provided SpanInputOutput1ValueParts11
+func (t *SpanInputOutput_1_Value_Parts_Item) MergeSpanInputOutput1ValueParts11(v SpanInputOutput1ValueParts11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSpanInputOutput1ValueParts12 returns the union data inside the SpanInputOutput_1_Value_Parts_Item as a SpanInputOutput1ValueParts12
+func (t SpanInputOutput_1_Value_Parts_Item) AsSpanInputOutput1ValueParts12() (SpanInputOutput1ValueParts12, error) {
+	var body SpanInputOutput1ValueParts12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSpanInputOutput1ValueParts12 overwrites any union data inside the SpanInputOutput_1_Value_Parts_Item as the provided SpanInputOutput1ValueParts12
+func (t *SpanInputOutput_1_Value_Parts_Item) FromSpanInputOutput1ValueParts12(v SpanInputOutput1ValueParts12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSpanInputOutput1ValueParts12 performs a merge with any union data inside the SpanInputOutput_1_Value_Parts_Item, using the provided SpanInputOutput1ValueParts12
+func (t *SpanInputOutput_1_Value_Parts_Item) MergeSpanInputOutput1ValueParts12(v SpanInputOutput1ValueParts12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -110240,11 +110480,6 @@ type ClientInterface interface {
 	// GetApiCodingAgentPullRequestUsage request
 	GetApiCodingAgentPullRequestUsage(ctx context.Context, params *GetApiCodingAgentPullRequestUsageParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ReceiveElevenLabsWebhookWithBody request with any body
-	ReceiveElevenLabsWebhookWithBody(ctx context.Context, modelProviderId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	ReceiveElevenLabsWebhookWithTextBody(ctx context.Context, modelProviderId string, body ReceiveElevenLabsWebhookTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// GetApiGatewayV1Budgets request
 	GetApiGatewayV1Budgets(ctx context.Context, params *GetApiGatewayV1BudgetsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -110360,66 +110595,6 @@ type ClientInterface interface {
 
 	IngestTurnResult(ctx context.Context, turnId string, body IngestTurnResultJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// LangyLocalStartCallWithBody request with any body
-	LangyLocalStartCallWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	LangyLocalStartCallWithTextBody(ctx context.Context, body LangyLocalStartCallTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// LangyLocalReadCall request
-	LangyLocalReadCall(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// LangyLocalCancelCall request
-	LangyLocalCancelCall(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// LangyLocalCreateRequestWithBody request with any body
-	LangyLocalCreateRequestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	LangyLocalCreateRequest(ctx context.Context, body LangyLocalCreateRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// LangyLocalWorkspace request
-	LangyLocalWorkspace(ctx context.Context, params *LangyLocalWorkspaceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// LangyUiActionsList request
-	LangyUiActionsList(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// LangyUiActionsDispatchWithBody request with any body
-	LangyUiActionsDispatchWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	LangyUiActionsDispatchWithTextBody(ctx context.Context, body LangyUiActionsDispatchTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// LangyLocalStartWaitWithBody request with any body
-	LangyLocalStartWaitWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	LangyLocalStartWait(ctx context.Context, body LangyLocalStartWaitJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// LangyLocalReadWait request
-	LangyLocalReadWait(ctx context.Context, waitId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ListProjects request
-	ListProjects(ctx context.Context, params *ListProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// CreateProjectWithBody request with any body
-	CreateProjectWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	CreateProject(ctx context.Context, body CreateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ArchiveProject request
-	ArchiveProject(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetProject request
-	GetProject(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// UpdateProjectWithBody request with any body
-	UpdateProjectWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	UpdateProject(ctx context.Context, id string, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetProjectApiKey request
-	GetProjectApiKey(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// RegenerateProjectApiKey request
-	RegenerateProjectApiKey(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// IngestBrowserTracesWithBody request with any body
 	IngestBrowserTracesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -110500,9 +110675,6 @@ type ClientInterface interface {
 	PostApiTrackEventWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	PostApiTrackEvent(ctx context.Context, body PostApiTrackEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ReadUserAvatarBytes request
-	ReadUserAvatarBytes(ctx context.Context, projectId string, userAvatarId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// StopAdminImpersonation request
 	StopAdminImpersonation(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -110845,6 +111017,11 @@ type ClientInterface interface {
 
 	PostApiDspyLogSteps(ctx context.Context, body PostApiDspyLogStepsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ReceiveElevenLabsWebhookWithBody request with any body
+	ReceiveElevenLabsWebhookWithBody(ctx context.Context, modelProviderId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	ReceiveElevenLabsWebhookWithTextBody(ctx context.Context, modelProviderId string, body ReceiveElevenLabsWebhookTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostApiEvaluationsBatchLogResultsWithBody request with any body
 	PostApiEvaluationsBatchLogResultsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -111110,6 +111287,41 @@ type ClientInterface interface {
 
 	ContinueLangyConversationTurn(ctx context.Context, conversationId string, body ContinueLangyConversationTurnJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// LangyLocalStartCallWithBody request with any body
+	LangyLocalStartCallWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	LangyLocalStartCallWithTextBody(ctx context.Context, body LangyLocalStartCallTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LangyLocalReadCall request
+	LangyLocalReadCall(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LangyLocalCancelCall request
+	LangyLocalCancelCall(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LangyLocalCreateRequestWithBody request with any body
+	LangyLocalCreateRequestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	LangyLocalCreateRequest(ctx context.Context, body LangyLocalCreateRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LangyLocalWorkspace request
+	LangyLocalWorkspace(ctx context.Context, params *LangyLocalWorkspaceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LangyUiActionsList request
+	LangyUiActionsList(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LangyUiActionsDispatchWithBody request with any body
+	LangyUiActionsDispatchWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	LangyUiActionsDispatchWithTextBody(ctx context.Context, body LangyUiActionsDispatchTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LangyLocalStartWaitWithBody request with any body
+	LangyLocalStartWaitWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	LangyLocalStartWait(ctx context.Context, body LangyLocalStartWaitJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LangyLocalReadWait request
+	LangyLocalReadWait(ctx context.Context, waitId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetApiMeProject request
 	GetApiMeProject(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -111226,6 +111438,31 @@ type ClientInterface interface {
 
 	// GetPlatformHealthSubsystem request
 	GetPlatformHealthSubsystem(ctx context.Context, check string, params *GetPlatformHealthSubsystemParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListProjects request
+	ListProjects(ctx context.Context, params *ListProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateProjectWithBody request with any body
+	CreateProjectWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateProject(ctx context.Context, body CreateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ArchiveProject request
+	ArchiveProject(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetProject request
+	GetProject(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateProjectWithBody request with any body
+	UpdateProjectWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateProject(ctx context.Context, id string, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetProjectApiKey request
+	GetProjectApiKey(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RegenerateProjectApiKey request
+	RegenerateProjectApiKey(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetApiV1ProjectsByProjectIdAnalyticsCharts request
 	GetApiV1ProjectsByProjectIdAnalyticsCharts(ctx context.Context, projectId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -111647,6 +111884,9 @@ type ClientInterface interface {
 	// ConfirmOneClickUnsubscribe request
 	ConfirmOneClickUnsubscribe(ctx context.Context, params *ConfirmOneClickUnsubscribeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ReadUserAvatarBytes request
+	ReadUserAvatarBytes(ctx context.Context, projectId string, userAvatarId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ReceiveStripeWebhookWithBody request with any body
 	ReceiveStripeWebhookWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -111775,30 +112015,6 @@ func (c *Client) ValidateProjectAuthToken(ctx context.Context, reqEditors ...Req
 
 func (c *Client) GetApiCodingAgentPullRequestUsage(ctx context.Context, params *GetApiCodingAgentPullRequestUsageParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetApiCodingAgentPullRequestUsageRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ReceiveElevenLabsWebhookWithBody(ctx context.Context, modelProviderId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReceiveElevenLabsWebhookRequestWithBody(c.Server, modelProviderId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ReceiveElevenLabsWebhookWithTextBody(ctx context.Context, modelProviderId string, body ReceiveElevenLabsWebhookTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReceiveElevenLabsWebhookRequestWithTextBody(c.Server, modelProviderId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -112313,270 +112529,6 @@ func (c *Client) IngestTurnResult(ctx context.Context, turnId string, body Inges
 	return c.Client.Do(req)
 }
 
-func (c *Client) LangyLocalStartCallWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyLocalStartCallRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) LangyLocalStartCallWithTextBody(ctx context.Context, body LangyLocalStartCallTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyLocalStartCallRequestWithTextBody(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) LangyLocalReadCall(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyLocalReadCallRequest(c.Server, callId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) LangyLocalCancelCall(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyLocalCancelCallRequest(c.Server, callId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) LangyLocalCreateRequestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyLocalCreateRequestRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) LangyLocalCreateRequest(ctx context.Context, body LangyLocalCreateRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyLocalCreateRequestRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) LangyLocalWorkspace(ctx context.Context, params *LangyLocalWorkspaceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyLocalWorkspaceRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) LangyUiActionsList(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyUiActionsListRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) LangyUiActionsDispatchWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyUiActionsDispatchRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) LangyUiActionsDispatchWithTextBody(ctx context.Context, body LangyUiActionsDispatchTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyUiActionsDispatchRequestWithTextBody(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) LangyLocalStartWaitWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyLocalStartWaitRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) LangyLocalStartWait(ctx context.Context, body LangyLocalStartWaitJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyLocalStartWaitRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) LangyLocalReadWait(ctx context.Context, waitId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyLocalReadWaitRequest(c.Server, waitId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ListProjects(ctx context.Context, params *ListProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListProjectsRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateProjectWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateProjectRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateProject(ctx context.Context, body CreateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateProjectRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ArchiveProject(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewArchiveProjectRequest(c.Server, id)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetProject(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetProjectRequest(c.Server, id)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) UpdateProjectWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateProjectRequestWithBody(c.Server, id, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) UpdateProject(ctx context.Context, id string, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateProjectRequest(c.Server, id, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetProjectApiKey(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetProjectApiKeyRequest(c.Server, id)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) RegenerateProjectApiKey(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRegenerateProjectApiKeyRequest(c.Server, id)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 func (c *Client) IngestBrowserTracesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewIngestBrowserTracesRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -112927,18 +112879,6 @@ func (c *Client) PostApiTrackEventWithBody(ctx context.Context, contentType stri
 
 func (c *Client) PostApiTrackEvent(ctx context.Context, body PostApiTrackEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiTrackEventRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ReadUserAvatarBytes(ctx context.Context, projectId string, userAvatarId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReadUserAvatarBytesRequest(c.Server, projectId, userAvatarId)
 	if err != nil {
 		return nil, err
 	}
@@ -114485,6 +114425,30 @@ func (c *Client) PostApiDspyLogSteps(ctx context.Context, body PostApiDspyLogSte
 	return c.Client.Do(req)
 }
 
+func (c *Client) ReceiveElevenLabsWebhookWithBody(ctx context.Context, modelProviderId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReceiveElevenLabsWebhookRequestWithBody(c.Server, modelProviderId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ReceiveElevenLabsWebhookWithTextBody(ctx context.Context, modelProviderId string, body ReceiveElevenLabsWebhookTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReceiveElevenLabsWebhookRequestWithTextBody(c.Server, modelProviderId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) PostApiEvaluationsBatchLogResultsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiEvaluationsBatchLogResultsRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -115661,6 +115625,162 @@ func (c *Client) ContinueLangyConversationTurn(ctx context.Context, conversation
 	return c.Client.Do(req)
 }
 
+func (c *Client) LangyLocalStartCallWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyLocalStartCallRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LangyLocalStartCallWithTextBody(ctx context.Context, body LangyLocalStartCallTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyLocalStartCallRequestWithTextBody(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LangyLocalReadCall(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyLocalReadCallRequest(c.Server, callId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LangyLocalCancelCall(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyLocalCancelCallRequest(c.Server, callId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LangyLocalCreateRequestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyLocalCreateRequestRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LangyLocalCreateRequest(ctx context.Context, body LangyLocalCreateRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyLocalCreateRequestRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LangyLocalWorkspace(ctx context.Context, params *LangyLocalWorkspaceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyLocalWorkspaceRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LangyUiActionsList(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyUiActionsListRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LangyUiActionsDispatchWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyUiActionsDispatchRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LangyUiActionsDispatchWithTextBody(ctx context.Context, body LangyUiActionsDispatchTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyUiActionsDispatchRequestWithTextBody(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LangyLocalStartWaitWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyLocalStartWaitRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LangyLocalStartWait(ctx context.Context, body LangyLocalStartWaitJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyLocalStartWaitRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LangyLocalReadWait(ctx context.Context, waitId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyLocalReadWaitRequest(c.Server, waitId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetApiMeProject(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetApiMeProjectRequest(c.Server)
 	if err != nil {
@@ -116167,6 +116287,114 @@ func (c *Client) GetPlatformHealth(ctx context.Context, params *GetPlatformHealt
 
 func (c *Client) GetPlatformHealthSubsystem(ctx context.Context, check string, params *GetPlatformHealthSubsystemParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPlatformHealthSubsystemRequest(c.Server, check, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListProjects(ctx context.Context, params *ListProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListProjectsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateProjectWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateProjectRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateProject(ctx context.Context, body CreateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateProjectRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ArchiveProject(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewArchiveProjectRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetProject(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetProjectRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateProjectWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateProjectRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateProject(ctx context.Context, id string, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateProjectRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetProjectApiKey(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetProjectApiKeyRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RegenerateProjectApiKey(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRegenerateProjectApiKeyRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -118037,6 +118265,18 @@ func (c *Client) ConfirmOneClickUnsubscribe(ctx context.Context, params *Confirm
 	return c.Client.Do(req)
 }
 
+func (c *Client) ReadUserAvatarBytes(ctx context.Context, projectId string, userAvatarId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReadUserAvatarBytesRequest(c.Server, projectId, userAvatarId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ReceiveStripeWebhookWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewReceiveStripeWebhookRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -118547,53 +118787,6 @@ func NewGetApiCodingAgentPullRequestUsageRequest(server string, params *GetApiCo
 	if err != nil {
 		return nil, err
 	}
-
-	return req, nil
-}
-
-// NewReceiveElevenLabsWebhookRequestWithTextBody calls the generic ReceiveElevenLabsWebhook builder with text/plain body
-func NewReceiveElevenLabsWebhookRequestWithTextBody(server string, modelProviderId string, body ReceiveElevenLabsWebhookTextRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	if stringer, ok := interface{}(body).(fmt.Stringer); ok {
-		bodyReader = strings.NewReader(stringer.String())
-	} else {
-		return nil, fmt.Errorf("text/plain is not supported for complex types, define a String() method on ReceiveElevenLabsWebhookTextBody to marshal it as text")
-	}
-	return NewReceiveElevenLabsWebhookRequestWithBody(server, modelProviderId, "text/plain", bodyReader)
-}
-
-// NewReceiveElevenLabsWebhookRequestWithBody generates requests for ReceiveElevenLabsWebhook with any type of body
-func NewReceiveElevenLabsWebhookRequestWithBody(server string, modelProviderId string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "modelProviderId", modelProviderId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/elevenlabs/webhook/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -120490,638 +120683,6 @@ func NewIngestTurnResultRequestWithBody(server string, turnId string, contentTyp
 	return req, nil
 }
 
-// NewLangyLocalStartCallRequestWithTextBody calls the generic LangyLocalStartCall builder with text/plain body
-func NewLangyLocalStartCallRequestWithTextBody(server string, body LangyLocalStartCallTextRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	if stringer, ok := interface{}(body).(fmt.Stringer); ok {
-		bodyReader = strings.NewReader(stringer.String())
-	} else {
-		return nil, fmt.Errorf("text/plain is not supported for complex types, define a String() method on LangyLocalStartCallTextBody to marshal it as text")
-	}
-	return NewLangyLocalStartCallRequestWithBody(server, "text/plain", bodyReader)
-}
-
-// NewLangyLocalStartCallRequestWithBody generates requests for LangyLocalStartCall with any type of body
-func NewLangyLocalStartCallRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/langy/local/calls")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewLangyLocalReadCallRequest generates requests for LangyLocalReadCall
-func NewLangyLocalReadCallRequest(server string, callId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "callId", callId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/langy/local/calls/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewLangyLocalCancelCallRequest generates requests for LangyLocalCancelCall
-func NewLangyLocalCancelCallRequest(server string, callId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "callId", callId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/langy/local/calls/%s/cancel", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewLangyLocalCreateRequestRequest calls the generic LangyLocalCreateRequest builder with application/json body
-func NewLangyLocalCreateRequestRequest(server string, body LangyLocalCreateRequestJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewLangyLocalCreateRequestRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewLangyLocalCreateRequestRequestWithBody generates requests for LangyLocalCreateRequest with any type of body
-func NewLangyLocalCreateRequestRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/langy/local/requests")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewLangyLocalWorkspaceRequest generates requests for LangyLocalWorkspace
-func NewLangyLocalWorkspaceRequest(server string, params *LangyLocalWorkspaceParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/langy/local/workspace")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.ConversationId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "conversationId", *params.ConversationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewLangyUiActionsListRequest generates requests for LangyUiActionsList
-func NewLangyUiActionsListRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/langy/ui/actions")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewLangyUiActionsDispatchRequestWithTextBody calls the generic LangyUiActionsDispatch builder with text/plain body
-func NewLangyUiActionsDispatchRequestWithTextBody(server string, body LangyUiActionsDispatchTextRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	if stringer, ok := interface{}(body).(fmt.Stringer); ok {
-		bodyReader = strings.NewReader(stringer.String())
-	} else {
-		return nil, fmt.Errorf("text/plain is not supported for complex types, define a String() method on LangyUiActionsDispatchTextBody to marshal it as text")
-	}
-	return NewLangyUiActionsDispatchRequestWithBody(server, "text/plain", bodyReader)
-}
-
-// NewLangyUiActionsDispatchRequestWithBody generates requests for LangyUiActionsDispatch with any type of body
-func NewLangyUiActionsDispatchRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/langy/ui/actions")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewLangyLocalStartWaitRequest calls the generic LangyLocalStartWait builder with application/json body
-func NewLangyLocalStartWaitRequest(server string, body LangyLocalStartWaitJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewLangyLocalStartWaitRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewLangyLocalStartWaitRequestWithBody generates requests for LangyLocalStartWait with any type of body
-func NewLangyLocalStartWaitRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/langy/waits")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewLangyLocalReadWaitRequest generates requests for LangyLocalReadWait
-func NewLangyLocalReadWaitRequest(server string, waitId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "waitId", waitId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/langy/waits/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListProjectsRequest generates requests for ListProjects
-func NewListProjectsRequest(server string, params *ListProjectsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/projects")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Page != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page", *params.Page, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateProjectRequest calls the generic CreateProject builder with application/json body
-func NewCreateProjectRequest(server string, body CreateProjectJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateProjectRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewCreateProjectRequestWithBody generates requests for CreateProject with any type of body
-func NewCreateProjectRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/projects")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewArchiveProjectRequest generates requests for ArchiveProject
-func NewArchiveProjectRequest(server string, id string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/projects/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetProjectRequest generates requests for GetProject
-func NewGetProjectRequest(server string, id string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/projects/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpdateProjectRequest calls the generic UpdateProject builder with application/json body
-func NewUpdateProjectRequest(server string, id string, body UpdateProjectJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateProjectRequestWithBody(server, id, "application/json", bodyReader)
-}
-
-// NewUpdateProjectRequestWithBody generates requests for UpdateProject with any type of body
-func NewUpdateProjectRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/projects/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewGetProjectApiKeyRequest generates requests for GetProjectApiKey
-func NewGetProjectApiKeyRequest(server string, id string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/projects/%s/api-key", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewRegenerateProjectApiKeyRequest generates requests for RegenerateProjectApiKey
-func NewRegenerateProjectApiKeyRequest(server string, id string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/projects/%s/regenerate-api-key", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
 // NewIngestBrowserTracesRequestWithTextBody calls the generic IngestBrowserTraces builder with text/plain body
 func NewIngestBrowserTracesRequestWithTextBody(server string, body IngestBrowserTracesTextRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -122059,47 +121620,6 @@ func NewPostApiTrackEventRequestWithBody(server string, contentType string, body
 	}
 
 	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewReadUserAvatarBytesRequest generates requests for ReadUserAvatarBytes
-func NewReadUserAvatarBytesRequest(server string, projectId string, userAvatarId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "projectId", projectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "userAvatarId", userAvatarId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/user-avatar/%s/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
 
 	return req, nil
 }
@@ -125724,6 +125244,53 @@ func NewPostApiDspyLogStepsRequestWithBody(server string, contentType string, bo
 	return req, nil
 }
 
+// NewReceiveElevenLabsWebhookRequestWithTextBody calls the generic ReceiveElevenLabsWebhook builder with text/plain body
+func NewReceiveElevenLabsWebhookRequestWithTextBody(server string, modelProviderId string, body ReceiveElevenLabsWebhookTextRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	if stringer, ok := interface{}(body).(fmt.Stringer); ok {
+		bodyReader = strings.NewReader(stringer.String())
+	} else {
+		return nil, fmt.Errorf("text/plain is not supported for complex types, define a String() method on ReceiveElevenLabsWebhookTextBody to marshal it as text")
+	}
+	return NewReceiveElevenLabsWebhookRequestWithBody(server, modelProviderId, "text/plain", bodyReader)
+}
+
+// NewReceiveElevenLabsWebhookRequestWithBody generates requests for ReceiveElevenLabsWebhook with any type of body
+func NewReceiveElevenLabsWebhookRequestWithBody(server string, modelProviderId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "modelProviderId", modelProviderId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/elevenlabs/webhook/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewPostApiEvaluationsBatchLogResultsRequest calls the generic PostApiEvaluationsBatchLogResults builder with application/json body
 func NewPostApiEvaluationsBatchLogResultsRequest(server string, body PostApiEvaluationsBatchLogResultsJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -128928,6 +128495,349 @@ func NewContinueLangyConversationTurnRequestWithBody(server string, conversation
 	return req, nil
 }
 
+// NewLangyLocalStartCallRequestWithTextBody calls the generic LangyLocalStartCall builder with text/plain body
+func NewLangyLocalStartCallRequestWithTextBody(server string, body LangyLocalStartCallTextRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	if stringer, ok := interface{}(body).(fmt.Stringer); ok {
+		bodyReader = strings.NewReader(stringer.String())
+	} else {
+		return nil, fmt.Errorf("text/plain is not supported for complex types, define a String() method on LangyLocalStartCallTextBody to marshal it as text")
+	}
+	return NewLangyLocalStartCallRequestWithBody(server, "text/plain", bodyReader)
+}
+
+// NewLangyLocalStartCallRequestWithBody generates requests for LangyLocalStartCall with any type of body
+func NewLangyLocalStartCallRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/langy/local/calls")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewLangyLocalReadCallRequest generates requests for LangyLocalReadCall
+func NewLangyLocalReadCallRequest(server string, callId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "callId", callId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/langy/local/calls/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewLangyLocalCancelCallRequest generates requests for LangyLocalCancelCall
+func NewLangyLocalCancelCallRequest(server string, callId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "callId", callId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/langy/local/calls/%s/cancel", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewLangyLocalCreateRequestRequest calls the generic LangyLocalCreateRequest builder with application/json body
+func NewLangyLocalCreateRequestRequest(server string, body LangyLocalCreateRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewLangyLocalCreateRequestRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewLangyLocalCreateRequestRequestWithBody generates requests for LangyLocalCreateRequest with any type of body
+func NewLangyLocalCreateRequestRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/langy/local/requests")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewLangyLocalWorkspaceRequest generates requests for LangyLocalWorkspace
+func NewLangyLocalWorkspaceRequest(server string, params *LangyLocalWorkspaceParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/langy/local/workspace")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.ConversationId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "conversationId", *params.ConversationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewLangyUiActionsListRequest generates requests for LangyUiActionsList
+func NewLangyUiActionsListRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/langy/ui/actions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewLangyUiActionsDispatchRequestWithTextBody calls the generic LangyUiActionsDispatch builder with text/plain body
+func NewLangyUiActionsDispatchRequestWithTextBody(server string, body LangyUiActionsDispatchTextRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	if stringer, ok := interface{}(body).(fmt.Stringer); ok {
+		bodyReader = strings.NewReader(stringer.String())
+	} else {
+		return nil, fmt.Errorf("text/plain is not supported for complex types, define a String() method on LangyUiActionsDispatchTextBody to marshal it as text")
+	}
+	return NewLangyUiActionsDispatchRequestWithBody(server, "text/plain", bodyReader)
+}
+
+// NewLangyUiActionsDispatchRequestWithBody generates requests for LangyUiActionsDispatch with any type of body
+func NewLangyUiActionsDispatchRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/langy/ui/actions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewLangyLocalStartWaitRequest calls the generic LangyLocalStartWait builder with application/json body
+func NewLangyLocalStartWaitRequest(server string, body LangyLocalStartWaitJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewLangyLocalStartWaitRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewLangyLocalStartWaitRequestWithBody generates requests for LangyLocalStartWait with any type of body
+func NewLangyLocalStartWaitRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/langy/waits")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewLangyLocalReadWaitRequest generates requests for LangyLocalReadWait
+func NewLangyLocalReadWaitRequest(server string, waitId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "waitId", waitId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/langy/waits/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetApiMeProjectRequest generates requests for GetApiMeProject
 func NewGetApiMeProjectRequest(server string) (*http.Request, error) {
 	var err error
@@ -130194,6 +130104,295 @@ func NewGetPlatformHealthSubsystemRequest(server string, check string, params *G
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListProjectsRequest generates requests for ListProjects
+func NewListProjectsRequest(server string, params *ListProjectsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/projects")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page", *params.Page, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateProjectRequest calls the generic CreateProject builder with application/json body
+func NewCreateProjectRequest(server string, body CreateProjectJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateProjectRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateProjectRequestWithBody generates requests for CreateProject with any type of body
+func NewCreateProjectRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/projects")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewArchiveProjectRequest generates requests for ArchiveProject
+func NewArchiveProjectRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/projects/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetProjectRequest generates requests for GetProject
+func NewGetProjectRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/projects/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateProjectRequest calls the generic UpdateProject builder with application/json body
+func NewUpdateProjectRequest(server string, id string, body UpdateProjectJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateProjectRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdateProjectRequestWithBody generates requests for UpdateProject with any type of body
+func NewUpdateProjectRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/projects/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetProjectApiKeyRequest generates requests for GetProjectApiKey
+func NewGetProjectApiKeyRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/projects/%s/api-key", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRegenerateProjectApiKeyRequest generates requests for RegenerateProjectApiKey
+func NewRegenerateProjectApiKeyRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/projects/%s/regenerate-api-key", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -135106,6 +135305,47 @@ func NewConfirmOneClickUnsubscribeRequest(server string, params *ConfirmOneClick
 	return req, nil
 }
 
+// NewReadUserAvatarBytesRequest generates requests for ReadUserAvatarBytes
+func NewReadUserAvatarBytesRequest(server string, projectId string, userAvatarId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "projectId", projectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "userAvatarId", userAvatarId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/user-avatar/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewReceiveStripeWebhookRequestWithBody generates requests for ReceiveStripeWebhook with any type of body
 func NewReceiveStripeWebhookRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -136050,11 +136290,6 @@ type ClientWithResponsesInterface interface {
 	// GetApiCodingAgentPullRequestUsageWithResponse request
 	GetApiCodingAgentPullRequestUsageWithResponse(ctx context.Context, params *GetApiCodingAgentPullRequestUsageParams, reqEditors ...RequestEditorFn) (*GetApiCodingAgentPullRequestUsageResponse, error)
 
-	// ReceiveElevenLabsWebhookWithBodyWithResponse request with any body
-	ReceiveElevenLabsWebhookWithBodyWithResponse(ctx context.Context, modelProviderId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReceiveElevenLabsWebhookResponse, error)
-
-	ReceiveElevenLabsWebhookWithTextBodyWithResponse(ctx context.Context, modelProviderId string, body ReceiveElevenLabsWebhookTextRequestBody, reqEditors ...RequestEditorFn) (*ReceiveElevenLabsWebhookResponse, error)
-
 	// GetApiGatewayV1BudgetsWithResponse request
 	GetApiGatewayV1BudgetsWithResponse(ctx context.Context, params *GetApiGatewayV1BudgetsParams, reqEditors ...RequestEditorFn) (*GetApiGatewayV1BudgetsResponse, error)
 
@@ -136170,66 +136405,6 @@ type ClientWithResponsesInterface interface {
 
 	IngestTurnResultWithResponse(ctx context.Context, turnId string, body IngestTurnResultJSONRequestBody, reqEditors ...RequestEditorFn) (*IngestTurnResultResponse, error)
 
-	// LangyLocalStartCallWithBodyWithResponse request with any body
-	LangyLocalStartCallWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyLocalStartCallResponse, error)
-
-	LangyLocalStartCallWithTextBodyWithResponse(ctx context.Context, body LangyLocalStartCallTextRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalStartCallResponse, error)
-
-	// LangyLocalReadCallWithResponse request
-	LangyLocalReadCallWithResponse(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*LangyLocalReadCallResponse, error)
-
-	// LangyLocalCancelCallWithResponse request
-	LangyLocalCancelCallWithResponse(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*LangyLocalCancelCallResponse, error)
-
-	// LangyLocalCreateRequestWithBodyWithResponse request with any body
-	LangyLocalCreateRequestWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyLocalCreateRequestResponse, error)
-
-	LangyLocalCreateRequestWithResponse(ctx context.Context, body LangyLocalCreateRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalCreateRequestResponse, error)
-
-	// LangyLocalWorkspaceWithResponse request
-	LangyLocalWorkspaceWithResponse(ctx context.Context, params *LangyLocalWorkspaceParams, reqEditors ...RequestEditorFn) (*LangyLocalWorkspaceResponse, error)
-
-	// LangyUiActionsListWithResponse request
-	LangyUiActionsListWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*LangyUiActionsListResponse, error)
-
-	// LangyUiActionsDispatchWithBodyWithResponse request with any body
-	LangyUiActionsDispatchWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyUiActionsDispatchResponse, error)
-
-	LangyUiActionsDispatchWithTextBodyWithResponse(ctx context.Context, body LangyUiActionsDispatchTextRequestBody, reqEditors ...RequestEditorFn) (*LangyUiActionsDispatchResponse, error)
-
-	// LangyLocalStartWaitWithBodyWithResponse request with any body
-	LangyLocalStartWaitWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyLocalStartWaitResponse, error)
-
-	LangyLocalStartWaitWithResponse(ctx context.Context, body LangyLocalStartWaitJSONRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalStartWaitResponse, error)
-
-	// LangyLocalReadWaitWithResponse request
-	LangyLocalReadWaitWithResponse(ctx context.Context, waitId string, reqEditors ...RequestEditorFn) (*LangyLocalReadWaitResponse, error)
-
-	// ListProjectsWithResponse request
-	ListProjectsWithResponse(ctx context.Context, params *ListProjectsParams, reqEditors ...RequestEditorFn) (*ListProjectsResponse, error)
-
-	// CreateProjectWithBodyWithResponse request with any body
-	CreateProjectWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateProjectResponse, error)
-
-	CreateProjectWithResponse(ctx context.Context, body CreateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateProjectResponse, error)
-
-	// ArchiveProjectWithResponse request
-	ArchiveProjectWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*ArchiveProjectResponse, error)
-
-	// GetProjectWithResponse request
-	GetProjectWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetProjectResponse, error)
-
-	// UpdateProjectWithBodyWithResponse request with any body
-	UpdateProjectWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error)
-
-	UpdateProjectWithResponse(ctx context.Context, id string, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error)
-
-	// GetProjectApiKeyWithResponse request
-	GetProjectApiKeyWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetProjectApiKeyResponse, error)
-
-	// RegenerateProjectApiKeyWithResponse request
-	RegenerateProjectApiKeyWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*RegenerateProjectApiKeyResponse, error)
-
 	// IngestBrowserTracesWithBodyWithResponse request with any body
 	IngestBrowserTracesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*IngestBrowserTracesResponse, error)
 
@@ -136310,9 +136485,6 @@ type ClientWithResponsesInterface interface {
 	PostApiTrackEventWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiTrackEventResponse, error)
 
 	PostApiTrackEventWithResponse(ctx context.Context, body PostApiTrackEventJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiTrackEventResponse, error)
-
-	// ReadUserAvatarBytesWithResponse request
-	ReadUserAvatarBytesWithResponse(ctx context.Context, projectId string, userAvatarId string, reqEditors ...RequestEditorFn) (*ReadUserAvatarBytesResponse, error)
 
 	// StopAdminImpersonationWithResponse request
 	StopAdminImpersonationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*StopAdminImpersonationResponse, error)
@@ -136655,6 +136827,11 @@ type ClientWithResponsesInterface interface {
 
 	PostApiDspyLogStepsWithResponse(ctx context.Context, body PostApiDspyLogStepsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiDspyLogStepsResponse, error)
 
+	// ReceiveElevenLabsWebhookWithBodyWithResponse request with any body
+	ReceiveElevenLabsWebhookWithBodyWithResponse(ctx context.Context, modelProviderId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReceiveElevenLabsWebhookResponse, error)
+
+	ReceiveElevenLabsWebhookWithTextBodyWithResponse(ctx context.Context, modelProviderId string, body ReceiveElevenLabsWebhookTextRequestBody, reqEditors ...RequestEditorFn) (*ReceiveElevenLabsWebhookResponse, error)
+
 	// PostApiEvaluationsBatchLogResultsWithBodyWithResponse request with any body
 	PostApiEvaluationsBatchLogResultsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiEvaluationsBatchLogResultsResponse, error)
 
@@ -136920,6 +137097,41 @@ type ClientWithResponsesInterface interface {
 
 	ContinueLangyConversationTurnWithResponse(ctx context.Context, conversationId string, body ContinueLangyConversationTurnJSONRequestBody, reqEditors ...RequestEditorFn) (*ContinueLangyConversationTurnResponse, error)
 
+	// LangyLocalStartCallWithBodyWithResponse request with any body
+	LangyLocalStartCallWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyLocalStartCallResponse, error)
+
+	LangyLocalStartCallWithTextBodyWithResponse(ctx context.Context, body LangyLocalStartCallTextRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalStartCallResponse, error)
+
+	// LangyLocalReadCallWithResponse request
+	LangyLocalReadCallWithResponse(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*LangyLocalReadCallResponse, error)
+
+	// LangyLocalCancelCallWithResponse request
+	LangyLocalCancelCallWithResponse(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*LangyLocalCancelCallResponse, error)
+
+	// LangyLocalCreateRequestWithBodyWithResponse request with any body
+	LangyLocalCreateRequestWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyLocalCreateRequestResponse, error)
+
+	LangyLocalCreateRequestWithResponse(ctx context.Context, body LangyLocalCreateRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalCreateRequestResponse, error)
+
+	// LangyLocalWorkspaceWithResponse request
+	LangyLocalWorkspaceWithResponse(ctx context.Context, params *LangyLocalWorkspaceParams, reqEditors ...RequestEditorFn) (*LangyLocalWorkspaceResponse, error)
+
+	// LangyUiActionsListWithResponse request
+	LangyUiActionsListWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*LangyUiActionsListResponse, error)
+
+	// LangyUiActionsDispatchWithBodyWithResponse request with any body
+	LangyUiActionsDispatchWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyUiActionsDispatchResponse, error)
+
+	LangyUiActionsDispatchWithTextBodyWithResponse(ctx context.Context, body LangyUiActionsDispatchTextRequestBody, reqEditors ...RequestEditorFn) (*LangyUiActionsDispatchResponse, error)
+
+	// LangyLocalStartWaitWithBodyWithResponse request with any body
+	LangyLocalStartWaitWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyLocalStartWaitResponse, error)
+
+	LangyLocalStartWaitWithResponse(ctx context.Context, body LangyLocalStartWaitJSONRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalStartWaitResponse, error)
+
+	// LangyLocalReadWaitWithResponse request
+	LangyLocalReadWaitWithResponse(ctx context.Context, waitId string, reqEditors ...RequestEditorFn) (*LangyLocalReadWaitResponse, error)
+
 	// GetApiMeProjectWithResponse request
 	GetApiMeProjectWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiMeProjectResponse, error)
 
@@ -137036,6 +137248,31 @@ type ClientWithResponsesInterface interface {
 
 	// GetPlatformHealthSubsystemWithResponse request
 	GetPlatformHealthSubsystemWithResponse(ctx context.Context, check string, params *GetPlatformHealthSubsystemParams, reqEditors ...RequestEditorFn) (*GetPlatformHealthSubsystemResponse, error)
+
+	// ListProjectsWithResponse request
+	ListProjectsWithResponse(ctx context.Context, params *ListProjectsParams, reqEditors ...RequestEditorFn) (*ListProjectsResponse, error)
+
+	// CreateProjectWithBodyWithResponse request with any body
+	CreateProjectWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateProjectResponse, error)
+
+	CreateProjectWithResponse(ctx context.Context, body CreateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateProjectResponse, error)
+
+	// ArchiveProjectWithResponse request
+	ArchiveProjectWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*ArchiveProjectResponse, error)
+
+	// GetProjectWithResponse request
+	GetProjectWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetProjectResponse, error)
+
+	// UpdateProjectWithBodyWithResponse request with any body
+	UpdateProjectWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error)
+
+	UpdateProjectWithResponse(ctx context.Context, id string, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error)
+
+	// GetProjectApiKeyWithResponse request
+	GetProjectApiKeyWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetProjectApiKeyResponse, error)
+
+	// RegenerateProjectApiKeyWithResponse request
+	RegenerateProjectApiKeyWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*RegenerateProjectApiKeyResponse, error)
 
 	// GetApiV1ProjectsByProjectIdAnalyticsChartsWithResponse request
 	GetApiV1ProjectsByProjectIdAnalyticsChartsWithResponse(ctx context.Context, projectId string, reqEditors ...RequestEditorFn) (*GetApiV1ProjectsByProjectIdAnalyticsChartsResponse, error)
@@ -137457,6 +137694,9 @@ type ClientWithResponsesInterface interface {
 	// ConfirmOneClickUnsubscribeWithResponse request
 	ConfirmOneClickUnsubscribeWithResponse(ctx context.Context, params *ConfirmOneClickUnsubscribeParams, reqEditors ...RequestEditorFn) (*ConfirmOneClickUnsubscribeResponse, error)
 
+	// ReadUserAvatarBytesWithResponse request
+	ReadUserAvatarBytesWithResponse(ctx context.Context, projectId string, userAvatarId string, reqEditors ...RequestEditorFn) (*ReadUserAvatarBytesResponse, error)
+
 	// ReceiveStripeWebhookWithBodyWithResponse request with any body
 	ReceiveStripeWebhookWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReceiveStripeWebhookResponse, error)
 
@@ -137752,35 +137992,6 @@ func (r GetApiCodingAgentPullRequestUsageResponse) ContentType() string {
 	return ""
 }
 
-type ReceiveElevenLabsWebhookResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-}
-
-// Status returns HTTPResponse.Status
-func (r ReceiveElevenLabsWebhookResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ReceiveElevenLabsWebhookResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ReceiveElevenLabsWebhookResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
 type GetApiGatewayV1BudgetsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -137830,8 +138041,14 @@ type GetApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                          `json:"code"`
@@ -137843,8 +138060,14 @@ type GetApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                          `json:"code"`
@@ -137856,8 +138079,14 @@ type GetApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                          `json:"code"`
@@ -137869,8 +138098,14 @@ type GetApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -137943,8 +138178,14 @@ type PostApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                             `json:"retryable"`
 		SpanId    *string                                          `json:"span_id,omitempty"`
 		Tips      *[]string                                        `json:"tips,omitempty"`
-		TraceId   *string                                          `json:"trace_id,omitempty"`
-		Type      string                                           `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                           `json:"code"`
@@ -137956,8 +138197,14 @@ type PostApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                             `json:"retryable"`
 		SpanId    *string                                          `json:"span_id,omitempty"`
 		Tips      *[]string                                        `json:"tips,omitempty"`
-		TraceId   *string                                          `json:"trace_id,omitempty"`
-		Type      string                                           `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                           `json:"code"`
@@ -137969,8 +138216,14 @@ type PostApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                             `json:"retryable"`
 		SpanId    *string                                          `json:"span_id,omitempty"`
 		Tips      *[]string                                        `json:"tips,omitempty"`
-		TraceId   *string                                          `json:"trace_id,omitempty"`
-		Type      string                                           `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON409 *struct {
 		Code      string                                           `json:"code"`
@@ -137982,8 +138235,14 @@ type PostApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                             `json:"retryable"`
 		SpanId    *string                                          `json:"span_id,omitempty"`
 		Tips      *[]string                                        `json:"tips,omitempty"`
-		TraceId   *string                                          `json:"trace_id,omitempty"`
-		Type      string                                           `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                           `json:"code"`
@@ -137995,8 +138254,14 @@ type PostApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                             `json:"retryable"`
 		SpanId    *string                                          `json:"span_id,omitempty"`
 		Tips      *[]string                                        `json:"tips,omitempty"`
-		TraceId   *string                                          `json:"trace_id,omitempty"`
-		Type      string                                           `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138069,8 +138334,14 @@ type DeleteApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                 `json:"code"`
@@ -138082,8 +138353,14 @@ type DeleteApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                 `json:"code"`
@@ -138095,8 +138372,14 @@ type DeleteApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                 `json:"code"`
@@ -138108,8 +138391,14 @@ type DeleteApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138183,8 +138472,14 @@ type GetApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                              `json:"code"`
@@ -138196,8 +138491,14 @@ type GetApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                              `json:"code"`
@@ -138209,8 +138510,14 @@ type GetApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                              `json:"code"`
@@ -138222,8 +138529,14 @@ type GetApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138296,8 +138609,14 @@ type PatchApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                `json:"code"`
@@ -138309,8 +138628,14 @@ type PatchApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                `json:"code"`
@@ -138322,8 +138647,14 @@ type PatchApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                `json:"code"`
@@ -138335,8 +138666,14 @@ type PatchApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138409,8 +138746,14 @@ type PostApiGatewayV1BudgetsByIdResetResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                    `json:"code"`
@@ -138422,8 +138765,14 @@ type PostApiGatewayV1BudgetsByIdResetResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                    `json:"code"`
@@ -138435,8 +138784,14 @@ type PostApiGatewayV1BudgetsByIdResetResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                    `json:"code"`
@@ -138448,8 +138803,14 @@ type PostApiGatewayV1BudgetsByIdResetResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138513,8 +138874,14 @@ type GetApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                             `json:"code"`
@@ -138526,8 +138893,14 @@ type GetApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                             `json:"code"`
@@ -138539,8 +138912,14 @@ type GetApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                             `json:"code"`
@@ -138552,8 +138931,14 @@ type GetApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138614,8 +138999,14 @@ type PostApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                              `json:"code"`
@@ -138627,8 +139018,14 @@ type PostApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                              `json:"code"`
@@ -138640,8 +139037,14 @@ type PostApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON409 *struct {
 		Code      string                                              `json:"code"`
@@ -138653,8 +139056,14 @@ type PostApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                              `json:"code"`
@@ -138666,8 +139075,14 @@ type PostApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138728,8 +139143,14 @@ type DeleteApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                    `json:"code"`
@@ -138741,8 +139162,14 @@ type DeleteApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                    `json:"code"`
@@ -138754,8 +139181,14 @@ type DeleteApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                    `json:"code"`
@@ -138767,8 +139200,14 @@ type DeleteApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138829,8 +139268,14 @@ type GetApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                 `json:"code"`
@@ -138842,8 +139287,14 @@ type GetApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                 `json:"code"`
@@ -138855,8 +139306,14 @@ type GetApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                 `json:"code"`
@@ -138868,8 +139325,14 @@ type GetApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138930,8 +139393,14 @@ type PatchApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                   `json:"code"`
@@ -138943,8 +139412,14 @@ type PatchApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                   `json:"code"`
@@ -138956,8 +139431,14 @@ type PatchApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                   `json:"code"`
@@ -138969,8 +139450,14 @@ type PatchApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139056,8 +139543,14 @@ type GetApiGatewayV1EndUsersByIdSpendResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                    `json:"code"`
@@ -139069,8 +139562,14 @@ type GetApiGatewayV1EndUsersByIdSpendResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                    `json:"code"`
@@ -139082,8 +139581,14 @@ type GetApiGatewayV1EndUsersByIdSpendResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                    `json:"code"`
@@ -139095,8 +139600,14 @@ type GetApiGatewayV1EndUsersByIdSpendResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139138,8 +139649,14 @@ type GetApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                              `json:"retryable"`
 		SpanId    *string                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                         `json:"tips,omitempty"`
-		TraceId   *string                                           `json:"trace_id,omitempty"`
-		Type      string                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                            `json:"code"`
@@ -139151,8 +139668,14 @@ type GetApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                              `json:"retryable"`
 		SpanId    *string                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                         `json:"tips,omitempty"`
-		TraceId   *string                                           `json:"trace_id,omitempty"`
-		Type      string                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                            `json:"code"`
@@ -139164,8 +139687,14 @@ type GetApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                              `json:"retryable"`
 		SpanId    *string                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                         `json:"tips,omitempty"`
-		TraceId   *string                                           `json:"trace_id,omitempty"`
-		Type      string                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON410 *struct {
 		Code      string                                            `json:"code"`
@@ -139177,8 +139706,14 @@ type GetApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                              `json:"retryable"`
 		SpanId    *string                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                         `json:"tips,omitempty"`
-		TraceId   *string                                           `json:"trace_id,omitempty"`
-		Type      string                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                            `json:"code"`
@@ -139190,8 +139725,14 @@ type GetApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                              `json:"retryable"`
 		SpanId    *string                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                         `json:"tips,omitempty"`
-		TraceId   *string                                           `json:"trace_id,omitempty"`
-		Type      string                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139233,8 +139774,14 @@ type PostApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                             `json:"code"`
@@ -139246,8 +139793,14 @@ type PostApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                             `json:"code"`
@@ -139259,8 +139812,14 @@ type PostApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON410 *struct {
 		Code      string                                             `json:"code"`
@@ -139272,8 +139831,14 @@ type PostApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                             `json:"code"`
@@ -139285,8 +139850,14 @@ type PostApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139328,8 +139899,14 @@ type DeleteApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                   `json:"code"`
@@ -139341,8 +139918,14 @@ type DeleteApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                   `json:"code"`
@@ -139354,8 +139937,14 @@ type DeleteApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON410 *struct {
 		Code      string                                                   `json:"code"`
@@ -139367,8 +139956,14 @@ type DeleteApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                   `json:"code"`
@@ -139380,8 +139975,14 @@ type DeleteApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139423,8 +140024,14 @@ type PatchApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                  `json:"code"`
@@ -139436,8 +140043,14 @@ type PatchApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                  `json:"code"`
@@ -139449,8 +140062,14 @@ type PatchApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON410 *struct {
 		Code      string                                                  `json:"code"`
@@ -139462,8 +140081,14 @@ type PatchApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                  `json:"code"`
@@ -139475,8 +140100,14 @@ type PatchApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139527,8 +140158,14 @@ type GetApiGatewayV1SpendEventsResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                              `json:"code"`
@@ -139540,8 +140177,14 @@ type GetApiGatewayV1SpendEventsResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                              `json:"code"`
@@ -139553,8 +140196,14 @@ type GetApiGatewayV1SpendEventsResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                              `json:"code"`
@@ -139566,8 +140215,14 @@ type GetApiGatewayV1SpendEventsResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139619,8 +140274,14 @@ type PostApiGatewayV1SpendEventsReplayResponse struct {
 		Retryable bool                                                       `json:"retryable"`
 		SpanId    *string                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                    `json:"trace_id,omitempty"`
-		Type      string                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                     `json:"code"`
@@ -139632,8 +140293,14 @@ type PostApiGatewayV1SpendEventsReplayResponse struct {
 		Retryable bool                                                       `json:"retryable"`
 		SpanId    *string                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                    `json:"trace_id,omitempty"`
-		Type      string                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                     `json:"code"`
@@ -139645,8 +140312,14 @@ type PostApiGatewayV1SpendEventsReplayResponse struct {
 		Retryable bool                                                       `json:"retryable"`
 		SpanId    *string                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                    `json:"trace_id,omitempty"`
-		Type      string                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                     `json:"code"`
@@ -139658,8 +140331,14 @@ type PostApiGatewayV1SpendEventsReplayResponse struct {
 		Retryable bool                                                       `json:"retryable"`
 		SpanId    *string                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                    `json:"trace_id,omitempty"`
-		Type      string                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139733,8 +140412,14 @@ type GetApiGatewayV1SpendSummariesResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                 `json:"code"`
@@ -139746,8 +140431,14 @@ type GetApiGatewayV1SpendSummariesResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                 `json:"code"`
@@ -139759,8 +140450,14 @@ type GetApiGatewayV1SpendSummariesResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                 `json:"code"`
@@ -139772,8 +140469,14 @@ type GetApiGatewayV1SpendSummariesResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139852,8 +140555,14 @@ type GetApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                              `json:"code"`
@@ -139865,8 +140574,14 @@ type GetApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                              `json:"code"`
@@ -139878,8 +140593,14 @@ type GetApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                              `json:"code"`
@@ -139891,8 +140612,14 @@ type GetApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139976,8 +140703,14 @@ type PostApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                 `json:"retryable"`
 		SpanId    *string                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                            `json:"tips,omitempty"`
-		TraceId   *string                                              `json:"trace_id,omitempty"`
-		Type      string                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                               `json:"code"`
@@ -139989,8 +140722,14 @@ type PostApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                 `json:"retryable"`
 		SpanId    *string                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                            `json:"tips,omitempty"`
-		TraceId   *string                                              `json:"trace_id,omitempty"`
-		Type      string                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                               `json:"code"`
@@ -140002,8 +140741,14 @@ type PostApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                 `json:"retryable"`
 		SpanId    *string                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                            `json:"tips,omitempty"`
-		TraceId   *string                                              `json:"trace_id,omitempty"`
-		Type      string                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON409 *struct {
 		Code      string                                               `json:"code"`
@@ -140015,8 +140760,14 @@ type PostApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                 `json:"retryable"`
 		SpanId    *string                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                            `json:"tips,omitempty"`
-		TraceId   *string                                              `json:"trace_id,omitempty"`
-		Type      string                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                               `json:"code"`
@@ -140028,8 +140779,14 @@ type PostApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                 `json:"retryable"`
 		SpanId    *string                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                            `json:"tips,omitempty"`
-		TraceId   *string                                              `json:"trace_id,omitempty"`
-		Type      string                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140105,8 +140862,14 @@ type GetApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                  `json:"code"`
@@ -140118,8 +140881,14 @@ type GetApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                  `json:"code"`
@@ -140131,8 +140900,14 @@ type GetApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                  `json:"code"`
@@ -140144,8 +140919,14 @@ type GetApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140221,8 +141002,14 @@ type PatchApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                    `json:"code"`
@@ -140234,8 +141021,14 @@ type PatchApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                    `json:"code"`
@@ -140247,8 +141040,14 @@ type PatchApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                    `json:"code"`
@@ -140260,8 +141059,14 @@ type PatchApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140337,8 +141142,14 @@ type PostApiGatewayV1VirtualKeysByIdDisableResponse struct {
 		Retryable bool                                                            `json:"retryable"`
 		SpanId    *string                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                         `json:"trace_id,omitempty"`
-		Type      string                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                          `json:"code"`
@@ -140350,8 +141161,14 @@ type PostApiGatewayV1VirtualKeysByIdDisableResponse struct {
 		Retryable bool                                                            `json:"retryable"`
 		SpanId    *string                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                         `json:"trace_id,omitempty"`
-		Type      string                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                          `json:"code"`
@@ -140363,8 +141180,14 @@ type PostApiGatewayV1VirtualKeysByIdDisableResponse struct {
 		Retryable bool                                                            `json:"retryable"`
 		SpanId    *string                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                         `json:"trace_id,omitempty"`
-		Type      string                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                          `json:"code"`
@@ -140376,8 +141199,14 @@ type PostApiGatewayV1VirtualKeysByIdDisableResponse struct {
 		Retryable bool                                                            `json:"retryable"`
 		SpanId    *string                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                         `json:"trace_id,omitempty"`
-		Type      string                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140453,8 +141282,14 @@ type PostApiGatewayV1VirtualKeysByIdEnableResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                         `json:"code"`
@@ -140466,8 +141301,14 @@ type PostApiGatewayV1VirtualKeysByIdEnableResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                         `json:"code"`
@@ -140479,8 +141320,14 @@ type PostApiGatewayV1VirtualKeysByIdEnableResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                         `json:"code"`
@@ -140492,8 +141339,14 @@ type PostApiGatewayV1VirtualKeysByIdEnableResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140569,8 +141422,14 @@ type PostApiGatewayV1VirtualKeysByIdRevokeResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                         `json:"code"`
@@ -140582,8 +141441,14 @@ type PostApiGatewayV1VirtualKeysByIdRevokeResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                         `json:"code"`
@@ -140595,8 +141460,14 @@ type PostApiGatewayV1VirtualKeysByIdRevokeResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                         `json:"code"`
@@ -140608,8 +141479,14 @@ type PostApiGatewayV1VirtualKeysByIdRevokeResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140686,8 +141563,14 @@ type PostApiGatewayV1VirtualKeysByIdRotateResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                         `json:"code"`
@@ -140699,8 +141582,14 @@ type PostApiGatewayV1VirtualKeysByIdRotateResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                         `json:"code"`
@@ -140712,8 +141601,14 @@ type PostApiGatewayV1VirtualKeysByIdRotateResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                         `json:"code"`
@@ -140725,8 +141620,14 @@ type PostApiGatewayV1VirtualKeysByIdRotateResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140776,8 +141677,14 @@ type GetApiGatewayV1VirtualKeysByIdSpendResponse struct {
 		Retryable bool                                                         `json:"retryable"`
 		SpanId    *string                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                      `json:"trace_id,omitempty"`
-		Type      string                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                       `json:"code"`
@@ -140789,8 +141696,14 @@ type GetApiGatewayV1VirtualKeysByIdSpendResponse struct {
 		Retryable bool                                                         `json:"retryable"`
 		SpanId    *string                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                      `json:"trace_id,omitempty"`
-		Type      string                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                       `json:"code"`
@@ -140802,8 +141715,14 @@ type GetApiGatewayV1VirtualKeysByIdSpendResponse struct {
 		Retryable bool                                                         `json:"retryable"`
 		SpanId    *string                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                      `json:"trace_id,omitempty"`
-		Type      string                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                       `json:"code"`
@@ -140815,8 +141734,14 @@ type GetApiGatewayV1VirtualKeysByIdSpendResponse struct {
 		Retryable bool                                                         `json:"retryable"`
 		SpanId    *string                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                      `json:"trace_id,omitempty"`
-		Type      string                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140937,601 +141862,6 @@ func (r IngestTurnResultResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r IngestTurnResultResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type LangyLocalStartCallResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		CallId string `json:"callId"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r LangyLocalStartCallResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r LangyLocalStartCallResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r LangyLocalStartCallResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type LangyLocalReadCallResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		CallId string `json:"callId"`
-		Error  *struct {
-			Code    LangyLocalReadCall200JSONResponseBodyErrorCode `json:"code"`
-			Message string                                         `json:"message"`
-		} `json:"error,omitempty"`
-		Ok     *bool `json:"ok,omitempty"`
-		Output *struct {
-			DurationMs int     `json:"durationMs"`
-			ExitCode   *int    `json:"exitCode"`
-			LogPath    *string `json:"logPath,omitempty"`
-			Pid        *int    `json:"pid,omitempty"`
-			Stderr     string  `json:"stderr"`
-			Stdout     string  `json:"stdout"`
-			Truncated  bool    `json:"truncated"`
-		} `json:"output,omitempty"`
-		State LangyLocalReadCall200JSONResponseBodyState `json:"state"`
-		Text  *string                                    `json:"text,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r LangyLocalReadCallResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r LangyLocalReadCallResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r LangyLocalReadCallResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type LangyLocalCancelCallResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		CallId    string                                           `json:"callId"`
-		Cancelled LangyLocalCancelCall200JSONResponseBodyCancelled `json:"cancelled"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r LangyLocalCancelCallResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r LangyLocalCancelCallResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r LangyLocalCancelCallResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type LangyLocalCreateRequestResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		Command string `json:"command"`
-		Request struct {
-			ConversationId    string `json:"conversationId"`
-			ConversationTitle string `json:"conversationTitle"`
-			ConversationUrl   string `json:"conversationUrl"`
-			CreatedAt         string `json:"createdAt"`
-			ExpiresAt         string `json:"expiresAt"`
-			Id                string `json:"id"`
-			ProjectId         string `json:"projectId"`
-			ProjectName       string `json:"projectName"`
-		} `json:"request"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r LangyLocalCreateRequestResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r LangyLocalCreateRequestResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r LangyLocalCreateRequestResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type LangyLocalWorkspaceResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		CodeAccessPreference *LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference `json:"codeAccessPreference"`
-		Connected            bool                                                        `json:"connected"`
-		Github               struct {
-			AccountLogin *string `json:"accountLogin,omitempty"`
-			Installed    bool    `json:"installed"`
-		} `json:"github"`
-		PendingRequest *struct {
-			ConversationId    string `json:"conversationId"`
-			ConversationTitle string `json:"conversationTitle"`
-			ConversationUrl   string `json:"conversationUrl"`
-			CreatedAt         string `json:"createdAt"`
-			ExpiresAt         string `json:"expiresAt"`
-			Id                string `json:"id"`
-			ProjectId         string `json:"projectId"`
-			ProjectName       string `json:"projectName"`
-		} `json:"pendingRequest,omitempty"`
-		Workspace *struct {
-			GhAuthenticated *bool   `json:"ghAuthenticated,omitempty"`
-			GitBranch       *string `json:"gitBranch,omitempty"`
-			GitDirty        *bool   `json:"gitDirty,omitempty"`
-			GitRemote       *string `json:"gitRemote,omitempty"`
-			GitRepository   *bool   `json:"gitRepository,omitempty"`
-			Name            string  `json:"name"`
-			NodeVersion     *string `json:"nodeVersion,omitempty"`
-			Os              string  `json:"os"`
-			PackageManager  *string `json:"packageManager,omitempty"`
-			PythonVersion   *string `json:"pythonVersion,omitempty"`
-			Root            string  `json:"root"`
-		} `json:"workspace,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r LangyLocalWorkspaceResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r LangyLocalWorkspaceResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r LangyLocalWorkspaceResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type LangyUiActionsListResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-}
-
-// Status returns HTTPResponse.Status
-func (r LangyUiActionsListResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r LangyUiActionsListResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r LangyUiActionsListResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type LangyUiActionsDispatchResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-}
-
-// Status returns HTTPResponse.Status
-func (r LangyUiActionsDispatchResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r LangyUiActionsDispatchResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r LangyUiActionsDispatchResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type LangyLocalStartWaitResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		WaitId string `json:"waitId"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r LangyLocalStartWaitResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r LangyLocalStartWaitResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r LangyLocalStartWaitResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type LangyLocalReadWaitResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		Answers *[]struct {
-			Other    *string  `json:"other,omitempty"`
-			Question string   `json:"question"`
-			Selected []string `json:"selected"`
-		} `json:"answers,omitempty"`
-		State  LangyLocalReadWait200JSONResponseBodyState `json:"state"`
-		WaitId string                                     `json:"waitId"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r LangyLocalReadWaitResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r LangyLocalReadWaitResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r LangyLocalReadWaitResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type ListProjectsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		Data       []Project  `json:"data"`
-		Pagination Pagination `json:"pagination"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r ListProjectsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListProjectsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListProjectsResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type CreateProjectResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON201      *struct {
-		CreatedAt       time.Time `json:"createdAt"`
-		Framework       string    `json:"framework"`
-		Id              string    `json:"id"`
-		Language        string    `json:"language"`
-		Name            string    `json:"name"`
-		ServiceApiKey   string    `json:"serviceApiKey"`
-		ServiceApiKeyId string    `json:"serviceApiKeyId"`
-		Slug            string    `json:"slug"`
-		TeamId          string    `json:"teamId"`
-		UpdatedAt       time.Time `json:"updatedAt"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r CreateProjectResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateProjectResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r CreateProjectResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type ArchiveProjectResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		ArchivedAt time.Time `json:"archivedAt"`
-		Id         string    `json:"id"`
-		Name       string    `json:"name"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r ArchiveProjectResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ArchiveProjectResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ArchiveProjectResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type GetProjectResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		CreatedAt         time.Time                                      `json:"createdAt"`
-		Framework         string                                         `json:"framework"`
-		Id                string                                         `json:"id"`
-		Language          string                                         `json:"language"`
-		Name              string                                         `json:"name"`
-		PiiRedactionLevel GetProject200JSONResponseBodyPiiRedactionLevel `json:"piiRedactionLevel"`
-		Slug              string                                         `json:"slug"`
-		TeamId            string                                         `json:"teamId"`
-		UpdatedAt         time.Time                                      `json:"updatedAt"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r GetProjectResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetProjectResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetProjectResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type UpdateProjectResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		CreatedAt         time.Time                                         `json:"createdAt"`
-		Framework         string                                            `json:"framework"`
-		Id                string                                            `json:"id"`
-		Language          string                                            `json:"language"`
-		Name              string                                            `json:"name"`
-		PiiRedactionLevel UpdateProject200JSONResponseBodyPiiRedactionLevel `json:"piiRedactionLevel"`
-		Slug              string                                            `json:"slug"`
-		TeamId            string                                            `json:"teamId"`
-		UpdatedAt         time.Time                                         `json:"updatedAt"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r UpdateProjectResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r UpdateProjectResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r UpdateProjectResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type GetProjectApiKeyResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		ApiKey string `json:"apiKey"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r GetProjectApiKeyResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetProjectApiKeyResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetProjectApiKeyResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type RegenerateProjectApiKeyResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		ApiKey string `json:"apiKey"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r RegenerateProjectApiKeyResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r RegenerateProjectApiKeyResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r RegenerateProjectApiKeyResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -142716,35 +143046,6 @@ func (r PostApiTrackEventResponse) ContentType() string {
 	return ""
 }
 
-type ReadUserAvatarBytesResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-}
-
-// Status returns HTTPResponse.Status
-func (r ReadUserAvatarBytesResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ReadUserAvatarBytesResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ReadUserAvatarBytesResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
 type StopAdminImpersonationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -142859,8 +143160,14 @@ type DeleteApiAgentCacheByNameResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                             `json:"code"`
@@ -142872,8 +143179,14 @@ type DeleteApiAgentCacheByNameResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                             `json:"code"`
@@ -142885,8 +143198,14 @@ type DeleteApiAgentCacheByNameResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                             `json:"code"`
@@ -142898,8 +143217,14 @@ type DeleteApiAgentCacheByNameResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -142944,8 +143269,14 @@ type GetApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                          `json:"code"`
@@ -142957,8 +143288,14 @@ type GetApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                          `json:"code"`
@@ -142970,8 +143307,14 @@ type GetApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                          `json:"code"`
@@ -142983,8 +143326,14 @@ type GetApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -143029,8 +143378,14 @@ type PutApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                          `json:"code"`
@@ -143042,8 +143397,14 @@ type PutApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                          `json:"code"`
@@ -143055,8 +143416,14 @@ type PutApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                          `json:"code"`
@@ -143068,8 +143435,14 @@ type PutApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -143115,8 +143488,14 @@ type PostApiAgentCacheByNameClaimResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                `json:"code"`
@@ -143128,8 +143507,14 @@ type PostApiAgentCacheByNameClaimResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                `json:"code"`
@@ -143141,8 +143526,14 @@ type PostApiAgentCacheByNameClaimResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                `json:"code"`
@@ -143154,8 +143545,14 @@ type PostApiAgentCacheByNameClaimResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -147148,6 +147545,35 @@ func (r PostApiDspyLogStepsResponse) ContentType() string {
 	return ""
 }
 
+type ReceiveElevenLabsWebhookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r ReceiveElevenLabsWebhookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReceiveElevenLabsWebhookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReceiveElevenLabsWebhookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type PostApiEvaluationsBatchLogResultsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -150261,8 +150687,14 @@ type CancelInstantEvalRunResponse struct {
 		Retryable bool                                          `json:"retryable"`
 		SpanId    *string                                       `json:"span_id,omitempty"`
 		Tips      *[]string                                     `json:"tips,omitempty"`
-		TraceId   *string                                       `json:"trace_id,omitempty"`
-		Type      string                                        `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -150709,6 +151141,349 @@ func (r ContinueLangyConversationTurnResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ContinueLangyConversationTurnResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type LangyLocalStartCallResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		CallId string `json:"callId"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r LangyLocalStartCallResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LangyLocalStartCallResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LangyLocalStartCallResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type LangyLocalReadCallResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		CallId string `json:"callId"`
+		Error  *struct {
+			Code    LangyLocalReadCall200JSONResponseBodyErrorCode `json:"code"`
+			Message string                                         `json:"message"`
+		} `json:"error,omitempty"`
+		Ok     *bool `json:"ok,omitempty"`
+		Output *struct {
+			DurationMs int     `json:"durationMs"`
+			ExitCode   *int    `json:"exitCode"`
+			LogPath    *string `json:"logPath,omitempty"`
+			Pid        *int    `json:"pid,omitempty"`
+			Stderr     string  `json:"stderr"`
+			Stdout     string  `json:"stdout"`
+			Truncated  bool    `json:"truncated"`
+		} `json:"output,omitempty"`
+		State LangyLocalReadCall200JSONResponseBodyState `json:"state"`
+		Text  *string                                    `json:"text,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r LangyLocalReadCallResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LangyLocalReadCallResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LangyLocalReadCallResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type LangyLocalCancelCallResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		CallId    string                                           `json:"callId"`
+		Cancelled LangyLocalCancelCall200JSONResponseBodyCancelled `json:"cancelled"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r LangyLocalCancelCallResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LangyLocalCancelCallResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LangyLocalCancelCallResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type LangyLocalCreateRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Command string `json:"command"`
+		Request struct {
+			ConversationId    string `json:"conversationId"`
+			ConversationTitle string `json:"conversationTitle"`
+			ConversationUrl   string `json:"conversationUrl"`
+			CreatedAt         string `json:"createdAt"`
+			ExpiresAt         string `json:"expiresAt"`
+			Id                string `json:"id"`
+			ProjectId         string `json:"projectId"`
+			ProjectName       string `json:"projectName"`
+		} `json:"request"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r LangyLocalCreateRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LangyLocalCreateRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LangyLocalCreateRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type LangyLocalWorkspaceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		CodeAccessPreference *LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference `json:"codeAccessPreference"`
+		Connected            bool                                                        `json:"connected"`
+		Github               struct {
+			AccountLogin *string `json:"accountLogin,omitempty"`
+			Installed    bool    `json:"installed"`
+		} `json:"github"`
+		PendingRequest *struct {
+			ConversationId    string `json:"conversationId"`
+			ConversationTitle string `json:"conversationTitle"`
+			ConversationUrl   string `json:"conversationUrl"`
+			CreatedAt         string `json:"createdAt"`
+			ExpiresAt         string `json:"expiresAt"`
+			Id                string `json:"id"`
+			ProjectId         string `json:"projectId"`
+			ProjectName       string `json:"projectName"`
+		} `json:"pendingRequest,omitempty"`
+		Workspace *struct {
+			GhAuthenticated *bool   `json:"ghAuthenticated,omitempty"`
+			GitBranch       *string `json:"gitBranch,omitempty"`
+			GitDirty        *bool   `json:"gitDirty,omitempty"`
+			GitRemote       *string `json:"gitRemote,omitempty"`
+			GitRepository   *bool   `json:"gitRepository,omitempty"`
+			Name            string  `json:"name"`
+			NodeVersion     *string `json:"nodeVersion,omitempty"`
+			Os              string  `json:"os"`
+			PackageManager  *string `json:"packageManager,omitempty"`
+			PythonVersion   *string `json:"pythonVersion,omitempty"`
+			Root            string  `json:"root"`
+		} `json:"workspace,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r LangyLocalWorkspaceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LangyLocalWorkspaceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LangyLocalWorkspaceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type LangyUiActionsListResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r LangyUiActionsListResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LangyUiActionsListResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LangyUiActionsListResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type LangyUiActionsDispatchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r LangyUiActionsDispatchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LangyUiActionsDispatchResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LangyUiActionsDispatchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type LangyLocalStartWaitResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		WaitId string `json:"waitId"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r LangyLocalStartWaitResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LangyLocalStartWaitResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LangyLocalStartWaitResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type LangyLocalReadWaitResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Answers *[]struct {
+			Other    *string  `json:"other,omitempty"`
+			Question string   `json:"question"`
+			Selected []string `json:"selected"`
+		} `json:"answers,omitempty"`
+		State  LangyLocalReadWait200JSONResponseBodyState `json:"state"`
+		WaitId string                                     `json:"waitId"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r LangyLocalReadWaitResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LangyLocalReadWaitResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LangyLocalReadWaitResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -151931,6 +152706,7 @@ type GetOrganizationMemberAccessResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		DirectBindings []struct {
+			CappedBySeat   bool                                                                  `json:"cappedBySeat"`
 			CustomRoleName *string                                                               `json:"customRoleName"`
 			Id             string                                                                `json:"id"`
 			Permissions    []string                                                              `json:"permissions"`
@@ -151941,6 +152717,7 @@ type GetOrganizationMemberAccessResponse struct {
 		} `json:"directBindings"`
 		Groups []struct {
 			Bindings []struct {
+				CappedBySeat   bool                                                                  `json:"cappedBySeat"`
 				CustomRoleName *string                                                               `json:"customRoleName"`
 				Id             string                                                                `json:"id"`
 				Permissions    []string                                                              `json:"permissions"`
@@ -152205,6 +152982,258 @@ func (r GetPlatformHealthSubsystemResponse) ContentType() string {
 	return ""
 }
 
+type ListProjectsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data       []Project  `json:"data"`
+		Pagination Pagination `json:"pagination"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r ListProjectsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListProjectsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListProjectsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateProjectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		CreatedAt       time.Time `json:"createdAt"`
+		Framework       string    `json:"framework"`
+		Id              string    `json:"id"`
+		Language        string    `json:"language"`
+		Name            string    `json:"name"`
+		ServiceApiKey   string    `json:"serviceApiKey"`
+		ServiceApiKeyId string    `json:"serviceApiKeyId"`
+		Slug            string    `json:"slug"`
+		TeamId          string    `json:"teamId"`
+		UpdatedAt       time.Time `json:"updatedAt"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateProjectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateProjectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateProjectResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ArchiveProjectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ArchivedAt time.Time `json:"archivedAt"`
+		Id         string    `json:"id"`
+		Name       string    `json:"name"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r ArchiveProjectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ArchiveProjectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ArchiveProjectResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetProjectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		CreatedAt         time.Time                                      `json:"createdAt"`
+		Framework         string                                         `json:"framework"`
+		Id                string                                         `json:"id"`
+		Language          string                                         `json:"language"`
+		Name              string                                         `json:"name"`
+		PiiRedactionLevel GetProject200JSONResponseBodyPiiRedactionLevel `json:"piiRedactionLevel"`
+		Slug              string                                         `json:"slug"`
+		TeamId            string                                         `json:"teamId"`
+		UpdatedAt         time.Time                                      `json:"updatedAt"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetProjectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetProjectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetProjectResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateProjectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		CreatedAt         time.Time                                         `json:"createdAt"`
+		Framework         string                                            `json:"framework"`
+		Id                string                                            `json:"id"`
+		Language          string                                            `json:"language"`
+		Name              string                                            `json:"name"`
+		PiiRedactionLevel UpdateProject200JSONResponseBodyPiiRedactionLevel `json:"piiRedactionLevel"`
+		Slug              string                                            `json:"slug"`
+		TeamId            string                                            `json:"teamId"`
+		UpdatedAt         time.Time                                         `json:"updatedAt"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateProjectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateProjectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateProjectResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetProjectApiKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ApiKey string `json:"apiKey"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetProjectApiKeyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetProjectApiKeyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetProjectApiKeyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RegenerateProjectApiKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ApiKey string `json:"apiKey"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r RegenerateProjectApiKeyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RegenerateProjectApiKeyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RegenerateProjectApiKeyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -152238,8 +153267,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                `json:"retryable"`
 		SpanId    *string                                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                                           `json:"tips,omitempty"`
-		TraceId   *string                                                             `json:"trace_id,omitempty"`
-		Type      string                                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                              `json:"code"`
@@ -152251,8 +153286,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                `json:"retryable"`
 		SpanId    *string                                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                                           `json:"tips,omitempty"`
-		TraceId   *string                                                             `json:"trace_id,omitempty"`
-		Type      string                                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                              `json:"code"`
@@ -152264,8 +153305,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                `json:"retryable"`
 		SpanId    *string                                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                                           `json:"tips,omitempty"`
-		TraceId   *string                                                             `json:"trace_id,omitempty"`
-		Type      string                                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                              `json:"code"`
@@ -152277,8 +153324,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                `json:"retryable"`
 		SpanId    *string                                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                                           `json:"tips,omitempty"`
-		TraceId   *string                                                             `json:"trace_id,omitempty"`
-		Type      string                                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152337,8 +153390,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                 `json:"retryable"`
 		SpanId    *string                                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                                            `json:"tips,omitempty"`
-		TraceId   *string                                                              `json:"trace_id,omitempty"`
-		Type      string                                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                               `json:"code"`
@@ -152350,8 +153409,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                 `json:"retryable"`
 		SpanId    *string                                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                                            `json:"tips,omitempty"`
-		TraceId   *string                                                              `json:"trace_id,omitempty"`
-		Type      string                                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                               `json:"code"`
@@ -152363,8 +153428,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                 `json:"retryable"`
 		SpanId    *string                                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                                            `json:"tips,omitempty"`
-		TraceId   *string                                                              `json:"trace_id,omitempty"`
-		Type      string                                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                               `json:"code"`
@@ -152376,8 +153447,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                 `json:"retryable"`
 		SpanId    *string                                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                                            `json:"tips,omitempty"`
-		TraceId   *string                                                              `json:"trace_id,omitempty"`
-		Type      string                                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152419,8 +153496,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                            `json:"retryable"`
 		SpanId    *string                                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                                         `json:"trace_id,omitempty"`
-		Type      string                                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                          `json:"code"`
@@ -152432,8 +153515,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                            `json:"retryable"`
 		SpanId    *string                                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                                         `json:"trace_id,omitempty"`
-		Type      string                                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                          `json:"code"`
@@ -152445,8 +153534,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                            `json:"retryable"`
 		SpanId    *string                                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                                         `json:"trace_id,omitempty"`
-		Type      string                                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                          `json:"code"`
@@ -152458,8 +153553,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                            `json:"retryable"`
 		SpanId    *string                                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                                         `json:"trace_id,omitempty"`
-		Type      string                                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                          `json:"code"`
@@ -152471,8 +153572,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                            `json:"retryable"`
 		SpanId    *string                                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                                         `json:"trace_id,omitempty"`
-		Type      string                                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152531,8 +153638,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                         `json:"retryable"`
 		SpanId    *string                                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                                      `json:"trace_id,omitempty"`
-		Type      string                                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                       `json:"code"`
@@ -152544,8 +153657,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                         `json:"retryable"`
 		SpanId    *string                                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                                      `json:"trace_id,omitempty"`
-		Type      string                                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                       `json:"code"`
@@ -152557,8 +153676,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                         `json:"retryable"`
 		SpanId    *string                                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                                      `json:"trace_id,omitempty"`
-		Type      string                                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                       `json:"code"`
@@ -152570,8 +153695,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                         `json:"retryable"`
 		SpanId    *string                                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                                      `json:"trace_id,omitempty"`
-		Type      string                                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                       `json:"code"`
@@ -152583,8 +153714,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                         `json:"retryable"`
 		SpanId    *string                                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                                      `json:"trace_id,omitempty"`
-		Type      string                                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152643,8 +153780,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                         `json:"code"`
@@ -152656,8 +153799,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                         `json:"code"`
@@ -152669,8 +153818,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                         `json:"code"`
@@ -152682,8 +153837,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                         `json:"code"`
@@ -152695,8 +153856,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152738,8 +153905,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse str
 		Retryable bool                                                                                     `json:"retryable"`
 		SpanId    *string                                                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                `json:"tips,omitempty"`
-		TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-		Type      string                                                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                                   `json:"code"`
@@ -152751,8 +153924,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse str
 		Retryable bool                                                                                     `json:"retryable"`
 		SpanId    *string                                                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                `json:"tips,omitempty"`
-		TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-		Type      string                                                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                                   `json:"code"`
@@ -152764,8 +153943,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse str
 		Retryable bool                                                                                     `json:"retryable"`
 		SpanId    *string                                                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                `json:"tips,omitempty"`
-		TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-		Type      string                                                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                                   `json:"code"`
@@ -152777,8 +153962,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse str
 		Retryable bool                                                                                     `json:"retryable"`
 		SpanId    *string                                                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                `json:"tips,omitempty"`
-		TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-		Type      string                                                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                                   `json:"code"`
@@ -152790,8 +153981,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse str
 		Retryable bool                                                                                     `json:"retryable"`
 		SpanId    *string                                                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                `json:"tips,omitempty"`
-		TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-		Type      string                                                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152850,8 +154047,14 @@ type PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse struct
 		Retryable bool                                                                                  `json:"retryable"`
 		SpanId    *string                                                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                                                             `json:"tips,omitempty"`
-		TraceId   *string                                                                               `json:"trace_id,omitempty"`
-		Type      string                                                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                                `json:"code"`
@@ -152863,8 +154066,14 @@ type PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse struct
 		Retryable bool                                                                                  `json:"retryable"`
 		SpanId    *string                                                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                                                             `json:"tips,omitempty"`
-		TraceId   *string                                                                               `json:"trace_id,omitempty"`
-		Type      string                                                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                                `json:"code"`
@@ -152876,8 +154085,14 @@ type PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse struct
 		Retryable bool                                                                                  `json:"retryable"`
 		SpanId    *string                                                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                                                             `json:"tips,omitempty"`
-		TraceId   *string                                                                               `json:"trace_id,omitempty"`
-		Type      string                                                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                                `json:"code"`
@@ -152889,8 +154104,14 @@ type PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse struct
 		Retryable bool                                                                                  `json:"retryable"`
 		SpanId    *string                                                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                                                             `json:"tips,omitempty"`
-		TraceId   *string                                                                               `json:"trace_id,omitempty"`
-		Type      string                                                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                                `json:"code"`
@@ -152902,8 +154123,14 @@ type PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse struct
 		Retryable bool                                                                                  `json:"retryable"`
 		SpanId    *string                                                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                                                             `json:"tips,omitempty"`
-		TraceId   *string                                                                               `json:"trace_id,omitempty"`
-		Type      string                                                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152971,8 +154198,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                          `json:"retryable"`
 		SpanId    *string                                                                       `json:"span_id,omitempty"`
 		Tips      *[]string                                                                     `json:"tips,omitempty"`
-		TraceId   *string                                                                       `json:"trace_id,omitempty"`
-		Type      string                                                                        `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                        `json:"code"`
@@ -152984,8 +154217,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                          `json:"retryable"`
 		SpanId    *string                                                                       `json:"span_id,omitempty"`
 		Tips      *[]string                                                                     `json:"tips,omitempty"`
-		TraceId   *string                                                                       `json:"trace_id,omitempty"`
-		Type      string                                                                        `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                        `json:"code"`
@@ -152997,8 +154236,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                          `json:"retryable"`
 		SpanId    *string                                                                       `json:"span_id,omitempty"`
 		Tips      *[]string                                                                     `json:"tips,omitempty"`
-		TraceId   *string                                                                       `json:"trace_id,omitempty"`
-		Type      string                                                                        `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                        `json:"code"`
@@ -153010,8 +154255,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                          `json:"retryable"`
 		SpanId    *string                                                                       `json:"span_id,omitempty"`
 		Tips      *[]string                                                                     `json:"tips,omitempty"`
-		TraceId   *string                                                                       `json:"trace_id,omitempty"`
-		Type      string                                                                        `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -153077,8 +154328,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                         `json:"code"`
@@ -153090,8 +154347,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                         `json:"code"`
@@ -153103,8 +154366,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                         `json:"code"`
@@ -153116,8 +154385,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -153159,8 +154434,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse s
 		Retryable bool                                                                                       `json:"retryable"`
 		SpanId    *string                                                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-		Type      string                                                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                                     `json:"code"`
@@ -153172,8 +154453,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse s
 		Retryable bool                                                                                       `json:"retryable"`
 		SpanId    *string                                                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-		Type      string                                                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                                     `json:"code"`
@@ -153185,8 +154472,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse s
 		Retryable bool                                                                                       `json:"retryable"`
 		SpanId    *string                                                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-		Type      string                                                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                                     `json:"code"`
@@ -153198,8 +154491,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse s
 		Retryable bool                                                                                       `json:"retryable"`
 		SpanId    *string                                                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-		Type      string                                                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                                     `json:"code"`
@@ -153211,8 +154510,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse s
 		Retryable bool                                                                                       `json:"retryable"`
 		SpanId    *string                                                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-		Type      string                                                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -153278,8 +154583,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 		Retryable bool                                                                                    `json:"retryable"`
 		SpanId    *string                                                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                                                               `json:"tips,omitempty"`
-		TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-		Type      string                                                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                                  `json:"code"`
@@ -153291,8 +154602,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 		Retryable bool                                                                                    `json:"retryable"`
 		SpanId    *string                                                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                                                               `json:"tips,omitempty"`
-		TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-		Type      string                                                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                                  `json:"code"`
@@ -153304,8 +154621,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 		Retryable bool                                                                                    `json:"retryable"`
 		SpanId    *string                                                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                                                               `json:"tips,omitempty"`
-		TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-		Type      string                                                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                                  `json:"code"`
@@ -153317,8 +154640,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 		Retryable bool                                                                                    `json:"retryable"`
 		SpanId    *string                                                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                                                               `json:"tips,omitempty"`
-		TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-		Type      string                                                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                                  `json:"code"`
@@ -153330,8 +154659,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 		Retryable bool                                                                                    `json:"retryable"`
 		SpanId    *string                                                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                                                               `json:"tips,omitempty"`
-		TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-		Type      string                                                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -153397,8 +154732,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 		Retryable bool                                                                                      `json:"retryable"`
 		SpanId    *string                                                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-		Type      string                                                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                                    `json:"code"`
@@ -153410,8 +154751,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 		Retryable bool                                                                                      `json:"retryable"`
 		SpanId    *string                                                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-		Type      string                                                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                                    `json:"code"`
@@ -153423,8 +154770,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 		Retryable bool                                                                                      `json:"retryable"`
 		SpanId    *string                                                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-		Type      string                                                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                                    `json:"code"`
@@ -153436,8 +154789,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 		Retryable bool                                                                                      `json:"retryable"`
 		SpanId    *string                                                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-		Type      string                                                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                                    `json:"code"`
@@ -153449,8 +154808,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 		Retryable bool                                                                                      `json:"retryable"`
 		SpanId    *string                                                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-		Type      string                                                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -153516,8 +154881,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 		Retryable bool                                                                                              `json:"retryable"`
 		SpanId    *string                                                                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                         `json:"tips,omitempty"`
-		TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-		Type      string                                                                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                                            `json:"code"`
@@ -153529,8 +154900,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 		Retryable bool                                                                                              `json:"retryable"`
 		SpanId    *string                                                                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                         `json:"tips,omitempty"`
-		TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-		Type      string                                                                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                                            `json:"code"`
@@ -153542,8 +154919,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 		Retryable bool                                                                                              `json:"retryable"`
 		SpanId    *string                                                                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                         `json:"tips,omitempty"`
-		TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-		Type      string                                                                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                                            `json:"code"`
@@ -153555,8 +154938,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 		Retryable bool                                                                                              `json:"retryable"`
 		SpanId    *string                                                                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                         `json:"tips,omitempty"`
-		TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-		Type      string                                                                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                                            `json:"code"`
@@ -153568,8 +154957,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 		Retryable bool                                                                                              `json:"retryable"`
 		SpanId    *string                                                                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                         `json:"tips,omitempty"`
-		TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-		Type      string                                                                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -154844,8 +156239,14 @@ type PostApiV1QueryResponse struct {
 		Retryable bool                                    `json:"retryable"`
 		SpanId    *string                                 `json:"span_id,omitempty"`
 		Tips      *[]string                               `json:"tips,omitempty"`
-		TraceId   *string                                 `json:"trace_id,omitempty"`
-		Type      string                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                  `json:"code"`
@@ -154857,8 +156258,14 @@ type PostApiV1QueryResponse struct {
 		Retryable bool                                    `json:"retryable"`
 		SpanId    *string                                 `json:"span_id,omitempty"`
 		Tips      *[]string                               `json:"tips,omitempty"`
-		TraceId   *string                                 `json:"trace_id,omitempty"`
-		Type      string                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                  `json:"code"`
@@ -154870,8 +156277,33 @@ type PostApiV1QueryResponse struct {
 		Retryable bool                                    `json:"retryable"`
 		SpanId    *string                                 `json:"span_id,omitempty"`
 		Tips      *[]string                               `json:"tips,omitempty"`
-		TraceId   *string                                 `json:"trace_id,omitempty"`
-		Type      string                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                  `json:"code"`
+		DocsUrl   *string                                 `json:"docs_url,omitempty"`
+		Fault     *PostApiV1Query404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                  `json:"message"`
+		Meta      *map[string]interface{}                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                          `json:"reasons,omitempty"`
+		Retryable bool                                    `json:"retryable"`
+		SpanId    *string                                 `json:"span_id,omitempty"`
+		Tips      *[]string                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON422 *struct {
 		Code      string                                  `json:"code"`
@@ -154883,8 +156315,14 @@ type PostApiV1QueryResponse struct {
 		Retryable bool                                    `json:"retryable"`
 		SpanId    *string                                 `json:"span_id,omitempty"`
 		Tips      *[]string                               `json:"tips,omitempty"`
-		TraceId   *string                                 `json:"trace_id,omitempty"`
-		Type      string                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                  `json:"code"`
@@ -154896,8 +156334,14 @@ type PostApiV1QueryResponse struct {
 		Retryable bool                                    `json:"retryable"`
 		SpanId    *string                                 `json:"span_id,omitempty"`
 		Tips      *[]string                               `json:"tips,omitempty"`
-		TraceId   *string                                 `json:"trace_id,omitempty"`
-		Type      string                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -155036,8 +156480,14 @@ type GetApiV1QueryReferenceResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                          `json:"code"`
@@ -155049,8 +156499,14 @@ type GetApiV1QueryReferenceResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                          `json:"code"`
@@ -155062,8 +156518,14 @@ type GetApiV1QueryReferenceResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                          `json:"code"`
@@ -155075,8 +156537,14 @@ type GetApiV1QueryReferenceResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -155151,8 +156619,14 @@ type GetApiV1QuerySchemaResponse struct {
 		Retryable bool                                         `json:"retryable"`
 		SpanId    *string                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                    `json:"tips,omitempty"`
-		TraceId   *string                                      `json:"trace_id,omitempty"`
-		Type      string                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                       `json:"code"`
@@ -155164,8 +156638,14 @@ type GetApiV1QuerySchemaResponse struct {
 		Retryable bool                                         `json:"retryable"`
 		SpanId    *string                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                    `json:"tips,omitempty"`
-		TraceId   *string                                      `json:"trace_id,omitempty"`
-		Type      string                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                       `json:"code"`
@@ -155177,8 +156657,14 @@ type GetApiV1QuerySchemaResponse struct {
 		Retryable bool                                         `json:"retryable"`
 		SpanId    *string                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                    `json:"tips,omitempty"`
-		TraceId   *string                                      `json:"trace_id,omitempty"`
-		Type      string                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                       `json:"code"`
@@ -155190,8 +156676,14 @@ type GetApiV1QuerySchemaResponse struct {
 		Retryable bool                                         `json:"retryable"`
 		SpanId    *string                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                    `json:"tips,omitempty"`
-		TraceId   *string                                      `json:"trace_id,omitempty"`
-		Type      string                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -159485,6 +160977,35 @@ func (r ConfirmOneClickUnsubscribeResponse) ContentType() string {
 	return ""
 }
 
+type ReadUserAvatarBytesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r ReadUserAvatarBytesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReadUserAvatarBytesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReadUserAvatarBytesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ReceiveStripeWebhookResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -160281,23 +161802,6 @@ func (c *ClientWithResponses) GetApiCodingAgentPullRequestUsageWithResponse(ctx 
 	return ParseGetApiCodingAgentPullRequestUsageResponse(rsp)
 }
 
-// ReceiveElevenLabsWebhookWithBodyWithResponse request with arbitrary body returning *ReceiveElevenLabsWebhookResponse
-func (c *ClientWithResponses) ReceiveElevenLabsWebhookWithBodyWithResponse(ctx context.Context, modelProviderId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReceiveElevenLabsWebhookResponse, error) {
-	rsp, err := c.ReceiveElevenLabsWebhookWithBody(ctx, modelProviderId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseReceiveElevenLabsWebhookResponse(rsp)
-}
-
-func (c *ClientWithResponses) ReceiveElevenLabsWebhookWithTextBodyWithResponse(ctx context.Context, modelProviderId string, body ReceiveElevenLabsWebhookTextRequestBody, reqEditors ...RequestEditorFn) (*ReceiveElevenLabsWebhookResponse, error) {
-	rsp, err := c.ReceiveElevenLabsWebhookWithTextBody(ctx, modelProviderId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseReceiveElevenLabsWebhookResponse(rsp)
-}
-
 // GetApiGatewayV1BudgetsWithResponse request returning *GetApiGatewayV1BudgetsResponse
 func (c *ClientWithResponses) GetApiGatewayV1BudgetsWithResponse(ctx context.Context, params *GetApiGatewayV1BudgetsParams, reqEditors ...RequestEditorFn) (*GetApiGatewayV1BudgetsResponse, error) {
 	rsp, err := c.GetApiGatewayV1Budgets(ctx, params, reqEditors...)
@@ -160665,198 +162169,6 @@ func (c *ClientWithResponses) IngestTurnResultWithResponse(ctx context.Context, 
 	return ParseIngestTurnResultResponse(rsp)
 }
 
-// LangyLocalStartCallWithBodyWithResponse request with arbitrary body returning *LangyLocalStartCallResponse
-func (c *ClientWithResponses) LangyLocalStartCallWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyLocalStartCallResponse, error) {
-	rsp, err := c.LangyLocalStartCallWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseLangyLocalStartCallResponse(rsp)
-}
-
-func (c *ClientWithResponses) LangyLocalStartCallWithTextBodyWithResponse(ctx context.Context, body LangyLocalStartCallTextRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalStartCallResponse, error) {
-	rsp, err := c.LangyLocalStartCallWithTextBody(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseLangyLocalStartCallResponse(rsp)
-}
-
-// LangyLocalReadCallWithResponse request returning *LangyLocalReadCallResponse
-func (c *ClientWithResponses) LangyLocalReadCallWithResponse(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*LangyLocalReadCallResponse, error) {
-	rsp, err := c.LangyLocalReadCall(ctx, callId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseLangyLocalReadCallResponse(rsp)
-}
-
-// LangyLocalCancelCallWithResponse request returning *LangyLocalCancelCallResponse
-func (c *ClientWithResponses) LangyLocalCancelCallWithResponse(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*LangyLocalCancelCallResponse, error) {
-	rsp, err := c.LangyLocalCancelCall(ctx, callId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseLangyLocalCancelCallResponse(rsp)
-}
-
-// LangyLocalCreateRequestWithBodyWithResponse request with arbitrary body returning *LangyLocalCreateRequestResponse
-func (c *ClientWithResponses) LangyLocalCreateRequestWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyLocalCreateRequestResponse, error) {
-	rsp, err := c.LangyLocalCreateRequestWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseLangyLocalCreateRequestResponse(rsp)
-}
-
-func (c *ClientWithResponses) LangyLocalCreateRequestWithResponse(ctx context.Context, body LangyLocalCreateRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalCreateRequestResponse, error) {
-	rsp, err := c.LangyLocalCreateRequest(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseLangyLocalCreateRequestResponse(rsp)
-}
-
-// LangyLocalWorkspaceWithResponse request returning *LangyLocalWorkspaceResponse
-func (c *ClientWithResponses) LangyLocalWorkspaceWithResponse(ctx context.Context, params *LangyLocalWorkspaceParams, reqEditors ...RequestEditorFn) (*LangyLocalWorkspaceResponse, error) {
-	rsp, err := c.LangyLocalWorkspace(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseLangyLocalWorkspaceResponse(rsp)
-}
-
-// LangyUiActionsListWithResponse request returning *LangyUiActionsListResponse
-func (c *ClientWithResponses) LangyUiActionsListWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*LangyUiActionsListResponse, error) {
-	rsp, err := c.LangyUiActionsList(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseLangyUiActionsListResponse(rsp)
-}
-
-// LangyUiActionsDispatchWithBodyWithResponse request with arbitrary body returning *LangyUiActionsDispatchResponse
-func (c *ClientWithResponses) LangyUiActionsDispatchWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyUiActionsDispatchResponse, error) {
-	rsp, err := c.LangyUiActionsDispatchWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseLangyUiActionsDispatchResponse(rsp)
-}
-
-func (c *ClientWithResponses) LangyUiActionsDispatchWithTextBodyWithResponse(ctx context.Context, body LangyUiActionsDispatchTextRequestBody, reqEditors ...RequestEditorFn) (*LangyUiActionsDispatchResponse, error) {
-	rsp, err := c.LangyUiActionsDispatchWithTextBody(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseLangyUiActionsDispatchResponse(rsp)
-}
-
-// LangyLocalStartWaitWithBodyWithResponse request with arbitrary body returning *LangyLocalStartWaitResponse
-func (c *ClientWithResponses) LangyLocalStartWaitWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyLocalStartWaitResponse, error) {
-	rsp, err := c.LangyLocalStartWaitWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseLangyLocalStartWaitResponse(rsp)
-}
-
-func (c *ClientWithResponses) LangyLocalStartWaitWithResponse(ctx context.Context, body LangyLocalStartWaitJSONRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalStartWaitResponse, error) {
-	rsp, err := c.LangyLocalStartWait(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseLangyLocalStartWaitResponse(rsp)
-}
-
-// LangyLocalReadWaitWithResponse request returning *LangyLocalReadWaitResponse
-func (c *ClientWithResponses) LangyLocalReadWaitWithResponse(ctx context.Context, waitId string, reqEditors ...RequestEditorFn) (*LangyLocalReadWaitResponse, error) {
-	rsp, err := c.LangyLocalReadWait(ctx, waitId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseLangyLocalReadWaitResponse(rsp)
-}
-
-// ListProjectsWithResponse request returning *ListProjectsResponse
-func (c *ClientWithResponses) ListProjectsWithResponse(ctx context.Context, params *ListProjectsParams, reqEditors ...RequestEditorFn) (*ListProjectsResponse, error) {
-	rsp, err := c.ListProjects(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListProjectsResponse(rsp)
-}
-
-// CreateProjectWithBodyWithResponse request with arbitrary body returning *CreateProjectResponse
-func (c *ClientWithResponses) CreateProjectWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateProjectResponse, error) {
-	rsp, err := c.CreateProjectWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateProjectResponse(rsp)
-}
-
-func (c *ClientWithResponses) CreateProjectWithResponse(ctx context.Context, body CreateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateProjectResponse, error) {
-	rsp, err := c.CreateProject(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateProjectResponse(rsp)
-}
-
-// ArchiveProjectWithResponse request returning *ArchiveProjectResponse
-func (c *ClientWithResponses) ArchiveProjectWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*ArchiveProjectResponse, error) {
-	rsp, err := c.ArchiveProject(ctx, id, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseArchiveProjectResponse(rsp)
-}
-
-// GetProjectWithResponse request returning *GetProjectResponse
-func (c *ClientWithResponses) GetProjectWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetProjectResponse, error) {
-	rsp, err := c.GetProject(ctx, id, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetProjectResponse(rsp)
-}
-
-// UpdateProjectWithBodyWithResponse request with arbitrary body returning *UpdateProjectResponse
-func (c *ClientWithResponses) UpdateProjectWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error) {
-	rsp, err := c.UpdateProjectWithBody(ctx, id, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateProjectResponse(rsp)
-}
-
-func (c *ClientWithResponses) UpdateProjectWithResponse(ctx context.Context, id string, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error) {
-	rsp, err := c.UpdateProject(ctx, id, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateProjectResponse(rsp)
-}
-
-// GetProjectApiKeyWithResponse request returning *GetProjectApiKeyResponse
-func (c *ClientWithResponses) GetProjectApiKeyWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetProjectApiKeyResponse, error) {
-	rsp, err := c.GetProjectApiKey(ctx, id, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetProjectApiKeyResponse(rsp)
-}
-
-// RegenerateProjectApiKeyWithResponse request returning *RegenerateProjectApiKeyResponse
-func (c *ClientWithResponses) RegenerateProjectApiKeyWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*RegenerateProjectApiKeyResponse, error) {
-	rsp, err := c.RegenerateProjectApiKey(ctx, id, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseRegenerateProjectApiKeyResponse(rsp)
-}
-
 // IngestBrowserTracesWithBodyWithResponse request with arbitrary body returning *IngestBrowserTracesResponse
 func (c *ClientWithResponses) IngestBrowserTracesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*IngestBrowserTracesResponse, error) {
 	rsp, err := c.IngestBrowserTracesWithBody(ctx, contentType, body, reqEditors...)
@@ -161116,15 +162428,6 @@ func (c *ClientWithResponses) PostApiTrackEventWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParsePostApiTrackEventResponse(rsp)
-}
-
-// ReadUserAvatarBytesWithResponse request returning *ReadUserAvatarBytesResponse
-func (c *ClientWithResponses) ReadUserAvatarBytesWithResponse(ctx context.Context, projectId string, userAvatarId string, reqEditors ...RequestEditorFn) (*ReadUserAvatarBytesResponse, error) {
-	rsp, err := c.ReadUserAvatarBytes(ctx, projectId, userAvatarId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseReadUserAvatarBytesResponse(rsp)
 }
 
 // StopAdminImpersonationWithResponse request returning *StopAdminImpersonationResponse
@@ -162236,6 +163539,23 @@ func (c *ClientWithResponses) PostApiDspyLogStepsWithResponse(ctx context.Contex
 	return ParsePostApiDspyLogStepsResponse(rsp)
 }
 
+// ReceiveElevenLabsWebhookWithBodyWithResponse request with arbitrary body returning *ReceiveElevenLabsWebhookResponse
+func (c *ClientWithResponses) ReceiveElevenLabsWebhookWithBodyWithResponse(ctx context.Context, modelProviderId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReceiveElevenLabsWebhookResponse, error) {
+	rsp, err := c.ReceiveElevenLabsWebhookWithBody(ctx, modelProviderId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReceiveElevenLabsWebhookResponse(rsp)
+}
+
+func (c *ClientWithResponses) ReceiveElevenLabsWebhookWithTextBodyWithResponse(ctx context.Context, modelProviderId string, body ReceiveElevenLabsWebhookTextRequestBody, reqEditors ...RequestEditorFn) (*ReceiveElevenLabsWebhookResponse, error) {
+	rsp, err := c.ReceiveElevenLabsWebhookWithTextBody(ctx, modelProviderId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReceiveElevenLabsWebhookResponse(rsp)
+}
+
 // PostApiEvaluationsBatchLogResultsWithBodyWithResponse request with arbitrary body returning *PostApiEvaluationsBatchLogResultsResponse
 func (c *ClientWithResponses) PostApiEvaluationsBatchLogResultsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiEvaluationsBatchLogResultsResponse, error) {
 	rsp, err := c.PostApiEvaluationsBatchLogResultsWithBody(ctx, contentType, body, reqEditors...)
@@ -163089,6 +164409,119 @@ func (c *ClientWithResponses) ContinueLangyConversationTurnWithResponse(ctx cont
 	return ParseContinueLangyConversationTurnResponse(rsp)
 }
 
+// LangyLocalStartCallWithBodyWithResponse request with arbitrary body returning *LangyLocalStartCallResponse
+func (c *ClientWithResponses) LangyLocalStartCallWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyLocalStartCallResponse, error) {
+	rsp, err := c.LangyLocalStartCallWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLangyLocalStartCallResponse(rsp)
+}
+
+func (c *ClientWithResponses) LangyLocalStartCallWithTextBodyWithResponse(ctx context.Context, body LangyLocalStartCallTextRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalStartCallResponse, error) {
+	rsp, err := c.LangyLocalStartCallWithTextBody(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLangyLocalStartCallResponse(rsp)
+}
+
+// LangyLocalReadCallWithResponse request returning *LangyLocalReadCallResponse
+func (c *ClientWithResponses) LangyLocalReadCallWithResponse(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*LangyLocalReadCallResponse, error) {
+	rsp, err := c.LangyLocalReadCall(ctx, callId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLangyLocalReadCallResponse(rsp)
+}
+
+// LangyLocalCancelCallWithResponse request returning *LangyLocalCancelCallResponse
+func (c *ClientWithResponses) LangyLocalCancelCallWithResponse(ctx context.Context, callId string, reqEditors ...RequestEditorFn) (*LangyLocalCancelCallResponse, error) {
+	rsp, err := c.LangyLocalCancelCall(ctx, callId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLangyLocalCancelCallResponse(rsp)
+}
+
+// LangyLocalCreateRequestWithBodyWithResponse request with arbitrary body returning *LangyLocalCreateRequestResponse
+func (c *ClientWithResponses) LangyLocalCreateRequestWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyLocalCreateRequestResponse, error) {
+	rsp, err := c.LangyLocalCreateRequestWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLangyLocalCreateRequestResponse(rsp)
+}
+
+func (c *ClientWithResponses) LangyLocalCreateRequestWithResponse(ctx context.Context, body LangyLocalCreateRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalCreateRequestResponse, error) {
+	rsp, err := c.LangyLocalCreateRequest(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLangyLocalCreateRequestResponse(rsp)
+}
+
+// LangyLocalWorkspaceWithResponse request returning *LangyLocalWorkspaceResponse
+func (c *ClientWithResponses) LangyLocalWorkspaceWithResponse(ctx context.Context, params *LangyLocalWorkspaceParams, reqEditors ...RequestEditorFn) (*LangyLocalWorkspaceResponse, error) {
+	rsp, err := c.LangyLocalWorkspace(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLangyLocalWorkspaceResponse(rsp)
+}
+
+// LangyUiActionsListWithResponse request returning *LangyUiActionsListResponse
+func (c *ClientWithResponses) LangyUiActionsListWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*LangyUiActionsListResponse, error) {
+	rsp, err := c.LangyUiActionsList(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLangyUiActionsListResponse(rsp)
+}
+
+// LangyUiActionsDispatchWithBodyWithResponse request with arbitrary body returning *LangyUiActionsDispatchResponse
+func (c *ClientWithResponses) LangyUiActionsDispatchWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyUiActionsDispatchResponse, error) {
+	rsp, err := c.LangyUiActionsDispatchWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLangyUiActionsDispatchResponse(rsp)
+}
+
+func (c *ClientWithResponses) LangyUiActionsDispatchWithTextBodyWithResponse(ctx context.Context, body LangyUiActionsDispatchTextRequestBody, reqEditors ...RequestEditorFn) (*LangyUiActionsDispatchResponse, error) {
+	rsp, err := c.LangyUiActionsDispatchWithTextBody(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLangyUiActionsDispatchResponse(rsp)
+}
+
+// LangyLocalStartWaitWithBodyWithResponse request with arbitrary body returning *LangyLocalStartWaitResponse
+func (c *ClientWithResponses) LangyLocalStartWaitWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyLocalStartWaitResponse, error) {
+	rsp, err := c.LangyLocalStartWaitWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLangyLocalStartWaitResponse(rsp)
+}
+
+func (c *ClientWithResponses) LangyLocalStartWaitWithResponse(ctx context.Context, body LangyLocalStartWaitJSONRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalStartWaitResponse, error) {
+	rsp, err := c.LangyLocalStartWait(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLangyLocalStartWaitResponse(rsp)
+}
+
+// LangyLocalReadWaitWithResponse request returning *LangyLocalReadWaitResponse
+func (c *ClientWithResponses) LangyLocalReadWaitWithResponse(ctx context.Context, waitId string, reqEditors ...RequestEditorFn) (*LangyLocalReadWaitResponse, error) {
+	rsp, err := c.LangyLocalReadWait(ctx, waitId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLangyLocalReadWaitResponse(rsp)
+}
+
 // GetApiMeProjectWithResponse request returning *GetApiMeProjectResponse
 func (c *ClientWithResponses) GetApiMeProjectWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiMeProjectResponse, error) {
 	rsp, err := c.GetApiMeProject(ctx, reqEditors...)
@@ -163462,6 +164895,85 @@ func (c *ClientWithResponses) GetPlatformHealthSubsystemWithResponse(ctx context
 		return nil, err
 	}
 	return ParseGetPlatformHealthSubsystemResponse(rsp)
+}
+
+// ListProjectsWithResponse request returning *ListProjectsResponse
+func (c *ClientWithResponses) ListProjectsWithResponse(ctx context.Context, params *ListProjectsParams, reqEditors ...RequestEditorFn) (*ListProjectsResponse, error) {
+	rsp, err := c.ListProjects(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListProjectsResponse(rsp)
+}
+
+// CreateProjectWithBodyWithResponse request with arbitrary body returning *CreateProjectResponse
+func (c *ClientWithResponses) CreateProjectWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateProjectResponse, error) {
+	rsp, err := c.CreateProjectWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateProjectResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateProjectWithResponse(ctx context.Context, body CreateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateProjectResponse, error) {
+	rsp, err := c.CreateProject(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateProjectResponse(rsp)
+}
+
+// ArchiveProjectWithResponse request returning *ArchiveProjectResponse
+func (c *ClientWithResponses) ArchiveProjectWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*ArchiveProjectResponse, error) {
+	rsp, err := c.ArchiveProject(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseArchiveProjectResponse(rsp)
+}
+
+// GetProjectWithResponse request returning *GetProjectResponse
+func (c *ClientWithResponses) GetProjectWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetProjectResponse, error) {
+	rsp, err := c.GetProject(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetProjectResponse(rsp)
+}
+
+// UpdateProjectWithBodyWithResponse request with arbitrary body returning *UpdateProjectResponse
+func (c *ClientWithResponses) UpdateProjectWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error) {
+	rsp, err := c.UpdateProjectWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateProjectResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateProjectWithResponse(ctx context.Context, id string, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error) {
+	rsp, err := c.UpdateProject(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateProjectResponse(rsp)
+}
+
+// GetProjectApiKeyWithResponse request returning *GetProjectApiKeyResponse
+func (c *ClientWithResponses) GetProjectApiKeyWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetProjectApiKeyResponse, error) {
+	rsp, err := c.GetProjectApiKey(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetProjectApiKeyResponse(rsp)
+}
+
+// RegenerateProjectApiKeyWithResponse request returning *RegenerateProjectApiKeyResponse
+func (c *ClientWithResponses) RegenerateProjectApiKeyWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*RegenerateProjectApiKeyResponse, error) {
+	rsp, err := c.RegenerateProjectApiKey(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRegenerateProjectApiKeyResponse(rsp)
 }
 
 // GetApiV1ProjectsByProjectIdAnalyticsChartsWithResponse request returning *GetApiV1ProjectsByProjectIdAnalyticsChartsResponse
@@ -164814,6 +166326,15 @@ func (c *ClientWithResponses) ConfirmOneClickUnsubscribeWithResponse(ctx context
 	return ParseConfirmOneClickUnsubscribeResponse(rsp)
 }
 
+// ReadUserAvatarBytesWithResponse request returning *ReadUserAvatarBytesResponse
+func (c *ClientWithResponses) ReadUserAvatarBytesWithResponse(ctx context.Context, projectId string, userAvatarId string, reqEditors ...RequestEditorFn) (*ReadUserAvatarBytesResponse, error) {
+	rsp, err := c.ReadUserAvatarBytes(ctx, projectId, userAvatarId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReadUserAvatarBytesResponse(rsp)
+}
+
 // ReceiveStripeWebhookWithBodyWithResponse request with arbitrary body returning *ReceiveStripeWebhookResponse
 func (c *ClientWithResponses) ReceiveStripeWebhookWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReceiveStripeWebhookResponse, error) {
 	rsp, err := c.ReceiveStripeWebhookWithBody(ctx, contentType, body, reqEditors...)
@@ -165253,22 +166774,6 @@ func ParseGetApiCodingAgentPullRequestUsageResponse(rsp *http.Response) (*GetApi
 	return response, nil
 }
 
-// ParseReceiveElevenLabsWebhookResponse parses an HTTP response from a ReceiveElevenLabsWebhookWithResponse call
-func ParseReceiveElevenLabsWebhookResponse(rsp *http.Response) (*ReceiveElevenLabsWebhookResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ReceiveElevenLabsWebhookResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	return response, nil
-}
-
 // ParseGetApiGatewayV1BudgetsResponse parses an HTTP response from a GetApiGatewayV1BudgetsWithResponse call
 func ParseGetApiGatewayV1BudgetsResponse(rsp *http.Response) (*GetApiGatewayV1BudgetsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -165336,8 +166841,14 @@ func ParseGetApiGatewayV1BudgetsResponse(rsp *http.Response) (*GetApiGatewayV1Bu
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165355,8 +166866,14 @@ func ParseGetApiGatewayV1BudgetsResponse(rsp *http.Response) (*GetApiGatewayV1Bu
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165374,8 +166891,14 @@ func ParseGetApiGatewayV1BudgetsResponse(rsp *http.Response) (*GetApiGatewayV1Bu
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165393,8 +166916,14 @@ func ParseGetApiGatewayV1BudgetsResponse(rsp *http.Response) (*GetApiGatewayV1Bu
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165469,8 +166998,14 @@ func ParsePostApiGatewayV1BudgetsResponse(rsp *http.Response) (*PostApiGatewayV1
 			Retryable bool                                             `json:"retryable"`
 			SpanId    *string                                          `json:"span_id,omitempty"`
 			Tips      *[]string                                        `json:"tips,omitempty"`
-			TraceId   *string                                          `json:"trace_id,omitempty"`
-			Type      string                                           `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165488,8 +167023,14 @@ func ParsePostApiGatewayV1BudgetsResponse(rsp *http.Response) (*PostApiGatewayV1
 			Retryable bool                                             `json:"retryable"`
 			SpanId    *string                                          `json:"span_id,omitempty"`
 			Tips      *[]string                                        `json:"tips,omitempty"`
-			TraceId   *string                                          `json:"trace_id,omitempty"`
-			Type      string                                           `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165507,8 +167048,14 @@ func ParsePostApiGatewayV1BudgetsResponse(rsp *http.Response) (*PostApiGatewayV1
 			Retryable bool                                             `json:"retryable"`
 			SpanId    *string                                          `json:"span_id,omitempty"`
 			Tips      *[]string                                        `json:"tips,omitempty"`
-			TraceId   *string                                          `json:"trace_id,omitempty"`
-			Type      string                                           `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165526,8 +167073,14 @@ func ParsePostApiGatewayV1BudgetsResponse(rsp *http.Response) (*PostApiGatewayV1
 			Retryable bool                                             `json:"retryable"`
 			SpanId    *string                                          `json:"span_id,omitempty"`
 			Tips      *[]string                                        `json:"tips,omitempty"`
-			TraceId   *string                                          `json:"trace_id,omitempty"`
-			Type      string                                           `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165545,8 +167098,14 @@ func ParsePostApiGatewayV1BudgetsResponse(rsp *http.Response) (*PostApiGatewayV1
 			Retryable bool                                             `json:"retryable"`
 			SpanId    *string                                          `json:"span_id,omitempty"`
 			Tips      *[]string                                        `json:"tips,omitempty"`
-			TraceId   *string                                          `json:"trace_id,omitempty"`
-			Type      string                                           `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165621,8 +167180,14 @@ func ParseDeleteApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*DeleteApiG
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165640,8 +167205,14 @@ func ParseDeleteApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*DeleteApiG
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165659,8 +167230,14 @@ func ParseDeleteApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*DeleteApiG
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165678,8 +167255,14 @@ func ParseDeleteApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*DeleteApiG
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165755,8 +167338,14 @@ func ParseGetApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165774,8 +167363,14 @@ func ParseGetApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165793,8 +167388,14 @@ func ParseGetApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165812,8 +167413,14 @@ func ParseGetApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165888,8 +167495,14 @@ func ParsePatchApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*PatchApiGat
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165907,8 +167520,14 @@ func ParsePatchApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*PatchApiGat
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165926,8 +167545,14 @@ func ParsePatchApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*PatchApiGat
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165945,8 +167570,14 @@ func ParsePatchApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*PatchApiGat
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166021,8 +167652,14 @@ func ParsePostApiGatewayV1BudgetsByIdResetResponse(rsp *http.Response) (*PostApi
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166040,8 +167677,14 @@ func ParsePostApiGatewayV1BudgetsByIdResetResponse(rsp *http.Response) (*PostApi
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166059,8 +167702,14 @@ func ParsePostApiGatewayV1BudgetsByIdResetResponse(rsp *http.Response) (*PostApi
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166078,8 +167727,14 @@ func ParsePostApiGatewayV1BudgetsByIdResetResponse(rsp *http.Response) (*PostApi
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166145,8 +167800,14 @@ func ParseGetApiGatewayV1CacheRulesResponse(rsp *http.Response) (*GetApiGatewayV
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166164,8 +167825,14 @@ func ParseGetApiGatewayV1CacheRulesResponse(rsp *http.Response) (*GetApiGatewayV
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166183,8 +167850,14 @@ func ParseGetApiGatewayV1CacheRulesResponse(rsp *http.Response) (*GetApiGatewayV
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166202,8 +167875,14 @@ func ParseGetApiGatewayV1CacheRulesResponse(rsp *http.Response) (*GetApiGatewayV
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166266,8 +167945,14 @@ func ParsePostApiGatewayV1CacheRulesResponse(rsp *http.Response) (*PostApiGatewa
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166285,8 +167970,14 @@ func ParsePostApiGatewayV1CacheRulesResponse(rsp *http.Response) (*PostApiGatewa
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166304,8 +167995,14 @@ func ParsePostApiGatewayV1CacheRulesResponse(rsp *http.Response) (*PostApiGatewa
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166323,8 +168020,14 @@ func ParsePostApiGatewayV1CacheRulesResponse(rsp *http.Response) (*PostApiGatewa
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166342,8 +168045,14 @@ func ParsePostApiGatewayV1CacheRulesResponse(rsp *http.Response) (*PostApiGatewa
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166406,8 +168115,14 @@ func ParseDeleteApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*DeleteA
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166425,8 +168140,14 @@ func ParseDeleteApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*DeleteA
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166444,8 +168165,14 @@ func ParseDeleteApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*DeleteA
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166463,8 +168190,14 @@ func ParseDeleteApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*DeleteA
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166527,8 +168260,14 @@ func ParseGetApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166546,8 +168285,14 @@ func ParseGetApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166565,8 +168310,14 @@ func ParseGetApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166584,8 +168335,14 @@ func ParseGetApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166648,8 +168405,14 @@ func ParsePatchApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*PatchApi
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166667,8 +168430,14 @@ func ParsePatchApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*PatchApi
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166686,8 +168455,14 @@ func ParsePatchApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*PatchApi
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166705,8 +168480,14 @@ func ParsePatchApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*PatchApi
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166794,8 +168575,14 @@ func ParseGetApiGatewayV1EndUsersByIdSpendResponse(rsp *http.Response) (*GetApiG
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166813,8 +168600,14 @@ func ParseGetApiGatewayV1EndUsersByIdSpendResponse(rsp *http.Response) (*GetApiG
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166832,8 +168625,14 @@ func ParseGetApiGatewayV1EndUsersByIdSpendResponse(rsp *http.Response) (*GetApiG
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166851,8 +168650,14 @@ func ParseGetApiGatewayV1EndUsersByIdSpendResponse(rsp *http.Response) (*GetApiG
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166896,8 +168701,14 @@ func ParseGetApiGatewayV1ProvidersResponse(rsp *http.Response) (*GetApiGatewayV1
 			Retryable bool                                              `json:"retryable"`
 			SpanId    *string                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                         `json:"tips,omitempty"`
-			TraceId   *string                                           `json:"trace_id,omitempty"`
-			Type      string                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166915,8 +168726,14 @@ func ParseGetApiGatewayV1ProvidersResponse(rsp *http.Response) (*GetApiGatewayV1
 			Retryable bool                                              `json:"retryable"`
 			SpanId    *string                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                         `json:"tips,omitempty"`
-			TraceId   *string                                           `json:"trace_id,omitempty"`
-			Type      string                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166934,8 +168751,14 @@ func ParseGetApiGatewayV1ProvidersResponse(rsp *http.Response) (*GetApiGatewayV1
 			Retryable bool                                              `json:"retryable"`
 			SpanId    *string                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                         `json:"tips,omitempty"`
-			TraceId   *string                                           `json:"trace_id,omitempty"`
-			Type      string                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166953,8 +168776,14 @@ func ParseGetApiGatewayV1ProvidersResponse(rsp *http.Response) (*GetApiGatewayV1
 			Retryable bool                                              `json:"retryable"`
 			SpanId    *string                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                         `json:"tips,omitempty"`
-			TraceId   *string                                           `json:"trace_id,omitempty"`
-			Type      string                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166972,8 +168801,14 @@ func ParseGetApiGatewayV1ProvidersResponse(rsp *http.Response) (*GetApiGatewayV1
 			Retryable bool                                              `json:"retryable"`
 			SpanId    *string                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                         `json:"tips,omitempty"`
-			TraceId   *string                                           `json:"trace_id,omitempty"`
-			Type      string                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167017,8 +168852,14 @@ func ParsePostApiGatewayV1ProvidersResponse(rsp *http.Response) (*PostApiGateway
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167036,8 +168877,14 @@ func ParsePostApiGatewayV1ProvidersResponse(rsp *http.Response) (*PostApiGateway
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167055,8 +168902,14 @@ func ParsePostApiGatewayV1ProvidersResponse(rsp *http.Response) (*PostApiGateway
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167074,8 +168927,14 @@ func ParsePostApiGatewayV1ProvidersResponse(rsp *http.Response) (*PostApiGateway
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167093,8 +168952,14 @@ func ParsePostApiGatewayV1ProvidersResponse(rsp *http.Response) (*PostApiGateway
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167138,8 +169003,14 @@ func ParseDeleteApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*DeleteAp
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167157,8 +169028,14 @@ func ParseDeleteApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*DeleteAp
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167176,8 +169053,14 @@ func ParseDeleteApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*DeleteAp
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167195,8 +169078,14 @@ func ParseDeleteApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*DeleteAp
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167214,8 +169103,14 @@ func ParseDeleteApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*DeleteAp
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167259,8 +169154,14 @@ func ParsePatchApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*PatchApiG
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167278,8 +169179,14 @@ func ParsePatchApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*PatchApiG
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167297,8 +169204,14 @@ func ParsePatchApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*PatchApiG
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167316,8 +169229,14 @@ func ParsePatchApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*PatchApiG
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167335,8 +169254,14 @@ func ParsePatchApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*PatchApiG
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167389,8 +169314,14 @@ func ParseGetApiGatewayV1SpendEventsResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167408,8 +169339,14 @@ func ParseGetApiGatewayV1SpendEventsResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167427,8 +169364,14 @@ func ParseGetApiGatewayV1SpendEventsResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167446,8 +169389,14 @@ func ParseGetApiGatewayV1SpendEventsResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167501,8 +169450,14 @@ func ParsePostApiGatewayV1SpendEventsReplayResponse(rsp *http.Response) (*PostAp
 			Retryable bool                                                       `json:"retryable"`
 			SpanId    *string                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                    `json:"trace_id,omitempty"`
-			Type      string                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167520,8 +169475,14 @@ func ParsePostApiGatewayV1SpendEventsReplayResponse(rsp *http.Response) (*PostAp
 			Retryable bool                                                       `json:"retryable"`
 			SpanId    *string                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                    `json:"trace_id,omitempty"`
-			Type      string                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167539,8 +169500,14 @@ func ParsePostApiGatewayV1SpendEventsReplayResponse(rsp *http.Response) (*PostAp
 			Retryable bool                                                       `json:"retryable"`
 			SpanId    *string                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                    `json:"trace_id,omitempty"`
-			Type      string                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167558,8 +169525,14 @@ func ParsePostApiGatewayV1SpendEventsReplayResponse(rsp *http.Response) (*PostAp
 			Retryable bool                                                       `json:"retryable"`
 			SpanId    *string                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                    `json:"trace_id,omitempty"`
-			Type      string                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167635,8 +169608,14 @@ func ParseGetApiGatewayV1SpendSummariesResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167654,8 +169633,14 @@ func ParseGetApiGatewayV1SpendSummariesResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167673,8 +169658,14 @@ func ParseGetApiGatewayV1SpendSummariesResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167692,8 +169683,14 @@ func ParseGetApiGatewayV1SpendSummariesResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167774,8 +169771,14 @@ func ParseGetApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167793,8 +169796,14 @@ func ParseGetApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167812,8 +169821,14 @@ func ParseGetApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167831,8 +169846,14 @@ func ParseGetApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167918,8 +169939,14 @@ func ParsePostApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*PostApiGatew
 			Retryable bool                                                 `json:"retryable"`
 			SpanId    *string                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                            `json:"tips,omitempty"`
-			TraceId   *string                                              `json:"trace_id,omitempty"`
-			Type      string                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167937,8 +169964,14 @@ func ParsePostApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*PostApiGatew
 			Retryable bool                                                 `json:"retryable"`
 			SpanId    *string                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                            `json:"tips,omitempty"`
-			TraceId   *string                                              `json:"trace_id,omitempty"`
-			Type      string                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167956,8 +169989,14 @@ func ParsePostApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*PostApiGatew
 			Retryable bool                                                 `json:"retryable"`
 			SpanId    *string                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                            `json:"tips,omitempty"`
-			TraceId   *string                                              `json:"trace_id,omitempty"`
-			Type      string                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167975,8 +170014,14 @@ func ParsePostApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*PostApiGatew
 			Retryable bool                                                 `json:"retryable"`
 			SpanId    *string                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                            `json:"tips,omitempty"`
-			TraceId   *string                                              `json:"trace_id,omitempty"`
-			Type      string                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167994,8 +170039,14 @@ func ParsePostApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*PostApiGatew
 			Retryable bool                                                 `json:"retryable"`
 			SpanId    *string                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                            `json:"tips,omitempty"`
-			TraceId   *string                                              `json:"trace_id,omitempty"`
-			Type      string                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168073,8 +170124,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*GetApiGat
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168092,8 +170149,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*GetApiGat
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168111,8 +170174,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*GetApiGat
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168130,8 +170199,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*GetApiGat
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168209,8 +170284,14 @@ func ParsePatchApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*PatchAp
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168228,8 +170309,14 @@ func ParsePatchApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*PatchAp
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168247,8 +170334,14 @@ func ParsePatchApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*PatchAp
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168266,8 +170359,14 @@ func ParsePatchApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*PatchAp
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168345,8 +170444,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdDisableResponse(rsp *http.Response) (*P
 			Retryable bool                                                            `json:"retryable"`
 			SpanId    *string                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                         `json:"trace_id,omitempty"`
-			Type      string                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168364,8 +170469,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdDisableResponse(rsp *http.Response) (*P
 			Retryable bool                                                            `json:"retryable"`
 			SpanId    *string                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                         `json:"trace_id,omitempty"`
-			Type      string                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168383,8 +170494,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdDisableResponse(rsp *http.Response) (*P
 			Retryable bool                                                            `json:"retryable"`
 			SpanId    *string                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                         `json:"trace_id,omitempty"`
-			Type      string                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168402,8 +170519,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdDisableResponse(rsp *http.Response) (*P
 			Retryable bool                                                            `json:"retryable"`
 			SpanId    *string                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                         `json:"trace_id,omitempty"`
-			Type      string                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168481,8 +170604,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdEnableResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168500,8 +170629,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdEnableResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168519,8 +170654,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdEnableResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168538,8 +170679,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdEnableResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168617,8 +170764,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRevokeResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168636,8 +170789,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRevokeResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168655,8 +170814,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRevokeResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168674,8 +170839,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRevokeResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168754,8 +170925,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRotateResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168773,8 +170950,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRotateResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168792,8 +170975,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRotateResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168811,8 +171000,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRotateResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168864,8 +171059,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdSpendResponse(rsp *http.Response) (*GetA
 			Retryable bool                                                         `json:"retryable"`
 			SpanId    *string                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                      `json:"trace_id,omitempty"`
-			Type      string                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168883,8 +171084,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdSpendResponse(rsp *http.Response) (*GetA
 			Retryable bool                                                         `json:"retryable"`
 			SpanId    *string                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                      `json:"trace_id,omitempty"`
-			Type      string                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168902,8 +171109,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdSpendResponse(rsp *http.Response) (*GetA
 			Retryable bool                                                         `json:"retryable"`
 			SpanId    *string                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                      `json:"trace_id,omitempty"`
-			Type      string                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168921,8 +171134,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdSpendResponse(rsp *http.Response) (*GetA
 			Retryable bool                                                         `json:"retryable"`
 			SpanId    *string                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                      `json:"trace_id,omitempty"`
-			Type      string                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -169015,519 +171234,6 @@ func ParseIngestTurnResultResponse(rsp *http.Response) (*IngestTurnResultRespons
 			return nil, err
 		}
 		response.JSON202 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseLangyLocalStartCallResponse parses an HTTP response from a LangyLocalStartCallWithResponse call
-func ParseLangyLocalStartCallResponse(rsp *http.Response) (*LangyLocalStartCallResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &LangyLocalStartCallResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			CallId string `json:"callId"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseLangyLocalReadCallResponse parses an HTTP response from a LangyLocalReadCallWithResponse call
-func ParseLangyLocalReadCallResponse(rsp *http.Response) (*LangyLocalReadCallResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &LangyLocalReadCallResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			CallId string `json:"callId"`
-			Error  *struct {
-				Code    LangyLocalReadCall200JSONResponseBodyErrorCode `json:"code"`
-				Message string                                         `json:"message"`
-			} `json:"error,omitempty"`
-			Ok     *bool `json:"ok,omitempty"`
-			Output *struct {
-				DurationMs int     `json:"durationMs"`
-				ExitCode   *int    `json:"exitCode"`
-				LogPath    *string `json:"logPath,omitempty"`
-				Pid        *int    `json:"pid,omitempty"`
-				Stderr     string  `json:"stderr"`
-				Stdout     string  `json:"stdout"`
-				Truncated  bool    `json:"truncated"`
-			} `json:"output,omitempty"`
-			State LangyLocalReadCall200JSONResponseBodyState `json:"state"`
-			Text  *string                                    `json:"text,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseLangyLocalCancelCallResponse parses an HTTP response from a LangyLocalCancelCallWithResponse call
-func ParseLangyLocalCancelCallResponse(rsp *http.Response) (*LangyLocalCancelCallResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &LangyLocalCancelCallResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			CallId    string                                           `json:"callId"`
-			Cancelled LangyLocalCancelCall200JSONResponseBodyCancelled `json:"cancelled"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseLangyLocalCreateRequestResponse parses an HTTP response from a LangyLocalCreateRequestWithResponse call
-func ParseLangyLocalCreateRequestResponse(rsp *http.Response) (*LangyLocalCreateRequestResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &LangyLocalCreateRequestResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			Command string `json:"command"`
-			Request struct {
-				ConversationId    string `json:"conversationId"`
-				ConversationTitle string `json:"conversationTitle"`
-				ConversationUrl   string `json:"conversationUrl"`
-				CreatedAt         string `json:"createdAt"`
-				ExpiresAt         string `json:"expiresAt"`
-				Id                string `json:"id"`
-				ProjectId         string `json:"projectId"`
-				ProjectName       string `json:"projectName"`
-			} `json:"request"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseLangyLocalWorkspaceResponse parses an HTTP response from a LangyLocalWorkspaceWithResponse call
-func ParseLangyLocalWorkspaceResponse(rsp *http.Response) (*LangyLocalWorkspaceResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &LangyLocalWorkspaceResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			CodeAccessPreference *LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference `json:"codeAccessPreference"`
-			Connected            bool                                                        `json:"connected"`
-			Github               struct {
-				AccountLogin *string `json:"accountLogin,omitempty"`
-				Installed    bool    `json:"installed"`
-			} `json:"github"`
-			PendingRequest *struct {
-				ConversationId    string `json:"conversationId"`
-				ConversationTitle string `json:"conversationTitle"`
-				ConversationUrl   string `json:"conversationUrl"`
-				CreatedAt         string `json:"createdAt"`
-				ExpiresAt         string `json:"expiresAt"`
-				Id                string `json:"id"`
-				ProjectId         string `json:"projectId"`
-				ProjectName       string `json:"projectName"`
-			} `json:"pendingRequest,omitempty"`
-			Workspace *struct {
-				GhAuthenticated *bool   `json:"ghAuthenticated,omitempty"`
-				GitBranch       *string `json:"gitBranch,omitempty"`
-				GitDirty        *bool   `json:"gitDirty,omitempty"`
-				GitRemote       *string `json:"gitRemote,omitempty"`
-				GitRepository   *bool   `json:"gitRepository,omitempty"`
-				Name            string  `json:"name"`
-				NodeVersion     *string `json:"nodeVersion,omitempty"`
-				Os              string  `json:"os"`
-				PackageManager  *string `json:"packageManager,omitempty"`
-				PythonVersion   *string `json:"pythonVersion,omitempty"`
-				Root            string  `json:"root"`
-			} `json:"workspace,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseLangyUiActionsListResponse parses an HTTP response from a LangyUiActionsListWithResponse call
-func ParseLangyUiActionsListResponse(rsp *http.Response) (*LangyUiActionsListResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &LangyUiActionsListResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	return response, nil
-}
-
-// ParseLangyUiActionsDispatchResponse parses an HTTP response from a LangyUiActionsDispatchWithResponse call
-func ParseLangyUiActionsDispatchResponse(rsp *http.Response) (*LangyUiActionsDispatchResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &LangyUiActionsDispatchResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	return response, nil
-}
-
-// ParseLangyLocalStartWaitResponse parses an HTTP response from a LangyLocalStartWaitWithResponse call
-func ParseLangyLocalStartWaitResponse(rsp *http.Response) (*LangyLocalStartWaitResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &LangyLocalStartWaitResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			WaitId string `json:"waitId"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseLangyLocalReadWaitResponse parses an HTTP response from a LangyLocalReadWaitWithResponse call
-func ParseLangyLocalReadWaitResponse(rsp *http.Response) (*LangyLocalReadWaitResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &LangyLocalReadWaitResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			Answers *[]struct {
-				Other    *string  `json:"other,omitempty"`
-				Question string   `json:"question"`
-				Selected []string `json:"selected"`
-			} `json:"answers,omitempty"`
-			State  LangyLocalReadWait200JSONResponseBodyState `json:"state"`
-			WaitId string                                     `json:"waitId"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseListProjectsResponse parses an HTTP response from a ListProjectsWithResponse call
-func ParseListProjectsResponse(rsp *http.Response) (*ListProjectsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ListProjectsResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			Data       []Project  `json:"data"`
-			Pagination Pagination `json:"pagination"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseCreateProjectResponse parses an HTTP response from a CreateProjectWithResponse call
-func ParseCreateProjectResponse(rsp *http.Response) (*CreateProjectResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreateProjectResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest struct {
-			CreatedAt       time.Time `json:"createdAt"`
-			Framework       string    `json:"framework"`
-			Id              string    `json:"id"`
-			Language        string    `json:"language"`
-			Name            string    `json:"name"`
-			ServiceApiKey   string    `json:"serviceApiKey"`
-			ServiceApiKeyId string    `json:"serviceApiKeyId"`
-			Slug            string    `json:"slug"`
-			TeamId          string    `json:"teamId"`
-			UpdatedAt       time.Time `json:"updatedAt"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON201 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseArchiveProjectResponse parses an HTTP response from a ArchiveProjectWithResponse call
-func ParseArchiveProjectResponse(rsp *http.Response) (*ArchiveProjectResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ArchiveProjectResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			ArchivedAt time.Time `json:"archivedAt"`
-			Id         string    `json:"id"`
-			Name       string    `json:"name"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetProjectResponse parses an HTTP response from a GetProjectWithResponse call
-func ParseGetProjectResponse(rsp *http.Response) (*GetProjectResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetProjectResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			CreatedAt         time.Time                                      `json:"createdAt"`
-			Framework         string                                         `json:"framework"`
-			Id                string                                         `json:"id"`
-			Language          string                                         `json:"language"`
-			Name              string                                         `json:"name"`
-			PiiRedactionLevel GetProject200JSONResponseBodyPiiRedactionLevel `json:"piiRedactionLevel"`
-			Slug              string                                         `json:"slug"`
-			TeamId            string                                         `json:"teamId"`
-			UpdatedAt         time.Time                                      `json:"updatedAt"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseUpdateProjectResponse parses an HTTP response from a UpdateProjectWithResponse call
-func ParseUpdateProjectResponse(rsp *http.Response) (*UpdateProjectResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &UpdateProjectResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			CreatedAt         time.Time                                         `json:"createdAt"`
-			Framework         string                                            `json:"framework"`
-			Id                string                                            `json:"id"`
-			Language          string                                            `json:"language"`
-			Name              string                                            `json:"name"`
-			PiiRedactionLevel UpdateProject200JSONResponseBodyPiiRedactionLevel `json:"piiRedactionLevel"`
-			Slug              string                                            `json:"slug"`
-			TeamId            string                                            `json:"teamId"`
-			UpdatedAt         time.Time                                         `json:"updatedAt"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetProjectApiKeyResponse parses an HTTP response from a GetProjectApiKeyWithResponse call
-func ParseGetProjectApiKeyResponse(rsp *http.Response) (*GetProjectApiKeyResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetProjectApiKeyResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			ApiKey string `json:"apiKey"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseRegenerateProjectApiKeyResponse parses an HTTP response from a RegenerateProjectApiKeyWithResponse call
-func ParseRegenerateProjectApiKeyResponse(rsp *http.Response) (*RegenerateProjectApiKeyResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &RegenerateProjectApiKeyResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			ApiKey string `json:"apiKey"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
 
 	}
 
@@ -170847,22 +172553,6 @@ func ParsePostApiTrackEventResponse(rsp *http.Response) (*PostApiTrackEventRespo
 	return response, nil
 }
 
-// ParseReadUserAvatarBytesResponse parses an HTTP response from a ReadUserAvatarBytesWithResponse call
-func ParseReadUserAvatarBytesResponse(rsp *http.Response) (*ReadUserAvatarBytesResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ReadUserAvatarBytesResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	return response, nil
-}
-
 // ParseStopAdminImpersonationResponse parses an HTTP response from a StopAdminImpersonationWithResponse call
 func ParseStopAdminImpersonationResponse(rsp *http.Response) (*StopAdminImpersonationResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -170983,8 +172673,14 @@ func ParseDeleteApiAgentCacheByNameResponse(rsp *http.Response) (*DeleteApiAgent
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171002,8 +172698,14 @@ func ParseDeleteApiAgentCacheByNameResponse(rsp *http.Response) (*DeleteApiAgent
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171021,8 +172723,14 @@ func ParseDeleteApiAgentCacheByNameResponse(rsp *http.Response) (*DeleteApiAgent
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171040,8 +172748,14 @@ func ParseDeleteApiAgentCacheByNameResponse(rsp *http.Response) (*DeleteApiAgent
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171088,8 +172802,14 @@ func ParseGetApiAgentCacheByNameResponse(rsp *http.Response) (*GetApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171107,8 +172827,14 @@ func ParseGetApiAgentCacheByNameResponse(rsp *http.Response) (*GetApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171126,8 +172852,14 @@ func ParseGetApiAgentCacheByNameResponse(rsp *http.Response) (*GetApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171145,8 +172877,14 @@ func ParseGetApiAgentCacheByNameResponse(rsp *http.Response) (*GetApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171193,8 +172931,14 @@ func ParsePutApiAgentCacheByNameResponse(rsp *http.Response) (*PutApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171212,8 +172956,14 @@ func ParsePutApiAgentCacheByNameResponse(rsp *http.Response) (*PutApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171231,8 +172981,14 @@ func ParsePutApiAgentCacheByNameResponse(rsp *http.Response) (*PutApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171250,8 +173006,14 @@ func ParsePutApiAgentCacheByNameResponse(rsp *http.Response) (*PutApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171299,8 +173061,14 @@ func ParsePostApiAgentCacheByNameClaimResponse(rsp *http.Response) (*PostApiAgen
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171318,8 +173086,14 @@ func ParsePostApiAgentCacheByNameClaimResponse(rsp *http.Response) (*PostApiAgen
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171337,8 +173111,14 @@ func ParsePostApiAgentCacheByNameClaimResponse(rsp *http.Response) (*PostApiAgen
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171356,8 +173136,14 @@ func ParsePostApiAgentCacheByNameClaimResponse(rsp *http.Response) (*PostApiAgen
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -175733,6 +177519,22 @@ func ParsePostApiDspyLogStepsResponse(rsp *http.Response) (*PostApiDspyLogStepsR
 	return response, nil
 }
 
+// ParseReceiveElevenLabsWebhookResponse parses an HTTP response from a ReceiveElevenLabsWebhookWithResponse call
+func ParseReceiveElevenLabsWebhookResponse(rsp *http.Response) (*ReceiveElevenLabsWebhookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReceiveElevenLabsWebhookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
 // ParsePostApiEvaluationsBatchLogResultsResponse parses an HTTP response from a PostApiEvaluationsBatchLogResultsWithResponse call
 func ParsePostApiEvaluationsBatchLogResultsResponse(rsp *http.Response) (*PostApiEvaluationsBatchLogResultsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -178920,8 +180722,14 @@ func ParseCancelInstantEvalRunResponse(rsp *http.Response) (*CancelInstantEvalRu
 			Retryable bool                                          `json:"retryable"`
 			SpanId    *string                                       `json:"span_id,omitempty"`
 			Tips      *[]string                                     `json:"tips,omitempty"`
-			TraceId   *string                                       `json:"trace_id,omitempty"`
-			Type      string                                        `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -179295,6 +181103,295 @@ func ParseContinueLangyConversationTurnResponse(rsp *http.Response) (*ContinueLa
 	response := &ContinueLangyConversationTurnResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseLangyLocalStartCallResponse parses an HTTP response from a LangyLocalStartCallWithResponse call
+func ParseLangyLocalStartCallResponse(rsp *http.Response) (*LangyLocalStartCallResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LangyLocalStartCallResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			CallId string `json:"callId"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseLangyLocalReadCallResponse parses an HTTP response from a LangyLocalReadCallWithResponse call
+func ParseLangyLocalReadCallResponse(rsp *http.Response) (*LangyLocalReadCallResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LangyLocalReadCallResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			CallId string `json:"callId"`
+			Error  *struct {
+				Code    LangyLocalReadCall200JSONResponseBodyErrorCode `json:"code"`
+				Message string                                         `json:"message"`
+			} `json:"error,omitempty"`
+			Ok     *bool `json:"ok,omitempty"`
+			Output *struct {
+				DurationMs int     `json:"durationMs"`
+				ExitCode   *int    `json:"exitCode"`
+				LogPath    *string `json:"logPath,omitempty"`
+				Pid        *int    `json:"pid,omitempty"`
+				Stderr     string  `json:"stderr"`
+				Stdout     string  `json:"stdout"`
+				Truncated  bool    `json:"truncated"`
+			} `json:"output,omitempty"`
+			State LangyLocalReadCall200JSONResponseBodyState `json:"state"`
+			Text  *string                                    `json:"text,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseLangyLocalCancelCallResponse parses an HTTP response from a LangyLocalCancelCallWithResponse call
+func ParseLangyLocalCancelCallResponse(rsp *http.Response) (*LangyLocalCancelCallResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LangyLocalCancelCallResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			CallId    string                                           `json:"callId"`
+			Cancelled LangyLocalCancelCall200JSONResponseBodyCancelled `json:"cancelled"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseLangyLocalCreateRequestResponse parses an HTTP response from a LangyLocalCreateRequestWithResponse call
+func ParseLangyLocalCreateRequestResponse(rsp *http.Response) (*LangyLocalCreateRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LangyLocalCreateRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Command string `json:"command"`
+			Request struct {
+				ConversationId    string `json:"conversationId"`
+				ConversationTitle string `json:"conversationTitle"`
+				ConversationUrl   string `json:"conversationUrl"`
+				CreatedAt         string `json:"createdAt"`
+				ExpiresAt         string `json:"expiresAt"`
+				Id                string `json:"id"`
+				ProjectId         string `json:"projectId"`
+				ProjectName       string `json:"projectName"`
+			} `json:"request"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseLangyLocalWorkspaceResponse parses an HTTP response from a LangyLocalWorkspaceWithResponse call
+func ParseLangyLocalWorkspaceResponse(rsp *http.Response) (*LangyLocalWorkspaceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LangyLocalWorkspaceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			CodeAccessPreference *LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference `json:"codeAccessPreference"`
+			Connected            bool                                                        `json:"connected"`
+			Github               struct {
+				AccountLogin *string `json:"accountLogin,omitempty"`
+				Installed    bool    `json:"installed"`
+			} `json:"github"`
+			PendingRequest *struct {
+				ConversationId    string `json:"conversationId"`
+				ConversationTitle string `json:"conversationTitle"`
+				ConversationUrl   string `json:"conversationUrl"`
+				CreatedAt         string `json:"createdAt"`
+				ExpiresAt         string `json:"expiresAt"`
+				Id                string `json:"id"`
+				ProjectId         string `json:"projectId"`
+				ProjectName       string `json:"projectName"`
+			} `json:"pendingRequest,omitempty"`
+			Workspace *struct {
+				GhAuthenticated *bool   `json:"ghAuthenticated,omitempty"`
+				GitBranch       *string `json:"gitBranch,omitempty"`
+				GitDirty        *bool   `json:"gitDirty,omitempty"`
+				GitRemote       *string `json:"gitRemote,omitempty"`
+				GitRepository   *bool   `json:"gitRepository,omitempty"`
+				Name            string  `json:"name"`
+				NodeVersion     *string `json:"nodeVersion,omitempty"`
+				Os              string  `json:"os"`
+				PackageManager  *string `json:"packageManager,omitempty"`
+				PythonVersion   *string `json:"pythonVersion,omitempty"`
+				Root            string  `json:"root"`
+			} `json:"workspace,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseLangyUiActionsListResponse parses an HTTP response from a LangyUiActionsListWithResponse call
+func ParseLangyUiActionsListResponse(rsp *http.Response) (*LangyUiActionsListResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LangyUiActionsListResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseLangyUiActionsDispatchResponse parses an HTTP response from a LangyUiActionsDispatchWithResponse call
+func ParseLangyUiActionsDispatchResponse(rsp *http.Response) (*LangyUiActionsDispatchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LangyUiActionsDispatchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseLangyLocalStartWaitResponse parses an HTTP response from a LangyLocalStartWaitWithResponse call
+func ParseLangyLocalStartWaitResponse(rsp *http.Response) (*LangyLocalStartWaitResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LangyLocalStartWaitResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			WaitId string `json:"waitId"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseLangyLocalReadWaitResponse parses an HTTP response from a LangyLocalReadWaitWithResponse call
+func ParseLangyLocalReadWaitResponse(rsp *http.Response) (*LangyLocalReadWaitResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LangyLocalReadWaitResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Answers *[]struct {
+				Other    *string  `json:"other,omitempty"`
+				Question string   `json:"question"`
+				Selected []string `json:"selected"`
+			} `json:"answers,omitempty"`
+			State  LangyLocalReadWait200JSONResponseBodyState `json:"state"`
+			WaitId string                                     `json:"waitId"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	}
 
 	return response, nil
@@ -180641,6 +182738,7 @@ func ParseGetOrganizationMemberAccessResponse(rsp *http.Response) (*GetOrganizat
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			DirectBindings []struct {
+				CappedBySeat   bool                                                                  `json:"cappedBySeat"`
 				CustomRoleName *string                                                               `json:"customRoleName"`
 				Id             string                                                                `json:"id"`
 				Permissions    []string                                                              `json:"permissions"`
@@ -180651,6 +182749,7 @@ func ParseGetOrganizationMemberAccessResponse(rsp *http.Response) (*GetOrganizat
 			} `json:"directBindings"`
 			Groups []struct {
 				Bindings []struct {
+					CappedBySeat   bool                                                                  `json:"cappedBySeat"`
 					CustomRoleName *string                                                               `json:"customRoleName"`
 					Id             string                                                                `json:"id"`
 					Permissions    []string                                                              `json:"permissions"`
@@ -180891,6 +182990,230 @@ func ParseGetPlatformHealthSubsystemResponse(rsp *http.Response) (*GetPlatformHe
 	return response, nil
 }
 
+// ParseListProjectsResponse parses an HTTP response from a ListProjectsWithResponse call
+func ParseListProjectsResponse(rsp *http.Response) (*ListProjectsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListProjectsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data       []Project  `json:"data"`
+			Pagination Pagination `json:"pagination"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateProjectResponse parses an HTTP response from a CreateProjectWithResponse call
+func ParseCreateProjectResponse(rsp *http.Response) (*CreateProjectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateProjectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			CreatedAt       time.Time `json:"createdAt"`
+			Framework       string    `json:"framework"`
+			Id              string    `json:"id"`
+			Language        string    `json:"language"`
+			Name            string    `json:"name"`
+			ServiceApiKey   string    `json:"serviceApiKey"`
+			ServiceApiKeyId string    `json:"serviceApiKeyId"`
+			Slug            string    `json:"slug"`
+			TeamId          string    `json:"teamId"`
+			UpdatedAt       time.Time `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseArchiveProjectResponse parses an HTTP response from a ArchiveProjectWithResponse call
+func ParseArchiveProjectResponse(rsp *http.Response) (*ArchiveProjectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ArchiveProjectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ArchivedAt time.Time `json:"archivedAt"`
+			Id         string    `json:"id"`
+			Name       string    `json:"name"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetProjectResponse parses an HTTP response from a GetProjectWithResponse call
+func ParseGetProjectResponse(rsp *http.Response) (*GetProjectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetProjectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			CreatedAt         time.Time                                      `json:"createdAt"`
+			Framework         string                                         `json:"framework"`
+			Id                string                                         `json:"id"`
+			Language          string                                         `json:"language"`
+			Name              string                                         `json:"name"`
+			PiiRedactionLevel GetProject200JSONResponseBodyPiiRedactionLevel `json:"piiRedactionLevel"`
+			Slug              string                                         `json:"slug"`
+			TeamId            string                                         `json:"teamId"`
+			UpdatedAt         time.Time                                      `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateProjectResponse parses an HTTP response from a UpdateProjectWithResponse call
+func ParseUpdateProjectResponse(rsp *http.Response) (*UpdateProjectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateProjectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			CreatedAt         time.Time                                         `json:"createdAt"`
+			Framework         string                                            `json:"framework"`
+			Id                string                                            `json:"id"`
+			Language          string                                            `json:"language"`
+			Name              string                                            `json:"name"`
+			PiiRedactionLevel UpdateProject200JSONResponseBodyPiiRedactionLevel `json:"piiRedactionLevel"`
+			Slug              string                                            `json:"slug"`
+			TeamId            string                                            `json:"teamId"`
+			UpdatedAt         time.Time                                         `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetProjectApiKeyResponse parses an HTTP response from a GetProjectApiKeyWithResponse call
+func ParseGetProjectApiKeyResponse(rsp *http.Response) (*GetProjectApiKeyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetProjectApiKeyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ApiKey string `json:"apiKey"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRegenerateProjectApiKeyResponse parses an HTTP response from a RegenerateProjectApiKeyWithResponse call
+func ParseRegenerateProjectApiKeyResponse(rsp *http.Response) (*RegenerateProjectApiKeyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RegenerateProjectApiKeyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ApiKey string `json:"apiKey"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetApiV1ProjectsByProjectIdAnalyticsChartsResponse parses an HTTP response from a GetApiV1ProjectsByProjectIdAnalyticsChartsWithResponse call
 func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response) (*GetApiV1ProjectsByProjectIdAnalyticsChartsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -180942,8 +183265,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response)
 			Retryable bool                                                                `json:"retryable"`
 			SpanId    *string                                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                                           `json:"tips,omitempty"`
-			TraceId   *string                                                             `json:"trace_id,omitempty"`
-			Type      string                                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -180961,8 +183290,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response)
 			Retryable bool                                                                `json:"retryable"`
 			SpanId    *string                                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                                           `json:"tips,omitempty"`
-			TraceId   *string                                                             `json:"trace_id,omitempty"`
-			Type      string                                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -180980,8 +183315,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response)
 			Retryable bool                                                                `json:"retryable"`
 			SpanId    *string                                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                                           `json:"tips,omitempty"`
-			TraceId   *string                                                             `json:"trace_id,omitempty"`
-			Type      string                                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -180999,8 +183340,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response)
 			Retryable bool                                                                `json:"retryable"`
 			SpanId    *string                                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                                           `json:"tips,omitempty"`
-			TraceId   *string                                                             `json:"trace_id,omitempty"`
-			Type      string                                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181061,8 +183408,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response
 			Retryable bool                                                                 `json:"retryable"`
 			SpanId    *string                                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                                            `json:"tips,omitempty"`
-			TraceId   *string                                                              `json:"trace_id,omitempty"`
-			Type      string                                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181080,8 +183433,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response
 			Retryable bool                                                                 `json:"retryable"`
 			SpanId    *string                                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                                            `json:"tips,omitempty"`
-			TraceId   *string                                                              `json:"trace_id,omitempty"`
-			Type      string                                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181099,8 +183458,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response
 			Retryable bool                                                                 `json:"retryable"`
 			SpanId    *string                                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                                            `json:"tips,omitempty"`
-			TraceId   *string                                                              `json:"trace_id,omitempty"`
-			Type      string                                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181118,8 +183483,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response
 			Retryable bool                                                                 `json:"retryable"`
 			SpanId    *string                                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                                            `json:"tips,omitempty"`
-			TraceId   *string                                                              `json:"trace_id,omitempty"`
-			Type      string                                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181163,8 +183534,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *ht
 			Retryable bool                                                                            `json:"retryable"`
 			SpanId    *string                                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                                         `json:"trace_id,omitempty"`
-			Type      string                                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181182,8 +183559,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *ht
 			Retryable bool                                                                            `json:"retryable"`
 			SpanId    *string                                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                                         `json:"trace_id,omitempty"`
-			Type      string                                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181201,8 +183584,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *ht
 			Retryable bool                                                                            `json:"retryable"`
 			SpanId    *string                                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                                         `json:"trace_id,omitempty"`
-			Type      string                                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181220,8 +183609,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *ht
 			Retryable bool                                                                            `json:"retryable"`
 			SpanId    *string                                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                                         `json:"trace_id,omitempty"`
-			Type      string                                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181239,8 +183634,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *ht
 			Retryable bool                                                                            `json:"retryable"`
 			SpanId    *string                                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                                         `json:"trace_id,omitempty"`
-			Type      string                                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181301,8 +183702,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *http.
 			Retryable bool                                                                         `json:"retryable"`
 			SpanId    *string                                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                                      `json:"trace_id,omitempty"`
-			Type      string                                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181320,8 +183727,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *http.
 			Retryable bool                                                                         `json:"retryable"`
 			SpanId    *string                                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                                      `json:"trace_id,omitempty"`
-			Type      string                                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181339,8 +183752,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *http.
 			Retryable bool                                                                         `json:"retryable"`
 			SpanId    *string                                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                                      `json:"trace_id,omitempty"`
-			Type      string                                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181358,8 +183777,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *http.
 			Retryable bool                                                                         `json:"retryable"`
 			SpanId    *string                                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                                      `json:"trace_id,omitempty"`
-			Type      string                                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181377,8 +183802,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *http.
 			Retryable bool                                                                         `json:"retryable"`
 			SpanId    *string                                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                                      `json:"trace_id,omitempty"`
-			Type      string                                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181439,8 +183870,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181458,8 +183895,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181477,8 +183920,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181496,8 +183945,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181515,8 +183970,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181560,8 +184021,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementRespons
 			Retryable bool                                                                                     `json:"retryable"`
 			SpanId    *string                                                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                `json:"tips,omitempty"`
-			TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-			Type      string                                                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181579,8 +184046,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementRespons
 			Retryable bool                                                                                     `json:"retryable"`
 			SpanId    *string                                                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                `json:"tips,omitempty"`
-			TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-			Type      string                                                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181598,8 +184071,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementRespons
 			Retryable bool                                                                                     `json:"retryable"`
 			SpanId    *string                                                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                `json:"tips,omitempty"`
-			TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-			Type      string                                                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181617,8 +184096,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementRespons
 			Retryable bool                                                                                     `json:"retryable"`
 			SpanId    *string                                                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                `json:"tips,omitempty"`
-			TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-			Type      string                                                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181636,8 +184121,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementRespons
 			Retryable bool                                                                                     `json:"retryable"`
 			SpanId    *string                                                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                `json:"tips,omitempty"`
-			TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-			Type      string                                                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181698,8 +184189,14 @@ func ParsePutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse(r
 			Retryable bool                                                                                  `json:"retryable"`
 			SpanId    *string                                                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                                                             `json:"tips,omitempty"`
-			TraceId   *string                                                                               `json:"trace_id,omitempty"`
-			Type      string                                                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181717,8 +184214,14 @@ func ParsePutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse(r
 			Retryable bool                                                                                  `json:"retryable"`
 			SpanId    *string                                                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                                                             `json:"tips,omitempty"`
-			TraceId   *string                                                                               `json:"trace_id,omitempty"`
-			Type      string                                                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181736,8 +184239,14 @@ func ParsePutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse(r
 			Retryable bool                                                                                  `json:"retryable"`
 			SpanId    *string                                                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                                                             `json:"tips,omitempty"`
-			TraceId   *string                                                                               `json:"trace_id,omitempty"`
-			Type      string                                                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181755,8 +184264,14 @@ func ParsePutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse(r
 			Retryable bool                                                                                  `json:"retryable"`
 			SpanId    *string                                                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                                                             `json:"tips,omitempty"`
-			TraceId   *string                                                                               `json:"trace_id,omitempty"`
-			Type      string                                                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181774,8 +184289,14 @@ func ParsePutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse(r
 			Retryable bool                                                                                  `json:"retryable"`
 			SpanId    *string                                                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                                                             `json:"tips,omitempty"`
-			TraceId   *string                                                                               `json:"trace_id,omitempty"`
-			Type      string                                                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181845,8 +184366,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *http
 			Retryable bool                                                                          `json:"retryable"`
 			SpanId    *string                                                                       `json:"span_id,omitempty"`
 			Tips      *[]string                                                                     `json:"tips,omitempty"`
-			TraceId   *string                                                                       `json:"trace_id,omitempty"`
-			Type      string                                                                        `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181864,8 +184391,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *http
 			Retryable bool                                                                          `json:"retryable"`
 			SpanId    *string                                                                       `json:"span_id,omitempty"`
 			Tips      *[]string                                                                     `json:"tips,omitempty"`
-			TraceId   *string                                                                       `json:"trace_id,omitempty"`
-			Type      string                                                                        `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181883,8 +184416,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *http
 			Retryable bool                                                                          `json:"retryable"`
 			SpanId    *string                                                                       `json:"span_id,omitempty"`
 			Tips      *[]string                                                                     `json:"tips,omitempty"`
-			TraceId   *string                                                                       `json:"trace_id,omitempty"`
-			Type      string                                                                        `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181902,8 +184441,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *http
 			Retryable bool                                                                          `json:"retryable"`
 			SpanId    *string                                                                       `json:"span_id,omitempty"`
 			Tips      *[]string                                                                     `json:"tips,omitempty"`
-			TraceId   *string                                                                       `json:"trace_id,omitempty"`
-			Type      string                                                                        `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181971,8 +184516,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181990,8 +184541,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182009,8 +184566,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182028,8 +184591,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182073,8 +184642,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespo
 			Retryable bool                                                                                       `json:"retryable"`
 			SpanId    *string                                                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-			Type      string                                                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182092,8 +184667,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespo
 			Retryable bool                                                                                       `json:"retryable"`
 			SpanId    *string                                                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-			Type      string                                                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182111,8 +184692,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespo
 			Retryable bool                                                                                       `json:"retryable"`
 			SpanId    *string                                                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-			Type      string                                                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182130,8 +184717,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespo
 			Retryable bool                                                                                       `json:"retryable"`
 			SpanId    *string                                                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-			Type      string                                                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182149,8 +184742,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespo
 			Retryable bool                                                                                       `json:"retryable"`
 			SpanId    *string                                                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-			Type      string                                                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182218,8 +184817,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 			Retryable bool                                                                                    `json:"retryable"`
 			SpanId    *string                                                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                                                               `json:"tips,omitempty"`
-			TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-			Type      string                                                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182237,8 +184842,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 			Retryable bool                                                                                    `json:"retryable"`
 			SpanId    *string                                                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                                                               `json:"tips,omitempty"`
-			TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-			Type      string                                                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182256,8 +184867,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 			Retryable bool                                                                                    `json:"retryable"`
 			SpanId    *string                                                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                                                               `json:"tips,omitempty"`
-			TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-			Type      string                                                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182275,8 +184892,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 			Retryable bool                                                                                    `json:"retryable"`
 			SpanId    *string                                                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                                                               `json:"tips,omitempty"`
-			TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-			Type      string                                                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182294,8 +184917,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 			Retryable bool                                                                                    `json:"retryable"`
 			SpanId    *string                                                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                                                               `json:"tips,omitempty"`
-			TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-			Type      string                                                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182363,8 +184992,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 			Retryable bool                                                                                      `json:"retryable"`
 			SpanId    *string                                                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-			Type      string                                                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182382,8 +185017,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 			Retryable bool                                                                                      `json:"retryable"`
 			SpanId    *string                                                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-			Type      string                                                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182401,8 +185042,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 			Retryable bool                                                                                      `json:"retryable"`
 			SpanId    *string                                                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-			Type      string                                                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182420,8 +185067,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 			Retryable bool                                                                                      `json:"retryable"`
 			SpanId    *string                                                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-			Type      string                                                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182439,8 +185092,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 			Retryable bool                                                                                      `json:"retryable"`
 			SpanId    *string                                                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-			Type      string                                                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182508,8 +185167,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			Retryable bool                                                                                              `json:"retryable"`
 			SpanId    *string                                                                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                         `json:"tips,omitempty"`
-			TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-			Type      string                                                                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182527,8 +185192,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			Retryable bool                                                                                              `json:"retryable"`
 			SpanId    *string                                                                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                         `json:"tips,omitempty"`
-			TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-			Type      string                                                                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182546,8 +185217,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			Retryable bool                                                                                              `json:"retryable"`
 			SpanId    *string                                                                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                         `json:"tips,omitempty"`
-			TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-			Type      string                                                                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182565,8 +185242,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			Retryable bool                                                                                              `json:"retryable"`
 			SpanId    *string                                                                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                         `json:"tips,omitempty"`
-			TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-			Type      string                                                                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182584,8 +185267,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			Retryable bool                                                                                              `json:"retryable"`
 			SpanId    *string                                                                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                         `json:"tips,omitempty"`
-			TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-			Type      string                                                                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184170,8 +186859,14 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 			Retryable bool                                    `json:"retryable"`
 			SpanId    *string                                 `json:"span_id,omitempty"`
 			Tips      *[]string                               `json:"tips,omitempty"`
-			TraceId   *string                                 `json:"trace_id,omitempty"`
-			Type      string                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184189,8 +186884,14 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 			Retryable bool                                    `json:"retryable"`
 			SpanId    *string                                 `json:"span_id,omitempty"`
 			Tips      *[]string                               `json:"tips,omitempty"`
-			TraceId   *string                                 `json:"trace_id,omitempty"`
-			Type      string                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184208,13 +186909,44 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 			Retryable bool                                    `json:"retryable"`
 			SpanId    *string                                 `json:"span_id,omitempty"`
 			Tips      *[]string                               `json:"tips,omitempty"`
-			TraceId   *string                                 `json:"trace_id,omitempty"`
-			Type      string                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                  `json:"code"`
+			DocsUrl   *string                                 `json:"docs_url,omitempty"`
+			Fault     *PostApiV1Query404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                  `json:"message"`
+			Meta      *map[string]interface{}                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                          `json:"reasons,omitempty"`
+			Retryable bool                                    `json:"retryable"`
+			SpanId    *string                                 `json:"span_id,omitempty"`
+			Tips      *[]string                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest struct {
@@ -184227,8 +186959,14 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 			Retryable bool                                    `json:"retryable"`
 			SpanId    *string                                 `json:"span_id,omitempty"`
 			Tips      *[]string                               `json:"tips,omitempty"`
-			TraceId   *string                                 `json:"trace_id,omitempty"`
-			Type      string                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184246,8 +186984,14 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 			Retryable bool                                    `json:"retryable"`
 			SpanId    *string                                 `json:"span_id,omitempty"`
 			Tips      *[]string                               `json:"tips,omitempty"`
-			TraceId   *string                                 `json:"trace_id,omitempty"`
-			Type      string                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184388,8 +187132,14 @@ func ParseGetApiV1QueryReferenceResponse(rsp *http.Response) (*GetApiV1QueryRefe
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184407,8 +187157,14 @@ func ParseGetApiV1QueryReferenceResponse(rsp *http.Response) (*GetApiV1QueryRefe
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184426,8 +187182,14 @@ func ParseGetApiV1QueryReferenceResponse(rsp *http.Response) (*GetApiV1QueryRefe
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184445,8 +187207,14 @@ func ParseGetApiV1QueryReferenceResponse(rsp *http.Response) (*GetApiV1QueryRefe
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184523,8 +187291,14 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 			Retryable bool                                         `json:"retryable"`
 			SpanId    *string                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                    `json:"tips,omitempty"`
-			TraceId   *string                                      `json:"trace_id,omitempty"`
-			Type      string                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184542,8 +187316,14 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 			Retryable bool                                         `json:"retryable"`
 			SpanId    *string                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                    `json:"tips,omitempty"`
-			TraceId   *string                                      `json:"trace_id,omitempty"`
-			Type      string                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184561,8 +187341,14 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 			Retryable bool                                         `json:"retryable"`
 			SpanId    *string                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                    `json:"tips,omitempty"`
-			TraceId   *string                                      `json:"trace_id,omitempty"`
-			Type      string                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184580,8 +187366,14 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 			Retryable bool                                         `json:"retryable"`
 			SpanId    *string                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                    `json:"tips,omitempty"`
-			TraceId   *string                                      `json:"trace_id,omitempty"`
-			Type      string                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -188896,6 +191688,22 @@ func ParseConfirmOneClickUnsubscribeResponse(rsp *http.Response) (*ConfirmOneCli
 		}
 		response.JSON200 = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseReadUserAvatarBytesResponse parses an HTTP response from a ReadUserAvatarBytesWithResponse call
+func ParseReadUserAvatarBytesResponse(rsp *http.Response) (*ReadUserAvatarBytesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReadUserAvatarBytesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
 	}
 
 	return response, nil

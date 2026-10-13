@@ -49,11 +49,12 @@ export type UserDeactivationOutcome =
   | Readonly<{ outcome: "deactivated"; user: UserProfile }>
   | Readonly<{ outcome: "none_active" }>;
 
-/** An account as the created-fact seed reads it: its id and when its row was written. */
-export type UserCreatedRow = Readonly<{ id: string; createdAt: Instant }>;
-
-/** An account as the standing-fact step reads it: its id and when it was deactivated, if it is. */
-export type UserStandingRow = Readonly<{ id: string; deactivatedAt: Instant | null }>;
+/** An account as the lifecycle-fact step reads it: its id, creation and deactivation times. */
+export type UserBackfillRow = Readonly<{
+  id: string;
+  createdAt: Instant;
+  deactivatedAt: Instant | null;
+}>;
 
 /**
  * Persistence owned by User. It never crosses the feature boundary. Every mint commits user's
@@ -119,8 +120,6 @@ export interface UserRepository {
   hasAccountOnDomain(domain: string): Promise<boolean>;
   /** Whether any account exists, install-wide. */
   hasAnyAccount(): Promise<boolean>;
-  /** One page of every account, in id order after `afterId`, for user's created-fact seed. */
-  findCreatedPage(input: { afterId: string | null; limit: number }): Promise<UserCreatedRow[]>;
-  /** One page of every account, in id order after `afterId`, for user's standing-fact step. */
-  findStandingPage(input: { afterId: string | null; limit: number }): Promise<UserStandingRow[]>;
+  /** One page of every account, in id order after `afterId`, for user's lifecycle-fact step. */
+  findBackfillPage(input: { afterId: string | null; limit: number }): Promise<UserBackfillRow[]>;
 }

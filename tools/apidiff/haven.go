@@ -88,8 +88,9 @@ func havenOnPath() bool {
 // instance-admin operations comparable rather than symmetrically unauthorized.
 func havenEnv(inherit []string, slug string) []string {
 	return havenrun.Env(inherit, slug, havenrun.EnvOptions{
-		ExtraManagedKeys: []string{"LANGWATCH_INSTANCE_ADMIN_API_KEY", "FEATURE_FLAG_FORCE_ENABLE", "API_RATE_LIMIT_REQUESTS", "API_RATE_LIMIT_SECONDS"},
+		ExtraManagedKeys: []string{"LANGWATCH_INSTANCE_ADMIN_API_KEY", "FEATURE_FLAG_FORCE_ENABLE", "API_RATE_LIMIT_REQUESTS", "API_RATE_LIMIT_SECONDS", "HAVEN_AUTO_SEED"},
 		Extra: []string{
+			havenNoAutoSeed,
 			"LANGWATCH_INSTANCE_ADMIN_API_KEY=" + throwawayInstanceAdminKey,
 			"FEATURE_FLAG_FORCE_ENABLE=" + forcedFeatureFlags,
 			"API_RATE_LIMIT_REQUESTS=" + raisedRateLimitRequests,
@@ -100,8 +101,12 @@ func havenEnv(inherit []string, slug string) []string {
 
 // havenUpArgs brings one instance's stack up and returns. --agent is plain,
 // token-free output; --detach backgrounds the stack instead of attaching the
-// log viewer, which is what makes this a call rather than a session.
-func havenUpArgs() []string { return havenrun.UpArgs() }
+// log viewer, which is what makes this a call rather than a session. +analytics
+// selects analyticssim, which the analytics scenarios read.
+func havenUpArgs() []string { return havenrun.UpArgs(havenAnalyticsSelection) }
+
+// havenAnalyticsSelection is haven's sticky choice of the PostHog and Customer.io stand-in.
+const havenAnalyticsSelection = "+analytics"
 
 // havenStatusArgs asks for the machine-readable one-shot report.
 func havenStatusArgs() []string { return havenrun.StatusArgs() }
@@ -199,6 +204,9 @@ func (state *bootState) bootThroughHaven(ctx context.Context, booted *Booted) er
 	}
 	for _, instance := range []*Instance{&booted.A, &booted.B} {
 		if err := state.havenWaitReady(ctx, instance); err != nil {
+			return err
+		}
+		if err := state.havenWaitSeeded(ctx, instance); err != nil {
 			return err
 		}
 	}
@@ -421,4 +429,5 @@ func (state *bootState) destroyHavenStacks(ctx context.Context) {
 			state.logf("teardown: haven down --destroy --stack %s: %v", slug, err)
 		}
 	}
+	state.flushHavenRedis(ctx)
 }

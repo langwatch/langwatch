@@ -1,4 +1,3 @@
-import { memorySessionState } from "@langwatch/process-stores";
 /**
  * What the agents list reads about presence, including what it shows when the registry
  * cannot answer for one agent.
@@ -6,6 +5,8 @@ import { memorySessionState } from "@langwatch/process-stores";
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryConnectedAgentRelayChannel } from "../../channels/memory/memory.connected-agent-relay.channel.ts";
+import { MemoryConnectedAgentStateRepository } from "../../repositories/memory/memory.connected-agent-state.repository.ts";
 import { NO_PRESENCE, ConnectedAgentPresenceService } from "../connected-agent-presence.service.ts";
 import type { LiveInstance, ConnectedAgentRuntime } from "../connected-agent-runtime.service.ts";
 import { ConnectedAgentRuntimeService } from "../connected-agent-runtime.service.ts";
@@ -33,7 +34,10 @@ let runtime: ConnectedAgentRuntime;
 
 beforeEach(() => {
   listLive.mockReset();
-  runtime = ConnectedAgentRuntimeService.create({ store: memorySessionState() });
+  runtime = ConnectedAgentRuntimeService.create({
+    state: MemoryConnectedAgentStateRepository.create(),
+    relay: MemoryConnectedAgentRelayChannel.create(),
+  });
   vi.spyOn(runtime.registry, "listLive").mockImplementation(listLive);
 });
 

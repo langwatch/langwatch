@@ -1,11 +1,10 @@
+import { Card } from "@langwatch/design-system/card";
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import {
   Box,
   Button,
-  Card,
   Collapsible,
-  Heading,
   HStack,
   Stack,
   Tabs,
@@ -91,22 +90,19 @@ function RunSteps({ run }: { run: UpgradeRunDetailView }) {
   return (
     <Stack gap={4}>
       {releases.map((group) => (
-        <Card.Root
+        <Card
           key={group.release ?? "development"}
-          variant="outline"
+          title={releaseName(group.release)}
+          titleLevel={3}
+          padding="lg"
           data-testid="upgrade-run-release"
         >
-          <Card.Header>
-            <Heading size="sm">{releaseName(group.release)}</Heading>
-          </Card.Header>
-          <Card.Body>
-            <Stack gap={2}>
-              {group.steps.map((step) => (
-                <StepRow key={step.id} step={step} />
-              ))}
-            </Stack>
-          </Card.Body>
-        </Card.Root>
+          <Stack gap={2}>
+            {group.steps.map((step) => (
+              <StepRow key={step.id} step={step} />
+            ))}
+          </Stack>
+        </Card>
       ))}
     </Stack>
   );

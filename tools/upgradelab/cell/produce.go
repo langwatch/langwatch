@@ -85,10 +85,8 @@ func ProduceCommand(ctx context.Context, args []string, stdout io.Writer) (int, 
 		return 2, err
 	}
 	options.Shots, options.Stdout = false, stdout
-	if options.PostgresBase == "" || options.ClickHouseBase == "" {
-		if options.PostgresBase, options.ClickHouseBase, err = HavenServers(ctx); err != nil {
-			return 2, err
-		}
+	if options.Options, err = withHavenServers(ctx, options.Options); err != nil {
+		return 2, err
 	}
 	dir, err := Produce(ctx, options)
 	if err != nil {
@@ -212,7 +210,9 @@ func (cell *run) drainQueue(ctx context.Context) error {
 		case drainDone:
 			cell.report.Notes = append(cell.report.Notes, fmt.Sprintf("queue drained to %d in %s", depth, time.Since(start).Round(time.Second)))
 			return nil
+		case drainWaiting:
 		case drainExpired:
+			//nolint:errorlint // err is a diagnostic about the depth read, nil when only the backlog expired
 			return fmt.Errorf("main's queue still held %d jobs (read error: %v) after -drain-within %s", depth, err, cell.options.DrainWithin)
 		}
 		if cell.options.Stdout != nil && time.Since(lastLog) >= time.Minute {
@@ -370,6 +370,7 @@ func (cell *run) resumeSeed(ctx context.Context) error {
 		return err
 	}
 	name, value, _ := strings.Cut(cookie, "=")
+	//nolint:gosec // a client-side jar entry for the local stack; the attributes only matter to a server setting it
 	jar.SetCookies(public, []*http.Cookie{{Name: name, Value: value}})
 	product := cell.seeder.Context
 	cell.seeder = seed.NewSeeder(seed.ProductInput{AppURL: cell.url(), Email: email, Password: password, Label: cell.options.Name(),

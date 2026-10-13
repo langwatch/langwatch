@@ -10,11 +10,11 @@ import {
   PROTOCOL_VERSION,
 } from "@langwatch/agent-contract";
 import type { StoredCall } from "@langwatch/agent-contract";
-import { memorySessionState } from "@langwatch/process-stores";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { callKey, httpSessionKey, pendingKey } from "../rules/connected-agent-keys.rules.ts";
+import { MemoryConnectedAgentRelayChannel } from "../channels/memory/memory.connected-agent-relay.channel.ts";
+import type { ConnectedAgentStateRepository } from "../repositories/connected-agent-state.repository.ts";
+import { MemoryConnectedAgentStateRepository } from "../repositories/memory/memory.connected-agent-state.repository.ts";
 import type { AgentService } from "../services/agent.service.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
 import { AgentSessionService } from "../services/connected-agent-session.service.ts";
@@ -27,8 +27,12 @@ const seededToken = "ait_test_token";
 
 const fakeAgents = createConnectedAgentFixture();
 function build({ pollWaitMs }: { pollWaitMs: number }) {
-  const store = memorySessionState();
-  const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
+  const state = MemoryConnectedAgentStateRepository.create();
+  const runtime = ConnectedAgentRuntimeService.create({
+    podId: "pod_solo",
+    state,
+    relay: MemoryConnectedAgentRelayChannel.create(),
+  });
   const transport = createLongPollFixture({
     runtime,
     agents: fakeAgents,
@@ -36,14 +40,13 @@ function build({ pollWaitMs }: { pollWaitMs: number }) {
     replicaCount: 1,
     pollWaitMs,
   });
-  return { store, runtime, transport };
+  return { state, runtime, transport };
 }
 
 /** A session as the register route would have stored it. */
-async function seedSession(store: SessionStateStore) {
-  await store.set(
-    httpSessionKey(projectId, seededToken),
-    JSON.stringify({
+async function seedSession(state: ConnectedAgentStateRepository) {
+  await state.saveHttpSession({
+    session: {
       token: seededToken,
       instanceId,
       projectId,
@@ -62,12 +65,12 @@ async function seedSession(store: SessionStateStore) {
         connectedAt: Date.now(),
         maxConcurrency: 1,
       },
-    }),
-    300,
-  );
+    },
+    ttlSeconds: 300,
+  });
 }
 
-async function parkCall(store: SessionStateStore, callId: string) {
+async function parkCall(state: ConnectedAgentStateRepository, callId: string) {
   const deadlineAt = Date.now() + 60_000;
   const stored: StoredCall = {
     projectId,
@@ -87,13 +90,8 @@ async function parkCall(store: SessionStateStore, callId: string) {
     },
   };
   const ttl = 60 + 60;
-  await store.set(callKey(projectId, callId), JSON.stringify(stored), ttl);
-  await store.zadd({
-    key: pendingKey(projectId, instanceId),
-    score: deadlineAt,
-    member: callId,
-    ttlSeconds: ttl,
-  });
+  await state.saveCall({ call: stored, ttlSeconds: ttl });
+  await state.addPendingCall({ projectId, instanceId, callId, deadlineAt, ttlSeconds: ttl });
 }
 
 const resolved = {
@@ -111,9 +109,9 @@ describe("LongPollTransportService with a memory store", () => {
   describe("when nothing is pending for the instance", () => {
     /** @scenario "A poll with nothing pending answers empty after the poll wait" */
     it("answers no frame once the poll wait passes", async () => {
-      const { store, transport } = build({ pollWaitMs: 120 });
+      const { state, transport } = build({ pollWaitMs: 120 });
       vi.spyOn(AgentSessionService.prototype, "refreshPresence").mockResolvedValue(undefined);
-      await seedSession(store);
+      await seedSession(state);
 
       const started = Date.now();
       const answer = await transport.poll({
@@ -131,10 +129,10 @@ describe("LongPollTransportService with a memory store", () => {
   describe("when a call is parked before the poll", () => {
     /** @scenario "A poll delivers a parked call once" */
     it("hands the call to the first poll and never again", async () => {
-      const { store, transport } = build({ pollWaitMs: 50 });
+      const { state, transport } = build({ pollWaitMs: 50 });
       vi.spyOn(AgentSessionService.prototype, "refreshPresence").mockResolvedValue(undefined);
-      await seedSession(store);
-      await parkCall(store, "call_1");
+      await seedSession(state);
+      await parkCall(state, "call_1");
 
       const first = await transport.poll({
         credentials,
@@ -165,8 +163,12 @@ describe("LongPollTransportService with a memory store", () => {
      * @scenario "An HTTP register is refused without Redis on a deployment with several replicas"
      */
     it("refuses the register with replica_count_unsupported before any credential read", async () => {
-      const store = memorySessionState();
-      const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
+      const state = MemoryConnectedAgentStateRepository.create();
+      const runtime = ConnectedAgentRuntimeService.create({
+        podId: "pod_solo",
+        state,
+        relay: MemoryConnectedAgentRelayChannel.create(),
+      });
       const transport = createLongPollFixture({
         runtime,
         agents: fakeAgents,
@@ -219,7 +221,8 @@ describe("LongPollTransportService registration and polling, against a memory st
       const registerSpy = vi.spyOn(agents, "registerConnected");
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store: memorySessionState(),
+        state: MemoryConnectedAgentStateRepository.create(),
+        relay: MemoryConnectedAgentRelayChannel.create(),
       });
       const registeringTransport = createLongPollFixture({
         runtime,
@@ -243,10 +246,11 @@ describe("LongPollTransportService registration and polling, against a memory st
     /** @scenario "A poll refreshes presence" */
     it("is live for its agent, and a read after the TTL with no poll finds it offline", async () => {
       let now = Date.now();
-      const store = memorySessionState({ now: () => now });
+      const state = MemoryConnectedAgentStateRepository.create({ now: () => now });
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store,
+        state,
+        relay: MemoryConnectedAgentRelayChannel.create(),
         resultPollMs: 20,
       });
       const agents = registeringAgentService();
@@ -301,10 +305,11 @@ describe("LongPollTransportService registration and polling, against a memory st
   describe("when an instance registered over HTTP stops polling", () => {
     /** @scenario "A process that stops polling goes offline after the presence TTL" */
     it("fails a call dispatched to its agent with agent_offline", async () => {
-      const store = memorySessionState();
+      const state = MemoryConnectedAgentStateRepository.create();
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store,
+        state,
+        relay: MemoryConnectedAgentRelayChannel.create(),
         firstTurnGraceMs: 10,
         firstTurnPollMs: 5,
       });
@@ -324,11 +329,11 @@ describe("LongPollTransportService registration and polling, against a memory st
       // No poll came in: force the instance's last-seen score past the
       // presence TTL, the way a stalled process reads once no watch's clock
       // extends it.
-      const { instanceSetKey } = await import("../rules/connected-agent-keys.rules.ts");
-      await store.zadd({
-        key: instanceSetKey(projectId, registeredAgentId),
-        score: Date.now() - (PRESENCE_TTL_SECONDS + 5) * 1000,
-        member: instanceId,
+      await state.markInstanceSeen({
+        projectId,
+        agentId: registeredAgentId,
+        instanceId,
+        seenAt: Date.now() - (PRESENCE_TTL_SECONDS + 5) * 1000,
         ttlSeconds: 1,
       });
 
@@ -362,10 +367,11 @@ describe("LongPollTransportService registration and polling, against a memory st
 
 /** One instance registered over HTTP, with a real dispatcher call in flight. */
 async function registerAndDispatch(signal?: AbortSignal) {
-  const store = memorySessionState();
+  const state = MemoryConnectedAgentStateRepository.create();
   const runtime = ConnectedAgentRuntimeService.create({
     podId: "pod_solo",
-    store,
+    state,
+    relay: MemoryConnectedAgentRelayChannel.create(),
     resultPollMs: 15,
   });
   const agents = registeringAgentService();

@@ -23,6 +23,22 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "authz:engine",
+    "kind": "tenant",
+    "mode": "background",
+    "owner": "authz",
+    "description": "Turns each organization's existing access into the authorization engine's own records, verifies the engine gives the same answers, and then has the engine answer permission checks for that organization.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "authz:carry-over-engine-switch",
+    "kind": "data",
+    "mode": "background",
+    "owner": "authz",
+    "description": "Copies which organizations the authorization engine answers for from the migration state table into authz's own engine switch.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "automation:import-slack-connections",
     "kind": "tenant",
     "mode": "background",
@@ -109,11 +125,51 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "identity:identifier-backfill",
+    "kind": "tenant",
+    "mode": "background",
+    "owner": "identity",
+    "description": "Records each member's existing sign-in methods as identity history and verifies the recorded data matches their accounts. Sign-in behavior does not change.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "identity:secret-heal",
+    "kind": "tenant",
+    "mode": "background",
+    "owner": "identity",
+    "description": "Keeps each member's stored sign-in credentials in step across the two places they can be written during the migration, so a password changed at any moment keeps working. Sign-in behavior does not change.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "identity:connection-grandfather",
+    "kind": "tenant",
+    "mode": "background",
+    "owner": "identity",
+    "description": "Records each organization's existing enterprise sign-in setup as connection history, and checks that it routes people exactly where the current setup does. Sign-in behavior does not change.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "identity:sso-domain-ownership-backfill",
+    "kind": "tenant",
+    "mode": "background",
+    "owner": "identity",
+    "description": "Records which organization owns each email domain its single sign-on connection has already proved, so sign-ins for those domains reach the connection. Domains that were never proved are not affected.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "identity:reopen-unproven-accounts-after-rollout",
     "kind": "data",
     "mode": "background",
     "owner": "identity",
     "description": "Returns accounts an older image finalized during the rollout to the legacy sign-in path.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "identity:carry-over-sign-in-switch",
+    "kind": "data",
+    "mode": "background",
+    "owner": "identity",
+    "description": "Copies which users sign in on the identifier path from the migration state table into identity's own sign-in switch.",
     "needsOldWritersGone": true
   },
   {
@@ -148,6 +204,21 @@
     "description": "Carries organizations that finished or were enrolled in the Slack connections migration over to its new step, so it does not run for them again and keeps its enrolments."
   },
   {
+    "id": "ops:copy-identity-authz-migration-state",
+    "kind": "data",
+    "mode": "background",
+    "owner": "ops",
+    "description": "Carries users and organizations that finished, were rolled back in or were enrolled in the sign-in, credential repair, SSO and authorization engine migrations over to their new steps, so none runs for them again."
+  },
+  {
+    "id": "ops:recopy-identity-authz-migration-state-after-rollout",
+    "kind": "data",
+    "mode": "background",
+    "owner": "ops",
+    "description": "Carries over what an older image changed in the sign-in, credential repair, SSO and authorization engine migrations during the rollout, once no older image is running.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "ops:checkup-canary-project",
     "kind": "data",
     "mode": "background",
@@ -174,23 +245,7 @@
     "kind": "data",
     "mode": "background",
     "owner": "project",
-    "description": "Records every existing project as created, so the Instant Evals judge, nurturing and data privacy know it.",
-    "needsOldWritersGone": true
-  },
-  {
-    "id": "project:record-department-assignments",
-    "kind": "data",
-    "mode": "background",
-    "owner": "project",
-    "description": "Records every existing project's department, team and personal flag, for data privacy to fold.",
-    "needsOldWritersGone": true
-  },
-  {
-    "id": "project:record-presence-settings",
-    "kind": "data",
-    "mode": "background",
-    "owner": "project",
-    "description": "Records every existing project's presence setting, for presence to fold.",
+    "description": "Records every existing project as created, and each live project's department and presence setting.",
     "needsOldWritersGone": true
   },
   {
@@ -269,15 +324,7 @@
     "kind": "data",
     "mode": "background",
     "owner": "user",
-    "description": "Records every existing account as user's created fact, for peers to read.",
-    "needsOldWritersGone": true
-  },
-  {
-    "id": "user:record-standing-facts",
-    "kind": "data",
-    "mode": "background",
-    "owner": "user",
-    "description": "Re-states each account's deactivation, and a reactivation its log still misses, for peers.",
+    "description": "Records every existing account's created fact and re-states its standing, for peers to read.",
     "needsOldWritersGone": true
   },
   {

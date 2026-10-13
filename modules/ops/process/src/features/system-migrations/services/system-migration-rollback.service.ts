@@ -78,6 +78,8 @@ export class SystemMigrationRollbackService {
     // the operator, who sees a rollback that was recorded but not fully applied and can retry
     // it; the reverse order could leave a tenant the runner re-finalizes minutes later.
     await this.writePin({ pin, record, isRetry, priorReport, actorUserId });
+    // The owner's own switch follows the pin through ops' fact; a retry re-sends the same one.
+    await this.deps.recordRolledBack?.({ migrationName, tenantId, actorUserId, decidedAt });
 
     // Only for a status that could have reached the ledger. A `parked`
     // organization and one with no record never cut over, so there is

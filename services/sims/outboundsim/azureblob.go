@@ -2,7 +2,7 @@ package outboundsim
 
 import (
 	"crypto/hmac"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec // G501: Azure Blob reports Content-MD5; this is the protocol, not a security check
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
@@ -139,7 +139,7 @@ func sasRefusal(r *http.Request, account, key string, now time.Time) (int, strin
 	return 0, ""
 }
 
-// azureRefusal authorises a blob call by SAS, Shared Key or a bearer token this sim issued.
+// azureRefusal authorizes a blob call by SAS, Shared Key or a bearer token this sim issued.
 func (s *Server) azureRefusal(r *http.Request) reply {
 	account := r.PathValue("account")
 	key, known := AzureSimAccounts[account]
@@ -149,7 +149,7 @@ func (s *Server) azureRefusal(r *http.Request) reply {
 		return azureError(http.StatusForbidden, "AuthenticationFailed", "Server failed to authenticate the request: no account "+account)
 	case r.URL.Query().Get("sig") != "":
 		if status, code := sasRefusal(r, account, key, s.now()); status != 0 {
-			return azureError(status, code, "The SAS does not authorise this request.")
+			return azureError(status, code, "The SAS does not authorize this request.")
 		}
 	case strings.HasPrefix(auth, "SharedKey "):
 		name, signature, _ := strings.Cut(strings.TrimPrefix(auth, "SharedKey "), ":")
@@ -212,7 +212,7 @@ func (s *Server) azureAnswer(r *http.Request, name string, body []byte) reply {
 			return azureError(http.StatusBadRequest, "MissingRequiredHeader", "x-ms-blob-type: BlockBlob is required.")
 		}
 		s.azure.blobs[name] = azureBlob{body: body, contentType: r.Header.Get("Content-Type"), modified: s.now()}
-		sum := md5.Sum(body)
+		sum := md5.Sum(body) //nolint:gosec // G401: the Content-MD5 the Azure protocol defines
 		return reply{status: http.StatusCreated, header: map[string]string{
 			"ETag": fmt.Sprintf(`"0x%X"`, sum[:6]), "Content-MD5": base64.StdEncoding.EncodeToString(sum[:]),
 		}}

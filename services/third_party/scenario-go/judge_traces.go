@@ -97,7 +97,7 @@ func resolveTraceFetcher(own RemoteTraceFetcher, s *Settings) RemoteTraceFetcher
 // when a mapping read the trace and found nothing. It never fails, and
 // returns at once when no message carries a trace id or no API key is set.
 func (ex *Executor) SettleRemoteTraces(ctx context.Context) {
-	ids := messageTraceIDs(ex.state.Messages())
+	ids := messageTraceIDs(ex.state.messagesView())
 	lw := resolveLangWatch(ex.cfg.LangWatch)
 	if len(ids) == 0 || lw.APIKey == "" {
 		return
@@ -124,14 +124,13 @@ func firstPositive(field string, fallback time.Duration, values ...time.Duration
 	return fallback
 }
 
-// traceDigest renders the spans for the judge: in full, or structure-only
-// with the discovery hint when the full digest exceeds the token threshold.
-func traceDigest(spans []sdktrace.ReadOnlySpan, threshold int) (digest string, large bool) {
-	full := spandigest.Format(spans)
-	if len(spans) == 0 || spandigest.EstimateTokens(full) <= threshold {
-		return full, false
-	}
-	return spandigest.FormatStructureOnly(spans) + spandigest.LargeTraceHint, true
+// judgeContent is the judge's user message with the trace digest of spans:
+// in full, or structure-only with the discovery hint when the full digest
+// exceeds the token threshold (large). The cache keeps each ended span's
+// rendering across the run's judge calls.
+func judgeContent(cache *spandigest.Cache, spans []sdktrace.ReadOnlySpan, threshold int, transcript, additionalContext string) (content string, large bool) {
+	head, tail := judgeContentFrame(transcript, additionalContext)
+	return cache.Framed(head, tail, spans, threshold)
 }
 
 // discoveryTools are expand_trace and grep_trace over spans.

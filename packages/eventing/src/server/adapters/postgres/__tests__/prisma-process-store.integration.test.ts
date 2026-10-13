@@ -471,6 +471,67 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
       });
     });
 
+    describe("when the holder renews its lease while its delivery runs", () => {
+      /** @scenario "Renewing a lease is fenced on the lease token" */
+      it("keeps the message leased one more lease length from the renewal", async () => {
+        const identity = identityOf();
+        await store.commit(commit({ now: base }));
+        const held = (
+          await store.leaseDueMessages({ now: base, limit: 1, leaseDurationMs: 100 })
+        )[0]!;
+
+        const renewal = await store.renewLease({
+          identity,
+          leaseToken: held.leaseToken,
+          now: base + 90,
+          leaseDurationMs: 100,
+        });
+        const beforeRenewedExpiry = await store.leaseDueMessages({
+          now: base + 189,
+          limit: 1,
+          leaseDurationMs: 100,
+        });
+
+        expect(renewal).toEqual({ applied: true });
+        expect(beforeRenewedExpiry).toEqual([]);
+        expect(await store.findMessagesByRef({ ref: ref() })).toEqual([
+          expect.objectContaining({ status: "pending", attempts: 1, leaseToken: held.leaseToken }),
+        ]);
+      });
+    });
+
+    describe("when a holder whose lease was taken over renews it", () => {
+      /** @scenario "Renewing a lease is fenced on the lease token" */
+      it("refuses the renewal and leaves the new holder's lease untouched", async () => {
+        const identity = identityOf();
+        await store.commit(commit({ now: base }));
+        const first = (
+          await store.leaseDueMessages({ now: base, limit: 1, leaseDurationMs: 100 })
+        )[0]!;
+        const second = (
+          await store.leaseDueMessages({ now: base + 100, limit: 1, leaseDurationMs: 100 })
+        )[0]!;
+
+        const staleRenewal = await store.renewLease({
+          identity,
+          leaseToken: first.leaseToken,
+          now: base + 150,
+          leaseDurationMs: 10_000,
+        });
+        const afterSecondLapses = await store.leaseDueMessages({
+          now: base + 200,
+          limit: 1,
+          leaseDurationMs: 100,
+        });
+
+        expect(staleRenewal).toEqual({ applied: false });
+        expect(afterSecondLapses).toEqual([
+          expect.objectContaining({ attempts: 3, messageKey: identity.messageKey }),
+        ]);
+        expect(afterSecondLapses[0]!.leaseToken).not.toBe(second.leaseToken);
+      });
+    });
+
     describe("when two acknowledgements of one lease land at the same moment", () => {
       /** @scenario "Two acknowledgements of one lease: the second is refused" */
       it("applies the dispatch and refuses the failure, which waited on the row", async () => {

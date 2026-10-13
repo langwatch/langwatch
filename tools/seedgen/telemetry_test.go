@@ -154,6 +154,10 @@ func TestLargePlanWalkStaysUnder256MB(t *testing.T) {
 	if testing.Short() {
 		t.Skip("walks two million spans")
 	}
+	if raceDetector {
+		// The race detector multiplies memory and time; go-ci runs this test without -race.
+		t.Skip("memory ceiling is meaningless under -race")
+	}
 	plan := mustPlan(t, "--size", "large")
 	var stats runtime.MemStats
 	chunks, peak := 0, uint64(0)

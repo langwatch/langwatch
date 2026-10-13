@@ -3,6 +3,7 @@
  * alerts. Two failure modes: reporting a dropped table, and letting one
  * bad endpoint affect others. Spec: specs/ops/worker-operational-loops.feature
  */
+import { handledErrorFromHerr } from "@langwatch/handled-error";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
@@ -111,6 +112,36 @@ describe("given two configured endpoints, one of which refuses the read", () => 
       await service.collect();
 
       expect(await tablesOf(readings)).toEqual(["shared event_log"]);
+    });
+  });
+});
+
+describe("given an endpoint whose ClickHouse is overloaded", () => {
+  describe("when the collection ticks", () => {
+    /** @scenario "An overloaded ClickHouse refusing the read is a warning, not an error" */
+    it("logs the failed read as a warning, not an error", async () => {
+      const storage = endpointHolding({});
+      storage.refusals.tables = () =>
+        handledErrorFromHerr(
+          {
+            code: "clickhouse_overloaded",
+            type: "clickhouse_overloaded",
+            message: "Too many queries in flight",
+          },
+          { httpStatus: 503 },
+        );
+      const { logger, lines } = createTestLogger();
+      const service = StorageStatsCollectionService.create({
+        resolveInstances: async () => [{ target: "shared", storage }],
+        readings: sharedReadings(),
+        collectBackups: false,
+        logger,
+      });
+
+      await service.collect();
+
+      expect(lines.findLine("warn", "failed to collect ClickHouse storage stats")).toBeDefined();
+      expect(lines.findLine("error", "failed to collect ClickHouse storage stats")).toBeUndefined();
     });
   });
 });

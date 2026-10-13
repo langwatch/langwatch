@@ -1,7 +1,8 @@
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * The membership and spend rows behind one organization's usage reading.
  */
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import type { UsageMembershipRepository } from "../usage-membership.repository.ts";
 
@@ -10,7 +11,7 @@ type PrismaUsageMembershipDatabase = PrismaClient | Prisma.TransactionClient;
 
 /** The first instant of the current calendar month, in the process's zone. */
 function getCurrentMonthStart(): Date {
-  const now = new Date();
+  const now = toDate(nowInstant());
   return new Date(now.getFullYear(), now.getMonth(), 1);
 }
 

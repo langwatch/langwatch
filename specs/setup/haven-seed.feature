@@ -210,6 +210,18 @@ Feature: haven db seed fills a stack with every kind of data, at any size, witho
     And "haven db seed --resume" continues from the last acknowledged action without duplicating data
 
   @unit
+  Scenario: A resume keeps the run id of the last run
+    Given an earlier run of the same flags recorded under the stack
+    When "haven db seed --resume" runs in a later hour
+    Then the earlier run's directory is resumed instead of a new run being planned
+
+  @unit
+  Scenario: Destroying a stack forgets its seeded logins
+    Given a stack with a seed run record and a seed status
+    When the stack is destroyed
+    Then its seed status is forgotten
+
+  @unit
   Scenario: The seed waits only for its own data to land
     Given the stack's worker also holds other tenants' jobs and jobs deferred by minutes
     When the seed has sent its last action

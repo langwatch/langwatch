@@ -24,6 +24,10 @@ export class GroupQueueDispatcher {
   private paused = false;
   /** Ends the loop's wait: for a resume, or a listed-group dispatcher's poll. */
   private wake: (() => void) | null = null;
+  /** A listed-group dispatcher's own job finished since its last claim: it claims again at once. */
+  private slotFreed = false;
+  /** The open list that claims first next time, so each list leads in turn. */
+  private nextList = 0;
 
   constructor(
     private readonly params: {
@@ -140,6 +144,11 @@ export class GroupQueueDispatcher {
     this.wake?.();
   }
 
+  private wakeForFreedSlot(): void {
+    this.slotFreed = true;
+    if (!this.paused) this.wake?.();
+  }
+
   private untilWoken(): Promise<void> {
     return new Promise((resolve) => {
       this.wake = () => {
@@ -169,6 +178,7 @@ export class GroupQueueDispatcher {
    * is the whole queue's, and taking from it leaves the other dispatcher asleep.
    */
   private pollListedGroups(): Promise<void> {
+    if (this.slotFreed) return Promise.resolve();
     return new Promise((resolve) => {
       const timer = setTimeout(() => this.wake?.(), this.params.signalTimeoutSec * 1000);
       this.wake = () => {
@@ -201,26 +211,41 @@ export class GroupQueueDispatcher {
 
   /** One claim over the allow-list, or over each open list in turn while slots remain. */
   private async claim(maxJobs: number): Promise<DispatchResult[]> {
-    const claimFrom = (allowedGroupsKey: string | undefined, jobs: number) =>
+    const claimFrom = ({
+      allowedGroupsKey,
+      jobs,
+      listKey,
+    }: {
+      allowedGroupsKey: string | undefined;
+      jobs: number;
+      listKey?: string;
+    }) =>
       this.params.scripts.dispatchBatch({
         nowMs: nowInstant().epochMilliseconds,
         activeTtlSec: this.params.activeTtlSec,
         maxJobs: jobs,
         allowedGroupsKey,
+        ...(listKey ? { listKey } : {}),
       });
     if (!this.params.listedGroupsKeys) {
-      return claimFrom(this.params.dispatchGroupAllowListKey, maxJobs);
+      return claimFrom({ allowedGroupsKey: this.params.dispatchGroupAllowListKey, jobs: maxJobs });
     }
     const results: DispatchResult[] = [];
-    for (const listKey of await this.params.listedGroupsKeys()) {
+    const lists = await this.params.listedGroupsKeys();
+    const first = this.nextList++ % Math.max(lists.length, 1);
+    for (const listKey of [...lists.slice(first), ...lists.slice(0, first)]) {
       if (results.length >= maxJobs) break;
-      results.push(...(await claimFrom(`${listKey}:candidates`, maxJobs - results.length)));
+      const jobs = maxJobs - results.length;
+      results.push(
+        ...(await claimFrom({ allowedGroupsKey: `${listKey}:candidates`, jobs, listKey })),
+      );
     }
     return results;
   }
 
   private async dispatchBatch(): Promise<number> {
     if (this.paused) return 0;
+    this.slotFreed = false;
     const availableSlots =
       this.params.globalConcurrency -
       this.params.processingQueue.length() -
@@ -233,7 +258,7 @@ export class GroupQueueDispatcher {
     const results = await this.claim(maxJobs);
 
     for (const result of results) {
-      this.params.processingQueue.push(result).catch((err) => {
+      const run = this.params.processingQueue.push(result).catch((err) => {
         this.params.logger.debug(
           {
             queueName: this.params.queueName,
@@ -244,6 +269,8 @@ export class GroupQueueDispatcher {
           "fastq push error (already handled in processWithRetries)",
         );
       });
+      // The shared signal is the main dispatcher's; a listed one wakes on its own freed slot.
+      if (this.listed) void run.finally(() => this.wakeForFreedSlot());
 
       gqJobsDispatchedTotal.inc({ queue_name: this.params.queueName });
     }

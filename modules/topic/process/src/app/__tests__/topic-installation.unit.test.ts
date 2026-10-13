@@ -1,29 +1,33 @@
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { createApp } from "@langwatch/process";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { testPeer } from "@langwatch/process/testing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
-import type { TraceApi } from "@langwatch/trace-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { topicProcessModule } from "../../topic.module.ts";
 function process(role: "api" | "worker") {
-  return createApp({ role })
-    .withModules([topicProcessModule])
-    .withStores(memoryStores())
-    .provide({
-      "data-retention": createApiFixture<DataRetentionApi>({}),
-      evaluation: createApiFixture<EvaluationApi>({}),
-      trace: createApiFixture<TraceApi>({}),
-      "model-provider": createApiFixture<ModelProviderApi>({}),
-    });
+  return bootInstalledProcess({
+    role,
+    modules: [topicProcessModule],
+    config: {},
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: DataRetentionApi, instance: createApiFixture<DataRetentionApi>({}) }),
+      testPeer({ token: EvaluationApi, instance: createApiFixture<EvaluationApi>({}) }),
+      testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>({}) }),
+      testPeer({ token: ModelProviderApi, instance: createApiFixture<ModelProviderApi>({}) }),
+    ],
+  });
 }
 
 describe("topic app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process(role).boot();
+    const runtime = await process(role);
 
     try {
       const app = runtime.service(TopicApi);
@@ -41,7 +45,7 @@ describe("topic app installation", () => {
 
   describe("when no clustering wake is scheduled in the memory tier", () => {
     it("reports no next run rather than reaching for a database", async () => {
-      const runtime = await process("worker").boot();
+      const runtime = await process("worker");
 
       try {
         const status = await runtime.service(TopicApi).getClusteringStatus({

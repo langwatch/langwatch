@@ -241,7 +241,7 @@ var baseTable = []commandSpec{
 		minusArgs: true,
 		flags: []flagSpec{
 			{long: "--watch", short: "-w", summary: "rebuild and reload on a change: one-shot UI builds (open pages reload once idle), Node reload, Go rebuild. Without it nothing reloads; `haven reload` applies changes. Not sticky"},
-			{long: "--hmr", summary: "as --watch, but the UI runs Vite bundledDev with HMR. Not sticky"},
+			{long: "--hmr", summary: "as --watch, but the UI runs the plain Vite dev server with HMR. Not sticky"},
 			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
 			{long: "--force", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},

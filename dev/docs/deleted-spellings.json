@@ -488,7 +488,7 @@
     {
       "spelling": "per-module `use-feature-flag.ts` copies",
       "kind": "file",
-      "path": "(?:^|/)use-feature-flag\\.tsx?$",
+      "path": "^(?!modules/feature-flag/)(?:.*/)?use-feature-flag\\.tsx?$",
       "pattern": "\\buse-feature-flag\\.ts\\b",
       "replacement": "`useFeatureFlag(flag, { projectId | organizationId })` from `@langwatch/browser-host`",
       "section": "§3.4, §10.1",
@@ -578,7 +578,7 @@
     {
       "spelling": "noMembers",
       "kind": "identifier",
-      "pattern": "\\bnoMembers\\b",
+      "pattern": "import[^;]*\\bnoMembers\\b|\\bnoMembers\\s*\\(|withMembers\\(\\s*noMembers\\b",
       "replacement": "nothing: a module with no store clients declares none",
       "section": "§3.3, §5",
       "ruled": "2026-10-01"

@@ -4,8 +4,7 @@
   "private": true,
   "description": "Reusable LangWatchQL workbench, result and visualization browser surfaces.",
   "files": [
-    "src",
-    "tests"
+    "src"
   ],
   "type": "module",
   "exports": {

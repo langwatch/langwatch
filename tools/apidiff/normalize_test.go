@@ -30,13 +30,13 @@ func TestShapeOfArrayUnionAndLength(t *testing.T) {
 }
 
 func TestIsVolatileKey(t *testing.T) {
-	volatile := []string{"id", "project_id", "projectId", "created_at", "updatedAt", "timestamp", "token", "api_key", "passwordHash", "secret", "platformUrl", "url", "slug", "path"}
+	volatile := []string{"id", "project_id", "projectId", "created_at", "updatedAt", "timestamp", "token", "api_key", "passwordHash", "secret", "platformUrl", "url", "slug", "path", "display_prefix", "displayPrefix"}
 	for _, key := range volatile {
 		if !IsVolatileKey(key) {
 			t.Errorf("IsVolatileKey(%q) = false, want true", key)
 		}
 	}
-	stable := []string{"name", "status", "message", "count", "identity", "slugline"}
+	stable := []string{"name", "status", "message", "count", "identity", "slugline", "prefix"}
 	for _, key := range stable {
 		if IsVolatileKey(key) {
 			t.Errorf("IsVolatileKey(%q) = true, want false", key)
@@ -143,5 +143,13 @@ func TestMaskValueMasksScimTimestamps(t *testing.T) {
 	}
 	if meta["resourceType"] != "User" {
 		t.Errorf("resourceType = %v, want untouched", meta["resourceType"])
+	}
+}
+
+func TestVirtualKeyDisplayPrefixIsNotADifference(t *testing.T) {
+	main := map[string]any{"virtual_key": map[string]any{"name": "vd-x", "display_prefix": "vk-lw-01M4RBY"}}
+	branch := map[string]any{"virtual_key": map[string]any{"name": "vd-x", "display_prefix": "vk-lw-01M4RBZ"}}
+	if fields := valueDiffFields(MaskValue(main), MaskValue(branch)); len(fields) != 0 {
+		t.Errorf("display_prefix minted a second apart differs: %v", fields)
 	}
 }

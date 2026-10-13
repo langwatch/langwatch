@@ -31,20 +31,22 @@ Entry: `apps/server/src/cli.ts` (commander). The published bin is `langwatch-ser
 ## What it manages
 
 `src/predeps/` installs what the machine lacks (Postgres, Redis, ClickHouse, uv, pnpm,
-goose, the AI gateway binary, opencode for langyagent); `src/services/` starts each one in order and
-supervises it (`runtime.ts`): Postgres, Redis, ClickHouse, the LangWatch app, then its
-workers once the app is healthy, NLP, langevals, AI gateway, langyagent. There is no
-migration phase: the worker half's gate runs `pnpm task upgrade` when the installation is behind
-(`services/langwatch-workers.ts`) while the app holds, then serves only declared routes (see `upgrade`). `src/port-conflict/` shifts
-both port tiers by +10 when a slot is taken.
+goose, the AI gateway binary, opencode for langyagent); `src/services/` starts and supervises them
+in two tiers (`runtime.ts`): the infrastructure tier (Postgres, Redis, ClickHouse) concurrently,
+then the application tier concurrently (the LangWatch backend, NLP, langevals, AI gateway,
+langyagent). The backend is one Node process, `apps/backend`, running the api and the worker
+(`services/langwatch.ts`, ADR-168). There is no migration phase: the worker half runs the upgrade
+in-process when the installation is behind while the api serves every route and reports not ready
+until the ledger is current (see `upgrade`); `pnpm task upgrade` stays the deliberate run-once
+command. `src/port-conflict/` shifts both port tiers by +10 when a slot is taken.
 
 - Ports (`src/shared/ports.ts`): app tier `base` (app), `+1` nlp, `+2` langevals, `+3`
-  gateway, `+4` langyagent; infra tier `base+1000` (Postgres), `+1001` Redis, `+1002` and
+  gateway, `+4` langyagent, `+5` the worker half's health door; infra tier `base+1000` (Postgres), `+1001` Redis, `+1002` and
   `+1003` ClickHouse.
 - State (`src/shared/paths.ts`): everything under `LANGWATCH_HOME`, default `~/.langwatch`
   (`bin/`, `data/`, `logs/`, `app/`, `.env`, `install-manifest.json`, `run/`).
-- It ships the production build: the app is one port; the worker is a second supervised
-  process started after the app is healthy (`services/langwatch-workers.ts`).
+- It ships the production build: the api and worker share one supervised process; the api
+  holds the app port and the worker half opens its own health door.
 
 ## Run, test, build
 
@@ -64,7 +66,8 @@ test does not touch the real `~/.langwatch`. Never run `reset` without it.
 packages import; `distribution-files.json` and `embeds.versions.json` pin what the
 package ships.
 
-## Open question, not yours to answer
+## Process shape
 
-ADR-168 open question 3: should this CLI also run api and worker in one process, without
-watch? Unanswered; see `dev-runtime`. Do not change the CLI's process shape for it.
+The question whether the CLI runs api and worker in one process is answered: it does, through the
+shared backend host (`@langwatch/process/backend-host`, ADR-168 Accepted, record §4). `dev-runtime`
+reuses the same host. Do not change the CLI's process shape without a ruling.

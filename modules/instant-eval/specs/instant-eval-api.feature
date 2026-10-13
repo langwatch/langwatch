@@ -278,6 +278,13 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     Then it fails with instant_eval_not_enabled
     And it does not report the run as missing
 
+  @unit
+  Scenario: A query identity ClickHouse refuses to log in answers as not enabled
+    Given a deployment whose LangWatchQL identity exists but cannot authenticate
+    When a run's statement is read
+    Then it fails with instant_eval_not_enabled
+    And other ClickHouse errors still reach the caller unchanged
+
   @integration
   Scenario: A read-only key cannot create or cancel a run
     Given a key carrying analytics:view only

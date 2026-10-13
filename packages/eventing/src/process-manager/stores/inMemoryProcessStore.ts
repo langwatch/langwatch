@@ -313,6 +313,21 @@ export class InMemoryProcessStore implements ProcessStore {
     return { applied: true };
   }
 
+  async renewLease(params: {
+    identity: OutboxMessageIdentity;
+    leaseToken: string;
+    now: number;
+    leaseDurationMs: number;
+  }): Promise<{ applied: boolean }> {
+    const message = this.messages.get(messageKeyOf(params.identity));
+    if (!message || message.status !== "pending" || message.leaseToken !== params.leaseToken) {
+      return { applied: false };
+    }
+    message.leasedUntil = params.now + params.leaseDurationMs;
+    message.updatedAt = params.now;
+    return { applied: true };
+  }
+
   async markFailed(params: {
     identity: OutboxMessageIdentity;
     leaseToken: string;

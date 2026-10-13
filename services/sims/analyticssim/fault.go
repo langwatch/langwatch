@@ -38,7 +38,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "forcedError is 0 (off) or a 4xx/5xx status")
 			return
 		}
-		s.fault.status.Store(int32(next.ForcedError)) //nolint:gosec // bounded to 0 or 400-599 above
+		s.fault.status.Store(int32(next.ForcedError))
 	}
 	writeJSON(w, http.StatusOK, map[string]int{"forcedError": int(s.fault.status.Load())})
 }

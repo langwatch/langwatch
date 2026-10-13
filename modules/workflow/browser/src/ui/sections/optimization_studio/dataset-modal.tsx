@@ -5,13 +5,13 @@ import {
   type DatasetColumns,
   type InMemoryDataset,
 } from "@langwatch/dataset-contract";
+import { Dialog } from "@langwatch/design-system/dialog";
 /**
  * Dataset dialog for the workflow entry-point node: same experience as the rest of the
  * platform: the shared dataset picker for choosing, the shared TanStack editor for
  * editing.
  */
 import { Box, Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";

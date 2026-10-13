@@ -1,7 +1,7 @@
 import { nowInstant } from "@langwatch/time";
 
 import type { DiscoveredAggregate } from "./replayEventSource.ts";
-import type { ReplayRedis } from "./replayRedis.ts";
+import type { ReplayRedis, ReplayRedisPipeline } from "./replayRedis.ts";
 import type { ProjectionKind } from "./types.ts";
 
 /**
@@ -11,10 +11,16 @@ import type { ProjectionKind } from "./types.ts";
 const GQ_KEY_PREFIX = "{event-sourcing/jobs}:gq:";
 
 /**
+ * A group is in flight while it holds an active key, or a claimed record a dead worker left for
+ * the next claim to put back (packages/group-queue/specs/claimed-job-recovery.feature).
+ */
+const IN_FLIGHT_SUFFIXES = [":active", ":claimed"] as const;
+
+/**
  * Fold groupIds are always `${tenantId}/fold/${name}/${aggregateType}:${aggregateId}`,
  * so they can be reconstructed exactly from the discovered aggregates.
  */
-function foldGroupActiveKey({
+function foldGroupKey({
   tenantId,
   projectionName,
   aggregateType,
@@ -26,7 +32,19 @@ function foldGroupActiveKey({
   aggregateId: string;
 }): string {
   const groupId = `${tenantId}/fold/${projectionName}/${aggregateType}:${aggregateId}`;
-  return `${GQ_KEY_PREFIX}group:${groupId}:active`;
+  return `${GQ_KEY_PREFIX}group:${groupId}`;
+}
+
+/** Queues the fold group's active key and its claimed record's token: null for both is idle. */
+function queueFoldGroupChecks({
+  pipeline,
+  groupKey,
+}: {
+  pipeline: ReplayRedisPipeline;
+  groupKey: string;
+}): void {
+  pipeline.get(`${groupKey}:active`);
+  pipeline.hget(`${groupKey}:claimed`, "token");
 }
 
 /**
@@ -47,13 +65,15 @@ async function hasActiveGroups({
   scannedGroupPath: "map" | "state";
 }): Promise<boolean> {
   for (const tenantId of tenantIds) {
-    const pattern = `${GQ_KEY_PREFIX}group:${tenantId}/${scannedGroupPath}/${projectionName}/*:active`;
-    let cursor = "0";
-    do {
-      const [nextCursor, keys] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 500);
-      if (keys.length > 0) return true;
-      cursor = nextCursor;
-    } while (cursor !== "0");
+    for (const suffix of IN_FLIGHT_SUFFIXES) {
+      const pattern = `${GQ_KEY_PREFIX}group:${tenantId}/${scannedGroupPath}/${projectionName}/*${suffix}`;
+      let cursor = "0";
+      do {
+        const [nextCursor, keys] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 500);
+        if (keys.length > 0) return true;
+        cursor = nextCursor;
+      } while (cursor !== "0");
+    }
   }
   return false;
 }
@@ -116,14 +136,15 @@ async function projectionDrained({
   }
   const pipeline = redis.pipeline();
   for (const agg of aggregates) {
-    pipeline.get(
-      foldGroupActiveKey({
+    queueFoldGroupChecks({
+      pipeline,
+      groupKey: foldGroupKey({
         tenantId: agg.tenantId,
         projectionName,
         aggregateType: agg.aggregateType,
         aggregateId: agg.aggregateId,
       }),
-    );
+    });
   }
   const results = await pipeline.exec();
   if (!results) {
@@ -148,14 +169,15 @@ async function foldGroupsDrainedAcross({
   const pipeline = redis.pipeline();
   for (const agg of aggregates) {
     for (const proj of foldProjections) {
-      pipeline.get(
-        foldGroupActiveKey({
+      queueFoldGroupChecks({
+        pipeline,
+        groupKey: foldGroupKey({
           tenantId: agg.tenantId,
           projectionName: proj.projectionName,
           aggregateType: agg.aggregateType,
           aggregateId: agg.aggregateId,
         }),
-      );
+      });
     }
   }
   const results = await pipeline.exec();

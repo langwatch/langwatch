@@ -32,6 +32,7 @@ const bootIdentity = () =>
         passkeysEnabled: false,
         mfaEnrollmentOpen: false,
         localPasswords: false,
+        identifierBackfillMaxQueuedJobs: 5000,
       },
     })
     .withEventing(new EventSourcing({ enabled: false, processManagerMode: "producer-only" }))

@@ -5,14 +5,11 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { register } from "prom-client";
 import { describe, expect, it } from "vitest";
 
+import { AuthzCutoverRepository } from "../../repositories/authz-cutover.repository.ts";
 import {
   type AuthzRevocationReason,
   authzDirectProjectionWriteTotal,
 } from "../../repositories/authz-revocation.repository.ts";
-import {
-  type AuthzCutoverDatabase,
-  PrismaAuthzCutoverRepository,
-} from "../../repositories/prisma/prisma.authz-cutover.repository.ts";
 import { PrismaAuthzRevocationRepository } from "../../repositories/prisma/prisma.authz-revocation.repository.ts";
 import {
   AuthzCutoverGateService,
@@ -35,16 +32,26 @@ function revocations(): PrismaAuthzRevocationRepository {
   });
 }
 
+/** An engine switch whose every read fails, as a down Postgres answers. */
+class FailingCutoverRepository extends AuthzCutoverRepository {
+  async getEngineSwitch(): Promise<never> {
+    throw new Error("pg is down");
+  }
+
+  async carryOverEngineSwitch(): Promise<number> {
+    return 0;
+  }
+
+  async switchOnEngine(): Promise<boolean> {
+    return true;
+  }
+
+  async pinEngineSwitch(): Promise<void> {}
+}
+
 function failingGate(): AuthzCutoverGateService {
-  const database: AuthzCutoverDatabase = {
-    systemMigrationTenantState: {
-      findUnique: async () => {
-        throw new Error("pg is down");
-      },
-    },
-  };
   return AuthzCutoverGateService.create({
-    repository: PrismaAuthzCutoverRepository.create({ database }),
+    repository: new FailingCutoverRepository(),
     logger: createTestLogger().logger,
   });
 }

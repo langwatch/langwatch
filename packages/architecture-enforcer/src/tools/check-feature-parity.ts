@@ -138,13 +138,6 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // this root, every scenario describing what the published plugin does could
   // only be @unimplemented.
   "plugins",
-  // The capture half of visualdiff (@langwatch/visual-diff-runner): the settle
-  // and per-step recording scenarios are proved by its vitest suite, which
-  // lives beside it under tools/ rather than in packages/.
-  "tools/visualdiff/runner/src",
-  // The fuzz browser runner (@langwatch/fuzz-runner): its vision judge's
-  // scenarios are proved by its vitest suite and by nothing else.
-  "tools/fuzz/runner/src",
   // The seed runner's tests bind specs/setup/seedgen-runner.feature.
   "tools/seedgen/runner/src",
   // The contributor-only backend launcher (tools/dev-runtime): the API and the
@@ -250,8 +243,6 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "services/sims/githubsim",
   // The Go scenario runner: its child-contract and fence scenarios bind only from Go tests.
   "services/scenariorunner",
-  "tools/diffsuite",
-  "tools/fuzz",
   "tools/workerrun",
   "tools/seedgen",
   // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
@@ -280,10 +271,6 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // identity each keeps and which address variable each binds are asserted
   // here and nowhere else.
   "cmd/service",
-  // visualdiff: the boot, classification and teardown rules in
-  // specs/tooling/visual-diff.feature are asserted by these Go tests and by
-  // nothing else. Its Playwright half binds from the TS roots below.
-  "tools/visualdiff",
   // apidiff: how it boots its two instances - one haven stack per instance
   // under its own run-scoped slug, and a teardown that can only reach the
   // slugs it started (specs/tooling/apidiff-on-haven.feature) - is asserted by
@@ -351,6 +338,9 @@ const LEGACY_UNBOUND: string[] = [
  * spot.
  */
 const LEGACY_INERT: string[] = [
+  // 2026-10-12: the id index (dev/docs/plans/id-index-2026-10-10.md) is planned,
+  // not built; every scenario is @unimplemented. Remove with its first binding.
+  "specs/clickhouse/id-index-reads.feature",
   // 2026-09-30 port of #7532: design-only specs for ADRs 161-163, every
   // scenario @unimplemented until the ADR is accepted and built.
   "modules/authz/specs/access-reviews.feature",

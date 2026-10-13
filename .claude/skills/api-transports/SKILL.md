@@ -26,16 +26,19 @@ anything; the process mounts every installed module's declarations.
 3. **Output schemas are required.** A tRPC member with no `.withOutput` answers nothing and a handler
    that returns data is refused. A REST route declares `.withOutput` or `.responds` (mandatory, record section 8).
 4. **A handler receives `{ input, app, actor, scope, signal }`, calls one `*Api` operation, returns a
-   plain value or throws.** No `c.json`, no `JSON.parse`, no status branches, no error envelope, no
+   plain value or throws.** The route's declarations add typed members: `target` (the scope the door
+   authorised, from `.withPermission(perm, { at })`), `session` (from `.withCredential("cli_token", { session })`)
+   and `response` (from `.withResponse`); never a raw request or an arbitrary response object. No `c.json`, no `JSON.parse`, no status branches, no error envelope, no
    `RestErrorHandler`. A handler that needs a branch moves into the module as an `*Api` operation.
 5. **The framework owns validation.** Never hand-check a body, a content type or a param. Tighten the
    schema. Unparseable input is the 400 `malformed_request`; parsed but failing the schema is the 422
    `validation_error`. A REST request is authenticated before its body is read, so a bad key is 401/403,
    never 422 or 413. A route that reads its raw body names its media type,
-   `.withRawBody("text", { mediaType })`; any other `Content-Type` is refused after the door with 415
-   `unsupported_media_type`. Only the `*-legacy` family and the collector add
-   `mismatch: "malformed_request"`, keeping main's 400 (record §8, E9, Alex 2026-10-05;
-   `modules/evaluation/process/src/transport/evaluations-legacy.rest.ts`).
+   `.withRawBody("text", { mediaType, because })` (a real caller:
+   `enterprise/modules/connect/process/src/transport/connect-hosted.rest.ts`); any other `Content-Type`
+   is refused after the door with 415 `unsupported_media_type`. Only the `*-legacy` family and the
+   collector add `mismatch: "malformed_request"`, keeping main's 400 (record §8, E9, Alex 2026-10-05;
+   protocol responses with body limits: `modules/evaluation/process/src/transport/evaluations-legacy.rest.ts`).
 6. **Every wire schema imports from the module's own contract.** No schema declared in the transport file.
 7. **Docs live on the route.** `.withDocs({ tags, description, errors? })` in the same `*.rest.ts` file.
    Never a `*-openapi.rules.ts`. An extra status or non-JSON body goes through `documentedResponses()`.
@@ -52,6 +55,7 @@ anything; the process mounts every installed module's declarations.
    whose namespace it is, why, and the plan or release that retires it. A blank reason or plan is
    refused, a family claiming `/api/<x>` may not carry one, and a second module claiming a namespace is
    refused at mount. The route registry lists every shared path (`packages/api/specs/shared-path.feature`).
+   A dated family (`/<version>/...`) may carry one too when every route in it shares one owner's namespace.
    `withSharedPath` takes `permanent: true` instead of `deprecate` only for a ruled-permanent
    path; the owner must be the namespace's owner in modules/catalogue.json `restNamespaces`.
 9. **Auth is the process's.** REST authenticates with API keys, tRPC with the session. A route names a
@@ -61,16 +65,21 @@ anything; the process mounts every installed module's declarations.
    `.withAccess(anyAuthenticated(...))` and then ask a permission in a middleware context, the handler or
    the `*Api`: that is a bypass. `{ at: "route", param }` asks at the scope the path names; on the
    `api_key` door `{ at: "grants" }` passes a key naming no project on any scope it is granted at, and
-   `{ at: "organization" }` asks at the organization. If none fits, extend `packages/api` and the
+   `{ at: "organization" }` asks at the organization. A credential bound by the module is a typed
+   door: `defineRestDoor(credential, { needs, identify })`, bound with `.withDoors({...})` keyed by the
+   routes' credentials (a route naming a credential nobody bound refuses the boot; `packages/api/src/rest/door.ts`).
+   An endpoint that mints a key, token or secret declares `.mintsCredential(permission)` and is
+   refused while the actor carries an impersonator. `optionalCredential({ reason, refused: "anonymous" })`
+   answers a credential the door refuses as no caller. If none fits, extend `packages/api` and the
    door (`modules/auth/process/src/services/api-door.service.ts`), with a spec scenario in
    `packages/api/specs/transport-declaration-split.feature`. A service keeps only the check that needs
    the loaded row.
    **Middleware never does the framework's work** (record §8, 2026-10-05): middleware that
    authenticates or parses a JSON body, and a route opened to any authenticated or unauthenticated
    caller, are drift that lint rules catch; the guard list is
-   `dev/docs/plans/api-framework-bypass-2026-10-05.md`. The framework extensions E1 to E8 in that plan
-   are shapes first: Alex approves the signature and one example route before any is built. E9 (above)
-   and E10 (below) are built (record §8).
+   `dev/docs/plans/api-framework-bypass-2026-10-05.md`. The extensions that plan lists have landed as
+   typed doors, credential minting and typed middleware context (record §8); a new framework
+   extension is still shaped first: Alex approves the signature and one example route before it is built.
    **The audit is declared too.** A mutation whose row names the organization holding the project its
    input names declares `.withAudit({ target: "organization", via: "projectId" })` (record §8, E10,
    Alex 2026-10-05; `modules/instant-eval/process/src/transport/instant-eval.trpc.ts`). The door resolves
@@ -113,7 +122,9 @@ defineTrpcRouter(AutomationApi, automationTrpc)
   .handle(({ app, input }) => app.listAutomations({ projectId: input.projectId }));
 ```
 
-REST (`.../transport/automation.rest.ts`): a namespace, a version, then complete routes.
+REST (`.../transport/automation.rest.ts`, abridged): a namespace, a version, then complete routes. The
+route reads `projectRequestContext`, middleware context the module's installer provides
+(rule 11), as the handler's second argument; `automationWire` is that file's mapper.
 
 ```ts
 defineRestRouter(AutomationApi)
@@ -124,10 +135,14 @@ defineRestRouter(AutomationApi)
   .withPermission("triggers:view")
   .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
   .withDocs({ tags: ["Triggers"], description: "Get a trigger by its ID" })
-  .handle(async ({ app, input, scope }) => ({
-    status: 200 as const,
-    body: wire(await app.getPublicTrigger({ triggerId: input.triggerId, projectId: scope.id })),
-  }));
+  .withMiddlewareContext(projectRequestContext)
+  .handle(async ({ app, input, scope }, project) => {
+    const trigger = await app.getPublicTrigger({ triggerId: input.triggerId, projectId: scope.id });
+    return {
+      status: 200 as const,
+      body: automationWire({ app, projectSlug: project.projectSlug, trigger }),
+    };
+  });
 ```
 
 A POST that creates declares `.withInput(...)`, `.withStatus(201)` and `.withOutput(...)` in the same
@@ -140,8 +155,8 @@ Throw `HandledError` only when the cause is known and the caller can act on it. 
 the module's contract (`modules/automation/contract/src/automation.errors.ts`: `TriggerNotFoundError`
 carries `code: "trigger_not_found"` and `httpStatus: 404`). The service throws it; the transport lets it
 escape. The REST runtime renders `type`, `code`, `message` at the root of the body, and tRPC sends the
-code slug. Register the code in `packages/handled-error/src/app-codes.ts` and its customer copy in
-`packages/handled-error/src/presentation.ts`. Never a `TRPCError`. Never set `Retry-After` yourself:
+code slug. Register the code in `packages/handled-error/src/app-codes.ts`, its customer copy in
+`presentation.ts` and its tips in `remediation.ts` (the `contract` skill has the recipe). Never a `TRPCError`. Never set `Retry-After` yourself:
 `meta.retryAfterMs` renders it. Everything unknown stays a plain `Error`; the boundary degrades it to
 "unknown" plus a trace id. Detail: `dev/docs/best_practices/error-handling.md`.
 

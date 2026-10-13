@@ -11,7 +11,6 @@ import { privateDataplaneRecorderEventing } from "./eventing/organization-privat
 import { seatLimitEventing } from "./eventing/seat-limit.pipeline.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
 import { OrganizationPresenceSettingBackfillService } from "./services/organization-presence-setting-backfill.service.ts";
-import { OrganizationPresenceSettingBackfillTask } from "./tasks/organization-presence-setting-backfill.task.ts";
 import { groupsRest } from "./transport/group.rest.ts";
 import { groupTrpcTransport } from "./transport/group.trpc.ts";
 import { inviteTrpcTransport } from "./transport/invite.trpc.ts";
@@ -64,10 +63,7 @@ export const organizationProcessModule: PublishedProcessModule<
       run: async ({ checkpoint, dryRun, signal }) => {
         const resumed = checkpoint.resumeFrom?.afterOrganizationId;
         const report = await OrganizationPresenceSettingBackfillService.create({
-          peers: {
-            organizations: app,
-            record: ({ organizationId }) => app.recordStoredPresenceSetting({ organizationId }),
-          },
+          peers: { recordPage: (input) => app.recordStoredPresenceSettingPage(input) },
         }).backfill({
           after: typeof resumed === "string" ? resumed : undefined,
           dryRun,
@@ -77,5 +73,4 @@ export const organizationProcessModule: PublishedProcessModule<
         return { ...report, dryRun };
       },
     }),
-  ])
-  .withTasks(({ app }) => [OrganizationPresenceSettingBackfillTask.create({ organizations: app })]);
+  ]);

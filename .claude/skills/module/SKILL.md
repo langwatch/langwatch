@@ -11,7 +11,11 @@ Record: `dev/docs/ARCHITECTURE.md` §3 (what a module is), §3.4 (browser half),
 restate the rulings: follow the links.
 
 A module is **an isolated microservice in one folder**. Other code sees its
-contract and calls its `*Api` token. Nothing else.
+contract and calls its `*Api` token. Beyond that, by surface (record §2, §7, §10.1): a browser
+reads its owner's data through the owner's `<name>-client` and lent tokens; a module may expose a
+portable library (analytics' filters); and a table another module owns is read only through a
+declared share (`SHARED_PRISMA_TABLES`, the ClickHouse table-ownership policy). An undeclared read
+is a defect.
 
 ```
 modules/monitor/
@@ -32,7 +36,7 @@ Each rule lives in the record or CLAUDE.md; this table only points at it.
 | Rule                                                                                    | Record       |
 | --------------------------------------------------------------------------------------- | ------------ |
 | Dependency direction: apps -> process/browser -> contract, never sideways               | §3           |
-| Others import only your contract and call your `*Api` token                             | §3           |
+| Others import only your contract and call your `*Api` token (plus the surfaces above)   | §3, §7       |
 | One owner per subject, mapped in `modules/catalogue.json`                               | §3           |
 | Install by catalogue entry + `pnpm generate:modules`; never hand-edit a generated list  | §1, §5       |
 | Specs first, error paths included                                                       | CLAUDE.md    |
@@ -73,9 +77,12 @@ For a module with a `client/` package read `modules/dataset/client`.
    `pnpm sync:references` (new workspace packages). Run `pnpm generate:readmes` and write the
    one-paragraph description above each new page's generated block (`readmes` skill).
 5. Prove it with an installation test that boots the installed list over
-   memory twins (record §13; `apps/api/src/__tests__/api-installation.fixture.ts`).
-   `monitor-installation.unit.test.ts` still uses the deleted `createApp`
-   chain and `withMemoryRepositories` (§15); do not copy it.
+   memory twins with `bootInstalledProcess` and `testPeer` (record §13;
+   `apps/api/src/__tests__/share-link-engine.integration.test.ts`).
+   `monitor-installation.unit.test.ts` still builds with the old `createApp` chain
+   (`withStores(memoryStores())` and `.provide`, §15); do not copy it. Annotate the installer
+   `PublishedProcessModule<name, Api, Config>` so the class, repositories and generated database
+   types stay out of the emitted declarations (`process-module`).
 6. Scoped checks only, then `pnpm --filter @langwatch/<name>-process typecheck`.
 
 ## Traps
@@ -86,14 +93,15 @@ For a module with a `client/` package read `modules/dataset/client`.
   Kits are deleted (§3.4, §15). Shared UI goes to `packages/design-system`,
   shared data to a `<name>-client`.
 - **A contract `package.json` naming a runtime** (`prisma-client`,
-  `clickhouse-client`, `redis-client`, `eventing`, `group-queue`, `process-*`).
-  The `manifests` policy refuses it (§3).
+  `clickhouse-client`, `redis-client`, the eventing runtime, `group-queue`, `process-*`).
+  The `manifests` policy refuses it (§3). The one eventing import a contract may make is the
+  plain-data subpath `@langwatch/eventing/tables` (§2; `modules/data-retention/contract`).
 - **A second `feature.json` or a hand-edited generated list.** The catalogue
   is the one map.
 - **Old spellings are deleted** (`defineServerModule`, `*App` classes,
   `<f>.server.ts`; §15). Write `defineProcessModule`, `*Module` and `<f>.module.ts`.
 - **Peer cycles.** A module may not depend back on its dependent: every cycle
-  is refused (§5, §17; the `peer-cycles` policy). Cut from the reactor's side
+  is refused (§5, §17; the `peer-cycles` policy), bar the one ruled organization and identity pair. Cut from the reactor's side
   with a peer subscriber (§9), and cut or list no edge without asking Alex
   first (§5, 2026-10-05). The `module-dependencies` skill walks it.
 

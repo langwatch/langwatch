@@ -4,7 +4,9 @@
  * platform; fixtures use recordCount.
  */
 
+import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import type { DatasetSummary } from "@langwatch/dataset-contract";
+import { SetupWithAgentButtonToken } from "@langwatch/trace-client";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +24,19 @@ const { datasetsQuery, mockDeleteMutate } = vi.hoisted(() => ({
   },
   mockDeleteMutate: vi.fn(),
 }));
+
+const declarations: { current: UiDeclarations | undefined } = vi.hoisted(() => ({
+  current: undefined,
+}));
+
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
+  const { uiDeclarations: none } = await import("@langwatch/browser-host/declarations");
+  const nothingLent = none([]);
+  return {
+    ...(await importOriginal<object>()),
+    useUiDeclarations: () => declarations.current ?? nothingLent,
+  };
+});
 
 vi.mock("../../../behavior/dataset-api.ts", () => ({
   datasetApi: {
@@ -221,6 +236,34 @@ describe("Datasets list screen", () => {
   describe("given the project has no datasets", () => {
     beforeEach(() => {
       datasetsQuery.current = { data: [], isLoading: false, refetch: vi.fn() };
+    });
+
+    /** @scenario Every empty surface offers its own skill */
+    it("offers trace's set-up-with-AI control for datasets", async () => {
+      declarations.current = uiDeclarations([
+        {
+          name: "trace",
+          installation: {
+            capabilities: {},
+            lends: [
+              {
+                token: SetupWithAgentButtonToken,
+                load: async () => ({
+                  default: ({ surface }: { surface: string }) => (
+                    <button>Setup via Agent ({surface})</button>
+                  ),
+                }),
+              },
+            ],
+          },
+        },
+      ]);
+      renderWithDatasetHost(<DatasetsScreen />);
+
+      expect(
+        await screen.findByRole("button", { name: "Setup via Agent (datasets)" }),
+      ).toBeInTheDocument();
+      declarations.current = undefined;
     });
 
     /** @scenario Empty project shows a helpful empty state */

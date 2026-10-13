@@ -31,6 +31,8 @@ export type BrowserSessionRecord = {
   id: string;
   identifierId: string | null;
   amr: readonly string[];
+  /** Minted while the account had never signed in: the session its sign-up started. */
+  startedBySignUp: boolean;
   ipAddress: string | null;
   userAgent: string | null;
   createdAt: Instant;

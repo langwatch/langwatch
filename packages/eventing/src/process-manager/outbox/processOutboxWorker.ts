@@ -32,13 +32,20 @@ function leasedFullBatch(report: DispatchReport | undefined, batchSize: number):
   return leased >= batchSize;
 }
 
+/** One drain's watchdog timer, replaced each time a still-progressing drain re-arms it. */
+interface DrainWatchdog {
+  timer: NodeJS.Timeout | null;
+}
+
 function clampFraction(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.min(Math.max(value, 0), 1);
 }
 
 export interface ProcessOutboxWorkerOptions {
-  dispatcher: Pick<OutboxDispatcherService, "runOnce">;
+  /** With `lastProgressAt`, a drain still renewing its lease never counts as stuck. */
+  dispatcher: Pick<OutboxDispatcherService, "runOnce"> &
+    Partial<Pick<OutboxDispatcherService, "lastProgressAt">>;
   logger: Logger;
   /** Process-manager name, used to label stuck-drain metrics and logs. */
   name?: string;
@@ -63,7 +70,7 @@ export interface ProcessOutboxWorkerOptions {
  * lifecycle, recovery polling, and single-flight execution.
  */
 export class ProcessOutboxWorker {
-  private readonly dispatcher: Pick<OutboxDispatcherService, "runOnce">;
+  private readonly dispatcher: ProcessOutboxWorkerOptions["dispatcher"];
   private readonly logger: Logger;
   private readonly name: string;
   private readonly intervalMs: number;
@@ -192,9 +199,32 @@ export class ProcessOutboxWorker {
     this.inFlight = drain;
     // The watchdog belongs to THIS drain, so an abandoned drain settling
     // late can never disarm its successor's watchdog.
-    const watchdog = setTimeout(() => this.abandonStuckDrain(drain), this.stuckDrainTimeoutMs);
-    watchdog.unref();
+    const watchdog: DrainWatchdog = { timer: null };
+    this.armWatchdog({ drain, watchdog, delayMs: this.stuckDrainTimeoutMs });
     void drain.then((report) => this.settleDrain({ drain, watchdog, report }));
+  }
+
+  /** Stuck means no progress for the threshold, so a drain still renewing its lease is re-armed. */
+  private armWatchdog({
+    drain,
+    watchdog,
+    delayMs,
+  }: {
+    drain: Promise<DispatchReport | undefined>;
+    watchdog: DrainWatchdog;
+    delayMs: number;
+  }): void {
+    watchdog.timer = setTimeout(() => {
+      watchdog.timer = null;
+      const lastProgressAt = this.dispatcher.lastProgressAt?.();
+      const quietMs = lastProgressAt === undefined ? Infinity : this.now() - lastProgressAt;
+      if (quietMs < this.stuckDrainTimeoutMs) {
+        this.armWatchdog({ drain, watchdog, delayMs: this.stuckDrainTimeoutMs - quietMs });
+        return;
+      }
+      this.abandonStuckDrain(drain);
+    }, delayMs);
+    watchdog.timer.unref();
   }
 
   private refuseToDrain(): void {
@@ -244,10 +274,10 @@ export class ProcessOutboxWorker {
     report,
   }: {
     drain: Promise<DispatchReport | undefined>;
-    watchdog: NodeJS.Timeout;
+    watchdog: DrainWatchdog;
     report: DispatchReport | undefined;
   }): void {
-    clearTimeout(watchdog);
+    if (watchdog.timer) clearTimeout(watchdog.timer);
     if (this.inFlight !== drain) {
       // An abandoned drain settled after all: it no longer retains its
       // batch, so give its slot back and let polling recover on its own.

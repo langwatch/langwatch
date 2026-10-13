@@ -11,7 +11,7 @@ import {
   Prisma,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import { fromDate, toDate, type Instant } from "@langwatch/time";
+import { type Instant, fromDate, nowInstant, toDate } from "@langwatch/time";
 
 import type { ScimTokenHashScheme } from "../../rules/scim-token-digest.rules.ts";
 import {
@@ -315,7 +315,7 @@ export class PrismaScimRepository extends ScimRepository {
     userName: string;
     name: string | null;
   }): Promise<void> => {
-    const deletedAt = new Date();
+    const deletedAt = toDate(nowInstant());
     await this.prisma.scimUserResource.upsert({
       where: {
         organizationId_userId: {
@@ -345,7 +345,7 @@ export class PrismaScimRepository extends ScimRepository {
         organizationId: input.organizationId,
         userId: input.userId,
         role: organizationUserRole(input.role),
-        disabledAt: input.pending ? new Date() : null,
+        disabledAt: input.pending ? toDate(nowInstant()) : null,
       },
     });
   };

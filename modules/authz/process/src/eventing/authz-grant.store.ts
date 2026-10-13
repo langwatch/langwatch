@@ -67,10 +67,10 @@ type LedgerWriteSource = GrantEventSource;
 // A background caller waiting on this read-your-writes poll is not being
 // watched by a person — the only cost of a lazy poll is a job slot, and the
 // alternative (acting on a fact the log may not hold yet) is the defect this
-// wait exists to prevent. Over an 8s window, 250ms costs at most thirty-two
+// wait exists to prevent. Over a 10s window, 250ms costs at most forty
 // reads and no accuracy.
 const CONVERGENCE_POLL_MS = 250;
-const CONVERGENCE_TIMEOUT_MS = 8_000;
+const CONVERGENCE_TIMEOUT_MS = 10_000;
 
 export type LedgerBindingAttach = Omit<GrantWrite, "organizationId"> & {
   /** Internal generation captured by a membership transaction. Callers that

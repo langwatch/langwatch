@@ -48,7 +48,13 @@ class BlockingConnectionDouble {
 }
 
 function job(stagedJobId: string): DispatchResult {
-  return { stagedJobId, groupId: `group-${stagedJobId}`, jobDataJson: "{}", originalScore: 0 };
+  return {
+    stagedJobId,
+    groupId: `group-${stagedJobId}`,
+    jobDataJson: "{}",
+    originalScore: 0,
+    claimToken: `claim-${stagedJobId}`,
+  };
 }
 
 function startDispatcher() {

@@ -83,6 +83,70 @@ Feature: Ops runs the system migration passes and names their cohorts
     Then "acme" is enrolled under automation's step and "delta" keeps its one enrolment there
     And the legacy enrolments are left in place, and a second run copies nothing
 
+  # The five identity and authz migrations ops held move to their owners' steps in one release
+  # (Alex, 2026-10-12): authz:engine, identity:identifier-backfill, identity:secret-heal,
+  # identity:connection-grandfather and identity:sso-domain-ownership-backfill.
+  @unit
+  Scenario: No tenant is migrated twice in the release that converts the identity and authz migrations
+    Given organization "acme" finished the authorization engine migration under ops' legacy name
+    And user "sam" finished the identifier backfill and user "ann" was rolled back from it
+    And user "gil" has never been visited
+    When ops copies their state to the owners' steps and a pass drives those steps
+    Then "acme", "sam" and "ann" are not migrated again
+    And only "gil" is migrated
+
+  @unit
+  Scenario: What an older image changed during the rollout reaches the owners' steps once it is gone
+    Given the copy ran while an older image still served
+    And the older image then finished "late", rolled back "pulled" and identity reopened "unproven"
+    And an operator already rolled back "pinned" on the new step
+    When no older image is running and identity's reopen step has run
+    Then the re-copy finalizes "late", rolls back "pulled" and holds "unproven" for another pass
+    And "pinned" keeps its rollback, and a second run copies nothing
+
+  # Expand then contract (Alex, 2026-10-12): until a later release, the moved steps write both tables.
+  @unit
+  Scenario: A rollback to the older release after a tenant finished on the new step keeps it on its new path
+    Given the older release reads only ops' older migration table
+    When a pass finishes organization "acme" on the authorization engine step and users "ann" and "sam" on the identifier backfill step
+    And an operator rolls "sam" back from the identifier backfill step
+    Then ops' older table reads "acme" and "ann" finished under the old names, so the older release keeps them on the new path
+    And it reads "sam" rolled back under the identifier backfill's old name
+
+  @unit
+  Scenario: A withdrawal made on the older page during the rollout is withdrawn on the new step by the re-copy
+    Given organizations "acme" and "beta" were enrolled in the authorization engine migration and the copy carried them over
+    And an operator enrolled "gamma" and withdrew "acme" on the new page, which writes both names
+    And an operator withdrew "beta" on the older page during the rollout
+    When the re-copy runs once no older image is running
+    Then only "gamma" is enrolled in the authorization engine step, and a second run withdraws nothing
+
+  @unit
+  Scenario: The re-copy waits for older images and for identity's reopen step
+    Given ops declares its migration steps
+    Then the first copy is a background step that runs as soon as the new worker starts
+    And the re-copy is a background step that needs old writers gone
+    And it runs after the first copy and identity's reopen-unproven-accounts step
+
+  @unit
+  Scenario: A targeted run of a user step drives the organization's members
+    Given the identifier backfill is a declared user step
+    When an operator runs it for organization "acme" with members "sam" and "ann"
+    Then both members are migrated on the step's own state, and nobody else
+
+  @unit
+  Scenario: A step still waiting for older images is not driven by a targeted run
+    Given a declared step that needs old writers gone while an older image is live
+    When an operator runs it for an organization
+    Then the run migrates nobody
+
+  @unit
+  Scenario: An operator's rollback pins the tenant on the step's own state
+    Given organization "acme" finalized the authorization engine step
+    When an operator rolls "acme" back on the migrations page
+    Then the step's own state reads rolled back for "acme"
+    And ops records the rollback under the step's id for authz to switch its engine off
+
   @unit
   Scenario: Each worker process finishes an interrupted pass on its first re-drive
     Given a pass died part-way, so the stored state reads latched while some tenants have no row

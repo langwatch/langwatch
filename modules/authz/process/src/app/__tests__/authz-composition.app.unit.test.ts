@@ -45,9 +45,7 @@ describe("AuthzModule.create", () => {
     expect([...pipeline.mapProjections.keys()]).toEqual(["authzGrantsWrite"]);
     expect([...pipeline.eventSubscribers.keys()]).toEqual(["auditTrail"]);
     expect([...pipeline.mapSubscribers.keys()]).toEqual(["sessionVersion"]);
-    expect(app.registeredMigrations().map((migration) => migration.name)).toEqual([
-      AUTHZ_ENGINE_MIGRATION_NAME,
-    ]);
+    expect(app.engineMigration().name).toBe(AUTHZ_ENGINE_MIGRATION_NAME);
     expect(audited).toEqual([]);
   });
 

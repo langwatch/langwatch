@@ -22,6 +22,7 @@ import {
   sortKeysDeep,
   type PromptUsageCount,
 } from "@langwatch/prompt-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import type { CreateLlmConfigVersionParams } from "../prompt-version.repository.ts";
 import {
@@ -661,7 +662,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     await this.prisma.llmPromptConfig.update({
       where: { id: config.id, projectId },
       data: {
-        deletedAt: new Date(),
+        deletedAt: toDate(nowInstant()),
         handle: null,
         name: archivedName,
       },
@@ -752,7 +753,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       // Update the config's updatedAt timestamp
       const updatedConfig = await tx.llmPromptConfig.update({
         where: { id: newConfig.id, projectId: configData.projectId },
-        data: { updatedAt: new Date() },
+        data: { updatedAt: toDate(nowInstant()) },
       });
 
       updatedConfig.handle =

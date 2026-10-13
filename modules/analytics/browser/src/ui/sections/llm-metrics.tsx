@@ -1,6 +1,5 @@
 import { Card } from "@langwatch/design-system/card";
 import {
-  Card as LegacyCard,
   Grid,
   GridItem,
   Heading,
@@ -231,53 +230,42 @@ export function LLMMetrics() {
           <LLMSummary />
         </GridItem>
         <GridItem>
-          <LegacyCard.Root height="full">
-            <LegacyCard.Header>
-              <HStack gap={1}>
-                <Heading textStyle="cardTitle">Evaluations summary</Heading>
-                <Tooltip content="View online evaluations">
-                  <Link href={`/${project?.slug}/analytics/evaluations`}>
-                    <IconButton
-                      aria-label="View evaluations"
-                      variant="ghost"
-                      size="2xs"
-                      color="fg.subtle"
-                    >
-                      <ArrowUpRight size={14} />
-                    </IconButton>
-                  </Link>
-                </Tooltip>
-              </HStack>
-            </LegacyCard.Header>
-            <LegacyCard.Body>
-              <CustomGraph
-                input={{
-                  ...evaluationsSummary,
-                  graphType: "summary",
-                }}
-              />
-            </LegacyCard.Body>
-          </LegacyCard.Root>
+          <Card
+            variant="panel-fill"
+            padding="lg"
+            title="Evaluations summary"
+            actions={
+              <Tooltip content="View online evaluations">
+                <Link href={`/${project?.slug}/analytics/evaluations`}>
+                  <IconButton
+                    aria-label="View evaluations"
+                    variant="ghost"
+                    size="2xs"
+                    color="fg.subtle"
+                  >
+                    <ArrowUpRight size={14} />
+                  </IconButton>
+                </Link>
+              </Tooltip>
+            }
+          >
+            <CustomGraph
+              input={{
+                ...evaluationsSummary,
+                graphType: "summary",
+              }}
+            />
+          </Card>
         </GridItem>
         <GridItem>
-          <LegacyCard.Root height="full">
-            <LegacyCard.Header>
-              <Heading textStyle="cardTitle">Error trend</Heading>
-            </LegacyCard.Header>
-            <LegacyCard.Body>
-              <CustomGraph input={errorTrend} />
-            </LegacyCard.Body>
-          </LegacyCard.Root>
+          <Card variant="panel-fill" padding="lg" title="Error trend">
+            <CustomGraph input={errorTrend} />
+          </Card>
         </GridItem>
         <GridItem>
-          <LegacyCard.Root height="full">
-            <LegacyCard.Header>
-              <Heading textStyle="cardTitle">Latency trend</Heading>
-            </LegacyCard.Header>
-            <LegacyCard.Body>
-              <CustomGraph input={latencyTrend} />
-            </LegacyCard.Body>
-          </LegacyCard.Root>
+          <Card variant="panel-fill" padding="lg" title="Latency trend">
+            <CustomGraph input={latencyTrend} />
+          </Card>
         </GridItem>
       </Grid>
     </>

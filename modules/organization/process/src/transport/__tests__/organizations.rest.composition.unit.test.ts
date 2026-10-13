@@ -44,7 +44,7 @@ async function application() {
     recordPersonalWorkspaceArchived: accepts,
     recordPersonalWorkspaceRevived: accepts,
     recordPersonalWorkspaceFeaturesChanged: accepts,
-    recordPresenceSettingChanged: accepts,
+    recordPresenceSettingChanged: { ...accepts, sendBatch: async () => undefined },
     recordTraceSharingDisabled: accepts,
     recordMemberDisabled: accepts,
     recordMemberEnabled: accepts,

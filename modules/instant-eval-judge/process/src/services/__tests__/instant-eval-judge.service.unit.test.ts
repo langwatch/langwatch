@@ -129,7 +129,7 @@ describe("given a judge call on LangWatch cloud", () => {
       expect(answer).toMatchObject({ outcome: "refused", code: "instant_eval_project_unknown" });
       expect(classifier.classify).not.toHaveBeenCalled();
       expect(recorded).toEqual([]);
-      const line = lines.findLine("warn", "backfill-project-created");
+      const line = lines.findLine("warn", "project:record-created-facts");
       expect(line?.projectId).toBe(PROJECT_ID);
     });
   });
@@ -248,7 +248,7 @@ describe("given a judge call off LangWatch cloud", () => {
       const answer = await service.judge(call);
 
       expect(answer).toMatchObject({ outcome: "refused", code: "classifier_not_configured" });
-      expect(lines.findLine("warn", "backfill-project-created")).toBeUndefined();
+      expect(lines.findLine("warn", "project:record-created-facts")).toBeUndefined();
     });
   });
 });

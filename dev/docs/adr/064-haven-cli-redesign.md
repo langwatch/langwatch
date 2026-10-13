@@ -665,7 +665,7 @@ mode restarts the stack without `--force`.
 | ------------------ | -------------------------------------------------------- | ------------ | -------- |
 | `haven up` (still) | built once at up; `haven reload ui` rebuilds             | no reload    | no watch |
 | `haven up --watch` | `haven ui-watch` one-shot builds, open pages reload idle | reloads      | rebuilds |
-| `haven up --hmr`   | Vite bundledDev with HMR                                 | reloads      | rebuilds |
+| `haven up --hmr`   | plain Vite dev server with HMR                           | reloads      | rebuilds |
 
 `haven reload [app|api|worker|ui]` and `haven restart <lane>` work on a still
 stack; anything needing the running mode reads the stack record, which status

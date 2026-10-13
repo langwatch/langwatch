@@ -73,8 +73,10 @@ describe("the admission marker read", () => {
     });
 
     await expect(repository.readAdmissionMarker(SCOPE)).resolves.toEqual({ found: false });
-    expect(queryRaw.mock.calls[0]?.slice(1)).toEqual([USER_ID]);
-    expect(queryRaw.mock.calls[0]?.[0].join("")).toContain('"AuthzUserStanding"');
+    // The second slot is the platform-wide tenant-check skip; the standing table has no tenant.
+    const [statement, , ...values] = queryRaw.mock.calls[0] ?? [];
+    expect(values).toEqual([USER_ID]);
+    expect(statement?.join("")).toContain('"AuthzUserStanding"');
   });
 
   it("answers absent when no membership carries one", async () => {

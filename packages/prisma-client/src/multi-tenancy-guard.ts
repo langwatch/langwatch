@@ -120,6 +120,9 @@ const GLOBAL_MODELS = [
   // Authz's record of who is deactivated or erased (ARCHITECTURE.md, "Platform operators are
   // a grant"): keyed by userId alone and platform-wide, like User; written in raw SQL only.
   "AuthzUserStanding",
+  // Identity's sign-in switch (sign-in-switch.feature): keyed by userId alone, read on the
+  // sign-in path before any tenant is known, like AccountCredential; written in raw SQL only.
+  "IdentitySignInSwitch",
 ] as const;
 
 /**

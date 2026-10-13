@@ -1,4 +1,7 @@
-import { AuthzCutoverRepository, type AuthzCutoverRow } from "../authz-cutover.repository.ts";
+import { type Instant, Temporal } from "@langwatch/time";
+
+import { type AuthzEngineSwitch, LEGACY_ENGINE } from "../../rules/authz-engine-switch.rules.ts";
+import { AuthzCutoverRepository } from "../authz-cutover.repository.ts";
 import { AuthzEpochRepository } from "../authz-epoch.repository.ts";
 import { AuthzSessionVersionRepository } from "../authz-session-version.repository.ts";
 import type { AuthzRepositories } from "../authz.repositories.ts";
@@ -44,7 +47,7 @@ export class MemoryAuthzRepositories {
   }
 }
 
-/** The cutover state a process without a database keeps, written by tests. */
+/** The engine switch a process without a database keeps, written by tests. */
 export class MemoryAuthzCutoverRepository extends AuthzCutoverRepository {
   static create(options: { memory: AuthzMemoryStore }): MemoryAuthzCutoverRepository {
     return new MemoryAuthzCutoverRepository(options.memory);
@@ -54,13 +57,52 @@ export class MemoryAuthzCutoverRepository extends AuthzCutoverRepository {
     super();
   }
 
-  async findCutover({
+  async getEngineSwitch({
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<AuthzCutoverRow | null> {
+  }): Promise<AuthzEngineSwitch> {
     const row = this.memory.cutovers.get(organizationId);
-    return row ? { status: row.status, occurredAt: row.occurredAt } : null;
+    return row ? { onEngine: row.onEngine, switchedAt: row.switchedAt } : LEGACY_ENGINE;
+  }
+
+  async switchOnEngine({
+    organizationId,
+    at,
+  }: {
+    organizationId: string;
+    at: Instant;
+  }): Promise<boolean> {
+    const row = this.memory.cutovers.get(organizationId);
+    if (row?.pinned) return false;
+    this.memory.cutovers.set(organizationId, { organizationId, onEngine: true, switchedAt: at });
+    return true;
+  }
+
+  async pinEngineSwitch({
+    organizationId,
+    at,
+    eventId,
+  }: {
+    organizationId: string;
+    at: Instant;
+    eventId: string;
+  }): Promise<void> {
+    const row = this.memory.cutovers.get(organizationId);
+    const switchedAt =
+      row && Temporal.Instant.compare(row.switchedAt, at) > 0 ? row.switchedAt : at;
+    this.memory.cutovers.set(organizationId, {
+      organizationId,
+      onEngine: false,
+      switchedAt,
+      pinned: true,
+      lastAppliedEventId: eventId,
+    });
+  }
+
+  /** No older state table exists in memory, so there is nothing to carry over. */
+  async carryOverEngineSwitch(_input: { dryRun: boolean }): Promise<number> {
+    return 0;
   }
 }
 

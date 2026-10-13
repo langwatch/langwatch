@@ -1,5 +1,6 @@
 /** Spec: modules/trace/specs/trace-ingest-allowance.feature */
 import { setLedgerCurrent } from "@langwatch/api";
+import { HandledError } from "@langwatch/handled-error";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TraceIngestAllowanceService } from "../trace-ingest-allowance.service.ts";
@@ -54,5 +55,24 @@ describe("trace limit check failure level", () => {
     const logger = await run(Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }));
     expect(logger.error).toHaveBeenCalledOnce();
     expect(logger.warn).not.toHaveBeenCalled();
+  });
+});
+
+class ClickHouseBusy extends HandledError {
+  constructor() {
+    super("clickhouse_overloaded", "The database is busy", {
+      httpStatus: 503,
+      fault: "platform",
+      retryable: true,
+    });
+  }
+}
+
+describe("trace limit check on a busy ClickHouse", () => {
+  /** @scenario "An allowance read a busy ClickHouse refuses is logged as a warning" */
+  it("warns, because the refusal is transient and retried", async () => {
+    const logger = await run(new ClickHouseBusy());
+    expect(logger.warn).toHaveBeenCalledOnce();
+    expect(logger.error).not.toHaveBeenCalled();
   });
 });

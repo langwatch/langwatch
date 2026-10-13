@@ -228,7 +228,7 @@ func PinDotenvOrigin(dir, origin string) error {
 		}
 		pinned := strings.TrimRight(string(data), "\n") +
 			"\n# pinned by haven for this stack\nBASE_HOST=" + origin + "\nNEXTAUTH_URL=" + origin + "\n"
-		if err := os.WriteFile(path, []byte(pinned), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte(pinned), 0o600); err != nil { //nolint:gosec // G703: the stack's own .env under dir, not request input
 			return err
 		}
 	}

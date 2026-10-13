@@ -123,8 +123,8 @@ pnpm start:prepare:db                # upgrade + system-migrations pass; the api
 make go-lint-changed                # Go: lints your uncommitted edits (never raw golangci-lint)
 ```
 
-Nx (ADR-150) sits beside the root scripts, not in front of them: prefer the
-`pnpm` scripts above; the Nx plugin's skills cover `nx` itself.
+The root `test`, `typecheck` and `lint` scripts run through Nx (ADR-150): use
+the `pnpm` scripts above rather than `nx` directly; the Nx plugin's skills cover `nx` itself.
 
 ## Dev stack
 

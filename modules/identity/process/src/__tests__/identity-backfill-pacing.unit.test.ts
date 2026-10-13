@@ -1,6 +1,7 @@
 import {
   type MigrationLeaseRepository,
   SystemMigrationRecordNotFoundError,
+  type SystemMigrationRunnerDeps,
   SystemMigrationRunnerService,
   type SystemMigrationStateRepository,
   type TenantMigrationRecord,
@@ -8,6 +9,8 @@ import {
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { MemoryIdentityLatchRepository } from "../repositories/memory/memory.identity-latch.repository.ts";
+import { MemoryIdentityStore } from "../repositories/memory/memory.identity.store.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
 
 const LIMIT = 5_000;
@@ -62,7 +65,13 @@ function slowQueue({ waiting, drainPerRead }: { waiting: number; drainPerRead: n
   return { queue, read };
 }
 
-function pass({ read }: { read: () => Promise<number> }) {
+function pass({
+  read,
+  runListedWork,
+}: {
+  read: () => Promise<number>;
+  runListedWork?: SystemMigrationRunnerDeps["runListedWork"];
+}) {
   const userIds = Array.from({ length: USERS }, (_, n) => `user_${String(n).padStart(4, "0")}`);
   const migrated: { userId: string; lastRead: number | undefined }[] = [];
   const lastRead = { value: undefined as number | undefined };
@@ -79,6 +88,7 @@ function pass({ read }: { read: () => Promise<number> }) {
     cohort: () => true,
     migrations: [
       IdentityIdentifierBackfillMigrationService.create({
+        latch: MemoryIdentityLatchRepository.create(MemoryIdentityStore.create()),
         backfill: {
           migrateUser: async ({ userId }) => {
             migrated.push({ userId, lastRead: lastRead.value });
@@ -93,6 +103,7 @@ function pass({ read }: { read: () => Promise<number> }) {
       return lastRead.value;
     },
     pacingWaitMs: 1,
+    ...(runListedWork ? { runListedWork } : {}),
   });
   return { runner, migrated };
 }
@@ -133,5 +144,23 @@ describe("the identifier backfill's pacing", () => {
     await runner.runPass({ signal: abort.signal });
 
     expect(migrated).toHaveLength(0);
+  });
+
+  /** @scenario "A large unrelated backlog does not hold the identifier backfill" */
+  it("on its own queue list, waits only for its own jobs, whatever the whole queue holds", async () => {
+    const { queue, read } = slowQueue({ waiting: 1_000_000, drainPerRead: 0 });
+    const rooms: number[] = [];
+    const { runner, migrated } = pass({
+      read,
+      runListedWork: async ({ work }) =>
+        work({ waitForRoom: async ({ maxOutstanding }) => void rooms.push(maxOutstanding) }),
+    });
+
+    await runner.runPass();
+
+    expect(migrated).toHaveLength(USERS);
+    expect(queue.reads).toEqual([]);
+    expect(rooms.length).toBeGreaterThan(0);
+    expect(rooms.every((room) => room === LIMIT)).toBe(true);
   });
 });

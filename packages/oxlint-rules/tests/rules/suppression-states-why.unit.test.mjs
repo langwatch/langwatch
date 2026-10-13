@@ -164,9 +164,13 @@ describe("given the directive grammar", () => {
 });
 
 describe("given the registered plugin", () => {
-  /** @scenario "No house rule opts in to a disable yet" */
+  /** @scenario "Only the route-door rule opts in to a disable" */
   it("holds the guard and no existing rule that accepts a disable", () => {
     expect(rules["suppression-states-why"]).toBeDefined();
-    expect(Object.values(rules).filter((entry) => entry.meta.docs.escape)).toEqual([]);
+    // The route-door rule opts in on purpose (.claude/rules/lint-tooling.md); any other is new.
+    const accepting = Object.entries(rules)
+      .filter(([, entry]) => entry.meta.docs.escape)
+      .map(([name]) => name);
+    expect(accepting).toEqual(["access-escape-kind"]);
   });
 });

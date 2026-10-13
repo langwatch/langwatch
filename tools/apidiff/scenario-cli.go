@@ -161,6 +161,8 @@ func runScenarioPhase(ctx context.Context, phase scenarioPhase) int {
 	defer runner.cancel()
 	runner.probeAdminKey()
 	items, deferred := runner.deferAdminScenarios(items)
+	items, noSim := runner.deferAnalyticsScenarios(items)
+	deferred = append(deferred, noSim...)
 	if len(items) == 0 {
 		phase.reportDeferred(deferred)
 		return exitEqual
@@ -256,7 +258,8 @@ func repeatScenarios(items []scenario, count int) []scenario {
 	}
 	repeated := make([]scenario, 0, len(items)*count)
 	for round := 1; round <= count; round++ {
-		for _, item := range items {
+		for i := range items {
+			item := items[i]
 			item.ID = fmt.Sprintf("%s-x%d", item.ID, round)
 			repeated = append(repeated, item)
 		}

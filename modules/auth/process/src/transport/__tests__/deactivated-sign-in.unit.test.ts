@@ -21,7 +21,11 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 
-function repoAnswering(deactivatedAt: Instant | null, signupConfirmationPending = false) {
+function repoAnswering(
+  deactivatedAt: Instant | null,
+  signupConfirmationPending = false,
+  lastLoginAt: Instant | null = nowInstant(),
+) {
   const getUserForHooks = vi.fn(async () => ({
     id: "user-1",
     email: "user@example.com",
@@ -30,6 +34,7 @@ function repoAnswering(deactivatedAt: Instant | null, signupConfirmationPending 
     pendingSsoSetup: false,
     signupConfirmationPending,
     emailVerified: true,
+    lastLoginAt,
   }));
   const findFederatedAccountsForUser = vi.fn(async () => [
     { providerId: "auth0", accountId: "waad|acme|sam" },
@@ -184,6 +189,36 @@ describe("the before-session-create hook", () => {
       });
       await expect(mintOn("/passkey/verify-authentication")).resolves.toMatchObject({
         data: { amr: ["phw"] },
+      });
+    });
+
+    describe("when the account has never signed in", () => {
+      const mintFirst = (path: string) =>
+        createBeforeSessionCreateHook({
+          sessionClaims: {
+            identity: identityAnswering(null).identity,
+            evidence: NO_CLAIMS.evidence,
+          },
+          repo: repoAnswering(null, false, null).repo,
+          collaborators: CONTINUING,
+        })(sessionFor("user-1"), createApiFixture<MintContext>({ path }));
+
+      /** @scenario "The offer waits past the sign-up session" */
+      it("marks the session as the one its sign-up started", async () => {
+        await expect(mintFirst("/sign-in/email")).resolves.toMatchObject({
+          data: { amr: ["pwd"], startedBySignUp: true },
+        });
+        await expect(mintFirst("/callback/auth0")).resolves.toMatchObject({
+          data: { startedBySignUp: true },
+        });
+      });
+
+      /** @scenario "The offer waits past the sign-up session" */
+      it("leaves every later sign-in unmarked, however soon after", async () => {
+        const minted = await mintOn("/sign-in/email");
+
+        expect(minted).toMatchObject({ data: { amr: ["pwd"] } });
+        expect(minted).not.toHaveProperty("data.startedBySignUp");
       });
     });
 

@@ -8,7 +8,6 @@ import { defineConfig, type Plugin, type UserConfig } from "vite";
 
 import { UI_ASSET_URL_GLOBAL } from "./vite/asset-base";
 import { bootSplash } from "./vite/boot-splash";
-import { bundledRefresh } from "./vite/bundled-refresh";
 import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
 import { HAVEN_SLUG_ENV, havenOrb } from "./vite/haven-orb";
@@ -102,9 +101,6 @@ function workspaceSourcePlugin(): Plugin {
 const rootEnvPath = path.resolve(here, "../../.env");
 
 dotenv.config({ path: rootEnvPath, quiet: true });
-
-// Set by `haven up --ui=bundled`: Vite serves incrementally rebuilt bundles from memory.
-const IS_BUNDLED = process.env.LANGWATCH_UI_BUNDLED === "1";
 
 // Set by the cached `build:local` target haven serves: gzip size reporting is pure cost there.
 const IS_LOCAL_BUILD = process.env.LANGWATCH_UI_LOCAL_BUILD === "1";
@@ -213,8 +209,6 @@ function logDevelopmentTlsState(
   devLogger.info("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
 }
 
-const BUNDLED_ROLLDOWN = IS_BUNDLED ? { experimental: { devMode: { lazy: false } } } : {};
-
 type RenderBuiltUrl = NonNullable<NonNullable<UserConfig["experimental"]>["renderBuiltUrl"]>;
 type RollupOnWarn = NonNullable<
   NonNullable<NonNullable<UserConfig["build"]>["rollupOptions"]>["onwarn"]
@@ -268,9 +262,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       // The api renders the page's public config; the dev server lifts it from the api's shell.
       ...(command === "serve" ? [injectDevelopmentPublicConfig({ apiUrl: API_TARGET })] : []),
       havenHmrGate(),
-      ...(IS_BUNDLED ? [bundledRefresh()] : []),
-      // Skipped when bundled: its /@fs script is not in the bundle, so it 404s.
-      havenOrb({ slug: IS_BUNDLED ? undefined : process.env[HAVEN_SLUG_ENV] }),
+      havenOrb({ slug: process.env[HAVEN_SLUG_ENV] }),
       designSystemStorybook({ appPort: FRONTEND_PORT }),
       mailPreview({ appPort: FRONTEND_PORT }),
       workspaceSourcePlugin(),
@@ -309,8 +301,6 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       sourcemap: !IS_LOCAL_BUILD,
       reportCompressedSize: !IS_LOCAL_BUILD,
       rollupOptions: {
-        // Vite 8.3's bundled client lacks the `requestLazy` rolldown 1.2.9 emits for lazy imports.
-        ...BUNDLED_ROLLDOWN,
         // Both statically and dynamically imported means the `import()` splits
         // nothing -- the module stays in the importer's chunk. Rolldown always
         // detected this and we only logged it, which is how 468 kB of screens
@@ -326,7 +316,6 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       },
     },
     experimental: {
-      bundledDev: IS_BUNDLED,
       renderBuiltUrl,
     },
     server: {

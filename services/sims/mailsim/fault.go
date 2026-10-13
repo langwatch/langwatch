@@ -59,7 +59,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "forcedError is 0 (off) or a 4xx/5xx status"})
 			return
 		}
-		s.fault.status.Store(int32(next.ForcedError)) //nolint:gosec // bounded to 0 or 400-599 above
+		s.fault.status.Store(int32(next.ForcedError))
 	}
 	s.fault.mu.Lock()
 	tally := s.fault.tally

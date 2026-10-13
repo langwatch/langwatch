@@ -936,7 +936,7 @@ function ParsingCSVReader({
               },
             });
           } catch (error) {
-            console.error("error", error);
+            logger.error({ error }, "Failed to parse JSON file");
             toaster.create({
               title: "Error",
               description: "Failed to parse JSON file",

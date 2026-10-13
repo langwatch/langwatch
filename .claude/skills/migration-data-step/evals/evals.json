@@ -10,7 +10,7 @@
     {
       "id": 2,
       "prompt": "The next release can't work until this backfill finishes, so make it blocking. It uses ProjectService and the Prisma client to compute the values.",
-      "expected_output": "A blocking step is frozen SQL: it runs at its own release's schema during a jump, when the newest Prisma client names columns that may not exist yet. So it imports no service, no peer *Api and no typed client; it reaches tables only through the owner's prisma.<subject>-migration.repository.ts with raw SQL naming every column (exemplar prisma.identity-migration.repository.ts, called by identity:reopen-unproven-accounts). If the logic needs ProjectService, it stays background, and the release must tolerate it being unfinished. Only kind data may be blocking (blocking_not_data).",
+      "expected_output": "A blocking step is frozen SQL: it runs at its own release's schema during a jump, when the newest Prisma client names columns that may not exist yet. So it imports no service, no peer *Api and no typed client; it reaches tables only through the owner's prisma.<subject>-migration.repository.ts with raw SQL naming every column (exemplar prisma.ops-migration.repository.ts, called by ops:copy-automation-migration-state). It may touch only tables created in its own release and never a sign-in or ingest table. If the logic needs ProjectService, it stays background, and the release must tolerate it being unfinished. Only kind data may be blocking (blocking_not_data).",
       "files": []
     },
     {
@@ -22,13 +22,19 @@
     {
       "id": 4,
       "prompt": "Our new peer projection in trace folds annotation events. Add a note to the release docs asking operators to run a projection replay after deploy.",
-      "expected_output": "No operator replay: declares defineProjectionReplayStep in trace's .withMigrations, taking `replayer` from the binder (({ replayer }) => [...], never built by the module), with id trace:<kebab-name>, a description, lane set to the projection's lane constant, and needsOldWritersGone: true because an old worker does not know the new lane. Optional since narrows a handed-over fold to the deploy overlap. It is a data step in background mode; the report carries replayedThrough so a reopened run only refolds aggregates touched after it. Exemplar modules/trace/process/src/trace.module.ts.",
+      "expected_output": "No operator replay: declares defineProjectionReplayStep in the owning module's .withMigrations, taking `replayer` from the binder (({ replayer }) => [...], never built by the module), with id <module>:<kebab-name>, a description, lane set to the projection's lane constant, and needsOldWritersGone: true because an old worker does not know the new lane. Optional since narrows a handed-over fold to the deploy overlap. It is a data step in background mode; the report carries replayedThrough so a reopened run only refolds aggregates touched after it. Exemplars: scim:replay-sso-connection-view (trailingPass) and governance:replay-cost-charges (bounded since).",
       "files": []
     },
     {
       "id": 5,
       "prompt": "We need to move each organization's files to the new storage layout, keeping the old path readable until each one is verified. Run it at startup so it's done before anyone uses it.",
-      "expected_output": "This is a tenant step: a SystemMigration answered through the owner's registeredMigrations(), run by the system-migrations pass (after upgrade in start:prepare:db and hourly on the worker), never executionMode 'startup'. migrateTenant is re-runnable and self-proving (finalized when the proof passes, migrated and held when it disagrees, parked when work may have committed without its follow-up), declares candidateTenants so a pass walks only tenants with work, and copies rather than moves. If an operator must choose the provider, it is a procedure step (plan, copy, finalize, verify), as object-storage-migrate.task.ts.",
+      "expected_output": "This is a tenant step: defineMigrationStep with kind tenant, mode background, tenants set to the axis, title, the rollout flags and migrateTenant (not a SystemMigration class answered through registeredMigrations(), which is transitional), never run at startup. The framework keeps per-tenant state; the upgrade asks a worker for a pass. migrateTenant is re-runnable and self-proving (finalized when the proof passes, migrated and held when it disagrees, parked when work may have committed without its follow-up), declares candidateTenants so a pass walks only tenants with work, copies rather than moves, and awaits waitForRoom between pages of commands so the pass paces by its own queue work. A provider choice by an operator is a named task outside the ledger (plan, copy, finalize, verify), as object-storage-migrate.task.ts.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Backfill needs three kinds of events per project row. I planned three steps, one per event, each walking the project table.",
+      "expected_output": "One pass per table (Alex, 2026-10-12): one step walks the table once and records every event it needs for each row, in pages with sendBatch and stable per-row keys, saving the checkpoint after each page so the step paces by its own queue work. Prerequisite ordering is kept (after), shipped step ids are not renamed or removed. The events go to every projection, subscriber and process manager like any other; a backfilled field is data a consumer may read, never routing.",
       "files": []
     }
   ]

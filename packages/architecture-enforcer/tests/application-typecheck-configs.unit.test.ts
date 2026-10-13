@@ -105,7 +105,7 @@ describe.each(["api", "worker", "ui"])("%s application typecheck configuration",
     ) as { scripts?: Record<string, string> };
     const solution = parse(join(root, "apps", application), "tsconfig.json");
 
-    expect(manifest.scripts?.typecheck).toBe("tsc -b");
+    expect(manifest.scripts?.typecheck).toMatch(/^(?:[A-Z_]+=\S+ )*tsc -b$/);
     expect(solution.projectReferences?.map((reference) => reference.path)).toEqual([
       join(root, "apps", application, "tsconfig.app.json"),
     ]);

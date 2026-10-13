@@ -258,7 +258,7 @@ func spanAttribute(s sdktrace.ReadOnlySpan, keys ...attribute.Key) (attribute.Va
 }
 
 func attributeAny(v attribute.Value) any {
-	if v.Type() == attribute.INVALID {
+	if v.Type() == attribute.EMPTY {
 		return nil
 	}
 	return v.AsInterface()
@@ -307,7 +307,7 @@ func (s *ExecutionState) collectToolCalls(msgs []Message, spans []sdktrace.ReadO
 		}
 		callName := sp.Name()
 		if v, ok := spanAttribute(sp, "gen_ai.tool.name"); ok {
-			callName = v.Emit()
+			callName = v.String()
 		}
 		traceID := sp.SpanContext().TraceID().String()
 		turn, ok := traceTurn[traceID]

@@ -405,7 +405,7 @@ interface Response {
 
 Deferred scope: a key reads the avatars its own project stores, which the runtime pins; the object's purpose and owner kind are what gate the bytes. Declared at `src/transport/user-avatar.rest.ts:43`.
 
-Answers at `/api/user-avatar/:projectId/:userAvatarId`.
+Answers at `/api/user-avatar/:projectId/:userAvatarId`, `/api/v1/user-avatar/:projectId/:userAvatarId`.
 
 ```typescript
 // Params: userAvatarRestParamsSchema, ../contract/src/user-rest.schemas.ts:32

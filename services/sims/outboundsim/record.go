@@ -121,8 +121,8 @@ func newStore(maxRecords int) *store {
 	return &store{ring: make([]Record, maxRecords)}
 }
 
-// add stamps r with an id and the time, keeps it, and returns what was kept.
-func (s *store) add(r Record, at time.Time) Record {
+// add stamps r with an id and the time and keeps it.
+func (s *store) add(r Record, at time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.next++
@@ -134,11 +134,10 @@ func (s *store) add(r Record, at time.Time) Record {
 	if s.size < len(s.ring) {
 		s.ring[(s.head+s.size)%len(s.ring)] = r
 		s.size++
-		return r
+		return
 	}
 	s.ring[s.head] = r
 	s.head = (s.head + 1) % len(s.ring)
-	return r
 }
 
 // at is the i-th record, oldest first.

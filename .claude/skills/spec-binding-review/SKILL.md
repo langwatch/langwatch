@@ -40,9 +40,10 @@ including what its setup builds.
    the call.
 2. **The test is at the scenario's level.** An `@integration` scenario about a composition (a
    process, "composed", "mounted", "at boot", the API or the worker) is proven by booting the
-   composition: the installation fixture (`apps/api/src/__tests__/api-installation.fixture.ts`;
-   the worker and tasks have their own, record §13) or the `createApp` chain, taught by
-   `process-composition`. A unit test that fakes the collaborators is weak: auth rows 86 and 87
+   composition: a whole-list test that calls `bootInstalledProcess` with `testPeer` peers
+   (`apps/api/src/__tests__/share-link-engine.integration.test.ts`, taught by `process-composition`
+   and `backend`). The api, worker and tasks installation fixtures still build with `withMembers`;
+   a bind to one proves the composition but is conversion debt to note. A unit test that fakes the collaborators is weak: auth rows 86 and 87
    were unbound at review because the tests faked the directory (2026-10-05). A test's level is its
    filename (`testing` skill, "Name the level honestly"). A rendering scenario bound to a test that
    proves only the service's decision is weak too (langy rows 169-172).
@@ -89,7 +90,9 @@ Report one line per bind:
 
 - **Trusting the candidate score.** `parity:candidates` ranks a reading order (about 75% have the
   right test in the top three); a high score from another module's test proves nothing.
-- **A per-file "all bound".** Read the verdict banner; an untagged file reads `0/0` and green.
+- **A per-file "all bound".** Read the verdict banner; an untagged file reads `0/0`, but a new
+  wholly inert or partly untagged file fails the run (`newInert`, `newPartial`,
+  `check-feature-parity.ts`), so a `0/0` count still needs the final verdict.
 - **A test written to what the code does today.** If it asserts the code rather than the scenario,
   it is a pin, not a bind.
 - **A new test that hand-makes a Prisma stand-in.** §13 allows only the one typed double in

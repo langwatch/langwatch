@@ -13,7 +13,7 @@ shim, never expose it. Code: `services/sims/voicesim`, console `apps/sims/src/vo
 
 ## Run it
 
-- Opt-in: `haven up +voice` (sticky). Hosted in the `sims` lane.
+- Opt-in: `haven up +voice` (sticky). Runs in the `go` lane by default (see `sims`).
 - Already on? `haven sim voice status` answers with the base URLs; the seeded org then has an ElevenLabs provider at voicesim, no clean instance needed.
 - Console: `https://voice.<slug>.langwatch.localhost` (calls, transcripts, events, Clear calls); `haven status` shows the loopback port.
 - Unless `.env` names `ELEVENLABS_BASE_URL`, the overlay sets it to `http://127.0.0.1:<port>`,
@@ -50,7 +50,7 @@ A call id is `conv_voicesim_0001`, `0002`, ... An unfaked provider path answers 
 
 - `VOICESIM_SEED=1` (haven sets it) records one finished two-turn call for agent
   `agent_voicesim_seed`, so the console starts with content.
-- Nothing persists: a restart (`haven restart sims`) empties it.
+- Nothing persists: a restart of the lane that hosts it (`haven restart go`) empties it.
 
 ## Tests and load
 

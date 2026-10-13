@@ -52,6 +52,10 @@ class StubRepository extends OrganizationRepository {
     return { ids: [], next: null };
   }
 
+  async findPresenceSettingPage(): Promise<[]> {
+    return [];
+  }
+
   async countUsage(): Promise<{ members: number; teams: number; ssoProviders: string[] }> {
     return { members: 0, teams: 0, ssoProviders: [] };
   }

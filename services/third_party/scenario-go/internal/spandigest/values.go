@@ -1,7 +1,6 @@
 package spandigest
 
 import (
-	"hash/maphash"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -110,27 +109,6 @@ func numberOf(v attribute.Value) float64 {
 		}
 	}
 	return 0
-}
-
-// deepTransform applies fn to v; when fn returns a replacement the branch
-// stops there, otherwise it descends into arrays and objects. Mirrors the
-// JS deep-transform helper. It rewrites v in place, so v must be owned by
-// the caller (a fresh parse or a fresh attribute conversion).
-func deepTransform(v any, fn func(any) (any, bool)) any {
-	if r, replaced := fn(v); replaced {
-		return r
-	}
-	switch x := v.(type) {
-	case []any:
-		for i := range x {
-			x[i] = deepTransform(x[i], fn)
-		}
-	case jsjson.Object:
-		for i := range x {
-			x[i].Value = deepTransform(x[i].Value, fn)
-		}
-	}
-	return v
 }
 
 // truncateMediaURL replaces a base64 image/audio/video data URL by a marker.
@@ -263,74 +241,25 @@ func isBase64Charset(s string) bool {
 // FormatValue renders an attribute value for display without deduplication:
 // media is truncated and JSON strings are normalized recursively.
 func FormatValue(v attribute.Value) string {
-	if v.Type() == attribute.STRING {
-		if s, ok := transformValue(v.AsString()).(string); ok {
-			return s
-		}
-	}
-	processed := transformValue(jsValue(v))
-	if s, ok := processed.(string); ok {
-		return s
-	}
-	return jsjson.Stringify(processed)
+	return string(appendFormattedValue(nil, &compiler{}, v))
 }
 
-func transformValue(v any) any {
-	return deepTransform(v, func(x any) (any, bool) {
-		if part, ok := truncateMediaPart(x); ok {
-			return part, true
-		}
-		s, ok := x.(string)
-		if !ok {
-			return nil, false
-		}
-		if truncated, ok := truncateMediaURL(s); ok {
-			return truncated, true
-		}
-		if jsjson.LooksLikeJSON(s) {
-			if parsed, err := jsjson.Parse(s); err == nil {
-				return jsjson.Stringify(transformValue(parsed)), true
-			}
-		}
-		return nil, false
-	})
-}
-
-// deduplicator replaces repeated long strings with a marker. One instance
-// lives for one digest.
-//
-// Seen strings are keyed by a 64-bit hash of their normalized form, built in
-// a reused scratch buffer, so checking a string allocates nothing.
-type deduplicator struct {
-	threshold int
-	seen      map[uint64]struct{}
-	seed      maphash.Seed
-	scratch   []byte
+// appendFormattedValue appends FormatValue(v), using c as scratch.
+func appendFormattedValue(dst []byte, c *compiler, v attribute.Value) []byte {
+	c.reset()
+	c.attrValue(v)
+	c.flush()
+	for _, p := range c.pieces {
+		dst = append(dst, c.buf[p.start:p.end]...)
+	}
+	return dst
 }
 
 const duplicateMarker = "[DUPLICATE - SEE ABOVE]"
 
-func (d *deduplicator) process(s string) string {
-	if len(s) < d.threshold || jsstr.Len(s) < d.threshold {
-		return s
-	}
-	if d.seen == nil {
-		d.seen = make(map[uint64]struct{})
-		d.seed = maphash.MakeSeed()
-	}
-	d.scratch = appendNormalized(d.scratch[:0], s)
-	key := maphash.Bytes(d.seed, d.scratch)
-	if _, dup := d.seen[key]; dup {
-		return duplicateMarker
-	}
-	d.seen[key] = struct{}{}
-	return s
-}
-
-// normalizeForDedup collapses whitespace (actual and JSON-escaped), trims and
-// lowercases, matching the JS deduplicator's comparison key.
-func normalizeForDedup(s string) string { return string(appendNormalized(nil, s)) }
-
+// appendNormalized appends the deduplicator's comparison key of s:
+// whitespace (actual and JSON-escaped) collapsed, trimmed and lowercased,
+// like the JS deduplicator.
 func appendNormalized(buf []byte, s string) []byte {
 	space := false
 	for i := 0; i < len(s); {
@@ -370,56 +299,4 @@ func appendNormalized(buf []byte, s string) []byte {
 		buf = utf8.AppendRune(buf, unicode.ToLower(r))
 	}
 	return buf
-}
-
-// appendValue appends an attribute value rendered like FormatValue, with
-// long repeated strings replaced by a duplicate marker.
-func (d *deduplicator) appendValue(dst []byte, v attribute.Value) []byte {
-	if v.Type() == attribute.STRING {
-		return d.appendString(dst, v.AsString())
-	}
-	processed := d.transform(jsValue(v))
-	if s, ok := processed.(string); ok {
-		return append(dst, s...)
-	}
-	return jsjson.Append(dst, processed)
-}
-
-func (d *deduplicator) transform(v any) any {
-	return deepTransform(v, func(x any) (any, bool) {
-		if part, ok := truncateMediaPart(x); ok {
-			return part, true
-		}
-		s, ok := x.(string)
-		if !ok {
-			return nil, false
-		}
-		return d.transformString(s), true
-	})
-}
-
-// appendString appends the transformed string: re-encoded JSON, a media
-// marker, or the (possibly deduplicated) text.
-func (d *deduplicator) appendString(dst []byte, s string) []byte {
-	if jsjson.LooksLikeJSON(s) {
-		if parsed, err := jsjson.Parse(s); err == nil {
-			return jsjson.Append(dst, d.transform(parsed))
-		}
-	}
-	if truncated, ok := truncateMediaURL(s); ok {
-		return append(dst, truncated...)
-	}
-	return append(dst, d.process(s)...)
-}
-
-func (d *deduplicator) transformString(s string) string {
-	if jsjson.LooksLikeJSON(s) {
-		if parsed, err := jsjson.Parse(s); err == nil {
-			return jsjson.Stringify(d.transform(parsed))
-		}
-	}
-	if truncated, ok := truncateMediaURL(s); ok {
-		return truncated
-	}
-	return d.process(s)
 }

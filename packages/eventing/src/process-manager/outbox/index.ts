@@ -1,4 +1,9 @@
 export {
+  runDeliveryMarkingProgress,
+  runOutsideDelivery,
+  trackDeliveryProgress,
+} from "./deliveryProgress.ts";
+export {
   type DispatchableMessage,
   type DispatchReport,
   type IntentHandler,

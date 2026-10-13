@@ -273,7 +273,9 @@ func (cell *run) downExcused() int {
 		return 0
 	}
 	excused := 0
-	for _, call := range cell.privateTraffic.Calls() {
+	callsRange := cell.privateTraffic.Calls()
+	for i := range callsRange {
+		call := &callsRange[i]
 		if !call.ok() && call.AtMs >= cell.down.downAtMs && call.AtMs <= cell.down.upAtMs {
 			excused++
 		}

@@ -1,11 +1,11 @@
 ---
 name: postgres-migration
-description: "Change the Postgres schema without breaking any release still in the supported window: the expand/contract recipes for adding a column or table, removing one, renaming one, changing its type, making it NOT NULL, adding an index or a unique constraint and splitting a table; why a migration never drops a table or a column (a drop is an operator step confirmed in Ops); the lock-heavy shapes the guard refuses and the ops pre-build note for an index; re-runnable statements; one owner per migration; timestamp keys and the migration-order check; no new foreign key and no new @relation; where schema.prisma and packages/prisma-client/prisma/migrations live; why inline DML on an existing table, a volatile default, two ALTERs on one table and a long lock_timeout are refused; and how a projection table changes (a rebuild beside the old one). Use whenever someone says 'add a field', 'add a column', 'add a table', 'drop that column', 'drop the table', 'rename this table', 'rename the column', 'change the column type', 'make it required', 'NOT NULL', 'add an index', 'unique constraint', 'add a relation', 'foreign key', '@relation', 'onDelete Cascade', 'write a Prisma migration', 'the migration failed on deploy', 'prisma migrate resolve', or the migration-safety test named their migration."
+description: "Change the Postgres schema without breaking the previous release, which keeps serving on the new schema: the expand/contract recipes for adding a column or table, removing one, renaming one, changing its type, making it NOT NULL, adding an index or a unique constraint and splitting a table; why a migration never drops a table or a column (a drop is an operator step confirmed in Ops); the lock-heavy shapes the guard refuses and the ops pre-build note for an index; re-runnable statements; one owner per migration; timestamp keys and the migration-order check; no new foreign key and no new @relation; where schema.prisma and packages/prisma-client/prisma/migrations live; why inline DML on an existing table, a volatile default, two ALTERs on one table and a long lock_timeout are refused; and how a projection table changes (a rebuild beside the old one). Use whenever someone says 'add a field', 'add a column', 'add a table', 'drop that column', 'drop the table', 'rename this table', 'rename the column', 'change the column type', 'make it required', 'NOT NULL', 'add an index', 'unique constraint', 'add a relation', 'foreign key', '@relation', 'onDelete Cascade', 'write a Prisma migration', 'the migration failed on deploy', 'prisma migrate resolve', or the migration-safety test named their migration."
 user-invocable: true
 argument-hint: "<the schema change, or the migration name the scanner refused>"
 ---
 
-# Change the Postgres schema inside the window
+# Change the Postgres schema safely
 
 **The rule** (ADR-155; ADR-173): the previous image serves on the new schema during the rollout
 and after a rollback, so every change is expand/contract. No release is a required stop (Alex,
@@ -24,8 +24,9 @@ pnpm start:prepare:db
 ```
 
 `--create-only` is not optional: Prisma generates the breaking form by default, and every recipe
-below edits the SQL first. `pnpm prisma:migrate` still exists but bypasses the ledger, so the api
-and worker keep refusing until `upgrade` runs; use `start:prepare:db`. The release PR stamps the
+below edits the SQL first. The root `pnpm prisma:migrate` is an alias of `pnpm task upgrade`, so it
+goes through the ledger; raw `prisma migrate` does not, and the api and worker keep refusing until
+`upgrade` runs. The release PR stamps the
 folder into a release manifest (`packages/upgrade/releases/<release>.json`); you never write one.
 
 ## The rules that never bend
@@ -47,11 +48,12 @@ folder into a release manifest (`packages/upgrade/releases/<release>.json`); you
    `CREATE INDEX IF NOT EXISTS` (never `CONCURRENTLY` in the file), `DROP ... IF EXISTS`,
    `ADD VALUE IF NOT EXISTS`, `INSERT ... ON CONFLICT`, `CREATE OR REPLACE`; guard a constraint, a
    type or a rename with a `DO $$ ... $$` block that checks the catalogue. Prisma's generated SQL
-   has none of these: edit it before you commit. Never move the marker back.
+   has none of these: edit it before you commit. The marker may move earlier, never later.
 7. **A migration never drops a table or a column** (`drop-table-or-column`, above the newest
    `langwatch@v*` tag). Leave it, stop reading and writing it, and declare an operator step
    (`mode: "operator"`) in the owning module that drops it; an operator confirms it in Ops once
-   it is safe. Dropping an index, constraint, default or type holds no data and stays allowed.
+   it is safe. Ops has no generic action to start such a step yet and none is declared today, so
+   until it exists leave the column in place and never bridge the gap with SQL. Dropping an index, constraint, default or type holds no data and stays allowed.
    Released history kept its drops under `-- contract: retired in <release>` and `-- archive:`.
 8. **Nothing is renamed or retyped in place.**
 9. **No new foreign key and no new `@relation`** (Alex, 2026-10-06; existing ones stay).
@@ -152,6 +154,8 @@ since A` in `schema.prisma`, no migration. Nothing drops it automatically: the o
 declares an operator step (`defineMigrationStep({ mode: "operator", ... })`) whose run drops it
 through the module's own repository, and an operator confirms it in Ops once old writers are gone.
 The upgrade registers it pending and never runs it (`packages/upgrade/specs/contract-order.feature`).
+Ops' generic "start this operator step" action is not built yet, so today stopping use is the
+whole job.
 
 **Rename a column, or change its type.** Expand: the new column beside the old. Migrate: dual-write
 from release A and copy with a background `.withMigrations` step (never an inline `UPDATE` on an
@@ -185,13 +189,21 @@ applies it again, up to 3 attempts, logging each by name (`Prisma migration <nam
 of 3 and is re-runnable: marked it rolled back`). A failed row an earlier run left is cleared the same
 way at preflight. Still failing after the last attempt, the run exits 1 with code
 `rerunnable_migration_failed`: fix the cause (often a lock another session holds, `lock_timeout` 2 s)
-and run `upgrade` again; no resolve command is needed.
+and run `upgrade` again; no resolve command is needed. The few named hand-applied folders are not
+re-run even above the marker (`findHandAppliedSql` prints the SQL that finishes one).
 
 A folder at or below the marker, or one the image does not ship, keeps the conservative path:
-`upgrade` exits 1 with code `failed_prisma_migration` and names the command to clear it. Check what it left, then
+`upgrade` exits 1 with code `failed_prisma_migration`. Retry on Ops > Upgrades records consent to
+rerun it, and a first install may rerun it too. Otherwise check what it left, then
 `prisma migrate resolve --rolled-back <name>` if nothing remains, or `--applied <name>` if you
 completed it by hand, then run `upgrade` again. Nothing has rolled; the old image still serves.
-Spec: `specs/upgrade/rerunnable-migrations.feature`.
+
+**An index that already exists.** Before applying, the runner checks each pending folder's
+`CREATE INDEX` against what an operator pre-built: an existing index of the same name with a
+different shape, or one that is invalid, stops the run with a message naming it
+(`packages/upgrade/src/stepping/prebuilt-indexes.ts`). Drop the wrong index (`DROP INDEX
+CONCURRENTLY`) and let the migration or the pre-build recreate it. Spec:
+`specs/upgrade/rerunnable-migrations.feature`.
 
 ## The scanner
 

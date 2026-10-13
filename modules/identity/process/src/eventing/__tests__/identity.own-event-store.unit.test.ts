@@ -50,7 +50,7 @@ function ownStore(input: { pipeline: string; aggregateType: string; events?: Eve
   };
   const eventStore = PipelineEventStore.create({
     pipeline: input.pipeline,
-    log: () => ({ getEvents, storeEvents }),
+    log: () => ({ getEvents, findEventsOfAggregates: async () => [], storeEvents }),
   });
   eventStore.bindTo({ aggregate: { type: input.aggregateType } });
   return { eventStore, asked, stored };

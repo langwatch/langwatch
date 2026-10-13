@@ -73,6 +73,22 @@ func TestDestroyStack(t *testing.T) {
 		})
 	})
 
+	t.Run("given a launcher that takes a while to exit", func(t *testing.T) {
+		t.Run("when the stack is destroyed, its Redis DB is flushed only once the launcher is gone", func(t *testing.T) {
+			_, _, _, o := newOrch([]domain.Stack{{Slug: mine, WorktreeDir: "/repos/langwatch", LauncherPID: 4242, RedisDB: 4}})
+			sys := &lingeringLauncher{fakeSystem: &fakeSystem{alive: map[int]bool{4242: true}}, pid: 4242, polls: 3}
+			rds := &fakeRedis{}
+			o.sys, o.rds, o.cfg.ShouldManageRedis = sys, rds, true
+			rds.onFlush = func() { sys.aliveAtFlush = sys.alive[4242] }
+			if err := o.DestroyStack(ctx, mine); err != nil {
+				t.Fatalf("DestroyStack: %v", err)
+			}
+			if !slices.Equal(rds.flushed, []int{4}) || sys.aliveAtFlush {
+				t.Errorf("flushed %v with the launcher alive=%v; want [4] after it exited, or its lanes refill the DB", rds.flushed, sys.aliveAtFlush)
+			}
+		})
+	})
+
 	t.Run("given a slug no stack is registered under", func(t *testing.T) {
 		t.Run("when it is destroyed, the databases a dead boot left behind still go", func(t *testing.T) {
 			ch, pg, _, o := newOrch([]domain.Stack{{Slug: neighbor, WorktreeDir: "/repos/langwatch", LauncherPID: 99}})
@@ -113,4 +129,23 @@ func TestMainSlugNamesTheProtectedDatabase(t *testing.T) {
 	if !domain.IsProtectedDatabase(domain.DatabaseForSlug("main")) {
 		t.Fatal("slug \"main\" must map onto the protected shared database")
 	}
+}
+
+// lingeringLauncher is a launcher that outlives SIGTERM for a few liveness
+// polls, as a real one shutting its lanes down does.
+type lingeringLauncher struct {
+	*fakeSystem
+	pid          int
+	polls        int
+	aliveAtFlush bool
+}
+
+func (l *lingeringLauncher) Terminate(pid int) { l.terminated = append(l.terminated, pid) }
+
+func (l *lingeringLauncher) ProcessAlive(pid int) bool {
+	if pid == l.pid && len(l.terminated) > 0 && l.alive[pid] {
+		l.polls--
+		l.alive[pid] = l.polls > 0
+	}
+	return l.alive[pid]
 }

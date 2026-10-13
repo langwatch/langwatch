@@ -174,6 +174,8 @@ func (s *Server) applyItems(subID string, current []*Item, specs []params) ([]*I
 }
 
 // newSubscription starts a subscription for customer over items, billing the first period.
+//
+//nolint:unparam // returns the first invoice, as Stripe does; no caller reads it yet
 func (s *Server) newSubscription(id, customer string, items []params, meta map[string]string, collection string, daysUntilDue *int64, anchor int64) (*Subscription, *Invoice, error) {
 	if collection == "" {
 		collection = "charge_automatically"

@@ -40,11 +40,10 @@ Sources, read in this order when a step here is unclear:
                                                                                                     │
             ┌──────────────────────── FLOW ROUND (per flow, on head) ───────────────────────────┐   ▼
             │ own worktree + haven stack (--mode) ─► sims ─► persona seed ─► steps ─► assert in  │  #8553 row
-            │ the product ─► visualdiff check / apidiff scenarios / workerrun ─► logs + consoles │  round log
+            │ the product ─► apidiff scenarios / workerrun ─► logs + consoles │  round log
             │ Plugs in: (a) on a fresh head stack; (b) on the stores a kept cell upgraded         │  fix lanes
             │ (-keep), so each flow also proves "works after upgrade"                             │
             └────────────────────────────────────────────────────────────────────────────────────┘
-   Beside both: UI fuzz lanes (fuzz ui), never on a stack a cell or flow round is judging.
 ```
 
 What runs today:
@@ -319,11 +318,8 @@ Tools every flow below uses:
 
 | Tool                                 | Command                                                                                                                                                             | Proves                          |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| visualdiff check                     | `go run ./cmd/visualdiff check -stack flows-<name> -only <flow ids>` (`-mark` to record passes)                                                                     | UI flow, scripted, with expects |
 | apidiff scenarios                    | `.bin/apidiff/apidiff scenarios -a https://app.flows-<name>.langwatch.localhost -scenarios 'tools/apidiff/scenarios/<name>.yaml'` (no `-b`: PASS/FAIL on one stack) | API behaviour                   |
 | workerrun                            | `.bin/workerrun/workerrun -stack flows-<name> -families <list> -n 50`                                                                                               | worker drained, read back by id |
-| interactionsimulator                 | `pnpm --filter @langwatch/interactionsimulator simulate run -url <app> -features <f> -budget-usd 5` (spends model money; needs AI keys from the environment)        | exploratory journeys, findings  |
-| fuzz (beside, not on a judged stack) | `.bin/fuzz/fuzz ui -url <app> -duration 20m -reload-every 5` / `fuzz api`                                                                                           | crashes, 5xx                    |
 
 Rows, prerequisite ids (P1, P2, …: persona or tier, sims, env flags) and claims live in
 [#8553](https://github.com/langwatch/langwatch/issues/8553). The full flow list and prereq
@@ -473,7 +469,6 @@ round and correct this table.
 | One cell (old app + worker, then head api + worker, redis) | 6-8 GB at the switch | ≤ 2                                                 |
 | One flow stack (`haven up` + 4 sims)                       | 4-6 GB               | ≤ 2                                                 |
 | `+langevals`                                               | +2-3 GB              | 1                                                   |
-| UI fuzz lane (`fuzz ui`, 16 workers)                       | 3-5 GB               | 1, on its own stack                                 |
 | Tier L or XL                                               | n/a                  | never on the laptop's shared native ClickHouse (R3) |
 
 ---

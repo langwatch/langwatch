@@ -48,7 +48,7 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		query.Set("state", state)
 	}
 	target.RawQuery = query.Encode()
-	http.Redirect(w, r, target.String(), http.StatusFound)
+	http.Redirect(w, r, target.String(), http.StatusFound) //nolint:gosec // G710: OAuth sends the browser back to redirect_uri; the sim mirrors GitHub
 }
 
 // handleAccessToken is OAuth's code exchange. GitHub answers a bad code with 200 and an error body.
@@ -174,7 +174,7 @@ func (s *Server) renderInstallChoices(w http.ResponseWriter, r *http.Request) {
 	for _, login := range logins {
 		b.WriteString(installLink(r, login, ""))
 	}
-	b.WriteString(installLink(r, "new-org", " (a new organisation)"))
+	b.WriteString(installLink(r, "new-org", " (a new organization)"))
 	b.WriteString("</ul>")
 	writePage(w, "githubsim install", b.String())
 }

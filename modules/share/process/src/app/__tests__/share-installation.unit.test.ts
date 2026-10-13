@@ -1,5 +1,9 @@
-import { createApp } from "@langwatch/process";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi, ShareLinkNotFoundError } from "@langwatch/share-contract";
 import { describe, expect, it } from "vitest";
 
@@ -11,16 +15,22 @@ import {
 } from "./share.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({ role }).withModules([shareProcessModule]).withStores(memoryStores()).provide({
-    authz: createShareTestAuthz(),
-    "data-retention": createShareTestDataRetention(),
-    project: createShareTestProjects(),
+  return bootInstalledProcess({
+    role,
+    modules: [shareProcessModule],
+    config: {},
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: AuthzApi, instance: createShareTestAuthz() }),
+      testPeer({ token: DataRetentionApi, instance: createShareTestDataRetention() }),
+      testPeer({ token: ProjectApi, instance: createShareTestProjects() }),
+    ],
   });
 }
 
 describe("share app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process(role).boot();
+    const runtime = await process(role);
 
     try {
       const app = runtime.service(ShareApi);

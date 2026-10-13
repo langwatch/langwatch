@@ -29,7 +29,8 @@ func Ribbon(report *Report, origin time.Time, steps []LedgerRow) string {
 	for _, name := range slices.Sorted(maps.Keys(report.Marks)) {
 		rows = append(rows, ribbonRow{name, report.Marks[name], report.Marks[name]})
 	}
-	for _, step := range steps {
+	for i := range steps {
+		step := &steps[i]
 		start, ok1 := ledgerMs(step.Started, origin)
 		end, ok2 := ledgerMs(step.Finished, origin)
 		if ok1 && ok2 && end >= start {
