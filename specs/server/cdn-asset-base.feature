@@ -4,6 +4,9 @@ Feature: Production HTTP server — runtime-configurable CDN asset base
   So that one image serves assets same-origin for self-host and from a
   commit-prefixed CDN for SaaS, and a rolling deploy never strands a tab on a 404
 
+  # ADR-111 moves the UI build and static server into separate application
+  # workspaces without changing this runtime asset-delivery contract.
+
   # Background: Vite hashes asset filenames per build and, before this change,
   # baked an absolute base ("/") into every chunk URL at build time. During a
   # rolling deploy two builds serve behind one Service, so a tab that fetched the
@@ -52,7 +55,7 @@ Feature: Production HTTP server — runtime-configurable CDN asset base
       And dist/client/index.html references /assets/index-deadbeef.js
       When a client requests /
       Then the response body references https://cdn.langwatch.ai/abc123/assets/index-deadbeef.js
-      And the resolver returns "https://cdn.langwatch.ai/abc123/assets/x.js" for the path "assets/x.js"
+      And the preload and stylesheet links under /assets/ are rewritten the same way
 
     @unit
     Scenario: Same-origin rewriting is a no-op for the entry references

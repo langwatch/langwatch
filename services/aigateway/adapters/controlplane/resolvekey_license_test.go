@@ -30,6 +30,7 @@ func TestResolveKey_LicenseTokenRefusalsKeepTheirCode(t *testing.T) {
 		{"connect_license_revoked", http.StatusForbidden, domain.ErrConnectLicenseRevoked},
 		{"connect_license_expired", http.StatusForbidden, domain.ErrConnectLicenseExpired},
 		{"connect_wrong_instance", http.StatusForbidden, domain.ErrConnectWrongInstance},
+		{"connect_credential_pending", http.StatusServiceUnavailable, domain.ErrConnectCredentialPending},
 		// Malformed is refused by the gateway before it asks. If the control
 		// plane ever answers it, it reads as any other bad credential.
 		{"connect_license_token_malformed", http.StatusUnauthorized, domain.ErrInvalidAPIKey},

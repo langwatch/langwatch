@@ -52,12 +52,12 @@ Page by cursor while a run is still writing: you neither see a verdict twice nor
 }
 ```
 
-| Field | Set for |
-|---|---|
-| `passed`, `probability` | A yes or no question |
-| `score` | A score question |
-| `label`, `probability`, `probabilities` | A category question: the most likely option, its probability, and every option's probability |
-| `status`, `error` | Every verdict: `judged`, `skipped` (the judge declined the row) or `failed` (the judge could not be reached), with the reason in `error`. For example, a row is skipped when its text is too large even after cutting |
+| Field                                   | Set for                                                                                                                                                                                                               |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `passed`, `probability`                 | A yes or no question                                                                                                                                                                                                  |
+| `score`                                 | A score question                                                                                                                                                                                                      |
+| `label`, `probability`, `probabilities` | A category question: the most likely option, its probability, and every option's probability                                                                                                                          |
+| `status`, `error`                       | Every verdict: `judged`, `skipped` (the judge declined the row) or `failed` (the judge could not be reached), with the reason in `error`. For example, a row is skipped when its text is too large even after cutting |
 
 ## What did the judge read
 
@@ -95,20 +95,20 @@ LIMIT 20
 langwatch query "$(cat by-user.sql)" --param run=<run-id>
 ```
 
-| Column | What it holds |
-|---|---|
-| `RunId` | The run the verdict belongs to |
+| Column                          | What it holds                                                                                                                                   |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RunId`                         | The run the verdict belongs to                                                                                                                  |
 | `TraceId`, `ThreadId`, `SpanId` | The trace whose text was judged, its conversation, and the span when the statement judged one span. `ThreadId` and `SpanId` are empty otherwise |
-| `QuestionId` | The question, named by its column in the run's statement |
-| `Kind` | `boolean`, `score` or `category` |
-| `Status` | `judged`, `skipped` or `failed` |
-| `Passed` | 1 or 0 for a yes or no question, null for the other kinds |
-| `Probability` | The probability of yes, or of the chosen label for a category question |
-| `Score` | The probability-weighted mean inside the declared range, for a score question |
-| `Label` | The most likely option, for a category question |
-| `Probabilities` | Every option's probability for a category question, as a JSON object |
-| `OccurredAt` | When the judged row happened, so a verdict can be joined to a trace inside a bounded period |
-| `CreatedAt` | When the verdict was written. Filter on it to keep the query fast |
+| `QuestionId`                    | The question, named by its column in the run's statement                                                                                        |
+| `Kind`                          | `boolean`, `score` or `category`                                                                                                                |
+| `Status`                        | `judged`, `skipped` or `failed`                                                                                                                 |
+| `Passed`                        | 1 or 0 for a yes or no question, null for the other kinds                                                                                       |
+| `Probability`                   | The probability of yes, or of the chosen label for a category question                                                                          |
+| `Score`                         | The probability-weighted mean inside the declared range, for a score question                                                                   |
+| `Label`                         | The most likely option, for a category question                                                                                                 |
+| `Probabilities`                 | Every option's probability for a category question, as a JSON object                                                                            |
+| `OccurredAt`                    | When the judged row happened, so a verdict can be joined to a trace inside a bounded period                                                     |
+| `CreatedAt`                     | When the verdict was written. Filter on it to keep the query fast                                                                               |
 
 `langwatch query reference` lists the columns with their types, and `GET /api/v1/query/schema` returns the same over REST.
 

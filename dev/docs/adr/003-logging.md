@@ -29,11 +29,11 @@ We use Node.js **AsyncLocalStorage** to propagate request context across async b
 
 ### Key Components
 
-| Component | File | Purpose |
-|-----------|------|---------|
-| `context` | `packages/observability/src/context/` | Core context management and logger registration |
-| `logger.ts` | `packages/observability/src/` | Isomorphic logger factory with context injection |
-| `loggerMiddleware` | `src/app/api/middleware/` | Hono HTTP context setup |
+| Component          | File                                  | Purpose                                          |
+| ------------------ | ------------------------------------- | ------------------------------------------------ |
+| `context`          | `packages/observability/src/context/` | Core context management and logger registration  |
+| `logger.ts`        | `packages/observability/src/`         | Isomorphic logger factory with context injection |
+| `loggerMiddleware` | `src/app/api/middleware/`             | Hono HTTP context setup                          |
 
 ### RequestContext Shape
 
@@ -55,7 +55,7 @@ Jobs receive context via payload metadata:
 ```typescript
 // When creating a job
 const metadata = getJobContextMetadata();
-await queue.add('job-name', { ...data, __context: metadata });
+await queue.add("job-name", { ...data, __context: metadata });
 
 // When processing a job
 const ctx = createContextFromJobData(job.data.__context);

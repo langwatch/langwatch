@@ -1,14 +1,16 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import {
   type BudgetOnBreach,
   type BudgetWindow,
   type CreateGatewayBudgetScope,
   GatewayBudgetsApiService,
 } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface CreateGatewayBudgetOptions {
   name: string;
@@ -27,6 +29,13 @@ export interface CreateGatewayBudgetOptions {
   providerKey?: string;
   cycleAnchorAt?: string;
 }
+
+/**
+ * A budget created partway through its window starts at zero: what its scope
+ * spent earlier in the window is not counted against it.
+ */
+export const BUDGET_COUNTS_FROM_CREATION_NOTE =
+  "This budget counts spend from now on. Spend earlier in the current window is not counted.";
 
 const ALLOWED_WINDOWS = [
   "minute",
@@ -78,9 +87,7 @@ export const createGatewayBudgetCommand = async (
   // is always lowercase.
   const window = options.window.toLowerCase() as BudgetWindow;
   if (!(ALLOWED_WINDOWS as readonly BudgetWindow[]).includes(window)) {
-    console.error(
-      chalk.red(`Error: --window must be one of ${ALLOWED_WINDOWS.join(", ")}`),
-    );
+    console.error(chalk.red(`Error: --window must be one of ${ALLOWED_WINDOWS.join(", ")}`));
     process.exit(1);
   }
 
@@ -139,6 +146,8 @@ export const createGatewayBudgetCommand = async (
             `${chalk.bold("Anchor:")}   ${new Date(budget.cycle_anchor_at).toLocaleString()}`,
           );
         }
+        console.log();
+        console.log(chalk.gray(BUDGET_COUNTS_FROM_CREATION_NOTE));
         console.log();
       },
     };

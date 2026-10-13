@@ -11,7 +11,7 @@ T = TypeVar("T", bound="PostApiWorkflowsByWorkflowIdRunResponse200ResultType0")
 
 @_attrs_define
 class PostApiWorkflowsByWorkflowIdRunResponse200ResultType0:
-    """The workflow's output fields, named as the workflow names them"""
+    """ """
 
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 

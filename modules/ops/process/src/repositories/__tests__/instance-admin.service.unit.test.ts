@@ -1,0 +1,89 @@
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { AdminOperationInput } from "@langwatch/ops-contract";
+import type { UserProfile } from "@langwatch/user-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { TestUserApi } from "../../services/__tests__/support/test-user-api.ts";
+import { AdminAuditSink } from "../../services/impersonation.service.ts";
+import { InstanceAdminService } from "../../services/instance-admin.service.ts";
+import { InstanceAdminRepository } from "../instance-admin.repository.ts";
+
+const user: UserProfile = {
+  id: "user-1",
+  name: "Alice",
+  email: "alice@example.com",
+  emailVerified: true,
+  image: null,
+  pendingSsoSetup: false,
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+  lastLoginAt: null,
+  deactivatedAt: null,
+};
+
+/** The one operation an operator's email edit reaches; auth ends the sessions on a real change. */
+const updateProfileFake = (email = user.email) =>
+  vi.fn(async (): Promise<UserProfile> => ({ ...user, email }));
+
+class RepositoryFake extends InstanceAdminRepository {
+  execute = vi.fn();
+  findUserById = vi.fn(async () => ({ data: user }));
+}
+
+class AuditFake extends AdminAuditSink {
+  record = vi.fn(async () => undefined);
+}
+
+function input(email: string): AdminOperationInput {
+  return {
+    resource: "user",
+    method: "update",
+    params: { id: user.id, data: { email } },
+    actorId: "operator-1",
+    req: { headers: {} },
+  };
+}
+
+function serviceWith(changeUserEmail: AuthApi["changeUserEmail"]) {
+  return InstanceAdminService.create({
+    accounts: {
+      deactivateUser: () => Promise.reject(new Error("unreached")),
+      changeUserEmail,
+    },
+    repository: new RepositoryFake(),
+    users: new TestUserApi({}),
+    audit: new AuditFake(),
+  });
+}
+
+describe("InstanceAdminService user email updates", () => {
+  /** @scenario "An operator changing a user's email revokes their browser sessions" */
+  it("hands the normalised email to user, which auth revokes after on a real change", async () => {
+    const updateProfile = updateProfileFake("new@example.com");
+
+    await serviceWith(updateProfile).execute(input(" NEW@example.com "));
+
+    expect(updateProfile).toHaveBeenCalledWith({ id: user.id, email: "new@example.com" });
+  });
+
+  /** @scenario "A change that only differs in case or spacing revokes nothing" */
+  it("hands a case-only change to user as the stored email", async () => {
+    const updateProfile = updateProfileFake();
+
+    await serviceWith(updateProfile).execute(input(" ALICE@EXAMPLE.COM "));
+
+    expect(updateProfile).toHaveBeenCalledWith({ id: user.id, email: user.email });
+  });
+
+  /** @scenario "A failed revocation still leaves the new admin email in place" */
+  it("surfaces a revocation failure from auth's door, which saved the email first", async () => {
+    const updateProfile = vi.fn(async (): Promise<UserProfile> => {
+      throw new Error("redis unavailable");
+    });
+
+    await expect(serviceWith(updateProfile).execute(input("new@example.com"))).rejects.toThrow(
+      "redis unavailable",
+    );
+    expect(updateProfile).toHaveBeenCalledWith({ id: user.id, email: "new@example.com" });
+  });
+});

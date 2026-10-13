@@ -27,8 +27,8 @@ Feature: The AI Governance Agents page
   # `governanceAgents.list` reads two organization-scoped tables: agents that
   # registered themselves from code (ADR-128) and agents a connected provider
   # was asked to list. Neither measures spend, request counts or health per
-  # agent, so a real row leaves those null and the page draws a dash with the
-  # reason on it.
+  # agent, so a real row leaves those null and the page draws a quiet "No data"
+  # with the reason on it.
   #
   # SAMPLE MODE IS AN EITHER-OR, NEVER A FALLBACK. With it on the page shows
   # the invented set and says so; with it off it shows what the read returned,
@@ -563,7 +563,7 @@ Feature: The AI Governance Agents page
   # is a large part of what the list is for.
   #
   # Both layouts draw a figure through the same component, so a value the
-  # platform does not have is the same em dash carrying the same sentence in
+  # platform does not have is the same "No data" carrying the same reason in
   # either one, and neither can quietly render a zero instead.
 
   @integration
@@ -592,12 +592,12 @@ Feature: The AI Governance Agents page
     And choosing List again takes it back out
 
   @integration
-  Scenario: A value the list does not have reads as a dash, never a zero
+  Scenario: A value the list does not have reads as No data with its reason, never a zero
     Given a sample agent that has never been called
     When its row renders
     Then its spend, its request count, its health and its last active read as
-      a dash
-    And each dash explains itself
+      No data
+    And each one carries its reason
     And the row still names the agent and the environment it runs in
 
   # ===========================================================================
@@ -612,11 +612,11 @@ Feature: The AI Governance Agents page
     And its spend, its request count and when it was last active
 
   @integration
-  Scenario: A figure the platform does not have reads as a dash, never a zero
+  Scenario: A figure the platform does not have reads as No data with its reason, never a zero
     Given a sample agent that has never been called
     When its card renders
-    Then its spend and request count read as a dash
-    And the dash explains itself on hover
+    Then its spend and request count read as No data
+    And each one carries its reason on hover
 
   # ===========================================================================
   # The fleet summary strip

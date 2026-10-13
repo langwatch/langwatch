@@ -46,7 +46,7 @@ func (ic InlineCredentials) Encode() (string, error) {
 // shape, dispatching by `provider` (parsed from the model id by the caller).
 //
 // Unknown fields in `params` are ignored — the source-of-truth fields are
-// dictated by platform/app/src/server/api/routers/modelProviders.utils.ts:225
+// dictated by modules/model-provider/process/src/adapters/legacy-model-provider.adapter.ts:225
 // (prepareLitellmParams). Adding a new field there means adding it here.
 func FromLiteLLMParams(provider string, params map[string]any) (InlineCredentials, error) {
 	switch provider {
@@ -74,14 +74,14 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 			Bedrock: pickStrings(params,
 				"aws_access_key_id", "aws_secret_access_key",
 				"aws_session_token", "aws_region_name",
-				"aws_bedrock_runtime_endpoint",
+				"aws_bedrock_runtime_endpoint", "api_base",
 			),
 		}, nil
 	case "vertex_ai", "vertex":
 		return InlineCredentials{
 			Provider: "vertex_ai",
 			VertexAI: pickStrings(params,
-				"vertex_credentials", "vertex_project", "vertex_location",
+				"vertex_credentials", "vertex_project", "vertex_location", "api_base",
 			),
 		}, nil
 	case "gemini":
@@ -91,7 +91,7 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 		// credential is an AI Studio key for the Gemini API.
 		return InlineCredentials{
 			Provider: "gemini",
-			Gemini:   pickStrings(params, "api_key", "project_id", "region"),
+			Gemini:   pickStrings(params, "api_key", "project_id", "region", "api_base"),
 		}, nil
 	case "xai", "groq", "cerebras", "deepseek":
 		return InlineCredentials{
