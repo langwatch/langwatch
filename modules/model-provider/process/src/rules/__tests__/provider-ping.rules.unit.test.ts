@@ -47,7 +47,7 @@ describe("given a chat provider", () => {
 
 describe("given a provider whose catalogue lists a router", () => {
   describe("when the model to ping is picked", () => {
-    /** @scenario A provider ping never picks a router */
+    // No registered provider lists a router today; this keeps a future one off the ping.
     it("never picks the router, whose -1 rate is no price", () => {
       const routers = getModelsForProvider("nvidia").filter((model) =>
         isVariablePriceRouter(model),

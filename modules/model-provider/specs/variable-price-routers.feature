@@ -27,15 +27,15 @@ Feature: A router has no price of its own
       Then no rule is found
 
     @unit @regression
-    Scenario: A router id in another letter case borrows no cost rule
-      Given a router id written in upper case
+    Scenario: A router id in a client's spelling borrows no cost rule
+      Given a router id written in another letter case, with its provider repeated, or with a variant tag
       When its cost rule is matched against the registry
       Then no rule is found
 
     @unit
     Scenario: A cost rule that names the router still prices it
-      Given a project rule whose pattern names a router
-      When the router's cost rule is matched, in any letter case
+      Given a project rule whose pattern is the router's plain id
+      When the router's cost rule is matched, in any client's spelling
       Then that rule is the match
 
   Rule: The registry sync writes the marker, never a refund
@@ -54,11 +54,11 @@ Feature: A router has no price of its own
       Then its input and output rates are zero
       And the catalogue does not read it as a router
 
-  Rule: Every reader of catalogue prices leaves a router unpriced
+  Rule: Every cost path leaves a router unpriced
 
     @unit @regression
     Scenario: A span through a router is never costed below zero
-      Given a span whose model is a router
+      Given a span priced as a router, because its model names one
       When the span is costed from the registry
       Then its cost is zero
 
@@ -76,15 +76,9 @@ Feature: A router has no price of its own
 
     @unit @regression
     Scenario: A DSPy step's call through a router is left unpriced
-      Given a DSPy step whose LLM call went through a router
+      Given a DSPy step whose LLM response names a router as its model
       When the call is priced
       Then the call has no cost
-
-    @unit
-    Scenario: A provider ping never picks a router
-      Given a provider whose catalogue lists a router
-      When the model to ping is picked
-      Then the first pick is not the router
 
     @unit @regression
     Scenario: The evaluator price table skips a router
