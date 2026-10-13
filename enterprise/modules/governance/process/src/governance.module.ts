@@ -157,7 +157,8 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
             after: typeof resumed === "string" ? resumed : undefined,
             dryRun,
             signal,
-            onAggregate: (progress) => checkpoint.save({ report: progress }),
+            onAggregate: (progress) =>
+              dryRun ? Promise.resolve() : checkpoint.save({ report: progress }),
           });
           return { ...report, dryRun };
         },
