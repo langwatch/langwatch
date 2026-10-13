@@ -344,7 +344,19 @@ jobs:
 
       # The graph is derived, not source: it is rebuilt whenever the workspace
       # shape changes and is cheap to recompute, so a miss costs seconds.
+      # Only main saves; a pull request restores main's newest entry.
+      - name: Restore the Nx project graph
+        if: github.ref != 'refs/heads/main'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .nx/workspace-data
+          key: ${{ runner.os }}-nx-graph-${{ hashFiles('pnpm-lock.yaml', 'nx.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-graph-${{ hashFiles('pnpm-lock.yaml', 'nx.json') }}-
+            ${{ runner.os }}-nx-graph-
+
       - name: Cache the Nx project graph
+        if: github.ref == 'refs/heads/main'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/workspace-data
@@ -494,9 +506,10 @@ jobs:
       #
       # The restore key is pinned to the lockfile and the root compiler
       # options: a snapshot built against other dependency types is never
-      # restored. The source hashes beside it let the next step drop what changed.
-      - name: Cache TypeScript incremental build info
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # restored. Only main saves, below, so a pull request restores main's.
+      - name: Restore TypeScript incremental build info
+        id: tsbuildinfo
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           # One level per package: a `**` walks every node_modules symlink below
           # it, and the save then outlives the job's timeout.
@@ -550,7 +563,23 @@ jobs:
       # migration in flight tends to break several at once. The job still fails.
       # One pass: the step above leaves no stale declaration to re-check against.
       - name: Run typecheck (every workspace package)
+        id: typecheck
         run: pnpm run typecheck
+
+      # Saved even when the typecheck fails, so one red commit on main does not
+      # leave every later run cold. Safe: tsbuildinfo keeps the errors, and a
+      # fix changes the package's sources, which drops it and its dependants.
+      - name: Save TypeScript incremental build info
+        if: ${{ !cancelled() && github.ref == 'refs/heads/main' && (steps.typecheck.outcome == 'success' || steps.typecheck.outcome == 'failure') }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            packages/*/dist
+            modules/*/*/dist
+            enterprise/modules/*/*/dist
+            apps/*/dist
+            node_modules/.cache/typecheck-dist
+          key: ${{ steps.tsbuildinfo.outputs.cache-primary-key }}
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -1092,6 +1121,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
           cache-dependency-glob: uv.lock
 
       - name: Regenerate the clients and the docs copy

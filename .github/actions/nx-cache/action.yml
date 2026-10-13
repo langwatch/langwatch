@@ -1,11 +1,10 @@
 # The Nx task cache, carried between runs. Entries are keyed by task hash, so
-# restoring any older cache is safe: a stale entry is simply never looked up.
-# The key rotates with the commit so every run saves what it added; the suffix
-# keeps jobs that fill different entries (the prepare steps, the build) from
-# racing to save one key. The index (a SQLite file) travels with the cache: Nx
-# ignores artefacts it has no index rows for. Locally Nx shares ~/.nx (ADR-150).
+# restoring any older cache is safe. Only main saves, under a key that rotates
+# with the commit; pull requests and merge queues restore main's newest entry
+# and never save, because each save is a fresh copy against the 10 GB quota.
+# The index (a SQLite file) travels with the cache. Locally Nx shares ~/.nx (ADR-150).
 name: nx-cache
-description: Restore and save the Nx task cache under a key that rotates with the commit.
+description: Restore the Nx task cache; save it only on main, under a key that rotates with the commit.
 
 inputs:
   suffix:
@@ -23,6 +22,19 @@ runs:
         echo "NX_WORKSPACE_DATA_DIRECTORY=$GITHUB_WORKSPACE/.nx/workspace-data" >> "$GITHUB_ENV"
 
     - name: Restore the Nx cache
+      if: github.ref != 'refs/heads/main'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          .nx/cache
+          .nx/workspace-data/*.db*
+        key: ${{ runner.os }}-nx-${{ inputs.suffix }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-nx-${{ inputs.suffix }}-
+          ${{ runner.os }}-nx-
+
+    - name: Restore and save the Nx cache
+      if: github.ref == 'refs/heads/main'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
