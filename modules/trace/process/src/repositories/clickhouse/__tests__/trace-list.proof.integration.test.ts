@@ -469,8 +469,7 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
       });
     });
 
-    // QUARANTINED(main-green): `NOT eval:...`, `NOT evaluator:...` and `NOT scenarioVerdict:...` build `NOT ((TenantId, TraceId) IN (SELECT ... WHERE TenantId IN (<fence>) ...))`, which the tenant guard refuses as "negates the tenant predicate" (TenantScopeError) - a trace search negating these filters fails in production. Tracking: https://github.com/langwatch/langwatch/issues/8606
-    describe.skip("when filters reach side tables no twin row has a match in", () => {
+    describe("when filters reach side tables no twin row has a match in", () => {
       it("runs each one across the members and matches by tenant and id", async () => {
         const evalRuns: ResolvedInstantEvalRun[] = [
           {
