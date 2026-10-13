@@ -23,8 +23,11 @@ const VITE_FALLBACK = `<!DOCTYPE html>
 
 const GROUND = "window.__ground = true;";
 
-async function transform(html: string): Promise<string> {
-  const hook = bootSplash({ bundleGround: async () => GROUND }).transformIndexHtml;
+/** A minified bundle may hold `$\``, `$'` or `$&`, which a string replacement would expand. */
+const GROUND_WITH_PATTERNS = 'var a=`$``,b="$\'",c="$&";';
+
+async function transform(html: string, ground = GROUND): Promise<string> {
+  const hook = bootSplash({ bundleGround: async () => ground }).transformIndexHtml;
   if (!hook || typeof hook === "function") throw new Error("expected an ordered hook");
   return (await hook.handler.call({} as never, html, {} as never)) as string;
 }
@@ -42,6 +45,13 @@ describe("the boot splash", () => {
       const html = await transform('<html><head></head><body><div id="root"></div></body></html>');
       expect(html).toContain(`<script data-boot-splash>${GROUND}</script>`);
       expect(html).not.toContain('type="module" src="/src/boot-ground.ts"');
+    });
+
+    it("inlines a ground script holding replacement patterns as written", async () => {
+      const page = '<html><head></head><body><div id="root"></div></body></html>';
+      const html = await transform(page, GROUND_WITH_PATTERNS);
+      expect(html).toContain(`<script data-boot-splash>${GROUND_WITH_PATTERNS}</script>`);
+      expect(html.match(/<head>/g)).toHaveLength(1);
     });
 
     it("holds the screen while the app shows its own loading screen", async () => {
@@ -172,6 +182,14 @@ describe("the boot splash", () => {
       served = '<html><body><div id="root"></div></body></html>';
       await tick();
       expect(reloads).toBe(1);
+    });
+  });
+
+  describe("given Vite's bundling page and a ground script holding replacement patterns", () => {
+    it("inlines the script as written", () => {
+      const html = brandFallbackPage({ html: VITE_FALLBACK, ground: GROUND_WITH_PATTERNS });
+      expect(html).toContain(GROUND_WITH_PATTERNS);
+      expect(html.match(/<body/g)).toHaveLength(1);
     });
   });
 
