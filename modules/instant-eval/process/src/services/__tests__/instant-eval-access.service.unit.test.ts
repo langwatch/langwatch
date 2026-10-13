@@ -10,6 +10,7 @@ import {
   type InstantEvalFlagReader,
   InstantEvalAccessService,
   type InstantEvalOptInReader,
+  type InstantEvalPlanReader,
   type InstantEvalProjectReader,
 } from "../instant-eval-access.service.ts";
 
@@ -35,13 +36,21 @@ function gate({
   flags = LOUD_FLAGS,
   projects = LOUD_PROJECTS,
   optIns = NEVER_OPTED_IN,
+  hostedPlans,
 }: {
   isJudgeConfigured: () => boolean;
   flags?: InstantEvalFlagReader;
   projects?: InstantEvalProjectReader;
   optIns?: InstantEvalOptInReader;
+  hostedPlans?: InstantEvalPlanReader;
 }) {
-  return InstantEvalAccessService.create({ flags, projects, optIns, isJudgeConfigured });
+  return InstantEvalAccessService.create({
+    flags,
+    projects,
+    optIns,
+    isJudgeConfigured,
+    hostedPlans,
+  });
 }
 
 describe("given a deployment with no judge configured", () => {
@@ -158,20 +167,21 @@ describe("given a judge that judges for some organizations and not others", () =
   });
 });
 
-describe("given the release flag is off for the project", () => {
-  const flagOff: InstantEvalFlagReader = { isEnabled: async () => false };
+describe("given a self-serve organization on the hosted service", () => {
+  const selfServe: InstantEvalPlanReader = { isEnterprisePlan: async () => false };
   const inOrganization: InstantEvalProjectReader = {
     findOrganizationId: async () => "organization-1",
   };
 
-  describe("when its organization switched Instant Evals on", () => {
+  describe("when it switched Instant Evals on and the release flag is off", () => {
     /** @scenario "An organization that switched itself on is judged without the flag" */
     it("may judge, from the organization's switch", async () => {
       const asked: string[] = [];
       const released = await gate({
         isJudgeConfigured: () => true,
-        flags: flagOff,
+        flags: { isEnabled: async () => false },
         projects: inOrganization,
+        hostedPlans: selfServe,
         optIns: {
           isOptedIn: async (organizationId) => {
             asked.push(organizationId);
@@ -185,23 +195,82 @@ describe("given the release flag is off for the project", () => {
     });
   });
 
-  describe("when its organization has not switched Instant Evals on", () => {
-    it("may not judge", async () => {
+  describe("when it has not switched Instant Evals on and the release flag is on", () => {
+    /** @scenario "The release flag does not release a self-serve organization that never switched itself on" */
+    it("may not judge, and the flag is not read", async () => {
+      const access = gate({
+        isJudgeConfigured: () => true,
+        projects: inOrganization,
+        hostedPlans: selfServe,
+      });
+
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(false);
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(false);
+    });
+  });
+
+  describe("when its project belongs to no organization", () => {
+    it("may not judge, with no plan to read", async () => {
       await expect(
         gate({
           isJudgeConfigured: () => true,
-          flags: flagOff,
-          projects: inOrganization,
+          projects: { findOrganizationId: async () => undefined },
+          hostedPlans: {
+            isEnterprisePlan: () => {
+              throw new Error("the gate read the plan");
+            },
+          },
         }).isReleased({ projectId: "project-1" }),
       ).resolves.toBe(false);
     });
   });
 });
 
-describe("given the release flag is on for the project", () => {
+describe("given an enterprise organization on the hosted service", () => {
+  const enterprise: InstantEvalPlanReader = { isEnterprisePlan: async () => true };
+  const inOrganization: InstantEvalProjectReader = {
+    findOrganizationId: async () => "organization-1",
+  };
+  const LOUD_OPT_INS: InstantEvalOptInReader = {
+    isOptedIn: () => {
+      throw new Error("the gate read the switch");
+    },
+  };
+
+  describe("when the release flag is on for the project", () => {
+    /** @scenario "The release flag releases an enterprise organization" */
+    it("may judge, without reading the organization's switch", async () => {
+      await expect(
+        gate({
+          isJudgeConfigured: () => true,
+          flags: { isEnabled: async () => true },
+          projects: inOrganization,
+          hostedPlans: enterprise,
+          optIns: LOUD_OPT_INS,
+        }).isReleased({ projectId: "project-1" }),
+      ).resolves.toBe(true);
+    });
+  });
+
+  describe("when the release flag is off and its switch was thrown earlier", () => {
+    /** @scenario "A switch thrown before an organization moved to an enterprise plan no longer counts" */
+    it("may not judge", async () => {
+      await expect(
+        gate({
+          isJudgeConfigured: () => true,
+          flags: { isEnabled: async () => false },
+          projects: inOrganization,
+          hostedPlans: enterprise,
+          optIns: LOUD_OPT_INS,
+        }).isReleased({ projectId: "project-1" }),
+      ).resolves.toBe(false);
+    });
+  });
+});
+
+describe("given an install off the hosted service, with the release flag on", () => {
   describe("when the project asks whether it is released", () => {
-    /** @scenario "An organization that switched itself on is judged without the flag" */
-    it("never reads the organization's switch", async () => {
+    it("may judge from the flag, without reading the organization's switch", async () => {
       await expect(
         gate({
           isJudgeConfigured: () => true,

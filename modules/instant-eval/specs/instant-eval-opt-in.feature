@@ -19,7 +19,12 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
   - a self-hosted install that is not released is told why in its own terms: its license does
     not include Instant Evals, an admin switched them off, it is not connected to LangWatch, or it
     has judging turned off, since judging runs on LangWatch Cloud only, and its operator decides;
-  - the operator's release flag stays as it was, and the flag, the license or the switch makes a
+  - on the hosted service the plan decides what releases a project: a self-serve organization is
+    released by its own switch alone, whatever the operator's release flag says, so no organization
+    sends its text to the judge without having agreed to it; an enterprise organization is released
+    by the flag alone, which is how one that asked gets them, and a switch thrown before it was on
+    an enterprise plan no longer counts;
+  - elsewhere the operator's release flag stays as it was, and the flag or the license makes a
     project judgeable.
 
   Rule: The offer depends on the plan, the deployment, and whether the member may throw the switch
@@ -133,12 +138,42 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Then the registry's words are shown as a warning
       And no estimate is requested and the popover stays open
 
-    @unit
+  Rule: On the hosted service the plan decides whether the switch or the release flag releases a project
+
+    @unit @integration
     Scenario: An organization that switched itself on is judged without the flag
-      Given the release flag is off for the project and its organization switched Instant Evals on
+      Given a self-serve organization on the hosted service that switched Instant Evals on
+      And the release flag is off for the project
       When the project asks whether it may judge
       Then it may, from the organization's switch
-      And a project the flag is on for never reads the switch
+
+    @unit @integration
+    Scenario: The release flag does not release a self-serve organization that never switched itself on
+      Given a self-serve organization on the hosted service that has not switched Instant Evals on
+      And the release flag is on for the project
+      When the project asks whether it may judge
+      Then it may not, and the flag is not read
+      And the popover still offers the switch
+
+    @unit @integration
+    Scenario: The release flag releases an enterprise organization
+      Given an enterprise organization on the hosted service
+      And the release flag is on for the project
+      When the project asks whether it may judge
+      Then it may, and the organization's switch is not read
+
+    @integration
+    Scenario: The search bar takes release from the server, never from its own read of the flag
+      Given the release flag reads on in the browser but the server says the project is not released
+      When the search bar asks whether Instant Evals are available
+      Then they are not, and the offer is the server's
+
+    @unit
+    Scenario: A switch thrown before an organization moved to an enterprise plan no longer counts
+      Given an enterprise organization on the hosted service whose switch was thrown earlier
+      And the release flag is off for the project
+      When the project asks whether it may judge
+      Then it may not
 
   Rule: An enterprise organization is never switched on by a click
 
