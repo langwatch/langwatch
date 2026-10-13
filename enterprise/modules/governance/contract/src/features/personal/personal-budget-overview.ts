@@ -1,0 +1,71 @@
+import type { Named } from "@langwatch/module";
+import { z } from "zod";
+
+export type GovernanceBudgetOverviewInput = {
+  organizationId: string;
+  userId: string;
+  includeTopModels?: boolean;
+};
+
+/**
+ * One budget on the /me overview, labelled with the scope it binds. The three
+ * money fields are decimal STRINGS: they are read straight off the ledger and
+ * never rounded through a float on the way to a screen.
+ */
+const governanceBudgetOverviewItemSchemaDefinition = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    scopeType: z.string(),
+    scopeId: z.string(),
+    scopeLabel: z.string(),
+    window: z.string(),
+    limitUsd: z.string(),
+    spentUsd: z.string(),
+    onBreach: z.string(),
+    timezone: z.string().nullable(),
+    providerKey: z.string().nullable(),
+    providerLabel: z.string().nullable(),
+    isPerMember: z.boolean(),
+    managedByVirtualKeyId: z.string().nullable(),
+    scopeClass: z.enum([
+      "organization",
+      "team",
+      "project",
+      "personal",
+      "key",
+      "department",
+      "other",
+    ]),
+    scopePhrase: z.string(),
+    resetsAt: z.string().nullable(),
+    topModels: z.array(z.object({ model: z.string(), spentUsd: z.number() }).strict()).optional(),
+  })
+  .strict();
+export interface GovernanceBudgetOverviewItemSchema extends Named<
+  typeof governanceBudgetOverviewItemSchemaDefinition
+> {}
+export const governanceBudgetOverviewItemSchema: GovernanceBudgetOverviewItemSchema =
+  governanceBudgetOverviewItemSchemaDefinition;
+
+/**
+ * Every budget binding one member's own keys. A caller with no gateway access
+ * is answered rather than refused, with the reason, so the screen renders
+ * nothing budget-related instead of an error.
+ */
+const governanceBudgetOverviewForUserSchemaDefinition = z
+  .object({
+    gatewayAccess: z.boolean(),
+    reason: z.enum(["flag_off", "no_membership"]).optional(),
+    budgets: z.array(governanceBudgetOverviewItemSchema),
+  })
+  .strict();
+export interface GovernanceBudgetOverviewForUserSchema extends Named<
+  typeof governanceBudgetOverviewForUserSchemaDefinition
+> {}
+export const governanceBudgetOverviewForUserSchema: GovernanceBudgetOverviewForUserSchema =
+  governanceBudgetOverviewForUserSchemaDefinition;
+
+export type GovernanceBudgetOverviewItem = z.infer<typeof governanceBudgetOverviewItemSchema>;
+
+export type GovernanceBudgetOverviewForUser = z.infer<typeof governanceBudgetOverviewForUserSchema>;

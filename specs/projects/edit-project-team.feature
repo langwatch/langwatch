@@ -161,7 +161,7 @@ Feature: Edit project name and team
     When I look at a project row
     Then I see an Edit button with a pencil icon next to the access count
 
-  @integration @unimplemented
+  @integration
   Scenario: Edit button opens project edit drawer
     Given I am on the Settings Teams & Projects page
     When I click the Edit button on project "My Chatbot"
@@ -169,7 +169,7 @@ Feature: Edit project name and team
     And it shows the current project name "My Chatbot"
     And it shows a team selector with the current team "Engineering" selected
 
-  @integration @unimplemented
+  @integration
   Scenario: User updates project name via drawer
     Given the EditProject drawer is open for "My Chatbot"
     When I change the name to "Renamed Bot"
@@ -178,7 +178,7 @@ Feature: Edit project name and team
     And I see a success toast
     And the project list refreshes showing "Renamed Bot"
 
-  @integration @unimplemented
+  @integration
   Scenario: User moves project to different team via drawer
     Given the EditProject drawer is open for "My Chatbot"
     When I select team "Analytics" from the team dropdown
@@ -187,7 +187,7 @@ Feature: Edit project name and team
     And I see a success toast
     And the project appears under team "Analytics"
 
-  @integration @unimplemented
+  @integration
   Scenario: Team selector only shows non-archived teams in same org
     Given the EditProject drawer is open
     Then the team dropdown lists "Engineering" and "Analytics"

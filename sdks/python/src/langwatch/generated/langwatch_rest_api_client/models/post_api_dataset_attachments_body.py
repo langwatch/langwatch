@@ -17,7 +17,7 @@ T = TypeVar("T", bound="PostApiDatasetAttachmentsBody")
 class PostApiDatasetAttachmentsBody:
     """
     Attributes:
-        file (File): The file to store.
+        file (File):
         dataset_id (str | Unset): The dataset that owns the file. Omit it while the dataset is still a draft.
     """
 

@@ -1,0 +1,235 @@
+import { useDrawerRouter } from "@langwatch/browser-host/drawer";
+/**
+ * Who is offered the annotation pass.
+ * @vitest-environment jsdom
+ */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
+
+const mocks = vi.hoisted(() => ({
+  canUpdateAnnotations: true,
+  openDrawer: vi.fn(),
+}));
+
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({
+    hasPermission: (permission: string) =>
+      permission === "annotations:update" ? mocks.canUpdateAnnotations : true,
+  }),
+}));
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
+
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDrawer: () => ({ openDrawer: mocks.openDrawer }),
+}));
+
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-1", slug: "acme" },
+  }),
+}));
+
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
+  useConversationTurns: () => ({ data: undefined }),
+}));
+
+vi.mock("@langwatch/design-system/toaster", () => ({
+  toaster: { create: vi.fn() },
+}));
+
+vi.mock("../../../../errors/index.ts", () => ({
+  showErrorToast: vi.fn(),
+}));
+
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
+  api: {
+    useUtils: () => ({
+      pinnedTrace: { getPin: { invalidate: vi.fn() } },
+    }),
+    pinnedTrace: {
+      getPin: { useQuery: () => ({ data: undefined }) },
+      pin: { useMutation: () => ({ mutate: vi.fn(), isLoading: false }) },
+      unpin: { useMutation: () => ({ mutate: vi.fn(), isLoading: false }) },
+    },
+  },
+}));
+
+const { getTraceDrawer, useTraceEditStore } = await import("../../../../../../index.ts");
+const { openTraceDrawerAt, setWindowAddress } =
+  await import("../../../../../../__tests__/window-location-router.ts");
+const { TraceOverflowMenu } = await import("../trace-overflow-menu.tsx");
+const PAGE = "/my-project/traces";
+const drawerAddress = (traceId: string, extra = "") =>
+  `${PAGE}?drawer.open=traceV2Details&drawer.traceId=${traceId}${extra}`;
+
+function RouterRegistration() {
+  useDrawerRouter();
+  return null;
+}
+
+const renderMenu = ({
+  readOnly = false,
+  traceId = "trace-1",
+  onAddToAnnotationQueue = vi.fn(),
+}: {
+  readOnly?: boolean;
+  traceId?: string;
+  onAddToAnnotationQueue?: () => void;
+} = {}) => {
+  renderWithDesignSystem(
+    <>
+      <RouterRegistration />
+      <TraceOverflowMenu
+        traceId={traceId}
+        conversationId={null}
+        onCopyTraceId={vi.fn()}
+        onFindSimilar={null}
+        dejaViewHref={null}
+        onOpenRawJson={vi.fn()}
+        onShowShortcuts={vi.fn()}
+        onAddToAnnotationQueue={onAddToAnnotationQueue}
+        pinned={false}
+        onTogglePinned={vi.fn()}
+        readOnly={readOnly}
+      />
+    </>,
+  );
+  return { onAddToAnnotationQueue };
+};
+
+/**
+ * Chakra v3 Menu (Ark) needs the full pointer chain to open in jsdom; a native
+ * `Element.click()` leaves it `data-state="closed"`.
+ */
+const openMenu = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByRole("button", { name: /more actions/i }));
+  await screen.findByText("Copy trace ID");
+};
+
+const editTraceItem = () => screen.queryByText("Edit trace");
+
+const annotationQueueItem = () => screen.queryByText("Add to annotation queue");
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.openDrawer.mockImplementation(() => {
+    setWindowAddress({ url: drawerAddress("trace-1", "&drawer.edit=1") });
+  });
+  mocks.canUpdateAnnotations = true;
+  useTraceEditStore.getState().discard();
+  openTraceDrawerAt({ mode: "trace" });
+});
+
+afterEach(() => {
+  cleanup();
+});
+
+describe("given a reviewer reading a trace in the drawer", () => {
+  describe("when they open the trace actions menu", () => {
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(async () => {
+      user = userEvent.setup();
+      renderMenu();
+      await openMenu(user);
+    });
+
+    /** @scenario "The overflow menu offers to edit the trace" */
+    it("offers an action to annotate the trace", () => {
+      expect(editTraceItem()).toBeInTheDocument();
+    });
+
+    /** @scenario "The overflow menu offers to edit the trace" */
+    it("starts annotating that trace when the action is chosen", async () => {
+      await user.click(screen.getByText("Edit trace"));
+
+      expect(useTraceEditStore.getState().editingTraceId).toBe("trace-1");
+      expect(getTraceDrawer().isEditing).toBe(true);
+    });
+  });
+
+  describe("when they are reading the conversation view", () => {
+    beforeEach(() => {
+      openTraceDrawerAt({ mode: "conversation" });
+    });
+
+    /** @scenario "Starting to annotate from the conversation leaves the reader there" */
+    it("leaves them on the conversation, where they were commenting", async () => {
+      const user = userEvent.setup();
+      renderMenu();
+      await openMenu(user);
+
+      await user.click(screen.getByText("Edit trace"));
+
+      expect(getTraceDrawer().viewMode).toBe("conversation");
+      expect(getTraceDrawer().isEditing).toBe(true);
+    });
+  });
+
+  describe("when the trace is a sample preview trace", () => {
+    /** @scenario "A sample preview trace is never offered for annotation" */
+    it("offers no action to annotate the trace", async () => {
+      const user = userEvent.setup();
+      renderMenu({ traceId: "lw-preview-chat" });
+
+      await openMenu(user);
+
+      expect(editTraceItem()).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when they may not update annotations", () => {
+    beforeEach(() => {
+      mocks.canUpdateAnnotations = false;
+    });
+
+    /** @scenario "A reviewer without permission to update annotations cannot annotate" */
+    it("offers no action to annotate the trace", async () => {
+      const user = userEvent.setup();
+      renderMenu();
+
+      await openMenu(user);
+
+      expect(editTraceItem()).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the trace is being read on its public share page", () => {
+    beforeEach(async () => {
+      const user = userEvent.setup();
+      renderMenu({ readOnly: true });
+      await openMenu(user);
+    });
+
+    /** @scenario "A shared trace is never editable" */
+    it("offers no action to annotate the trace, however permitted the reader is", () => {
+      expect(editTraceItem()).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A shared trace never offers the action" */
+    it("offers no action to queue the trace for annotation", () => {
+      expect(annotationQueueItem()).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when they pick the annotation queue action", () => {
+    /** @scenario "The trace drawer offers the same action for a single trace" */
+    it("hands the open trace to the header's dialog", async () => {
+      const user = userEvent.setup();
+      const { onAddToAnnotationQueue } = renderMenu();
+      await openMenu(user);
+
+      await user.click(screen.getByText("Add to annotation queue"));
+
+      expect(onAddToAnnotationQueue).toHaveBeenCalledTimes(1);
+    });
+  });
+});

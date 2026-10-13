@@ -1,20 +1,10 @@
 /**
- * `langwatch whoami` on the CLI output port: `-o json` (and `-o yaml`, `--jq`)
- * project a secret-free machine-readable snapshot from the persisted login
- * (~/.langwatch/config.json), while the bare command keeps its human-readable
- * output. Driven through the REAL command tree (`buildProgram`) so the port's
- * own resolution and serialization are exercised, not stubbed.
- *
- * Feature: specs/typescript-sdk/cli-cross-project-access.feature
- * Rule: whoami -o json prints a secret-free machine-readable snapshot
- *
- * Only `loadConfig` is mocked — the persisted config. `isLoggedIn` is the real
- * pure function (it reads `access_token`), so the logged-in / logged-out split
- * is the shipped rule, not a test double of it.
- *
+ * `langwatch whoami` on the output port: `-o json|yaml` and `--jq` project a
+ * secret-free snapshot of the persisted login, through the real command tree.
  * gitleaks:allow — test fixture keys only (not real secrets)
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type * as GovernanceConfigModule from "@/cli/utils/governance/config";
 
 const loadConfig = vi.fn();

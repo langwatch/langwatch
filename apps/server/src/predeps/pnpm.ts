@@ -1,0 +1,93 @@
+import { chmodSync, existsSync, rmSync } from "node:fs";
+import { join } from "node:path";
+
+import { execa } from "execa";
+import * as tar from "tar";
+
+import { downloadWithProgress } from "./_download.ts";
+import type { Predep, DetectionResult, InstallContext } from "./types.ts";
+
+// Pinned pnpm version. Keep in lockstep with the root package.json's
+// `packageManager` field — both control which pnpm we expect dev tooling
+// + npx-server to use.
+const PNPM_VERSION = "12.6.0";
+
+// Release archive published by pnpm/pnpm since v11: `pnpm` plus the `dist/` it
+// ships beside it (node-gyp, bundled deps). Asset names match our platform keys.
+const PLATFORMS = new Set([
+  "darwin-arm64",
+  "darwin-x64",
+  "linux-arm64",
+  "linux-x64",
+  "linux-arm64-musl",
+  "linux-x64-musl",
+]);
+
+function downloadUrl(platform: string): string {
+  if (!PLATFORMS.has(platform)) throw new Error(`pnpm: unsupported platform ${platform}`);
+  return `https://github.com/pnpm/pnpm/releases/download/v${PNPM_VERSION}/pnpm-${platform}.tar.gz`;
+}
+
+async function resolveVersion(bin: string): Promise<string | null> {
+  try {
+    const { stdout } = await execa(bin, ["--version"], { reject: false });
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export const pnpmPredep: Predep = {
+  id: "pnpm",
+  label: `pnpm ${PNPM_VERSION}`,
+  required: true,
+
+  async detect(paths): Promise<DetectionResult> {
+    // Prefer our own bundled binary when present — exact-version pinned,
+    // deterministic across re-runs.
+    const bundled = join(paths.bin, "pnpm");
+    if (existsSync(bundled)) {
+      const v = await resolveVersion(bundled);
+      if (v === PNPM_VERSION) {
+        return { installed: true, version: v, resolvedPath: bundled };
+      }
+      // Stale binary from an older PNPM_VERSION pin — fall through and
+      // re-download. install() overwrites, so this is recoverable.
+      return {
+        installed: false,
+        reason: `bundled pnpm ${v ?? "unknown"} != pinned ${PNPM_VERSION}`,
+      };
+    }
+    // Fall through to a system pnpm 10+: each honours the `packageManager: pnpm@12.6.0`
+    // pin, fetching that version into its own cache and running with it. The same
+    // pattern uv.ts uses for the host's uv.
+    const sysVersion = await resolveVersion("pnpm");
+    if (sysVersion && Number(sysVersion.split(".")[0]) >= 10) {
+      return { installed: true, version: sysVersion, resolvedPath: "pnpm" };
+    }
+    return {
+      installed: false,
+      reason: sysVersion
+        ? `system pnpm ${sysVersion} is older than 10 — bundled pnpm ${PNPM_VERSION} required`
+        : "no system pnpm on PATH; will install bundled",
+    };
+  },
+
+  async install({ platform, paths, task }: InstallContext) {
+    const url = downloadUrl(platform);
+    const bin = join(paths.bin, "pnpm");
+    const tmp = join(paths.bin, `.pnpm-${PNPM_VERSION}.tgz`);
+    await downloadWithProgress({ url, tmp, task, prefix: `downloading pnpm ${PNPM_VERSION}` });
+    task.output = "extracting";
+    tar.x({ sync: true, file: tmp, cwd: paths.bin });
+    rmSync(tmp, { force: true });
+    chmodSync(bin, 0o755);
+    const version = (await resolveVersion(bin)) ?? "unknown";
+    if (version !== PNPM_VERSION) {
+      throw new Error(
+        `pnpm install: downloaded binary reports v${version}, expected v${PNPM_VERSION}`,
+      );
+    }
+    return { version, resolvedPath: bin };
+  },
+};

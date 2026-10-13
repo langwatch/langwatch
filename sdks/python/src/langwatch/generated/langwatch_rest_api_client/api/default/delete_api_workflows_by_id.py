@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
@@ -6,11 +6,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.delete_api_workflows_by_id_response_200 import DeleteApiWorkflowsByIdResponse200
-from ...models.delete_api_workflows_by_id_response_400 import DeleteApiWorkflowsByIdResponse400
-from ...models.delete_api_workflows_by_id_response_401 import DeleteApiWorkflowsByIdResponse401
-from ...models.delete_api_workflows_by_id_response_404 import DeleteApiWorkflowsByIdResponse404
-from ...models.delete_api_workflows_by_id_response_422 import DeleteApiWorkflowsByIdResponse422
-from ...models.delete_api_workflows_by_id_response_500 import DeleteApiWorkflowsByIdResponse500
 from ...types import Response, safe_http_status
 
 
@@ -20,7 +15,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/workflows/{id}".format(
+        "url": "/api/v1/workflows/{id}".format(
             id=quote(str(id), safe=""),
         ),
     }
@@ -30,44 +25,15 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    DeleteApiWorkflowsByIdResponse200
-    | DeleteApiWorkflowsByIdResponse400
-    | DeleteApiWorkflowsByIdResponse401
-    | DeleteApiWorkflowsByIdResponse404
-    | DeleteApiWorkflowsByIdResponse422
-    | DeleteApiWorkflowsByIdResponse500
-    | None
-):
+) -> Any | DeleteApiWorkflowsByIdResponse200 | None:
     if response.status_code == 200:
         response_200 = DeleteApiWorkflowsByIdResponse200.from_dict(response.json())
 
         return response_200
 
-    if response.status_code == 400:
-        response_400 = DeleteApiWorkflowsByIdResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = DeleteApiWorkflowsByIdResponse401.from_dict(response.json())
-
-        return response_401
-
     if response.status_code == 404:
-        response_404 = DeleteApiWorkflowsByIdResponse404.from_dict(response.json())
-
+        response_404 = cast(Any, None)
         return response_404
-
-    if response.status_code == 422:
-        response_422 = DeleteApiWorkflowsByIdResponse422.from_dict(response.json())
-
-        return response_422
-
-    if response.status_code == 500:
-        response_500 = DeleteApiWorkflowsByIdResponse500.from_dict(response.json())
-
-        return response_500
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -77,14 +43,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    DeleteApiWorkflowsByIdResponse200
-    | DeleteApiWorkflowsByIdResponse400
-    | DeleteApiWorkflowsByIdResponse401
-    | DeleteApiWorkflowsByIdResponse404
-    | DeleteApiWorkflowsByIdResponse422
-    | DeleteApiWorkflowsByIdResponse500
-]:
+) -> Response[Any | DeleteApiWorkflowsByIdResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -100,14 +59,7 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    DeleteApiWorkflowsByIdResponse200
-    | DeleteApiWorkflowsByIdResponse400
-    | DeleteApiWorkflowsByIdResponse401
-    | DeleteApiWorkflowsByIdResponse404
-    | DeleteApiWorkflowsByIdResponse422
-    | DeleteApiWorkflowsByIdResponse500
-]:
+) -> Response[Any | DeleteApiWorkflowsByIdResponse200]:
     """Archive (soft-delete) a workflow
 
     Args:
@@ -118,7 +70,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiWorkflowsByIdResponse200 | DeleteApiWorkflowsByIdResponse400 | DeleteApiWorkflowsByIdResponse401 | DeleteApiWorkflowsByIdResponse404 | DeleteApiWorkflowsByIdResponse422 | DeleteApiWorkflowsByIdResponse500]
+        Response[Any | DeleteApiWorkflowsByIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -136,15 +88,7 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    DeleteApiWorkflowsByIdResponse200
-    | DeleteApiWorkflowsByIdResponse400
-    | DeleteApiWorkflowsByIdResponse401
-    | DeleteApiWorkflowsByIdResponse404
-    | DeleteApiWorkflowsByIdResponse422
-    | DeleteApiWorkflowsByIdResponse500
-    | None
-):
+) -> Any | DeleteApiWorkflowsByIdResponse200 | None:
     """Archive (soft-delete) a workflow
 
     Args:
@@ -155,7 +99,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiWorkflowsByIdResponse200 | DeleteApiWorkflowsByIdResponse400 | DeleteApiWorkflowsByIdResponse401 | DeleteApiWorkflowsByIdResponse404 | DeleteApiWorkflowsByIdResponse422 | DeleteApiWorkflowsByIdResponse500
+        Any | DeleteApiWorkflowsByIdResponse200
     """
 
     return sync_detailed(
@@ -168,14 +112,7 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    DeleteApiWorkflowsByIdResponse200
-    | DeleteApiWorkflowsByIdResponse400
-    | DeleteApiWorkflowsByIdResponse401
-    | DeleteApiWorkflowsByIdResponse404
-    | DeleteApiWorkflowsByIdResponse422
-    | DeleteApiWorkflowsByIdResponse500
-]:
+) -> Response[Any | DeleteApiWorkflowsByIdResponse200]:
     """Archive (soft-delete) a workflow
 
     Args:
@@ -186,7 +123,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiWorkflowsByIdResponse200 | DeleteApiWorkflowsByIdResponse400 | DeleteApiWorkflowsByIdResponse401 | DeleteApiWorkflowsByIdResponse404 | DeleteApiWorkflowsByIdResponse422 | DeleteApiWorkflowsByIdResponse500]
+        Response[Any | DeleteApiWorkflowsByIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -202,15 +139,7 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    DeleteApiWorkflowsByIdResponse200
-    | DeleteApiWorkflowsByIdResponse400
-    | DeleteApiWorkflowsByIdResponse401
-    | DeleteApiWorkflowsByIdResponse404
-    | DeleteApiWorkflowsByIdResponse422
-    | DeleteApiWorkflowsByIdResponse500
-    | None
-):
+) -> Any | DeleteApiWorkflowsByIdResponse200 | None:
     """Archive (soft-delete) a workflow
 
     Args:
@@ -221,7 +150,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiWorkflowsByIdResponse200 | DeleteApiWorkflowsByIdResponse400 | DeleteApiWorkflowsByIdResponse401 | DeleteApiWorkflowsByIdResponse404 | DeleteApiWorkflowsByIdResponse422 | DeleteApiWorkflowsByIdResponse500
+        Any | DeleteApiWorkflowsByIdResponse200
     """
 
     return (

@@ -1,0 +1,25 @@
+/**
+ * The price on the pricing page is the price in the code.
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
+ */
+
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+import { INSTANT_EVAL_PRICING, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
+import { describe, expect, it } from "vitest";
+
+const PRICING_PAGE = fileURLToPath(new URL("../../../../../../docs/pricing.mdx", import.meta.url));
+
+describe("given the classifier's published rate and markup", () => {
+  describe("when the pricing page is read", () => {
+    /** @scenario "The pricing page states the shipped rate" */
+    it("states the customer price per million input tokens those two produce", () => {
+      const price = instantEvalPriceUsd({ costUsd: INSTANT_EVAL_PRICING.usdPerMillionInputTokens });
+      const page = readFileSync(PRICING_PAGE, "utf8");
+
+      expect(page).toContain("## Instant Evals");
+      expect(page).toContain(`$${price.toFixed(4)} per million input tokens`);
+    });
+  });
+});

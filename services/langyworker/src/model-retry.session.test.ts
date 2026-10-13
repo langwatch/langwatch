@@ -66,7 +66,9 @@ afterEach(async () => {
 });
 
 /** A chat-completions endpoint that answers each request with the next stream in line. */
-async function scriptedProvider(streams: string[]): Promise<{ url: string; requests: () => number }> {
+async function scriptedProvider(
+  streams: string[],
+): Promise<{ url: string; requests: () => number }> {
   let served = 0;
   server = createServer((request, response) => {
     request.resume();
@@ -209,7 +211,10 @@ describe("a pi session with the model retry installed", () => {
 
     describe("when a later turn in the same session fails for a transient reason", () => {
       it("retries it with the full budget again", async () => {
-        const failures = Array.from({ length: 1 + MODEL_RETRY_MAX_ATTEMPTS }, () => OVERLOADED_STREAM);
+        const failures = Array.from(
+          { length: 1 + MODEL_RETRY_MAX_ATTEMPTS },
+          () => OVERLOADED_STREAM,
+        );
         const provider = await scriptedProvider([...failures, OVERLOADED_STREAM, ANSWER_STREAM]);
         const { session } = await sessionAgainst(provider.url);
         await session.prompt("count");

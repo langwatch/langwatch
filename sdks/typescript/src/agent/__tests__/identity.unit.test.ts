@@ -27,7 +27,10 @@ describe("resolveEnvironment()", () => {
     /** @scenario "The environment is the explicit option first" */
     it("wins over every environment variable", () => {
       expect(
-        resolveEnvironment({ explicit: "production", env: { LANGWATCH_AGENT_ENVIRONMENT: "staging" } }),
+        resolveEnvironment({
+          explicit: "production",
+          env: { LANGWATCH_AGENT_ENVIRONMENT: "staging" },
+        }),
       ).toBe("production");
     });
   });
@@ -42,9 +45,16 @@ describe("resolveEnvironment()", () => {
   describe("when several variables are set", () => {
     /** @scenario "LANGWATCH_AGENT_ENVIRONMENT wins over APP_ENV, ENVIRONMENT and NODE_ENV" */
     it("reads them in order", () => {
-      const env = { LANGWATCH_AGENT_ENVIRONMENT: "one", APP_ENV: "two", ENVIRONMENT: "three", NODE_ENV: "four" };
+      const env = {
+        LANGWATCH_AGENT_ENVIRONMENT: "one",
+        APP_ENV: "two",
+        ENVIRONMENT: "three",
+        NODE_ENV: "four",
+      };
       expect(resolveEnvironment({ env })).toBe("one");
-      expect(resolveEnvironment({ env: { APP_ENV: "two", ENVIRONMENT: "three", NODE_ENV: "four" } })).toBe("two");
+      expect(
+        resolveEnvironment({ env: { APP_ENV: "two", ENVIRONMENT: "three", NODE_ENV: "four" } }),
+      ).toBe("two");
       expect(resolveEnvironment({ env: { ENVIRONMENT: "three", NODE_ENV: "four" } })).toBe("three");
       expect(resolveEnvironment({ env: { NODE_ENV: "four" } })).toBe("four");
     });
@@ -74,7 +84,9 @@ describe("resolveEnabled()", () => {
   /** @scenario "LANGWATCH_AGENT_CONNECT=0 disables the connection" */
   it("is off when LANGWATCH_AGENT_CONNECT is 0 or false, even with enabled true", () => {
     expect(resolveEnabled({ explicit: true, env: { LANGWATCH_AGENT_CONNECT: "0" } })).toBe(false);
-    expect(resolveEnabled({ explicit: true, env: { LANGWATCH_AGENT_CONNECT: "false" } })).toBe(false);
+    expect(resolveEnabled({ explicit: true, env: { LANGWATCH_AGENT_CONNECT: "false" } })).toBe(
+      false,
+    );
     expect(resolveEnabled({ env: { LANGWATCH_AGENT_CONNECT: "1" } })).toBe(true);
   });
 });
@@ -82,7 +94,9 @@ describe("resolveEnabled()", () => {
 describe("resolveInstanceLabel()", () => {
   /** @scenario "The instance label comes from the option or LANGWATCH_AGENT_INSTANCE_LABEL" */
   it("reads the option first, then the variable", () => {
-    expect(resolveInstanceLabel({ explicit: "green", env: { LANGWATCH_AGENT_INSTANCE_LABEL: "blue" } })).toBe("green");
+    expect(
+      resolveInstanceLabel({ explicit: "green", env: { LANGWATCH_AGENT_INSTANCE_LABEL: "blue" } }),
+    ).toBe("green");
     expect(resolveInstanceLabel({ env: { LANGWATCH_AGENT_INSTANCE_LABEL: "blue" } })).toBe("blue");
     expect(resolveInstanceLabel({ env: {} })).toBeUndefined();
   });
@@ -99,9 +113,7 @@ describe("buildInstance()", () => {
     expect(buildInstance({ machine: machineNamed("ACME-Laptop.home") }).hostname).toBe(
       "acme-laptop",
     );
-    expect(hostLabel("ip-10-0-1-23.eu-west-1.compute.internal")).toBe(
-      "ip-10-0-1-23-eu-west-1-c",
-    );
+    expect(hostLabel("ip-10-0-1-23.eu-west-1.compute.internal")).toBe("ip-10-0-1-23-eu-west-1-c");
     expect(hostLabel("a".repeat(40))).toHaveLength(24);
     expect(hostLabel("--Pod A--")).toBe("pod-a");
   });
@@ -133,9 +145,15 @@ describe("buildInstance()", () => {
 describe("resolveConnectUrl()", () => {
   /** @scenario "The connect URL is derived from the endpoint" */
   it("turns https into wss and http into ws, on /api/v1/agents/connect", () => {
-    expect(resolveConnectUrl("https://app.langwatch.ai")).toBe("wss://app.langwatch.ai/api/v1/agents/connect");
-    expect(resolveConnectUrl("http://localhost:5560")).toBe("ws://localhost:5560/api/v1/agents/connect");
-    expect(resolveConnectUrl("http://localhost:5560/")).toBe("ws://localhost:5560/api/v1/agents/connect");
+    expect(resolveConnectUrl("https://app.langwatch.ai")).toBe(
+      "wss://app.langwatch.ai/api/v1/agents/connect",
+    );
+    expect(resolveConnectUrl("http://localhost:5560")).toBe(
+      "ws://localhost:5560/api/v1/agents/connect",
+    );
+    expect(resolveConnectUrl("http://localhost:5560/")).toBe(
+      "ws://localhost:5560/api/v1/agents/connect",
+    );
   });
 });
 

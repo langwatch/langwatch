@@ -1,6 +1,8 @@
 import { createServer, type Server } from "http";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { initConfig } from "../config.js";
+
+import { initConfig } from "../config.ts";
 
 // --- Canned responses for each API endpoint ---
 
@@ -8,7 +10,8 @@ const CANNED_TRACES_SEARCH = {
   traces: [
     {
       trace_id: "trace-001",
-      formatted_trace: "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Hello, how are you?\n    Output: I am fine, thank you!",
+      formatted_trace:
+        "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Hello, how are you?\n    Output: I am fine, thank you!",
       input: { value: "Hello, how are you?" },
       output: { value: "I am fine, thank you!" },
       timestamps: { started_at: 1700000000000 },
@@ -20,7 +23,8 @@ const CANNED_TRACES_SEARCH = {
 
 const CANNED_TRACE_DETAIL = {
   trace_id: "trace-001",
-  formatted_trace: "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Hello\n    Output: Hi there",
+  formatted_trace:
+    "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Hello\n    Output: Hi there",
   timestamps: {
     started_at: 1700000000000,
     inserted_at: 1700000001000,
@@ -66,7 +70,7 @@ const CANNED_PROMPT_DETAIL = {
   version: 3,
   versionId: "ver_p1v3",
   commitMessage: "Updated tone",
-  model: "openai/gpt-4o",
+  model: "openai/gpt-5-mini",
   messages: [{ role: "system", content: "You are a friendly bot." }],
   parameters: {},
   tags: [{ name: "latest", versionId: "ver_p1v3" }],
@@ -102,41 +106,30 @@ function createMockServer(): Server {
       const url = req.url ?? "";
       res.setHeader("Content-Type", "application/json");
 
-      if (url === "/api/traces/search" && req.method === "POST") {
+      if (url === "/api/v1/traces/search" && req.method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_TRACES_SEARCH));
-      } else if (
-        url.match(/^\/api\/traces\/[^/]+(\?|$)/) &&
-        req.method === "GET"
-      ) {
+      } else if (url.match(/^\/api\/v1\/traces\/[^/]+(\?|$)/) && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_TRACE_DETAIL));
-      } else if (
-        url === "/api/analytics/timeseries" &&
-        req.method === "POST"
-      ) {
+      } else if (url === "/api/v1/analytics/timeseries" && req.method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_ANALYTICS));
-      } else if (url === "/api/prompts" && req.method === "GET") {
+      } else if (url === "/api/v1/prompts" && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPTS_LIST));
-      } else if (url.match(/^\/api\/prompts\/[^/]+$/) && req.method === "GET") {
+      } else if (url.match(/^\/api\/v1\/prompts\/[^/]+$/) && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_DETAIL));
-      } else if (url === "/api/prompts" && req.method === "POST") {
+      } else if (url === "/api/v1/prompts" && req.method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_CREATED));
-      } else if (
-        url.match(/^\/api\/prompts\/[^/]+$/) &&
-        req.method === "PUT"
-      ) {
+      } else if (url.match(/^\/api\/v1\/prompts\/[^/]+$/) && req.method === "PUT") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_UPDATED));
       } else {
         res.writeHead(404);
-        res.end(
-          JSON.stringify({ message: `Not found: ${req.method} ${url}` })
-        );
+        res.end(JSON.stringify({ message: `Not found: ${req.method} ${url}` }));
       }
     });
   });
@@ -167,11 +160,9 @@ describe("MCP tools integration", () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  describe("search_traces", () => {
+  describe("search_traces()", () => {
     it("returns formatted trace digests from mock server", async () => {
-      const { handleSearchTraces } = await import(
-        "../tools/search-traces.js"
-      );
+      const { handleSearchTraces } = await import("../tools/search-traces.ts");
       const result = await handleSearchTraces({
         startDate: "24h",
         endDate: "now",
@@ -182,9 +173,9 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("get_trace", () => {
+  describe("get_trace()", () => {
     it("returns formatted trace digest from mock server", async () => {
-      const { handleGetTrace } = await import("../tools/get-trace.js");
+      const { handleGetTrace } = await import("../tools/get-trace.ts");
       const result = await handleGetTrace({ traceId: "trace-001" });
       expect(result).toContain("trace-001");
       expect(result).toContain("LLM Call [llm] 500ms");
@@ -193,11 +184,9 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("get_analytics", () => {
+  describe("get_analytics()", () => {
     it("returns formatted analytics data from mock server", async () => {
-      const { handleGetAnalytics } = await import(
-        "../tools/get-analytics.js"
-      );
+      const { handleGetAnalytics } = await import("../tools/get-analytics.ts");
       const result = await handleGetAnalytics({
         metric: "metadata.trace_id",
         aggregation: "cardinality",
@@ -208,9 +197,9 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("platform_list_prompts", () => {
+  describe("platform_list_prompts()", () => {
     it("returns formatted prompt list from mock server", async () => {
-      const { handleListPrompts } = await import("../tools/list-prompts.js");
+      const { handleListPrompts } = await import("../tools/list-prompts.ts");
       const result = await handleListPrompts();
       expect(result).toContain("greeting-bot");
       expect(result).toContain("Greeting Bot");
@@ -218,40 +207,36 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("platform_get_prompt", () => {
+  describe("platform_get_prompt()", () => {
     it("returns formatted prompt details from mock server", async () => {
-      const { handleGetPrompt } = await import("../tools/get-prompt.js");
+      const { handleGetPrompt } = await import("../tools/get-prompt.ts");
       const result = await handleGetPrompt({ idOrHandle: "greeting-bot" });
       expect(result).toContain("Greeting Bot");
-      expect(result).toContain("gpt-4o");
+      expect(result).toContain("gpt-5-mini");
       expect(result).toContain("You are a friendly bot.");
       expect(result).toContain("v3");
     });
   });
 
-  describe("platform_create_prompt", () => {
+  describe("platform_create_prompt()", () => {
     it("returns success message from mock server", async () => {
-      const { handleCreatePrompt } = await import(
-        "../tools/create-prompt.js"
-      );
+      const { handleCreatePrompt } = await import("../tools/create-prompt.ts");
       const result = await handleCreatePrompt({
         name: "New Prompt",
         messages: [{ role: "system", content: "You are helpful." }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
       expect(result).toContain("created successfully");
       expect(result).toContain("p-new");
     });
   });
 
-  describe("platform_update_prompt", () => {
+  describe("platform_update_prompt()", () => {
     it("returns success message from mock server", async () => {
-      const { handleUpdatePrompt } = await import(
-        "../tools/update-prompt.js"
-      );
+      const { handleUpdatePrompt } = await import("../tools/update-prompt.ts");
       const result = await handleUpdatePrompt({
         idOrHandle: "greeting-bot",
-        model: "openai/gpt-4o-mini",
+        model: "openai/gpt-5-mini",
         commitMessage: "Switch to mini",
       });
       expect(result).toContain("updated successfully");
@@ -273,12 +258,8 @@ describe("MCP tools integration", () => {
         endpoint: `http://localhost:${port}`,
       });
 
-      const { handleSearchTraces } = await import(
-        "../tools/search-traces.js"
-      );
-      await expect(
-        handleSearchTraces({ startDate: "24h" })
-      ).rejects.toThrow("401");
+      const { handleSearchTraces } = await import("../tools/search-traces.ts");
+      await expect(handleSearchTraces({ startDate: "24h" })).rejects.toThrow("401");
     });
   });
 });

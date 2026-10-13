@@ -1,0 +1,119 @@
+// @vitest-environment jsdom
+/**
+ * The name each target column shows in its header.
+ * @see specs/batch-evaluation-results/target-column-identity.feature
+ */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
+import { cleanup, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { WHOLE_RUN_COMPLETENESS } from "../../../../__tests__/run-completeness.fixture.ts";
+import { transformBatchEvaluationData } from "../../batch-evaluation-results.types.ts";
+import { BatchEvaluationResultsTable } from "../../batch-results/batch-evaluation-results-table.tsx";
+
+vi.mock("@langwatch/browser-host/drawer", () => ({
+  useDrawer: () => ({ openDrawer: vi.fn() }),
+}));
+
+// TraceIdPeek (rendered transitively) calls useFeatureFlag → tRPC, which has
+// no withTRPC wrapper in these tests.
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
+/** A finished run over one dataset row, with one output per named target. */
+const runWithTargetNames = (names: string[]): ExperimentRunWithItems => ({
+  experimentId: "exp-1",
+  runId: "run-1",
+  projectId: "proj-1",
+  completeness: WHOLE_RUN_COMPLETENESS,
+  targets: names.map((name, index) => ({
+    id: `target-${index + 1}`,
+    name,
+    type: "prompt",
+  })),
+  dataset: names.map((_, index) => ({
+    index: 0,
+    targetId: `target-${index + 1}`,
+    entry: { input: "a question" },
+    predicted: { output: `answer ${index + 1}` },
+    cost: 0.001,
+    duration: 400,
+  })),
+  evaluations: [],
+  timestamps: { createdAt: 1, updatedAt: 1, finishedAt: 2 },
+});
+
+const renderTableFor = (names: string[]) => {
+  renderWithDesignSystem(
+    <BatchEvaluationResultsTable
+      data={transformBatchEvaluationData(runWithTargetNames(names))}
+      disableVirtualization
+    />,
+  );
+};
+
+/** The same run twice, which is what puts the table in comparison mode. */
+const renderComparisonFor = (names: string[]) => {
+  const runs = ["run-1", "run-2"].map((runId) => ({
+    runId,
+    runName: runId,
+    color: "#3182ce",
+    isLoading: false,
+    data: {
+      ...transformBatchEvaluationData(runWithTargetNames(names)),
+      runId,
+    },
+  }));
+
+  renderWithDesignSystem(
+    <BatchEvaluationResultsTable
+      data={runs[0]!.data}
+      comparisonData={runs}
+      disableVirtualization
+    />,
+  );
+};
+
+afterEach(() => {
+  cleanup();
+});
+
+describe("given two targets stored under the same name", () => {
+  describe("when the results table renders", () => {
+    /** @scenario "Two target columns with the same name get separate headers" */
+    it("numbers each header the way the workbench does", () => {
+      renderTableFor(["category_classifier", "category_classifier"]);
+
+      expect(screen.getByText("category_classifier (1)")).toBeInTheDocument();
+      expect(screen.getByText("category_classifier (2)")).toBeInTheDocument();
+      expect(screen.queryByText("category_classifier")).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given targets with names of their own", () => {
+  describe("when the results table renders", () => {
+    /** @scenario "A target column with a unique name keeps its plain name" */
+    it("prints each name untouched", () => {
+      renderTableFor(["classifier", "summarizer"]);
+
+      expect(screen.getByText("classifier")).toBeInTheDocument();
+      expect(screen.getByText("summarizer")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given two runs whose targets share one name", () => {
+  describe("when the comparison table renders", () => {
+    /** @scenario "Compare mode numbers same-named target columns too" */
+    it("numbers each column the way single-run mode does", () => {
+      renderComparisonFor(["category_classifier", "category_classifier"]);
+
+      expect(screen.getByText("category_classifier (1)")).toBeInTheDocument();
+      expect(screen.getByText("category_classifier (2)")).toBeInTheDocument();
+      expect(screen.queryByText("category_classifier")).not.toBeInTheDocument();
+    });
+  });
+});

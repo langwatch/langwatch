@@ -18,11 +18,11 @@ The chain for a request is built from three things:
 
 Open the key under **AI Gateway, Virtual Keys** and click **Edit**. The **Routing** section lists two fixed choices, then one row per routing policy the key can reach:
 
-| Choice | Chain |
-|---|---|
-| Default: no fallback | One attempt. The provider's error reaches the caller unchanged. |
+| Choice                              | Chain                                                                                                                                                                  |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Default: no fallback                | One attempt. The provider's error reaches the caller unchanged.                                                                                                        |
 | Fall back to all eligible providers | Every provider the key's scope can reach, ordered by each provider's **Fallback priority** (Settings, Model Providers, Advanced), lowest first, then by creation date. |
-| A routing policy | The providers the policy lists, in the policy's order. See [Routing policies](/ai-gateway/governance/routing-policies). |
+| A routing policy                    | The providers the policy lists, in the policy's order. See [Routing policies](/ai-gateway/governance/routing-policies).                                                |
 
 The attempt limit is 3 by default and is part of the key's configuration (`fallback.maxAttempts` on the management API). With no fallback the limit is 1.
 
@@ -30,15 +30,15 @@ The attempt limit is 3 by default and is part of the key's configuration (`fallb
 
 The gateway decides from the provider's real answer, and this is not configurable.
 
-| Provider outcome | Next provider? |
-|---|---|
-| HTTP 5xx | Yes |
-| HTTP 429 | Yes |
-| HTTP 404 | Yes. In a multi-provider chain a 404 usually means this provider does not serve that model. |
-| Timeout, connection failure | Yes |
-| Any other 4xx (400, 401, 402, 403) | No. The error reaches the caller. |
-| Credential or provider configuration refused before the call | No. Retrying gives the same answer. |
-| The caller disconnected | No |
+| Provider outcome                                             | Next provider?                                                                              |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| HTTP 5xx                                                     | Yes                                                                                         |
+| HTTP 429                                                     | Yes                                                                                         |
+| HTTP 404                                                     | Yes. In a multi-provider chain a 404 usually means this provider does not serve that model. |
+| Timeout, connection failure                                  | Yes                                                                                         |
+| Any other 4xx (400, 401, 402, 403)                           | No. The error reaches the caller.                                                           |
+| Credential or provider configuration refused before the call | No. Retrying gives the same answer.                                                         |
+| The caller disconnected                                      | No                                                                                          |
 
 When every attempt fails, the caller gets the error of the last provider tried, with that provider's status and body.
 
@@ -70,13 +70,13 @@ The window, the threshold and the open duration are gateway settings: `LW_GATEWA
 
 ## Errors before the first attempt
 
-| Code | Status | Cause |
-|---|---|---|
-| `model_not_allowed` | 400 | The model resolves to a provider the routing policy does not list. The message names the provider and the policy. |
-| `policy_violation` | 403 | A restriction on the policy refuses the model, or the model is not in the policy's allow-only list. The message names the model: `model "gemini-2.5-flash" is blocked by policy`, or `model "gemini-2.5-flash" is not in allowlist`. See [Policy rules](/ai-gateway/policy-rules). |
-| `model_not_allowed` | 400 | The model is outside the key's own model allowlist, or resolves to a provider the key's provider access excludes. |
-| `no_provider_configured` | 400 | The key reaches no provider at all. |
-| `model_not_recognized` | 400 | No provider on the key declares the model. See [Model naming](/ai-gateway/model-naming). |
+| Code                     | Status | Cause                                                                                                                                                                                                                                                                              |
+| ------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model_not_allowed`      | 400    | The model resolves to a provider the routing policy does not list. The message names the provider and the policy.                                                                                                                                                                  |
+| `policy_violation`       | 403    | A restriction on the policy refuses the model, or the model is not in the policy's allow-only list. The message names the model: `model "gemini-2.5-flash" is blocked by policy`, or `model "gemini-2.5-flash" is not in allowlist`. See [Policy rules](/ai-gateway/policy-rules). |
+| `model_not_allowed`      | 400    | The model is outside the key's own model allowlist, or resolves to a provider the key's provider access excludes.                                                                                                                                                                  |
+| `no_provider_configured` | 400    | The key reaches no provider at all.                                                                                                                                                                                                                                                |
+| `model_not_recognized`   | 400    | No provider on the key declares the model. See [Model naming](/ai-gateway/model-naming).                                                                                                                                                                                           |
 
 ## Boundaries
 

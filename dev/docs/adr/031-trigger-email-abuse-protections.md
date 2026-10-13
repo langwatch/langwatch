@@ -6,7 +6,8 @@
 
 ## Context
 
-Trigger notifications (ADR-026/028/030) send customer-authored email to
+Trigger notifications ([ADR-026](./026-per-trigger-dispatch-timing.md) and
+[ADR-052](./052-automations-on-process-manager-substrate.md)) send customer-authored email to
 recipient lists the customer types in freely. Three abuse/cost surfaces are
 currently unprotected:
 
@@ -64,7 +65,7 @@ Over the cap the dispatcher **does not send**: it logs `logger.error` with
 project, trigger, and the running count, marks the outbox job done (a
 non-retryable outcome — retrying would re-send the spam), and the send claim
 is recorded so replays stay no-ops. The counter increments per email
-*dispatch* (one digest of 100 traces = 1), not per trace and not per
+_dispatch_ (one digest of 100 traces = 1), not per trace and not per
 recipient.
 
 The cap default is **100 emails per trigger per hour**, env-configurable
@@ -76,7 +77,7 @@ cap only ever bites `immediate`-cadence triggers — by design.
 The per-trigger hourly cap above bounds a single noisy trigger, but a project
 with many immediate-cadence triggers can still aggregate a large daily email
 volume under it — each trigger independently sitting just under its own hourly
-ceiling. A second, coarser limit caps the *total* trigger-email volume a whole
+ceiling. A second, coarser limit caps the _total_ trigger-email volume a whole
 project can emit per 24h, protecting SES sender reputation (which is scored on
 aggregate outbound volume, not per-trigger).
 
@@ -88,7 +89,7 @@ key:    trigger-email-tenant-cap:{projectId}:{floor(now / 24h)}
 INCRBY recipientCount + EXPIRE 25h; if count > cap → drop
 ```
 
-Unlike the hourly cap — which counts *dispatches* — the daily cap counts
+Unlike the hourly cap — which counts _dispatches_ — the daily cap counts
 **recipients**: trigger emails fan out one provider call per recipient
 (§3 below), so the recipient count is the actual outbound volume SES reputation
 is measured on. The counter advances by `recipients.length` (INCRBY), not by 1.
@@ -201,7 +202,7 @@ verification table, a pending-state UI in the authoring drawer, and setup
 friction for the dominant legitimate case (an operator adding their own
 team's distribution list). One-click unsubscribe matches what bulk-mail
 providers actually require for deliverability, costs recipients one click
-only when they *don't* want the mail, and the suppression table doubles as
+only when they _don't_ want the mail, and the suppression table doubles as
 the home for future bounce handling. Verification remains available as a
 follow-up if abuse reports show unsubscribe is insufficient — the suppression
 model is forward-compatible with it (`reason` column).
@@ -227,7 +228,7 @@ price, bounded by the hourly cap.
 
 - **Test-fire UX changes.** The recipients input disappears from the
   authoring drawer's test affordance, replaced by "a test will be sent to
-  *you@…*". Operators who used test fire to demo a notification to a
+  _you@…_". Operators who used test fire to demo a notification to a
   colleague now forward the email instead.
 - **One new Prisma model + migration** (`EmailSuppression`). All queries
   include `projectId` per the multitenancy contract.
@@ -262,6 +263,6 @@ price, bounded by the hourly cap.
 - [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence/digest mechanics the cap composes with
 - [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — template rendering the footer wraps
 - [ADR-037](./037-automation-operator-surfaces.md) — health surface that displays cap drops
-- [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — dispatcher stage carrying the cap check
+- [ADR-052](./052-automations-on-process-manager-substrate.md) — dispatcher stage carrying the cap check
 - `src/server/rateLimit.ts` — sliding-window limiter reused for test fire
 - `src/server/mailer/triggerNoReply.ts` — existing HMAC keyed-hash pattern the unsubscribe token follows

@@ -1,0 +1,79 @@
+import { AuthzApi } from "@langwatch/authz-contract";
+import { FeatureFlagApi, UnknownFeatureFlagError } from "@langwatch/feature-flag-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
+import { bootInstalledProcess } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
+import { testPeer } from "@langwatch/process/testing";
+import { describe, expect, it } from "vitest";
+
+import { featureFlagProcessModule } from "../../feature-flag.module.ts";
+import { createFeatureFlagTestAuthz, TestOrganizations } from "./feature-flag.fixture.ts";
+
+const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
+
+function process(role: "api" | "worker") {
+  return bootInstalledProcess({
+    role,
+    modules: [featureFlagProcessModule],
+    config: { "feature-flag": { forceEnable: [], overrides: {}, legacy: {} } },
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: AuthzApi, instance: createFeatureFlagTestAuthz() }),
+      testPeer({ token: OrganizationApi, instance: TestOrganizations.create().api() }),
+    ],
+  });
+}
+
+describe("feature flag app installation", () => {
+  it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
+    const runtime = await process(role);
+
+    try {
+      const app = runtime.service(FeatureFlagApi);
+
+      expect(runtime.module(featureFlagProcessModule).provided).toBe(app);
+
+      await expect(app.isEnabled(SYSTEM_FLAG, { kind: "system" })).resolves.toBe(false);
+
+      await app.setEnabled({ key: SYSTEM_FLAG, enabled: true, lastEditedBy: "operator-1" });
+
+      await expect(app.isEnabled(SYSTEM_FLAG, { kind: "system" })).resolves.toBe(true);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  it("allocates independent memory repositories for each installation", async () => {
+    const first = await process("api");
+    const second = await process("api");
+
+    try {
+      await first
+        .service(FeatureFlagApi)
+        .setEnabled({ key: SYSTEM_FLAG, enabled: true, lastEditedBy: "operator-1" });
+
+      await expect(
+        first.service(FeatureFlagApi).isEnabled(SYSTEM_FLAG, { kind: "system" }),
+      ).resolves.toBe(true);
+      await expect(
+        second.service(FeatureFlagApi).isEnabled(SYSTEM_FLAG, { kind: "system" }),
+      ).resolves.toBe(false);
+    } finally {
+      await Promise.all([first.stop(), second.stop()]);
+    }
+  });
+
+  it("refuses a key the registry does not define", async () => {
+    const runtime = await process("api");
+
+    try {
+      await expect(
+        runtime
+          .service(FeatureFlagApi)
+          .setEnabled({ key: "not_a_flag", enabled: true, lastEditedBy: "operator-1" }),
+      ).rejects.toBeInstanceOf(UnknownFeatureFlagError);
+    } finally {
+      await runtime.stop();
+    }
+  });
+});

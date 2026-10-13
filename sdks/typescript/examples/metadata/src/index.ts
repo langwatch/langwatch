@@ -1,20 +1,12 @@
 /**
- * Metadata and Labels Example
- *
- * Demonstrates ALL metadata fields supported by LangWatch:
- * - gen_ai.conversation.id (OTEL semconv, primary)
- * - langwatch.thread.id (legacy alias)
- * - langwatch.user.id
- * - langwatch.customer.id
- * - langwatch.labels (JSON array)
- * - metadata attribute (custom JSON object)
- *
- * Run: pnpm start
+ * Metadata and Labels Example: demonstrates every metadata field LangWatch
+ * supports (gen_ai.conversation.id is the primary OTel semconv; thread/user/
+ * customer id, labels and the metadata attribute are the rest). Run: pnpm start
  */
 
-import { getLangWatchTracer } from "langwatch";
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
+import { getLangWatchTracer } from "langwatch";
 import { setupObservability } from "langwatch/observability/node";
 
 // Initialize LangWatch observability
@@ -30,10 +22,7 @@ interface UserContext {
   environment: string;
 }
 
-async function handleUserMessage(
-  message: string,
-  context: UserContext
-): Promise<string> {
+async function handleUserMessage(message: string, context: UserContext): Promise<string> {
   return await tracer.withActiveSpan(
     "HandleUserMessage",
     {
@@ -103,7 +92,7 @@ async function handleUserMessage(
       span.setAttribute("input.tokens", result.usage?.promptTokens ?? 0);
 
       return result.text;
-    }
+    },
   );
 }
 
@@ -129,18 +118,12 @@ async function main() {
   try {
     // First message in conversation
     console.log("User: What is the capital of France?\n");
-    const response1 = await handleUserMessage(
-      "What is the capital of France?",
-      userContext
-    );
+    const response1 = await handleUserMessage("What is the capital of France?", userContext);
     console.log(`Assistant: ${response1}\n`);
 
     // Second message in same conversation (same conversation ID)
     console.log("User: What about Germany?\n");
-    const response2 = await handleUserMessage(
-      "What about Germany?",
-      userContext
-    );
+    const response2 = await handleUserMessage("What about Germany?", userContext);
     console.log(`Assistant: ${response2}\n`);
 
     console.log("=".repeat(50));
