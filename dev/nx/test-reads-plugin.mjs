@@ -181,7 +181,10 @@ export const reads = {
     "apps/ui/src/shell/route-patterns.generated.json",
   ],
   "@langwatch/onboarding-browser": ["apps/ui/src/shell/route-patterns.generated.json"],
-  "@langwatch/analytics-browser": ["apps/ui/public/images/dashboards/templates/*"],
+  "@langwatch/analytics-browser": [
+    "apps/ui/public/images/dashboards/templates/*",
+    "pnpm-workspace.yaml",
+  ],
   "@langwatch/webhook-verify": ["specs/webhooks/signature-vectors.json"],
   "@langwatch/oxlint-rules": [
     ".oxlintrc.jsonc",
@@ -268,7 +271,6 @@ export const reads = {
   ],
   "@langwatch/user-browser": ["docs/coding-agents/explore-your-usage-with-your-own-agent.mdx"],
   "@langwatch/gateway-contract": [".env.example"],
-  "@langwatch/analytics-browser": ["pnpm-workspace.yaml"],
   "@langwatch/analytics-contract": ["dev/scripts/build-charts-lib.mjs"],
   "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/image/code-steps.json"],
   "@langwatch/seedgen-runner": ["tools/seedgen/**/*"],
