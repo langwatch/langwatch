@@ -93,6 +93,12 @@ async function loadedNoiseTexture(): Promise<HTMLImageElement | undefined> {
   return image;
 }
 
+/**
+ * Software WebGL draws each frame on the page's thread and stalls the app's start by close to a
+ * minute; with this the context is refused, mounting rejects, and the still ground stays.
+ */
+const LIVE_ONLY_ON_A_GPU: WebGLContextAttributes = { failIfMajorPerformanceCaveat: true };
+
 /** Starts the mesh or the warp in `element` and resolves to the stop; rejects without WebGL. */
 export async function mountAmbientShader({
   element,
@@ -120,7 +126,7 @@ export async function mountAmbientShader({
             u_noiseTexture: noiseTexture,
             ...sizing(defaultPatternSizing, WARP_AT_REST),
           },
-          undefined,
+          LIVE_ONLY_ON_A_GPU,
           WARP_AT_REST.speed,
           wallClockFrame({ speed: WARP_AT_REST.speed }),
         )
@@ -136,7 +142,7 @@ export async function mountAmbientShader({
             u_grainOverlay: 0,
             ...sizing(defaultObjectSizing, MESH_AT_REST),
           },
-          undefined,
+          LIVE_ONLY_ON_A_GPU,
           MESH_AT_REST.speed,
           wallClockFrame({ speed: MESH_AT_REST.speed }),
         );

@@ -16,3 +16,10 @@ Feature: The boot screen stays until the app draws a page
     Given the live ground script the boot screen inlines into every page
     When it is built
     Then it reads the wall clock without the Temporal polyfill
+
+  @unit
+  Scenario: The boot screen keeps its still ground where WebGL is slow
+    Given a browser that renders WebGL only in software
+    When the boot screen starts its live ground
+    Then it asks for a context that refuses a major performance caveat
+    And the boot screen keeps its still ground, so the app is not slowed while it loads
