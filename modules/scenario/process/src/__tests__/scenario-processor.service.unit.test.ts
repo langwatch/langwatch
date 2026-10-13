@@ -52,9 +52,21 @@ class TestCancellationSubscriber implements CancellationSubscriber {
 }
 
 class TestMetrics implements ScenarioProcessorServiceMetrics {
-  started(): void {}
-  completed(): void {}
-  failed(): void {}
+  startedCount = 0;
+  completedCount = 0;
+  failedCount = 0;
+
+  started(): void {
+    this.startedCount += 1;
+  }
+
+  completed(): void {
+    this.completedCount += 1;
+  }
+
+  failed(): void {
+    this.failedCount += 1;
+  }
 }
 
 class HoldingExecutionRunner implements ScenarioExecutionRunner {
@@ -78,6 +90,7 @@ function processorFixture() {
   const childProcesses = createApiFixture<ScenarioChildChoiceService>();
   const finishUnsuccessfulRun = vi.fn().mockResolvedValue(undefined);
   const cancellations = new TestCancellationSubscriber();
+  const metrics = new TestMetrics();
   execution.finishUnsuccessfulRun = finishUnsuccessfulRun;
 
   const processor = ScenarioProcessorService.create({
@@ -85,7 +98,7 @@ function processorFixture() {
     pool,
     cancellations,
     childProcesses,
-    metrics: new TestMetrics(),
+    metrics,
   });
   pool.connect(processor);
   return {
@@ -95,6 +108,7 @@ function processorFixture() {
     childProcesses,
     cancellations,
     finishUnsuccessfulRun,
+    metrics,
   };
 }
 
@@ -153,6 +167,39 @@ describe("ScenarioProcessorService", () => {
       await expect(fixture.processor.handleFailed(job("run-1"), "failed")).rejects.toThrow(
         "write failed",
       );
+    });
+
+    /** @scenario "A child startup failure is stored on the run" */
+    it("stores the child startup message and releases the pool", async () => {
+      const fixture = processorFixture();
+      const message =
+        "Scenario child bundle is missing and tsx is unavailable. Run `pnpm install` or `pnpm --filter @langwatch/scenario-child build`.";
+      fixture.childProcesses.start = vi.fn().mockRejectedValue(new Error(message));
+      fixture.execution.prepare = vi.fn().mockReturnValue({
+        childEnvironment: Promise.resolve({
+          labels: ["smoke"],
+          telemetry: { endpoint: "https://app.langwatch.ai", apiKey: "project-key" },
+        }),
+        result: new Promise<ScenarioExecutionPrefetchResult>(() => {}),
+      });
+
+      fixture.pool.submit(job("startup"));
+      fixture.pool.submit(job("next"));
+
+      await vi.waitFor(() => {
+        expect(fixture.finishUnsuccessfulRun).toHaveBeenCalledTimes(2);
+      });
+
+      expect(fixture.finishUnsuccessfulRun).toHaveBeenCalledWith(
+        expect.objectContaining({ scenarioRunId: "startup", error: message }),
+      );
+      expect(fixture.finishUnsuccessfulRun).toHaveBeenCalledWith(
+        expect.objectContaining({ scenarioRunId: "next", error: message }),
+      );
+      expect(fixture.metrics.startedCount).toBe(2);
+      expect(fixture.metrics.failedCount).toBe(2);
+      expect(fixture.pool.activeCount).toBe(0);
+      expect(fixture.pool.pendingCount).toBe(0);
     });
   });
 
