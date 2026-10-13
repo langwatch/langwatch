@@ -213,9 +213,11 @@ guards refuse a new `DROP TABLE` or `DROP COLUMN` in a Prisma folder or goose fi
 2026-10-11 (Alex, T0-F11): the worker takes jobs as soon as the schema and the blocking steps are
 done; LangWatchQL setup and the system-migrations pass request finish alongside in the same run,
 under its lease, and a failure among them is logged and recorded on the run without holding jobs.
-`pnpm task upgrade` still waits for the whole run and exits by its outcome. The pass request waits
-on its queue jobs ahead of any backlog, which the now-consuming worker runs. Spec:
-`specs/upgrade/in-app-upgrade.feature`.
+Amended 2026-10-13 (Alex): the run-once `pnpm task upgrade` sends no pass request; a serving
+worker's run does. The tenant-steps re-drive wakes every minute: it runs a pass while the last pass
+left anything pending, and hourly once nothing is, so a deploy onto a current ledger no longer
+waits an hour. Held or parked tenants that need an operator are not pending. Specs:
+`specs/upgrade/in-app-upgrade.feature`, `specs/migration/system-migrations-runner.feature`.
 
 ## Alternatives considered
 
