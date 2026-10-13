@@ -3,6 +3,7 @@
  * the settings AmbientGround renders at rest. The boot splash mounts it before the app loads,
  * so the loading screen looks the same from first paint to the app.
  */
+import { nowInstant } from "@langwatch/time";
 import {
   defaultObjectSizing,
   defaultPatternSizing,
@@ -66,7 +67,7 @@ function sizing(base: typeof defaultObjectSizing, rest: typeof MESH_AT_REST | ty
  * reloads (Vite's bundling page into the app) picks the animation up where it was.
  */
 export function wallClockFrame({ speed }: { speed: number }): number {
-  return (Date.now() % 3_600_000) * speed;
+  return (nowInstant().epochMilliseconds % 3_600_000) * speed;
 }
 
 /**

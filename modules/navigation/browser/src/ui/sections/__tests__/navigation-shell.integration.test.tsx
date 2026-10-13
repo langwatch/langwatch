@@ -975,6 +975,8 @@ describe("search entries in the shell", () => {
   it("keeps the sidebar search and draws the top-bar Search pill on a project page", () => {
     renderShell({
       readings: {
+        // Home carries its own search, so the pill shows on any other project page.
+        pathname: "/demo/traces",
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: <button>Top bar search</button> },
       },
     });
