@@ -1,8 +1,10 @@
+import { LANGY_DOCK_WIDTH_PX } from "@langwatch/langy-contract";
+
 /**
- * The docked sidebar's width.
+ * The docked sidebar's width, published in the contract for drawers that sit beside it.
  * Spec: specs/langy/langy-panel-layout.feature
  */
-export const SIDEBAR_PANEL_WIDTH = 392;
+export const SIDEBAR_PANEL_WIDTH = LANGY_DOCK_WIDTH_PX;
 
 /** What the page reserves for the flush full-height dock (no-shell pages). */
 export const LANGY_DOCKED_OFFSET = SIDEBAR_PANEL_WIDTH;

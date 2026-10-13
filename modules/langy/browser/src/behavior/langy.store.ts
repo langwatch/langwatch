@@ -128,6 +128,10 @@ interface LangyState extends TurnPhaseState, LangySliceSurface {
   requestComposerFocus: () => void;
   /** The composer has taken the requested focus — clear it so it fires once. */
   consumeComposerFocus: () => void;
+  /** Counts the panel's finished open transitions: a hidden composer can take focus after one. */
+  panelShownCount: number;
+  /** The panel finished its open transition and can be focused. */
+  markPanelShown: () => void;
 
   // Layout mode (Floating / Sidebar) — user-picked, persisted
   setPanelMode: (mode: LangyPanelMode) => void;
@@ -740,6 +744,8 @@ export const useLangyStore = defineSlice<LangyState>({
     composerFocusRequested: false,
     requestComposerFocus: () => set({ composerFocusRequested: true }),
     consumeComposerFocus: () => set({ composerFocusRequested: false }),
+    panelShownCount: 0,
+    markPanelShown: () => set((state) => ({ panelShownCount: state.panelShownCount + 1 })),
 
     // Sidebar by default: docked inside the app shell as a second content
     // card, working alongside the page. Floating stays one toggle away in

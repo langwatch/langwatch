@@ -17,6 +17,8 @@ import {
   type Dashboard,
 } from "@langwatch/dashboard-contract";
 
+import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
+
 export const dashboardRest = defineRestRouter(DashboardApi)
   .withNamespace("dashboards")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -28,8 +30,12 @@ export const dashboardRest = defineRestRouter(DashboardApi)
     tags: ["Dashboards"],
     description: "List all dashboards for the project with graph counts",
   })
-  .handle(async ({ app, scope }) => {
-    const dashboards = await app.getAll({ projectId: scope.id, graphCountScope: "builder" });
+  .handle(async ({ app, scope, actor }) => {
+    const dashboards = await app.getAll({
+      projectId: scope.id,
+      graphCountScope: "builder",
+      ...viewerOfActor({ actor }),
+    });
     const links = await app.getDashboardLinks({
       projectId: scope.id,
       dashboardIds: dashboards.map((dashboard) => dashboard.id),
@@ -57,8 +63,13 @@ export const dashboardRest = defineRestRouter(DashboardApi)
   .withOutput(dashboardResponseSchema)
   .withStatus(201)
   .withDocs({ tags: ["Dashboards"], description: "Create a new dashboard" })
-  .handle(async ({ app, input, scope }) => {
-    const created = await app.create({ projectId: scope.id, name: input.name });
+  .handle(async ({ app, input, scope, actor }) => {
+    const { viewer } = viewerOfActor({ actor });
+    const created = await app.create({
+      projectId: scope.id,
+      name: input.name,
+      ...(viewer === undefined ? {} : { createdById: viewer.userId }),
+    });
 
     return withLink(app, scope.id, created);
   })
@@ -74,8 +85,12 @@ export const dashboardRest = defineRestRouter(DashboardApi)
     tags: ["Dashboards"],
     description: "Reorder dashboards by providing an ordered list of IDs",
   })
-  .handle(async ({ app, input, scope }) =>
-    app.reorder({ projectId: scope.id, dashboardIds: input.dashboardIds }),
+  .handle(async ({ app, input, scope, actor }) =>
+    app.reorder({
+      projectId: scope.id,
+      dashboardIds: input.dashboardIds,
+      ...viewerOfActor({ actor }),
+    }),
   )
 
   .get("/:id", "getApiDashboardsById")
@@ -86,8 +101,12 @@ export const dashboardRest = defineRestRouter(DashboardApi)
     tags: ["Dashboards"],
     description: "Get a dashboard by its id, including its graphs",
   })
-  .handle(async ({ app, input, scope }) => {
-    const found = await app.getById({ projectId: scope.id, dashboardId: input.id });
+  .handle(async ({ app, input, scope, actor }) => {
+    const found = await app.getById({
+      projectId: scope.id,
+      dashboardId: input.id,
+      ...viewerOfActor({ actor }),
+    });
 
     return { ...(await withLink(app, scope.id, found)), graphs: found.graphs };
   })
@@ -99,11 +118,12 @@ export const dashboardRest = defineRestRouter(DashboardApi)
   .withPermission("analytics:update")
   .withOutput(dashboardResponseSchema)
   .withDocs({ tags: ["Dashboards"], description: "Rename a dashboard" })
-  .handle(async ({ app, input, scope }) => {
+  .handle(async ({ app, input, scope, actor }) => {
     const renamed = await app.rename({
       projectId: scope.id,
       dashboardId: input.id,
       name: input.name,
+      ...viewerOfActor({ actor }),
     });
 
     return withLink(app, scope.id, renamed);
@@ -119,8 +139,12 @@ export const dashboardRest = defineRestRouter(DashboardApi)
     tags: ["Dashboards"],
     description: "Delete a dashboard and its graphs (hard delete, cascade)",
   })
-  .handle(async ({ app, input, scope }) => {
-    const deleted = await app.delete({ projectId: scope.id, dashboardId: input.id });
+  .handle(async ({ app, input, scope, actor }) => {
+    const deleted = await app.delete({
+      projectId: scope.id,
+      dashboardId: input.id,
+      ...viewerOfActor({ actor }),
+    });
 
     return { id: deleted.id, name: deleted.name };
   })

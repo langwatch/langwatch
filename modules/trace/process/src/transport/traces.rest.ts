@@ -252,7 +252,7 @@ async function searchTraces({
 
   const startEpoch = coerceToEpochOrThrow(startDate, "startDate");
   const endEpoch = coerceToEpochOrThrow(endDate, "endDate");
-  const filterWhere = app.compileExplorerTraceFilter({
+  const filterWhere = await app.compileExplorerTraceFilter({
     query: filter ?? "",
     tenantId: scope.id,
     timeRange: { from: startEpoch, to: endEpoch },

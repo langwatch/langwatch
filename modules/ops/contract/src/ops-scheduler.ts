@@ -26,6 +26,41 @@ export interface OpsScheduledJobSchema extends Named<typeof opsScheduledJobSchem
 export const opsScheduledJobSchema: OpsScheduledJobSchema = opsScheduledJobSchemaDefinition;
 export type OpsScheduledJob = z.infer<typeof opsScheduledJobSchema>;
 
+/**
+ * One person's daily insights schedule as the operator's list shows it. Read only: a schedule
+ * is its person's own setting. Instants are ISO strings, as on a scheduled job.
+ */
+const opsInsightScheduleSchemaDefinition = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  projectName: z.string().nullable(),
+  userId: z.string(),
+  /** The owner's name, else their address; null for an account that is gone or has neither. */
+  owner: z.string().nullable(),
+  boardKind: z.string(),
+  boardId: z.string(),
+  boardName: z.string(),
+  on: z.boolean(),
+  /** Why the system turned it off; null while it is on, and when its person turned it off. */
+  offReason: z.string().nullable(),
+  hour: z.number().nullable(),
+  timezone: z.string().nullable(),
+  /** Null when it is off, and when it is on and lost its wake. */
+  nextRunAt: z.string().nullable(),
+  lastRunAt: z.string().nullable(),
+  lastRunOutcome: z.string().nullable(),
+  lastRunReason: z.string().nullable(),
+  /** The scheduled days in a row whose run was skipped, and how many turn the schedule off. */
+  consecutiveSkips: z.number(),
+  skippedDaysBeforeOff: z.number(),
+});
+export interface OpsInsightScheduleSchema extends Named<
+  typeof opsInsightScheduleSchemaDefinition
+> {}
+export const opsInsightScheduleSchema: OpsInsightScheduleSchema =
+  opsInsightScheduleSchemaDefinition;
+export type OpsInsightSchedule = z.infer<typeof opsInsightScheduleSchema>;
+
 export type SchedulerControlAction =
   | "ops.scheduler.pause"
   | "ops.scheduler.resume"
@@ -52,6 +87,10 @@ export interface ListScheduledJobsInput {
 }
 
 export interface ListPausedSchedulesInput {
+  limit?: number;
+}
+
+export interface ListInsightSchedulesInput {
   limit?: number;
 }
 
@@ -90,6 +129,15 @@ export interface OpsListScheduledJobsInputSchema extends Named<
 > {}
 export const opsListScheduledJobsInputSchema: OpsListScheduledJobsInputSchema =
   opsListScheduledJobsInputSchemaDefinition;
+
+const opsListInsightSchedulesInputSchemaDefinition = z.object({
+  limit: z.number().int().min(1).max(500).default(200),
+});
+export interface OpsListInsightSchedulesInputSchema extends Named<
+  typeof opsListInsightSchedulesInputSchemaDefinition
+> {}
+export const opsListInsightSchedulesInputSchema: OpsListInsightSchedulesInputSchema =
+  opsListInsightSchedulesInputSchemaDefinition;
 
 const opsListPausedSchedulesInputSchemaDefinition = z.object({
   limit: z.number().int().min(1).max(200).default(50),

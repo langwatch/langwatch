@@ -2,6 +2,7 @@ import type { Instant } from "@langwatch/time";
 
 import type { CliResultDigest } from "./cards/digest.ts";
 import type { CliToolResult } from "./cards/tool-result.ts";
+import type { LangyConversationOrigin } from "./constants.ts";
 import type { LangyEventCursor } from "./event-sourcing/contracts/cursor.ts";
 import type { LangyConversationTurnWireEvent } from "./event-sourcing/contracts/turn-wire.ts";
 import type { LangyMessagePart } from "./json.ts";
@@ -12,6 +13,8 @@ export type LangyConversationListItem = {
   title: string | null;
   isShared: boolean;
   isOwn: boolean;
+  /** Whether the person started it in the panel, or a module started it for them as a run. */
+  origin: LangyConversationOrigin;
   lastActivityAt: Instant;
   messageCount: number;
 };
@@ -129,6 +132,7 @@ export type LangyCredentialTurnCapability = {
     projectId: string;
     session: LangyCredentialSession;
     mintSessionKey?: boolean;
+    mintGithubToken?: boolean;
   }): Promise<LangyCredentials>;
   findEgressAllowlist(input: { projectId: string }): Promise<string[] | null>;
   resolveMirrorTier(input: { projectId: string }): Promise<LangyMirrorTier>;

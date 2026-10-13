@@ -21,6 +21,7 @@ export type ProductColourMap = Readonly<Record<string, ProductAccentPalette | nu
 export const PRODUCT_COLOURS = {
   me: "blue",
   "llm-ops": "accent",
+  dashboards: "accent",
   gateway: "accent",
   governance: "accent",
 } satisfies ProductColourMap;

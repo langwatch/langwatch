@@ -33,11 +33,13 @@ function harness({
   turnStartedAt = T0 - 90_000,
   title = "Weekly costs",
   owner = USER_ID,
+  origin = "interactive",
 }: {
   choice?: "enabled" | "declined" | null;
   turnStartedAt?: number | null;
   title?: string | null;
   owner?: string | null;
+  origin?: "interactive" | "run";
 } = {}) {
   const requests: RequestWebPushDeliveryCommand[] = [];
   const getNotificationPreference = vi.fn(async ({ topic }: { id: string; topic: "langy" }) => ({
@@ -45,7 +47,7 @@ function harness({
     choice,
   }));
   const subscriber = createLangyWebPushSubscriber({
-    conversations: { find: async () => ({ ownerUserId: owner, title }) },
+    conversations: { find: async () => ({ ownerUserId: owner, title, origin }) },
     turnStartedAt: async () => turnStartedAt,
     users: { getNotificationPreference },
     projects: { findSummaryById: async () => ({ name: "ACME", slug: "acme-x1y2" }) },
@@ -125,6 +127,21 @@ describe("given a person who turned Langy notifications on", () => {
           },
         },
       ]);
+    });
+  });
+
+  describe("when a long turn completes in a run conversation", () => {
+    /** @scenario "A finished run conversation sends no push notification" */
+    it("requests no push, while the same turn in a chat conversation requests one", async () => {
+      const run = harness({ origin: "run" });
+      const chat = harness({ origin: "interactive" });
+
+      await run.subscriber.handle(finished(), context);
+      await chat.subscriber.handle(finished(), context);
+
+      expect(run.requests).toEqual([]);
+      expect(run.getNotificationPreference).not.toHaveBeenCalled();
+      expect(chat.requests).toHaveLength(1);
     });
   });
 

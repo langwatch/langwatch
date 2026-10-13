@@ -185,6 +185,8 @@ export class TraceSummaryFoldProjection
       models: [],
       totalCost: null,
       nonBilledCost: null,
+      unpricedSpanCount: 0,
+      unpricedModels: [],
       tokensEstimated: false,
       totalPromptTokenCount: null,
       totalCompletionTokenCount: null,
