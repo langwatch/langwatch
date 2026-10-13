@@ -34,7 +34,7 @@ import { StubNavigationHost } from "../../../testing.tsx";
 import { ShellTopBar } from "../shell-top-bar.tsx";
 
 const LONG_NAME = "A".repeat(300);
-const SHOTS = "/Users/lw/Source/github.com/langwatch/langwatch/.claude/tmp/long-names";
+const SHOTS = "../../../../../../../.claude/tmp/long-names";
 const LONG_ORG = { id: "org_long", name: LONG_NAME, teams: [] };
 const OTHER_ORG = { id: "org_2", name: "ACME", teams: [] };
 const USER = { id: "user_1", name: "Ada", email: "ada@acme.test", image: null };
@@ -59,7 +59,8 @@ function renderBar({ organizations }: { organizations: (typeof LONG_ORG)[] }) {
         state={{
           status: "ready",
           user: USER,
-          project: undefined,
+          // The Search pill shows on a project page that is not Home (#8588).
+          project: { id: "proj_1", name: "Project", slug: "acme" },
           currentRoute: undefined,
           activeProductId: null,
           isSettingsRoute: true,
