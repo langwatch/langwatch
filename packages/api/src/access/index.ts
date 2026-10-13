@@ -1,0 +1,63 @@
+// @langwatch/api/access -- the three access decisions both transports call.
+// Neither runtime decides anything here itself: `decide` is the one check, and
+// the permission vocabulary it reads belongs to `@langwatch/authorization`.
+
+export {
+  AccessWiringError,
+  AuthenticationRequiredError,
+  anyAuthenticated,
+  assertRouteScopePermission,
+  chosenPermission,
+  declareAccessMiddleware,
+  decide,
+  decideEntitlement,
+  deferredScope,
+  optionalCredential,
+  permissionsTogether,
+  publicRoute,
+  routeScopeOf,
+  SCOPE_INPUT_FIELDS,
+  platformPrincipalOf,
+  securityRequirement,
+  sharedGrantTiers,
+  type AccessActor,
+  type AccessDecision,
+  type AccessDeclaration,
+  type AccessDenial,
+  type ApiEntitlement,
+  type AuthenticatedRouteAccess,
+  type Authorize,
+  type Caller,
+  type Credential,
+  type DeferredScopeAccess,
+  type EntitlementGate,
+  type EntitlementOptions,
+  type Entitlements,
+  type InputPermissionDeclaration,
+  type OptionalCredentialAccess,
+  type PermissionAllDeclaration,
+  type PlatformDecision,
+  type PlatformPermissionDeclaration,
+  type PlatformPermissionTarget,
+  type PublicRouteAccess,
+  type RouteAccess,
+} from "./access.ts";
+export { resolveDeclaredScope } from "./declaration.ts";
+export {
+  assertInputPermission,
+  isInputPermission,
+  permissionBy,
+  permissionsOfChoice,
+  type ExactInputPermission,
+  type InputPermission,
+  type PermissionChoice,
+  type PermissionMap,
+} from "./input-permission.ts";
+export {
+  AUTHZ_DECLARATION,
+  declareAuthzMiddleware,
+  findAuthzDeclaration,
+  type AuthzDeclaration,
+  type DeclaredAuthzMiddleware,
+  type EnforcedScopeFields,
+} from "./declared-middleware.ts";

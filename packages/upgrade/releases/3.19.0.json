@@ -1,0 +1,28 @@
+{
+  "release": "3.19.0",
+  "previous": "3.18.1",
+  "cutAt": "2026-09-30T16:59:54+02:00",
+  "steps": [
+    {
+      "id": "prisma:20260928120001_trigger_latest_evaluation",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: trigger latest evaluation"
+    },
+    {
+      "id": "prisma:20260928120002_slack_integration",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "slack",
+      "description": "Postgres schema: slack integration"
+    },
+    {
+      "id": "prisma:20260928120003_trigger_sent_history_index",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: trigger sent history index"
+    }
+  ]
+}

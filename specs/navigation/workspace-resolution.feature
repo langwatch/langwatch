@@ -40,6 +40,22 @@ Feature: Workspace resolution
     When a screen asks for my workspace
     Then it is told the workspace is still resolving
 
+  @integration @regression
+  Scenario: A project address is not called missing while its scope is still settling
+    Given the organization graph has answered
+    And my session or the project my address names has not settled yet
+    When the project chrome asks for my workspace
+    Then it is told the workspace is still resolving
+    And it does not draw the not-found page
+
+  @integration @regression
+  Scenario: The demo project resolves for somebody who is not a member of its organization
+    Given the deployment names a demo project
+    And I belong to no organization that holds it
+    When the project chrome opens the demo project's address
+    Then it reads the organization graph that carries the demo project
+    And it finds the project rather than drawing the not-found page
+
   @integration
   Scenario: A workspace whose graph has answered has resolved
     Given my session has resolved
@@ -47,14 +63,14 @@ Feature: Workspace resolution
     When a screen asks for my workspace
     Then it is told the workspace has resolved
 
-  @integration
+  @integration @unimplemented
   Scenario: An address anybody can open resolves without waiting for a graph
     Given I am on an address anybody can open
     And my session has resolved to nobody
     When a screen asks for my workspace
     Then it is told the workspace has resolved
 
-  @integration
+  @integration @unimplemented
   Scenario: An address anybody can open does not wait for the session either
     Given I am on an address anybody can open
     And my session has not resolved yet

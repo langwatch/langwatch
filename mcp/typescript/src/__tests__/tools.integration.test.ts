@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../langwatch-api.js", () => ({
+vi.mock("../langwatch-api.ts", () => ({
   searchTraces: vi.fn(),
   getTraceById: vi.fn(),
   getAnalyticsTimeseries: vi.fn(),
@@ -30,20 +30,19 @@ import {
   renamePromptTag,
   deletePromptTag,
   type PromptSummary,
-} from "../langwatch-api.js";
-
-import { handleSearchTraces } from "../tools/search-traces.js";
-import { handleGetTrace } from "../tools/get-trace.js";
-import { handleGetAnalytics } from "../tools/get-analytics.js";
-import { handleListPrompts } from "../tools/list-prompts.js";
-import { handleGetPrompt } from "../tools/get-prompt.js";
-import { handleCreatePrompt } from "../tools/create-prompt.js";
-import { handleUpdatePrompt } from "../tools/update-prompt.js";
-import { handleAssignPromptTag } from "../tools/assign-prompt-tag.js";
-import { handleListPromptTags } from "../tools/list-prompt-tags.js";
-import { handleCreatePromptTag } from "../tools/create-prompt-tag.js";
-import { handleRenamePromptTag } from "../tools/rename-prompt-tag.js";
-import { handleDeletePromptTag } from "../tools/delete-prompt-tag.js";
+} from "../langwatch-api.ts";
+import { handleAssignPromptTag } from "../tools/assign-prompt-tag.ts";
+import { handleCreatePromptTag } from "../tools/create-prompt-tag.ts";
+import { handleCreatePrompt } from "../tools/create-prompt.ts";
+import { handleDeletePromptTag } from "../tools/delete-prompt-tag.ts";
+import { handleGetAnalytics } from "../tools/get-analytics.ts";
+import { handleGetPrompt } from "../tools/get-prompt.ts";
+import { handleGetTrace } from "../tools/get-trace.ts";
+import { handleListPromptTags } from "../tools/list-prompt-tags.ts";
+import { handleListPrompts } from "../tools/list-prompts.ts";
+import { handleRenamePromptTag } from "../tools/rename-prompt-tag.ts";
+import { handleSearchTraces } from "../tools/search-traces.ts";
+import { handleUpdatePrompt } from "../tools/update-prompt.ts";
 
 const mockSearchTraces = vi.mocked(searchTraces);
 const mockGetTraceById = vi.mocked(getTraceById);
@@ -194,12 +193,14 @@ describe("handleSearchTraces()", () => {
   });
 
   describe("when no traces are found", () => {
-    it("returns a no-results message", async () => {
+    it("returns a no-results message that names the window and get_trace", async () => {
       mockSearchTraces.mockResolvedValue({ traces: [] });
 
       const result = await handleSearchTraces({});
 
-      expect(result).toBe("No traces found matching your query.");
+      expect(result).toContain("No traces found matching your query.");
+      expect(result).toContain("Searched the last 24 hours");
+      expect(result).toContain("get_trace");
     });
   });
 
@@ -213,6 +214,44 @@ describe("handleSearchTraces()", () => {
       expect(call.startDate).toBeTypeOf("number");
       expect(call.endDate).toBeTypeOf("number");
       expect(call.startDate).toBeLessThan(call.endDate);
+    });
+
+    it("anchors a default 24-hour window to an explicit end date", async () => {
+      mockSearchTraces.mockResolvedValue({ traces: [] });
+
+      await handleSearchTraces({ endDate: "2026-08-01T12:00:00Z" });
+
+      const end = Date.parse("2026-08-01T12:00:00Z");
+      expect(mockSearchTraces).toHaveBeenCalledWith(
+        expect.objectContaining({ startDate: end - 24 * 60 * 60 * 1000, endDate: end }),
+      );
+    });
+
+    /** @scenario An inverted search window fails before the API call */
+    it("rejects an inverted window before calling the API", async () => {
+      await expect(
+        handleSearchTraces({
+          startDate: "2026-08-02T12:00:00Z",
+          endDate: "2026-08-01T12:00:00Z",
+        }),
+      ).rejects.toThrow("startDate");
+      expect(mockSearchTraces).not.toHaveBeenCalled();
+    });
+
+    it("rejects an empty window before calling the API", async () => {
+      await expect(
+        handleSearchTraces({
+          startDate: "2026-08-01T12:00:00Z",
+          endDate: "2026-08-01T12:00:00Z",
+        }),
+      ).rejects.toThrow("must be before endDate");
+      expect(mockSearchTraces).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An empty date input fails before the API call" */
+    it("rejects an empty date before calling the API", async () => {
+      await expect(handleSearchTraces({ startDate: "" })).rejects.toThrow('Invalid date: ""');
+      expect(mockSearchTraces).not.toHaveBeenCalled();
     });
   });
 
@@ -275,15 +314,14 @@ describe("handleGetTrace()", () => {
     it("shows the formatted digest", async () => {
       mockGetTraceById.mockResolvedValue({
         trace_id: "trace-abc",
-        formatted_trace: "Root [server] 1200ms\n  LLM Call [llm] 800ms\n    Input: Hello\n    Output: Hi there",
+        formatted_trace:
+          "Root [server] 1200ms\n  LLM Call [llm] 800ms\n    Input: Hello\n    Output: Hi there",
         timestamps: {
           started_at: "2024-01-01T00:00:00Z",
           updated_at: "2024-01-01T00:01:00Z",
         },
         metadata: { user_id: "user-123" },
-        evaluations: [
-          { name: "Toxicity", passed: true, score: 0.95 },
-        ],
+        evaluations: [{ name: "Toxicity", passed: true, score: 0.95 }],
       });
 
       const result = await handleGetTrace({ traceId: "trace-abc" });
@@ -416,9 +454,7 @@ describe("handleGetAnalytics()", () => {
         metric: "performance.completion_time",
       });
 
-      expect(result).toContain(
-        "# Analytics: performance.completion_time (avg)"
-      );
+      expect(result).toContain("# Analytics: performance.completion_time (avg)");
       expect(result).toContain("| Date | Value |");
       expect(result).toContain("| 2024-01-01 | 42 |");
       expect(result).toContain("| 2024-01-02 | 55 |");
@@ -554,9 +590,7 @@ describe("handleListPrompts()", () => {
   });
 
   it("includes usage tip about platform_get_prompt", async () => {
-    mockListPrompts.mockResolvedValue([
-      { handle: "test", name: "Test", latestVersionNumber: 1 },
-    ]);
+    mockListPrompts.mockResolvedValue([{ handle: "test", name: "Test", latestVersionNumber: 1 }]);
 
     const result = await handleListPrompts();
 
@@ -573,7 +607,7 @@ describe("handleGetPrompt()", () => {
         name: "Greeting Prompt",
         version: 2,
         versionId: "ver_002",
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [
           { role: "system", content: "You are a greeter." },
           { role: "user", content: "Hello!" },
@@ -587,7 +621,7 @@ describe("handleGetPrompt()", () => {
       expect(result).toContain("**Handle**: greeting");
       expect(result).toContain("**ID**: p1");
       expect(result).toContain("**Version**: v2");
-      expect(result).toContain("**Model**: openai/gpt-4o");
+      expect(result).toContain("**Model**: openai/gpt-5-mini");
       expect(result).not.toContain("**Provider**");
     });
 
@@ -606,20 +640,19 @@ describe("handleGetPrompt()", () => {
       expect(result).toContain("### system\nYou are helpful.");
       expect(result).toContain("### user\nHi there");
     });
-
   });
 
   describe("when prompt has no versions", () => {
     it("uses prompt-level model config", async () => {
       mockGetPrompt.mockResolvedValue({
         name: "Simple",
-        model: "openai/gpt-3.5-turbo",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "Be brief." }],
       });
 
       const result = await handleGetPrompt({ idOrHandle: "simple" });
 
-      expect(result).toContain("**Model**: openai/gpt-3.5-turbo");
+      expect(result).toContain("**Model**: openai/gpt-5-mini");
       expect(result).not.toContain("**Provider**");
       expect(result).toContain("### system\nBe brief.");
     });
@@ -640,14 +673,14 @@ describe("handleCreatePrompt()", () => {
         name: "My Prompt",
         handle: "my-prompt",
         messages: [{ role: "system", content: "You are helpful." }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
 
       expect(result).toContain("Prompt created successfully!");
       expect(result).toContain("**ID**: new-id-123");
       expect(result).toContain("**Handle**: my-prompt");
       expect(result).toContain("**Name**: My Prompt");
-      expect(result).toContain("**Model**: openai/gpt-4o");
+      expect(result).toContain("**Model**: openai/gpt-5-mini");
       expect(result).toContain("**Version**: v1");
     });
 
@@ -660,13 +693,13 @@ describe("handleCreatePrompt()", () => {
       await handleCreatePrompt({
         name: "My Prompt!",
         messages: [{ role: "system", content: "test" }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
 
       expect(mockCreatePrompt).toHaveBeenCalledWith({
         handle: "my-prompt",
         messages: [{ role: "system", content: "test" }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
     });
 
@@ -680,13 +713,13 @@ describe("handleCreatePrompt()", () => {
         name: "My Prompt",
         handle: "custom-handle",
         messages: [{ role: "system", content: "test" }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
 
       expect(mockCreatePrompt).toHaveBeenCalledWith({
         handle: "custom-handle",
         messages: [{ role: "system", content: "test" }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
     });
   });
@@ -698,7 +731,7 @@ describe("handleCreatePrompt()", () => {
       const result = await handleCreatePrompt({
         name: "Fallback Name",
         messages: [{ role: "system", content: "test" }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
 
       expect(result).toContain("**Name**: Fallback Name");
@@ -740,12 +773,12 @@ describe("handleUpdatePrompt()", () => {
 
       await handleUpdatePrompt({
         idOrHandle: "greeting",
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         commitMessage: "Switch model",
       });
 
       expect(mockUpdatePrompt).toHaveBeenCalledWith("greeting", {
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         commitMessage: "Switch model",
       });
     });
@@ -759,7 +792,10 @@ describe("handleGetPrompt() with tag options", () => {
 
       await handleGetPrompt({ idOrHandle: "pizza-prompt", tag: "production" });
 
-      expect(mockGetPrompt).toHaveBeenCalledWith("pizza-prompt", { version: undefined, tag: "production" });
+      expect(mockGetPrompt).toHaveBeenCalledWith("pizza-prompt", {
+        version: undefined,
+        tag: "production",
+      });
     });
   });
 });

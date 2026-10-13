@@ -1,10 +1,8 @@
-import { listPrompts as apiListPrompts } from "../langwatch-api.js";
+import { listPrompts as apiListPrompts } from "../langwatch-api.ts";
 
 /**
- * Handles the platform_list_prompts MCP tool invocation.
- *
- * Lists all prompts in the LangWatch project, formatted as an
- * AI-readable markdown table.
+ * Handles the platform_list_prompts MCP tool: lists prompts in the
+ * project as an AI-readable markdown table.
  */
 export async function handleListPrompts(): Promise<string> {
   const prompts = await apiListPrompts();
@@ -26,9 +24,7 @@ export async function handleListPrompts(): Promise<string> {
     lines.push(`| ${handle} | ${name} | ${version} |`);
   }
 
-  lines.push(
-    "\n> Use `platform_get_prompt` with the handle or ID to see full prompt details."
-  );
+  lines.push("\n> Use `platform_get_prompt` with the handle or ID to see full prompt details.");
 
   return lines.join("\n");
 }

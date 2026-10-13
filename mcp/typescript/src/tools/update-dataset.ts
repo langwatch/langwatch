@@ -1,12 +1,10 @@
-import { updateDataset as apiUpdateDataset } from "../langwatch-api-datasets.js";
-import type { DatasetColumnType } from "../langwatch-api-datasets.js";
-import { formatDatasetMutationDetails } from "./format-dataset-mutation.js";
+import { updateDataset as apiUpdateDataset } from "../langwatch-api-datasets.ts";
+import type { DatasetColumnType } from "../langwatch-api-datasets.ts";
+import { formatDatasetMutationDetails } from "./format-dataset-mutation.ts";
 
 /**
- * Handles the platform_update_dataset MCP tool invocation.
- *
- * Updates an existing dataset and returns a confirmation
- * with the updated details.
+ * Handles the platform_update_dataset MCP tool: updates a dataset and
+ * returns a confirmation with the updated details.
  */
 export async function handleUpdateDataset(params: {
   slugOrId: string;

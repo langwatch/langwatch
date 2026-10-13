@@ -141,7 +141,7 @@ Feature: SCOPED_MODELS predicate-based tenancy guard
   Scenario: Migration-wide reads are the ops rollup and stay allowed
     When I call SystemMigrationTenantState.findMany with only a migrationName
     Then the guard allows the call
-    # This is the Ops → Migrations page listing one migration's tenants.
+    # This is the Upgrades page's Tenant migrations tab listing one migration's tenants.
 
   @integration
   Scenario: The periodic re-drive reads across the migrations it names

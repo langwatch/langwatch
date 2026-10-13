@@ -248,7 +248,13 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
   # The editor
   # ---------------------------------------------------------------------------
 
-  Rule: The routing policy editor opens from its own address
+  Rule: The routing policy editor opens from one address, whoever opened it
+
+    The editor is reached from two places that have nothing else in common: a
+    row on the policies table, and a virtual key's detail page saying which
+    policy that key routes through. Both have to land on the same editor
+    showing the same policy, and the link has to survive being pasted to a
+    colleague who is on neither page.
 
     @integration
     Scenario: Editing a policy from the list opens the editor for that policy

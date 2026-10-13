@@ -1,11 +1,11 @@
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { formatTable } from "../../utils/formatting";
-import type { CommandResult } from "../../utils/output";
-import { createSpinner } from "../../utils/spinner";
-import { failSpinner } from "../../utils/spinnerError";
-import { isRecord } from "./summary";
-import { triggerRequest } from "./triggerRequest";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import { formatTable } from "../../utils/formatting.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { isRecord } from "./summary.ts";
+import { triggerRequest } from "./triggerRequest.ts";
 
 interface Fire {
   id: string;
@@ -63,9 +63,7 @@ export const triggerFiresCommand = async ({
       table: () => {
         if (fires.length === 0) {
           console.log(
-            options.cursor
-              ? "\n  No more fires.\n"
-              : "\n  This automation has not fired yet.\n",
+            options.cursor ? "\n  No more fires.\n" : "\n  This automation has not fired yet.\n",
           );
           return;
         }

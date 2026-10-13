@@ -1,13 +1,15 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import {
   ExperimentsApiService,
   type ExperimentRunSummaryEntry,
 } from "@/client-sdk/services/experiments/experiments-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface ListRunsOptions {
   experiment?: string;
@@ -27,22 +29,15 @@ const summarizePassRate = (
 ): string => {
   const entries = Object.values(evaluations ?? {});
   if (entries.length === 0) return chalk.gray("—");
-  const passEntries = entries.filter(
-    (e) => typeof e.averagePassed === "number",
-  );
+  const passEntries = entries.filter((e) => typeof e.averagePassed === "number");
   if (passEntries.length === 0) {
-    const scoreEntries = entries.filter(
-      (e) => typeof e.averageScore === "number",
-    );
+    const scoreEntries = entries.filter((e) => typeof e.averageScore === "number");
     if (scoreEntries.length === 0) return chalk.gray("—");
     const avg =
-      scoreEntries.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) /
-      scoreEntries.length;
+      scoreEntries.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) / scoreEntries.length;
     return `${avg.toFixed(2)} avg`;
   }
-  const avg =
-    passEntries.reduce((sum, e) => sum + (e.averagePassed ?? 0), 0) /
-    passEntries.length;
+  const avg = passEntries.reduce((sum, e) => sum + (e.averagePassed ?? 0), 0) / passEntries.length;
   return `${(avg * 100).toFixed(0)}% pass`;
 };
 
@@ -50,6 +45,13 @@ const runStatus = (run: ExperimentRunSummaryEntry): string => {
   if (run.timestamps.stoppedAt) return chalk.gray("stopped");
   if (run.timestamps.finishedAt) return chalk.green("completed");
   return chalk.yellow("running");
+};
+
+const formatProgress = (run: ExperimentRunSummaryEntry): string => {
+  if (typeof run.progress !== "number" || typeof run.total !== "number") {
+    return chalk.gray("—");
+  }
+  return `${run.progress}/${run.total}`;
 };
 
 export const experimentListRunsCommand = async (
@@ -74,9 +76,7 @@ export const experimentListRunsCommand = async (
   })();
 
   const service = new ExperimentsApiService();
-  const spinner = createSpinner(
-    `Fetching runs for "${experimentSlug}"...`,
-  ).start();
+  const spinner = createSpinner(`Fetching runs for "${experimentSlug}"...`).start();
 
   try {
     const result = await service.listRuns({
@@ -102,10 +102,7 @@ export const experimentListRunsCommand = async (
         const tableData = result.runs.map((run) => ({
           "Run ID": run.runId,
           Status: runStatus(run),
-          Progress:
-            typeof run.progress === "number" && typeof run.total === "number"
-              ? `${run.progress}/${run.total}`
-              : chalk.gray("—"),
+          Progress: formatProgress(run),
           Started: formatTimestamp(run.timestamps.createdAt),
           Finished: formatTimestamp(run.timestamps.finishedAt),
           Result: summarizePassRate(run.summary?.evaluations ?? {}),

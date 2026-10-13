@@ -1,0 +1,33 @@
+/** One whole `trace_summaries` row as the legacy read selects it, in ClickHouse's JSON shape. */
+export function traceSummaryRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    ts_TraceId: "trace-1",
+    ts_SpanCount: 1,
+    ts_TotalDurationMs: "100",
+    ts_ComputedIOSchemaVersion: "1",
+    ts_ComputedInput: null,
+    ts_ComputedOutput: null,
+    ts_TimeToFirstTokenMs: null,
+    ts_TimeToLastTokenMs: null,
+    ts_TokensPerSecond: null,
+    ts_ContainsErrorStatus: false,
+    ts_ContainsOKStatus: true,
+    ts_ErrorMessage: null,
+    ts_Models: [],
+    ts_TotalCost: null,
+    ts_NonBilledCost: null,
+    ts_TokensEstimated: false,
+    ts_TotalPromptTokenCount: null,
+    ts_TotalCompletionTokenCount: null,
+    ts_TopicId: null,
+    ts_SubTopicId: null,
+    ts_HasAnnotation: null,
+    ts_AnnotationIds: [],
+    ts_Attributes: {},
+    ts_TraceName: "",
+    ts_OccurredAt: "0",
+    ts_CreatedAt: "0",
+    ts_UpdatedAt: "0",
+    ...overrides,
+  };
+}

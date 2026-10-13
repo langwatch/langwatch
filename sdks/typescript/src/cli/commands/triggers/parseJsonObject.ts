@@ -1,6 +1,7 @@
 import type { Ora } from "ora";
-import { commandValidationError } from "../../utils/errorOutput";
-import { failSpinner } from "../../utils/spinnerError";
+
+import { commandValidationError } from "../../utils/errorOutput.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 
 /** A flag value that must be a JSON OBJECT: `JSON.parse` alone accepts `5` and
  *  `[1]`, which would reach the API as `filters` or `actionParams`. */
@@ -31,12 +32,8 @@ export function parseJsonFlags({
   try {
     return {
       filters: options.filters ? parseJsonObject(options.filters) : undefined,
-      actionParams: options.actionParams
-        ? parseJsonObject(options.actionParams)
-        : undefined,
-      graphAlert: options.graphAlert
-        ? parseJsonObject(options.graphAlert)
-        : undefined,
+      actionParams: options.actionParams ? parseJsonObject(options.actionParams) : undefined,
+      graphAlert: options.graphAlert ? parseJsonObject(options.graphAlert) : undefined,
       report: options.report ? parseJsonObject(options.report) : undefined,
     };
   } catch {

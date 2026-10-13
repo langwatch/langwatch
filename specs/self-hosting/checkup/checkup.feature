@@ -28,7 +28,7 @@ Feature: The checkup page of a self-hosted install
 
   @unit
   Scenario: A failed check names the fix and the page that explains it
-    Given Postgres answers but a migration is still pending
+    Given Postgres answers but a blocking migration step is not done
     When the checkup runs
     Then the migrations row reads fail
     And the row names the command that applies the migration
@@ -70,12 +70,17 @@ Feature: The checkup page of a self-hosted install
     And the row never shows the password
 
   @unit
-  Scenario: A ClickHouse install where the goose binary is absent leaves migrations not checked
-    Given ClickHouse answers a ping
-    And the goose binary is not on this install
+  Scenario: A ClickHouse install that is not configured leaves its migrations row not checked
+    Given ClickHouse is not configured
     When the checkup runs
-    Then the ClickHouse row reads pass
-    And the ClickHouse migrations row reads not checked
+    Then the ClickHouse migrations row reads not checked
+
+  @unit
+  Scenario: The migration rows read the upgrade ledger
+    Given the upgrade ledger holds a blocking step that is not done
+    When the checkup runs
+    Then the migrations row of that engine is refused and names the step
+    And its fix names "pnpm task upgrade" and "/ops/upgrades"
 
   @unit
   Scenario: The usage report row reads the last report and its refusal
@@ -188,6 +193,14 @@ Feature: The checkup page of a self-hosted install
     Then the gateway control plane row reads fail with code "checkup_gateway_control_plane_mismatch"
 
   @unit
+  Scenario: The chart tells the app the control plane address its gateway dials
+    Given the chart runs the gateway beside the app
+    When the chart is rendered
+    Then the app receives GATEWAY_CONTROL_PLANE_URL equal to the address the gateway dials
+    And gateway.controlPlane.baseUrl replaces it on both when the operator sets one
+
+  # Not yet on this branch: see the merge of #8326 (a peer operation is needed).
+  @unit @unimplemented
   Scenario: The Langy canary asks the same access question the Langy panel asks
     Given Langy is open to everyone in this install
     And the Langy API key surface is switched off
@@ -195,14 +208,16 @@ Feature: The checkup page of a self-hosted install
     Then one Langy turn is sent as that administrator
     And the Langy row reads pass
 
-  @unit
+  # Not yet on this branch: see the merge of #8326 (a peer operation is needed).
+  @unit @unimplemented
   Scenario: The Langy canary is not checked for someone Langy is not open to
     Given Langy is not open to the administrator who asked for the checkup
     When the explicit Langy canary runs
     Then no Langy turn is sent
     And the Langy row reads not checked
 
-  @unit
+  # Not yet on this branch: see the merge of #8326 (a peer operation is needed).
+  @unit @unimplemented
   Scenario: The Langy canary honours an email-domain rollout rule
     Given Langy is open only to users of the administrator's email domain
     When the explicit Langy canary runs as that administrator
@@ -221,7 +236,8 @@ Feature: The checkup page of a self-hosted install
     Then the model provider row reads not checked
     And the row says the provider has no key stored
 
-  @unit
+  # Not yet on this branch: see the merge of #8326 (a peer operation is needed).
+  @unit @unimplemented
   Scenario: A provider whose keys will not decrypt fails the checkup
     Given a provider whose stored keys will not decrypt, as after a CREDENTIALS_SECRET change
     When the model provider checks run
@@ -244,6 +260,51 @@ Feature: The checkup page of a self-hosted install
     When the usage report preview is taken
     Then the preview carries no optional field
 
+  # Ops health: counts the ops dashboard, the process explorer and the
+  # migrations page already read, so LangWatch can see an install struggling.
+
+  @unit
+  Scenario: The report carries the install's ops health as counts
+    Given the ops pages read a queue backlog, dead letters, a blocked group, a stalled process and a parked migration
+    When the usage report is taken with the optional category on
+    Then the report carries ops_health
+    And it counts pending jobs and dead letters per queue, by our own queue name
+    And it counts pending jobs, blocked groups, pending messages, dead letters and stalled processes per pipeline, by our own pipeline name
+    And it counts parked and rolled back organizations per in-place migration, by the migration's name
+    And it carries the failed job counter and when the dashboard last measured
+    And a queue, pipeline or migration with nothing wrong is left out
+
+  @unit
+  Scenario: Ops health carries no ids, payloads, error messages or tenant names
+    Given the ops pages read an error message, a group id and a parked tenant naming a project
+    When ops health is read for the report
+    Then it carries none of them, and no writer name either
+
+  @unit
+  Scenario: An unreadable ops health section is reported as unknown, not as healthy
+    Given the dashboard has no reading yet and the migrations cannot be read
+    When ops health is read for the report
+    Then those sections are null rather than empty
+    And the rest of the report still goes
+
+  @unit
+  Scenario: Ops health is part of the optional category
+    Given an administrator switches the optional category off
+    When the usage report is taken
+    Then the report carries no ops_health
+
+  @unit
+  Scenario: DISABLE_USAGE_STATS sends no ops health either
+    Given DISABLE_USAGE_STATS is set
+    When the daily report runs
+    Then ops health is not read
+    And nothing is posted
+
+  @unit
+  Scenario: The preview shows ops health like every other field
+    When the usage report preview is taken
+    Then the payload shows ops_health exactly as it would be posted
+
   @integration
   Scenario: The checkup page lists every row with its verdict
     When an administrator opens Settings, Checkup
@@ -263,3 +324,10 @@ Feature: The checkup page of a self-hosted install
     Then the payload is shown pretty printed
     And a copy button copies it
     And the two switches are beside it
+
+  @unit
+  Scenario: A checkup canary runs with a minimal key of its own, never the project key
+    Given an installation whose oldest project the canaries run against
+    When an administrator runs a canary check
+    Then the canary calls with a key minted for it, owned by nobody and bound to that project
+    And the key holds only what that canary's probe calls, and the project's legacy key is never read

@@ -1,8 +1,10 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { describe, expect, it } from "vitest";
-import { listNativeSkills, renderSkill } from "../_compiler/native.js";
+
+import { listNativeSkills, renderSkill } from "../_compiler/native.ts";
 
 // Backs specs/langy/langy-trace-explorer-actions.feature ("The skill decides
 // between driving the Explorer and answering with cards"): what the
@@ -13,9 +15,7 @@ const skillsRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(skillsRoot, "..");
 
 function renderedSkill(): string {
-  const skill = listNativeSkills(skillsRoot).find(
-    (s) => s.slug === "find-traces",
-  );
+  const skill = listNativeSkills(skillsRoot).find((s) => s.slug === "find-traces");
   if (!skill) throw new Error("find-traces is not a shipped native skill");
   return renderSkill(skill);
 }
@@ -32,14 +32,8 @@ describe("the find-traces skill", () => {
   describe("given its section on the two ways of working", () => {
     /** @scenario "The skill states the primary and the secondary way of working" */
     it("drives the Explorer when finding traces is the ask, and stays on the page otherwise", () => {
-      const section = sectionOf(
-        renderedSkill(),
-        "Primary and secondary way of working",
-      );
-      const primary = section.slice(
-        section.indexOf("**Primary"),
-        section.indexOf("**Secondary"),
-      );
+      const section = sectionOf(renderedSkill(), "Primary and secondary way of working");
+      const primary = section.slice(section.indexOf("**Primary"), section.indexOf("**Secondary"));
       const secondary = section.slice(section.indexOf("**Secondary"));
 
       expect(primary).toContain("finding traces is the ask");
@@ -93,10 +87,7 @@ describe("the find-traces skill", () => {
   describe("given its section on driving the Explorer", () => {
     /** @scenario "The skill answers a saved read with the link, not a count" */
     it("answers a saved read with the link rather than a number it did not read", () => {
-      const section = sectionOf(
-        renderedSkill(),
-        "Step 4a: Primary, drive the Explorer",
-      );
+      const section = sectionOf(renderedSkill(), "Step 4a: Primary, drive the Explorer");
       const saved = section.slice(section.indexOf('A state with `source: "saved"`'));
 
       expect(saved).toContain("not the user's screen");
@@ -110,24 +101,15 @@ describe("the find-traces skill", () => {
     /** @scenario "The skill searches every form a concept can take before saying nothing was found" */
     it("reads the reference, lists values, names each form of feedback and widens the window", () => {
       const rendered = renderedSkill();
-      const reference = rendered.indexOf(
-        "langwatch query reference --section trace-filter",
-      );
+      const reference = rendered.indexOf("langwatch query reference --section trace-filter");
       const forms = rendered.indexOf("## Step 3");
       expect(reference).toBeGreaterThan(0);
-      expect(reference, "the reference comes before the search").toBeLessThan(
-        forms,
-      );
+      expect(reference, "the reference comes before the search").toBeLessThan(forms);
       expect(rendered).toContain("langwatch trace facets <field>");
 
-      const section = sectionOf(
-        rendered,
-        "Step 3: Search every form the concept can take",
-      );
+      const section = sectionOf(rendered, "Step 3: Search every form the concept can take");
       expect(section).toContain("**Events.**");
-      expect(section).toContain(
-        "event:thumbs_up_down AND event.attribute.event.metrics.vote:-1",
-      );
+      expect(section).toContain("event:thumbs_up_down AND event.attribute.event.metrics.vote:-1");
       expect(section).toContain("**Annotations.**");
       expect(section).toContain("**Evaluator results.**");
       expect(section).toContain("**A wider window.**");
@@ -140,14 +122,7 @@ describe("Langy's routing table", () => {
   /** @scenario "The routing table sends trace-finding asks to the find-traces skill" */
   it("routes trace-finding asks to find-traces, primary and secondary, and ships the skill as rendered", () => {
     const agentsMd = fs.readFileSync(
-      path.join(
-        repoRoot,
-        "services",
-        "langyagent",
-        "internal",
-        "assets",
-        "AGENTS.md",
-      ),
+      path.join(repoRoot, "services", "langyagent", "internal", "assets", "AGENTS.md"),
       "utf8",
     );
     const rows = agentsMd
@@ -189,11 +164,10 @@ describe("Langy's routing table", () => {
 });
 
 // Backs specs/langy/langy-trace-explorer-actions.feature ("A trace search
-// names no origin"). The Explorer already leaves Langy's own traces out
-// server side, so a search that names no origin counts what the Explorer
-// counts; naming `application` also drops evaluation, simulation, sample and
-// gateway traces, and the card's link then opens narrower than the count
-// beside it.
+// names no origin"): the Explorer already leaves Langy's own traces out, so a
+// search naming no origin counts what the Explorer counts; naming `application`
+// also drops evaluation, simulation, sample and gateway traces, and the card's
+// link then opens narrower than the count beside it.
 describe("every skill that tells Langy to run a trace search", () => {
   describe("given the commands they print", () => {
     /** @scenario "A trace search names no origin" */
@@ -213,9 +187,7 @@ describe("every skill that tells Langy to run a trace search", () => {
 
     /** @scenario "A trace search names no origin" */
     it("keeps the production-traffic narrowing on the export, where no link carries it", () => {
-      const performance = listNativeSkills(skillsRoot).find(
-        (s) => s.slug === "agent-performance",
-      );
+      const performance = listNativeSkills(skillsRoot).find((s) => s.slug === "agent-performance");
       if (!performance) throw new Error("agent-performance is not shipped");
       const rendered = renderSkill(performance);
       expect(rendered).toContain(

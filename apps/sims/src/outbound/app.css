@@ -1,0 +1,24 @@
+/* Layout glue only; every value is a kit token (packages/design-system-internal/README.md). */
+
+.outbound-search {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.outbound-select {
+  flex: 0 1 14rem;
+  min-width: 0;
+}
+
+.outbound-field {
+  flex: 0 1 9rem;
+  min-width: 0;
+}
+
+@media (max-width: 719px) {
+  .outbound-search,
+  .outbound-select,
+  .outbound-field {
+    flex-basis: 100%;
+  }
+}

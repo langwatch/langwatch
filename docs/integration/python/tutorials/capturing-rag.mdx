@@ -9,6 +9,7 @@ keywords: RAG, Retrieval Augmented Generation, LangChain, LangWatch, LangChain R
 Retrieval Augmented Generation (RAG) is a common pattern in LLM applications where you first retrieve relevant context from a knowledge base and then use that context to generate a response. LangWatch provides specific ways to capture RAG data, enabling better observability and evaluation of your RAG pipelines.
 
 Capturing the `contexts` (retrieved documents) used by the LLM enables the following in LangWatch:
+
 - Specialized RAG evaluators (e.g., Faithfulness, Context Relevancy).
 - Analytics on document usage (e.g., which documents are retrieved most often, which ones lead to better responses).
 - Deeper insights into the retrieval step of your pipeline.
@@ -93,6 +94,7 @@ if __name__ == "__main__":
 ```
 
 In this example:
+
 1.  `perform_rag` is decorated with `@langwatch.span(type="rag")`.
 2.  Inside `perform_rag`, we simulate a retrieval step.
 3.  `langwatch.get_current_span().update(contexts=retrieved_docs)` is called to explicitly log the retrieved documents.
@@ -182,6 +184,7 @@ if __name__ == "__main__":
 ```
 
 #### Key elements
+
 - `langwatch.langchain.capture_rag_from_retriever(retriever, lambda document: ...)`: This wraps your existing retriever.
 - The lambda function `lambda document: RAGChunk(...)` defines how to map fields from LangChain's `Document` to LangWatch's `RAGChunk`. This is crucial for providing detailed context information.
 - The wrapped retriever is then used to create a tool, which is subsequently used in an agent or chain.
@@ -225,6 +228,7 @@ def main():
         callbacks=[langWatchCallback]
     ))
 ```
+
 The `capture_rag_from_tool` approach is generally less direct for RAG from retrievers because you have to parse the tool's output (which is usually a string) to extract structured context information. `capture_rag_from_retriever` is preferred when dealing directly with LangChain retrievers.
 
 Refer to the SDK examples for more detailed implementations.
