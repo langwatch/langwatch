@@ -33,6 +33,7 @@ void describe("Nx reruns", () => {
       const { scripts } = JSON.parse(repoFile(`${root}/package.json`));
       assert.equal(scripts["test:repo"], "vitest run --config vitest.repo.config.ts", name);
       assert.equal(hashes({ name, path: "packages/process/src/server.ts" }), false, name);
+      assert.equal(hashes({ name, path: "modules/trace/process/src/server.ts" }), false, name);
     }
   });
 
