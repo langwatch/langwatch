@@ -51,6 +51,18 @@ const CAPPED_SETTINGS = {
   max_bytes_before_external_group_by: "30000000",
 } as const;
 
+/**
+ * The seed writes in small blocks on one thread: a default INSERT ... SELECT of the million
+ * traces holds over 1 GiB, more than the whole test server is given, while these hold under
+ * 150 MiB each. Only the seed is shaped; the panels run as the service sends them.
+ */
+const SEED_SETTINGS = {
+  max_threads: 1,
+  max_block_size: "4096",
+  min_insert_block_size_rows: "4096",
+  min_insert_block_size_bytes: "0",
+} as const;
+
 const end = new Date(Math.floor(Date.now() / DAY_MS) * DAY_MS);
 const start = new Date(end.getTime() - RANGE_DAYS * DAY_MS);
 const seedSpanMs = 2 * RANGE_DAYS * DAY_MS;
@@ -182,6 +194,7 @@ describe("dashboard panels under a memory cap", () => {
         WHERE v = 0 OR t % 2 = 0
       `,
       query_params: params,
+      clickhouse_settings: SEED_SETTINGS,
     });
 
     await ch.exec({
@@ -195,6 +208,7 @@ describe("dashboard panels under a memory cap", () => {
         FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers(${TRACE_COUNT}))
       `,
       query_params: params,
+      clickhouse_settings: SEED_SETTINGS,
     });
 
     await ch.exec({
@@ -209,6 +223,7 @@ describe("dashboard panels under a memory cap", () => {
         WHERE t % ${RAG_TRACE_EVERY} = 0
       `,
       query_params: params,
+      clickhouse_settings: SEED_SETTINGS,
     });
 
     await ch.exec({
@@ -223,6 +238,7 @@ describe("dashboard panels under a memory cap", () => {
         FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers(${TRACE_COUNT}))
       `,
       query_params: params,
+      clickhouse_settings: SEED_SETTINGS,
     });
 
     // Ground truth straight from the seed, without any dedup machinery: the

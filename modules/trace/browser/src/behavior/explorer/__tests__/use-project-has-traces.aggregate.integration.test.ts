@@ -2,6 +2,7 @@
  * An aggregate is never sent a trace and reads its members', so it never shows onboarding.
  * @see specs/governance/aggregate-project.feature
  */
+import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { projectRef } = vi.hoisted(() => ({
@@ -26,7 +27,9 @@ describe("useProjectHasTraces", () => {
     it("counts as having traces", () => {
       projectRef.current = { id: "project-aggregate", firstMessage: false, kind: "aggregate" };
 
-      expect(useProjectHasTraces().hasAnyTraces).toBe(true);
+      const { result } = renderHook(() => useProjectHasTraces());
+
+      expect(result.current.hasAnyTraces).toBe(true);
     });
   });
 
@@ -34,7 +37,9 @@ describe("useProjectHasTraces", () => {
     it("counts as having none", () => {
       projectRef.current = { id: "project-1", firstMessage: false, kind: "application" };
 
-      expect(useProjectHasTraces().hasAnyTraces).toBe(false);
+      const { result } = renderHook(() => useProjectHasTraces());
+
+      expect(result.current.hasAnyTraces).toBe(false);
     });
   });
 });

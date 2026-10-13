@@ -8,7 +8,7 @@
 import { defineSlice } from "@langwatch/browser-host/global-store";
 import { nowInstant } from "@langwatch/time";
 import { useQuery } from "@tanstack/react-query";
-import { createContext, useContext, useRef } from "react";
+import { createContext, useContext } from "react";
 
 export const DASHBOARD_AUTO_REFRESH_OPTIONS = ["off", "1m", "5m"] as const;
 export type DashboardAutoRefreshOption = (typeof DASHBOARD_AUTO_REFRESH_OPTIONS)[number];
@@ -55,11 +55,12 @@ export function useDashboardAutoRefresh() {
   const setOption = useDashboardAutoRefreshStore((state) => state.setOption);
   const refetchInterval: number | false = DASHBOARD_AUTO_REFRESH_MS[option] ?? false;
 
-  // The first answer is 0 so widgets see no refresh until the first poll after mount.
-  const calls = useRef(0);
+  // The first answer is 0 so widgets see no refresh until the first poll after mount. It reads
+  // the cache, not a render ref: the React Compiler made a ref counter answer a time at mount.
   const clock = useQuery({
     queryKey: ["analytics", "dashboard-refresh-clock"],
-    queryFn: () => (calls.current++ === 0 ? 0 : nowInstant().epochMilliseconds),
+    queryFn: ({ client, queryKey }) =>
+      client.getQueryData(queryKey) === undefined ? 0 : nowInstant().epochMilliseconds,
     enabled: refetchInterval !== false,
     refetchInterval,
     gcTime: 0,

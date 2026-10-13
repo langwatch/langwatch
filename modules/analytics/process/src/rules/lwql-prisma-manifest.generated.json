@@ -1513,6 +1513,70 @@
       ]
     },
     {
+      "name": "IdentitySignInSwitch",
+      "tableName": "IdentitySignInSwitch",
+      "documentation": "Whether a user signs in on the identifier path: identity's own switch, set when the\nidentifier backfill proves the user and pinned off by an operator's rollback. No row is the\nlegacy path. Spec: modules/identity/specs/sign-in-switch.feature. Column refs only, no FK.",
+      "primaryKey": [
+        "userId"
+      ],
+      "fields": [
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "onIdentifiers",
+          "columnName": "onIdentifiers",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "pinned",
+          "columnName": "pinned",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "switchedAt",
+          "columnName": "switchedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastAppliedEventId",
+          "columnName": "lastAppliedEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "IdentifierReservation",
       "tableName": "IdentifierReservation",
       "documentation": "",
@@ -17317,6 +17381,70 @@
         {
           "name": "standingChangedAt",
           "columnName": "standingChangedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AuthzEngineSwitch",
+      "tableName": "AuthzEngineSwitch",
+      "documentation": "Whether an organization's permission checks run on the authorization engine: authz's own\nswitch, set when the engine migration proves the organization and pinned off by an operator's\nrollback. No row is the legacy path. Spec: modules/authz/specs/engine-switch.feature.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "onEngine",
+          "columnName": "onEngine",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "pinned",
+          "columnName": "pinned",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "switchedAt",
+          "columnName": "switchedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastAppliedEventId",
+          "columnName": "lastAppliedEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,
