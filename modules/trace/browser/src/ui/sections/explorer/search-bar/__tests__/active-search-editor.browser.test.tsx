@@ -1176,8 +1176,7 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("when editing an existing chip, it reopens the dropdown", () => {
-    // QUARANTINED(main-green): the dropdown opens (footer renders) but lists no value rows for status in real Chromium; suspected value source moved off FIELD_VALUES to live facets. Tracking: https://github.com/langwatch/langwatch/issues/8607
-    it.skip("clicking inside the value of a static chip reopens value-mode suggestions for that field", async () => {
+    it("clicking inside the value of a static chip reopens value-mode suggestions for that field", async () => {
       // Boots with a pre-rendered `status:error` chip — mirrors the
       // saved-query / sidebar-toggle path that produces a chip the user
       // didn't just type. With the cursor mid-value, the dropdown must

@@ -2,8 +2,6 @@ import { getProjectSlug } from "../helpers";
 import { expect, test } from "../test.ts";
 
 test("experiment creation keeps the SDK workflow discoverable", async ({ page }, testInfo) => {
-  // QUARANTINED(main-green): asserts computed CSS the app no longer renders. Tracking: https://github.com/langwatch/langwatch/issues/8599
-  test.fixme(true, "quarantined, see langwatch/langwatch#8599");
   const projectSlug = await getProjectSlug(page);
 
   await page.goto(`/${projectSlug}/evaluations`);
