@@ -1,0 +1,197 @@
+/**
+ * Running a saved chart: the stored statement, its saved values, and the
+ * window and step the surface asked for, through the restricted LangWatchQL
+ * identity that owns the bucket budget.
+ */
+import {
+  EVERY_CATALOGUE_PERMISSION,
+  createLangWatchQLService,
+  recordingExecutor,
+} from "@langwatch/analytics-process/testing";
+import { describe, expect, it } from "vitest";
+
+import { createDashboardTestAnalytics } from "../../app/__tests__/dashboard.fixture.ts";
+import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
+import { SavedWorkbenchChartPolicyService } from "../saved-workbench-chart-policy.service.ts";
+import { SavedWorkbenchChartService } from "../saved-workbench-chart.service.ts";
+
+const PROJECT = { id: "project_1", lwqlKey: "restricted-project-key" };
+const WEEK = {
+  start: "2026-02-01T00:00:00.000Z",
+  end: "2026-02-08T00:00:00.000Z",
+};
+const TIMESERIES_SQL =
+  "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
+  "count() AS value FROM analytics.traces " +
+  "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} " +
+  "GROUP BY bucket";
+
+/** The runner every case here is measured for: nothing content-gated is hidden. */
+const FULLY_PERMITTED = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
+  canSeeCosts: true,
+};
+
+async function serviceWithSavedChart() {
+  const executor = recordingExecutor();
+  const langWatchQL = createLangWatchQLService({ executor, database: "analytics" });
+  const analytics = createDashboardTestAnalytics({
+    validateLangWatchQL: (input) => langWatchQL.validate(input),
+    executeLangWatchQL: (input) => langWatchQL.execute(input),
+  });
+
+  const repository = MemoryDashboardRepository.create();
+  await repository.createSavedWorkbenchChart({
+    id: "chart_1",
+    projectId: PROJECT.id,
+    name: "Traces over time",
+    definition: { version: 1, sql: TIMESERIES_SQL, parameters: {} },
+  });
+
+  const charts = SavedWorkbenchChartService.create({
+    repository,
+    policy: SavedWorkbenchChartPolicyService.create({ analytics }),
+    analytics,
+  });
+
+  return { charts, executor };
+}
+
+describe("Dashboard saved-chart execution", () => {
+  /**
+   * @scenario "Running a saved chart executes its stored statement with its saved values and the surface's window and step"
+   */
+  it("runs the stored statement through restricted LangWatchQL with dashboard coarsening", async () => {
+    const { charts, executor } = await serviceWithSavedChart();
+
+    const result = await charts.run({
+      projectId: PROJECT.id,
+      chartId: "chart_1",
+      execution: {
+        project: PROJECT,
+        protections: FULLY_PERMITTED,
+        timeWindow: WEEK,
+        granularitySeconds: 60,
+        onBudgetOverflow: "coarsen",
+      },
+    });
+
+    expect(result).toMatchObject({ granularitySeconds: 3_600, coarsenedFromSeconds: 60 });
+    expect(executor.calls).toHaveLength(1);
+    expect(executor.calls[0]!.sql).toContain("FROM analytics.traces");
+    expect(executor.calls[0]!.parameters).toMatchObject({
+      dashboard_context_granularity_seconds: 3_600,
+      dashboard_context_period_start: "2026-02-01 00:00:00",
+      dashboard_context_period_end: "2026-02-08 00:00:00",
+    });
+  });
+
+  /** @scenario "A chart declaring the granularity parameter runs at the step the surface supplies" */
+  it("executes the stored statement at the offered step and says it follows granularity", async () => {
+    const { charts, executor } = await serviceWithSavedChart();
+
+    const result = await charts.run({
+      projectId: PROJECT.id,
+      chartId: "chart_1",
+      execution: {
+        project: PROJECT,
+        protections: FULLY_PERMITTED,
+        timeWindow: WEEK,
+        granularitySeconds: 3_600,
+      },
+    });
+
+    expect(result.followsGranularity).toBe(true);
+    expect(executor.calls[0]!.parameters).toMatchObject({
+      dashboard_context_granularity_seconds: 3_600,
+    });
+  });
+
+  /** @scenario "A declared granularity with no step supplied refuses to run naming the parameter" */
+  it("refuses to run without a step and names the parameter it is missing", async () => {
+    const { charts, executor } = await serviceWithSavedChart();
+
+    await expect(
+      charts.run({
+        projectId: PROJECT.id,
+        chartId: "chart_1",
+        execution: { project: PROJECT, protections: FULLY_PERMITTED, timeWindow: WEEK },
+      }),
+    ).rejects.toThrowError(
+      expect.objectContaining({
+        code: "lwql_parameter_missing",
+        meta: expect.objectContaining({
+          parameters: expect.arrayContaining(["dashboard_context_granularity_seconds"]),
+        }),
+      }),
+    );
+
+    expect(executor.calls).toHaveLength(0);
+  });
+
+  /**
+   * A direct chart run is caller-owned, so it refuses where a dashboard widget
+   * passes `onBudgetOverflow: "coarsen"` and reads `coarsenedFromSeconds` off
+   * the result instead. Refusing is the default: nothing has to ask for it.
+   */
+  /** @scenario "Running a saved chart refuses a step finer than the period's bucket budget" */
+  it("refuses a step finer than the period's bucket budget when nothing asked to coarsen", async () => {
+    const { charts, executor } = await serviceWithSavedChart();
+
+    await expect(
+      charts.run({
+        projectId: PROJECT.id,
+        chartId: "chart_1",
+        execution: {
+          project: PROJECT,
+          protections: FULLY_PERMITTED,
+          timeWindow: WEEK,
+          granularitySeconds: 60,
+        },
+      }),
+    ).rejects.toThrowError(expect.objectContaining({ code: "lwql_granularity_too_fine" }));
+
+    expect(executor.calls).toHaveLength(0);
+  });
+
+  it("refuses identically when the caller asks for it, rather than only by default", async () => {
+    const { charts } = await serviceWithSavedChart();
+
+    await expect(
+      charts.run({
+        projectId: PROJECT.id,
+        chartId: "chart_1",
+        execution: {
+          project: PROJECT,
+          protections: FULLY_PERMITTED,
+          timeWindow: WEEK,
+          granularitySeconds: 60,
+          onBudgetOverflow: "refuse",
+        },
+      }),
+    ).rejects.toThrowError(expect.objectContaining({ code: "lwql_granularity_too_fine" }));
+  });
+
+  it("reports no coarsening for a period that fits, even when offered", async () => {
+    const { charts } = await serviceWithSavedChart();
+
+    // An hour over a week is 168 buckets. It fits, so nothing is substituted
+    // and the widget has no notice to show.
+    const result = await charts.run({
+      projectId: PROJECT.id,
+      chartId: "chart_1",
+      execution: {
+        project: PROJECT,
+        protections: FULLY_PERMITTED,
+        timeWindow: WEEK,
+        granularitySeconds: 3_600,
+        onBudgetOverflow: "coarsen",
+      },
+    });
+
+    expect(result.granularitySeconds).toBe(3_600);
+    expect(result.coarsenedFromSeconds).toBeUndefined();
+  });
+});

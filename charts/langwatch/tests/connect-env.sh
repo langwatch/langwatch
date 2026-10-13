@@ -2,7 +2,7 @@
 #
 # Renders the chart and asserts what Connect emits, on both postures.
 #
-# The upgrade guarantee for ADR-142 is a claim about absence: an install that
+# The upgrade guarantee for ADR-159 is a claim about absence: an install that
 # upgrades and changes no value must carry no LANGWATCH_CONNECT_ variable at
 # all, so what it calls is decided by its license and by nothing in this chart.
 # Absence is exactly what a template's source does not show: an `{{- if }}`
@@ -188,10 +188,48 @@ $(cat "$err")"
   done
 }
 
+# Verifies: a Helm install reports its install method and its chart release
+test_install_method_and_chart_version_are_emitted() {
+  local out="${TMPDIR:-/tmp}/connect-install-method.yaml"
+  local err="${TMPDIR:-/tmp}/connect-install-method.err"
+  if ! render_to "$out" "$err" t --set autogen.enabled=true; then
+    fail "install-method-render" "default render failed:
+$(cat "$err")"
+    return
+  fi
+
+  local chart_version
+  chart_version="$(awk '/^version:/ { gsub(/"/, "", $2); print $2; exit }' Chart.yaml)"
+
+  local workload names
+  for workload in "${WORKLOADS[@]}"; do
+    names="$(env_names_in "$out" "$workload")"
+    local named
+    for named in INSTALL_METHOD LANGWATCH_CHART_VERSION; do
+      if ! has_env "$names" "$named"; then
+        fail "install-method-missing-$workload-$named" \
+          "$workload does not emit $named. The workers send the usage report and the app shows its preview, so both need it, or a Helm install reports no chart release and an install method that cannot be told apart from any other."
+      fi
+    done
+  done
+
+  local method version
+  method="$(env_value_of "$out" "INSTALL_METHOD")"
+  if [[ "$method" != "helm" ]]; then
+    fail "install-method-value" "INSTALL_METHOD is '${method:-<empty>}', expected 'helm'."
+  fi
+  version="$(env_value_of "$out" "LANGWATCH_CHART_VERSION")"
+  if [[ -z "$chart_version" || "$version" != "$chart_version" ]]; then
+    fail "chart-version-value" \
+      "LANGWATCH_CHART_VERSION is '${version:-<empty>}', expected the Chart.yaml version '${chart_version:-<unreadable>}'."
+  fi
+}
+
 test_default_emits_nothing
 test_disabled_emits_the_flag_only
 test_named_endpoints_are_carried
 test_version_is_always_emitted
+test_install_method_and_chart_version_are_emitted
 
 if [[ $failures -gt 0 ]]; then
   echo
@@ -199,4 +237,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: all 4 Connect postures pinned: (1) a default render carries no LANGWATCH_CONNECT_ variable; (2) switching Connect off emits the flag on app and workers and no endpoint the operator did not name; (3) named endpoints and instance id are carried to both workloads; (4) SERVICE_VERSION is emitted on every render"
+echo "PASS: all 5 Connect postures pinned: (1) a default render carries no LANGWATCH_CONNECT_ variable; (2) switching Connect off emits the flag on app and workers and no endpoint the operator did not name; (3) named endpoints and instance id are carried to both workloads; (4) SERVICE_VERSION is emitted on every render; (5) INSTALL_METHOD is helm and LANGWATCH_CHART_VERSION is the chart release on app and workers"

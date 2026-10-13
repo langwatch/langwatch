@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..models.patch_api_gateway_v1_budgets_by_id_response_200_budget_on_breach import (
     PatchApiGatewayV1BudgetsByIdResponse200BudgetOnBreach,
@@ -43,32 +42,23 @@ class PatchApiGatewayV1BudgetsByIdResponse200Budget:
         on_breach (PatchApiGatewayV1BudgetsByIdResponse200BudgetOnBreach):
         limit_usd (str): Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never
             exponent notation. Use limit_nano_usd for arithmetic.
-        limit_nano_usd (int | None): Canonical integer amount, nano-USD. Null past the safe integer range, where
-            limit_usd still reads.
-        spent_usd (None | str): Display value, null when spend_available is false. Decimal string, up to 9 fractional
-            digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic.
-        spent_nano_usd (int | None): Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the
-            same integer as spent_usd, so the pair always agrees.
+        limit_nano_usd (int | None):
+        spent_usd (None | str):
+        spent_nano_usd (int | None):
         timezone (None | str):
         provider_key (None | str):
         external_id (None | str):
         metadata (PatchApiGatewayV1BudgetsByIdResponse200BudgetMetadata):
-        current_period_started_at (str): Start of the period `spent_usd` covers, computed at read time. For an anchored
-            budget this is its own cycle's start, not the calendar period's.
-        resets_at (str): When the current period gives way to the next. Far-future for total and manual windows, which
-            do not roll on their own.
-        cycle_anchor_at (None | str): The instant this budget's cycle is phased to. Null means no anchor: a calendar-
-            aligned cyclic window, or one of the two windows that do not cycle (total, manual).
+        current_period_started_at (str):
+        resets_at (str):
+        cycle_anchor_at (None | str):
         last_reset_at (None | str):
         archived_at (None | str):
         created_at (str):
         member_count (int | Unset):
         end_users_seen (int | Unset):
         end_users_over (int | Unset):
-        scope_reach (PatchApiGatewayV1BudgetsByIdResponse200BudgetScopeReach | Unset): Whether any active key in the
-            organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block
-            as configured: scope a key to its target, or move the budget where the keys already run. This is the only field
-            that tells a budget nothing can reach apart from one that simply has not been breached.
+        scope_reach (PatchApiGatewayV1BudgetsByIdResponse200BudgetScopeReach | Unset):
     """
 
     id: str
@@ -97,7 +87,6 @@ class PatchApiGatewayV1BudgetsByIdResponse200Budget:
     end_users_seen: int | Unset = UNSET
     end_users_over: int | Unset = UNSET
     scope_reach: PatchApiGatewayV1BudgetsByIdResponse200BudgetScopeReach | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
@@ -165,7 +154,7 @@ class PatchApiGatewayV1BudgetsByIdResponse200Budget:
             scope_reach = self.scope_reach.value
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -346,21 +335,4 @@ class PatchApiGatewayV1BudgetsByIdResponse200Budget:
             scope_reach=scope_reach,
         )
 
-        patch_api_gateway_v1_budgets_by_id_response_200_budget.additional_properties = d
         return patch_api_gateway_v1_budgets_by_id_response_200_budget
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

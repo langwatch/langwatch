@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { isLangWatchHandledError } from "@/internal/api/errors";
+
 import type { LangwatchApiClient } from "@/internal/api/client";
+import { isLangWatchHandledError } from "@/internal/api/errors";
+
 import { GraphsApiError, GraphsApiService } from "../graphs-api.service";
 
 const serviceWith = (error: unknown) =>
@@ -40,9 +42,7 @@ describe("GraphsApiService", () => {
 
   describe("when the failure body is not the platform's shape", () => {
     it("throws the family's own error, as before", async () => {
-      const thrown = await rejectionOf(
-        serviceWith("<html>bad gateway</html>").create({} as never),
-      );
+      const thrown = await rejectionOf(serviceWith("<html>bad gateway</html>").create({} as never));
 
       expect(isLangWatchHandledError(thrown)).toBe(false);
       expect(thrown).toBeInstanceOf(GraphsApiError);

@@ -1,0 +1,118 @@
+import type { RunParameterValues } from "../../scenario.parameters.ts";
+import type { ResolvedRunModels } from "../run/run-models.ts";
+import type { RunSecretCiphertext } from "../run/run-parameters.ts";
+import type {
+  ChildProcessJobData,
+  ExecutionContext,
+  RunPlanModels,
+  ScenarioAgentInstance,
+  TargetConfig,
+} from "./scenario-execution-data.ts";
+
+export interface ScenarioExecutionJob {
+  projectId: string;
+  scenarioId: string;
+  scenarioRunId: string;
+  batchRunId: string;
+  setId: string;
+  scenarioName?: string;
+  target: {
+    type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+    referenceId: string;
+    scenarioMappings?: TargetConfig["scenarioMappings"];
+  };
+  /** The models the queuing suite's plan picked; absent for a run no suite queued. */
+  plan?: RunPlanModels;
+  parameters?: RunParameterValues;
+  secretParameters?: RunSecretCiphertext;
+  /** The member who started the run; absent when nobody did, and the run acts as the system. */
+  startedByUserId?: string;
+  /** The API key that member started it with, which also bounds the run's key. */
+  startedByApiKeyId?: string;
+}
+
+export type ScenarioModelParametersFailureReason =
+  | "invalid_model_format"
+  | "provider_not_found"
+  | "provider_not_enabled"
+  | "missing_params"
+  // A project with no model set for a scenario feature key is the customer's
+  // to fix, so the refusal names it rather than leaving the caller unable to
+  // tell it from a fault of ours.
+  | "model_not_configured"
+  | "preparation_error";
+
+export type ScenarioExecutionPrefetchResult =
+  | {
+      success: true;
+      data: ChildProcessJobData;
+      telemetry: { endpoint: string; apiKey: string };
+      /**
+       * The models this run resolved. A sibling of `data`, not a member: the
+       * child builds its models from the prepared params needing no name,
+       * while the queuing caller records the names. Null if none resolved.
+       */
+      resolvedModels: ResolvedRunModels | null;
+    }
+  | {
+      success: false;
+      error: string;
+      reason?: ScenarioModelParametersFailureReason;
+    };
+
+export type ScenarioExecutionPrefetchInput = {
+  context: ExecutionContext & {
+    parameters?: RunParameterValues;
+    secretParameters?: RunSecretCiphertext;
+  };
+  plan?: RunPlanModels;
+  target: TargetConfig;
+  /** Whose run this is: its key acts as them and holds no more than they do. */
+  startedByUserId?: string | undefined;
+  /** The API key they started it with: the run's key holds no more than it either. */
+  startedByApiKeyId?: string | undefined;
+};
+
+export type ScenarioChildEnvironment = {
+  labels: string[];
+  telemetry: { endpoint: string; apiKey: string };
+};
+
+export type ScenarioExecutionPreparation = {
+  childEnvironment: Promise<ScenarioChildEnvironment | null>;
+  result: Promise<ScenarioExecutionPrefetchResult>;
+};
+
+export type ScenarioUnsuccessfulExecutionInput = {
+  projectId: string;
+  scenarioId: string;
+  setId: string;
+  batchRunId: string;
+  scenarioRunId: string;
+  error?: string;
+  cancelled?: boolean;
+  target?: { type: string; referenceId: string };
+};
+
+/** Worker-lifecycle boundary recorded in Scenario ADR-002. */
+export abstract class ScenarioExecutionService {
+  abstract submit(input: ScenarioExecutionJob): Promise<void>;
+  abstract cancel(input: { projectId: string; scenarioRunId: string }): Promise<void>;
+  abstract prefetch(
+    input: ScenarioExecutionPrefetchInput,
+  ): Promise<ScenarioExecutionPrefetchResult>;
+  abstract prepare(input: ScenarioExecutionPrefetchInput): ScenarioExecutionPreparation;
+  abstract finishUnsuccessfulRun(input: ScenarioUnsuccessfulExecutionInput): Promise<void>;
+  /**
+   * Records the connected agent instance that answered a finished run, in the
+   * reserved `langwatch` namespace of the run metadata. Nothing else on the
+   * run changes: not its status, not its verdict, not its other metadata.
+   */
+  abstract recordAgentInstance(input: {
+    projectId: string;
+    scenarioRunId: string;
+    agentInstance: ScenarioAgentInstance;
+  }): Promise<void>;
+  /** Marks a voice run LangWatch ended at the maximum call duration (AC28). */
+  abstract recordCutAtLimit(input: { projectId: string; scenarioRunId: string }): Promise<void>;
+}

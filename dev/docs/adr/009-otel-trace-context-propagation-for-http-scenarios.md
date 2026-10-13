@@ -70,6 +70,7 @@ Span query failures are different: they represent infrastructure problems. The s
 ## Consequences
 
 **Positive:**
+
 - Judge can evaluate tool call behavior for HTTP targets without SDK changes
 - No impact on conversation speed — delay only at judgment time
 - Works with any OTEL-compatible SDK on the user's side
@@ -77,11 +78,13 @@ Span query failures are different: they represent infrastructure problems. The s
 - Uses existing platform API and `JudgeSpanCollector` interface
 
 **Negative:**
+
 - Span collection adds latency before judge evaluation (up to timeout window)
 - Timing is inherently best-effort — spans that arrive after the timeout are missed by the judge (still visible in UI traces)
 - Reconstructing `ReadableSpan` objects from stored span documents requires an adapter layer
 
 **Neutral:**
+
 - The `@langwatch/scenario` SDK does not need changes for this feature
 - Users must have an OTEL-compatible SDK integrated for tool call evaluation to work
 

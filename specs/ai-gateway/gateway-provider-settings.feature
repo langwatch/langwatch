@@ -95,6 +95,16 @@ Feature: AI Gateway — Provider settings cohesion
     And the row's rate limit AND credentials reflect the new values
     And no separate "Save Advanced" button is rendered
 
+  @unit
+  Scenario: A saved gateway rate limit reopens as saved
+    Given a ModelProvider "openai" was saved with rateLimitRpm=600,
+      rateLimitTpm=null, rateLimitRpd=null, fallbackPriorityGlobal=1, and
+      providerConfig={"region":"us-east-1"}
+    When the provider is listed back for the settings drawer
+    Then the list entry carries rateLimitRpm=600, fallbackPriorityGlobal=1,
+      and providerConfig={"region":"us-east-1"}
+    And none of those fields silently fall back to the registry default
+
   # ============================================================================
   # Advanced (Gateway) writes inherit the row's scope-manage requirement
   # ============================================================================

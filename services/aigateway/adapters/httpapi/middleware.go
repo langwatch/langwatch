@@ -185,7 +185,7 @@ func extractToken(r *http.Request) string {
 	if k := r.Header.Get("Xi-Api-Key"); k != "" {
 		return strings.TrimSpace(k)
 	}
-	return ""
+	return socketToken(r)
 }
 
 const (

@@ -1,0 +1,154 @@
+import type { Named } from "@langwatch/module";
+import { z } from "zod";
+
+import {
+  codeAgentConfigSchema,
+  connectedAgentConfigSchema,
+  httpAgentConfigSchema,
+  signatureAgentConfigSchema,
+  voiceAgentConfigSchema,
+  workflowAgentConfigSchema,
+} from "./config/index.ts";
+import { fieldSchema } from "./fields.ts";
+
+export const agentIdSchema = z.string().brand<"AgentId">();
+
+const agentRecordSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  name: z.string(),
+  workflowId: z.string().nullable(),
+  copiedFromAgentId: z.string().nullable(),
+  archivedAt: z.date().nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  copyCount: z.number().int().nonnegative().optional(),
+  environment: z.string().nullable().optional(),
+  ownerUserId: z.string().nullable().optional(),
+  hostLabel: z.string().nullable().optional(),
+  /** What the SDK upserts by, unique within the project. */
+  identityKey: z.string().nullable().optional(),
+  lastSeenAt: z.date().nullable().optional(),
+});
+
+const agentViewRecordSchema = agentRecordSchema.pick({
+  id: true,
+  name: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+const agentSchemaDefinition = z.discriminatedUnion("type", [
+  z.object({
+    ...agentRecordSchema.shape,
+    type: z.literal("signature"),
+    config: signatureAgentConfigSchema,
+  }),
+  z.object({
+    ...agentRecordSchema.shape,
+    type: z.literal("code"),
+    config: codeAgentConfigSchema,
+  }),
+  z.object({
+    ...agentRecordSchema.shape,
+    type: z.literal("workflow"),
+    config: workflowAgentConfigSchema,
+  }),
+  z.object({
+    ...agentRecordSchema.shape,
+    type: z.literal("http"),
+    config: httpAgentConfigSchema,
+  }),
+  z.object({
+    ...agentRecordSchema.shape,
+    type: z.literal("connected"),
+    config: connectedAgentConfigSchema,
+  }),
+  z.object({
+    ...agentRecordSchema.shape,
+    type: z.literal("voice"),
+    config: voiceAgentConfigSchema,
+  }),
+]);
+export interface AgentSchema extends Named<typeof agentSchemaDefinition> {}
+export const agentSchema: AgentSchema = agentSchemaDefinition;
+
+const agentViewSchemaDefinition = z.discriminatedUnion("type", [
+  z.object({
+    ...agentViewRecordSchema.shape,
+    type: z.literal("signature"),
+    config: signatureAgentConfigSchema,
+  }),
+  z.object({
+    ...agentViewRecordSchema.shape,
+    type: z.literal("code"),
+    config: codeAgentConfigSchema,
+  }),
+  z.object({
+    ...agentViewRecordSchema.shape,
+    type: z.literal("workflow"),
+    config: workflowAgentConfigSchema,
+  }),
+  z.object({
+    ...agentViewRecordSchema.shape,
+    type: z.literal("http"),
+    config: httpAgentConfigSchema,
+  }),
+  z.object({
+    ...agentViewRecordSchema.shape,
+    type: z.literal("connected"),
+    config: connectedAgentConfigSchema,
+  }),
+  z.object({
+    ...agentViewRecordSchema.shape,
+    type: z.literal("voice"),
+    config: voiceAgentConfigSchema,
+  }),
+]);
+export interface AgentViewSchema extends Named<typeof agentViewSchemaDefinition> {}
+export const agentViewSchema: AgentViewSchema = agentViewSchemaDefinition;
+
+const agentFieldsSchemaDefinition = z.object({
+  inputFields: z.array(fieldSchema),
+  outputFields: z.array(fieldSchema),
+  fieldsResolved: z.boolean(),
+});
+export interface AgentFieldsSchema extends Named<typeof agentFieldsSchemaDefinition> {}
+export const agentFieldsSchema: AgentFieldsSchema = agentFieldsSchemaDefinition;
+
+const agentWithFieldsSchemaDefinition = z.intersection(agentSchema, agentFieldsSchema);
+export interface AgentWithFieldsSchema extends Named<typeof agentWithFieldsSchemaDefinition> {}
+export const agentWithFieldsSchema: AgentWithFieldsSchema = agentWithFieldsSchemaDefinition;
+
+export type AgentId = z.infer<typeof agentIdSchema>;
+export type Agent = z.infer<typeof agentSchema>;
+export type AgentView = z.infer<typeof agentViewSchema>;
+export type AgentFields = z.infer<typeof agentFieldsSchema>;
+export type AgentWithFields = z.infer<typeof agentWithFieldsSchema>;
+
+/** Includes the copy count displayed by list consumers. */
+export type TypedAgent = Agent & {
+  _count?: { copiedAgents: number };
+};
+
+export function findLinkedWorkflowIds(agent: Pick<Agent, "workflowId" | "config">): string[] {
+  const linked = agent.workflowId || (agent.config as { workflow_id?: string }).workflow_id;
+  return linked ? [linked] : [];
+}
+
+/** Workflow archives the agent's graph from its own side on this fact (§9, plan §7). */
+export const AGENT_ARCHIVED_EVENT_TYPE = "lw.agent.archived" as const;
+
+/** An agent was archived, and the linked graph the archive cascades to, if any. */
+const agentArchivedEventDataSchemaDefinition = z.object({
+  agentId: z.string(),
+  projectId: z.string(),
+  cascadedWorkflowId: z.string().nullable(),
+  occurredAt: z.number().int().nonnegative(),
+});
+export interface AgentArchivedEventDataSchema extends Named<
+  typeof agentArchivedEventDataSchemaDefinition
+> {}
+export const agentArchivedEventDataSchema: AgentArchivedEventDataSchema =
+  agentArchivedEventDataSchemaDefinition;
+export type AgentArchivedEventData = z.infer<typeof agentArchivedEventDataSchema>;

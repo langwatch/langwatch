@@ -1,0 +1,99 @@
+/**
+ * The by-path dispatcher reaches a screen as a HOST SERVICE, not through a
+ * context of its own — record 10.1 rules out ambient React context as a
+ * cross-module transport.
+ * @vitest-environment jsdom
+ */
+
+import { renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { describe, expect, it } from "vitest";
+
+import {
+  resolveUiHostServices,
+  UiHostServicesContextProvider,
+  UiHostServiceUnavailableError,
+  UiNavigation,
+  UiRoute,
+  UiRpc,
+  useUiRpc,
+  BrowserUiDocumentTitle,
+  type UiHostServices,
+  type UiRouteReadingValues,
+  type UiRpcSubscription,
+} from "../capabilities";
+
+class InertUiNavigation extends UiNavigation {
+  navigate(): void {}
+  replace(): void {}
+  back(): void {}
+}
+
+class InertUiRoute extends UiRoute {
+  reading(): UiRouteReadingValues {
+    return { params: {}, query: {} };
+  }
+
+  setQuery(): void {}
+}
+
+/** Answers the one path this test asks for and refuses the rest by name. */
+class RecordedUiRpc extends UiRpc {
+  query(path: string): Promise<unknown> {
+    return Promise.resolve({ path });
+  }
+
+  mutate(): Promise<unknown> {
+    throw new Error("this test mutates nothing");
+  }
+
+  subscribe(): UiRpcSubscription {
+    throw new Error("this test subscribes to nothing");
+  }
+}
+
+function hostServicesWith(rpc?: UiRpc): UiHostServices {
+  return resolveUiHostServices({
+    install: {},
+    documentTitle: BrowserUiDocumentTitle.create(),
+    navigation: new InertUiNavigation(),
+    route: new InertUiRoute(),
+    ...(rpc ? { rpc } : {}),
+  });
+}
+
+function mounted(hostServices: UiHostServices) {
+  return ({ children }: { children: ReactNode }) => (
+    <UiHostServicesContextProvider value={hostServices}>{children}</UiHostServicesContextProvider>
+  );
+}
+
+describe("given a shell that composed the by-path dispatcher", () => {
+  it("hands it to a screen through the host services", async () => {
+    const { result } = renderHook(() => useUiRpc(), {
+      wrapper: mounted(hostServicesWith(new RecordedUiRpc())),
+    });
+
+    await expect(result.current.query("organization.getAll", {})).resolves.toEqual({
+      path: "organization.getAll",
+    });
+  });
+});
+
+describe("given a screen mounted with no dispatcher above it", () => {
+  it("refuses by name rather than answering with a fabricated result", () => {
+    const { result } = renderHook(() => useUiRpc(), { wrapper: mounted(hostServicesWith()) });
+
+    expect(() => result.current.query("organization.getAll", {})).toThrow(
+      UiHostServiceUnavailableError,
+    );
+  });
+
+  it("refuses the same way outside the shell entirely", () => {
+    const { result } = renderHook(() => useUiRpc());
+
+    expect(() => result.current.mutate("organization.update", {})).toThrow(
+      UiHostServiceUnavailableError,
+    );
+  });
+});

@@ -12,7 +12,7 @@
 #   sdks/typescript/src/cli/utils/governance/wired-target.ts           (the target the agent's own exporter is wired to)
 #
 # Related specs:
-#   specs/coding-agent/session-git-context.feature , what the pipeline does with the event
+#   modules/coding-agent/specs/session-git-context.feature, what the pipeline does with the event
 #   specs/ai-governance/cli-wrappers/shell-rc-persistence.feature , the persist flow that also installs the hooks
 #   specs/ai-governance/cli-wrappers/claude-plugin-install.feature , the Claude Code plugin that carries this hook
 #

@@ -37,9 +37,9 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
   "created": 1734567890,
   "model": "gpt-5-mini",
   "choices": [
-    {"index": 0, "message": {"role": "assistant", "content": "Hello!"}, "finish_reason": "stop"}
+    { "index": 0, "message": { "role": "assistant", "content": "Hello!" }, "finish_reason": "stop" }
   ],
-  "usage": {"prompt_tokens": 8, "completion_tokens": 2, "total_tokens": 10}
+  "usage": { "prompt_tokens": 8, "completion_tokens": 2, "total_tokens": 10 }
 }
 ```
 
@@ -47,38 +47,38 @@ OpenAI-compatible providers (OpenAI, Azure OpenAI, custom OpenAI-compatible endp
 
 ## Parameters the gateway changes or refuses
 
-| Parameter | What the gateway does |
-|---|---|
-| `model` | Resolved through the key's aliases, allowlist and routing policy, then rewritten to the provider's own model id. Missing: `400 missing_model`. Outside the allowlist or policy: `400 model_not_allowed`. Names a provider the key has no credential for: `400 model_provider_not_bound`. |
-| `stream` | Read to choose the streaming path. |
-| `drop_tuning_params` | Consumed by the gateway, never forwarded. `false` turns every drop on a translated lane into `400 unsupported_parameter`. |
-| `user` | Forwarded unchanged. Also read as the end-user id for per-end-user budgets when no `X-LangWatch-End-User-Id` header is present. |
-| Every other parameter on a translated lane | Mapped, dropped with a signal, or refused, per the table on [Parameter mapping](/ai-gateway/parameter-mapping). |
-| `cache_control` | Governed by the key's cache rules: `disable` strips the markers, `force` adds a top-level ephemeral marker. See [Cache control](/ai-gateway/cache-control). |
+| Parameter                                  | What the gateway does                                                                                                                                                                                                                                                                    |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`                                    | Resolved through the key's aliases, allowlist and routing policy, then rewritten to the provider's own model id. Missing: `400 missing_model`. Outside the allowlist or policy: `400 model_not_allowed`. Names a provider the key has no credential for: `400 model_provider_not_bound`. |
+| `stream`                                   | Read to choose the streaming path.                                                                                                                                                                                                                                                       |
+| `drop_tuning_params`                       | Consumed by the gateway, never forwarded. `false` turns every drop on a translated lane into `400 unsupported_parameter`.                                                                                                                                                                |
+| `user`                                     | Forwarded unchanged. Also read as the end-user id for per-end-user budgets when no `X-LangWatch-End-User-Id` header is present.                                                                                                                                                          |
+| Every other parameter on a translated lane | Mapped, dropped with a signal, or refused, per the table on [Parameter mapping](/ai-gateway/parameter-mapping).                                                                                                                                                                          |
+| `cache_control`                            | Governed by the key's cache rules: `disable` strips the markers, `force` adds a top-level ephemeral marker. See [Cache control](/ai-gateway/cache-control).                                                                                                                              |
 
 ## Request headers the gateway reads
 
-| Header | Purpose |
-|---|---|
-| `Authorization: Bearer <key>` or `x-api-key: <key>` | The virtual key. |
-| `X-LangWatch-End-User-Id` | End-user id for attribution and per-end-user budgets. `X-Litellm-End-User-Id` is accepted as an alias. Removed before the request leaves the gateway. |
-| `X-LangWatch-Metadata` | A JSON object of at most 4 KB, attached to the trace and the spend event. Malformed or oversized values are dropped. Removed before forwarding. |
-| `Traceparent` | Links the gateway trace to your own trace. Removed before forwarding. |
+| Header                                              | Purpose                                                                                                                                               |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Authorization: Bearer <key>` or `x-api-key: <key>` | The virtual key.                                                                                                                                      |
+| `X-LangWatch-End-User-Id`                           | End-user id for attribution and per-end-user budgets. `X-Litellm-End-User-Id` is accepted as an alias. Removed before the request leaves the gateway. |
+| `X-LangWatch-Metadata`                              | A JSON object of at most 4 KB, attached to the trace and the spend event. Malformed or oversized values are dropped. Removed before forwarding.       |
+| `Traceparent`                                       | Links the gateway trace to your own trace. Removed before forwarding.                                                                                 |
 
 ## Response headers
 
-| Header | When present | Value |
-|---|---|---|
-| `X-LangWatch-Gateway-Request-Id` | A successful response, and any response a keep-alive byte committed | The request id. It is the `gateway_request_id` on spend events and the id to quote in support tickets. |
-| `X-LangWatch-Gateway-Version` | Every response | The gateway build version. |
-| `X-LangWatch-Fallback-Count` | A credential failed before another answered | The number of failed attempts. |
-| `X-LangWatch-Budget-Warning` | A budget is past its warning threshold | `<scope>:<percent used>`, or `<scope>/<provider id>:<percent>` for a provider-filtered budget. Comma separated. |
-| `X-LangWatch-Cache-Mode` | A cache rule or provider default was applied | `respect`, `disable`, `force`, or `auto` when the gateway added the provider's own cache marker. |
-| `X-LangWatch-Params-Dropped` | A parameter was dropped | The dropped parameter names, comma separated. |
-| `Traceparent` | The request was traced | The W3C traceparent of the LangWatch trace for this request. |
-| `X-LangWatch-Heartbeat-Active` | A non-streaming call ran long enough for a keep-alive byte | `true`. The status is then `200` even when the call fails later, so read the body for an `error` key. |
-| `X-LangWatch-Provider` | A provider error was forwarded | The provider that answered. |
-| `X-LangWatch-Handled-Error` | The gateway wrote the error | The `error.code` of the body. |
+| Header                           | When present                                                        | Value                                                                                                           |
+| -------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `X-LangWatch-Gateway-Request-Id` | A successful response, and any response a keep-alive byte committed | The request id. It is the `gateway_request_id` on spend events and the id to quote in support tickets.          |
+| `X-LangWatch-Gateway-Version`    | Every response                                                      | The gateway build version.                                                                                      |
+| `X-LangWatch-Fallback-Count`     | A credential failed before another answered                         | The number of failed attempts.                                                                                  |
+| `X-LangWatch-Budget-Warning`     | A budget is past its warning threshold                              | `<scope>:<percent used>`, or `<scope>/<provider id>:<percent>` for a provider-filtered budget. Comma separated. |
+| `X-LangWatch-Cache-Mode`         | A cache rule or provider default was applied                        | `respect`, `disable`, `force`, or `auto` when the gateway added the provider's own cache marker.                |
+| `X-LangWatch-Params-Dropped`     | A parameter was dropped                                             | The dropped parameter names, comma separated.                                                                   |
+| `Traceparent`                    | The request was traced                                              | The W3C traceparent of the LangWatch trace for this request.                                                    |
+| `X-LangWatch-Heartbeat-Active`   | A non-streaming call ran long enough for a keep-alive byte          | `true`. The status is then `200` even when the call fails later, so read the body for an `error` key.           |
+| `X-LangWatch-Provider`           | A provider error was forwarded                                      | The provider that answered.                                                                                     |
+| `X-LangWatch-Handled-Error`      | The gateway wrote the error                                         | The `error.code` of the body.                                                                                   |
 
 Non-streaming calls that run long receive a single space character before the JSON body at each keep-alive interval. JSON parsers skip it.
 
@@ -105,14 +105,14 @@ Response headers are written before the first frame. Dropped parameters also lan
 
 The gateway answers with the envelope on [Errors](/ai-gateway/api/errors). Codes this endpoint raises before the provider is called:
 
-| Code | Status | Cause |
-|---|---|---|
-| `missing_model` | 400 | The body has no top-level `model`. |
-| `model_not_allowed` | 400 | The model is outside the key's allowlist, policy rules or routing policy. |
-| `model_provider_not_bound` | 400 | The model names a provider the key holds no credential for. |
-| `model_not_recognized` | 400 | The model matches no provider the key holds, and the key holds more than one. |
-| `unsupported_parameter` | 400 | A parameter the target lane cannot honor, or a drop refused by `drop_tuning_params: false`. |
-| `end_user_required` | 400 | A per-end-user budget is active and the request names no end user. |
+| Code                       | Status | Cause                                                                                       |
+| -------------------------- | ------ | ------------------------------------------------------------------------------------------- |
+| `missing_model`            | 400    | The body has no top-level `model`.                                                          |
+| `model_not_allowed`        | 400    | The model is outside the key's allowlist, policy rules or routing policy.                   |
+| `model_provider_not_bound` | 400    | The model names a provider the key holds no credential for.                                 |
+| `model_not_recognized`     | 400    | The model matches no provider the key holds, and the key holds more than one.               |
+| `unsupported_parameter`    | 400    | A parameter the target lane cannot honor, or a drop refused by `drop_tuning_params: false`. |
+| `end_user_required`        | 400    | A per-end-user budget is active and the request names no end user.                          |
 
 A provider's own error is forwarded with the provider's status and body, under `X-LangWatch-Provider`.
 

@@ -1,0 +1,84 @@
+import type { AgentApi } from "@langwatch/agent-contract";
+/**
+ * SuiteModule reads `publicBaseUrl` off the process's own member.
+ * @vitest-environment node
+ */
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { ResourceScope } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it } from "vitest";
+
+import { SuiteModule } from "../suite.app.ts";
+import { createSuiteTestRepositories } from "./suite.fixture.ts";
+
+function buildProductionApp(
+  publicBaseUrl: string | undefined,
+  retention = createApiFixture<DataRetentionApi>({ getPlatformDefaultRetentionDays: () => 49 }),
+) {
+  return SuiteModule.create({
+    repositories: createSuiteTestRepositories(),
+    dependencies: {
+      scenarios: createApiFixture<ScenarioApi>({}),
+      agents: createApiFixture<AgentApi>({}),
+      prompts: createApiFixture<PromptApi>({}),
+      projects: createApiFixture<ProjectApi>({
+        findOrganizationId: async () => "organization-1",
+      }),
+      evaluators: createApiFixture<EvaluatorApi>({}),
+      retention,
+      featureFlags: createApiFixture<FeatureFlagApi>({}),
+      modelProviders: createApiFixture<ModelProviderApi>({}),
+    },
+    config: { publicBaseUrl, foldCacheTtlSeconds: 300 },
+    resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+  });
+}
+
+describe("SuiteModule built the way production composes it", () => {
+  describe("given a deployment that configured a public base URL", () => {
+    /** @scenario "The list surface renders a deep link when a public base URL is configured" */
+    it("answers a platform link instead of refusing by name", () => {
+      const app = buildProductionApp("https://app.langwatch.test");
+
+      expect(app.platformUrl({ projectSlug: "acme", path: "/suites/suite_1" })).toBe(
+        "https://app.langwatch.test/acme/suites/suite_1",
+      );
+    });
+  });
+
+  describe("given a deployment that named no public base URL", () => {
+    /** @scenario "The list surface refuses a deep link by name when no public base URL is configured" */
+    it("still refuses by name, as it did before this deployment had a config seam", () => {
+      const app = buildProductionApp(undefined);
+
+      expect(() => app.platformUrl({ projectSlug: "acme", path: "/suites/suite_1" })).toThrow(
+        /named no public base URL/,
+      );
+    });
+  });
+});
+
+describe("SuiteModule's platform retention default", () => {
+  /** @scenario "A suite reads the platform retention default from data retention" */
+  it("leaves the data retention capability unasked while the process is constructing", () => {
+    let asks = 0;
+    const retention = createApiFixture<DataRetentionApi>({
+      getPlatformDefaultRetentionDays: () => {
+        asks += 1;
+        return 49;
+      },
+    });
+
+    buildProductionApp(undefined, retention);
+
+    expect(asks).toBe(0);
+  });
+});

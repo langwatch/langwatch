@@ -1,0 +1,181 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  assertEnterprisePlan,
+  assertEnterprisePlanType,
+  ENTERPRISE_FEATURE_ERRORS,
+  EnterprisePlanRequiredError,
+  isEnterpriseTier,
+} from "../index.ts";
+import type { Plan } from "../plan.ts";
+
+const BASE_PLAN: Plan = {
+  planSource: "free",
+  type: "FREE",
+  name: "Free",
+  free: true,
+  maxMembers: 20,
+  maxMembersLite: 0,
+  maxMessagesPerMonth: 1000,
+  canPublish: false,
+  prices: { USD: 0, EUR: 0 },
+};
+
+const mockGetActivePlan = vi.fn();
+const planProvider = { getActivePlan: mockGetActivePlan };
+
+describe("the Enterprise plan gate", () => {
+  describe("isEnterpriseTier()", () => {
+    /** @scenario Plan type matching is case-sensitive */
+    it("returns true for ENTERPRISE", () => {
+      expect(isEnterpriseTier("ENTERPRISE")).toBe(true);
+    });
+
+    describe("when plan type is not ENTERPRISE", () => {
+      /** @scenario FREE plan is not recognized as enterprise */
+      /** @scenario OPEN_SOURCE plan is not recognized as enterprise */
+      it.each(["FREE", "OPEN_SOURCE", "PRO", "GROWTH", "STARTER", ""])(
+        "returns false for %s",
+        (planType) => {
+          expect(isEnterpriseTier(planType)).toBe(false);
+        },
+      );
+    });
+  });
+
+  describe("EnterprisePlanRequiredError", () => {
+    /** @scenario "A REST or setup gate refuses a non-Enterprise plan with 402" */
+    it("answers 402 and names the feature by default", () => {
+      expect(new EnterprisePlanRequiredError("MANAGEMENT_API")).toMatchObject({
+        code: "enterprise_plan_required",
+        httpStatus: 402,
+        meta: { feature: "MANAGEMENT_API" },
+      });
+    });
+  });
+
+  describe("assertEnterprisePlanType()", () => {
+    describe("when plan type is ENTERPRISE", () => {
+      it("does not throw", () => {
+        expect(() =>
+          assertEnterprisePlanType({
+            planType: "ENTERPRISE",
+            errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+          }),
+        ).not.toThrow();
+      });
+    });
+
+    describe("when plan type is not ENTERPRISE", () => {
+      /** @scenario "A tRPC plan assertion refuses a non-Enterprise plan with 403" */
+      it("throws a handled enterprise plan refusal", () => {
+        expect(() =>
+          assertEnterprisePlanType({
+            planType: "FREE",
+            errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+          }),
+        ).toThrow(
+          expect.objectContaining({
+            code: "enterprise_plan_required",
+            httpStatus: 403,
+            fault: "customer",
+          }),
+        );
+      });
+    });
+  });
+
+  describe("assertEnterprisePlan()", () => {
+    beforeEach(() => {
+      mockGetActivePlan.mockReset();
+    });
+
+    describe("when plan is ENTERPRISE", () => {
+      /** @scenario Enterprise plan from subscription is recognized */
+      /** @scenario Enterprise plan from license is recognized */
+      it("resolves without throwing", async () => {
+        const enterprisePlan: Plan = { ...BASE_PLAN, type: "ENTERPRISE" };
+        mockGetActivePlan.mockResolvedValue(enterprisePlan);
+
+        await expect(
+          assertEnterprisePlan({
+            planProvider,
+            organizationId: "org-1",
+            errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+          }),
+        ).resolves.toBeUndefined();
+      });
+    });
+
+    describe("when plan is not ENTERPRISE", () => {
+      it.each(["FREE", "OPEN_SOURCE", "PRO", "GROWTH"])(
+        "throws a handled refusal for %s plan",
+        async (planType) => {
+          const plan: Plan = { ...BASE_PLAN, type: planType };
+          mockGetActivePlan.mockResolvedValue(plan);
+
+          await expect(
+            assertEnterprisePlan({
+              planProvider,
+              organizationId: "org-1",
+              errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+            }),
+          ).rejects.toMatchObject({
+            code: "enterprise_plan_required",
+            httpStatus: 403,
+            fault: "customer",
+          });
+        },
+      );
+
+      it("uses the stable handled code for every feature", async () => {
+        mockGetActivePlan.mockResolvedValue({ ...BASE_PLAN, type: "FREE" });
+
+        await expect(
+          assertEnterprisePlan({
+            planProvider,
+            organizationId: "org-1",
+            errorMessage: ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS,
+          }),
+        ).rejects.toMatchObject({
+          code: "enterprise_plan_required",
+          httpStatus: 403,
+          fault: "customer",
+        });
+      });
+    });
+
+    describe("when plan provider fails", () => {
+      /** @scenario Guard fails closed when plan lookup fails */
+      it("denies access by propagating the error", async () => {
+        mockGetActivePlan.mockRejectedValue(new Error("Plan provider unavailable"));
+
+        await expect(
+          assertEnterprisePlan({
+            planProvider,
+            organizationId: "org-123",
+            errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+          }),
+        ).rejects.toThrow("Plan provider unavailable");
+      });
+    });
+
+    it("passes user to planProvider when provided", async () => {
+      const enterprisePlan: Plan = { ...BASE_PLAN, type: "ENTERPRISE" };
+      mockGetActivePlan.mockResolvedValue(enterprisePlan);
+
+      const user = { id: "user-1", email: "test@example.com", name: "Test" };
+      await assertEnterprisePlan({
+        planProvider,
+        organizationId: "org-1",
+        user,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+      });
+
+      expect(mockGetActivePlan).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        user,
+      });
+    });
+  });
+});

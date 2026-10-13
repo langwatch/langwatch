@@ -24,6 +24,16 @@ func elevenLabsAudioRouter(server *httptest.Server) *BifrostRouter {
 	return &BifrostRouter{elevenLabsClient: server.Client()}
 }
 
+// elevenLabsSpeech runs the native synthesis dispatch and collects the
+// relayed stream, the way the non-streaming Dispatch does.
+func elevenLabsSpeech(router *BifrostRouter, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
+	iter, err := router.dispatchElevenLabsSpeechStream(context.Background(), req, cred)
+	if err != nil {
+		return nil, err
+	}
+	return drainAudioStream(context.Background(), iter)
+}
+
 // @scenario "ElevenLabs' own synthesis path reaches the vendor unchanged"
 func TestElevenLabsSpeechForwardsTheCallersBodyAndMetersCharacters(t *testing.T) {
 	t.Parallel()
@@ -52,8 +62,7 @@ func TestElevenLabsSpeechForwardsTheCallersBodyAndMetersCharacters(t *testing.T)
 		ElevenLabs: &domain.ElevenLabsAudioRequest{VoiceID: "voice 9", RawQuery: "output_format=mp3_44100_128"},
 		Surface:    domain.ElevenLabsSpeechSurface(),
 	}
-	resp, err := elevenLabsAudioRouter(server).dispatchElevenLabsSpeech(
-		context.Background(), req, elevenLabsCredential(server))
+	resp, err := elevenLabsSpeech(elevenLabsAudioRouter(server), req, elevenLabsCredential(server))
 	require.NoError(t, err)
 
 	assert.Equal(t, "/v1/text-to-speech/voice 9", gotPath,
@@ -163,14 +172,13 @@ func TestElevenLabsAudioForwardsAVendorRejectionVerbatim(t *testing.T) {
 		Body:       []byte(`{"text":"hi"}`),
 		ElevenLabs: &domain.ElevenLabsAudioRequest{VoiceID: "nope"},
 	}
-	resp, err := elevenLabsAudioRouter(server).dispatchElevenLabsSpeech(
-		context.Background(), req, elevenLabsCredential(server))
-	require.NoError(t, err)
+	resp, err := elevenLabsSpeech(elevenLabsAudioRouter(server), req, elevenLabsCredential(server))
+	require.Nil(t, resp, "a call the vendor refused synthesized nothing, so there is no usage to bill")
 
-	assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
-	assert.JSONEq(t, `{"detail":{"status":"voice_not_found"}}`, string(resp.Body))
-	assert.Zero(t, resp.Usage.InputChars,
-		"a call the vendor refused synthesized nothing, so it must not be billed for characters")
+	var upstream *domain.UpstreamError
+	require.ErrorAs(t, err, &upstream)
+	assert.Equal(t, http.StatusUnprocessableEntity, upstream.StatusCode)
+	assert.JSONEq(t, `{"detail":{"status":"voice_not_found"}}`, string(upstream.Body))
 }
 
 // A cloud_storage_url request carries no file part, and refusing it here
