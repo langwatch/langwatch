@@ -83,6 +83,34 @@ describe("createUiModuleHostStack", () => {
       // The innermost provider is the one a screen reads.
       expect(await screen.findByText("inner")).toBeTruthy();
     });
+
+    /** @scenario "Every host mount loads at once, not one after another" */
+    it("asks for every mount's module before any of them has loaded", async () => {
+      const asked: string[] = [];
+      let release: () => void = () => void 0;
+      const released = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const heldMount = (answer: string) => async () => {
+        asked.push(answer);
+        await released;
+        return probeMount(answer)();
+      };
+      const Hosts = createUiModuleHostStack([
+        { module: "outer", host: "OuterHostApi", load: heldMount("outer") },
+        { module: "inner", host: "InnerHostApi", load: heldMount("inner") },
+      ]);
+
+      render(
+        <Hosts>
+          <ProbeScreen />
+        </Hosts>,
+      );
+
+      expect(asked).toEqual(["outer", "inner"]);
+      release();
+      expect(await screen.findByText("inner")).toBeTruthy();
+    });
   });
 
   describe("given no mounts at all", () => {

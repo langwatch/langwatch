@@ -5,9 +5,15 @@
  */
 import { mountAmbientShader } from "@langwatch/design-system/ambient-ground-shader";
 
+/** A slow start keeps the splash, not a full-window render loop: after this, the still floor. */
+const LIVE_FOR_MS = 4_000;
+/** The shader's fade out in the boot-splash styles, with room to finish before it stops. */
+const FADE_OUT_MS = 900;
+
 async function start(): Promise<void> {
-  const element = document.getElementById("lw-boot-shader");
-  if (!element || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const found = document.getElementById("lw-boot-shader");
+  if (!found || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const element: HTMLElement = found;
   const mode = document.documentElement.classList.contains("dark") ? "dark" : "light";
   let stop: () => void;
   try {
@@ -17,8 +23,26 @@ async function start(): Promise<void> {
   }
   // The splash may have left while the texture loaded.
   if (!element.isConnected) return stop();
+  let stopped = false;
+  function stopOnce(): void {
+    if (stopped) return;
+    stopped = true;
+    clearTimeout(settle);
+    document.removeEventListener("visibilitychange", onHidden);
+    stop();
+  }
+  function settleToStill(): void {
+    element.removeAttribute("data-live");
+    setTimeout(stopOnce, FADE_OUT_MS);
+  }
+  function onHidden(): void {
+    if (document.visibilityState === "hidden") stopOnce();
+  }
   element.dataset.live = "true";
-  document.addEventListener("lw-boot:done", () => stop(), { once: true });
+  const settle = setTimeout(settleToStill, LIVE_FOR_MS);
+  document.addEventListener("visibilitychange", onHidden);
+  document.addEventListener("lw-boot:done", stopOnce, { once: true });
+  onHidden();
 }
 
 void start();
