@@ -25,7 +25,7 @@ describe("the SDK batch result log REST family", () => {
           route.operation,
           route.permission,
           route.response?.kind,
-          route.rawBody?.form,
+          route.inputMediaType,
           route.sharedPath,
         ]),
       ).toEqual([
@@ -35,7 +35,7 @@ describe("the SDK batch result log REST family", () => {
           "postApiEvaluationsBatchLogResults",
           "evaluations:manage",
           "protocol",
-          "text",
+          { mediaType: "application/json", mismatch: "malformed_request" },
           undefined,
         ],
       ]);

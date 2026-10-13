@@ -22,6 +22,7 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { evaluationProcessModule } from "../../evaluation.module.ts";
 import { EvaluationExecutionService } from "../../features/execution/services/evaluation-execution.service.ts";
 import { ClickHouseEvaluationRepository } from "../../repositories/clickhouse/evaluation.repository.ts";
@@ -62,7 +63,12 @@ function process(role: "api" | "worker") {
     config: { evaluation: EVALUATION_TEST_CONFIG },
     stores: memoryStores(),
     peers: [
-      testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),
+      testPeer({
+        token: AuthzApi,
+        instance: createApiFixture<AuthzApi>({
+          authorizeInternal: async ({ projectId }) => ownProof({ projectId }),
+        }),
+      }),
       testPeer({ token: WorkflowApi, instance: createApiFixture<WorkflowApi>() }),
       testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
       testPeer({ token: ModelProviderApi, instance: createApiFixture<ModelProviderApi>() }),
