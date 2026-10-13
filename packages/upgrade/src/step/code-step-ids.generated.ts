@@ -15,6 +15,7 @@ export type CodeStepId =
   | "dataset:move-content-to-object-storage"
   | "governance:record-coding-assistant-billing"
   | "governance:migrate-anomaly-webhook-destinations"
+  | "governance:reconcile-aggregates-for-full-history"
   | "governance:replay-cost-charges"
   | "identity:identifier-backfill"
   | "identity:secret-heal"

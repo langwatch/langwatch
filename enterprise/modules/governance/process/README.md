@@ -2114,27 +2114,27 @@ Declared at `src/eventing/coding-assistant-billing.pipeline.ts:52`. Events: `cod
 
 ### Pipeline `governance_activity_monitor` (aggregate `global`)
 
-Declared at `src/eventing/governance-activity-monitor.pipeline.ts:165`.
+Declared at `src/eventing/governance-activity-monitor.pipeline.ts:166`.
 
 | Kind            | Name                                           | Handles                                                                                                                            | Declared at                                                |
 | --------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| process manager | `spendSpikeEvaluation`                         | every 5 min (`SPEND_SPIKE_EVALUATION_INTERVAL_MS = 5 * 60 * 1000`); intents `pass` (outbox)                                        | `src/eventing/governance-activity-monitor.pipeline.ts:180` |
-| process manager | `anomalyAlertDelivery`                         | every 1 d (`ANOMALY_ALERT_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/eventing/governance-activity-monitor.pipeline.ts:197` |
-| process manager | `governanceTraceFacts`                         | every 1 min (`GOVERNANCE_TRACE_FACTS_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)                                            | `src/eventing/governance-activity-monitor.pipeline.ts:214` |
-| process manager | `aggregateProjectReconcile`                    | every 1 d (`AGGREGATE_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `sweep`, `reconcile` (outbox)                             | `src/eventing/governance-activity-monitor.pipeline.ts:290` |
-| peer subscriber | `seedDefaultAiToolCatalog`                     | `lw.organization.created` from [organization](../../../../modules/organization/README.md)                                          | `src/eventing/governance-activity-monitor.pipeline.ts:170` |
-| peer subscriber | `assignScimCostCenterDepartment`               | `lw.scim.cost_center_changed` from [scim](../../scim/README.md)                                                                    | `src/eventing/governance-activity-monitor.pipeline.ts:175` |
-| peer subscriber | `reconcileAggregatesOnProjectCreated`          | `lw.project.created` from [project](../../../../modules/project/README.md)                                                         | `src/eventing/governance-activity-monitor.pipeline.ts:237` |
-| peer subscriber | `reconcileAggregatesOnProjectArchived`         | `lw.project.archived` from [project](../../../../modules/project/README.md)                                                        | `src/eventing/governance-activity-monitor.pipeline.ts:242` |
-| peer subscriber | `reconcileAggregatesOnDepartmentAssigned`      | `lw.project.department_assigned` from [project](../../../../modules/project/README.md)                                             | `src/eventing/governance-activity-monitor.pipeline.ts:247` |
-| peer subscriber | `reconcileAggregatesOnProjectRevived`          | `lw.project.revived` from [project](../../../../modules/project/README.md)                                                         | `src/eventing/governance-activity-monitor.pipeline.ts:252` |
-| peer subscriber | `reconcileAggregateOnRuleChanged`              | `lw.project.aggregate_rule_changed` from [project](../../../../modules/project/README.md)                                          | `src/eventing/governance-activity-monitor.pipeline.ts:257` |
-| peer subscriber | `reconcileAggregatesOnMemberRemoved`           | `lw.organization.member_removed` from [organization](../../../../modules/organization/README.md)                                   | `src/eventing/governance-activity-monitor.pipeline.ts:262` |
-| peer subscriber | `reconcileAggregatesOnMemberDepartmentChanged` | `lw.organization.member_department_changed` from [organization](../../../../modules/organization/README.md)                        | `src/eventing/governance-activity-monitor.pipeline.ts:267` |
-| peer subscriber | `reconcileAggregatesOnMemberDisabled`          | `lw.organization.member_disabled` from [organization](../../../../modules/organization/README.md)                                  | `src/eventing/governance-activity-monitor.pipeline.ts:273` |
-| peer subscriber | `reconcileAggregatesOnMemberEnabled`           | `lw.organization.member_enabled` from [organization](../../../../modules/organization/README.md)                                   | `src/eventing/governance-activity-monitor.pipeline.ts:279` |
-| peer subscriber | `auditAggregateRead`                           | `lw.authz.aggregate_read` from [authz](../../../../modules/authz/README.md)                                                        | `src/eventing/governance-activity-monitor.pipeline.ts:285` |
-| lane aliases    | `≈ MAIN_TRACE_GOVERNANCE_LANE_TOMBSTONES`      | –                                                                                                                                  | `src/eventing/governance-activity-monitor.pipeline.ts:312` |
+| process manager | `spendSpikeEvaluation`                         | every 5 min (`SPEND_SPIKE_EVALUATION_INTERVAL_MS = 5 * 60 * 1000`); intents `pass` (outbox)                                        | `src/eventing/governance-activity-monitor.pipeline.ts:181` |
+| process manager | `anomalyAlertDelivery`                         | every 1 d (`ANOMALY_ALERT_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/eventing/governance-activity-monitor.pipeline.ts:198` |
+| process manager | `governanceTraceFacts`                         | every 1 min (`GOVERNANCE_TRACE_FACTS_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)                                            | `src/eventing/governance-activity-monitor.pipeline.ts:215` |
+| process manager | `aggregateProjectReconcile`                    | every 1 d (`AGGREGATE_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `sweep`, `reconcile` (outbox)                             | `src/eventing/governance-activity-monitor.pipeline.ts:327` |
+| peer subscriber | `seedDefaultAiToolCatalog`                     | `lw.organization.created` from [organization](../../../../modules/organization/README.md)                                          | `src/eventing/governance-activity-monitor.pipeline.ts:171` |
+| peer subscriber | `assignScimCostCenterDepartment`               | `lw.scim.cost_center_changed` from [scim](../../scim/README.md)                                                                    | `src/eventing/governance-activity-monitor.pipeline.ts:176` |
+| peer subscriber | `reconcileAggregatesOnProjectCreated`          | `lw.project.created` from [project](../../../../modules/project/README.md)                                                         | `src/eventing/governance-activity-monitor.pipeline.ts:238` |
+| peer subscriber | `reconcileAggregatesOnProjectArchived`         | `lw.project.archived` from [project](../../../../modules/project/README.md)                                                        | `src/eventing/governance-activity-monitor.pipeline.ts:247` |
+| peer subscriber | `reconcileAggregatesOnDepartmentAssigned`      | `lw.project.department_assigned` from [project](../../../../modules/project/README.md)                                             | `src/eventing/governance-activity-monitor.pipeline.ts:256` |
+| peer subscriber | `reconcileAggregatesOnProjectRevived`          | `lw.project.revived` from [project](../../../../modules/project/README.md)                                                         | `src/eventing/governance-activity-monitor.pipeline.ts:265` |
+| peer subscriber | `reconcileAggregateOnRuleChanged`              | `lw.project.aggregate_rule_changed` from [project](../../../../modules/project/README.md)                                          | `src/eventing/governance-activity-monitor.pipeline.ts:274` |
+| peer subscriber | `reconcileAggregatesOnMemberRemoved`           | `lw.organization.member_removed` from [organization](../../../../modules/organization/README.md)                                   | `src/eventing/governance-activity-monitor.pipeline.ts:283` |
+| peer subscriber | `reconcileAggregatesOnMemberDepartmentChanged` | `lw.organization.member_department_changed` from [organization](../../../../modules/organization/README.md)                        | `src/eventing/governance-activity-monitor.pipeline.ts:292` |
+| peer subscriber | `reconcileAggregatesOnMemberDisabled`          | `lw.organization.member_disabled` from [organization](../../../../modules/organization/README.md)                                  | `src/eventing/governance-activity-monitor.pipeline.ts:302` |
+| peer subscriber | `reconcileAggregatesOnMemberEnabled`           | `lw.organization.member_enabled` from [organization](../../../../modules/organization/README.md)                                   | `src/eventing/governance-activity-monitor.pipeline.ts:312` |
+| peer subscriber | `auditAggregateRead`                           | `lw.authz.aggregate_read` from [authz](../../../../modules/authz/README.md)                                                        | `src/eventing/governance-activity-monitor.pipeline.ts:322` |
+| lane aliases    | `≈ MAIN_TRACE_GOVERNANCE_LANE_TOMBSTONES`      | –                                                                                                                                  | `src/eventing/governance-activity-monitor.pipeline.ts:347` |
 
 ### Pipeline `ingestion_pull_reconcile` (aggregate `global`)
 
@@ -2183,7 +2183,7 @@ Declared at `src/eventing/pulled-usage.pipeline.ts:167`. Events: `pulledUsageObs
 
 | Kind   | Leaf                       | Environment variable                  | Declared at                               |
 | ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:517`           |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:514`           |
 | config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
 | config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
 | config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |
