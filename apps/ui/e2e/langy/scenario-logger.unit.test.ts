@@ -17,6 +17,8 @@ vi.mock("node:fs", () => ({
   promises: { mkdir: vi.fn(), writeFile: vi.fn() },
 }));
 
+import { promises as fs } from "node:fs";
+
 import { runScenarioAndLog } from "./scenario-logger";
 
 const CONFIG = { name: "a scenario" } as Parameters<typeof runScenarioAndLog>[0]["config"];
@@ -95,5 +97,31 @@ describe("runScenarioAndLog", () => {
 
     expect(beforeRetry).not.toHaveBeenCalled();
     expect(scenarioRun).toHaveBeenCalledTimes(1);
+  });
+
+  describe("when the run is metered", () => {
+    it("starts the meter before the run and writes its line into the transcript", async () => {
+      const order: string[] = [];
+      scenarioRun.mockImplementationOnce(() => {
+        order.push("run");
+        return Promise.resolve({ success: true });
+      });
+
+      await runScenarioAndLog({
+        config: CONFIG,
+        cost: {
+          start: async () => {
+            order.push("start");
+          },
+          line: async () => "judge 1 calls, 10 input and 2 output tokens; Langy not metered",
+        },
+      });
+
+      expect(order).toEqual(["start", "run"]);
+      const transcript = vi.mocked(fs.writeFile).mock.calls[0]?.[1];
+      expect(transcript).toContain(
+        "**Cost:** judge 1 calls, 10 input and 2 output tokens; Langy not metered",
+      );
+    });
   });
 });

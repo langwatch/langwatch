@@ -6,6 +6,7 @@ import * as scenario from "@langwatch/scenario";
 import { expect } from "vitest";
 
 import { type BrowserQACheck, type BrowserQAResult, browserQA } from "./browser-qa";
+import type { ScenarioCost } from "./cost-meter";
 import { isTransientInfrastructureError } from "./langy-agent";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -29,6 +30,8 @@ export type RunOptions = BrowserQAOptions & {
    * can rebuild the world state its script consumes.
    */
   beforeRetry?: () => Promise<void>;
+  /** Meters the run, retry included, and adds its cost line to the transcript. */
+  cost?: ScenarioCost;
 };
 
 /**
@@ -39,8 +42,10 @@ export type RunOptions = BrowserQAOptions & {
 export async function runScenarioAndLog({
   config,
   beforeRetry,
+  cost,
   ...browserQAOptions
 }: { config: RunConfig } & RunOptions): Promise<Result> {
+  await cost?.start();
   // Two transients get one retry, both infrastructure rather than agent behaviour:
   // `langy_worker_stopped` (the worker died mid-reply, server-side recovery already exhausted)
   // and a turn that never settled because the conversation lock was held or the machine was too
@@ -61,6 +66,8 @@ export async function runScenarioAndLog({
     await beforeRetry?.();
     result = await scenario.run(config);
   }
+  const costLine = await cost?.line();
+  if (costLine) console.log(`[scenario] cost: ${costLine}`);
   const testName =
     expect.getState().currentTestName ?? (config as { name?: string }).name ?? "unknown";
 
@@ -83,7 +90,7 @@ export async function runScenarioAndLog({
       runName: (config as { name?: string }).name,
     });
     const filePath = path.join(LOG_DIR, `${slug}.md`);
-    await fs.writeFile(filePath, formatAsMarkdown({ testName, result, qa }), "utf8");
+    await fs.writeFile(filePath, formatAsMarkdown({ testName, result, qa, costLine }), "utf8");
   } catch {
     // intentionally silent — see jsdoc above.
     return result;
@@ -121,30 +128,26 @@ function formatAsMarkdown({
   testName,
   result,
   qa,
+  costLine,
 }: {
   testName: string;
   result: Result;
   qa: BrowserQAResult | null;
+  costLine?: string;
 }): string {
   const out: string[] = [];
   out.push(`# ${testName}`);
   out.push("");
   out.push(`**Verdict:** ${result.success ? "PASS" : "FAIL"}`);
   out.push(`**Generated:** ${new Date().toISOString()}`);
+  if (costLine) out.push(`**Cost:** ${costLine}`);
   if ((result as { reasoning?: string }).reasoning) {
     out.push("");
     out.push("## Judge reasoning");
     out.push("");
     out.push((result as { reasoning?: string }).reasoning ?? "");
   }
-  const met = (result as { metCriteria?: string[] }).metCriteria;
-  const unmet = (result as { unmetCriteria?: string[] }).unmetCriteria;
-  if (met?.length || unmet?.length) {
-    out.push("");
-    out.push("## Criteria");
-    for (const c of met ?? []) out.push(`- [x] ${c}`);
-    for (const c of unmet ?? []) out.push(`- [ ] ${c}`);
-  }
+  renderCriteria(out, result);
   out.push("");
   out.push("## Browser QA");
   out.push("");
@@ -167,6 +170,16 @@ function formatAsMarkdown({
     out.push("");
   }
   return out.join("\n");
+}
+
+function renderCriteria(out: string[], result: Result): void {
+  const met = (result as { metCriteria?: string[] }).metCriteria;
+  const unmet = (result as { unmetCriteria?: string[] }).unmetCriteria;
+  if (!met?.length && !unmet?.length) return;
+  out.push("");
+  out.push("## Criteria");
+  for (const c of met ?? []) out.push(`- [x] ${c}`);
+  for (const c of unmet ?? []) out.push(`- [ ] ${c}`);
 }
 
 function renderMessagePart(out: string[], part: unknown): void {

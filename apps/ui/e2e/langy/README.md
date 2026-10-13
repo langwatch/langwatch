@@ -401,6 +401,35 @@ Each file's header links here rather than repeating its narrative.
   the wording is pinned and the number is read from this machine rather than
   hard-coded to a version that only holds until Homebrew moves.
 
+## Dashboards and Insights helpers (issue 8573)
+
+The building blocks for the Dashboards and Insights suite. Each scenario checks
+the saved board and the numbers with code first, then the reply with a judge.
+
+- `cost-meter.ts`: `createCostMeter()` wraps the simulator and judge models
+  (`meter.wrap(model, "judge")`) in an AI SDK middleware that counts tokens per
+  role. `meter.watchLangy({ organizationId })` adds Langy's own spend: its
+  per-project "Langy" gateway key lives in the project's organization, and the
+  meter reads `gatewayUsage.summary` before and after the run (dollars and
+  requests; the summary carries no tokens). Pass `cost: meter` to
+  `runScenarioAndLog` and the transcript gets one `**Cost:**` line.
+- `dashboards-fixture.ts`: `seedDashboardsProject({ label })` signs a fresh
+  account up and points the whole process at a new organization and project
+  (`seed-organization.ts`, shared with the guided fixture), including the key
+  `langwatch-api.ts` sends (`useApiKey`). One project per file. `createBoard`
+  and `addWidget` go through `POST /api/dashboards` and the widget routes. It
+  attaches no model provider yet, so Langy cannot answer in it on its own.
+- `traffic-pattern.ts` plans now-relative traffic in the last full UTC day and
+  the day before, the windows the daily insights run reads
+  (`dailyRunWindows` in `modules/insight`): a flat baseline per hour, an
+  optional spike hour, optional injected text on the last day.
+  `expectedTotals(plan)` is what a correct chart or finding reports.
+  `seedTraffic({ plan })` in `langwatch-api.ts` sends it and waits until every
+  trace is queryable.
+- `board-state.ts`: `readBoard` lists a dashboard's widgets and saved charts,
+  `diffBoards` compares two reads by id, and `runBoardQueries` runs every
+  item's statement through `POST /api/v1/query` over a time window.
+
 ## Red team
 
 `langy-redteam.scenario.test.ts` uses `@langwatch/scenario`'s `redTeamCrescendo()`
