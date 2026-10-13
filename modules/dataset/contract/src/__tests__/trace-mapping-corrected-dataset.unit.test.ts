@@ -1,0 +1,102 @@
+import {
+  applyOverlayToTrace,
+  type Trace,
+  type TraceEditOverlayPatch,
+} from "@langwatch/trace-contract";
+/**
+ * What a corrected trace becomes once mapped into a dataset row: the
+ * dataset holds the trace as it should have been, so the corrected output
+ * is what it gets — from the drawer or a suggestion. The captured trace stays untouched.
+ */
+import { describe, expect, it } from "vitest";
+
+import { extractTracesFields, mapTraceToDatasetEntry } from "../trace-mapping.ts";
+
+const capturedTrace: Trace = {
+  trace_id: "trace-1",
+  project_id: "project-1",
+  metadata: {},
+  timestamps: { started_at: 1_000, inserted_at: 1_000, updated_at: 1_000 },
+  input: { value: "what is the capital of the Netherlands?" },
+  output: { value: "Rotterdam" },
+  spans: [],
+};
+
+const correctedOutputPatch: TraceEditOverlayPatch = {
+  version: 1,
+  trace: { output: { value: "Amsterdam" } },
+  spans: [],
+  deletedSpanIds: [],
+};
+
+describe("mapping a corrected trace into a dataset", () => {
+  describe("given a trace whose output was corrected", () => {
+    /** @scenario "A dataset output column carries the corrected output" */
+    it("fills the output column with the correction and keeps the captured trace id", () => {
+      const corrected = applyOverlayToTrace({
+        trace: capturedTrace,
+        patch: correctedOutputPatch,
+      });
+
+      const [row] = mapTraceToDatasetEntry({
+        trace: corrected as never,
+        mapping: {
+          trace_id: { source: "trace_id" },
+          input: { source: "input" },
+          output: { source: "output" },
+        },
+        expansions: new Set(),
+      });
+
+      expect(row).toEqual({
+        trace_id: "trace-1",
+        input: "what is the capital of the Netherlands?",
+        output: "Amsterdam",
+      });
+      expect(capturedTrace.output?.value).toBe("Rotterdam");
+    });
+
+    it("carries the correction through the thread field extraction too", () => {
+      const corrected = applyOverlayToTrace({
+        trace: capturedTrace,
+        patch: correctedOutputPatch,
+      });
+
+      expect(extractTracesFields([corrected as never], ["output"])).toEqual([
+        { output: "Amsterdam" },
+      ]);
+    });
+  });
+
+  describe("given a trace whose metadata was corrected", () => {
+    const capturedMetadataTrace: Trace = {
+      ...capturedTrace,
+      metadata: { environment: "staging", reviewer: "unassigned" },
+    };
+
+    /** @scenario "Corrected metadata reaches the dataset mapping" */
+    it("fills the metadata column with the correction", () => {
+      const corrected = applyOverlayToTrace({
+        trace: capturedMetadataTrace,
+        patch: {
+          version: 1,
+          trace: { metadata: { environment: "production", reviewer: null } },
+          spans: [],
+          deletedSpanIds: [],
+        },
+      });
+
+      const [row] = mapTraceToDatasetEntry({
+        trace: corrected as never,
+        mapping: {
+          environment: { source: "metadata", key: "environment" },
+          reviewer: { source: "metadata", key: "reviewer" },
+        },
+        expansions: new Set(),
+      });
+
+      expect(row).toEqual({ environment: "production", reviewer: undefined });
+      expect(capturedMetadataTrace.metadata.environment).toBe("staging");
+    });
+  });
+});

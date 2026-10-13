@@ -31,13 +31,13 @@ The guide for this example: https://langwatch.ai/docs/improve-your-agent/optimiz
 
 ## Environment
 
-| Variable | Effect |
-|---|---|
-| `OPENAI_API_KEY` | The key the agent, the user simulator and the judge use. Required. |
-| `LANGWATCH_API_KEY` | Sends the optimizer steps to LangWatch and the scenario runs to Agent Testing. Without it both scripts run untracked. |
-| `LANGWATCH_ENDPOINT` | The LangWatch endpoint, for a self-hosted install. |
-| `GEPA_MAX_METRIC_CALLS` | The scenario-run budget of the GEPA run. Default 48. |
-| `RUN_ID` | Reuse a run id instead of generating one. The Agent Testing batches are named after it. |
+| Variable                | Effect                                                                                                                |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `OPENAI_API_KEY`        | The key the agent, the user simulator and the judge use. Required.                                                    |
+| `LANGWATCH_API_KEY`     | Sends the optimizer steps to LangWatch and the scenario runs to Agent Testing. Without it both scripts run untracked. |
+| `LANGWATCH_ENDPOINT`    | The LangWatch endpoint, for a self-hosted install.                                                                    |
+| `GEPA_MAX_METRIC_CALLS` | The scenario-run budget of the GEPA run. Default 48.                                                                  |
+| `RUN_ID`                | Reuse a run id instead of generating one. The Agent Testing batches are named after it.                               |
 
 ## Running
 
@@ -58,10 +58,10 @@ Each scenario run is a full conversation with three models involved. Measured
 on one run of each script, with the agent, the simulated user and the judge on
 `gpt-5-mini`:
 
-| Script | Scenario runs | Wall clock | Cost |
-|---|---|---|---|
-| `optimize_mipro.py` | 64 (6 baseline, 10 bootstrap, 42 over seven trials, 6 final) | 42 minutes | $0.93, of which $0.41 for 18 `gpt-5` proposer calls |
-| `optimize_gepa.py` | 63 (6 baseline, 51 in the optimizer with `max_metric_calls=48`, 6 final) | 31 minutes | $0.64, of which $0.18 for 4 `gpt-5` reflection calls |
+| Script              | Scenario runs                                                            | Wall clock | Cost                                                 |
+| ------------------- | ------------------------------------------------------------------------ | ---------- | ---------------------------------------------------- |
+| `optimize_mipro.py` | 64 (6 baseline, 10 bootstrap, 42 over seven trials, 6 final)             | 42 minutes | $0.93, of which $0.41 for 18 `gpt-5` proposer calls  |
+| `optimize_gepa.py`  | 63 (6 baseline, 51 in the optimizer with `max_metric_calls=48`, 6 final) | 31 minutes | $0.64, of which $0.18 for 4 `gpt-5` reflection calls |
 
 Lower `GEPA_MAX_METRIC_CALLS` or `num_trials` to shorten a run.
 
@@ -91,10 +91,10 @@ It declares two run parameters: `model`, a closed list of `gpt-5` and
 The tool contract is picked by an environment variable, so a comparison run has
 a real before and after side:
 
-| `RETURNS_AGENT_TOOL_DESCRIPTIONS` | `check_return_eligibility` |
-|---|---|
-| `weak` | The description does not name the accepted `reason` values and the parameter is a free-text string. The model guesses, the tool rejects the call, the agent retries. |
-| `explicit` (default) | The description lists the accepted values and the schema carries them as an enum. |
+| `RETURNS_AGENT_TOOL_DESCRIPTIONS` | `check_return_eligibility`                                                                                                                                           |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `weak`                            | The description does not name the accepted `reason` values and the parameter is a free-text string. The model guesses, the tool rejects the call, the agent retries. |
+| `explicit` (default)              | The description lists the accepted values and the schema carries them as an enum.                                                                                    |
 
 Run one process per environment to compare the two:
 

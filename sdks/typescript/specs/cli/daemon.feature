@@ -14,18 +14,21 @@ Feature: CLI daemon mode
 
   Rule: The daemon is transparent — the CLI never breaks because of it
 
+    @integration
     Scenario: No daemon is running
       Given no daemon is listening on the socket
       When I run a command
       Then the command runs in-process exactly as it does today
       And the fallback is only mentioned at debug level
 
+    @integration
     Scenario: The socket file is stale after a crash
       Given a socket file exists but no process is listening on it
       When I run a command
       Then the stale socket file is removed
       And the command runs in-process without hanging
 
+    @integration
     Scenario: The daemon dies while serving a command
       Given a daemon is serving my command
       And it has not yet produced enough output to commit
@@ -33,11 +36,13 @@ Feature: CLI daemon mode
       Then the command is retried in-process
       And I see the output exactly once
 
+    @integration
     Scenario: The user opts out
       Given LANGWATCH_NO_DAEMON is set
       When I run a command
       Then no daemon is contacted and none is spawned
 
+    @unit
     Scenario: The user opts out persistently
       Given I ran "langwatch config set daemon off"
       When I run a command
@@ -45,12 +50,14 @@ Feature: CLI daemon mode
 
   Rule: Only non-interactive invocations are served by the daemon
 
+    @unit
     Scenario: A human is running the CLI in a terminal
       Given my stdout is a TTY
       When I run a command
       Then the command runs in-process
       And spinners, colours and prompts behave exactly as they do today
 
+    @integration
     Scenario: An agent pipes the CLI output
       Given my stdout is not a TTY
       And a daemon is running
@@ -74,6 +81,7 @@ Feature: CLI daemon mode
       Then the command runs in-process
       And it does not hang waiting for an answer nobody can give it
 
+    @unit
     Scenario Outline: Commands that must never be served by the daemon
       Given a daemon is running
       When I run "<command>"
@@ -92,17 +100,20 @@ Feature: CLI daemon mode
 
   Rule: Output and exit codes are faithful
 
+    @integration
     Scenario: Byte-identical stdout
       Given a daemon is running
       When I run a command that prints JSON with "--format json"
       Then stdout is byte-identical to running the same command in-process
 
+    @integration
     Scenario: Non-zero exit codes propagate
       Given a daemon is running
       When I run a command that fails
       Then stderr is byte-identical to running it in-process
       And the CLI exits with the same non-zero code
 
+    @unit
     Scenario: A command that calls process.exit mid-flight
       Given a daemon is running
       When a command exits early because no API key is configured
@@ -117,10 +128,12 @@ Feature: CLI daemon mode
       Then identity B does not reach identity A's daemon
       And identity B gets its own daemon on its own socket
 
+    @integration
     Scenario: The socket is private to the user
       When a daemon starts
       Then its socket is created with 0600 permissions inside a 0700 directory
 
+    @integration
     Scenario: A socket owned by another user is not used
       Given a socket exists at the path my identity resolves to
       But it is owned by another user
@@ -130,6 +143,7 @@ Feature: CLI daemon mode
       And the command runs in-process
       And "langwatch daemon status" reports no daemon running
 
+    @integration
     Scenario Outline: A socket that is not demonstrably private is not used
       Given a socket exists at the path my identity resolves to
       But <looseness>
@@ -149,6 +163,7 @@ Feature: CLI daemon mode
       Then no daemon is spawned, because its socket could never be private
       And the command runs in-process
 
+    @integration
     Scenario: A daemon rejects a request from a different identity
       Given a daemon is warm for identity A
       When a client presents a fingerprint for identity B
@@ -157,6 +172,7 @@ Feature: CLI daemon mode
 
   Rule: Version skew is detected at the handshake
 
+    @integration
     Scenario: A stale daemon from a previous CLI version
       Given a daemon running an older CLI version is listening
       When I run a command with the newer CLI
@@ -171,17 +187,20 @@ Feature: CLI daemon mode
       When I run several commands in a row
       Then the module graph, resolved auth and HTTP connections are reused
 
+    @integration
     Scenario: The daemon self-exits when idle
       Given a daemon is running with an idle timeout
       When no command arrives before the idle timeout elapses
       Then the daemon exits and removes its socket
 
+    @integration
     Scenario: Concurrent commands
       Given a daemon is running
       When I fan out several commands from the same working directory at once
       Then they execute concurrently
       And each caller receives only its own output and exit code
 
+    @integration
     Scenario: Commands run in the caller's working directory
       Given a daemon started from a different directory
       When I run a command that reads a local file
@@ -224,6 +243,7 @@ Feature: CLI daemon mode
 
   Rule: The client can cancel an in-flight command
 
+    @integration
     Scenario: Ctrl-C during a daemon-served command
       Given the daemon is running my command
       When I interrupt the client
@@ -255,12 +275,14 @@ Feature: CLI daemon mode
 
   Rule: The daemon never hands a result computed under the wrong environment
 
+    @integration
     Scenario: The daemon is stopped while it is still serving
       Given a daemon is serving my command
       When the daemon is asked to stop
       Then it waits for my command to finish before restoring its own
       working directory and environment
 
+    @integration
     Scenario: An in-flight command outlasts the shutdown grace period
       Given a daemon is serving a command that will not finish
       And none of its output has reached me yet
@@ -269,6 +291,7 @@ Feature: CLI daemon mode
       Then I am told the daemon declined the command before any exit code is sent
       And the command is retried in-process
 
+    @integration
     Scenario: An in-flight command outlasts the shutdown grace period after printing
       Given a daemon is serving a command whose output is too large to hold back
       And part of that output has already been printed to me
@@ -289,11 +312,13 @@ Feature: CLI daemon mode
       When I run "langwatch daemon status --json"
       Then I see its pid, uptime, served-request count, in-flight count and CLI version
 
+    @integration
     Scenario: Stopping a daemon
       Given a daemon is running
       When I run "langwatch daemon stop"
       Then the daemon exits and removes its socket
 
+    @integration
     Scenario: Auto-spawn on first use
       Given no daemon is running
       And auto-spawn is enabled

@@ -1,0 +1,626 @@
+{
+  "legacy_event_log": {
+    "name": "legacy_event_log",
+    "sourceTable": "event_log",
+    "description": "Legacy append-only event log, superseded by the canonical fact tables",
+    "gates": [],
+    "grain": "one row per (AggregateType, AggregateId, IdempotencyKey)",
+    "grainColumns": [
+      "AggregateType",
+      "AggregateId",
+      "IdempotencyKey"
+    ],
+    "joinKeys": [
+      "TenantId",
+      "AggregateId",
+      "EventId"
+    ],
+    "timeColumn": "EventOccurredAt",
+    "freshness": "seconds behind ingestion",
+    "dedup": {
+      "keyColumns": [
+        "TenantId",
+        "AggregateType",
+        "AggregateId",
+        "IdempotencyKey"
+      ],
+      "strategy": "in-tuple",
+      "versionColumn": "EventTimestamp"
+    },
+    "columns": [
+      {
+        "name": "TenantId",
+        "type": "String",
+        "description": "TenantId",
+        "gates": [],
+        "sourceColumns": [
+          "TenantId"
+        ]
+      },
+      {
+        "name": "IdempotencyKey",
+        "type": "String",
+        "description": "IdempotencyKey",
+        "gates": [],
+        "sourceColumns": [
+          "IdempotencyKey"
+        ]
+      },
+      {
+        "name": "AggregateType",
+        "type": "LowCardinality(String)",
+        "description": "AggregateType",
+        "gates": [],
+        "sourceColumns": [
+          "AggregateType"
+        ]
+      },
+      {
+        "name": "AggregateId",
+        "type": "String",
+        "description": "AggregateId",
+        "gates": [],
+        "sourceColumns": [
+          "AggregateId"
+        ]
+      },
+      {
+        "name": "EventId",
+        "type": "String",
+        "description": "EventId",
+        "gates": [],
+        "sourceColumns": [
+          "EventId"
+        ]
+      },
+      {
+        "name": "EventType",
+        "type": "LowCardinality(String)",
+        "description": "EventType",
+        "gates": [],
+        "sourceColumns": [
+          "EventType"
+        ]
+      },
+      {
+        "name": "EventVersion",
+        "type": "LowCardinality(String)",
+        "description": "EventVersion",
+        "gates": [],
+        "sourceColumns": [
+          "EventVersion"
+        ]
+      },
+      {
+        "name": "EventTimestamp",
+        "type": "UInt64",
+        "description": "EventTimestamp",
+        "gates": [],
+        "sourceColumns": [
+          "EventTimestamp"
+        ]
+      },
+      {
+        "name": "CreatedAt",
+        "type": "DateTime64(3)",
+        "description": "CreatedAt",
+        "gates": [],
+        "sourceColumns": [
+          "CreatedAt"
+        ]
+      },
+      {
+        "name": "EventPayload",
+        "type": "String",
+        "description": "EventPayload",
+        "gates": [
+          "output"
+        ],
+        "sourceColumns": [
+          "EventPayload"
+        ]
+      },
+      {
+        "name": "ProcessingTraceparent",
+        "type": "String",
+        "description": "ProcessingTraceparent",
+        "gates": [
+          "output"
+        ],
+        "sourceColumns": [
+          "ProcessingTraceparent"
+        ]
+      },
+      {
+        "name": "EventOccurredAt",
+        "type": "UInt64",
+        "description": "EventOccurredAt",
+        "gates": [],
+        "sourceColumns": [
+          "EventOccurredAt"
+        ]
+      },
+      {
+        "name": "_retention_days",
+        "type": "UInt16",
+        "description": "_retention_days",
+        "gates": [],
+        "sourceColumns": [
+          "_retention_days"
+        ]
+      },
+      {
+        "name": "_size_bytes",
+        "type": "UInt32",
+        "description": "_size_bytes",
+        "gates": [],
+        "sourceColumns": [
+          "_size_bytes"
+        ]
+      }
+    ]
+  },
+  "process_manager_inboxes": {
+    "name": "process_manager_inboxes",
+    "sourceTable": "process_manager_inboxes_pg",
+    "postgres": {
+      "baseRelation": "ProcessManagerInbox",
+      "approvedView": "lwql_process_manager_inboxes",
+      "tenantSourceColumn": "projectId"
+    },
+    "description": "Idempotency marker for a source event consumed by a process definition.",
+    "gates": [],
+    "grain": "one row per ProcessManagerInboxId",
+    "joinKeys": [
+      "TenantId",
+      "ProcessManagerInboxId",
+      "SourceEventId"
+    ],
+    "timeColumn": "ConsumedAt",
+    "freshness": "live \u2014 read from PostgreSQL at query time",
+    "dedup": {
+      "keyColumns": [
+        "ProcessManagerInboxId"
+      ]
+    },
+    "columns": [
+      {
+        "name": "TenantId",
+        "type": "String",
+        "description": "Project the row belongs to. Join key to every other view.",
+        "gates": [],
+        "sourceColumns": [
+          "projectId"
+        ]
+      },
+      {
+        "name": "ProcessManagerInboxId",
+        "type": "String",
+        "description": "ProcessManagerInboxId",
+        "gates": [],
+        "sourceColumns": [
+          "id"
+        ]
+      },
+      {
+        "name": "ProcessName",
+        "type": "String",
+        "description": "ProcessName",
+        "gates": [],
+        "sourceColumns": [
+          "processName"
+        ]
+      },
+      {
+        "name": "SourceEventId",
+        "type": "String",
+        "description": "The raw source event id, kept UNINDEXED for diagnostics.",
+        "gates": [],
+        "sourceColumns": [
+          "sourceEventId"
+        ]
+      },
+      {
+        "name": "ConsumedAt",
+        "type": "DateTime64(3)",
+        "description": "ConsumedAt",
+        "gates": [],
+        "sourceColumns": [
+          "consumedAt"
+        ]
+      }
+    ],
+    "skipColumns": {
+      "processKey": "secret material, never exposed",
+      "tenantId": "omitted by the catalogue",
+      "sourceEventKey": "secret material, never exposed"
+    }
+  },
+  "process_manager_instances": {
+    "name": "process_manager_instances",
+    "sourceTable": "process_manager_instances_pg",
+    "postgres": {
+      "baseRelation": "ProcessManagerInstance",
+      "approvedView": "lwql_process_manager_instances",
+      "tenantSourceColumn": "projectId"
+    },
+    "description": "Durable state for a long-running event-sourced process.",
+    "gates": [],
+    "grain": "one row per ProcessManagerInstanceId",
+    "joinKeys": [
+      "TenantId",
+      "ProcessManagerInstanceId",
+      "UserId"
+    ],
+    "timeColumn": "NextWakeAt",
+    "freshness": "live \u2014 read from PostgreSQL at query time",
+    "dedup": {
+      "keyColumns": [
+        "ProcessManagerInstanceId"
+      ]
+    },
+    "columns": [
+      {
+        "name": "TenantId",
+        "type": "String",
+        "description": "Project the row belongs to. Join key to every other view.",
+        "gates": [],
+        "sourceColumns": [
+          "projectId"
+        ]
+      },
+      {
+        "name": "ProcessManagerInstanceId",
+        "type": "String",
+        "description": "ProcessManagerInstanceId",
+        "gates": [],
+        "sourceColumns": [
+          "id"
+        ]
+      },
+      {
+        "name": "ProcessName",
+        "type": "String",
+        "description": "ProcessName",
+        "gates": [],
+        "sourceColumns": [
+          "processName"
+        ]
+      },
+      {
+        "name": "UserId",
+        "type": "Nullable(String)",
+        "description": "UserId",
+        "gates": [],
+        "sourceColumns": [
+          "userId"
+        ]
+      },
+      {
+        "name": "State",
+        "type": "String",
+        "description": "State",
+        "gates": [
+          "output"
+        ],
+        "sourceColumns": [
+          "state"
+        ]
+      },
+      {
+        "name": "Revision",
+        "type": "Int32",
+        "description": "Revision",
+        "gates": [],
+        "sourceColumns": [
+          "revision"
+        ]
+      },
+      {
+        "name": "NextWakeAt",
+        "type": "Nullable(DateTime64(3))",
+        "description": "NextWakeAt",
+        "gates": [],
+        "sourceColumns": [
+          "nextWakeAt"
+        ]
+      },
+      {
+        "name": "UpdatedAt",
+        "type": "DateTime64(3)",
+        "description": "UpdatedAt",
+        "gates": [],
+        "sourceColumns": [
+          "updatedAt"
+        ]
+      }
+    ],
+    "skipColumns": {
+      "processKey": "secret material, never exposed",
+      "tenantId": "omitted by the catalogue"
+    }
+  },
+  "process_manager_outbox_attempts": {
+    "name": "process_manager_outbox_attempts",
+    "sourceTable": "process_manager_outbox_attempts_pg",
+    "postgres": {
+      "baseRelation": "ProcessManagerOutboxAttempt",
+      "approvedView": "lwql_process_manager_outbox_attempts",
+      "tenantSourceColumn": "projectId"
+    },
+    "description": "One row per failed outbox delivery attempt, so the table grows with delivery trouble rather than with traffic.",
+    "gates": [],
+    "grain": "one row per ProcessManagerOutboxAttemptId",
+    "joinKeys": [
+      "TenantId",
+      "ProcessManagerOutboxAttemptId",
+      "OutboxId"
+    ],
+    "timeColumn": "OccurredAt",
+    "freshness": "live \u2014 read from PostgreSQL at query time",
+    "dedup": {
+      "keyColumns": [
+        "ProcessManagerOutboxAttemptId"
+      ]
+    },
+    "columns": [
+      {
+        "name": "TenantId",
+        "type": "String",
+        "description": "Project the row belongs to. Join key to every other view.",
+        "gates": [],
+        "sourceColumns": [
+          "projectId"
+        ]
+      },
+      {
+        "name": "ProcessManagerOutboxAttemptId",
+        "type": "String",
+        "description": "ProcessManagerOutboxAttemptId",
+        "gates": [],
+        "sourceColumns": [
+          "id"
+        ]
+      },
+      {
+        "name": "OutboxId",
+        "type": "String",
+        "description": "OutboxId",
+        "gates": [],
+        "sourceColumns": [
+          "outboxId"
+        ]
+      },
+      {
+        "name": "Attempt",
+        "type": "Int32",
+        "description": "1-based attempt number, as the dispatcher counts it.",
+        "gates": [],
+        "sourceColumns": [
+          "attempt"
+        ]
+      },
+      {
+        "name": "OccurredAt",
+        "type": "DateTime64(3)",
+        "description": "OccurredAt",
+        "gates": [],
+        "sourceColumns": [
+          "occurredAt"
+        ]
+      },
+      {
+        "name": "Outcome",
+        "type": "String",
+        "description": "Outcome",
+        "gates": [],
+        "sourceColumns": [
+          "outcome"
+        ]
+      },
+      {
+        "name": "ErrorType",
+        "type": "String",
+        "description": "ErrorType",
+        "gates": [],
+        "sourceColumns": [
+          "errorType"
+        ]
+      },
+      {
+        "name": "ErrorMessage",
+        "type": "String",
+        "description": "The safe failure diagnostic the dispatcher already computes for its span \u2014 never a raw provider body.",
+        "gates": [
+          "output"
+        ],
+        "sourceColumns": [
+          "errorMessage"
+        ]
+      },
+      {
+        "name": "RetryAfterMs",
+        "type": "Nullable(Int32)",
+        "description": "RetryAfterMs",
+        "gates": [],
+        "sourceColumns": [
+          "retryAfterMs"
+        ],
+        "unit": "ms"
+      }
+    ],
+    "skipColumns": {}
+  },
+  "process_manager_outboxes": {
+    "name": "process_manager_outboxes",
+    "sourceTable": "process_manager_outboxes_pg",
+    "postgres": {
+      "baseRelation": "ProcessManagerOutbox",
+      "approvedView": "lwql_process_manager_outboxes",
+      "tenantSourceColumn": "projectId"
+    },
+    "description": "Transactional intents emitted by a durable process transition.",
+    "gates": [],
+    "grain": "one row per ProcessManagerOutboxId",
+    "joinKeys": [
+      "TenantId",
+      "ProcessManagerOutboxId",
+      "UserId",
+      "SourceEventId"
+    ],
+    "timeColumn": "CreatedAt",
+    "freshness": "live \u2014 read from PostgreSQL at query time",
+    "dedup": {
+      "keyColumns": [
+        "ProcessManagerOutboxId"
+      ]
+    },
+    "columns": [
+      {
+        "name": "TenantId",
+        "type": "String",
+        "description": "Project the row belongs to. Join key to every other view.",
+        "gates": [],
+        "sourceColumns": [
+          "projectId"
+        ]
+      },
+      {
+        "name": "ProcessManagerOutboxId",
+        "type": "String",
+        "description": "ProcessManagerOutboxId",
+        "gates": [],
+        "sourceColumns": [
+          "id"
+        ]
+      },
+      {
+        "name": "ProcessName",
+        "type": "String",
+        "description": "ProcessName",
+        "gates": [],
+        "sourceColumns": [
+          "processName"
+        ]
+      },
+      {
+        "name": "UserId",
+        "type": "Nullable(String)",
+        "description": "UserId",
+        "gates": [],
+        "sourceColumns": [
+          "userId"
+        ]
+      },
+      {
+        "name": "IntentType",
+        "type": "String",
+        "description": "IntentType",
+        "gates": [],
+        "sourceColumns": [
+          "intentType"
+        ]
+      },
+      {
+        "name": "Payload",
+        "type": "String",
+        "description": "Payload",
+        "gates": [
+          "output"
+        ],
+        "sourceColumns": [
+          "payload"
+        ]
+      },
+      {
+        "name": "TraceCarrier",
+        "type": "String",
+        "description": "TraceCarrier",
+        "gates": [
+          "output"
+        ],
+        "sourceColumns": [
+          "traceCarrier"
+        ]
+      },
+      {
+        "name": "SourceEventId",
+        "type": "Nullable(String)",
+        "description": "SourceEventId",
+        "gates": [],
+        "sourceColumns": [
+          "sourceEventId"
+        ]
+      },
+      {
+        "name": "Status",
+        "type": "String",
+        "description": "Status",
+        "gates": [],
+        "sourceColumns": [
+          "status"
+        ]
+      },
+      {
+        "name": "Attempts",
+        "type": "Int32",
+        "description": "Attempts",
+        "gates": [],
+        "sourceColumns": [
+          "attempts"
+        ]
+      },
+      {
+        "name": "NextAttemptAt",
+        "type": "DateTime64(3)",
+        "description": "NextAttemptAt",
+        "gates": [],
+        "sourceColumns": [
+          "nextAttemptAt"
+        ]
+      },
+      {
+        "name": "LeasedUntil",
+        "type": "Nullable(DateTime64(3))",
+        "description": "LeasedUntil",
+        "gates": [],
+        "sourceColumns": [
+          "leasedUntil"
+        ]
+      },
+      {
+        "name": "DispatchedAt",
+        "type": "Nullable(DateTime64(3))",
+        "description": "DispatchedAt",
+        "gates": [],
+        "sourceColumns": [
+          "dispatchedAt"
+        ]
+      },
+      {
+        "name": "CreatedAt",
+        "type": "DateTime64(3)",
+        "description": "CreatedAt",
+        "gates": [],
+        "sourceColumns": [
+          "createdAt"
+        ]
+      },
+      {
+        "name": "UpdatedAt",
+        "type": "DateTime64(3)",
+        "description": "UpdatedAt",
+        "gates": [],
+        "sourceColumns": [
+          "updatedAt"
+        ]
+      }
+    ],
+    "skipColumns": {
+      "processKey": "secret material, never exposed",
+      "tenantId": "omitted by the catalogue",
+      "messageKey": "secret material, never exposed",
+      "leaseToken": "secret material, never exposed"
+    }
+  }
+}

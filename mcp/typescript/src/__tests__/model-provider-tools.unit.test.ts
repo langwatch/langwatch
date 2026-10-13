@@ -1,17 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../langwatch-api-model-providers.js", () => ({
+vi.mock("../langwatch-api-model-providers.ts", () => ({
   listModelProviders: vi.fn(),
   setModelProvider: vi.fn(),
 }));
 
-import {
-  listModelProviders,
-  setModelProvider,
-} from "../langwatch-api-model-providers.js";
-
-import { handleListModelProviders } from "../tools/list-model-providers.js";
-import { handleSetModelProvider } from "../tools/set-model-provider.js";
+import { listModelProviders, setModelProvider } from "../langwatch-api-model-providers.ts";
+import { handleListModelProviders } from "../tools/list-model-providers.ts";
+import { handleSetModelProvider } from "../tools/set-model-provider.ts";
 
 const mockListModelProviders = vi.mocked(listModelProviders);
 const mockSetModelProvider = vi.mocked(setModelProvider);
@@ -26,7 +22,7 @@ describe("handleListModelProviders()", () => {
       provider: "openai",
       enabled: true,
       customKeys: { OPENAI_API_KEY: "HAS_KEY" },
-      models: ["gpt-4o", "gpt-4o-mini"],
+      models: ["gpt-5-mini", "gpt-5-mini"],
       embeddingsModels: ["text-embedding-3-small"],
       deploymentMapping: null,
       extraHeaders: [],
@@ -103,7 +99,7 @@ describe("handleSetModelProvider()", () => {
           provider: "openai",
           enabled: true,
           customKeys: { OPENAI_API_KEY: "HAS_KEY" },
-          models: ["gpt-4o"],
+          models: ["gpt-5-mini"],
           embeddingsModels: null,
           deploymentMapping: null,
           extraHeaders: [],
@@ -142,7 +138,7 @@ describe("handleSetModelProvider()", () => {
           provider: "openai",
           enabled: true,
           customKeys: null,
-          models: ["gpt-4o"],
+          models: ["gpt-5-mini"],
           embeddingsModels: null,
           deploymentMapping: null,
           extraHeaders: [],
@@ -151,12 +147,12 @@ describe("handleSetModelProvider()", () => {
       result = await handleSetModelProvider({
         provider: "openai",
         enabled: true,
-        defaultModel: "gpt-4o",
+        defaultModel: "gpt-5-mini",
       });
     });
 
     it("prepends provider prefix in response", () => {
-      expect(result).toContain("**Default Model**: openai/gpt-4o");
+      expect(result).toContain("**Default Model**: openai/gpt-5-mini");
     });
   });
 
@@ -169,7 +165,7 @@ describe("handleSetModelProvider()", () => {
           provider: "openai",
           enabled: true,
           customKeys: null,
-          models: ["gpt-4o"],
+          models: ["gpt-5-mini"],
           embeddingsModels: null,
           deploymentMapping: null,
           extraHeaders: [],
@@ -178,12 +174,12 @@ describe("handleSetModelProvider()", () => {
       result = await handleSetModelProvider({
         provider: "openai",
         enabled: true,
-        defaultModel: "openai/gpt-4o",
+        defaultModel: "openai/gpt-5-mini",
       });
     });
 
     it("keeps the prefix as-is", () => {
-      expect(result).toContain("**Default Model**: openai/gpt-4o");
+      expect(result).toContain("**Default Model**: openai/gpt-5-mini");
       expect(result).not.toContain("openai/openai/");
     });
   });

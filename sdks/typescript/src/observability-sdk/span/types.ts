@@ -1,15 +1,9 @@
-import {
-  type AttributeValue,
-  type Span,
-  type SpanOptions,
-} from "@opentelemetry/api";
-import {
-  type SpanInputOutput,
-  type ChatMessage,
-} from "../../internal/generated/types/tracer";
-import { type Prompt } from "@/client-sdk/services/prompts";
-import { type AddEvaluationParams } from "../evaluation";
+import { type AttributeValue, type Span, type SpanOptions } from "@opentelemetry/api";
 
+import { type Prompt } from "@/client-sdk/services/prompts";
+
+import { type SpanInputOutput, type ChatMessage } from "../../internal/generated/types/tracer";
+import { type AddEvaluationParams } from "../evaluation";
 
 /**
  * Simple chat message type with just role and content
@@ -29,11 +23,10 @@ export const INPUT_OUTPUT_TYPES = [
   "list",
   "json",
   "guardrail_result",
-  "evaluation_result"
+  "evaluation_result",
 ] as const;
 
-export type InputOutputType = typeof INPUT_OUTPUT_TYPES[number];
-
+export type InputOutputType = (typeof INPUT_OUTPUT_TYPES)[number];
 
 export type JsonSerializable =
   | string
@@ -47,11 +40,8 @@ export type JsonSerializable =
 import type { SemConvAttributes } from "../semconv";
 
 /**
- * Supported types of spans for LangWatch observability. These types categorize the nature of the span for downstream analysis and visualization.
- *
- * @example
- * import { spanTypes, SpanType } from './span';
- * const myType: SpanType = 'llm';
+ * Supported types of spans for LangWatch observability, categorizing a span's
+ * nature for downstream analysis and visualization.
  */
 export const spanTypes = [
   "span",
@@ -77,20 +67,8 @@ export const spanTypes = [
 export type SpanType = (typeof spanTypes)[number];
 
 /**
- * Context for a RAG (Retrieval-Augmented Generation) span.
- *
- * This structure is used to record which document and chunk were retrieved and used as context for a generation.
- *
- * @property document_id - Unique identifier for the source document.
- * @property chunk_id - Unique identifier for the chunk within the document.
- * @property content - The actual content of the chunk provided to the model.
- *
- * @example
- * const ragContext: LangWatchSpanRAGContext = {
- *   document_id: 'doc-123',
- *   chunk_id: 'chunk-456',
- *   content: 'Relevant passage from the document.'
- * };
+ * Context for a RAG (Retrieval-Augmented Generation) span: which document and
+ * chunk were retrieved and used to generate a response.
  */
 export interface LangWatchSpanRAGContext {
   document_id: string;
@@ -98,13 +76,7 @@ export interface LangWatchSpanRAGContext {
   content: string;
 }
 
-/**
- * Metrics for a LangWatch span.
- *
- * @property promptTokens - The number of prompt tokens used.
- * @property completionTokens - The number of completion tokens used.
- * @property cost - The cost of the span.
- */
+/** Metrics for a LangWatch span. */
 export interface LangWatchSpanMetrics {
   /** The number of prompt tokens used */
   promptTokens?: number;
@@ -125,43 +97,14 @@ export interface LangWatchSpanOptions extends SpanOptions {
 }
 
 /**
- * Extension of OpenTelemetry's Span with LangWatch-specific helpers for LLM, RAG, and GenAI tracing.
- *
- * This interface provides ergonomic methods for recording structured LLM/GenAI data, such as inputs, outputs, RAG contexts, and message events.
- *
- * All methods return `this` for chaining.
- *
- * @example
- * const span = createLangWatchSpan(otelSpan);
- * span
- *   .setType('llm')
- *   .setInput({ prompt: 'Hello' })
- *   .setOutput('Hi!')
- *   .addGenAIUserMessageEvent({ content: 'Hello' })
- *   .addGenAIAssistantMessageEvent({ content: 'Hi!' });
+ * Extension of OpenTelemetry's Span with LangWatch-specific helpers for LLM, RAG, and
+ * GenAI tracing. All methods return `this` for chaining.
  */
 export interface LangWatchSpan extends Span {
   /**
-   * Record a manual evaluation result on this span.
-   *
-   * This emits a `langwatch.evaluation.custom` OpenTelemetry span event whose
-   * `json_encoded_event` attribute carries the evaluation payload. It matches
-   * the Python SDK's `span.add_evaluation(...)` exactly, so the LangWatch
-   * backend parses both identically.
-   *
-   * @param params - The evaluation parameters. Only `name` is required; see
-   *   {@link AddEvaluationParams}. `status` defaults to `"processed"`.
+   * Records a `langwatch.evaluation.custom` event, matching the Python SDK's `add_evaluation`.
+   * @param params - Evaluation params; only `name` is required. {@link AddEvaluationParams}
    * @returns this
-   *
-   * @example
-   * ```typescript
-   * span.addEvaluation({
-   *   name: "response_quality",
-   *   passed: true,
-   *   score: 0.95,
-   *   details: "High quality response",
-   * });
-   * ```
    */
   addEvaluation(params: AddEvaluationParams): this;
 
@@ -175,16 +118,12 @@ export interface LangWatchSpan extends Span {
   recordEvaluation(params: AddEvaluationParams): this;
 
   /**
-   * Set multiple attributes for the span.
-   *
    * @param attributes - The attributes object
    * @returns this
    */
   setAttributes(attributes: SemConvAttributes): this;
 
   /**
-   * Set a single attribute for the span.
-   *
    * @param key - The attribute key
    * @param value - The attribute value
    * @returns this
@@ -192,210 +131,146 @@ export interface LangWatchSpan extends Span {
   setAttribute(key: keyof SemConvAttributes, value: AttributeValue): this;
 
   /**
-   * Set the type of the span (e.g., 'llm', 'rag', 'tool', etc).
-   *
-   * This is used for downstream filtering and analytics.
-   *
+   * Sets the span type (e.g. 'llm', 'rag', 'tool') for downstream filtering and analytics.
    * @param type - The span type (see SpanType)
    * @returns this
    */
   setType(type: SpanType): this;
 
   /**
-   * Set the request model name for the span.
-   *
-   * This is typically the model name sent in the API request (e.g., 'gpt-4', 'claude-3').
-   *
+   * The model sent in the API request (e.g. 'gpt-4'), as opposed to the response model.
    * @param model - The request model name
    * @returns this
    */
   setRequestModel(model: string): this;
   /**
-   * Set the response model name for the span.
-   *
-   * This is the model name returned in the API response, if different from the request.
-   *
+   * The model name returned in the API response, if different from the request model.
    * @param model - The response model name
    * @returns this
    */
   setResponseModel(model: string): this;
 
   /**
-   * Set multiple RAG contexts for the span.
-   *
-   * Use this to record all retrieved documents/chunks used as context for a generation.
-   *
+   * Records all retrieved documents/chunks used as context for a generation.
    * @param ragContexts - Array of RAG context objects
    * @returns this
    */
   setRAGContexts(ragContexts: LangWatchSpanRAGContext[]): this;
   /**
-   * Set a single RAG context for the span.
-   *
-   * Use this if only one context was retrieved.
-   *
+   * Use when only a single RAG context was retrieved.
    * @param ragContext - The RAG context object
    * @returns this
    */
   setRAGContext(ragContext: LangWatchSpanRAGContext): this;
 
   /**
-   * Set the metrics for the span.
-   *
    * @param metrics - The metrics object
    * @returns this
    */
   setMetrics(metrics: LangWatchSpanMetrics): this;
 
   /**
-   * Set the selected prompt for the span. This will attach this prompt to the trace. If
-   * this is set on multiple spans, the last one will be used.
-   *
+   * Attaches this prompt to the trace; if set on multiple spans, the last one wins.
    * @param prompt - The prompt object
    * @returns this
    */
   setSelectedPrompt(prompt: Prompt): this;
 
   /**
-   * Record the input to the span with explicit type control.
-   *
    * @param type - Force as "text" type
    * @param input - String input value
    * @returns this
    */
   setInput(type: "text", input: string): this;
   /**
-   * Record the input to the span with explicit type control.
-   *
    * @param type - Force as "raw" type
    * @param input - Any input value
    * @returns this
    */
   setInput(type: "raw", input: unknown): this;
   /**
-   * Record the input to the span with explicit type control.
-   *
    * @param type - Force as "chat_messages" type
    * @param input - Chat messages array (supports both ChatMessage[] and SimpleChatMessage[])
    * @returns this
    */
   setInput(type: "chat_messages", input: ChatMessage[] | SimpleChatMessage[]): this;
   /**
-   * Record the input to the span with explicit type control.
-   *
    * @param type - Force as "list" type
    * @param input - SpanInputOutput array
    * @returns this
    */
   setInput(type: "list", input: SpanInputOutput[]): this;
   /**
-   * Record the input to the span with explicit type control.
-   *
    * @param type - Force as "json" type
    * @param input - Any JSON-serializable value
    * @returns this
    */
   setInput(type: "json", input: unknown): this;
   /**
-   * Record the input to the span with explicit type control.
-   *
    * @param type - Force as "guardrail_result" type
    * @param input - Guardrail result value
    * @returns this
    */
   setInput(type: "guardrail_result", input: unknown): this;
   /**
-   * Record the input to the span with explicit type control.
-   *
    * @param type - Force as "evaluation_result" type
    * @param input - Evaluation result value
    * @returns this
    */
   setInput(type: "evaluation_result", input: unknown): this;
   /**
-   * Record the input to the span with automatic type detection.
-   *
-   * Automatically detects: strings → text, ChatMessage[] → chat_messages,
-   * arrays → list, objects → json.
-   *
+   * Auto-detects type: string→text, ChatMessage[]→chat_messages, array→list, object→json.
    * @param input - The input value (auto-detected type)
    * @returns this
    */
   setInput(input: unknown): this;
 
   /**
-   * Record the output from the span with explicit type control.
-   *
    * @param type - Force as "text" type
    * @param output - String output value
    * @returns this
    */
   setOutput(type: "text", output: string): this;
   /**
-   * Record the output from the span with explicit type control.
-   *
    * @param type - Force as "raw" type
    * @param output - Any output value
    * @returns this
    */
   setOutput(type: "raw", output: unknown): this;
   /**
-   * Record the output from the span with explicit type control.
-   *
    * @param type - Force as "chat_messages" type
    * @param output - Chat messages array (supports both ChatMessage[] and SimpleChatMessage[])
    * @returns this
    */
   setOutput(type: "chat_messages", output: ChatMessage[] | SimpleChatMessage[]): this;
   /**
-   * Record the output from the span with explicit type control.
-   *
    * @param type - Force as "list" type
    * @param output - SpanInputOutput array
    * @returns this
    */
   setOutput(type: "list", output: SpanInputOutput[]): this;
   /**
-   * Record the output from the span with explicit type control.
-   *
    * @param type - Force as "json" type
    * @param output - Any JSON-serializable value
    * @returns this
    */
   setOutput(type: "json", output: unknown): this;
   /**
-   * Record the output from the span with explicit type control.
-   *
    * @param type - Force as "guardrail_result" type
    * @param output - Guardrail result value
    * @returns this
    */
   setOutput(type: "guardrail_result", output: unknown): this;
   /**
-   * Record the output from the span with explicit type control.
-   *
    * @param type - Force as "evaluation_result" type
    * @param output - Evaluation result value
    * @returns this
    */
   setOutput(type: "evaluation_result", output: unknown): this;
   /**
-   * Record the output from the span with automatic type detection.
-   *
-   * Automatically detects: strings → text, ChatMessage[] → chat_messages,
-   * arrays → list, objects → json.
-   *
+   * Auto-detects type: string→text, ChatMessage[]→chat_messages, array→list, object→json.
    * @param output - The output value (auto-detected type)
    * @returns this
    */
   setOutput(output: unknown): this;
-
-  // /**
-  //  * Set the evaluation output for the span.
-  //  *
-  //  * @param guardrail - Whether the evaluation is a guardrail
-  //  * @param output - The evaluation result
-  //  * @returns this
-  //  */
-  // setOutputEvaluation(guardrail: boolean, output: EvaluationResultModel): this;
 }

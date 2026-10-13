@@ -1,19 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import type * as EvaluationsApiModule from "@/client-sdk/services/experiments/experiments-api.service";
 
-vi.mock(
-  "@/client-sdk/services/experiments/experiments-api.service",
-  async (importOriginal) => {
-    const actual = await importOriginal<typeof EvaluationsApiModule>();
-    return {
-      ...actual,
-      ExperimentsApiService: vi.fn(),
-    };
-  },
-);
+vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (importOriginal) => {
+  const actual = await importOriginal<typeof EvaluationsApiModule>();
+  return {
+    ...actual,
+    ExperimentsApiService: vi.fn(),
+  };
+});
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -27,6 +29,7 @@ vi.mock("ora", () => ({
 }));
 
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+
 import { experimentListRunsCommand } from "../list-runs";
 
 class ProcessExitError extends Error {
@@ -52,10 +55,11 @@ describe("experimentListRunsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockListRuns = vi.fn();
-    vi.mocked(ExperimentsApiService).mockImplementation(
-      function () { return ({
-          listRuns: mockListRuns,
-        }) as unknown as ExperimentsApiService; });
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        listRuns: mockListRuns,
+      } as unknown as ExperimentsApiService;
+    });
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -69,9 +73,7 @@ describe("experimentListRunsCommand()", () => {
     describe("when invoked", () => {
       /** @scenario "Listing runs requires --experiment" */
       it("exits with non-zero code", async () => {
-        await expect(experimentListRunsCommand({})).rejects.toBeInstanceOf(
-          ProcessExitError,
-        );
+        await expect(experimentListRunsCommand({})).rejects.toBeInstanceOf(ProcessExitError);
       });
     });
   });

@@ -93,3 +93,33 @@ func TestRunHTTP_RecordsWhatTheEndpointAnswered(t *testing.T) {
 	assert.Contains(t, ns.HTTP.ResponseHeaders["Content-Type"], "application/json",
 		"response headers reach the author")
 }
+
+// A non-2xx is the case the author most needs to read: the endpoint's own
+// complaint, with the secrets they sent redacted from it.
+func TestRunHTTP_KeepsTheUpstreamBodyOfANon2xx(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"detail":"quota exceeded for s3cr3t"}`))
+	}))
+	defer srv.Close()
+
+	eng := New(Options{
+		HTTP: httpblock.New(httpblock.Options{
+			SSRF: httpblock.SSRFOptions{AllowLocal: true},
+		}),
+	})
+
+	ns := &NodeState{ID: "http"}
+	_, nodeErr := eng.runHTTP(
+		context.Background(),
+		httpNode(srv.URL),
+		map[string]any{},
+		ns,
+		map[string]string{"KEY": "s3cr3t"},
+	)
+
+	require.NotNil(t, nodeErr)
+	assert.Equal(t, "upstream_http_error", nodeErr.Type)
+	require.NotNil(t, ns.HTTP)
+	assert.JSONEq(t, `{"detail":"quota exceeded for [redacted]"}`, ns.HTTP.ResponseBody)
+}

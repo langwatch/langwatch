@@ -1,0 +1,278 @@
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
+import type { Named } from "@langwatch/module";
+import type { Instant } from "@langwatch/time";
+import { z } from "zod";
+
+import type { PlanTypes } from "./plan-types.ts";
+
+export type UsageUnit = "traces" | "events";
+export type LimitType = "members" | "membersLite";
+export type SignupData = {
+  usage?: string | null;
+  solution?: string | null;
+  terms?: boolean;
+  companyType?: string | null;
+  companySize?: string | null;
+  projectType?: string | null;
+  howDidYouHearAboutUs?: string | null;
+  otherCompanyType?: string | null;
+  otherProjectType?: string | null;
+  otherHowDidYouHearAboutUs?: string | null;
+  yourRole?: string | null;
+  featureUsage?: string | null;
+  leadSource?: string | null;
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
+  utmTerm?: string | null;
+  utmContent?: string | null;
+  referrer?: string | null;
+};
+
+/** Whose Cloud subscription plan is asked for, and the person asking. */
+const subscriptionPlanInputSchemaDefinition = z.object({
+  organizationId: z.string(),
+  user: z
+    .object({
+      id: z.string().optional(),
+      email: z.string().nullable().optional(),
+      name: z.string().nullable().optional(),
+      impersonator: z
+        .object({ id: z.string().optional(), email: z.string().nullable().optional() })
+        .optional(),
+    })
+    .optional(),
+});
+export interface SubscriptionPlanInputSchema extends Named<
+  typeof subscriptionPlanInputSchemaDefinition
+> {}
+export const subscriptionPlanInputSchema: SubscriptionPlanInputSchema =
+  subscriptionPlanInputSchemaDefinition;
+export type SubscriptionPlanInput = z.infer<typeof subscriptionPlanInputSchema>;
+
+export type BillingPlanProvider = {
+  getActivePlan(organizationId: string, user?: SubscriptionPlanInput["user"]): Promise<PlanInfo>;
+};
+
+export type PlanLimitNotifierInput = {
+  organizationId: string;
+  planName: string;
+  /** Counting unit the plan cap is measured in. */
+  usageUnit: UsageUnit;
+  /** Usage counted so far this month, in `usageUnit`. */
+  current: number;
+  /** Monthly cap allowed by the plan, in `usageUnit`. */
+  max: number;
+};
+
+export type PlanLimitNotificationContext = {
+  organizationId: string;
+  organizationName: string;
+  adminName?: string;
+  adminEmail?: string;
+  planName: string;
+  /** Display label for the cap that was hit, for example "Monthly Traces". */
+  limitType: string;
+  current: number;
+  max: number;
+};
+
+type SubscriptionPlan = PlanTypes | (string & {});
+
+type SubscriptionNotificationBase = {
+  organizationId: string;
+  organizationName: string;
+  plan: SubscriptionPlan;
+};
+
+type ProspectiveSubscriptionNotification = SubscriptionNotificationBase & {
+  type: "prospective";
+  customerName?: string;
+  customerEmail?: string;
+  note?: string;
+  actorEmail?: string;
+};
+
+type ConfirmedSubscriptionNotification = SubscriptionNotificationBase & {
+  type: "confirmed";
+  subscriptionId: string;
+  startDate?: Instant | null;
+  maxMembers?: number | null;
+  maxMessagesPerMonth?: number | null;
+};
+
+type CancelledSubscriptionNotification = SubscriptionNotificationBase & {
+  type: "cancelled";
+  subscriptionId: string;
+  cancellationDate?: Instant | null;
+};
+
+export type SubscriptionNotificationPayload =
+  | ProspectiveSubscriptionNotification
+  | ConfirmedSubscriptionNotification
+  | CancelledSubscriptionNotification;
+
+export type ResourceLimitNotificationContext = {
+  organizationId: string;
+  organizationName: string;
+  adminName?: string;
+  adminEmail?: string;
+  planName: string;
+  limitType: string;
+  current: number;
+  max: number;
+};
+
+export type ResourceLimitNotifierInput = {
+  organizationId: string;
+  limitType: LimitType;
+  current: number;
+  max: number;
+};
+
+export type LicensePurchaseNotificationPayload = {
+  buyerEmail: string;
+  planType: string;
+  seats: number;
+  amountPaid: number;
+  currency: string;
+};
+
+/** A lead signal from a self-hosted install, for the self-hosted Slack channel. */
+export type SelfHostedSignalNotificationPayload = {
+  headline: string;
+  instanceId: string;
+  organizationName?: string | null;
+  leadingDomain?: string | null;
+  version?: string | null;
+  users?: number | null;
+  traces28d?: number | null;
+  instanceUrl: string;
+};
+
+export type SignupNotificationPayload = {
+  userName?: string | null;
+  userEmail?: string | null;
+  organizationName?: string | null;
+  phoneNumber?: string | null;
+  utmCampaign?: string | null;
+  signUpData?: SignupData | null;
+};
+
+// ---------------------------------------------------------------------------
+// Usage limits — read by both usage-limit services (hard-limit vs warning);
+// declared here so neither has to import the other to reach it.
+// ---------------------------------------------------------------------------
+
+/** The counter cannot always answer; an unknown count is not a zero one. */
+export const USAGE_UNKNOWN = "unknown" as const;
+
+/**
+ * How an organization is billed, restated as a literal schema rather than
+ * imported: this contract does not depend on `@langwatch/entitlement-contract`.
+ */
+export const billingPricingModelSchema = z.enum(["TIERED", "SEAT_EVENT"]);
+export type BillingPricingModel = z.infer<typeof billingPricingModelSchema>;
+
+export interface BillingUsageLimitOrganization {
+  findWithAdmins(organizationId: string): Promise<{
+    id: string;
+    name: string;
+    sentPlanLimitAlert: Instant | null;
+    members: { user: { id: string; name: string | null; email: string | null } }[];
+  } | null>;
+  updateSentPlanLimitAlert(organizationId: string, timestamp: Instant): Promise<void>;
+  findProjectsWithName(organizationId: string): Promise<{ id: string; name: string }[]>;
+}
+
+export interface BillingPlanResolver {
+  getActivePlan(input: { organizationId: string }): Promise<{ name?: string | null }>;
+}
+
+/** One invoice, as the billing page lists it. */
+const billingDisplayInvoiceSchemaDefinition = z
+  .object({
+    id: z.string(),
+    number: z.string().nullable(),
+    date: z.number(),
+    amountDue: z.number(),
+    currency: z.string(),
+    status: z.string(),
+    pdfUrl: z.string().nullable(),
+    hostedUrl: z.string().nullable(),
+  })
+  .strict();
+export interface BillingDisplayInvoiceSchema extends Named<
+  typeof billingDisplayInvoiceSchemaDefinition
+> {}
+export const billingDisplayInvoiceSchema: BillingDisplayInvoiceSchema =
+  billingDisplayInvoiceSchemaDefinition;
+export type BillingDisplayInvoice = z.infer<typeof billingDisplayInvoiceSchema>;
+
+/**
+ * A hosted page to send the customer to. Null where the provider had nothing
+ * to redirect to — a change that took effect without one.
+ */
+const billingRedirectSchemaDefinition = z.object({ url: z.string().nullable() }).strict();
+export interface BillingRedirectSchema extends Named<typeof billingRedirectSchemaDefinition> {}
+export const billingRedirectSchema: BillingRedirectSchema = billingRedirectSchemaDefinition;
+
+/** The billing portal always answers a URL: it is the whole point of the call. */
+const billingPortalSessionSchemaDefinition = z.object({ url: z.string() }).strict();
+export interface BillingPortalSessionSchema extends Named<
+  typeof billingPortalSessionSchemaDefinition
+> {}
+export const billingPortalSessionSchema: BillingPortalSessionSchema =
+  billingPortalSessionSchemaDefinition;
+
+/** A live subscription's lines were changed. */
+const subscriptionItemsUpdatedSchemaDefinition = z.object({ success: z.boolean() }).strict();
+export interface SubscriptionItemsUpdatedSchema extends Named<
+  typeof subscriptionItemsUpdatedSchemaDefinition
+> {}
+export const subscriptionItemsUpdatedSchema: SubscriptionItemsUpdatedSchema =
+  subscriptionItemsUpdatedSchemaDefinition;
+
+const billingStripeWebhookReceiptSchemaDefinition = z.object({ received: z.literal(true) });
+export interface BillingStripeWebhookReceiptSchema extends Named<
+  typeof billingStripeWebhookReceiptSchemaDefinition
+> {}
+export const billingStripeWebhookReceiptSchema: BillingStripeWebhookReceiptSchema =
+  billingStripeWebhookReceiptSchemaDefinition;
+
+const billingStripeWebhookHeadersSchemaDefinition = z.object({
+  "stripe-signature": z.string().optional(),
+});
+export interface BillingStripeWebhookHeadersSchema extends Named<
+  typeof billingStripeWebhookHeadersSchemaDefinition
+> {}
+export const billingStripeWebhookHeadersSchema: BillingStripeWebhookHeadersSchema =
+  billingStripeWebhookHeadersSchemaDefinition;
+
+/** How one delivered event was handled: a 400 tells Stripe not to retry, a 500 asks it to. */
+export type HandleEventResult =
+  | { status: "ok" }
+  | { status: "error"; httpStatus: 400 | 500; message: string };
+
+export const BILLING_FEATURE_ID = "billing" as const;
+
+export abstract class BillingService implements BillingPlanProvider {
+  abstract getActivePlan(
+    organizationId: string,
+    user?: {
+      id?: string;
+      email?: string | null;
+      name?: string | null;
+      impersonator?: { email?: string | null };
+    },
+  ): Promise<PlanInfo>;
+}
+
+/**
+ * Notification types stored in metadata.type field
+ */
+export const NOTIFICATION_TYPES = {
+  USAGE_LIMIT_WARNING: "USAGE_LIMIT_WARNING",
+} as const;
+
+export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];

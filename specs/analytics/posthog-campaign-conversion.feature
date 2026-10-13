@@ -93,6 +93,10 @@ Feature: PostHog campaign conversion events
 
   # ---------------------------------------------------------------------------
   # subscription_started: a subscription became active
+  #
+  # Billing records the fact on its lifecycle pipeline, with the plan and the
+  # organization's members, only on the transition to active. Nurturing
+  # subscribes to it and tracks the event for every member.
   # ---------------------------------------------------------------------------
 
   @unit
@@ -103,22 +107,28 @@ Feature: PostHog campaign conversion events
     And each carries the plan and the organization id
 
   @unit
+  Scenario: A redelivered started subscription tracks subscription_started once
+    Given a started subscription was delivered to nurturing
+    When the same started subscription is delivered again
+    Then each member gets one "subscription_started" event
+
+  @unit
   Scenario: subscription_started is skipped when PostHog is not configured
     Given no PostHog key is configured
-    When a subscription becomes active
-    Then organization members are not queried and no event is tracked
+    When a started subscription is delivered to nurturing
+    Then no event is tracked and nothing is thrown
 
   @unit
   Scenario: A failed member lookup does not break the webhook
     Given the organization member lookup fails
     When a subscription becomes active
-    Then the error is captured and nothing is thrown
+    Then nothing is recorded and nothing is thrown
 
   @unit
-  Scenario: A PostHog client that cannot be built does not break the webhook
+  Scenario: A PostHog client that cannot be built does not fail the delivery
     Given building the PostHog client throws
-    When a subscription becomes active
-    Then the error is captured and nothing is thrown
+    When a started subscription is delivered to nurturing
+    Then the failure is logged and nothing is thrown
 
   @unit
   Scenario: The first successful payment reports the subscription as started
