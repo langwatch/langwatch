@@ -246,31 +246,19 @@ export class ModelProviderModule implements ModelProviderApi {
     /** The engine hop's shared credential: the same handle the process owner holds. */
     nlpInternal: nlpInternalSecret,
   } as const;
-  /** Install-wide provider credentials a row falls back to, beside the config's settings. */
-  static readonly fallbackSecrets = {
-    awsSecretAccessKey: Secret.load("AWS_SECRET_ACCESS_KEY", { optional: true }),
-  } as const;
   static readonly secrets = {
     ...ModelProviderModule.platformCredentials,
     ...ModelProviderModule.operationalSecrets,
-    ...ModelProviderModule.fallbackSecrets,
   } as const;
 
   static async create(setup: ModelProviderSetup): Promise<ModelProviderModule> {
     const platformChain = await ModelProviderModule.resolvePlatformChain(setup.secrets);
     return setup.secrets.into(ModelProviderModule.secrets.nlpInternal, (nlpInternalSecret) =>
-      setup.secrets.into(
-        ModelProviderModule.fallbackSecrets.awsSecretAccessKey,
-        (awsSecretAccessKey) =>
-          ModelProviderModule.withPlatformChain(setup, {
-            platformChain,
-            nlpInternalSecret,
-            environment: {
-              ...setup.config.providerFallbacks,
-              AWS_SECRET_ACCESS_KEY: awsSecretAccessKey,
-            },
-          }),
-      ),
+      ModelProviderModule.withPlatformChain(setup, {
+        platformChain,
+        nlpInternalSecret,
+        environment: { ...setup.config.providerFallbacks },
+      }),
     );
   }
 

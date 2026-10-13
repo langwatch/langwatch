@@ -105,11 +105,12 @@ Feature: Model Provider service
 
   @unit
   Scenario: A provider row falls back to the install-wide provider settings
-    Given a deployment that sets OPENAI_BASE_URL, ANTHROPIC_BASE_URL, AZURE_OPENAI_ENDPOINT, CUSTOM_BASE_URL, VERTEXAI_PROJECT, VERTEXAI_LOCATION, AWS_SECRET_ACCESS_KEY or AWS_REGION_NAME
+    Given a deployment that sets OPENAI_BASE_URL, ANTHROPIC_BASE_URL, AZURE_OPENAI_ENDPOINT, CUSTOM_BASE_URL, VERTEXAI_PROJECT, VERTEXAI_LOCATION or AWS_REGION_NAME
     And a project's provider row that leaves the matching field empty
     When a model on that provider is prepared for execution
     Then the deployment's value is used for that field
     And a value the row stored itself is used instead of the deployment's
+    And no API key or secret is ever taken from the deployment's environment
 
   @unit
   Scenario: A stored key is checked only against the endpoint it was saved with

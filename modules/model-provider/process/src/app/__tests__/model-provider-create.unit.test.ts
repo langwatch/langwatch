@@ -205,10 +205,9 @@ describe("ModelProviderModule.create", () => {
     });
 
     /** @scenario "A provider row falls back to the install-wide provider settings" */
-    it("executes Bedrock with the deployment's AWS secret and region", async () => {
+    it("executes Bedrock with the deployment's region and never an environment secret", async () => {
       const app = await createRealModelProviderApp(undefined, undefined, {
         providerFallbacks: { AWS_REGION_NAME: "eu-west-1" },
-        environment: { AWS_SECRET_ACCESS_KEY: "install-wide-secret" },
       });
       await app.upsertUnattributed({
         projectId: "project-1",
@@ -221,7 +220,7 @@ describe("ModelProviderModule.create", () => {
         app.prepareExecution({ model: "bedrock/anthropic.claude-v2", projectId: "project-1" }),
       ).resolves.toMatchObject({
         aws_access_key_id: "AKIATEST",
-        aws_secret_access_key: "install-wide-secret",
+        aws_secret_access_key: "invalid",
         aws_region_name: "eu-west-1",
       });
     });

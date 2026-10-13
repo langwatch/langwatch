@@ -24,6 +24,15 @@ describe("model provider server configuration", () => {
       });
       expect(fallbacks.AWS_REGION_NAME).toBeUndefined();
     });
+
+    /** @scenario "A provider row falls back to the install-wide provider settings" */
+    it("never reads a key or secret from the environment", () => {
+      const fallbacks = read({
+        OPENAI_API_KEY: "sk-env",
+        AWS_SECRET_ACCESS_KEY: "env-secret",
+      }).providerFallbacks;
+      expect(Object.keys(fallbacks).filter((name) => /KEY|SECRET/.test(name))).toEqual([]);
+    });
   });
 
   describe("given the deployment sets no allowlist", () => {
