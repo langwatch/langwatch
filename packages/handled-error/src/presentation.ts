@@ -6041,16 +6041,6 @@ const presentations = {
     describe: () =>
       "Your license is valid and its key is being prepared. Try again in a few seconds.",
   },
-  below_lts_floor: {
-    title: "This version is too old to upgrade from",
-    describe: () =>
-      "Upgrade to the oldest supported long-term release first, then continue to this version.",
-  },
-  image_below_ledger_floor: {
-    title: "This image is older than the database",
-    describe: () =>
-      "The database has already been upgraded past what this image supports. Start an image at or above the version last run.",
-  },
   step_after_unknown: {
     title: "An upgrade step depends on a step that doesn't exist",
     describe: () => "This build's upgrade steps are inconsistent. Use an official image.",
