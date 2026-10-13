@@ -794,8 +794,8 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   (null when it no longer parses), and the reconciler compares it with the
   rule's window: a wrong start is revoked with reason
   `aggregate_read_window_changed` and attached again, after the dropped
-  members are revoked, on the next reconcile the aggregate's facts queue
-  (v4.11). A department read with any attach-time start is left
+  members are revoked, the next time a fact queues a reconcile for that
+  aggregate (v4.11). A department read with any attach-time start is left
   alone, so nothing is rewritten on a later run. A member is unread
   between its revoke and its new attach; a failed attach is retried by the
   next reconcile, like any other.
