@@ -41,6 +41,16 @@ describe("auth server configuration", () => {
     });
   });
 
+  describe("given the two-step switch written the way the previous release read it", () => {
+    /** @scenario "A switch the previous release spelled on and off reads the same way" */
+    it('opens enrolment on "on" and keeps it closed on "off", blank or unset', () => {
+      expect(read({ MFA_ENROLLMENT_OPEN: "on" }).mfaEnrollmentOpen).toBe(true);
+      expect(read({ MFA_ENROLLMENT_OPEN: "off" }).mfaEnrollmentOpen).toBe(false);
+      expect(read({ MFA_ENROLLMENT_OPEN: "" }).mfaEnrollmentOpen).toBe(false);
+      expect(read({}).mfaEnrollmentOpen).toBe(false);
+    });
+  });
+
   describe("given the browser config the served page carries", () => {
     /** @scenario "The served page names the identifier-first screens as the sign-in front door" */
     it("names the identifier-first screens as the front door with no switch set", async () => {

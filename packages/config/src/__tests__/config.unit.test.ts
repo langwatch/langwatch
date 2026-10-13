@@ -76,6 +76,37 @@ describe("parseProcessConfig", () => {
     expect(refusals.some((line) => line.startsWith("strict.nested.two ← STRICT_TWO"))).toBe(true);
   });
 
+  /** @scenario "A blank value on an optional leaf reads as unset" */
+  it("reads a blank optional leaf as unset and still refuses a blank required one", () => {
+    const blanks = {
+      name: "blanks",
+      config: Config.define((c) => ({
+        provider: c.env("BLANK_PROVIDER", z.enum(["email", "auth0"]).optional()),
+        days: c.env("BLANK_DAYS", z.coerce.number().int().positive().default(49)),
+        base: c.env("BLANK_BASE", z.string().url().default("https://slack.com/api")),
+        name: c.env("BLANK_NAME", z.string().optional()),
+      })),
+    } as const;
+    const config = parseProcessConfig({
+      owners: [blanks],
+      environment: { BLANK_PROVIDER: "", BLANK_DAYS: "", BLANK_BASE: "", BLANK_NAME: "" },
+    });
+    expect(config.blanks).toEqual({
+      provider: undefined,
+      days: 49,
+      base: "https://slack.com/api",
+      name: undefined,
+    });
+
+    const required = {
+      name: "required",
+      config: Config.define((c) => ({ url: c.env("BLANK_REQUIRED", z.string().url()) })),
+    } as const;
+    expect(() =>
+      parseProcessConfig({ owners: [required], environment: { BLANK_REQUIRED: "" } }),
+    ).toThrow(ConfigParseError);
+  });
+
   /** @scenario "Two meanings for one variable still refuse" */
   it("refuses two owners claiming one variable, however they spell it", () => {
     const a = {

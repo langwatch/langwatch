@@ -30,6 +30,12 @@ Feature: Feature configuration is one schema, validated at boot
     And the operator is told rather than left with a surface quietly off
 
   @unit
+  Scenario: A switch the previous release spelled on and off reads the same way
+    Given a deployment that sets MFA_ENROLLMENT_OPEN or SCIM_V2_GRANTS to "on" or "off"
+    When the process resolves its configuration
+    Then "on" turns the feature on and "off" turns it off, as the previous release read them
+
+  @unit
   Scenario: A blank identifier resolves to absent rather than to an empty filter
     Given an identifier a deployment exported blank
     When the process resolves its configuration

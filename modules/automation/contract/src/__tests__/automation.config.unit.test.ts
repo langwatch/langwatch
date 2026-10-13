@@ -16,9 +16,9 @@ describe("automation server configuration", () => {
       expect(read({})).toEqual({
         emailHourlyCap: 100,
         tenantDailyCap: 10_000,
-        persistDailyCapFree: 50,
-        persistDailyCapPaid: 500,
-        persistDailyCapEnterprise: 5_000,
+        persistDailyCapFree: 100,
+        persistDailyCapPaid: 1_000,
+        persistDailyCapEnterprise: 10_000,
         publicBaseUrl: undefined,
         slackApiBase: "https://slack.com/api",
         slackWebhookBase: "https://hooks.slack.com",

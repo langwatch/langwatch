@@ -20,8 +20,8 @@ SCIM provisioning: directory connections, their tokens, and syncing users from a
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Stores required |                                                                                                                                                                                    | `process/src/channels/scim-channels.registry.ts:13`              |
 | Stores required | prisma, operatorReads, eventReadSeat                                                                                                                                               | `process/src/repositories/prisma/prisma.scim.repositories.ts:17` |
-| Secrets         | `auth0WebhookSecret` (AUTH0_SCIM_WEBHOOK_SECRET), `tokenPepper` (CREDENTIALS_SECRET), `tokenPepperFallback` (NEXTAUTH_SECRET), `tokenPepperPrevious` (CREDENTIALS_SECRET_PREVIOUS) | `contract/src/scim.config.ts:14`                                 |
-| Config          | `provenOffboarding` (SCIM_V2_GRANTS)                                                                                                                                               | `contract/src/scim.config.ts:7`                                  |
+| Secrets         | `auth0WebhookSecret` (AUTH0_SCIM_WEBHOOK_SECRET), `tokenPepper` (CREDENTIALS_SECRET), `tokenPepperFallback` (NEXTAUTH_SECRET), `tokenPepperPrevious` (CREDENTIALS_SECRET_PREVIOUS) | `contract/src/scim.config.ts:21`                                 |
+| Config          | `provenOffboarding` (SCIM_V2_GRANTS)                                                                                                                                               | `contract/src/scim.config.ts:14`                                 |
 
 Anything else scim needs belongs to another module and is reached through its `*Api`.
 

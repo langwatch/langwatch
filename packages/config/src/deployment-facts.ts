@@ -347,7 +347,7 @@ export const { passkeysEnabled, mfaEnrollmentOpen, localPasswords } = Config.def
   mfaEnrollmentOpen: c.env(
     "MFA_ENROLLMENT_OPEN",
     z
-      .union([z.literal("on"), z.literal("")])
+      .enum(["off", "on"])
       .optional()
       .transform((value) => value === "on"),
   ),

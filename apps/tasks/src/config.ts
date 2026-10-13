@@ -32,6 +32,8 @@ export type TasksConfig = ConfigOf<typeof tasksConfig>;
 export const tasksSecrets = {
   databaseUrl: Secret.load("DATABASE_URL", { optional: true }),
   redisUrl: Secret.load("REDIS_URL", { optional: true }),
+  /** Main's cluster Redis, read instead of REDIS_URL when set, as the stores read it. */
+  redisClusterEndpoints: Secret.load("REDIS_CLUSTER_ENDPOINTS", { optional: true }),
 } as const;
 
 export function resolveTasksConfig(source: Readonly<Record<string, unknown>>): TasksConfig {
