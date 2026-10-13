@@ -16,20 +16,20 @@ Datasets and their records: creating, naming, mapping and reading them by slug o
 
 ## What dataset owns
 
-| Kind            | Name                                                                                                                                     | Declared at                                                                     |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Postgres table  | `BatchEvaluation`                                                                                                                        | `process/src/repositories/prisma/prisma.batch-evaluation.repository.ts:19`      |
-| Postgres table  | `Dataset`                                                                                                                                | `process/src/repositories/prisma/prisma.dataset-content.repository.ts:62`       |
-| Postgres table  | `DatasetRecord`                                                                                                                          | `process/src/repositories/prisma/prisma.dataset-content.repository.ts:62`       |
-| Postgres table  | `Dataset`                                                                                                                                | `process/src/repositories/prisma/prisma.dataset-count.repository.ts:8`          |
-| Postgres table  | `DatasetRecord`                                                                                                                          | `process/src/repositories/prisma/prisma.dataset-count.repository.ts:8`          |
-| Postgres table  | `BatchEvaluation`                                                                                                                        | `process/src/repositories/prisma/prisma.dataset-count.repository.ts:8`          |
-| Postgres table  | `DatasetRecord`                                                                                                                          | `process/src/repositories/prisma/prisma.dataset-record-content.repository.ts:8` |
-| Postgres table  | `DatasetRecord`                                                                                                                          | `process/src/repositories/prisma/prisma.dataset-record.repository.ts:19`        |
-| Postgres table  | `Dataset`                                                                                                                                | `process/src/repositories/prisma/prisma.dataset.repository.ts:28`               |
-| Postgres table  | `DatasetRecord`                                                                                                                          | `process/src/repositories/prisma/prisma.dataset.repository.ts:28`               |
-| Stores required | prisma, objectStorage                                                                                                                    | `process/src/repositories/prisma/prisma.dataset.repositories.ts:29`             |
-| Config          | `publicBaseUrl` (BASE_HOST), `singleFileStorage.onLocalDisk` (DATASET_STORAGE_LOCAL), `singleFileStorage.localPath` (LOCAL_STORAGE_PATH) | `contract/src/dataset.config.ts:11`                                             |
+| Kind            | Name                        | Declared at                                                                     |
+| --------------- | --------------------------- | ------------------------------------------------------------------------------- |
+| Postgres table  | `BatchEvaluation`           | `process/src/repositories/prisma/prisma.batch-evaluation.repository.ts:19`      |
+| Postgres table  | `Dataset`                   | `process/src/repositories/prisma/prisma.dataset-content.repository.ts:62`       |
+| Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset-content.repository.ts:62`       |
+| Postgres table  | `Dataset`                   | `process/src/repositories/prisma/prisma.dataset-count.repository.ts:8`          |
+| Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset-count.repository.ts:8`          |
+| Postgres table  | `BatchEvaluation`           | `process/src/repositories/prisma/prisma.dataset-count.repository.ts:8`          |
+| Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset-record-content.repository.ts:8` |
+| Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset-record.repository.ts:19`        |
+| Postgres table  | `Dataset`                   | `process/src/repositories/prisma/prisma.dataset.repository.ts:28`               |
+| Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset.repository.ts:28`               |
+| Stores required | prisma, objectStorage       | `process/src/repositories/prisma/prisma.dataset.repositories.ts:25`             |
+| Config          | `publicBaseUrl` (BASE_HOST) | `contract/src/dataset.config.ts:5`                                              |
 
 Anything else dataset needs belongs to another module and is reached through its `*Api`.
 

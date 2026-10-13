@@ -21,22 +21,19 @@ export const datasetProcessModule: PublishedProcessModule<
   .withTransports(createDatasetRest(), datasetTrpcTransport, datasetRecordTrpcTransport)
   .provideMiddlewareContext({ projectRequestContext: projectRequestContextOf })
   .withEventing(datasetNormalizationEventing)
-  // Background, after old writers are gone: an older image may still write postgres-layout
-  // or single-file content.
+  // Background, after old writers are gone: an older image may still write postgres-layout content.
   .withMigrations(({ repositories, dependencies }) => [
     defineMigrationStep({
       id: "dataset:move-content-to-object-storage",
       kind: "data",
       mode: "background",
-      description:
-        "Moves each dataset's content out of Postgres, and copies each single-file dataset, into object-storage chunks.",
+      description: "Moves each dataset's content out of Postgres and into object-storage chunks.",
       needsOldWritersGone: true,
       run: (args) =>
         DatasetMigrationService.create({
           repository: repositories.migration,
           storage: repositories.migrationChunks,
           projects: dependencies.projects,
-          singleFiles: repositories.singleFiles,
         }).runStep(args),
     }),
   ]);

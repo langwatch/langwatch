@@ -868,10 +868,8 @@ Declared at `src/eventing/dataset-normalization.pipeline.ts:33`. Events: `datase
 
 ## Configuration
 
-| Kind   | Leaf                            | Environment variable    | Declared at                            |
-| ------ | ------------------------------- | ----------------------- | -------------------------------------- |
-| config | `publicBaseUrl`                 | `BASE_HOST`             | `../contract/src/dataset.config.ts:11` |
-| config | `singleFileStorage.onLocalDisk` | `DATASET_STORAGE_LOCAL` | `../contract/src/dataset.config.ts:14` |
-| config | `singleFileStorage.localPath`   | `LOCAL_STORAGE_PATH`    | `../contract/src/dataset.config.ts:15` |
+| Kind   | Leaf            | Environment variable | Declared at                           |
+| ------ | --------------- | -------------------- | ------------------------------------- |
+| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/dataset.config.ts:5` |
 
 <!-- readme:generated:end -->

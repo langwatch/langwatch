@@ -2,7 +2,6 @@ import { memoryObjectStorage } from "@langwatch/process-stores";
 
 import type { DatasetRepositories } from "../dataset.repositories.ts";
 import { ObjectStorageDatasetChunkRepository } from "../object-storage/object-storage.dataset-chunk.repository.ts";
-import { ObjectStorageDatasetSingleFileRepository } from "../object-storage/object-storage.dataset-single-file.repository.ts";
 import { MemoryBatchEvaluationRepository } from "./memory.batch-evaluation.repository.ts";
 import { MemoryDatasetContentRepository } from "./memory.dataset-content.repository.ts";
 import { MemoryDatasetCountRepository } from "./memory.dataset-count.repository.ts";
@@ -17,8 +16,9 @@ export class MemoryDatasetRepositories {
 
   static create(): DatasetRepositories {
     const database = MemoryDatasetDatabase.create();
-    const objectStorage = memoryObjectStorage();
-    const chunks = ObjectStorageDatasetChunkRepository.create({ objectStorage });
+    const chunks = ObjectStorageDatasetChunkRepository.create({
+      objectStorage: memoryObjectStorage(),
+    });
 
     return {
       datasets: MemoryDatasetRepository.create({ database }),
@@ -27,10 +27,9 @@ export class MemoryDatasetRepositories {
       recordContent: MemoryDatasetRecordContentRepository.create({ database }),
       batchEvaluations: MemoryBatchEvaluationRepository.create({ database }),
       count: MemoryDatasetCountRepository.create({ database }),
-      migration: MemoryDatasetMigrationRepository.create({ database }),
+      migration: MemoryDatasetMigrationRepository.create(),
       chunks,
       migrationChunks: chunks,
-      singleFiles: ObjectStorageDatasetSingleFileRepository.create({ objectStorage }),
     };
   }
 }

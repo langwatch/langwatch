@@ -151,10 +151,7 @@ export function createDatasetTestApp(
       storedObjects:
         input.dependencies?.storedObjects ?? createApiFixture<StoredObjectApi>({}, "storedObjects"),
     },
-    config: {
-      publicBaseUrl: input.publicBaseUrl,
-      singleFileStorage: { onLocalDisk: false, localPath: undefined },
-    },
+    config: { publicBaseUrl: input.publicBaseUrl },
     resources: new ResourceScope(),
     secrets: {} as never,
   });

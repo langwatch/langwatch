@@ -10,7 +10,6 @@ import {
 import { DatasetMigrationService } from "../../../services/dataset-migration.service.ts";
 import type { DatasetChunkRepository } from "../../dataset-chunk.repository.ts";
 import { ObjectStorageDatasetChunkRepository } from "../../object-storage/object-storage.dataset-chunk.repository.ts";
-import { ObjectStorageDatasetSingleFileRepository } from "../../object-storage/object-storage.dataset-single-file.repository.ts";
 import { PrismaDatasetMigrationRepository } from "../prisma.dataset-migration.repository.ts";
 
 type DatasetLayout = { contentLayout: string; useS3: boolean };
@@ -61,8 +60,7 @@ function fixture(input: {
   const listAllIds = vi.fn(async () => ({ ids: ["project_1"], next: null }));
   const datasetFindFirst = vi.fn(async () => current);
   const lockedDatasetFindFirst = vi.fn(async () => current);
-  // Past the candidate pages, the single-file walk finds no dataset.
-  const datasetFindMany = vi.fn().mockResolvedValue([]);
+  const datasetFindMany = vi.fn();
   for (const page of input.candidatePages ?? [[]]) {
     datasetFindMany.mockResolvedValueOnce(page.map((id) => ({ id })));
   }
@@ -105,9 +103,6 @@ function fixture(input: {
     repository: PrismaDatasetMigrationRepository.create({ database: database as never }),
     storage: input.storage ?? storage,
     projects: { listAllIds },
-    singleFiles: ObjectStorageDatasetSingleFileRepository.create({
-      objectStorage: memoryObjectStorage(),
-    }),
   });
 
   return {
@@ -300,9 +295,6 @@ describe("PrismaDatasetMigrationRepository", () => {
         alreadyMigrated: 1,
         skippedConcurrentWrite: 1,
         failed: 1,
-        singleFileConverted: 0,
-        singleFileWouldConvert: 0,
-        singleFileSkipped: [],
       },
     });
   });
@@ -320,9 +312,6 @@ describe("PrismaDatasetMigrationRepository", () => {
         alreadyMigrated: 0,
         skippedConcurrentWrite: 0,
         failed: 0,
-        singleFileConverted: 0,
-        singleFileWouldConvert: 0,
-        singleFileSkipped: [],
       },
     });
     expect(subject.datasetFindMany).toHaveBeenNthCalledWith(

@@ -1,12 +1,8 @@
-import type { DatasetServerConfig } from "@langwatch/dataset-contract";
 import { prismaRepositories } from "@langwatch/prisma-client";
 import type { ObjectStorage } from "@langwatch/process-stores/members";
 
-import type { DatasetSingleFileRepository } from "../dataset-single-file.repository.ts";
 import type { DatasetRepositories } from "../dataset.repositories.ts";
-import { FilesystemDatasetSingleFileRepository } from "../filesystem/filesystem.dataset-single-file.repository.ts";
 import { ObjectStorageDatasetChunkRepository } from "../object-storage/object-storage.dataset-chunk.repository.ts";
-import { ObjectStorageDatasetSingleFileRepository } from "../object-storage/object-storage.dataset-single-file.repository.ts";
 import { PrismaBatchEvaluationRepository } from "./prisma.batch-evaluation.repository.ts";
 import { PrismaDatasetContentRepository } from "./prisma.dataset-content.repository.ts";
 import { PrismaDatasetCountRepository } from "./prisma.dataset-count.repository.ts";
@@ -32,10 +28,8 @@ export class PostgresDatasetRepositories {
   static create({
     prisma,
     objectStorage,
-    config,
   }: Parameters<typeof PostgresDatasetTableRepositories.create>[0] & {
     objectStorage: ObjectStorage;
-    config: Pick<DatasetServerConfig, "singleFileStorage">;
   }): DatasetRepositories {
     const chunks = ObjectStorageDatasetChunkRepository.create({ objectStorage });
     return {
@@ -43,20 +37,6 @@ export class PostgresDatasetRepositories {
       chunks,
       migration: PrismaDatasetMigrationRepository.create({ database: prisma }),
       migrationChunks: chunks,
-      singleFiles: singleFilesOf({ objectStorage, storage: config.singleFileStorage }),
     };
   }
-}
-
-/** Where the last release kept single-file datasets: local disk if told so, else object storage. */
-function singleFilesOf({
-  objectStorage,
-  storage,
-}: {
-  objectStorage: ObjectStorage;
-  storage: DatasetServerConfig["singleFileStorage"];
-}): DatasetSingleFileRepository {
-  return storage.onLocalDisk
-    ? FilesystemDatasetSingleFileRepository.create({ localPath: storage.localPath })
-    : ObjectStorageDatasetSingleFileRepository.create({ objectStorage });
 }
