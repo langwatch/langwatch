@@ -168,6 +168,12 @@ Two migrations are heavy on a cloud-sized table (plan items P05 and C03).
   check `indisvalid` in `pg_index`; drop and rebuild an invalid index. The migration
   then finds both. The `GatewayRealtimeSession` index (migration `20261006180001`)
   takes the same steps.
+- **Lower-case address indexes.** `User_email_lower_idx` on `"User" (lower("email"))`
+  (migration `20261013120000`) and `Identifier_value_lower_idx` on
+  `"Identifier" (lower("value"))` (`20261013120100`). Left to the migration, each build
+  holds a SHARE lock and makes sign-ups and sign-ins wait. Run each
+  `CREATE INDEX CONCURRENTLY IF NOT EXISTS ...` from the migration file ahead of the deploy,
+  then check `indisvalid`.
 - **`trace_summaries` index (C03).** `MATERIALIZE INDEX` starts a mutation over
   every part at deploy. It competes with merges, and later `ALTER`s queue behind
   it. Watch `system.mutations`; if the cloud measurement says it is too heavy,
@@ -223,7 +229,8 @@ branded page while an upgrade blocks, so the operator signals below are the only
 2. Rehearse on a snapshot clone and time each step.
 3. Grant on-call staff the platform-operator role (`pnpm task grant-platform-operator <email>`)
    so Ops > Upgrades and the upgrade alert email reach someone.
-4. Pre-build the `AuditLog` and `GatewayRealtimeSession` indexes concurrently, as under "Long
+4. Pre-build the `AuditLog`, `GatewayRealtimeSession`, `User_email_lower_idx` and
+   `Identifier_value_lower_idx` indexes concurrently, as under "Long
    blocking steps". Pre-apply the hot-table `ALTER`s in a quiet window.
 5. Check that the database role can `CREATE` the `<schema>_upgrade_ledger` schema, that every
    private ClickHouse target answers (one that does not is held, so only its organizations
