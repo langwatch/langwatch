@@ -75,6 +75,8 @@ export interface UserRepository {
   findById(id: string): Promise<UserProfile | null>;
   /** The account holding exactly this address; addresses are stored lower-cased. */
   findByEmail(email: string): Promise<UserProfile[]>;
+  /** Every account on this address, case aside, oldest first: rows stored before lower-casing. */
+  findByEmailAnyCase(email: string): Promise<UserProfile[]>;
   create(input: CreateUserInput): Promise<UserProfile>;
   createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser>;
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;

@@ -61,6 +61,7 @@ class StubRepository implements UserRepository {
   findProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async (): Promise<UserFullProfile | null> => user);
   findByEmail = vi.fn(async (): Promise<UserFullProfile[]> => [user]);
+  findByEmailAnyCase = vi.fn(async (): Promise<UserFullProfile[]> => []);
   create = vi.fn(async () => user);
   updateProfile = vi.fn(async () => user);
   findAccountInfo = vi.fn(async () => ({ createdAt: user.createdAt }));
@@ -569,6 +570,20 @@ describe("findByEmail()", () => {
       });
       await expect(service.emailIsTaken({ email: "ADA@example.com" })).resolves.toBe(true);
       expect(repository.findByEmail.mock.calls).toEqual([["ada@example.com"], ["ada@example.com"]]);
+    });
+  });
+
+  describe("given an account stored with capitals the address step has not reached", () => {
+    /** @scenario "An address stored with capitals still signs in" */
+    it("answers it case aside, and counts the address taken", async () => {
+      const { service, repository } = createService();
+      repository.findByEmail.mockResolvedValue([]);
+      repository.findByEmailAnyCase.mockResolvedValue([{ ...user, email: "Ada@Example.com" }]);
+
+      await expect(service.findByEmail({ email: "ada@example.com" })).resolves.toMatchObject({
+        id: user.id,
+      });
+      await expect(service.emailIsTaken({ email: "ada@example.com" })).resolves.toBe(true);
     });
   });
 

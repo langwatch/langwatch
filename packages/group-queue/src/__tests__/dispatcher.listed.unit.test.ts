@@ -137,4 +137,44 @@ describe("GroupQueueDispatcher with an allow-list", () => {
       expect(claimedAt.find((at) => at > dueAtMs)).toBeLessThan(dueAtMs + 50);
     });
   });
+
+  describe("given a candidate that comes due while a claim is running", () => {
+    /** @scenario "A listed run's group gets its next job about a second after a job sent outside the run" */
+    it("claims it at the next short poll, not after the idle wait", async () => {
+      vi.useFakeTimers({ now: 1_000_000 });
+      onTestFinished(() => void vi.useRealTimers());
+      // The first claim follows the first idle wait, at 1_005_000.
+      const dueAtMs = 1_005_010;
+      const claimedAt: number[] = [];
+      const dispatcher = new GroupQueueDispatcher({
+        scripts: {
+          getSignalKey: () => "{test}:gq:signal",
+          getEarliestReadyScore: async () => null,
+          getEarliestCandidateScore: async ({ afterMs }) =>
+            claimedAt.some((at) => at > dueAtMs) || afterMs >= dueAtMs ? null : dueAtMs,
+          dispatchBatch: async ({ nowMs }) => {
+            claimedAt.push(nowMs);
+            // The claim takes 20 ms, so the candidate comes due while it runs.
+            if (claimedAt.length === 1) vi.setSystemTime(nowMs + 20);
+            return [];
+          },
+        },
+        processingQueue: fastq.promise(async () => {}, 1),
+        blockingConnection: { brpop: vi.fn(async () => null), del: vi.fn(async () => 0) },
+        queueName: "{test}",
+        globalConcurrency: 1,
+        activeTtlSec: 300,
+        signalTimeoutSec: 5,
+        logger: createTestLogger().logger,
+        listedGroupsKeys: async () => ["{test}:gq:listed:a"],
+      });
+
+      dispatcher.start();
+      await vi.advanceTimersByTimeAsync(6_000);
+      dispatcher.requestShutdown();
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(claimedAt.find((at) => at > dueAtMs)).toBeLessThan(dueAtMs + 100);
+    });
+  });
 });

@@ -162,12 +162,18 @@ export class UserService {
     return this.repository.findById(parsed.id);
   }
 
-  /** The parse lower-cases the address, so the holder of its stored, lower-cased form answers. */
+  /**
+   * The parse lower-cases the address, so its lower-cased holder answers on the unique index.
+   * A miss asks again case aside, oldest first: rows the address step has not reached yet, or
+   * an older image wrote meanwhile, still sign in.
+   */
   async findByEmail(input: UserEmailInput): Promise<UserProfile | null> {
     const parsed = userEmailInputSchema.parse(input);
-    const [account] = await this.repository.findByEmail(parsed.email);
+    const [exact] = await this.repository.findByEmail(parsed.email);
+    if (exact) return exact;
+    const [anyCase] = await this.repository.findByEmailAnyCase(parsed.email);
 
-    return account ?? null;
+    return anyCase ?? null;
   }
 
   /**
@@ -182,9 +188,7 @@ export class UserService {
   }
 
   async emailIsTaken(input: UserEmailInput): Promise<boolean> {
-    const parsed = userEmailInputSchema.parse(input);
-
-    return (await this.repository.findByEmail(parsed.email)).length > 0;
+    return (await this.findByEmail(input)) !== null;
   }
 
   /** Every mint commits user's created fact with the row, through the repository's outbox. */

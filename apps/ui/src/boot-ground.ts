@@ -21,16 +21,19 @@ async function runOn(element: HTMLElement): Promise<void> {
   // The splash may have left while the texture loaded.
   if (!element.isConnected) return stop();
   let stopped = false;
+  let fade: ReturnType<typeof setTimeout> | undefined;
   function stopOnce(): void {
     if (stopped) return;
     stopped = true;
     clearTimeout(settle);
+    clearTimeout(fade);
     document.removeEventListener("visibilitychange", onHidden);
+    document.removeEventListener("lw-boot:done", stopOnce);
     stop();
   }
   function settleToStill(): void {
     element.removeAttribute("data-live");
-    setTimeout(stopOnce, FADE_OUT_MS);
+    fade = setTimeout(stopOnce, FADE_OUT_MS);
   }
   function onHidden(): void {
     if (document.visibilityState === "hidden") stopOnce();

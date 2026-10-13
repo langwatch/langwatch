@@ -272,6 +272,16 @@ export class PrismaUserRepository
     return row ? userProfileSchema.parse(row) : null;
   }
 
+  async findByEmailAnyCase(email: string): Promise<UserProfile[]> {
+    const rows = await this.prisma.user.findMany({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: userProfileSelect,
+      orderBy: { createdAt: "asc" },
+    });
+
+    return rows.map((row) => userProfileSchema.parse(row));
+  }
+
   async findByEmail(email: string): Promise<UserProfile[]> {
     const rows = await this.prisma.user.findMany({
       where: { email },

@@ -144,6 +144,16 @@ export class MemoryUserRepository implements UserRepository {
       .map((row) => userProfileSchema.parse(profileOf(row)));
   }
 
+  async findByEmailAnyCase(email: string): Promise<UserProfile[]> {
+    const wanted = email.toLowerCase();
+
+    return this.#database
+      .rows()
+      .filter((row) => row.email?.toLowerCase() === wanted)
+      .toSorted((a, b) => a.createdAt.epochMilliseconds - b.createdAt.epochMilliseconds)
+      .map((row) => userProfileSchema.parse(profileOf(row)));
+  }
+
   async create(input: CreateUserInput): Promise<UserProfile> {
     if (this.#database.usersWithEmail(input.email).length > 0) {
       throw new EmailAlreadyRegisteredError();

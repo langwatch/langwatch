@@ -29,7 +29,7 @@ Feature: Canonical user lifecycle
     And one active operator remains
 
   # Addresses are stored lower-cased (Alex, 2026-10-13): every lookup is a plain match on the
-  # unique index, never a case-insensitive read of every account.
+  # unique index first; only a miss asks again case aside, for rows not lower-cased yet.
   @unit
   Scenario: Stored addresses are lower-cased
     When an account is minted, or its address changed, with capitals or spaces in the address
@@ -41,6 +41,13 @@ Feature: Canonical user lifecycle
     When it is looked up by the address typed with capitals
     Then that account is answered
     And the store is asked for the lower-cased address only, matched exactly
+
+  @unit
+  Scenario: An address stored with capitals still signs in
+    Given an account stored with capitals that the address step has not reached, or an older image wrote
+    When it is looked up by its address and no account holds the lower-cased form
+    Then the lookup asks again case aside and answers the oldest such account
+    And the address counts as taken
 
   @unit @integration
   Scenario: The address step lower-cases every stored address

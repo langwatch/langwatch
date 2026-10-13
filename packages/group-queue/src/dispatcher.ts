@@ -30,6 +30,8 @@ export class GroupQueueDispatcher {
   private nextList = 0;
   /** The candidates the last listed claim scanned; the poll wakes when the soonest comes due. */
   private scannedCandidates: readonly string[] = [];
+  /** The clock just before the last claim: a candidate due since then may have been missed. */
+  private claimedAtMs = 0;
 
   constructor(
     private readonly params: {
@@ -208,7 +210,7 @@ export class GroupQueueDispatcher {
     try {
       const earliest = await this.params.scripts.getEarliestCandidateScore({
         candidatesKeys: this.scannedCandidates,
-        afterMs: nowMs,
+        afterMs: this.claimedAtMs - 1,
       });
       if (earliest === null) return idleAtMs;
       return Math.min(idleAtMs, Math.max(earliest, nowMs + 50));
@@ -244,6 +246,7 @@ export class GroupQueueDispatcher {
 
   /** One claim over the allow-list, or over each open list in turn while slots remain. */
   private async claim(maxJobs: number): Promise<DispatchResult[]> {
+    this.claimedAtMs = nowInstant().epochMilliseconds;
     const claimFrom = ({
       allowedGroupsKey,
       jobs,

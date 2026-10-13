@@ -160,6 +160,8 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
       const created = await users.create({ name: "Ada", email: "Ada@Example.com" });
 
       await users.create({ name: "Grace", email: "grace@example.com" });
+      await expect(users.findByEmail(EMAIL)).resolves.toEqual([]);
+      await expect(users.findByEmailAnyCase(EMAIL)).resolves.toMatchObject([{ id: created.id }]);
       await expect(users.findMixedCaseAddressPage({ afterId: null, limit: 10 })).resolves.toEqual([
         { id: created.id, email: "Ada@Example.com" },
       ]);
