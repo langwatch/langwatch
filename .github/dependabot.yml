@@ -1,11 +1,5 @@
 version: 2
 
-# PAUSED (#8638): version updates are off and Dependabot no longer rebases its
-# PRs, because every main merge rebased ~30 PRs and each rebase queued full CI.
-# Security updates are not subject to open-pull-requests-limit and still open.
-# To undo: set every open-pull-requests-limit back to 50 and delete every
-# rebase-strategy line.
-
 # The npm workspace enforces pnpm's minimumReleaseAge (7 days) and the uv
 # projects enforce exclude-newer = "7 days", so dependabot must not propose
 # versions younger than that: the package manager would refuse to resolve
@@ -57,8 +51,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     ignore:
@@ -136,8 +129,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -178,8 +170,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -210,8 +201,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -228,8 +218,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -246,8 +235,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -264,8 +252,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -282,8 +269,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -300,8 +286,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -318,8 +303,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -336,8 +320,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -354,8 +337,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -372,8 +354,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -390,8 +371,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -408,8 +388,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -426,8 +405,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -444,8 +422,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -462,8 +439,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -480,8 +456,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -498,8 +473,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     cooldown:
       default-days: 8
     groups:
@@ -519,8 +493,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     groups:
       minor-and-patch:
         applies-to: version-updates
@@ -535,8 +508,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     groups:
       minor-and-patch:
         applies-to: version-updates
@@ -551,8 +523,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 0
-    rebase-strategy: "disabled"
+    open-pull-requests-limit: 50
     groups:
       github-actions:
         applies-to: version-updates
