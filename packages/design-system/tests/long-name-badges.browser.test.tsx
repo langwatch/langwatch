@@ -12,7 +12,7 @@ import { Badge, Table, Text } from "../src/primitives.ts";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 const LONG_NAME = "A".repeat(300);
-const SHOTS = "/Users/lw/Source/github.com/langwatch/langwatch/.claude/tmp/long-names";
+const SHOTS = "../../../.claude/tmp/long-names";
 
 afterEach(() => cleanup());
 
