@@ -96,6 +96,7 @@ export function conversationDetail(over: Partial<ConversationDetail> = {}): Conv
     lastError: null,
     lastModel: null,
     eventCursor: null,
+    origin: "interactive",
     ...over,
   };
 }

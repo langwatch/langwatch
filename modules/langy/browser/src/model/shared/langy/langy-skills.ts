@@ -39,22 +39,26 @@ interface GeneratedSkill {
   description: string;
   category: "skill" | "recipe";
   userPrompt?: string;
+  /** Installed for a module's own brief to name; never offered to a person. */
+  internal?: boolean;
 }
 
 /**
  * The skills the worker installs. A `recipe` is a task walkthrough rather than a
  * standing capability, so it carries its own source and the palette can group it
- * apart — but both are real, loadable, and offerable.
+ * apart — but both are real, loadable, and offerable. An `internal` skill is left out.
  */
-const AGENT_SKILLS: LangySkill[] = (GENERATED_SKILLS as GeneratedSkill[]).map((skill) => ({
-  id: skill.id,
-  label: skill.label,
-  source: skill.category === "recipe" ? ("recipe" as const) : ("agent-skill" as const),
-  summary: skill.description,
-  prompt: skill.userPrompt,
-  searchText:
-    `${skill.label} ${skill.id} ${skill.description} ${skill.userPrompt ?? ""}`.toLowerCase(),
-}));
+const AGENT_SKILLS: LangySkill[] = (GENERATED_SKILLS as GeneratedSkill[])
+  .filter((skill) => !skill.internal)
+  .map((skill) => ({
+    id: skill.id,
+    label: skill.label,
+    source: skill.category === "recipe" ? ("recipe" as const) : ("agent-skill" as const),
+    summary: skill.description,
+    prompt: skill.userPrompt,
+    searchText:
+      `${skill.label} ${skill.id} ${skill.description} ${skill.userPrompt ?? ""}`.toLowerCase(),
+  }));
 
 /** `trace search` / `dataset upload` → the bare verbs a feature really exposes. */
 function verbsOf(cli: string[]): string[] {

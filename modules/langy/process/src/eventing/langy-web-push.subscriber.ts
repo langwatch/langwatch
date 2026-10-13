@@ -10,6 +10,7 @@ import {
 } from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
+  LANGY_CONVERSATION_ORIGIN,
   LANGY_NOTIFICATION_TOPIC,
   langyConversationPath,
   langyNotificationContent,
@@ -36,7 +37,7 @@ interface LangyWebPushConversationReader {
   find(params: {
     projectId: string;
     conversationId: string;
-  }): Promise<{ ownerUserId: string | null; title: string | null } | null>;
+  }): Promise<{ ownerUserId: string | null; title: string | null; origin: string } | null>;
 }
 
 /** When the turn began, from its folded document; null until it is folded. */
@@ -126,6 +127,8 @@ async function requestPush(
   }
   const owner = conversation.ownerUserId;
   if (!owner) return;
+  // A run nobody watched has nobody to call back: its findings reach the person another way.
+  if (conversation.origin === LANGY_CONVERSATION_ORIGIN.RUN) return;
 
   const notificationEvent = await toNotificationEvent(deps, candidate, {
     projectId,
@@ -194,8 +197,8 @@ export function langyWebPushReaders(stores: {
           aggregateId: conversationId,
         });
         if (read.kind === "empty") return null;
-        const { UserId, Title } = read.projection.state;
-        return { ownerUserId: UserId || null, title: Title };
+        const { UserId, Title, Origin } = read.projection.state;
+        return { ownerUserId: UserId || null, title: Title, origin: Origin };
       },
     },
     async turnStartedAt({ projectId, conversationId, turnId }) {

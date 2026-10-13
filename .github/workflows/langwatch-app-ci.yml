@@ -782,6 +782,11 @@ jobs:
           CLICKHOUSE_PASSWORD: ci_password
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
 
+      # Build only: the upgrade runs below without BUILD_TIME, which it reads as
+      # "no datastore here" (that made every package suite skip).
+      - name: Build workspace packages
+        run: pnpm run ensure:built
+
       # BUILD_TIME is set job-wide and the ClickHouse migrator returns early
       # under it, so the whole upgrade runs here with it unset, once.
       - name: Run the upgrade (Postgres and ClickHouse migrations)

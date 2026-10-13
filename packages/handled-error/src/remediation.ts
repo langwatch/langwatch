@@ -175,7 +175,7 @@ const registry = {
   },
   custom_chart_playground_not_enabled: {
     tips: [
-      "The custom-chart-playground feature is not enabled for this project; retrying will not help",
+      "Dashboard widgets need both Dashboards and LangWatchQL enabled for this project; retrying will not help",
       "Use the lwql-charts skill / `langwatch chart` commands for a saved dashboard chart instead",
     ],
   },
@@ -226,6 +226,12 @@ const registry = {
     tips: [
       "Check the column name against the dataset's columns; a typo is the usual cause",
       "Column existence is only known when the query runs, so a saved chart can carry this until it is run",
+    ],
+  },
+  lwql_invalid_query: {
+    tips: [
+      "Check the aggregates, types and function arguments in the SQL; the database refused it as written",
+      "Aggregate functions such as count() or any() belong in SELECT, HAVING or a subquery, not in WHERE",
     ],
   },
   lwql_unavailable: {

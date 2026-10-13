@@ -4,6 +4,7 @@
  * sits below the router and below the feature shell. ARCHITECTURE.md §10.1.
  */
 
+import { loadChunk } from "@langwatch/browser-host/navigation";
 import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 
 import type { UiModuleHostMount } from "./ui-host-mounts.ts";
@@ -13,13 +14,14 @@ type UiHostProvider = ComponentType<{ children?: ReactNode }>;
 
 /**
  * A chunk that will not load names no module, and this stack is at the ROOT —
- * so the blank page is the whole application, not one screen.
+ * so the blank page is the whole application, not one screen. A dropped request is
+ * retried; one that still fails reaches the page boundary, which offers a retry.
  */
 function loadHostProvider(mount: UiModuleHostMount): Promise<{ default: UiHostProvider }> {
   const named = `Module ${JSON.stringify(mount.module)} mounts ${mount.host}`;
-  return Promise.resolve(mount.load()).then(
-    (loaded) => {
-      const provider = (loaded as { default?: unknown }).default;
+  return loadChunk(async () => mount.load()).then(
+    (loaded: unknown) => {
+      const provider = (loaded as { default?: unknown } | undefined)?.default;
       if (typeof provider !== "function") {
         throw new Error(`${named} with no default-exported provider component.`);
       }
