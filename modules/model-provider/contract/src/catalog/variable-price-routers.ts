@@ -45,10 +45,10 @@ export type RouterMatch = { kind: "router"; routerId: string } | { kind: "not-ro
  */
 export function matchVariablePriceRouter(modelId: string): RouterMatch {
   routerIds ??= new Set(getVariablePriceRouterIds().map((id) => id.toLowerCase()));
-  const segments = modelId
-    .toLowerCase()
-    .replace(/:[^/]*$/, "")
-    .split("/");
+  const segments = modelId.toLowerCase().split("/");
+  const last = segments.length - 1;
+  const tag = segments[last]!.indexOf(":");
+  if (tag >= 0) segments[last] = segments[last]!.slice(0, tag);
   for (let start = 0; start < segments.length - 1; start++) {
     const candidate = segments.slice(start).join("/");
     if (routerIds.has(candidate)) return { kind: "router", routerId: candidate };

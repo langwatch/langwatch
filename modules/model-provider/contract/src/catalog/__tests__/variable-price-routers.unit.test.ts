@@ -58,6 +58,16 @@ describe("isVariablePriceRouter", () => {
   });
 });
 
+describe("isVariablePriceRouterId", () => {
+  describe("given a model string a span could send, many colons before a slash", () => {
+    it("answers in time linear in its length", () => {
+      const started = Date.now();
+      expect(isVariablePriceRouterId(`${":".repeat(200_000)}/x`)).toBe(false);
+      expect(Date.now() - started).toBeLessThan(1_000);
+    });
+  });
+});
+
 describe("given the committed catalog", () => {
   it("lists routers to check against", () => {
     expect(catalogRouterIds.length).toBeGreaterThan(0);
