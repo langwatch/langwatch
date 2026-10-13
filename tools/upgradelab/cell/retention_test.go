@@ -1,6 +1,7 @@
 package cell
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -44,15 +45,15 @@ func TestRetentionJudgesEachSliceAgainstMainsOwnTTL(t *testing.T) {
 	if got := judgeRetention(kept); got.Result != "pass" {
 		t.Errorf("an expired slice may empty on main's TTL: %s %s", got.Result, got.Detail)
 	}
-	lost := append(kept, sliceCount{Org: "default", Kind: "events", Slice: 61, AtCut: 25, After: 24})
+	lost := append(slices.Clone(kept), sliceCount{Org: "default", Kind: "events", Slice: 61, AtCut: 25, After: 24})
 	if got := judgeRetention(lost); got.Result != "fail" || !strings.Contains(got.Detail, "default events 61d 25->24") {
 		t.Errorf("a kept slice that lost a row fails: %s %s", got.Result, got.Detail)
 	}
-	empty := append(kept, sliceCount{Org: "org-rule", Kind: "logs", Slice: 30})
+	empty := append(slices.Clone(kept), sliceCount{Org: "org-rule", Kind: "logs", Slice: 30})
 	if got := judgeRetention(empty); got.Result != "inconclusive" {
 		t.Errorf("a slice empty at the cut proves nothing: %s", got.Result)
 	}
-	expired := append(kept, sliceCount{Org: "org-rule", Kind: "logs", Slice: 61, Retention: 35, Seeded: 25})
+	expired := append(slices.Clone(kept), sliceCount{Org: "org-rule", Kind: "logs", Slice: 61, Retention: 35, Seeded: 25})
 	if got := judgeRetention(expired); got.Result != "pass" || !strings.Contains(got.Detail, "before the cut: [org-rule logs 61d]") {
 		t.Errorf("a slice main's TTL emptied before the cut proves no upgrade loss: %s %s", got.Result, got.Detail)
 	}

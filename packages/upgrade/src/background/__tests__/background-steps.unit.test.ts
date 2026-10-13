@@ -1,3 +1,4 @@
+import type { ListedWork } from "@langwatch/eventing";
 /**
  * A paused worker runs nothing; a stopped or failing step stays resumable; the lease renews on a
  * timer. Spec: specs/upgrade/background-steps.feature.
@@ -771,7 +772,7 @@ class ListedRunsDouble implements BackgroundStepsQueue {
 describe("BackgroundStepsService queue work", () => {
   describe("given a step whose queue work all runs", () => {
     /** @scenario "A background step is done only once the queue work it sent has run" */
-    it("runs the step on a list of its own, waiting 60 s by default, and records it done", async () => {
+    it("runs the step on a list of its own, waiting 5 minutes by default, and records it done", async () => {
       const ledger = new MemoryBackgroundLedger();
       const queue = new ListedRunsDouble();
       const service = serviceOver({ ledger, queue, run: async () => ({ sent: 2 }) });
@@ -779,7 +780,7 @@ describe("BackgroundStepsService queue work", () => {
       expect(await sweepOnce(service)).toMatchObject({ ran: [STEP] });
 
       expect(queue.runs).toEqual([
-        { name: expect.stringMatching(`^upgrade-step:${STEP}:`), timeoutMs: 60_000 },
+        { name: expect.stringMatching(`^upgrade-step:${STEP}:`), timeoutMs: 5 * 60_000 },
       ]);
       expect(ledger.row).toMatchObject({ status: "done", report: { sent: 2 } });
     });
@@ -837,6 +838,68 @@ describe("BackgroundStepsService queue work", () => {
   });
 });
 
+/** A queue whose worker runs a step's jobs as the step waits for room, counting the outstanding. */
+class PacedRunsDouble implements BackgroundStepsQueue {
+  outstanding = 0;
+  peak = 0;
+  ran = 0;
+  readonly rooms: number[] = [];
+
+  send(): void {
+    this.outstanding += 1;
+    this.peak = Math.max(this.peak, this.outstanding);
+  }
+
+  private runDownTo(bound: number): void {
+    const running = Math.max(0, this.outstanding - bound);
+    this.outstanding -= running;
+    this.ran += running;
+  }
+
+  async runListedWork<Result>({ work }: ListedWork<Result>): Promise<Result> {
+    const result = await work({
+      waitForRoom: async ({ maxOutstanding }) => {
+        this.rooms.push(maxOutstanding);
+        this.runDownTo(maxOutstanding);
+      },
+    });
+    this.runDownTo(0);
+    return result;
+  }
+}
+
+describe("BackgroundStepsService pacing", () => {
+  describe("given a step over 10,000 rows that sends a job per row, 500 rows a page", () => {
+    /** @scenario "A step over many rows keeps at most a page and a small bound of its own jobs outstanding" */
+    it("saves each page only once at most 1,000 of its jobs are outstanding, and finishes every row", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const queue = new PacedRunsDouble();
+      const rows = 10_000;
+      const page = 500;
+      const service = serviceOver({
+        ledger,
+        queue,
+        run: async ({ checkpoint }) => {
+          let sent = 0;
+          while (sent < rows) {
+            for (let row = 0; row < page; row++) queue.send();
+            sent += page;
+            await checkpoint.save({ report: { sent } });
+          }
+          return { sent };
+        },
+      });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [STEP] });
+
+      expect(queue.rooms).toEqual(Array.from({ length: rows / page }, () => 1_000));
+      expect(queue.peak).toBeLessThanOrEqual(1_000 + page);
+      expect(queue.ran).toBe(rows);
+      expect(ledger.row).toMatchObject({ status: "done", report: { sent: rows } });
+    });
+  });
+});
+
 describe("BackgroundStepsService side by side", () => {
   describe("given five independent pending steps and one that runs after another", () => {
     /** @scenario "Independent background steps run side by side, a few at a time" */
@@ -845,7 +908,7 @@ describe("BackgroundStepsService side by side", () => {
       let running = 0;
       let widest = 0;
       const leases: string[] = [];
-      const step = (id: string, after?: string[]) =>
+      const step = (id: string, after?: Parameters<typeof defineMigrationStep>[0]["after"]) =>
         defineMigrationStep({
           id,
           kind: "data",
@@ -874,9 +937,10 @@ describe("BackgroundStepsService side by side", () => {
         setStatus: async () => undefined,
         saveReport: async () => undefined,
       };
+      const independent = ids.map((id) => step(id));
       const service = BackgroundStepsService.create({
         ledger,
-        steps: [...ids.map((id) => step(id)), step("a:six", ["a:one"])],
+        steps: [...independent, step("a:six", [independent[0]!])],
         serving: () => true,
         oldWritersGoneFor: async () => true,
         identity: { owner: "worker-1", image: "3.21.0", host: "host" },

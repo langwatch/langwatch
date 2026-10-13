@@ -7,17 +7,21 @@ import {
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import type { TenantMigrationRolledBackEventData } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 
 import type { OpsModule } from "../app/ops.app.ts";
 import type { OpsRepositories } from "../repositories/ops.repositories.ts";
 import {
+  RecordTenantMigrationRolledBackCommand,
   RequestSystemMigrationPassCommand,
   SYSTEM_MIGRATION_PASS_AGGREGATE_TYPE,
   type SystemMigrationPassRequestedEvent,
   type systemMigrationPassRequestedEventDataSchema,
   systemMigrationPassRequestedEventSchema,
+  type TenantMigrationRolledBackEvent,
+  tenantMigrationRolledBackEventSchema,
 } from "./ops-system-migrations.commands.ts";
 import {
   SYSTEM_MIGRATION_PASS_PROCESS_NAME,
@@ -35,12 +39,16 @@ import {
 export const SYSTEM_MIGRATIONS_PIPELINE_NAME = "ops_system_migrations";
 
 type SystemMigrationsPipelineDefinition = StaticPipelineDefinition<
-  SystemMigrationPassRequestedEvent,
+  SystemMigrationPassRequestedEvent | TenantMigrationRolledBackEvent,
   Record<string, Projection>,
-  {
-    name: "requestSystemMigrationPass";
-    payload: z.infer<typeof systemMigrationPassRequestedEventDataSchema> & CommandEnvelope;
-  }
+  | {
+      name: "requestSystemMigrationPass";
+      payload: z.infer<typeof systemMigrationPassRequestedEventDataSchema> & CommandEnvelope;
+    }
+  | {
+      name: "recordTenantMigrationRolledBack";
+      payload: TenantMigrationRolledBackEventData & CommandEnvelope;
+    }
 >;
 
 /**
@@ -58,8 +66,9 @@ export function buildSystemMigrations({
     name: SYSTEM_MIGRATIONS_PIPELINE_NAME,
     aggregate: defineAggregate({ type: SYSTEM_MIGRATION_PASS_AGGREGATE_TYPE }),
   })
-    .withEvents([systemMigrationPassRequestedEventSchema])
+    .withEvents([systemMigrationPassRequestedEventSchema, tenantMigrationRolledBackEventSchema])
     .withCommand("requestSystemMigrationPass", RequestSystemMigrationPassCommand)
+    .withCommand("recordTenantMigrationRolledBack", RecordTenantMigrationRolledBackCommand)
     .withProcessManager(SYSTEM_MIGRATION_PASS_PROCESS_NAME, (pm) =>
       pm
         .state(systemMigrationPassStateSchema, SYSTEM_MIGRATION_PASS_INITIAL_STATE)
@@ -75,13 +84,9 @@ export function buildSystemMigrations({
           }),
         )
         .on(systemMigrationPassRequestedEventSchema, systemMigrationPassRequested)
-        // One pass at a time; a lease as long as the cadence, since a pass can sweep the fleet.
-        .outbox({
-          leaseDurationMs: SYSTEM_MIGRATION_REDRIVE_INTERVAL_MS,
-          maxAttempts: 3,
-          concurrency: 1,
-          batchSize: 1,
-        }),
+        // One pass at a time on a short, renewed lease. Tenant steps work in pages through
+        // their repositories, so each call keeps the lease and the default silence limit holds.
+        .outbox({ maxAttempts: 3, concurrency: 1, batchSize: 1 }),
     )
     .build();
 }

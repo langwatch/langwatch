@@ -14,7 +14,7 @@ README there is the full reference), console `apps/sims/src/idp` (ADR-160).
 
 ## Run it
 
-- On by default in haven (`haven up -idp` turns it off). Hosted in the `sims` lane.
+- On by default in haven (`haven up -idp` turns it off). Runs in the `go` lane by default (see `sims`).
 - Console: `https://idp.<slug>.langwatch.localhost`; tenant pages at `/t/<n>/`. `haven status`
   shows the loopback port and the DNS port (default `:15353`).
 - The overlay sets `LANGWATCH_IDPSIM_URL`, `SSO_TRUSTED_IDP_ORIGINS` and
@@ -78,10 +78,10 @@ README there is the full reference), console `apps/sims/src/idp` (ADR-160).
 ## From a terminal or agent
 
 `haven sim idp <verb>` drives a running idpsim (`--json` on reads, `--stack <slug>` for another stack):
-`tenants` (every tenant, as the console's landing page lists them), `tenant show <t>` (also prints signing keys, skew and the armed break), `apps add|remove`, `populate`, `churn`, `user add`, `scim target set|clear`,
+`list` (every tenant, as the console's landing page lists them), `get <t>` (also prints signing keys, skew and the armed break), `apps add|remove`, `populate`, `churn`, `user add`, `scim target set|clear`,
 `scim push|pull|sync`, `scim-event <t> <kind> [--style okta|entra] [--user] [--group] [--set k=v]`,
 `dns add|remove`, `verification set|clear`, `activity`, `signin <t> --user <email>` (prints the IdP-initiated URL),
-`reset`, `samlp <t> on|off`. Full table: `services/sims/idpsim/README.md`.
+`clear` (resets), `samlp <t> on|off`. The retired spellings `tenants`, `tenant show` and `reset` are refused. Full table: `services/sims/idpsim/README.md`.
 
 - SAML sign-in (redirect binding) with no `login_hint` lands on the same account picker as OIDC;
   scripts skip it with `login_hint=<email>` on the SSO URL. A POST-binding request without a hint still asserts the first active user.

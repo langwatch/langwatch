@@ -115,7 +115,7 @@ func (c *Console) serveNotBuilt(w http.ResponseWriter, r *http.Request) {
 
 // NotBuiltMessage is the not-built page's whole text.
 func NotBuiltMessage(buildCommand string) string {
-	return fmt.Sprintf("This console is not built into this binary. Run `%s`, then rebuild the binary that serves it.\n", buildCommand)
+	return fmt.Sprintf("This console is not built into this binary. Run %#q, then rebuild the binary that serves it.\n", buildCommand)
 }
 
 // NotBuiltPage gives consoles without a bundle the same favicon as the built UI.

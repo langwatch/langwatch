@@ -5,10 +5,14 @@
  * repositories, with the two peers it declares, in every role it serves.
  */
 import type { FeatureRestHost, FeatureTrpcHost } from "@langwatch/api";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { DatasetApi, DatasetNotFoundError } from "@langwatch/dataset-contract";
-import { createApp } from "@langwatch/process";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
+import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -19,24 +23,30 @@ import {
   createDatasetTestProjects,
 } from "./dataset.fixture.ts";
 
-function process(role: "api" | "worker") {
-  return createApp({ role })
-    .withModules([datasetProcessModule])
-    .withStores(memoryStores())
-    .withConfig({ dataset: { publicBaseUrl: undefined } })
-    .provide({
-      authz: createDatasetTestAuthz(),
-      project: createDatasetTestProjects(),
-      entitlement: createDatasetTestEntitlement(),
-      "stored-object": createApiFixture<StoredObjectApi>(),
-    });
+function process(
+  role: "api" | "worker",
+  surface?: Parameters<typeof bootInstalledProcess>[0]["surface"],
+) {
+  return bootInstalledProcess({
+    role,
+    modules: [datasetProcessModule],
+    config: { dataset: { publicBaseUrl: undefined } },
+    stores: memoryStores(),
+    surface,
+    peers: [
+      testPeer({ token: AuthzApi, instance: createDatasetTestAuthz() }),
+      testPeer({ token: ProjectApi, instance: createDatasetTestProjects() }),
+      testPeer({ token: EntitlementApi, instance: createDatasetTestEntitlement() }),
+      testPeer({ token: StoredObjectApi, instance: createApiFixture<StoredObjectApi>() }),
+    ],
+  });
 }
 
 const projectId = "project-1";
 
 describe("dataset app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process(role).boot();
+    const runtime = await process(role);
 
     try {
       const app = runtime.service(DatasetApi);
@@ -67,8 +77,8 @@ describe("dataset app installation", () => {
   });
 
   it("allocates independent memory repositories for each installation", async () => {
-    const first = await process("api").boot();
-    const second = await process("api").boot();
+    const first = await process("api");
+    const second = await process("api");
 
     try {
       const created = await first
@@ -84,6 +94,12 @@ describe("dataset app installation", () => {
   });
 });
 
+function keepsApp(value: unknown): value is { app: () => unknown } {
+  return (
+    typeof value === "object" && value !== null && "app" in value && typeof value.app === "function"
+  );
+}
+
 describe("dataset transports installation", () => {
   /** A door that keeps the app thunk each declaration was mounted with. */
   const keepingApp: FeatureRestHost<{ app: () => unknown }> &
@@ -91,16 +107,21 @@ describe("dataset transports installation", () => {
 
   /** @scenario "Compatibility transports share one service" */
   it("hands every REST and tRPC declaration the process's one Dataset service, on every request", async () => {
-    const runtime = await process("api")
-      .expose(() => ({ hosts: { rest: keepingApp, trpc: keepingApp }, serve: () => undefined }))
-      .boot();
+    const runtime = await process("api", () => ({
+      hosts: { rest: keepingApp, trpc: keepingApp },
+      serve: () => undefined,
+    }));
 
     try {
       const shared = runtime.service(DatasetApi);
-      const mounted = [...runtime.transports.rest, ...Object.values(runtime.transports.trpc)];
+      const mounted = [
+        ...runtime.transports.rest,
+        ...Object.values(runtime.transports.trpc),
+      ].filter(keepsApp);
 
       expect(Object.keys(runtime.transports.trpc).toSorted()).toEqual(["dataset", "datasetRecord"]);
       expect(runtime.transports.rest).toHaveLength(1);
+      expect(mounted).toHaveLength(runtime.transports.rest.length + 2);
       for (const transport of mounted) {
         const first = transport.app();
         const second = transport.app();

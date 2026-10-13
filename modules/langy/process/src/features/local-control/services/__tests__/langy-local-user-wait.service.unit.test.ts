@@ -12,6 +12,7 @@ import type { SessionStateStore } from "@langwatch/redis-client/session-state";
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LangyLocalUserWaitRedisRepository } from "../../../../repositories/redis/redis.langy-local-user-wait.repository.ts";
 import { waitKey } from "../../../../rules/langy-local-control-keys.rules.ts";
 import type {
   UserWaitBuffer,
@@ -123,7 +124,7 @@ beforeEach(() => {
   buffer = recordingBuffer();
   sendPermission = vi.fn(async () => undefined);
   service = UserWaitService.create({
-    store,
+    waits: LangyLocalUserWaitRedisRepository.create({ store }),
     events,
     buffer,
     sendPermission: sendPermission as never,
@@ -543,7 +544,7 @@ describe("given a card in the turn's pending set that cannot be read", () => {
       },
     };
     const brokenService = UserWaitService.create({
-      store: brokenStore,
+      waits: LangyLocalUserWaitRedisRepository.create({ store: brokenStore }),
       events,
       buffer,
       sendPermission: sendPermission as never,

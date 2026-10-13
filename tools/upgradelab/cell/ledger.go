@@ -205,7 +205,7 @@ func (cell *run) flowResult(id, date string) (FlowResult, string) {
 	if cell.report.Error != "" {
 		notes += " Stopped: " + scrub(cell.report.Error)
 	}
-	evidence := fmt.Sprintf("cell `%s`, %s → %s, run %s", cell.options.Name(), cell.options.Release, cell.report.HeadCommit, filepath.Base(cell.options.RunDir))
+	evidence := fmt.Sprintf("cell %#q, %s → %s, run %s", cell.options.Name(), cell.options.Release, cell.report.HeadCommit, filepath.Base(cell.options.RunDir))
 	summary := fmt.Sprintf("%s %s %d/%d", cell.options.Deployment, status, passed, len(verdicts))
 	if len(failed) > 0 {
 		summary += " (" + strings.Join(failed, " ") + ")"

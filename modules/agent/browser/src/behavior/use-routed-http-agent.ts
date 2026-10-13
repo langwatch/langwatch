@@ -5,8 +5,8 @@ import { scenarioClient } from "@langwatch/scenario-client";
 import { useRef } from "react";
 
 import type { AgentBrowser } from "../model/agent-client.ts";
-import { explainTestError } from "../model/http-test-error.ts";
 import { useAgentManagementHost } from "../model/agent-management-host.ts";
+import { explainTestError } from "../model/http-test-error.ts";
 import { agentApi } from "./agent-api.ts";
 import type { HttpAgentEditorOptions } from "./use-http-agent-editor.ts";
 

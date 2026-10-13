@@ -395,7 +395,7 @@ List projects
 
 Authenticated: the listing answers exactly the projects the presented credential already reaches, resolved per key, so authentication is the whole gate and a narrower key is filtered rather than refused. Declared at `src/transport/api-key-projects.rest.ts:91`.
 
-Answers at `/api/projects`.
+Answers at `/api/projects`, `/api/v1/projects`.
 
 ```typescript
 // Query: projectRestPaginationQuerySchema, ../contract/src/api-key-rest.schemas.ts:137
@@ -412,7 +412,7 @@ Create a project
 
 Permission `project:create`. Declared at `src/transport/api-key-projects.rest.ts:118`.
 
-Answers at `/api/projects`.
+Answers at `/api/projects`, `/api/v1/projects`.
 
 ```typescript
 // Body: projectRestCreateSchema, ../contract/src/api-key-rest.schemas.ts:162

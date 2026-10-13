@@ -64,9 +64,7 @@ describe.skipIf(!DB_URL)(
         logger: { error: () => void 0 },
         projects: {
           findWithOrgAdmin: async () => null,
-          findIdsByOrganization: async () => [],
           findWithTeam: async () => null,
-          findLiveWithTeamByIds: async () => [],
         },
       }),
       repository: PrismaProjectRepository.create({ prisma }),

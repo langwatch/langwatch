@@ -1,3 +1,5 @@
+import type { Instant } from "@langwatch/time";
+
 import { IdentityLatchRepository } from "../identity-latch.repository.ts";
 import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
@@ -20,6 +22,18 @@ export class MemoryIdentityLatchRepository extends IdentityLatchRepository {
   }
 
   async recordFinalized(args: { userId: string; report: unknown }): Promise<void> {
+    if (this.store.pinnedUsers.has(args.userId)) return;
     this.store.finalizedUsers.add(args.userId);
+  }
+
+  async recordProven(args: { userId: string; at: Instant }): Promise<boolean> {
+    if (this.store.pinnedUsers.has(args.userId)) return false;
+    this.store.finalizedUsers.add(args.userId);
+    return true;
+  }
+
+  async pinSignInSwitch(args: { userId: string; at: Instant; eventId: string }): Promise<void> {
+    this.store.pinnedUsers.add(args.userId);
+    this.store.finalizedUsers.delete(args.userId);
   }
 }

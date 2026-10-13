@@ -1,4 +1,3 @@
-import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
 import { Drawer } from "@langwatch/design-system/drawer";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -12,18 +11,10 @@ export const UPGRADE_RUN_OVERLAY = "upgradeRun";
 export function UpgradeRunDrawer({ runId, onClose }: { runId: string; onClose: () => void }) {
   const run = api.ops.upgrade.getRun.useQuery({ id: runId });
   return (
-    <Drawer.Root open={true} placement="end" size="lg" onOpenChange={() => onClose()}>
-      <Drawer.Content>
-        <Drawer.Header>
-          <DetailDrawerHeader kind="Upgrade run" title={runId} />
-        </Drawer.Header>
-        <Drawer.Body>
-          <UpgradeReadState read={run} failedTitle="The upgrade run could not load">
-            {(detail) => <UpgradeRunDetail run={detail} />}
-          </UpgradeReadState>
-        </Drawer.Body>
-        <Drawer.CloseTrigger />
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer title={runId} eyebrow={{ label: "Upgrade run" }} size="lg" onClose={onClose}>
+      <UpgradeReadState read={run} failedTitle="The upgrade run could not load">
+        {(detail) => <UpgradeRunDetail run={detail} />}
+      </UpgradeReadState>
+    </Drawer>
   );
 }

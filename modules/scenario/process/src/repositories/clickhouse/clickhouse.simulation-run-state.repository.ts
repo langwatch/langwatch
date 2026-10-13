@@ -13,6 +13,7 @@ import {
   ValidationError,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import type {
   SimulationRunState,
@@ -212,7 +213,7 @@ export class ClickHouseSimulationRunStateRepository<
         Object.keys(data.TraceMetrics).length > 0 ? JSON.stringify(data.TraceMetrics) : "",
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       QueuedAt: data.QueuedAt != null ? new Date(data.QueuedAt) : null,
-      CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
+      CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : toDate(nowInstant()),
       UpdatedAt: new Date(data.UpdatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
       ArchivedAt: data.ArchivedAt != null ? new Date(data.ArchivedAt) : null,

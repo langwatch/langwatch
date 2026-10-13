@@ -26,7 +26,7 @@ A batch is a pure function of preset, seed and index: the same seed sends the sa
 
 ## Run it
 
-- Opt-in: `haven up +telemetry` (sticky). Hosted in the `sims` lane.
+- Opt-in: `haven up +telemetry` (sticky). Runs in the `go` lane by default (see `sims`).
 - Console: `https://telemetry.<slug>.langwatch.localhost` (`haven sim telemetry console` prints
   it). haven gives the sim the stack's door and key, so nothing there needs a key. Tabs:
   - **Runs**: a start form, the current run and the last ten; a run opens with its rate,

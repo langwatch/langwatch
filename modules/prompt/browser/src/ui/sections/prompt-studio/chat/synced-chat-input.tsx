@@ -1,4 +1,5 @@
 import { Box, HStack } from "@langwatch/design-system/primitives";
+import { createLogger } from "@langwatch/observability/browser";
 import { nowInstant } from "@langwatch/time";
 import { useEffect, useRef, useState } from "react";
 
@@ -11,6 +12,8 @@ import {
   usePromptPlaygroundChatSync,
   useTabId,
 } from "../studio-internals.ts";
+
+const logger = createLogger("langwatch:prompt:synced-chat-input");
 
 /**
  * Chat input that can sync its text and broadcast submit across chat tabs.
@@ -41,7 +44,7 @@ async function sendLocally({
   try {
     await onSend(message);
   } catch (error) {
-    console.error("Failed to send message:", error);
+    logger.error({ error }, "Failed to send message");
     setInput(message);
   }
 }
@@ -90,7 +93,7 @@ function useSyncedChatInput({ inProgress, onSend }: Pick<ChatInputProps, "inProg
 
     // Submit the message
     void Promise.resolve(onSend(submitTrigger.message)).catch((error) => {
-      console.error("Failed to send synced message:", error);
+      logger.error({ error }, "Failed to send synced message");
     });
   }, [submitTrigger, isSynced, onSend, isTabActive]);
 

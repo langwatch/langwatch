@@ -55,6 +55,82 @@ export class PrismaOpsMigrationRepository extends OpsMigrationRepository {
     );
   }
 
+  async recopyTenantStateAfterRollout({
+    moves,
+    dryRun,
+  }: {
+    moves: MovedTenantSteps;
+    dryRun: boolean;
+  }): Promise<number> {
+    const { tenantState } = await ledgerTables({
+      postgres: {
+        query: async <Row extends object>(text: string, values: unknown[] = []) => ({
+          rows: await this.prisma.$queryRawUnsafe<Row[]>(`${TENANCY}${text}`, ...values),
+        }),
+      },
+    });
+    const names = [Object.keys(moves), Object.values(moves)];
+    // The older table stores UTC wall-clock without a zone; the step's table keeps instants.
+    const changed = `FROM "SystemMigrationTenantState" s
+      JOIN unnest($1::text[], $2::text[]) AS moved("legacy_name", "step_id")
+        ON moved."legacy_name" = s."migrationName"`;
+    if (dryRun) {
+      const [row] = await this.prisma.$queryRawUnsafe<{ count: bigint }[]>(
+        `${TENANCY}SELECT count(*) AS "count" ${changed}
+          WHERE NOT EXISTS (SELECT 1 FROM ${tenantState} t
+                             WHERE t."step_id" = moved."step_id" AND t."tenant_id" = s."tenantId"
+                               AND (t."status" = 'rolled_back'
+                                    OR t."updated_at" >= (s."updatedAt" AT TIME ZONE 'UTC')))`,
+        ...names,
+      );
+      return Number(row?.count ?? 0);
+    }
+    return this.prisma.$executeRawUnsafe(
+      `${TENANCY}INSERT INTO ${tenantState} AS t
+         ("step_id", "tenant_id", "status", "report", "held_reason", "held_since", "updated_at")
+       SELECT moved."step_id", s."tenantId", s."status", s."report",
+              CASE WHEN s."status" = 'migrated' THEN 'proof' END,
+              CASE WHEN s."status" = 'migrated' THEN now() END,
+              s."updatedAt" AT TIME ZONE 'UTC'
+       ${changed}
+       ON CONFLICT ("step_id", "tenant_id") DO UPDATE SET
+         "status" = EXCLUDED."status", "report" = EXCLUDED."report",
+         "held_reason" = EXCLUDED."held_reason", "held_since" = EXCLUDED."held_since",
+         "updated_at" = now()
+       WHERE t."status" <> 'rolled_back' AND t."updated_at" < EXCLUDED."updated_at"`,
+      ...names,
+    );
+  }
+
+  async withdrawEnrolmentsAfterRollout({
+    moves,
+    dryRun,
+  }: {
+    moves: MovedTenantSteps;
+    dryRun: boolean;
+  }): Promise<number> {
+    const names = [Object.keys(moves), Object.values(moves)];
+    const twinGone = `NOT EXISTS (SELECT 1 FROM "SystemMigrationEnrollment" e
+                       WHERE e."migrationName" = moved."legacy_name"
+                         AND e."organizationId" = n."organizationId")`;
+    if (dryRun) {
+      const [row] = await this.prisma.$queryRawUnsafe<{ count: bigint }[]>(
+        `${ENROLMENT_TENANCY}SELECT count(*) AS "count" FROM "SystemMigrationEnrollment" n
+           JOIN unnest($1::text[], $2::text[]) AS moved("legacy_name", "step_id")
+             ON moved."step_id" = n."migrationName"
+          WHERE ${twinGone}`,
+        ...names,
+      );
+      return Number(row?.count ?? 0);
+    }
+    return this.prisma.$executeRawUnsafe(
+      `${ENROLMENT_TENANCY}DELETE FROM "SystemMigrationEnrollment" n
+        USING unnest($1::text[], $2::text[]) AS moved("legacy_name", "step_id")
+        WHERE n."migrationName" = moved."step_id" AND ${twinGone}`,
+      ...names,
+    );
+  }
+
   async copyEnrolments({
     moves,
     dryRun,

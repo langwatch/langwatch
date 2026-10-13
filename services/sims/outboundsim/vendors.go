@@ -65,7 +65,7 @@ func (s *Server) handleOpenAIProjects(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAnthropicMe(w http.ResponseWriter, r *http.Request) {
 	s.vendorCall(w, r, func(string) reply {
-		return jsonReply(http.StatusOK, map[string]string{"id": "org_sim", "name": "Sim organisation"})
+		return jsonReply(http.StatusOK, map[string]string{"id": "org_sim", "name": "Sim organization"})
 	})
 }
 
@@ -195,7 +195,7 @@ func bucketedReply(items []map[string]any, r *http.Request, tenant string) reply
 
 // handleOpenAICosts serves GET /openai/v1/organization/costs: daily cost buckets from
 // start_time, one per page. A credential holding "nokeys" refuses group_by[]=api_key_id the way
-// an old organisation does, so the puller falls back to user-only grouping.
+// an old organization does, so the puller falls back to user-only grouping.
 func (s *Server) handleOpenAICosts(w http.ResponseWriter, r *http.Request) {
 	s.vendorCall(w, r, func(tenant string) reply {
 		q := r.URL.Query()
@@ -368,7 +368,7 @@ var dataverseBots = []map[string]any{
 	{"botid": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2", "name": "Sim HR Agent", "modifiedon": "2026-09-02T09:00:00Z"},
 }
 
-// handleDataverseBots serves GET /dataverse/api/data/v9.2/bots; $top is honoured.
+// handleDataverseBots serves GET /dataverse/api/data/v9.2/bots; $top is honored.
 func (s *Server) handleDataverseBots(w http.ResponseWriter, r *http.Request) {
 	s.vendorCall(w, r, func(tenant string) reply {
 		rows := dataverseBots

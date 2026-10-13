@@ -1,6 +1,7 @@
 import { createTestLogger, type TestLogLine } from "@langwatch/test-harness";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { DispatchReport } from "../outboxDispatcherService.ts";
 import { ProcessOutboxWorker } from "../processOutboxWorker.ts";
 
 function makeLogger() {
@@ -305,6 +306,81 @@ describe("ProcessOutboxWorker", () => {
       .map((line) => line.phaseMs);
     expect(phases).toEqual([100, 800]);
     draw.mockRestore();
+  });
+
+  describe("given a drain whose delivery runs for an hour", () => {
+    const stuckDrainTimeoutMs = 10 * 60_000;
+    const renewEveryMs = 40_000;
+
+    /** A dispatcher whose one delivery runs until `finish`, renewing for `renewForMs`. */
+    function renewingDispatcher({ renewForMs }: { renewForMs: number }) {
+      const startedAt = Date.now();
+      let lastProgress = startedAt;
+      const renewals = setInterval(() => {
+        if (Date.now() - startedAt <= renewForMs) lastProgress = Date.now();
+      }, renewEveryMs);
+      let settle: () => void = () => undefined;
+      const delivery = new Promise<DispatchReport>((resolve) => {
+        settle = () => resolve(busyReport());
+      });
+      return {
+        dispatcher: {
+          runOnce: vi
+            .fn()
+            .mockImplementationOnce(async () => delivery)
+            .mockResolvedValue(report()),
+          lastProgressAt: () => lastProgress,
+        },
+        finish: () => {
+          clearInterval(renewals);
+          settle();
+        },
+      };
+    }
+
+    function startWorker(dispatcher: ReturnType<typeof renewingDispatcher>["dispatcher"]) {
+      const { logger, lines } = createTestLogger();
+      const worker = new ProcessOutboxWorker({
+        dispatcher,
+        logger,
+        jitter: () => 0,
+        intervalMs: 1_000,
+        stuckDrainTimeoutMs,
+      });
+      worker.start();
+      return { worker, lines };
+    }
+
+    /** @scenario "A drain still renewing its lease is never taken for stuck" */
+    it("raises no stuck-drain alarm while the drain keeps renewing its lease", async () => {
+      vi.useFakeTimers();
+      const { dispatcher, finish } = renewingDispatcher({ renewForMs: Infinity });
+      const { worker, lines } = startWorker(dispatcher);
+
+      await vi.advanceTimersByTimeAsync(60 * 60_000);
+
+      expect(atLevel(lines, 50)).toEqual([]);
+      expect(dispatcher.runOnce).toHaveBeenCalledTimes(1);
+      finish();
+      await worker.stop();
+    });
+
+    /** @scenario "A drain still renewing its lease is never taken for stuck" */
+    it("abandons the drain once it stops renewing for the threshold", async () => {
+      vi.useFakeTimers();
+      const { dispatcher, finish } = renewingDispatcher({ renewForMs: 30 * 60_000 });
+      const { worker, lines } = startWorker(dispatcher);
+
+      await vi.advanceTimersByTimeAsync(30 * 60_000 + stuckDrainTimeoutMs - renewEveryMs);
+      const beforeThreshold = atLevel(lines, 50).length;
+      await vi.advanceTimersByTimeAsync(renewEveryMs + 1_000);
+
+      expect(beforeThreshold).toBe(0);
+      expect(atLevel(lines, 50)).toHaveLength(1);
+      expect(dispatcher.runOnce.mock.calls.length).toBeGreaterThanOrEqual(2);
+      finish();
+      await worker.stop();
+    });
   });
 
   describe("given drains that lease nothing", () => {

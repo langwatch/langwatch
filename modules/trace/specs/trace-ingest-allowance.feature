@@ -18,3 +18,10 @@ Feature: The ingest allowance check logs a store failure at the level it deserve
     When a batch asks the allowance
     Then the batch is admitted
     And the failure is logged as an error
+
+  @unit
+  Scenario: An allowance read a busy ClickHouse refuses is logged as a warning
+    Given ClickHouse refuses the meter read as busy (clickhouse_overloaded or clickhouse_unavailable)
+    When a batch asks the allowance
+    Then the batch is admitted
+    And the failure is logged as a warning, not an error

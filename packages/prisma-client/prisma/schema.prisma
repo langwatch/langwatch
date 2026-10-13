@@ -115,6 +115,10 @@ model Session {
   /// factor reads this when a member reaches its data; it is never read at
   /// mint and never ends a session.
   amr                    String[]  @default([])
+  /// Minted while the account had never signed in: the session its sign-up
+  /// started, which skips the secure-account offer. False on every later one
+  /// and on every session that predates the column (specs/identity/passkeys.feature).
+  startedBySignUp        Boolean   @default(false)
   /// The legacy impersonation payload. NOTHING READS OR WRITES IT any more -
   /// the {actor, subject} columns below replaced it, and the migration beside
   /// them ended every session that still carried a value.
@@ -374,6 +378,18 @@ model Identifier {
   @@index([provider, providerAccountId])
   @@index([issuer, providerAccountId])
   @@index([accountId])
+}
+
+/// Whether a user signs in on the identifier path: identity's own switch, set when the
+/// identifier backfill proves the user and pinned off by an operator's rollback. No row is the
+/// legacy path. Spec: modules/identity/specs/sign-in-switch.feature. Column refs only, no FK.
+model IdentitySignInSwitch {
+  userId        String   @id
+  onIdentifiers Boolean
+  pinned        Boolean  @default(false)
+  switchedAt    DateTime
+  lastAppliedEventId String?
+  updatedAt     DateTime @default(now()) @updatedAt
 }
 
 // The address lock (ADR-116 §6). ROW-TRUTH, and deliberately not a projection:
@@ -4440,6 +4456,18 @@ model AuthzUserStanding {
   deactivatedAt     DateTime?
   erasedAt          DateTime?
   standingChangedAt DateTime
+}
+
+/// Whether an organization's permission checks run on the authorization engine: authz's own
+/// switch, set when the engine migration proves the organization and pinned off by an operator's
+/// rollback. No row is the legacy path. Spec: modules/authz/specs/engine-switch.feature.
+model AuthzEngineSwitch {
+  organizationId String   @id
+  onEngine       Boolean
+  pinned         Boolean  @default(false)
+  switchedAt     DateTime
+  lastAppliedEventId String?
+  updatedAt      DateTime @default(now()) @updatedAt
 }
 
 model RoleBinding {

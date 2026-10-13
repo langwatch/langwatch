@@ -11,6 +11,7 @@ import { HStack, Skeleton, Spacer, Text, VStack } from "@langwatch/design-system
 import { Activity, Plus, Shield } from "lucide-react";
 import { useState } from "react";
 
+import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
 import { monitorApi } from "../../behavior/monitor-api.ts";
 import { useOnlineEvaluations } from "../../behavior/use-online-evaluations.ts";
 import { useMonitorHost } from "../../model/monitor-host.ts";
@@ -131,6 +132,7 @@ export default function OnlineEvaluationsScreen() {
           description="Score live traces and threads as they arrive, or set up a synchronous guardrail that can block unsafe traffic."
           icon={<Activity size={24} />}
           docsHref={DOCS_URL}
+          secondaryAction={<SetupWithAgentButton surface="onlineEvaluations" />}
         />
       )}
       {listState === "list" && (

@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability/browser";
 import {
   generateWorkflowEdgeId,
   LlmConfigInputTypes,
@@ -44,11 +45,7 @@ export type CodedExecutionFailure = {
 };
 import { nowInstant } from "@langwatch/time";
 
-const logger = {
-  warn: (...args: unknown[]) => console.warn(...args),
-  debug: (...args: unknown[]) => console.debug(...args),
-  info: (...args: unknown[]) => console.info(...args),
-};
+const logger = createLogger("langwatch:workflow:store");
 
 export type SocketStatus = "disconnected" | "connecting-python" | "connected";
 

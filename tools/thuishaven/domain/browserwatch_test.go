@@ -115,6 +115,7 @@ func TestBrowserMemoryLimitFollowsTheMachine(t *testing.T) {
 }
 
 // @scenario "A headless browser above its memory ceiling is reaped whole"
+// @scenario "The shared browser between its memory limit and the headroom is not reaped"
 func TestGovernorSparesABrowserBetweenLimitAndHeadroom(t *testing.T) {
 	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
 	limitMB := 8192

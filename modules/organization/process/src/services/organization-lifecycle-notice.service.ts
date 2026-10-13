@@ -37,7 +37,10 @@ export type OrganizationLifecycleSenders = Readonly<{
   recordPersonalWorkspaceArchived: Sender<RecordPersonalWorkspaceArchivedCommandData>;
   recordPersonalWorkspaceRevived: Sender<RecordPersonalWorkspaceRevivedCommandData>;
   recordPersonalWorkspaceFeaturesChanged: Sender<RecordPersonalWorkspaceFeaturesChangedCommandData>;
-  recordPresenceSettingChanged: Sender<RecordPresenceSettingChangedCommandData>;
+  recordPresenceSettingChanged: Pick<
+    EventingCommandSender<RecordPresenceSettingChangedCommandData>,
+    "send" | "sendBatch"
+  >;
   recordTraceSharingDisabled: Sender<RecordTraceSharingDisabledCommandData>;
   recordMemberDisabled: Sender<RecordMemberDisabledCommandData>;
   recordMemberEnabled: Sender<RecordMemberEnabledCommandData>;
@@ -127,13 +130,21 @@ export class OrganizationLifecycleNoticeService {
     });
   }
 
-  /** The backfill's record of a stored setting; throws, so the task fails rather than skips. */
-  async recordStoredPresenceSetting(
-    input: Readonly<{ organizationId: string; presenceEnabled: boolean }>,
+  /** The presence step's record of a page of stored settings, one batch; throws, so it retries. */
+  async recordStoredPresenceSettings(
+    settings: readonly Readonly<{ organizationId: string; presenceEnabled: boolean }>[],
   ): Promise<void> {
     const sender = this.#senders?.recordPresenceSettingChanged;
     if (!sender) throw new Error("organization_lifecycle is not registered in this process");
-    await sender.send({ ...this.#envelope(input.organizationId), ...input, backfilled: true });
+    if (settings.length === 0) return;
+    await sender.sendBatch(
+      settings.map(({ organizationId, presenceEnabled }) => ({
+        ...this.#envelope(organizationId),
+        organizationId,
+        presenceEnabled,
+        backfilled: true,
+      })),
+    );
   }
 
   /** Trace sharing switched off; awaited and loud, since share revokes only on this record. */

@@ -2,9 +2,6 @@ package diffkit
 
 import "sort"
 
-// Copied from tools/apidiff/payloads.go so the fuzzer synthesizes valid bodies
-// the same way; switch apidiff onto diffkit later.
-
 // JSON kinds a schema resolves to.
 const (
 	KindObject  = "object"

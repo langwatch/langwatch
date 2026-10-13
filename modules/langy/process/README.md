@@ -739,7 +739,7 @@ The code access card's own status document, as the command line reads it.
 
 Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:64`.
 
-Answers at `/api/langy/local/workspace`.
+Answers at `/api/langy/local/workspace`, `/api/v1/langy/local/workspace`.
 
 ```typescript
 // Query: langyLocalWorkspaceQuerySchema, ../contract/src/langy-rest.schemas.ts:145
@@ -755,7 +755,7 @@ The recorded request and the command that approves it.
 
 Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:81`.
 
-Answers at `/api/langy/local/requests`.
+Answers at `/api/langy/local/requests`, `/api/v1/langy/local/requests`.
 
 ```typescript
 // Body: langyLocalCreateRequestBodySchema, ../contract/src/langy-rest.schemas.ts:155
@@ -771,7 +771,7 @@ The started call's own id.
 
 Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:98`.
 
-Answers at `/api/langy/local/calls`.
+Answers at `/api/langy/local/calls`, `/api/v1/langy/local/calls`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/langy-local.rest.ts:104)
@@ -787,7 +787,7 @@ The call's answer, or not found while it is still running.
 
 Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:116`.
 
-Answers at `/api/langy/local/calls/:callId`.
+Answers at `/api/langy/local/calls/:callId`, `/api/v1/langy/local/calls/:callId`.
 
 ```typescript
 // Params: langyLocalCallIdParamsSchema, ../contract/src/langy-rest.schemas.ts:127
@@ -803,7 +803,7 @@ The cancelled call's own id.
 
 Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:130`.
 
-Answers at `/api/langy/local/calls/:callId/cancel`.
+Answers at `/api/langy/local/calls/:callId/cancel`, `/api/v1/langy/local/calls/:callId/cancel`.
 
 ```typescript
 type Params = z.infer<typeof langyLocalCallIdParamsSchema>; // ../contract/src/langy-rest.schemas.ts:127
@@ -821,7 +821,7 @@ The started wait's own id.
 
 Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:147`.
 
-Answers at `/api/langy/waits`.
+Answers at `/api/langy/waits`, `/api/v1/langy/waits`.
 
 ```typescript
 type Body = z.infer<typeof langyLocalStartWaitRequestSchema>; // ../contract/src/langy-rest.schemas.ts:172
@@ -837,7 +837,7 @@ The answered question, or not found while it is still waiting.
 
 Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:158`.
 
-Answers at `/api/langy/waits/:waitId`.
+Answers at `/api/langy/waits/:waitId`, `/api/v1/langy/waits/:waitId`.
 
 ```typescript
 // Params: langyLocalWaitIdParamsSchema, ../contract/src/langy-rest.schemas.ts:135
@@ -934,7 +934,7 @@ The dispatch answers the action service's own outcome, and a plain 404 when the 
 
 Deferred scope: the dispatched action's own kind names the permission it requires, so the ceiling is the key's ceiling on THAT permission - only the handler, having read the body, knows which one. Declared at `src/transport/langy-ui-actions.rest.ts:84`.
 
-Answers at `/api/langy/ui/actions`.
+Answers at `/api/langy/ui/actions`, `/api/v1/langy/ui/actions`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/langy-ui-actions.rest.ts:87)
@@ -948,7 +948,7 @@ The catalogue publishes each action's own draft-07 payload schema, which the CLI
 
 Deferred scope: the dispatched action's own kind names the permission it requires, so the ceiling is the key's ceiling on THAT permission - only the handler, having read the body, knows which one. Declared at `src/transport/langy-ui-actions.rest.ts:99`.
 
-Answers at `/api/langy/ui/actions`.
+Answers at `/api/langy/ui/actions`, `/api/v1/langy/ui/actions`.
 
 ```typescript
 // Response: inline, src/transport/langy-ui-actions.rest.ts:101

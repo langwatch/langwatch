@@ -7,7 +7,6 @@ import { cleanup, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
-import "@testing-library/jest-dom/vitest";
 
 import { ActiveSearchEditor } from "../active-search-editor.tsx";
 

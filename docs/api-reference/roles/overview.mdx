@@ -12,7 +12,7 @@ description: "Build custom roles out of the permission catalog and keep them up 
 
 ## Intro
 
-The Roles API manages custom roles: named permission sets your organization defines, for when the built-in roles are not the shape you need. It also lists the built-in roles, addressed by the stable ids `admin`, `member` and `viewer`.
+The Roles API manages custom roles: named permission sets your organization defines, for when the built-in roles are not the shape you need. It can also list the built-in roles, addressed by the stable ids `admin`, `member` and `viewer`.
 
 A role on its own grants no access. It becomes access when a [grant](/api-reference/grants/overview) hands it to a user, a group or an API key at a scope. Roles are what, grants are who and where. See [Roles & access](/platform/roles-and-access).
 
@@ -29,7 +29,7 @@ Authorization: Bearer sk-lw-<id>_<secret>
 | Method   | Path                     | Description                                 |
 | -------- | ------------------------ | ------------------------------------------- |
 | `GET`    | `/api/v1/roles/permissions` | The permission catalog roles are built from |
-| `GET`    | `/api/v1/roles`             | List the built-in roles, then custom ones   |
+| `GET`    | `/api/v1/roles`             | List the custom roles                        |
 | `POST`   | `/api/v1/roles`             | Create a custom role                        |
 | `GET`    | `/api/v1/roles/{id}`        | Read one custom role                        |
 | `PATCH`  | `/api/v1/roles/{id}`        | Update a custom role                        |
@@ -59,7 +59,7 @@ curl -X POST https://app.langwatch.ai/api/v1/roles \
 
 ## Built-in roles
 
-`GET /api/v1/roles` lists `admin`, `member` and `viewer` first, marked `"builtIn": true` with `createdAt` and `updatedAt` null, then the custom roles. `?builtIn=true` lists only the built-in roles and `?builtIn=false` only the custom ones; any other value is refused with 422. `GET /api/v1/roles/admin` reads a built-in role and its permissions. A built-in role cannot be changed or deleted: 409 `role_is_built_in`.
+`GET /api/v1/roles` lists only the custom roles. `?builtIn=true` lists only the built-in roles `admin`, `member` and `viewer` (marked `"builtIn": true`, with `createdAt` and `updatedAt` null) and `?builtIn=false` only the custom ones; any other value is refused with 422. `GET /api/v1/roles/admin` reads a built-in role and its permissions. A built-in role cannot be changed or deleted: 409 `role_is_built_in`.
 
 ## You cannot add a permission you do not hold
 

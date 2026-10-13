@@ -132,8 +132,8 @@ func (g *rig) do(req *http.Request) (int, map[string]any) {
 func (g *rig) eventTypes() []string {
 	events, _, _ := g.s.hook.snapshot()
 	var out []string
-	for _, e := range events {
-		out = append(out, e.Event.Type)
+	for i := range events {
+		out = append(out, events[i].Event.Type)
 	}
 	return out
 }
@@ -141,9 +141,9 @@ func (g *rig) eventTypes() []string {
 func (g *rig) eventIDs(typ string) []string {
 	events, _, _ := g.s.hook.snapshot()
 	var out []string
-	for _, e := range events {
-		if typ == "" || e.Event.Type == typ {
-			out = append(out, e.Event.ID)
+	for i := range events {
+		if typ == "" || events[i].Event.Type == typ {
+			out = append(out, events[i].Event.ID)
 		}
 	}
 	return out

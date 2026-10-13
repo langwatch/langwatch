@@ -416,6 +416,15 @@
           "documentation": "What the sign-in that minted this session PROVED, as RFC 8176 method\nreferences (D06). Empty on every session minted before the column, and\non any ordinary password sign-in. An organization that requires a second\nfactor reads this when a member reaches its data; it is never read at\nmint and never ends a session."
         },
         {
+          "name": "startedBySignUp",
+          "columnName": "startedBySignUp",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Minted while the account had never signed in: the session its sign-up\nstarted, which skips the secure-account offer. False on every later one\nand on every session that predates the column (specs/identity/passkeys.feature)."
+        },
+        {
           "name": "impersonating",
           "columnName": "impersonating",
           "type": "Json",

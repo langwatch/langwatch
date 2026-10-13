@@ -8,17 +8,17 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// DestroyStack is the slug-addressed wipe apidiff's teardown runs. What these
+// DestroyStack is the slug-addressed wipe a tool's teardown runs. What these
 // cases pin is the blast radius: one slug in, one stack down, one database
 // pair dropped, every neighbor untouched.
 func TestDestroyStack(t *testing.T) {
 	ctx := context.Background()
-	const mine, neighbor = "apidiff-20260909t2230-branch", "feat-strict-feature-layout-v0"
+	const mine, neighbor = "run-20260909t2230-branch", "feat-strict-feature-layout-v0"
 
 	newOrch := func(stacks []domain.Stack) (*fakeDBServer, *fakeDBServer, *fakeStore, *Orchestrator) {
 		store := &fakeStore{stacks: stacks}
-		ch := &fakeDBServer{databases: []string{"lw_apidiff_20260909t2230_branch", "lw_feat_strict_feature_layout_v0", "lw_main"}}
-		pg := &fakeDBServer{databases: []string{"lw_apidiff_20260909t2230_branch", "lw_feat_strict_feature_layout_v0", "lw_main"}}
+		ch := &fakeDBServer{databases: []string{"lw_run_20260909t2230_branch", "lw_feat_strict_feature_layout_v0", "lw_main"}}
+		pg := &fakeDBServer{databases: []string{"lw_run_20260909t2230_branch", "lw_feat_strict_feature_layout_v0", "lw_main"}}
 		return ch, pg, store, pruneOrch(store, &fakeSystem{alive: map[int]bool{}}, ch, pg, &fakeHygiene{})
 	}
 
@@ -31,7 +31,7 @@ func TestDestroyStack(t *testing.T) {
 			if err := o.DestroyStack(ctx, mine); err != nil {
 				t.Fatalf("DestroyStack: %v", err)
 			}
-			want := []string{"lw_apidiff_20260909t2230_branch"}
+			want := []string{"lw_run_20260909t2230_branch"}
 			if !slices.Equal(ch.dropped, want) || !slices.Equal(pg.dropped, want) {
 				t.Errorf("dropped ch=%v pg=%v, want %v on each", ch.dropped, pg.dropped, want)
 			}
@@ -69,6 +69,22 @@ func TestDestroyStack(t *testing.T) {
 			}
 			if len(rds.flushed) != 0 {
 				t.Errorf("flushed %v, want nothing while %q still uses db 4", rds.flushed, neighbor)
+			}
+		})
+	})
+
+	t.Run("given a launcher that takes a while to exit", func(t *testing.T) {
+		t.Run("when the stack is destroyed, its Redis DB is flushed only once the launcher is gone", func(t *testing.T) {
+			_, _, _, o := newOrch([]domain.Stack{{Slug: mine, WorktreeDir: "/repos/langwatch", LauncherPID: 4242, RedisDB: 4}})
+			sys := &lingeringLauncher{fakeSystem: &fakeSystem{alive: map[int]bool{4242: true}}, pid: 4242, polls: 3}
+			rds := &fakeRedis{}
+			o.sys, o.rds, o.cfg.ShouldManageRedis = sys, rds, true
+			rds.onFlush = func() { sys.aliveAtFlush = sys.alive[4242] }
+			if err := o.DestroyStack(ctx, mine); err != nil {
+				t.Fatalf("DestroyStack: %v", err)
+			}
+			if !slices.Equal(rds.flushed, []int{4}) || sys.aliveAtFlush {
+				t.Errorf("flushed %v with the launcher alive=%v; want [4] after it exited, or its lanes refill the DB", rds.flushed, sys.aliveAtFlush)
 			}
 		})
 	})
@@ -113,4 +129,23 @@ func TestMainSlugNamesTheProtectedDatabase(t *testing.T) {
 	if !domain.IsProtectedDatabase(domain.DatabaseForSlug("main")) {
 		t.Fatal("slug \"main\" must map onto the protected shared database")
 	}
+}
+
+// lingeringLauncher is a launcher that outlives SIGTERM for a few liveness
+// polls, as a real one shutting its lanes down does.
+type lingeringLauncher struct {
+	*fakeSystem
+	pid          int
+	polls        int
+	aliveAtFlush bool
+}
+
+func (l *lingeringLauncher) Terminate(pid int) { l.terminated = append(l.terminated, pid) }
+
+func (l *lingeringLauncher) ProcessAlive(pid int) bool {
+	if pid == l.pid && len(l.terminated) > 0 && l.alive[pid] {
+		l.polls--
+		l.alive[pid] = l.polls > 0
+	}
+	return l.alive[pid]
 }

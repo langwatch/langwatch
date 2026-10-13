@@ -78,6 +78,26 @@ describe("a tenant step", () => {
     expect(step.title).toBe("Default prompt tags");
   });
 
+  /** @scenario "A tenant step keeps its declared steadiness and queue bound" */
+  it("keeps migratedIsSteady and pauseWhileQueuedAbove through the declaration's parse", () => {
+    const step = defineMigrationStep({
+      id: "identity:heal-secrets",
+      kind: "tenant",
+      mode: "background",
+      description: "Heals each user's secrets every pass.",
+      tenants: "user",
+      title: "Secret heal",
+      requiresOperatorConfirmation: false,
+      runsAutomaticallyOnSelfHosted: true,
+      enrolledAutomatically: true,
+      migratedIsSteady: true,
+      pauseWhileQueuedAbove: 2_000,
+      migrateTenant: async () => ({ status: "migrated", report: {} }),
+    });
+
+    expect(step).toMatchObject({ migratedIsSteady: true, pauseWhileQueuedAbove: 2_000 });
+  });
+
   it("refuses tenant pacing on any other kind, by type", () => {
     const data = defineMigrationStep({
       id: "prompt:fill-column",

@@ -19,10 +19,8 @@ func Command(ctx context.Context, args []string, stdout io.Writer) (int, error) 
 		return 2, err
 	}
 	options.Stdout = stdout
-	if options.PostgresBase == "" || options.ClickHouseBase == "" {
-		if options.PostgresBase, options.ClickHouseBase, err = HavenServers(ctx); err != nil {
-			return 2, err
-		}
+	if options, err = withHavenServers(ctx, options); err != nil {
+		return 2, err
 	}
 	report, err := Run(ctx, options)
 	if err != nil || report == nil {

@@ -11,6 +11,10 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./shared-credential": {
+      "types": "./dist/shared-credential.d.ts",
+      "default": "./src/shared-credential.ts"
+    },
     "./session-state": {
       "types": "./dist/session-state.d.ts",
       "default": "./src/session-state.ts"
@@ -25,6 +29,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
     "ioredis": "catalog:"
   },

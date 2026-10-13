@@ -254,12 +254,12 @@ func TestOAuthSignIn(t *testing.T) {
 	code := loc.Query().Get("code")
 	assert.Equal(t, "s1", loc.Query().Get("state"))
 
-	req := httptest.NewRequest("POST", "/login/oauth/access_token", strings.NewReader(`{"code":"`+code+`"}`))
+	req := httptest.NewRequest(http.MethodPost, "/login/oauth/access_token", strings.NewReader(`{"code":"`+code+`"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, req)
 	assert.Contains(t, rec.Body.String(), "access_token")
-	retry := httptest.NewRequest("POST", "/login/oauth/access_token", strings.NewReader(`{"code":"`+code+`"}`))
+	retry := httptest.NewRequest(http.MethodPost, "/login/oauth/access_token", strings.NewReader(`{"code":"`+code+`"}`))
 	retry.Header.Set("Content-Type", "application/json")
 	rec = httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, retry)
@@ -267,7 +267,7 @@ func TestOAuthSignIn(t *testing.T) {
 
 	again := call(s, "GET", "/login/oauth/authorize?redirect_uri="+url.QueryEscape("http://app.test/cb"), "", "")
 	loc, _ = url.Parse(again.Header().Get("Location"))
-	form := httptest.NewRequest("POST", "/login/oauth/access_token", strings.NewReader("code="+loc.Query().Get("code")))
+	form := httptest.NewRequest(http.MethodPost, "/login/oauth/access_token", strings.NewReader("code="+loc.Query().Get("code")))
 	form.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec = httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, form)

@@ -162,6 +162,8 @@ export interface ProcessManagerConfig<State, Intents, E extends Event = Event> {
   outbox?: {
     maxAttempts?: number;
     leaseDurationMs?: number;
+    /** Silence before a running handler's lease stops renewing. Default 5 minutes. */
+    maxSilenceMs?: number;
     retryDelayMs?: (params: { attempt: number }) => number;
     /** In-flight dispatches per loop. Default 1 (sequential). */
     concurrency?: number;

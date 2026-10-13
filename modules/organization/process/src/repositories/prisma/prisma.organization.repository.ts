@@ -36,6 +36,7 @@ import {
   type EnsuredPersonalTeam,
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
+  type OrganizationPresenceSettingRow,
 } from "../organization.repository.ts";
 import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.ts";
 
@@ -87,6 +88,24 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     if (limit === undefined || ids.length <= limit) return { ids, next: null };
     const page = ids.slice(0, limit);
     return { ids: page, next: page[page.length - 1] ?? null };
+  }
+
+  async findPresenceSettingPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<OrganizationPresenceSettingRow[]> {
+    return this.database.organization.findMany({
+      select: { id: true, presenceEnabled: true },
+      orderBy: { id: "asc" },
+      where: {
+        kind: { not: ORGANIZATION_KIND.SYSTEM },
+        ...(afterId === null ? {} : { id: { gt: afterId } }),
+      },
+      take: limit,
+    });
   }
 
   async countUsage({

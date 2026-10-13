@@ -30,6 +30,7 @@ import {
   type EnsuredPersonalTeam,
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
+  type OrganizationPresenceSettingRow,
 } from "../organization.repository.ts";
 import type {
   MemoryOrganizationDatabase,
@@ -66,6 +67,21 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     if (limit === undefined || ids.length <= limit) return { ids, next: null };
     const page = ids.slice(0, limit);
     return { ids: page, next: page[page.length - 1] ?? null };
+  }
+
+  async findPresenceSettingPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<OrganizationPresenceSettingRow[]> {
+    return [...this.memory.organizations.values()]
+      .filter((row) => row.kind !== ORGANIZATION_KIND.SYSTEM)
+      .filter((row) => afterId === null || row.id > afterId)
+      .toSorted((a, b) => (a.id < b.id ? -1 : 1))
+      .slice(0, limit)
+      .map((row) => ({ id: row.id, presenceEnabled: row.presenceEnabled }));
   }
 
   /** The memory rows carry no legacy single sign-on column, so no provider is named here. */

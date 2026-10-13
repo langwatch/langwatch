@@ -60,8 +60,9 @@ export interface SystemMigration {
   readonly migratedIsSteady?: boolean;
 
   /**
-   * Pacing: a pass starts no new page of tenants while the group queues hold more waiting jobs than
-   * this, and an unreadable count reads as over it (Alex, 2026-10-12). Omitted means unpaced.
+   * Pacing: a pass starts no new page of tenants while more than this many of its own jobs wait or
+   * run; without a queue list, of the whole queue's (Alex, 2026-10-12). Omitted, a pass on a queue
+   * list still waits at `DEFAULT_PAUSE_WHILE_QUEUED_ABOVE` of its own jobs; without, unpaced.
    */
   readonly pauseWhileQueuedAbove?: number;
 
@@ -80,5 +81,10 @@ export interface SystemMigration {
      * rather than short-circuit on "nothing left to write".
      */
     previous?: TenantMigrationRecord | null;
+    /**
+     * Pacing inside one tenant: a migration that sends many commands awaits this between pages of
+     * them. It resolves once the pass is back under its bound, or as soon as the signal aborts.
+     */
+    waitForRoom?: () => Promise<void>;
   }): Promise<TenantMigrationOutcome>;
 }

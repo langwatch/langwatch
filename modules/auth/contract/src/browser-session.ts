@@ -104,6 +104,8 @@ const browserSessionInventoryEntrySchemaDefinition = z
      */
     lastActiveAt: z.string().datetime(),
     expiresAt: z.string().datetime(),
+    /** The account's first session, the one its sign-up started; false on every later one. */
+    startedBySignUp: z.boolean(),
     /** Whether this is the session doing the reading. */
     current: z.boolean(),
   })

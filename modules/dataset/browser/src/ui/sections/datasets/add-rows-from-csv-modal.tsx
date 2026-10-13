@@ -9,11 +9,14 @@ import {
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, HStack, NativeSelect, Spacer, Text } from "@langwatch/design-system/primitives";
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight } from "react-feather";
 
 import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
 import { CSVReaderComponent } from "./upload-csv-drawer.tsx";
+
+const logger = createLogger("langwatch:dataset:add-rows-from-csv");
 
 /**
  * The app's KSUID resource for a dataset record row (`KSUID_RESOURCES.RECORD`).
@@ -154,7 +157,7 @@ export function AddRowsFromCSVModal({
         entries: convertDatasetRecordsToColumnTypes(recordEntries, columnTypes),
       });
     } catch (error) {
-      console.error(error);
+      logger.error({ error }, "Failed to process CSV");
       toaster.create({
         title: "Error processing CSV",
         type: "error",

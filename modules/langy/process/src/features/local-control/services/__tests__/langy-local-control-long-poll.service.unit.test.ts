@@ -9,6 +9,10 @@ import { memorySessionState } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { MemoryLangyLocalWorkspaceChannel } from "../../../../channels/memory/memory.langy-local-workspace.channel.ts";
+import { LangyLocalCallMemoryRepository } from "../../../../repositories/memory/memory.langy-local-call.repository.ts";
+import { LangyLocalControlRequestMemoryRepository } from "../../../../repositories/memory/memory.langy-local-control-request.repository.ts";
+import { LangyLocalUserWaitMemoryRepository } from "../../../../repositories/memory/memory.langy-local-user-wait.repository.ts";
 import { LangyLocalPresenceRedisRepository } from "../../../../repositories/redis/redis.langy-local-presence.repository.ts";
 import { nullLocalBuffer } from "../../../../rules/langy-local-call-record.rules.ts";
 import { readSessionKeyCredential } from "../../../../rules/langy-local-control-connect.rules.ts";
@@ -55,8 +59,11 @@ beforeEach(() => {
   minted = new Map();
   const store = memorySessionState();
   runtime = LangyLocalControlRuntimeService.create({
-    store,
+    calls: LangyLocalCallMemoryRepository.create(),
+    userWaits: LangyLocalUserWaitMemoryRepository.create(),
+    controlRequests: LangyLocalControlRequestMemoryRepository.create(),
     presence: LangyLocalPresenceRedisRepository.create({ store }),
+    workspace: MemoryLangyLocalWorkspaceChannel.create(),
     projects: { getOrganizationId: async () => "org_1", getSlug: async () => "local" },
     mintSessionKey: async () => {
       const token = `sk-lw-minted-${minted.size}`;
@@ -74,7 +81,7 @@ beforeEach(() => {
       readCredential: readSessionKeyCredential,
       actors: { findById: async () => null },
       baseHost: "https://app.test",
-      store,
+      workspace: runtime.workspace,
       presence: runtime.presence,
       dispatcher: runtime.dispatcher,
       waits: runtime.waits,

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { fromDate } from "@langwatch/time";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
 import { UserNotFoundError } from "@langwatch/user-contract";
 
 import {
@@ -29,6 +29,7 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
         deactivatedAt: true,
         pendingSsoSetup: true,
         signupConfirmationPending: true,
+        lastLoginAt: true,
       },
     });
     if (user === null) throw new UserNotFoundError(userId);
@@ -36,6 +37,7 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
     return {
       ...user,
       deactivatedAt: user.deactivatedAt === null ? null : fromDate(user.deactivatedAt),
+      lastLoginAt: user.lastLoginAt === null ? null : fromDate(user.lastLoginAt),
     };
   }
 
@@ -126,7 +128,7 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
   async recordLastLogin({ userId }: { userId: string }): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
-      data: { lastLoginAt: new Date() },
+      data: { lastLoginAt: toDate(nowInstant()) },
     });
   }
 }

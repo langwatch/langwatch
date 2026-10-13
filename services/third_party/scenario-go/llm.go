@@ -67,6 +67,13 @@ type InferenceResult struct {
 }
 
 // ModelConfig selects a model and its sampling settings.
+//
+// Either set LLM to a provider (openai.NewProvider(&client), …) and Model to
+// that provider's model name, or leave LLM nil and set Model to a
+// "provider/model" string such as "openai/gpt-4.1-mini", the format of the
+// JS and Python SDKs. The provider part is looked up among the providers
+// registered with RegisterProvider, which read their API keys from the
+// environment unless APIKey is set.
 type ModelConfig struct {
 	LLM   LLM
 	Model string
@@ -74,15 +81,42 @@ type ModelConfig struct {
 	// reasoning models that reject it working.
 	Temperature *float64
 	MaxTokens   *int64
+	// APIKey, BaseURL and Headers configure the provider a "provider/model"
+	// string resolves to; empty fields fall back to its environment
+	// variables. They are ignored when LLM is set.
+	APIKey  string
+	BaseURL string
+	Headers map[string]string
 }
 
-// merged returns c with unset fields taken from defaults.
-func (c ModelConfig) merged(defaults ModelConfig) ModelConfig {
-	if c.LLM == nil {
-		c.LLM = defaults.LLM
-	}
-	if c.Model == "" {
+// WithDefaults returns c with unset fields taken from defaults, the way the
+// built-in agents combine their own model with Configure(WithDefaultModel).
+//
+// A Model naming a registered provider ("anthropic/claude-sonnet-4-5")
+// stands on its own: it does not inherit the default LLM, nor the default's
+// key and endpoint unless both name the same provider. A bare model name
+// ("gpt-4.1") keeps the default's provider.
+func (c ModelConfig) WithDefaults(defaults ModelConfig) ModelConfig {
+	switch {
+	case c.Model == "":
 		c.Model = defaults.Model
+		if c.LLM == nil {
+			c.LLM = defaults.LLM
+		}
+		c.inheritEndpoint(defaults)
+	case c.LLM != nil:
+	case registeredProvider(c.Model) != "":
+		if registeredProvider(c.Model) == registeredProvider(defaults.Model) {
+			c.inheritEndpoint(defaults)
+		}
+	default:
+		c.LLM = defaults.LLM
+		if c.LLM == nil {
+			if p := registeredProvider(defaults.Model); p != "" {
+				c.Model = p + "/" + c.Model
+			}
+		}
+		c.inheritEndpoint(defaults)
 	}
 	if c.Temperature == nil {
 		c.Temperature = defaults.Temperature
@@ -93,14 +127,40 @@ func (c ModelConfig) merged(defaults ModelConfig) ModelConfig {
 	return c
 }
 
+func (c *ModelConfig) inheritEndpoint(defaults ModelConfig) {
+	if c.APIKey == "" {
+		c.APIKey = defaults.APIKey
+	}
+	if c.BaseURL == "" {
+		c.BaseURL = defaults.BaseURL
+	}
+	if c.Headers == nil {
+		c.Headers = defaults.Headers
+	}
+}
+
+// merged combines c with the defaults and resolves a "provider/model"
+// string to its LLM.
+func (c ModelConfig) merged(defaults ModelConfig) (ModelConfig, error) {
+	return c.WithDefaults(defaults).Resolve()
+}
+
 // ErrNoModel is returned when neither the agent nor Configure provides an LLM.
-var ErrNoModel = errors.New("a model is required: set LLM on the agent config or call scenario.Configure(scenario.WithDefaultModel(...))")
+var ErrNoModel = errors.New("a model is required: set LLM or a \"provider/model\" Model on the agent config, or call scenario.Configure(scenario.WithDefaultModel(...))")
+
+// errNilInference is returned when an LLM reports neither a result nor an
+// error, which the agents would otherwise dereference.
+var errNilInference = errors.New("the model returned neither a result nor an error")
 
 // invoker calls an LLM and learns, per agent, which request features the
 // provider rejects: a forced tool choice or a temperature. On such an error
 // the call is retried once with the feature adapted, and later calls apply
-// the adaptation up front, like the JS SDK's createLLMInvoker.
+// the adaptation up front, like the JS SDK's createLLMInvoker. Every
+// attempt is recorded as an LLM span (see TraceInference).
 type invoker struct {
+	// role is the scenario role recorded on the model-call spans; the judge
+	// sets it so it can tell its own calls apart in the trace.
+	role            AgentRole
 	mu              sync.Mutex
 	relaxToolChoice bool
 	dropTemperature bool
@@ -122,8 +182,11 @@ func (iv *invoker) invoke(ctx context.Context, llm LLM, params InferenceParams) 
 	}
 	for {
 		adapted := iv.apply(params)
-		res, err := llm.Inference(ctx, adapted)
+		res, err := traceInference(ctx, llm, adapted, iv.role)
 		if err == nil {
+			if res == nil {
+				return nil, errNilInference
+			}
 			return res, nil
 		}
 		if !iv.learn(err, adapted) {

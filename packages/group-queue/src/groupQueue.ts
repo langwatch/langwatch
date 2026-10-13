@@ -55,6 +55,7 @@ import type {
   GroupQueuePolicy,
   GroupQueueRuntimeDefinition,
   JobDelivery,
+  ListedRun,
   QueueAuditAdapter,
   QueueSendOptions,
 } from "./contracts.ts";
@@ -213,6 +214,9 @@ export function handBackOutcome({
 /** What a refusal over a list's groups names: the operation, and whose work it was. */
 type TargetsFault = Readonly<{ operation: string; work: string }>;
 
+/** How often a listed run waiting for room counts its outstanding jobs, at least. */
+const LIST_ROOM_POLL_MS = 250;
+
 const PREFLIGHT_FAULT: TargetsFault = {
   operation: "waitUntilPreflightIdle",
   work: "Migration preflight work",
@@ -239,8 +243,11 @@ function nonEmptyString(value: unknown): string | undefined {
  * floor for poison guard beacon TTL (interdependency tested across modules).
  */
 export const GROUP_QUEUE_CONFIG = {
-  /** Default global concurrency (max parallel groups) */
-  defaultGlobalConcurrency: 100,
+  /**
+   * Max parallel groups per consumer. Jobs mostly wait on flushed ClickHouse inserts (~200 ms),
+   * so slots set throughput; a listed run's bench reached 1,474 jobs/s at 1,000 (Alex, 2026-10-12).
+   */
+  defaultGlobalConcurrency: 1_000,
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */
@@ -348,6 +355,7 @@ type ClaimedJob<Payload> = {
   stagedJobId: string;
   jobDataJson: string;
   originalScore: number;
+  claimToken: string;
   payload: Payload;
   contextMetadata: GroupQueueContextMetadata | undefined;
   attempt: number;
@@ -514,7 +522,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     this.consumerEnabled = options?.consumerEnabled ?? true;
     this.dispatchGroupAllowListKey = options?.dispatchGroupAllowListKey;
     this.dispatchListed = options?.dispatchListed ?? false;
-    this.preflightDrainTimeoutMs = options?.preflightDrainTimeoutMs ?? 60_000;
+    this.preflightDrainTimeoutMs = options?.preflightDrainTimeoutMs ?? 300_000;
     // Dedicated connection for BRPOP to avoid blocking the shared connection.
     // Only needed when the dispatcher loop runs (consumer mode).
     // IORedis.duplicate() takes an options override; Cluster.duplicate() takes no
@@ -884,10 +892,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       }),
     );
 
-    await Promise.all(jobsToStage.map((job) => this.registerPreflightGroup(job.groupId)));
+    // One registration per batch, before and after staging, as send() makes for its one job.
+    const stagedGroupIds = () => [...new Set(jobsToStage.map((job) => job.groupId))];
+    await this.registerPreflightGroups(stagedGroupIds);
 
     const { newStagedCount } = await this.scripts.stageBatch(jobsToStage);
-    await Promise.all(jobsToStage.map((job) => this.activatePreflightGroup(job.groupId)));
+    await this.registerPreflightGroups(stagedGroupIds);
 
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
@@ -978,7 +988,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
    * the next claimant finds a provably dead owner (poison-group-park-guard.feature).
    */
   private async processWithRetries(dispatched: DispatchResult): Promise<void> {
-    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
+    const { stagedJobId, groupId, jobDataJson, originalScore, claimToken } = dispatched;
 
     // The beacon must exist before this worker owns a marker, or a peer would
     // read our live claim as an abandoned one.
@@ -1005,6 +1015,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           stagedJobId,
           jobDataJson,
           originalScore,
+          claimToken,
           reason: "claim_strikes",
           lastOwnerState,
           errorMessage: `Poison guard: ${deaths} confirmed worker deaths while this group was in flight (threshold ${deathThreshold}). Each was a worker that claimed this group and then stopped heartbeating without shutting down. Inspect the staged jobs, then unblock the group to retry.`,
@@ -1061,7 +1072,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const [job] = await this.claimedJobFrom({ dispatched, jobData });
     if (!job) return;
 
-    const { groupId, stagedJobId, jobDataJson, drainedSiblings, routingLabels } = job;
+    const { groupId, stagedJobId, jobDataJson, claimToken, drainedSiblings, routingLabels } = job;
     const jobStartTime = performance.now();
     // Idempotent so an outcome path can stop the beat at the moment it decides
     // (see the retry path) while the `finally` still guarantees it is stopped.
@@ -1069,6 +1080,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const heartbeat = this.startActiveKeyHeartbeat({
       groupId,
       stagedJobId,
+      claimToken,
       jobDataValues: [jobDataJson, ...drainedSiblings.map((sibling) => sibling.jobDataJson)],
       isCancelled: () => heartbeatStopped,
     });
@@ -1094,7 +1106,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
 
   /** The stored job data, or none when the value was retried, parked or dropped instead. */
   private async decodeClaimedJob(dispatched: DispatchResult): Promise<Record<string, unknown>[]> {
-    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
+    const { stagedJobId, groupId, jobDataJson, originalScore, claimToken } = dispatched;
     // Parse the stored job data
     try {
       return [
@@ -1110,6 +1122,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           groupId,
           stagedJobId,
           jobDataJson,
+          claimToken,
           err,
         });
         return [];
@@ -1123,6 +1136,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           stagedJobId,
           jobDataJson,
           originalScore,
+          claimToken,
           reason: "oversized_payload",
           errorMessage: `Poison guard: ${err.message}. The staged value was parked unparsed.`,
         });
@@ -1135,6 +1149,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         groupId,
         stagedJobId,
         jobDataJson,
+        claimToken,
         err,
         reason: dropReasonOf(err),
         message: "Failed to parse staged job data",
@@ -1151,7 +1166,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     dispatched: DispatchResult;
     jobData: Record<string, unknown>;
   }): Promise<ClaimedJob<Payload>[]> {
-    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
+    const { stagedJobId, groupId, jobDataJson, originalScore, claimToken } = dispatched;
     const contextMetadata = jobData.__context as GroupQueueContextMetadata | undefined;
     const jobAttempt = typeof jobData.__attempt === "number" ? jobData.__attempt : 1;
     // A re-staged sibling carries no __attempt of its own, so fall back to the
@@ -1174,16 +1189,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
 
     // Opt-in batch coalescing drains additional staged DUE jobs from the same
     // group into one handler call; the group's active key makes the drain
-    // exclusive. A preflight scope must propagate through every causal chain, so
-    // coalescing across two concurrent scopes would drop the second one's fan-out.
-    const maxBatch = contextMetadata?.queueDispatchScopeKey
-      ? 1
-      : (this.coalesceMaxBatch?.(payload) ?? 1);
+    // exclusive. Only siblings sent under the same dispatch scope join the batch
+    // (coalescedBatch restages the rest), so every scope's fan-out stays its own.
+    const maxBatch = this.coalesceMaxBatch?.(payload) ?? 1;
     const base = {
       groupId,
       stagedJobId,
       jobDataJson,
       originalScore,
+      claimToken,
       payload,
       contextMetadata,
       attempt,
@@ -1214,7 +1228,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     payload: Payload;
     maxBatch: number;
   }): Promise<DrainedJob[]> {
-    const { groupId, jobDataJson } = dispatched;
+    const { groupId, jobDataJson, claimToken } = dispatched;
     let drainedSiblings: DrainedJob[] = [];
     const maxBytes = this.coalesceMaxBytes?.(payload) ?? DEFAULT_COALESCE_MAX_BYTES;
     const initialBytes = readJobPayloadBytes(jobDataJson);
@@ -1225,6 +1239,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         maxJobs: maxBatch - 1,
         maxBytes,
         initialBytes,
+        claimToken,
       });
     } catch (err) {
       this.logger.warn(
@@ -1256,7 +1271,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       }
       if (foreignSiblings.length > 0) {
         gqForeignSiblingsRestagedTotal.inc({ queue_name: this.queueName }, foreignSiblings.length);
-        await this.restageDrainedSiblings(groupId, foreignSiblings);
+        await this.restageDrainedSiblings({ groupId, siblings: foreignSiblings, claimToken });
       }
       drainedSiblings = matchingSiblings;
     }
@@ -1275,7 +1290,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     contextMetadata: GroupQueueContextMetadata | undefined;
     drained: DrainedJob[];
   }): Promise<CoalescedBatch<Payload>> {
-    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
+    const { stagedJobId, groupId, jobDataJson, originalScore, claimToken } = dispatched;
     const drainedSiblings = drained;
     if (drainedSiblings.length === 0) {
       return { kind: "batch", batch: { batchPayloads: null, batchJobIds: [], drainedSiblings } };
@@ -1298,7 +1313,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         siblingPayloads.push(parsed.payload);
       }
       if (differentlyScoped.length > 0) {
-        await this.restageDrainedSiblings(groupId, differentlyScoped);
+        await this.restageDrainedSiblings({ groupId, siblings: differentlyScoped, claimToken });
       }
       if (siblingPayloads.length === 0) {
         return {
@@ -1321,11 +1336,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         // the siblings via the normal path and route the dispatched job
         // through the same handleTransientDecode as the direct decode
         // failure — the body is unreachable, not gone (ADR-029).
-        await this.restageDrainedSiblings(groupId, drainedSiblings);
+        await this.restageDrainedSiblings({ groupId, siblings: drainedSiblings, claimToken });
         await this.handleTransientDecode({
           groupId,
           stagedJobId,
           jobDataJson,
+          claimToken,
           err,
         });
         return { kind: "handled" };
@@ -1336,12 +1352,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         // path: park the group and re-stage the drained siblings first, preserving
         // them (and the oversized value) for inspection rather than losing them to
         // replay. The dispatched job's value carries the park.
-        await this.restageDrainedSiblings(groupId, drainedSiblings);
+        await this.restageDrainedSiblings({ groupId, siblings: drainedSiblings, claimToken });
         await this.parkPoisonGroup({
           groupId,
           stagedJobId,
           jobDataJson,
           originalScore,
+          claimToken,
           reason: "oversized_payload",
           errorMessage: `Poison guard: a coalesced sibling of this group is oversized (${err.message}). The batch was parked unparsed.`,
         });
@@ -1481,6 +1498,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId,
       stagedJobId,
       jobDataJson,
+      claimToken,
       payload,
       attempt,
       jobName,
@@ -1491,7 +1509,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // Success — complete the group slot. Drained siblings were
     // removed from staging during the drain, so completing the
     // dispatched job is enough to free the group.
-    await this.scripts.complete({ groupId, stagedJobId, jobName });
+    const completed = await this.scripts.complete({ groupId, stagedJobId, jobName, claimToken });
+    if (!completed) {
+      // Another worker recovered this claim after our active key lapsed and runs the job
+      // now; its lease and the group's chain are that worker's (claimed-job-recovery.feature).
+      this.logger.warn(
+        { queueName: this.queueName, groupId, stagedJobId, attempt },
+        "Job finished after its claim was recovered by another worker; leaving the completion to that worker",
+      );
+      return;
+    }
 
     // PAST THE POINT OF NO RETURN: the slot is completed, so this needs its own
     // catch — the outer one treats a throw as a FAILED job and would re-stage the
@@ -1584,7 +1611,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // Re-stage them so they are re-dispatched (and re-coalesced) on the
     // dispatched job's retry, rather than lost until an event replay.
     if (drainedSiblings.length > 0) {
-      await this.restageDrainedSiblings(groupId, drainedSiblings);
+      await this.restageDrainedSiblings({
+        groupId,
+        siblings: drainedSiblings,
+        claimToken: job.claimToken,
+      });
     }
 
     if (err instanceof HandBackGroupQueueError) {
@@ -1695,6 +1726,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId,
       stagedJobId,
       jobDataJson,
+      claimToken,
       payload,
       contextMetadata,
       attempt,
@@ -1742,16 +1774,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         // keeping it buys a later worker nothing.
         bodyPreserved: false,
       });
-      await this.blobLifecycle.releaseLease({
-        values: [jobDataJson],
-        groupId,
-      });
-      await this.scripts.complete({
+      const completed = await this.scripts.complete({
         groupId,
         stagedJobId,
         jobName,
         dropped: true,
+        claimToken,
       });
+      // A recovering worker's job carries this value and its lease; only the owner releases it.
+      if (completed) await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
       // Kept alongside gq_jobs_dropped_total: this counter is the
       // specific "a retry-encode blip lost it" diagnostic, not a
       // genuine non-retryable process() error. Oncall triaging a
@@ -1780,6 +1811,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       // would hand the next sibling-led claim a fresh budget.
       attempt: attempt + 1,
       attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
+      claimToken,
     });
     // Only transfer once the replacement is staged: retryRestage returns false
     // when the active key is stale and nothing was written, so transferring
@@ -1847,7 +1879,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     since: number;
     stopHeartbeat: () => void;
   }): Promise<void> {
-    const { groupId, stagedJobId, jobDataJson, payload, contextMetadata, attempt, jobName } = job;
+    const { groupId, stagedJobId, jobDataJson, claimToken, payload, contextMetadata } = job;
+    const { attempt, jobName } = job;
     let handBackJobData: string;
     try {
       handBackJobData = await this.blobLifecycle.encode({
@@ -1869,8 +1902,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         message: "Hand-back re-encode failed; releasing old lease and discarding job",
         bodyPreserved: false,
       });
-      await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
-      await this.scripts.complete({ groupId, stagedJobId, jobName, dropped: true });
+      const completed = await this.scripts.complete({
+        groupId,
+        stagedJobId,
+        jobName,
+        dropped: true,
+        claimToken,
+      });
+      if (completed) await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
       return;
     }
     // Before the re-stage, as on the retry path: a heartbeat tick would overwrite its TTL.
@@ -1884,6 +1923,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       backoffMs: HAND_BACK_CONFIG.delayMs,
       attempt,
       attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
+      claimToken,
     });
     if (restaged) {
       await this.blobLifecycle.transferLease({
@@ -1943,7 +1983,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // When the group tripped the quarantine breaker, block it with the descriptive quarantine
     // error rather than the raw job error, so /ops shows why the group is blocked.
     const lastError = quarantineError ?? error;
-    const deadPayloads =
+    const { deadPayloads, claimLost } =
       this.onExhausted?.(payload) === "dead-letter"
         ? await this.deadLetterClaimedJob({ job, lastError, offender })
         : await this.blockClaimedJob({ job, lastError });
@@ -1959,30 +1999,38 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           }),
       ),
     );
+    // The recovering worker's job carries this value and its lease (claimed-job-recovery.feature).
+    if (claimLost) return;
     await this.blobLifecycle.releaseLease({
       values: [jobDataJson],
       groupId,
     });
   }
 
-  /** Blocks the group with the job re-staged; every payload of the batch counts as dead. */
+  /**
+   * Blocks the group with the job re-staged; every payload of the batch counts as dead,
+   * unless the claim was lost.
+   */
   private async blockClaimedJob({
     job,
     lastError,
   }: {
     job: ClaimedJob<Payload>;
     lastError: Error;
-  }): Promise<Payload[]> {
-    await this.handleExhaustedRetries({
+  }): Promise<{ deadPayloads: Payload[]; claimLost: boolean }> {
+    const blocked = await this.handleExhaustedRetries({
       groupId: job.groupId,
       stagedJobId: job.stagedJobId,
       payload: job.payload,
       originalScore: job.originalScore,
+      claimToken: job.claimToken,
       lastError,
       contextMetadata: job.contextMetadata,
       routingLabels: job.routingLabels,
     });
-    return job.batchPayloads ?? [job.payload];
+    // A job whose claim was recovered did not die: the recovering worker runs it.
+    if (!blocked) return { deadPayloads: [], claimLost: true };
+    return { deadPayloads: job.batchPayloads ?? [job.payload], claimLost: false };
   }
 
   /**
@@ -1998,7 +2046,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     job: ClaimedJob<Payload>;
     lastError: Error;
     offender: string | undefined;
-  }): Promise<Payload[]> {
+  }): Promise<{ deadPayloads: Payload[]; claimLost: boolean }> {
     const { groupId, stagedJobId, payload, contextMetadata, jobName, routingLabels } = job;
     const score = this.restageScore(job.originalScore);
     const batchJobIds = job.batchJobIds.length > 0 ? job.batchJobIds : [stagedJobId];
@@ -2010,8 +2058,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId,
     });
     const handlerError = lastError.cause instanceof Error ? lastError.cause : lastError;
+    const refusedJobIds: string[] = [];
     for (const jobId of deadJobIds) {
-      await deadLetterJob({
+      const outcome = await deadLetterJob({
         redis: this.redisConnection,
         keyPrefix: `${this.queueName}:gq:`,
         groupId,
@@ -2020,7 +2069,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         jobDataJson: jobId === stagedJobId ? freshValue : "",
         errorMessage: lastError.message,
         errorStack: handlerError.stack ?? "",
+        claimToken: job.claimToken,
       });
+      if (outcome === "claim-lost") refusedJobIds.push(jobId);
     }
     if (!deadJobIds.includes(stagedJobId)) {
       await this.scripts.stage({
@@ -2030,9 +2081,37 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         dedupId: "",
         dedupTtlMs: 0,
         jobDataJson: freshValue,
+        claimToken: job.claimToken,
       });
     }
-    await this.scripts.complete({ groupId, stagedJobId, jobName, dropped: true });
+    const payloads = job.batchPayloads ?? [payload];
+    // A job refused for a lost claim did not die: the recovering worker runs it.
+    const deadPayloads = payloads.filter((_, index) => {
+      const jobId = batchJobIds[index] ?? stagedJobId;
+      return deadJobIds.includes(jobId) && !refusedJobIds.includes(jobId);
+    });
+    const completed = await this.scripts.complete({
+      groupId,
+      stagedJobId,
+      jobName,
+      dropped: true,
+      claimToken: job.claimToken,
+    });
+    if (!completed) {
+      // The recovering worker now owns the group's chain, its failures and its attempt count.
+      this.logger.warn(
+        {
+          queueName: this.queueName,
+          groupId,
+          stagedJobId,
+          deadJobIds,
+          refusedJobIds,
+          error: lastError,
+        },
+        "Job exhausted after its claim was recovered by another worker; leaving the group to that worker",
+      );
+      return { deadPayloads, claimLost: true };
+    }
     // The chain is over for this group: the next job starts with a fresh budget and streak.
     await this.scripts.clearGroupFailures(groupId).catch(() => {});
     await this.clearGroupAttempt(groupId);
@@ -2049,8 +2128,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       },
       "Job dead-lettered after exhausted retries; its group drains on",
     );
-    const payloads = job.batchPayloads ?? [payload];
-    return payloads.filter((_, index) => deadJobIds.includes(batchJobIds[index] ?? stagedJobId));
+    return { deadPayloads, claimLost: false };
   }
 
   /**
@@ -2386,10 +2464,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     span.setAttribute("queue.batch_offending_job_id", entry.stagedJobId);
   }
 
-  private async restageDrainedSiblings(groupId: string, siblings: DrainedJob[]): Promise<void> {
+  private async restageDrainedSiblings({
+    groupId,
+    siblings,
+    claimToken,
+  }: {
+    groupId: string;
+    siblings: DrainedJob[];
+    claimToken: string;
+  }): Promise<void> {
     for (const sibling of siblings) {
       try {
-        await this.scripts.stage({
+        const { claimLost } = await this.scripts.stage({
           stagedJobId: sibling.stagedJobId,
           groupId,
           // Guarded like every other re-stage. An invalid persisted score such
@@ -2398,7 +2484,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           dedupId: "",
           dedupTtlMs: 0,
           jobDataJson: sibling.jobDataJson,
+          claimToken,
         });
+        if (claimLost) {
+          // The recovering worker already put every sibling this claim held back on the group.
+          this.logger.warn(
+            { queueName: this.queueName, groupId, stagedJobId: sibling.stagedJobId },
+            "Drained siblings not re-staged: their claim was recovered by another worker",
+          );
+          return;
+        }
       } catch (err) {
         // The sibling never made it back into staging, so nothing will dispatch
         // it again — that is a discard, whatever the re-stage intended (#5538).
@@ -2464,11 +2559,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   private startActiveKeyHeartbeat({
     groupId,
     stagedJobId,
+    claimToken,
     jobDataValues,
     isCancelled,
   }: {
     groupId: string;
     stagedJobId: string;
+    claimToken: string;
     jobDataValues: string[];
     /** True once the job's outcome is decided; see `stopHeartbeat`. */
     isCancelled: () => boolean;
@@ -2481,6 +2578,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           stagedJobId,
           activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec,
           isCancelled,
+          claimToken,
         })
         .catch((err) => {
           this.logger.warn(
@@ -2508,6 +2606,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     stagedJobId,
     payload,
     originalScore,
+    claimToken,
     lastError,
     contextMetadata,
     routingLabels,
@@ -2516,10 +2615,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     stagedJobId: string;
     payload: Payload;
     originalScore: number;
+    claimToken: string;
     lastError: Error | undefined;
     contextMetadata: GroupQueueContextMetadata | undefined;
     routingLabels: Record<string, string>;
-  }): Promise<void> {
+  }): Promise<boolean> {
     // The re-staged job keeps its original ready score so an operator sees it
     // where it belongs in the queue - unless that score is not a usable
     // timestamp, in which case re-staging it would park the group at the epoch
@@ -2544,14 +2644,22 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const handlerError = lastError?.cause instanceof Error ? lastError.cause : lastError;
 
     // Atomically: block the group, re-stage the job, update ready score, store error
-    await this.scripts.restageAndBlock({
+    const blocked = await this.scripts.restageAndBlock({
       groupId,
       newStagedJobId,
       score,
       jobDataJson,
       errorMessage: lastError?.message,
       errorStack: handlerError?.stack,
+      claimToken,
     });
+    if (!blocked) {
+      this.logger.warn(
+        { queueName: this.queueName, groupId, stagedJobId, error: lastError },
+        "Job exhausted its retries after its claim was recovered by another worker; not blocking the group",
+      );
+      return false;
+    }
 
     gqGroupsBlockedTotal.inc(routingLabels);
     gqJobsExhaustedTotal.inc(routingLabels);
@@ -2570,6 +2678,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       },
       "Group blocked after exhausted retries, job re-staged",
     );
+    return true;
   }
 
   /**
@@ -2581,6 +2690,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     groupId,
     stagedJobId,
     jobDataJson,
+    claimToken,
     err,
     reason,
     message,
@@ -2588,6 +2698,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     groupId: string;
     stagedJobId: string;
     jobDataJson: string;
+    claimToken: string;
     err: unknown;
     /** Narrower than {@link DropReason}; other discard sites own no active slot. */
     reason: DecodeFailureReason | "transient_exhausted" | "unknown";
@@ -2607,8 +2718,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
 
     // `dropped: true` keeps the group advancing WITHOUT counting a thrown-away
     // job as a completion or clearing the group's stored error (#5538).
-    await this.scripts.complete({ groupId, stagedJobId, dropped: true });
-    await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
+    const completed = await this.scripts.complete({
+      groupId,
+      stagedJobId,
+      dropped: true,
+      claimToken,
+    });
+    // A recovering worker's job carries this value and its lease; only the owner releases it.
+    if (completed) await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
   }
 
   /**
@@ -2688,6 +2805,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     stagedJobId,
     jobDataJson,
     originalScore,
+    claimToken,
     reason,
     errorMessage,
     lastOwnerState,
@@ -2696,6 +2814,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     stagedJobId: string;
     jobDataJson: string;
     originalScore: number;
+    claimToken: string;
     reason: "claim_strikes" | "oversized_payload";
     errorMessage: string;
     /**
@@ -2708,7 +2827,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // Same reasoning as handleExhaustedRetries: keep the original score when it
     // is a real timestamp, otherwise the parked group reads as decades old.
     const score = this.restageScore(originalScore);
-    await this.scripts.restageAndBlock({
+    const parked = await this.scripts.restageAndBlock({
       groupId,
       // Parked under the id it was dispatched under (ADR-080). This used to
       // append a wall-clock marker, which made a parked job impossible to find
@@ -2717,7 +2836,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       score,
       jobDataJson,
       errorMessage,
+      claimToken,
     });
+    if (!parked) {
+      this.logger.warn(
+        { queueName: this.queueName, groupId, stagedJobId, reason },
+        "Poison guard could not park the group: its claim was recovered by another worker",
+      );
+      return;
+    }
     // Release the marker as the group is parked: leaving it would let the death
     // count survive, so an operator who unblocked inside the marker's TTL would
     // see it re-park on the very next claim. Unconditional here, unlike the
@@ -2754,11 +2881,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     groupId,
     stagedJobId,
     jobDataJson,
+    claimToken,
     err,
   }: {
     groupId: string;
     stagedJobId: string;
     jobDataJson: string;
+    claimToken: string;
     err: TransientBlobStoreError;
   }): Promise<void> {
     const attempt =
@@ -2773,6 +2902,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         groupId,
         stagedJobId,
         jobDataJson,
+        claimToken,
         err,
         reason: "transient_exhausted",
         message: `Blob store unreachable after ${attempt} attempts; discarding job (replay does not recover subscriber jobs)`,
@@ -2793,6 +2923,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       backoffMs,
       attempt,
       attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
+      claimToken,
     });
     // The script writes the chain in the same step, so a value whose machinery
     // does not live in the header still advances — that write is what keeps
@@ -2974,14 +3105,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   }: {
     name: string;
     timeoutMs: number;
-    work: () => Promise<Result>;
+    work: (list?: ListedRun) => Promise<Result>;
   }): Promise<Result> {
     const listKey = `${this.queueName}:gq:listed:${name}`;
     await this.scripts.openGroupList({ listKey, nowMs: nowInstant().epochMilliseconds });
     try {
       const scope = { ...this.captureContext(), queueDispatchScopeKey: listKey };
-      const result = await this.runInContext(scope, work);
       const fault = { operation: "runListedWork", work: `Queue work of ${name}` };
+      const list: ListedRun = {
+        waitForRoom: ({ maxOutstanding, signal }) =>
+          this.waitForListRoom({ name, listKey, timeoutMs, fault, maxOutstanding, signal }),
+      };
+      const result = await this.runInContext(scope, () => work(list));
       const unsettled = await this.waitForTargets({
         key: listKey,
         timeoutMs,
@@ -2992,6 +3127,46 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       return result;
     } finally {
       await this.scripts.closeGroupList(listKey);
+    }
+  }
+
+  /**
+   * Holds a listed run's work until at most `maxOutstanding` of its jobs wait or run, so a step
+   * sends its next page only once its last has mostly run. Fails as the closing wait does when the
+   * count stands still for `timeoutMs`. Spec: specs/upgrade/background-steps.feature.
+   */
+  private async waitForListRoom({
+    name,
+    listKey,
+    timeoutMs,
+    fault,
+    maxOutstanding,
+    signal,
+  }: {
+    name: string;
+    listKey: string;
+    timeoutMs: number;
+    fault: TargetsFault;
+    maxOutstanding: number;
+    signal?: AbortSignal;
+  }): Promise<void> {
+    let deadline = nowInstant().epochMilliseconds + timeoutMs;
+    let lastLook: number | undefined;
+    while (!signal?.aborted) {
+      const lookStartedMs = nowInstant().epochMilliseconds;
+      const outstanding = await this.scripts.countListedOutstanding(listKey);
+      if (outstanding <= maxOutstanding) return;
+      const nowMs = nowInstant().epochMilliseconds;
+      if (outstanding !== lastLook) {
+        lastLook = outstanding;
+        deadline = nowMs + timeoutMs;
+      } else if (nowMs >= deadline) {
+        const state = await this.scripts.inspectPreflightTargets(listKey);
+        this.refuseUnsettledList({ name, timeoutMs, state, fault });
+      }
+      await new Promise<void>((resolve) =>
+        setTimeout(resolve, Math.max(LIST_ROOM_POLL_MS, nowMs - lookStartedMs)),
+      );
     }
   }
 

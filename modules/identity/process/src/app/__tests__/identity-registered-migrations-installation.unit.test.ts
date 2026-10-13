@@ -5,19 +5,18 @@ import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EventSourcing } from "@langwatch/eventing";
-import { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { isDeclaredMigrationStep, isTenantMigrationStep } from "@langwatch/upgrade/step";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { grandfatheredConnectionFacts } from "../../features/sso-connection/rules/sso-connection-grandfather-facts.rules.ts";
 import { identityProcessModule } from "../../identity.module.ts";
-import { IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
 
 /** An empty secrets chain: every optional handle, the sign-ups webhook included, reads as unset. */
 const noSecretsChain = SecretsResolver.over(SecretsChain.start({ environment: {} }));
@@ -27,7 +26,7 @@ const noSecretsChain = SecretsResolver.over(SecretsChain.start({ environment: {}
 /** An email-mode deployment: no federated provider, no licence, no passkeys, its own passwords. */
 async function bootIdentity() {
   return createApp({
-    role: "api",
+    role: "worker",
     secrets: (owner, declared) => noSecretsChain.scopeTo(owner, declared),
   })
     .withModules([identityProcessModule])
@@ -40,6 +39,7 @@ async function bootIdentity() {
         passkeysEnabled: false,
         mfaEnrollmentOpen: false,
         localPasswords: false,
+        identifierBackfillMaxQueuedJobs: 5000,
       },
     })
     .withEventing(new EventSourcing({ enabled: false, processManagerMode: "producer-only" }))
@@ -61,21 +61,30 @@ async function bootIdentity() {
     .boot();
 }
 
-describe("identity's registered migrations", () => {
+describe("identity's declared tenant steps", () => {
   describe("when any system migration entry point reads the installed registry", () => {
     /** @scenario "The D04 connection grandfather migration is declared in the shared registry" */
-    it("declares D04 under its state key and runs it on a fresh self-hosted start", async () => {
+    it("declares the five tenant steps, D04 among them, each after old writers", async () => {
       const runtime = await bootIdentity();
       try {
-        const registered = runtime.service(IdentityApi).registeredMigrations();
-        const d04 = registered.find(
-          (migration) => migration.name === IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
-        );
+        const steps = runtime.migrationSteps(isDeclaredMigrationStep).filter(isTenantMigrationStep);
 
-        expect(d04).toMatchObject({
-          name: "identity-d04-connection-grandfather",
+        expect(steps.map(({ id, tenants }) => ({ id, tenants }))).toEqual([
+          { id: "identity:identifier-backfill", tenants: "user" },
+          { id: "identity:secret-heal", tenants: "user" },
+          { id: "identity:connection-grandfather", tenants: "organization" },
+          { id: "identity:sso-domain-ownership-backfill", tenants: "organization" },
+        ]);
+        expect(steps.every((step) => step.needsOldWritersGone)).toBe(true);
+        expect(steps.find(({ id }) => id === "identity:connection-grandfather")).toMatchObject({
           runsAutomaticallyOnSelfHosted: true,
           enrolledAutomatically: true,
+        });
+        expect(steps.find(({ id }) => id === "identity:secret-heal")).toMatchObject({
+          migratedIsSteady: true,
+        });
+        expect(steps.find(({ id }) => id === "identity:identifier-backfill")).toMatchObject({
+          pauseWhileQueuedAbove: 5000,
         });
       } finally {
         await runtime.stop();

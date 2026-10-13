@@ -80,6 +80,7 @@ function seedApis(overrides: Partial<{ [Name in keyof SeedApis]: SeedApis[Name] 
       createAndAssign: vi.fn(async () => ({
         organization: { id: "org_new", name: "acme" },
         team: { id: "team_new", slug: "acme", name: "acme" },
+        grantsConfirmed: true,
       })),
       createMembership: vi.fn(async () => ({
         outcome: "created" as const,

@@ -6,7 +6,7 @@ export default defineModuleVitestConfig({
   isolate: false,
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts", "tests/**/*.test.ts"],
+    include: ["src/**/*.test.ts"],
     exclude: [...configDefaults.exclude, "**/*.integration.test.ts"],
   },
 });

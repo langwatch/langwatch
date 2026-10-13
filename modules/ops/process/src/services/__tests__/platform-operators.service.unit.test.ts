@@ -520,9 +520,9 @@ describe("PlatformOperatorsService.grantFirstUser", () => {
     it("records that user as the seed's decision, whatever ADMIN_EMAILS names", async () => {
       const { service, record, granted } = signingUp({ users: [user("ana")] });
 
-      await expect(service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted })).resolves.toBe(
-        true,
-      );
+      await expect(
+        service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted }),
+      ).resolves.toBe(true);
 
       expect(record).toHaveBeenCalledExactlyOnceWith({ via: "first-user", userIds: ["ana"] });
       expect(granted).toEqual([]);
@@ -549,9 +549,9 @@ describe("PlatformOperatorsService.grantFirstUser", () => {
     it("records nothing for the second user", async () => {
       const { service, record } = signingUp({ users: [user("ana"), user("bo")] });
 
-      await expect(service.grantFirstUser({ userId: "bo", backfilled: false, settings: selfHosted })).resolves.toBe(
-        false,
-      );
+      await expect(
+        service.grantFirstUser({ userId: "bo", backfilled: false, settings: selfHosted }),
+      ).resolves.toBe(false);
       expect(record).not.toHaveBeenCalled();
     });
 
@@ -573,7 +573,11 @@ describe("PlatformOperatorsService.grantFirstUser", () => {
       const { service, record } = signingUp({ users: [user("ana")] });
 
       await expect(
-        service.grantFirstUser({ userId: "ana", backfilled: false, settings: { ...selfHosted, cloud: true } }),
+        service.grantFirstUser({
+          userId: "ana",
+          backfilled: false,
+          settings: { ...selfHosted, cloud: true },
+        }),
       ).resolves.toBe(false);
       expect(record).not.toHaveBeenCalled();
     });
@@ -587,9 +591,9 @@ describe("PlatformOperatorsService.grantFirstUser", () => {
         holders: [holder("carol")],
       });
 
-      await expect(service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted })).resolves.toBe(
-        false,
-      );
+      await expect(
+        service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted }),
+      ).resolves.toBe(false);
       expect(record).not.toHaveBeenCalled();
       expect(granted).toEqual([]);
       expect(authz.revokePlatformOperator).not.toHaveBeenCalled();
@@ -619,9 +623,9 @@ describe("PlatformOperatorsService.grantFirstUser", () => {
     ])("records nothing when the user was $case", async ({ users }) => {
       const { service, record } = signingUp({ users });
 
-      await expect(service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted })).resolves.toBe(
-        false,
-      );
+      await expect(
+        service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted }),
+      ).resolves.toBe(false);
       expect(record).not.toHaveBeenCalled();
     });
   });

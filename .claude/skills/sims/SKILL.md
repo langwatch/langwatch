@@ -11,8 +11,9 @@ console URL, the `haven up +<name>` it needs if off, its verbs (read from haven'
 table) and its skill path. `--stack <slug>` reads another worktree's stack.
 
 Eleven Go simulators stand in for outside services so a stack runs offline, deterministically
-and for free. Code is `services/<name>` and each console is a React app, `apps/<name>-web`,
-built by Vite into the Go package's `web/dist` and embedded (ADR-160,
+and for free. Code is `services/sims/<name>` and each console is one surface of the React app
+`apps/sims` (`apps/sims/src/<surface>`, e.g. `llm`, `mail`), built by Vite and embedded in the Go
+package (ADR-160,
 `dev/docs/adr/160-internal-consoles-are-go-served-react.md`).
 
 | Sim            | Stands in for                                       | haven        | Skill                                      | Seed env               |
@@ -43,9 +44,11 @@ Chakra, no product design system.
 - The Go services are one binary, `cmd/service`. `service combined` hosts the data plane
   (aigateway, nlpgo) and, in a dev build only (`-tags dev`, `cmd/service/combined_dev.go`),
   the simulators. Release images build untagged: no simulator is linked.
-- In a dev checkout haven runs every selected sim in the `sims` lane: a second
-  `service combined` process beside the `go` lane, so a sim under load cannot starve the
-  gateway. `haven restart sims` bounces them all. `haven logs <name>` still reads each.
+- By default haven runs every selected sim inside the `go` lane, in the same process as the
+  gateway and nlpgo (`LANGWATCH_DEV_ONE_PROCESS` defaults on). Sim load is therefore gateway
+  load, and `haven restart go` bounces both. `LANGWATCH_DEV_ONE_PROCESS=0` splits Go and sims
+  into two processes (a `sims` lane beside `go`); then `haven restart sims` bounces only the sims.
+  `haven logs <name>` reads each sim either way.
 - A checkout whose mono-binary has no `combined` subcommand, or a monolith build, runs
   haven's bundled copy of each sim as one lane each (`haven simulator <name>`, hidden).
 - Without haven: `make service svc=combined args="mailsim storagesim llmsim analyticssim voicesim idpsim telemetrysim outboundsim paymentsim lambdasim githubsim"`,
@@ -53,7 +56,7 @@ Chakra, no product design system.
   `make service` builds the console bundle first; a binary without it serves a one-line
   page naming the build command.
 - A new simulator is one entry in the `simulators` list in `cmd/service/combined_dev.go`
-  (its own comment says so), plus its `apps/<name>-web` console.
+  (its own comment says so), plus its surface under `apps/sims/src/<name>`.
 
 ## Load runs
 
@@ -62,12 +65,12 @@ Chakra, no product design system.
 3. Reset between runs: DELETE on each sim's list (see its skill); idpsim resets per tenant.
 4. Every sim keeps bounded history (mail 10000 messages, analytics 5000 records, llm 500
    calls, voice 200 calls), so a long run cannot grow memory without limit.
-5. Benchmarks: `go test -bench . -benchmem ./services/<name>` for mail, storage, analytics.
+5. Benchmarks: `go test -bench . -benchmem ./services/sims/<name>` for mail, storage, analytics.
 
 ## Deeper
 
-`dev/docs/LOCAL_STACK.md` (simulators and the sims lane), `tools/thuishaven/README.md`
-(hostname scheme), and `services/<name>/README.md` where one exists (llmsim, mailsim,
+`dev/docs/LOCAL_STACK.md` (simulators and the Go lane), `tools/thuishaven/README.md`
+(hostname scheme), and `services/sims/<name>/README.md` where one exists (llmsim, mailsim,
 storagesim, idpsim).
 
 ## CLI parity
@@ -78,7 +81,7 @@ Every console action has a verb (`--json` on reads, non-zero exit on failure, `-
 | --------- | ------------------------------------------------------------------------------------------------------------------------- |
 | mail      | `haven sim mail address\|status\|list\|get <id>\|links <id>\|wait\|delete <id>\|clear`                                    |
 | llm       | `haven sim llm status\|list [--model <text>] [--failed]\|get <id>\|clear\|fault <status>\|config --seed`                  |
-| analytics | `haven sim analytics status\|list\|get <id>\|clear\|wait --event`                                                         |
+| analytics | `haven sim analytics status\|list\|record <id>\|clear\|wait --event`                                                         |
 | storage   | `haven sim storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|presign\|delete\|clear [bucket]\|seed\|list` |
 | voice     | `haven sim voice status\|list\|get <id>\|clear`                                                                           |
 | telemetry | `haven sim telemetry send\|load\|fuzz\|status\|stop`                                                                      |

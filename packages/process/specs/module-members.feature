@@ -7,7 +7,7 @@ Feature: What a process hands its modules
   Scenario: A process hands a module one peer by its token
     Given a process that answers for a peer itself and hands it in by its token
     When a module that depends on that peer boots
-    Then the module is given the very instance the process handed in, unwrapped
+    Then an api-role module is given the very instance the process handed in, unwrapped
     And the same token handed in twice is refused at the second call, naming the token
 
   @unit
@@ -34,3 +34,11 @@ Feature: What a process hands its modules
     Given a module whose live repository tier reads a leaf of the module's config
     When the process boots with that module's config stated
     Then the live tier is built with the module's parsed config beside its stores
+
+  @unit
+  Scenario: A worker's module dependencies mark the running delivery's progress
+    Given a module whose repositories, channels, peers and store clients a worker hands it
+    When the module calls one of them while an outbox delivery runs
+    Then the call marks that delivery's progress when it starts and when it settles
+    And the same call outside any delivery passes straight through
+    And an api or tasks process hands the module its dependencies untracked

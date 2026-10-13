@@ -4,6 +4,7 @@ import { ValidationError } from "../services/errorHandling.ts";
 import { EventUtils } from "../utils/event.utils.ts";
 import type {
   EventStore as BaseEventStore,
+  EventStoreAggregateKey,
   EventStoreEventReadInput,
   EventStoreReadContext,
 } from "./eventStore.types.ts";
@@ -162,6 +163,45 @@ export abstract class AbstractEventStore<
       aggregateType,
       occurredAtFromMs: rehydrationLowerBoundMs(aggregateType, anchorOccurredAtMs),
     });
+  }
+
+  async findEventsOfAggregates({
+    aggregates,
+    aggregateType,
+  }: {
+    aggregates: readonly EventStoreAggregateKey[];
+    aggregateType: AggregateType;
+  }): Promise<readonly EventType[]> {
+    const label = `${this.constructor.name}.findEventsOfAggregates`;
+    for (const { tenantId } of aggregates) EventUtils.validateTenantId({ tenantId }, label);
+    const asked = aggregates.filter(({ aggregateId }) => !this.hasMissingAggregateId(aggregateId));
+    if (asked.length === 0) return [];
+
+    return this.instrument(
+      label,
+      { "aggregate.type": aggregateType, "aggregate.count": asked.length },
+      async () => {
+        try {
+          const records = await this.repository.findEventRecordsOfAggregates({
+            aggregates: asked,
+            aggregateType,
+          });
+          const byAggregate = new Map<string, EventType[]>();
+          for (const record of records) {
+            const key = `${record.TenantId}\n${record.AggregateId}`;
+            const events = byAggregate.get(key) ?? [];
+            events.push(recordToEvent<EventType>(record, record.AggregateId));
+            byAggregate.set(key, events);
+          }
+          return [...byAggregate.values()].flatMap((events) =>
+            deduplicateEvents(this.postProcessEvents(events)),
+          );
+        } catch (error) {
+          this.logError(label, { aggregateType, aggregateCount: asked.length }, error);
+          throw error;
+        }
+      },
+    );
   }
 
   /**

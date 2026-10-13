@@ -319,7 +319,7 @@ func healthFailures(health *healthWatch, failing []failure) (healthReport, []fai
 }
 
 // compare reads the newest earlier summary.json beside this run (a sibling run
-// directory, or diffsuite's previous iteration) and answers the new and fixed ids.
+// directory) and answers the new and fixed ids.
 func compare(runDir string, failing []failure) (string, []string, []string) {
 	own := filepath.Join(runDir, "summary.json")
 	siblings, _ := filepath.Glob(filepath.Join(filepath.Dir(runDir), "*", "summary.json"))

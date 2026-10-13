@@ -88,6 +88,8 @@ export class MemoryIdentityStore {
   readonly organizationMembers = new Map<string, string[]>();
   readonly organizationAdmins = new Map<string, { userId: string; email: string }[]>();
   readonly finalizedUsers = new Set<string>();
+  /** Users an operator rolled back: nothing turns their sign-in switch on again. */
+  readonly pinnedUsers = new Set<string>();
   /** Users carrying `User.deactivatedAt`, which the memory user row does not hold. */
   readonly deactivatedUsers = new Set<string>();
   /** Keyed by the lowercased address, the way the legacy read matches it. */

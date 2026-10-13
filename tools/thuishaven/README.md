@@ -223,8 +223,7 @@ langevals — the Python evaluator service monitors and evaluations call — is
 off by default too (its imports hold a few GiB). `haven up +langevals` runs
 `services/langevals` with `uv` on an allocated port, routed at
 `langevals.<slug>.langwatch.localhost`, and sets `LANGEVALS_ENDPOINT` to its
-loopback port for every lane; without it `.env`'s value stands. diffsuite's
-`-langevals` passes `+langevals` to the branch stack it starts with `-up`.
+loopback port for every lane; without it `.env`'s value stands.
 idp — the identity-provider simulator (`services/sims/idpsim`: a range of OIDC +
 SAML + SCIM tenants with DNS/HTTP domain verification, routed at
 `idp.<slug>.langwatch.localhost`) — runs by default; a worktree that does not
@@ -301,8 +300,7 @@ each call as one record (provider, kind, id, name, properties, raw). The overlay
 sets `POSTHOG_HOST` and `CUSTOMER_IO_BASE_URL` to its route, plus
 `POSTHOG_KEY=phc_analyticssim` and `CUSTOMER_IO_API_KEY=analyticssim` where no
 key is set, leaving any provider whose host `.env` names alone. Its console and
-`/_sim/api/records?provider=&kind=&id=&name=` list what was sent; apidiff's
-`analytics` verify step reads the same list.
+`/_sim/api/records?provider=&kind=&id=&name=` list what was sent.
 
 Mail, IdP, storage and voice are bundled into the installed Haven binary. Each stack runs its
 own supervised simulator processes with its own ports. Under Haven's home
@@ -630,9 +628,8 @@ downstream reads that one answer:
 A checkout with neither shape is planned as modular and fails on its own lane's
 error rather than on a guess.
 
-The monolith layout is `origin/main`, and it exists here so `apidiff` and
-`visualdiff` can boot their base ref as its own haven stack (`tools/havenrun`,
-`specs/tooling/visualdiff-on-haven.feature`). On such a stack:
+The monolith layout is `origin/main`, so a checkout of it can run as its own
+haven stack. On such a stack:
 
 - The one Node lane is `app`: `pnpm --filter @langwatch/web run dev:app`, handed
   `PORT` as the app port haven allocated and reached at the routed `app.<slug>`
@@ -846,14 +843,12 @@ refuse`. That one line is the whole point: a quieter isolation posture than the 
   regenerable build artifacts of idle worktrees and orphaned dev runtimes.
   Two more categories are pre-ticked on their class rather than their age, with
   the reason in the row:
-  - **temporary** worktrees — a detached checkout under `.apidiff/` or
-    `.claude/worktrees/`, a `visual-*` / `apidiff-*` directory under a
-    `worktrees` parent, anything under `.claude/jobs/`, or any worktree on a
+  - **temporary** worktrees — a detached checkout under `.claude/worktrees/`,
+    anything under `.claude/jobs/`, or any worktree on a
     `worktree-agent-` / `agent/` branch — once nothing has been written in the
     directory itself for a day. That clock is the directory's own mtime, not its
-    HEAD's committer date: a diff drive checks out whatever ref it is comparing,
-    so a comparison made five minutes ago against a year-old tag would otherwise
-    read as a year idle.
+    HEAD's committer date: a scratch worktree may check out any ref, so one
+    made five minutes ago at a year-old tag would otherwise read as a year idle.
   - **merged** worktrees, whose branch is already an ancestor of `origin/main`
     (`git merge-base --is-ancestor`), at any age.
 

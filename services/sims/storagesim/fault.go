@@ -25,7 +25,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, http.StatusBadRequest, "forcedError is 0 (off) or a 4xx/5xx status")
 			return
 		}
-		s.fault.status.Store(int32(next.ForcedError)) //nolint:gosec // bounded to 0 or 400-599 above
+		s.fault.status.Store(int32(next.ForcedError))
 	default:
 		writeAPIError(w, http.StatusMethodNotAllowed, "settings is a GET or a PUT")
 		return

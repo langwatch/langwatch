@@ -2,6 +2,7 @@ package scenario
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/langwatch/scenario/go/internal/jsjson"
@@ -58,7 +59,7 @@ func NewJudgeAgent(cfg JudgeAgentConfig) *JudgeAgent {
 		cfg.MaxDiscoverySteps = 10
 	}
 	cfg.Criteria = append([]string(nil), cfg.Criteria...)
-	return &JudgeAgent{cfg: cfg}
+	return &JudgeAgent{cfg: cfg, invoker: invoker{role: AgentRoleJudge}}
 }
 
 // Role implements AgentAdapter.
@@ -160,9 +161,9 @@ func (j *JudgeAgent) Call(ctx context.Context, in AgentInput) (*AgentReturn, err
 		return nil, nil
 	}
 
-	model := j.cfg.ModelConfig.merged(currentSettings().DefaultModel)
-	if model.LLM == nil {
-		return nil, ErrNoModel
+	model, err := j.cfg.ModelConfig.merged(currentSettings().DefaultModel)
+	if err != nil {
+		return nil, err
 	}
 	msgs, hasAudio, err := j.prepareMessages(ctx, in, model.Model)
 	if err != nil {
@@ -207,6 +208,9 @@ func (j *JudgeAgent) prepareMessages(ctx context.Context, in AgentInput, model s
 		return msgs, hasAudio, nil
 	}
 	opts := JudgeInputOptions{IncludeAudio: j.includeAudio(hasAudio, model)}
+	// The executor hands the judge a view of the stored conversation;
+	// extensions get a copy they may modify.
+	msgs = slices.Clone(msgs)
 	var err error
 	for _, p := range in.Executor.hooks.judgeInput {
 		if msgs, err = p.PreprocessJudgeInput(ctx, in.Executor, msgs, opts); err != nil {
@@ -259,8 +263,8 @@ type decisionOutcome struct {
 // decide is phase 1: continue, or move to the verdict. It never fetches
 // remote traces and never produces a verdict.
 func (j *JudgeAgent) decide(ctx context.Context, c judgeCall) (decisionOutcome, error) {
-	spans := j.collector().SpansForThread(c.in.ThreadID)
-	digest, large := traceDigest(spans, j.cfg.TokenThreshold)
+	spans := withoutJudgeModelCalls(j.collector().SpansForThread(c.in.ThreadID))
+	content, large := judgeContent(c.in.ScenarioState.spanDigests(), spans, j.cfg.TokenThreshold, c.transcript, c.extra)
 
 	system := buildDecisionSystemPrompt(c.criteria, c.in.ScenarioConfig.Description, c.traces.fetch)
 	if j.cfg.SystemPrompt != "" {
@@ -280,7 +284,7 @@ func (j *JudgeAgent) decide(ctx context.Context, c judgeCall) (decisionOutcome, 
 		MaxTokens:   c.model.MaxTokens,
 		Messages: []Message{
 			SystemMsg(system),
-			UserMsg(buildJudgeContent(c.transcript, digest, c.extra)),
+			UserMsg(content),
 		},
 		Tools: append(toolDefinitions(tools),
 			ToolDefinition{Name: "continue_test", Description: continueTestDescription, Parameters: emptyObjectSchema()},
@@ -352,12 +356,12 @@ func (j *JudgeAgent) verdict(ctx context.Context, c judgeCall, forced, exhausted
 		evidenceExhausted := ts.fetch && len(traceIDs) > 0 && ts.fetcher.NoneSettled(c.in.ThreadID, traceIDs)
 		terminal := forced || evidenceExhausted
 
-		spans := collector.SpansForThread(c.in.ThreadID)
-		digest, large := traceDigest(spans, j.cfg.TokenThreshold)
+		spans := withoutJudgeModelCalls(collector.SpansForThread(c.in.ThreadID))
 		extra := ""
 		if c.in.JudgmentRequest != nil {
 			extra = additionalContextSection(c.in.JudgmentRequest.AdditionalContext)
 		}
+		content, large := judgeContent(c.in.ScenarioState.spanDigests(), spans, j.cfg.TokenThreshold, c.transcript, extra+c.extra)
 		system := buildVerdictSystemPrompt(c.criteria, c.in.ScenarioConfig.Description, ts.fetch)
 		if j.cfg.SystemPrompt != "" {
 			system = j.cfg.SystemPrompt
@@ -365,7 +369,7 @@ func (j *JudgeAgent) verdict(ctx context.Context, c judgeCall, forced, exhausted
 				system += "\n\n" + remoteTraceJudgingRule
 			}
 		}
-		msgs := []Message{SystemMsg(system), UserMsg(buildJudgeContent(c.transcript, digest, extra+c.extra))}
+		msgs := []Message{SystemMsg(system), UserMsg(content)}
 		if exhausted {
 			msgs = append(msgs, recap...)
 			msgs = append(msgs, UserMsg(discoveryExhaustedPrompt))
@@ -549,7 +553,7 @@ func (j *JudgeAgent) loop(ctx context.Context, llm LLM, params InferenceParams, 
 			if err != nil {
 				out = "Error: " + err.Error()
 			}
-			results = append(results, Message{Role: RoleTool, ToolCallID: tc.ID, ToolName: tc.Name, Content: out})
+			results = append(results, Message{Role: RoleTool, ToolCallID: tc.ID, ToolName: tc.Name, Content: out, IsError: err != nil})
 		}
 		assistant := res.Message
 		assistant.Role = RoleAssistant

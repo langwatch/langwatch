@@ -1,6 +1,6 @@
-import type { SystemMigration, TenantMigrationStatus } from "@langwatch/system-migrations";
+import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import { defineMigrationStep } from "@langwatch/upgrade/step";
+import { defineMigrationStep, type TenantMigrationStep } from "@langwatch/upgrade/step";
 import {
   MemoryTenantStepLedgerRepository,
   MemoryTenantStepStateRepository,
@@ -9,103 +9,83 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { MemoryMigrationLeaseRepository } from "../../../../repositories/memory/memory.migration-lease.repository.ts";
-import { MemorySystemMigrationStateRepository } from "../../../../repositories/memory/memory.system-migration-state.repository.ts";
 import { PostgresOpsRepositories } from "../../../../repositories/prisma/prisma.ops.repositories.ts";
+import { NullQueueRepository } from "../../../../repositories/queue.repository.ts";
 import { SystemMigrationPassService } from "../system-migration-pass.service.ts";
 
 const STEP = "prompt:seed-default-tags";
 
-function migration({
-  name,
+function stepOf({
+  id,
   enrolledAutomatically = true,
 }: {
-  name: string;
+  id: string;
   enrolledAutomatically?: boolean;
-}): SystemMigration {
-  return {
-    name,
-    title: name,
-    description: name,
+}): TenantMigrationStep {
+  return defineMigrationStep({
+    id,
+    kind: "tenant",
+    mode: "background",
+    description: id,
+    tenants: "organization",
+    title: id,
     requiresOperatorConfirmation: false,
     runsAutomaticallyOnSelfHosted: true,
     enrolledAutomatically,
     migrateTenant: async () => ({ status: "finalized" }),
-  };
+  });
 }
 
 function gate({
   isSaaS = false,
-  migrations = [],
-  withStep = false,
+  steps = [],
 }: {
   isSaaS?: boolean;
-  migrations?: readonly SystemMigration[];
-  withStep?: boolean;
+  steps?: readonly TenantMigrationStep[];
 }) {
-  const state = MemorySystemMigrationStateRepository.create();
-  const stepState = MemoryTenantStepStateRepository.create();
-  const step = defineMigrationStep({
-    id: STEP,
-    kind: "tenant",
-    mode: "background",
-    description: "Seeds the default prompt tags into every organization.",
-    tenants: "organization",
-    title: "Default prompt tags",
-    requiresOperatorConfirmation: false,
-    runsAutomaticallyOnSelfHosted: true,
-    enrolledAutomatically: true,
-    migrateTenant: async () => ({ status: "finalized" }),
-  });
+  const state = MemoryTenantStepStateRepository.create();
   const passes = SystemMigrationPassService.create({
     repositories: {
       ...PostgresOpsRepositories.create({ prisma: prismaDouble({}) }),
-      migrationState: state,
       migrationLease: MemoryMigrationLeaseRepository.create(),
+      queues: NullQueueRepository.create(),
     },
     isSaaS: () => isSaaS,
-    migrations: () => migrations,
-    userMigrations: () => [],
     newbornSweep: async () => {},
     declared: {
-      steps: () => (withStep ? [step] : []),
-      state: stepState,
+      steps: () => steps,
+      state,
       settle: TenantStepSettleService.create({
-        state: stepState,
+        state,
         ledger: MemoryTenantStepLedgerRepository.create(),
       }),
     },
   });
   type Row = { name: string; status: TenantMigrationStatus; tenantId?: string };
-  const record = ({ name, status, tenantId = "org-1" }: Row) => ({
-    migrationName: name,
-    tenantId,
-    status,
-    report: null,
-  });
   return {
     passes,
-    record: (row: Row) => state.upsertRecord(record(row)),
-    recordStep: (row: Omit<Row, "name">) => stepState.upsertRecord(record({ name: STEP, ...row })),
+    record: ({ name, status, tenantId = "org-1" }: Row) =>
+      state.upsertRecord({ migrationName: name, tenantId, status, report: null }),
   };
 }
 
 describe("SystemMigrationPassService.hasTenantAwaitingRedrive", () => {
-  describe("given a fresh install whose automatic migration no tenant has met", () => {
+  describe("given a fresh install whose automatic step no tenant has met", () => {
     /** @scenario "The worker's re-drive discovers a tenant migration no pass has run" */
     it("asks for a pass", async () => {
-      const { passes } = gate({ migrations: [migration({ name: "identity:backfill" })] });
+      const { passes } = gate({ steps: [stepOf({ id: "identity:backfill" })] });
 
       expect(await passes.hasTenantAwaitingRedrive()).toBe(true);
     });
   });
 
-  describe("given every tenant finalised an old migration and a release registers a new one", () => {
+  describe("given every tenant finalised an old step and a release declares a new one", () => {
     /** @scenario "The worker's re-drive discovers a tenant migration no pass has run" */
     it("asks for a pass", async () => {
       const { passes, record } = gate({
-        migrations: [migration({ name: "old" }), migration({ name: "new" })],
+        steps: [stepOf({ id: "probe:old" }), stepOf({ id: "probe:new" })],
       });
-      await record({ name: "old", status: "finalized" });
+      await record({ name: "probe:old", status: "finalized" });
 
       expect(await passes.hasTenantAwaitingRedrive()).toBe(true);
     });
@@ -114,10 +94,10 @@ describe("SystemMigrationPassService.hasTenantAwaitingRedrive", () => {
   describe("given a declared tenant step no pass has driven", () => {
     /** @scenario "The worker's re-drive discovers a tenant migration no pass has run" */
     it("asks for a pass, and stops asking once a tenant finalised it", async () => {
-      const { passes, recordStep } = gate({ withStep: true });
+      const { passes, record } = gate({ steps: [stepOf({ id: STEP })] });
       expect(await passes.hasTenantAwaitingRedrive()).toBe(true);
 
-      await recordStep({ status: "finalized" });
+      await record({ name: STEP, status: "finalized" });
       expect(await passes.hasTenantAwaitingRedrive()).toBe(false);
     });
   });
@@ -125,19 +105,19 @@ describe("SystemMigrationPassService.hasTenantAwaitingRedrive", () => {
   describe("given a declared tenant step with a parked tenant beside a finalised one", () => {
     /** @scenario "The worker's re-drive discovers a tenant migration no pass has run" */
     it("asks for a pass", async () => {
-      const { passes, recordStep } = gate({ withStep: true });
-      await recordStep({ status: "finalized" });
-      await recordStep({ status: "parked", tenantId: "org-2" });
+      const { passes, record } = gate({ steps: [stepOf({ id: STEP })] });
+      await record({ name: STEP, status: "finalized" });
+      await record({ name: STEP, status: "parked", tenantId: "org-2" });
 
       expect(await passes.hasTenantAwaitingRedrive()).toBe(true);
     });
   });
 
-  describe("given every registered migration is finalised", () => {
+  describe("given every declared step is finalised", () => {
     /** @scenario "A latched fleet skips the worker's re-drive" */
     it("skips the pass", async () => {
-      const { passes, record } = gate({ migrations: [migration({ name: "old" })] });
-      await record({ name: "old", status: "finalized" });
+      const { passes, record } = gate({ steps: [stepOf({ id: "probe:old" })] });
+      await record({ name: "probe:old", status: "finalized" });
 
       expect(await passes.hasTenantAwaitingRedrive()).toBe(false);
     });
@@ -146,19 +126,19 @@ describe("SystemMigrationPassService.hasTenantAwaitingRedrive", () => {
   describe("given an operator rolled every touched tenant back", () => {
     /** @scenario "A latched fleet skips the worker's re-drive" */
     it("skips the pass", async () => {
-      const { passes, record } = gate({ migrations: [migration({ name: "old" })] });
-      await record({ name: "old", status: "rolled_back" });
+      const { passes, record } = gate({ steps: [stepOf({ id: "probe:old" })] });
+      await record({ name: "probe:old", status: "rolled_back" });
 
       expect(await passes.hasTenantAwaitingRedrive()).toBe(false);
     });
   });
 
-  describe("given a cloud migration still soaking that no organization is enrolled in", () => {
+  describe("given a cloud step still soaking that no organization is enrolled in", () => {
     /** @scenario "A latched fleet skips the worker's re-drive" */
     it("skips the pass", async () => {
       const { passes } = gate({
         isSaaS: true,
-        migrations: [migration({ name: "soaking", enrolledAutomatically: false })],
+        steps: [stepOf({ id: "probe:soaking", enrolledAutomatically: false })],
       });
 
       expect(await passes.hasTenantAwaitingRedrive()).toBe(false);

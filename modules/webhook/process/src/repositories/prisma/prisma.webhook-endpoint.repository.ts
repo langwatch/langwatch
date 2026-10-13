@@ -9,7 +9,7 @@ import {
   type WebhookEndpoint,
 } from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";
-import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
+import { type Instant, fromDate, nowInstant, toDate } from "@langwatch/time";
 import {
   WebhookEndpointNotFoundError,
   type SqsDestinationInput,
@@ -382,7 +382,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
       data: {
         status: "DISABLED",
         disabledReason: WEBHOOK_DISABLED_REASON_MANUAL,
-        disabledAt: new Date(),
+        disabledAt: toDate(nowInstant()),
       },
     });
     return PrismaWebhookEndpointRepository.toView(updated);
@@ -393,7 +393,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     const endpoint = await this.getEndpoint(params);
     await this.prisma.webhookEndpoint.update({
       where: { id: endpoint.id },
-      data: { archivedAt: new Date(), status: "DISABLED", idempotencyKey: null },
+      data: { archivedAt: toDate(nowInstant()), status: "DISABLED", idempotencyKey: null },
     });
   }
 

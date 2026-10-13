@@ -13,23 +13,26 @@ import type {
   RecordProjectPresenceSettingChangedCommandData,
   RecordProjectTraceSharingDisabledCommandData,
 } from "../eventing/project-lifecycle.events.ts";
-import type { ProjectRepository } from "../repositories/project.repository.ts";
+import type { ProjectBackfillRow, ProjectRepository } from "../repositories/project.repository.ts";
 
 export type ProjectLifecycleSenders = Readonly<{
-  recordProjectCreated: Pick<EventingCommandSender<RecordProjectCreatedCommandData>, "send">;
+  recordProjectCreated: Pick<
+    EventingCommandSender<RecordProjectCreatedCommandData>,
+    "send" | "sendBatch"
+  >;
   recordProjectLegacyKeyRevoked: Pick<
     EventingCommandSender<RecordProjectLegacyKeyRevokedCommandData>,
     "send"
   >;
   recordPresenceSettingChanged: Pick<
     EventingCommandSender<RecordProjectPresenceSettingChangedCommandData>,
-    "send"
+    "send" | "sendBatch"
   >;
   recordProjectMoved: Pick<EventingCommandSender<RecordProjectMovedCommandData>, "send">;
   recordProjectArchived: Pick<EventingCommandSender<RecordProjectArchivedCommandData>, "send">;
   recordProjectDepartmentAssigned: Pick<
     EventingCommandSender<RecordProjectDepartmentAssignedCommandData>,
-    "send"
+    "send" | "sendBatch"
   >;
   recordProjectTraceSharingDisabled: Pick<
     EventingCommandSender<RecordProjectTraceSharingDisabledCommandData>,
@@ -48,16 +51,8 @@ type NoticeLogger = Readonly<{
 
 type NoticeDependencies = Readonly<{
   logger: NoticeLogger;
-  projects: Pick<
-    ProjectRepository,
-    "findWithOrgAdmin" | "findIdsByOrganization" | "findWithTeam" | "findLiveWithTeamByIds"
-  >;
+  projects: Pick<ProjectRepository, "findWithOrgAdmin" | "findWithTeam">;
 }>;
-
-/** How many projects a backfill reads in one query. */
-const BACKFILL_READ_PAGE = 100;
-/** How many of a backfill's commands are in flight at once. */
-const BACKFILL_SEND_WIDTH = 20;
 
 /**
  * Where a new project is recorded as project's event, with the organization's admin and its
@@ -103,36 +98,61 @@ export class ProjectCreatedNoticeService {
     } catch (error) {
       this.dependencies.logger.error(
         { projectId: input.projectId, error },
-        "recording the new project failed; re-run the backfill-project-created task to record it",
+        "recording the new project failed; retry the project:record-created-facts step in Ops to record it",
       );
     }
   }
 
   /**
-   * Records every project of one organization again, marked as backfilled. Idempotent: the
-   * event keeps its key, and every peer treats a repeat as the same fact. A dry run counts the
-   * projects it would record, recording nothing.
+   * The facts step's page: every project's created fact at its stored creation, then each live
+   * project's department and presence setting at `occurredAt`, one batch each, marked backfilled
+   * and keyed per project. Throws, so the step retries the page.
    */
-  async recordExisting(
-    input: Readonly<{ organizationId: string; isDryRun?: boolean }>,
-  ): Promise<number> {
-    const projectIds = await this.dependencies.projects.findIdsByOrganization(input.organizationId);
-    // The admin is the organization's, so one project's read answers for all of them.
-    let admin: Awaited<ReturnType<ProjectRepository["findWithOrgAdmin"]>> = null;
-    for (const projectId of projectIds) {
-      admin = await this.dependencies.projects.findWithOrgAdmin(projectId);
-      if (admin?.organizationId) break;
+  async recordBackfillPage({
+    created,
+    live,
+    occurredAt,
+  }: {
+    created: readonly ProjectBackfillRow[];
+    live: readonly ProjectBackfillRow[];
+    occurredAt: number;
+  }): Promise<void> {
+    const senders = this.#connected();
+    if (created.length > 0) {
+      await senders.recordProjectCreated.sendBatch(
+        created.map((project) => ({
+          tenantId: project.id,
+          occurredAt: project.createdAt.epochMilliseconds,
+          projectId: project.id,
+          organizationId: project.organizationId,
+          adminUserId: project.adminUserId,
+          backfilled: true,
+        })),
+      );
     }
-    const organizationId = admin?.organizationId;
-    if (!organizationId) return 0;
-    if (input.isDryRun) return projectIds.length;
-    const adminUserId = admin?.adminUserId ?? null;
-    await inSlices({
-      items: projectIds,
-      width: BACKFILL_SEND_WIDTH,
-      each: (projectId) => this.#send({ projectId, organizationId, adminUserId, backfilled: true }),
-    });
-    return projectIds.length;
+    if (live.length === 0) return;
+    await senders.recordProjectDepartmentAssigned.sendBatch(
+      live.map((project) => ({
+        tenantId: project.id,
+        projectId: project.id,
+        organizationId: project.organizationId,
+        occurredAt,
+        departmentId: project.departmentId,
+        teamId: project.teamId,
+        isPersonal: project.isPersonal,
+        backfilled: true,
+      })),
+    );
+    await senders.recordPresenceSettingChanged.sendBatch(
+      live.map((project) => ({
+        tenantId: project.id,
+        occurredAt,
+        projectId: project.id,
+        organizationId: project.organizationId,
+        presenceEnabled: project.presenceEnabled,
+        backfilled: true,
+      })),
+    );
   }
 
   /** Best effort: the revocation has happened, so a failed record is logged, not raised. */
@@ -275,73 +295,6 @@ export class ProjectCreatedNoticeService {
     }
   }
 
-  /** Records each project's stored department and team, marked backfilled and keyed per project. */
-  async recordExistingDepartmentAssignments(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<number> {
-    const senders = this.#connected();
-    let recorded = 0;
-    await this.#eachLivePage({
-      organizationId: input.organizationId,
-      onPage: async ({ projects, occurredAt }) => {
-        await inSlices({
-          items: projects,
-          width: BACKFILL_SEND_WIDTH,
-          each: (project) =>
-            senders.recordProjectDepartmentAssigned.send(departmentFact({ project, occurredAt })),
-        });
-        recorded += projects.length;
-      },
-    });
-    return recorded;
-  }
-
-  /** Records each project's stored presence setting, marked backfilled and keyed per project. */
-  async recordExistingPresenceSettings(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<number> {
-    let recorded = 0;
-    await this.#eachLivePage({
-      organizationId: input.organizationId,
-      onPage: async ({ projects }) => {
-        await inSlices({
-          items: projects,
-          width: BACKFILL_SEND_WIDTH,
-          each: (project) =>
-            this.#sendPresenceSetting({
-              projectId: project.id,
-              organizationId: project.team.organizationId,
-              presenceEnabled: project.presenceEnabled,
-              backfilled: true,
-            }),
-        });
-        recorded += projects.length;
-      },
-    });
-    return recorded;
-  }
-
-  /**
-   * An organization's live projects, one read per page. The moment is taken before each read, so
-   * a change saved meanwhile is the newer fact.
-   */
-  async #eachLivePage({
-    organizationId,
-    onPage,
-  }: {
-    organizationId: string;
-    onPage: (page: { projects: ProjectWithTeam[]; occurredAt: number }) => Promise<void>;
-  }): Promise<void> {
-    const projectIds = await this.dependencies.projects.findIdsByOrganization(organizationId);
-    for (let start = 0; start < projectIds.length; start += BACKFILL_READ_PAGE) {
-      const occurredAt = nowInstant().epochMilliseconds;
-      const projects = await this.dependencies.projects.findLiveWithTeamByIds(
-        projectIds.slice(start, start + BACKFILL_READ_PAGE),
-      );
-      if (projects.length > 0) await onPage({ projects, occurredAt });
-    }
-  }
-
   #connected(): ProjectLifecycleSenders {
     const senders = this.#senders;
     if (!senders) throw new Error("project_lifecycle is not registered in this process");
@@ -420,19 +373,4 @@ function departmentFact({
     isPersonal: project.isPersonal,
     ...(backfilled ? { backfilled: true } : {}),
   };
-}
-
-/** Runs `each` over the items, at most `width` at a time, in order of the slices. */
-async function inSlices<Item>({
-  items,
-  width,
-  each,
-}: {
-  items: readonly Item[];
-  width: number;
-  each: (item: Item) => Promise<unknown>;
-}): Promise<void> {
-  for (let start = 0; start < items.length; start += width) {
-    await Promise.all(items.slice(start, start + width).map(each));
-  }
 }

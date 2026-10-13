@@ -71,6 +71,48 @@ function actor(userId: string | null | undefined): {
   return userId ? { type: "user", id: userId } : { type: "system", id: null };
 }
 
+/** A key written revoked and not yet granted and activated: its token lives only here. */
+export type DisabledApiKey = Readonly<{
+  id: string;
+  token: string;
+  organizationId: string;
+  bindings: ApiKeyScope[];
+  permissions: string[] | undefined;
+  actor: ReturnType<typeof actor>;
+  caller: AuthzGrantCaller;
+}>;
+
+type PreparedKey = {
+  parsed: z.infer<typeof createApiKeyInputSchema>;
+  bindings: ApiKeyScope[];
+  permissions: string[] | undefined;
+};
+
+function disabledKey({
+  id,
+  token,
+  prepared,
+}: {
+  id: string;
+  token: string;
+  prepared: PreparedKey;
+}): DisabledApiKey {
+  const { parsed } = prepared;
+
+  return {
+    id,
+    token,
+    organizationId: parsed.organizationId,
+    bindings: prepared.bindings,
+    permissions: prepared.permissions,
+    actor: actor(parsed.createdByUserId ?? parsed.userId),
+    caller: grantCaller({
+      userId: parsed.createdByUserId ?? parsed.userId,
+      apiKeyId: parsed.callerApiKeyId,
+    }),
+  };
+}
+
 export class ApiKeyLifecycleService {
   static create(
     options: ApiKeyDependencies & { repository: ApiKeyRepository },
@@ -111,6 +153,55 @@ export class ApiKeyLifecycleService {
   }
 
   async create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
+    return this.grantAndActivate(await this.writeDisabled(input));
+  }
+
+  /** Validates and writes the key's row revoked; nothing is granted and no token is live yet. */
+  async writeDisabled(input: CreateApiKeyInput): Promise<DisabledApiKey> {
+    return this.writeRow(await this.prepare(input));
+  }
+
+  /**
+   * The key an earlier attempt wrote from this same `input`, as `writeDisabled` answered it, so a
+   * grant that has not landed can be retried on any server without writing another key.
+   */
+  async reopenDisabled({
+    id,
+    token,
+    input,
+  }: {
+    id: string;
+    token: string;
+    input: CreateApiKeyInput;
+  }): Promise<DisabledApiKey> {
+    return disabledKey({ id, token, prepared: await this.prepare(input) });
+  }
+
+  /**
+   * Grants a written key and activates it. A grant that has not landed leaves the row revoked and
+   * throws, so the same key may be granted again: its role id and binding identities are its own.
+   */
+  async grantAndActivate(key: DisabledApiKey): Promise<{ token: string; apiKey: ApiKey }> {
+    await this.grants.writeBindings({
+      apiKeyId: key.id,
+      organizationId: key.organizationId,
+      bindings: key.bindings,
+      permissions: key.permissions,
+      actor: key.actor,
+      caller: key.caller,
+      roleId: `apikey:${key.id}`,
+    });
+
+    return {
+      token: key.token,
+      apiKey: publicApiKey(
+        await this.bindings.attachOne(await this.repository.activate({ id: key.id })),
+      ),
+    };
+  }
+
+  /** Parses and validates a create; the bindings and permissions it would grant. */
+  private async prepare(input: CreateApiKeyInput): Promise<PreparedKey> {
     const parsed = createApiKeyInputSchema.parse(input);
     if (!parsed.isSystemManaged && RESERVED_NAMES.has(parsed.name)) {
       throw new ApiKeyReservedNameError(parsed.name);
@@ -145,6 +236,11 @@ export class ApiKeyLifecycleService {
       throw new ApiKeyScopeViolationError("A personal API key needs at least one role binding");
     }
 
+    return { parsed, bindings: effectiveBindings, permissions };
+  }
+
+  private async writeRow(prepared: PreparedKey): Promise<DisabledApiKey> {
+    const { parsed } = prepared;
     const generated = this.options.tokens.generate({
       prefix: parsed.ingestSourceType ? INGEST_KEY_PREFIX : API_KEY_PREFIX,
     });
@@ -153,28 +249,11 @@ export class ApiKeyLifecycleService {
         parsed,
         lookupId: generated.lookupId,
         hashedSecret: generated.hashedSecret,
-        grants: effectiveBindings,
+        grants: prepared.bindings,
       }),
     );
-    await this.grants.writeBindings({
-      apiKeyId: row.id,
-      organizationId: parsed.organizationId,
-      bindings: effectiveBindings,
-      permissions,
-      actor: actor(parsed.createdByUserId ?? parsed.userId),
-      caller: grantCaller({
-        userId: parsed.createdByUserId ?? parsed.userId,
-        apiKeyId: parsed.callerApiKeyId,
-      }),
-      roleId: `apikey:${row.id}`,
-    });
 
-    return {
-      token: generated.token,
-      apiKey: publicApiKey(
-        await this.bindings.attachOne(await this.repository.activate({ id: row.id })),
-      ),
-    };
+    return disabledKey({ id: row.id, token: generated.token, prepared });
   }
 
   /** Every pod reads the changed key afresh: its shared answer is deleted right after the write. */

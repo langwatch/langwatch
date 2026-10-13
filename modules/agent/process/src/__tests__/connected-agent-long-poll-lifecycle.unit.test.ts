@@ -8,9 +8,10 @@ import {
   PRESENCE_TTL_SECONDS,
   PROTOCOL_VERSION,
 } from "@langwatch/agent-contract";
-import { memorySessionState } from "@langwatch/process-stores";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryConnectedAgentRelayChannel } from "../channels/memory/memory.connected-agent-relay.channel.ts";
+import { MemoryConnectedAgentStateRepository } from "../repositories/memory/memory.connected-agent-state.repository.ts";
 import type { AgentService } from "../services/agent.service.ts";
 import type { LongPollTransportService } from "../services/connected-agent-long-poll.service.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
@@ -81,7 +82,8 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
     it("answers the dispatcher's outcome once it posts an ack and a result", async () => {
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store: memorySessionState(),
+        state: MemoryConnectedAgentStateRepository.create(),
+        relay: MemoryConnectedAgentRelayChannel.create(),
       });
       const transport = createLongPollFixture({
         runtime,
@@ -116,7 +118,8 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
     it("answers the next poll with a cancel frame for that call", async () => {
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store: memorySessionState(),
+        state: MemoryConnectedAgentStateRepository.create(),
+        relay: MemoryConnectedAgentRelayChannel.create(),
       });
       const transport = createLongPollFixture({
         runtime,
@@ -161,7 +164,8 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
     it("is no longer live and the token answers agent_session_unknown", async () => {
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store: memorySessionState(),
+        state: MemoryConnectedAgentStateRepository.create(),
+        relay: MemoryConnectedAgentRelayChannel.create(),
       });
       const transport = createLongPollFixture({
         runtime,
@@ -207,10 +211,11 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
     /** @scenario "A process that stops polling goes offline after the presence TTL" */
     it("fails a call dispatched to its agent with agent_offline", async () => {
       let now = Date.now();
-      const store = memorySessionState({ now: () => now });
+      const state = MemoryConnectedAgentStateRepository.create({ now: () => now });
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store,
+        state,
+        relay: MemoryConnectedAgentRelayChannel.create(),
         firstTurnGraceMs: 20,
         firstTurnPollMs: 5,
       });
@@ -236,13 +241,17 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
 });
 
 function build() {
-  const store = memorySessionState();
-  const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
+  const state = MemoryConnectedAgentStateRepository.create();
+  const runtime = ConnectedAgentRuntimeService.create({
+    podId: "pod_solo",
+    state,
+    relay: MemoryConnectedAgentRelayChannel.create(),
+  });
   const transport = createLongPollFixture({
     runtime,
     agents: fakeAgents,
     publicBaseUrl: "https://example.test",
     replicaCount: 1,
   });
-  return { store, runtime, transport };
+  return { state, runtime, transport };
 }

@@ -1,4 +1,4 @@
-import { toDate, type Instant } from "@langwatch/time";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 import {
   workflowDslSchema,
   workflowSchema,
@@ -95,7 +95,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
   async archiveLinked(input: WorkflowReference): Promise<{ id: string }> {
     const row = await this.database.workflow.update({
       where: { id: input.workflowId, projectId: input.projectId },
-      data: { archivedAt: new Date() },
+      data: { archivedAt: toDate(nowInstant()) },
       select: { id: true },
     });
 

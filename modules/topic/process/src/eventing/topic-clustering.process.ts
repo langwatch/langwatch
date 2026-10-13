@@ -22,6 +22,7 @@ import {
   createTopicClusteringRunHandler,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,
   TOPIC_CLUSTERING_OUTBOX_BATCH_SIZE,
+  TOPIC_CLUSTERING_MAX_SILENCE_MS,
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
   TOPIC_CLUSTERING_PROCESS_INTENT_TYPES,
   topicClusteringRunIntentSchema,
@@ -313,6 +314,7 @@ export function topicClusteringProcessManager(
         // executor-crash paths).
         maxAttempts: TOPIC_CLUSTERING_MAX_ATTEMPTS,
         leaseDurationMs: TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
+        maxSilenceMs: TOPIC_CLUSTERING_MAX_SILENCE_MS,
         // ADR-051 §4 promises langevals sees the same load profile as the
         // old worker's `concurrency: 3`; the batch bound keeps leased
         // messages from waiting invisibly behind a slow page.

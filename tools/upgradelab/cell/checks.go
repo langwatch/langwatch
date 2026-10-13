@@ -86,7 +86,8 @@ func (cell *run) holdingVerdict() Verdict {
 // ingestVerdict: ingest never sees a non-2xx, on any attempt.
 func ingestVerdict(summaries []KindSummary) Verdict {
 	var seen []string
-	for _, each := range summaries {
+	for i := range summaries {
+		each := &summaries[i]
 		if storedTable[each.Kind] != "" && each.NonOK > 0 {
 			seen = append(seen, fmt.Sprintf("%s %d", each.Kind, each.NonOK))
 		}
@@ -97,7 +98,8 @@ func ingestVerdict(summaries []KindSummary) Verdict {
 func ledgerVerdict(rows []LedgerRow) Verdict {
 	left := Outstanding(rows)
 	names := make([]string, 0, len(left))
-	for _, row := range left {
+	for i := range left {
+		row := &left[i]
 		names = append(names, row.ID+"="+row.Status)
 	}
 	return verdict("I2", len(rows) > 0 && len(left) == 0,
@@ -118,7 +120,8 @@ func reopenedVerdict(atReady, final []LedgerRow, drilled string) Verdict {
 
 func countDone(rows []LedgerRow) int {
 	done := 0
-	for _, row := range rows {
+	for i := range rows {
+		row := &rows[i]
 		if row.Status == "done" {
 			done++
 		}
@@ -346,7 +349,8 @@ func unansweredVerdict(calls []Call) Verdict {
 func droppedVerdict(summaries []KindSummary, excused int) Verdict {
 	failed, sent, retries, window := 0, 0, 0, int64(0)
 	var detail []string
-	for _, each := range summaries {
+	for i := range summaries {
+		each := &summaries[i]
 		failed += each.Failed
 		sent += each.Sent
 		retries += each.Retries
@@ -365,7 +369,8 @@ func lostByPhase(calls []Call, phases []PhaseChange, visible map[string]bool) []
 		first, last int64
 	}
 	lost := map[string]*span{}
-	for _, call := range calls {
+	for i := range calls {
+		call := &calls[i]
 		if !call.Write || !call.ok() || visible[call.Kind+"/"+call.ID] {
 			continue
 		}
@@ -387,7 +392,8 @@ func lostByPhase(calls []Call, phases []PhaseChange, visible map[string]bool) []
 func lostVerdict(summaries []KindSummary) Verdict {
 	lost := 0
 	var detail []string
-	for _, each := range summaries {
+	for i := range summaries {
+		each := &summaries[i]
 		lost += each.Lost
 		if each.Lost > 0 {
 			detail = append(detail, fmt.Sprintf("%s %d", each.Kind, each.Lost))
@@ -400,7 +406,7 @@ func (cell *run) queueSummary(ctx context.Context) QueueSummary {
 	cell.queueMu.Lock()
 	samples, reads := append([]QueueSample(nil), cell.queue...), cell.queueReads
 	cell.queueMu.Unlock()
-	summary := summariseQueue(samples, cell.marks["fromWorkerPaused"], cell.marks["headWorkerStarted"])
+	summary := summariseQueue(samples, cell.marks["headWorkerStarted"])
 	summary.AtCut, summary.ReadErrors, summary.FirstError = cell.cutDepth, reads.failed, reads.first
 	summary.ByQueue = QueueBreakdown(ctx, cell.stores.RedisPort)
 	byKind, stop := context.WithTimeout(ctx, 2*time.Minute) // one SCAN of the group keys, bounded at a deep backlog
@@ -452,7 +458,7 @@ func queueSlope(samples []QueueSample) float64 {
 
 // summariseQueue finds the peak and when, after head's worker started, the depth fell within the
 // limit and stayed there to the last reading (-1: never, or it grew again).
-func summariseQueue(samples []QueueSample, pausedAt, workerAt int64) QueueSummary {
+func summariseQueue(samples []QueueSample, workerAt int64) QueueSummary {
 	summary := QueueSummary{Samples: samples, Baseline: queueBase, DrainedMs: -1, Final: -1, SlopePerMin: queueSlope(samples)}
 	summary.Limit = drainLimit(summary.Baseline)
 	for _, sample := range samples {
@@ -531,7 +537,9 @@ func (cell *run) visibleWrites(ctx context.Context) (map[string]bool, error) {
 	}
 	visible := map[string]bool{}
 	seen := evidence{stored: stored, versions: cell.promptVersions(ctx)}
-	for _, call := range cell.allCalls() {
+	callsRange := cell.allCalls()
+	for i := range callsRange {
+		call := &callsRange[i]
 		if !call.Write || !call.ok() {
 			continue
 		}
@@ -540,10 +548,10 @@ func (cell *run) visibleWrites(ctx context.Context) (map[string]bool, error) {
 			continue
 		}
 		if strings.HasPrefix(call.Kind, privatePrefix) {
-			visible[call.Kind+"/"+call.ID] = cell.privateVisible(ctx, call, privateStored)
+			visible[call.Kind+"/"+call.ID] = cell.privateVisible(ctx, *call, privateStored)
 			continue
 		}
-		visible[call.Kind+"/"+call.ID] = cell.isVisible(ctx, call, seen)
+		visible[call.Kind+"/"+call.ID] = cell.isVisible(ctx, *call, seen)
 	}
 	return visible, nil
 }

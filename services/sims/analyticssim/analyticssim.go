@@ -2,7 +2,7 @@
 // the stack talks to: PostHog (posthog-node's /batch/, posthog-js's /e/ and
 // flags) and Customer.io (the CDP API nurturing posts to, and the Track API).
 // Every call is normalized into one Record and kept in memory, listed under
-// /_sim/api/records for the console, apidiff and visualdiff.
+// /_sim/api/records for the console and for tests.
 //
 // ponytail: keys are accepted, never checked. It is a dev shim; never expose it.
 package analyticssim

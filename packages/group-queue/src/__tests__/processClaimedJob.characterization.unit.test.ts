@@ -57,6 +57,9 @@ type Scenario = {
   failStreak?: number;
   retryable?: boolean;
   retryAfterMs?: number;
+  /** Another worker recovered the claim, so every fenced write answers false. */
+  claimLost?: boolean;
+  onExhausted?: GroupQueueRuntimeDefinition<TestPayload>["onExhausted"];
 };
 
 const connections: IORedis[] = [];
@@ -80,16 +83,20 @@ function recordingProcessor(scenario: Scenario): {
     log("redis.del", args);
     return 1;
   });
+  vi.spyOn(conn, "evalsha").mockImplementation(async () => {
+    log("redis.evalsha", []);
+    return scenario.claimLost ? -1 : 1;
+  });
 
   const scriptAnswers: [keyof GroupStagingScripts, () => unknown][] = [
-    ["complete", () => undefined],
+    ["complete", () => !scenario.claimLost],
     ["drainGroupReady", () => scenario.siblings ?? []],
     ["refreshActiveKey", () => undefined],
-    ["restageAndBlock", () => undefined],
+    ["restageAndBlock", () => !scenario.claimLost],
     ["retryRestage", () => true],
     ["recordGroupFailure", () => scenario.failStreak ?? 1],
     ["clearGroupFailures", () => undefined],
-    ["stage", () => undefined],
+    ["stage", () => ({ isNew: true, orphanedValue: "", claimLost: Boolean(scenario.claimLost) })],
     ["discardClaim", () => undefined],
     ["retireWorker", () => undefined],
     ["recordWorkerAlive", () => undefined],
@@ -125,6 +132,7 @@ function recordingProcessor(scenario: Scenario): {
     },
     groupKey: (payload) => payload.groupId,
     identify: (payload) => payload.id,
+    ...(scenario.onExhausted ? { onExhausted: scenario.onExhausted } : {}),
     ...(handleBatch
       ? {
           processBatch: async (payloads: TestPayload[]) => {
@@ -154,6 +162,7 @@ async function runClaimed(scenario: Scenario): Promise<unknown[]> {
     groupId: GROUP,
     jobDataJson: jobValue("job-1"),
     originalScore: 1000,
+    claimToken: "claim-1",
   });
   return calls;
 }
@@ -225,6 +234,57 @@ describe("given a claimed job", () => {
   });
 });
 
+describe("given a claimed job whose claim another worker recovered", () => {
+  const named = (calls: unknown[], name: string) =>
+    calls.filter((call) => Array.isArray(call) && call[0] === name);
+
+  /** @scenario "A former owner that dead-letters or parks a recovered job leaves the group alone" */
+  it("dead-letters without clearing the group's failures or attempt count", async () => {
+    const calls = await runClaimed({
+      claimLost: true,
+      retryable: false,
+      onExhausted: () => "dead-letter",
+      process: async () => {
+        throw new NonRetryableGroupQueueError("never again");
+      },
+    });
+    expect(named(calls, "scripts.complete")).toHaveLength(1);
+    expect(named(calls, "scripts.clearGroupFailures")).toHaveLength(0);
+    expect(named(calls, "redis.del")).toHaveLength(0);
+  });
+
+  /** @scenario "A former owner that dead-letters or parks a recovered job leaves the group alone" */
+  it("parks nothing and leaves the claim marker in place", async () => {
+    const calls = await runClaimed({
+      claimLost: true,
+      decode: async () => {
+        throw new PayloadTooLargeError(99_999_999);
+      },
+    });
+    expect(named(calls, "scripts.restageAndBlock")).toHaveLength(1);
+    expect(named(calls, "scripts.discardClaim")).toHaveLength(0);
+  });
+
+  /** @scenario "A former owner's dead-letter and re-stage leave the recovering worker's state alone" */
+  it("stops re-staging its drained siblings at the first refusal", async () => {
+    const calls = await runClaimed({
+      claimLost: true,
+      siblings: [
+        { stagedJobId: "job-2", jobDataJson: jobValue("job-2"), originalScore: 1001 },
+        { stagedJobId: "job-3", jobDataJson: jobValue("job-3"), originalScore: 1002 },
+      ],
+      processBatch: async () => {},
+      decode: async (value) => {
+        if (value.includes("job-2")) {
+          throw new TransientBlobStoreError({ projectId: "project_1", hash: "h", cause: "down" });
+        }
+        return JSON.parse(value);
+      },
+    });
+    expect(named(calls, "scripts.stage")).toHaveLength(1);
+  });
+});
+
 describe("given a claimed job that coalesces its siblings", () => {
   const siblings: DrainedJob[] = [
     { stagedJobId: "job-2", jobDataJson: jobValue("job-2"), originalScore: 1001 },
@@ -287,6 +347,7 @@ describe("given a coalesced batch that fails", () => {
         groupId: GROUP,
         jobDataJson: jobValue("job-1"),
         originalScore: 1000,
+        claimToken: "claim-1",
       });
 
       expect(named(calls, "handler.processBatch")).toHaveLength(1);
@@ -344,6 +405,7 @@ describe("given a claimed job this worker has no handler for", () => {
       groupId: GROUP,
       jobDataJson: handedBackJob(handedBackSince),
       originalScore: 1000,
+      claimToken: "claim-1",
     });
     return { calls, warn, error };
   };

@@ -139,8 +139,9 @@ describe("CodingAssistantBillingFactService", () => {
         policies,
         organizationIds: async ({ after, limit }) => {
           const rest = ids.filter((id) => after === undefined || id > after);
+          if (limit === undefined || rest.length <= limit) return { ids: rest, next: null };
           const page = rest.slice(0, limit);
-          return { ids: page, next: rest.length > limit ? (page.at(-1) ?? null) : null };
+          return { ids: page, next: page.at(-1) ?? null };
         },
         clock: () => AT,
         record: async () => {

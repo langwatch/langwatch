@@ -2,7 +2,12 @@ import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MigrationLeaseRepository } from "../lease.repository.ts";
-import { heldNoticeLevel, SystemMigrationRunnerService } from "../runner.service.ts";
+import {
+  DEFAULT_PAUSE_WHILE_QUEUED_ABOVE,
+  heldNoticeLevel,
+  type PassQueueRun,
+  SystemMigrationRunnerService,
+} from "../runner.service.ts";
 import {
   SystemMigrationRecordNotFoundError,
   type SystemMigrationStateRepository,
@@ -212,6 +217,95 @@ describe("SystemMigrationRunnerService", () => {
       // pool keeps pulling past the straggler, where a chunked convoy would
       // hold the tail behind org-00's sleep.
       expect(completed.indexOf("org-11")).toBeLessThan(completed.indexOf("org-00"));
+    });
+  });
+
+  describe("when a migration that declares no pacing limit fans out on a worker", () => {
+    /** @scenario "A migration that declares no pacing limit is paced by default on the worker" */
+    it("keeps at most the default plus a page of its own jobs outstanding and finishes every organization", async () => {
+      const jobsPerTenant = 30;
+      const ids = Array.from({ length: 2_000 }, (_, i) => `org-${String(i).padStart(4, "0")}`);
+      const own = { outstanding: 0, peak: 0, rooms: [] as number[] };
+      // The worker drains the list down to the room asked for before the next page starts.
+      const list: PassQueueRun = {
+        waitForRoom: async ({ maxOutstanding }) => {
+          own.rooms.push(maxOutstanding);
+          own.outstanding = Math.min(own.outstanding, maxOutstanding);
+        },
+      };
+      const migration = migrationOf("m1", async () => {
+        own.outstanding += jobsPerTenant;
+        own.peak = Math.max(own.peak, own.outstanding);
+        return finalized;
+      });
+      const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(ids),
+        cohort: () => true,
+        migrations: [migration],
+        runListedWork: async ({ work }) => work(list),
+      });
+
+      const summary = await runner.runPass();
+
+      expect(summary.finalized).toBe(ids.length);
+      expect(own.rooms.every((room) => room === DEFAULT_PAUSE_WHILE_QUEUED_ABOVE)).toBe(true);
+      expect(own.peak).toBeGreaterThan(DEFAULT_PAUSE_WHILE_QUEUED_ABOVE);
+      expect(own.peak).toBeLessThanOrEqual(DEFAULT_PAUSE_WHILE_QUEUED_ABOVE + 100 * jobsPerTenant);
+    });
+
+    /** @scenario "A migration can wait for queue room inside one organization" */
+    it("offers the migration a wait that holds at the pass's own limit between pages", async () => {
+      const rooms: number[] = [];
+      const list: PassQueueRun = {
+        waitForRoom: async ({ maxOutstanding }) => {
+          rooms.push(maxOutstanding);
+        },
+      };
+      const migration = migrationOf("m1", async ({ waitForRoom }) => {
+        await waitForRoom?.();
+        await waitForRoom?.();
+        return finalized;
+      });
+      const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migration],
+        runListedWork: async ({ work }) => work(list),
+      });
+
+      const summary = await runner.runPass();
+
+      expect(summary.finalized).toBe(1);
+      // One wait before the page of organizations, then the two the migration asked for.
+      expect(rooms).toEqual([
+        DEFAULT_PAUSE_WHILE_QUEUED_ABOVE,
+        DEFAULT_PAUSE_WHILE_QUEUED_ABOVE,
+        DEFAULT_PAUSE_WHILE_QUEUED_ABOVE,
+      ]);
+    });
+
+    it("leaves a pass without a queue list unpaced, as on the tasks process", async () => {
+      const queuedJobs = vi.fn(async () => 1_000_000);
+      const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme", "globex"]),
+        cohort: () => true,
+        migrations: [migrationOf("m1", async () => finalized)],
+        queuedJobs,
+      });
+
+      const summary = await runner.runPass();
+
+      expect(summary.finalized).toBe(2);
+      expect(queuedJobs).not.toHaveBeenCalled();
     });
   });
 
@@ -634,6 +728,51 @@ describe("SystemMigrationRunnerService", () => {
     });
   });
 
+  describe("when a paced pass runs on a queue list of its own", () => {
+    const stoppedDraining = new Error("Queue work stopped draining");
+
+    function pacedRunner({
+      tenants,
+      waitForRoom,
+    }: {
+      tenants: TenantSource;
+      waitForRoom: () => Promise<void>;
+    }): SystemMigrationRunnerService {
+      return new SystemMigrationRunnerService({
+        now: nowInstant,
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants,
+        cohort: () => true,
+        migrations: [{ ...migrationOf("m1", async () => finalized), pauseWhileQueuedAbove: 10 }],
+        runListedWork: ({ work }) => work({ waitForRoom }),
+      });
+    }
+
+    /** @scenario "A paced pass leaves undrained queue work to the next pass but fails on a tenant fault" */
+    it("completes the pass when the list stops draining", async () => {
+      const runner = pacedRunner({
+        tenants: tenantSourceOf(["acme"]),
+        waitForRoom: () => Promise.reject(stoppedDraining),
+      });
+
+      const summary = await runner.runPass();
+
+      expect(summary.tenantsSeen).toBe(0);
+    });
+
+    /** @scenario "A paced pass leaves undrained queue work to the next pass but fails on a tenant fault" */
+    it("fails the pass when reading the next page of tenants fails", async () => {
+      const unreadable = new Error("tenant source unreachable");
+      const runner = pacedRunner({
+        tenants: { findTenantIdsAfter: () => Promise.reject(unreadable) },
+        waitForRoom: () => Promise.resolve(),
+      });
+
+      await expect(runner.runPass()).rejects.toBe(unreadable);
+    });
+  });
+
   describe("when the tenant source pages", () => {
     it("walks every page with the last id as the cursor", async () => {
       const ids = Array.from({ length: 250 }, (_, i) => `org-${String(i).padStart(3, "0")}`);
@@ -908,6 +1047,7 @@ describe("SystemMigrationRunnerService over a finished fleet", () => {
           migrationName,
           tenantId,
           status: "finalized",
+          report: null,
         });
       }
     }

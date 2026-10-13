@@ -104,12 +104,9 @@ A lane never edits a shared file. It writes, under `Shared-file requests`, the
 exact change:
 
 ```text
-apps/api/src/app-rest/api-rest.doors.ts
-  add:  installApiTraceExport,   (after installApiTrace, line 34)
-
-packages/architecture-enforcer/src/feature-shape-baseline.json
-  drop: "trace|legacy-transport-runtime"
-  drop: "trace|nested-transport"
+modules/catalogue.json
+  add:  { "id": "widget", "root": "modules/widget", "classification": "core",
+          "subjects": ["widget"] },   (after the "webhook" entry)
 ```
 
 Path, then the line to add or drop, and where. The coordinator applies it

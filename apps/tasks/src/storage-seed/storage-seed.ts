@@ -449,7 +449,7 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
     });
   }
 
-  // haven mints this per stack (HAVEN_SEED_SCIM_TOKEN) so the diff tools can call SCIM.
+  // haven mints this per stack (HAVEN_SEED_SCIM_TOKEN) so local tools can call SCIM.
   if (environment.HAVEN_SEED_SCIM_TOKEN) {
     await seedScimToken({
       prisma,

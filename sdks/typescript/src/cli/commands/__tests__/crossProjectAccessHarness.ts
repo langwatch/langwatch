@@ -117,7 +117,7 @@ export function installCrossProjectHarness(): CrossProjectHarness {
           return;
         }
 
-        if (url.startsWith("/api/projects")) {
+        if (url.startsWith("/api/v1/projects")) {
           recorded.projectsListCalls++;
           recorded.projectsAuth = auth;
           // The platform filters the listing by what the credential can view,

@@ -57,7 +57,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .withNamespace("langy")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("project")
-  .withAddressing("literal", { v1Twin: false })
+  .withAddressing("literal", { v1Twin: true })
 
   // ── what `code_access` reads ──────────────────────────────────────────────
 

@@ -158,6 +158,7 @@ class StubRepository implements ProjectRepository {
   touchCodingAgentSessionSeen = vi.fn(async () => undefined);
   touchCodingAgentPullRequestSeen = vi.fn(async () => undefined);
   findWithOrgAdmin = vi.fn(async () => null);
+  findBackfillPage = vi.fn(async () => []);
   findTraceSharingConfig = vi.fn(async () => null);
   searchByQuery = vi.fn(async () => []);
   update = vi.fn(async () => applicationProject);
@@ -445,9 +446,7 @@ const createService = (
     logger: { error: () => void 0 },
     projects: {
       findWithOrgAdmin: async () => null,
-      findIdsByOrganization: async () => [],
       findWithTeam: async () => null,
-      findLiveWithTeamByIds: async () => [],
     },
   }),
   granted: (permission: AuthzPermission) => boolean = () => true,
@@ -773,18 +772,22 @@ describe("ProjectService", () => {
         logger: { error: () => void 0 },
         projects: {
           findWithOrgAdmin: async () => null,
-          findIdsByOrganization: async () => [],
           findWithTeam: async () => null,
-          findLiveWithTeamByIds: async () => [],
         },
       });
       created.connect({
-        recordProjectCreated: { send },
+        recordProjectCreated: { send, sendBatch: async () => undefined },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
-        recordPresenceSettingChanged: { send: async () => undefined },
+        recordPresenceSettingChanged: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectMoved: { send: async () => undefined },
         recordProjectArchived: { send: async () => undefined },
-        recordProjectDepartmentAssigned: { send: async () => undefined },
+        recordProjectDepartmentAssigned: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectTraceSharingDisabled: { send: async () => undefined },
         recordProjectAggregateRuleChanged: { send: async () => undefined },
         recordProjectRevived: { send: async () => undefined },
@@ -810,18 +813,22 @@ describe("ProjectService", () => {
         logger: { error: () => void 0 },
         projects: {
           findWithOrgAdmin: async () => null,
-          findIdsByOrganization: async () => [],
           findWithTeam: async () => null,
-          findLiveWithTeamByIds: async () => [],
         },
       });
       created.connect({
-        recordProjectCreated: { send },
+        recordProjectCreated: { send, sendBatch: async () => undefined },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
-        recordPresenceSettingChanged: { send: async () => undefined },
+        recordPresenceSettingChanged: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectMoved: { send: async () => undefined },
         recordProjectArchived: { send: async () => undefined },
-        recordProjectDepartmentAssigned: { send: async () => undefined },
+        recordProjectDepartmentAssigned: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectTraceSharingDisabled: { send: async () => undefined },
         recordProjectAggregateRuleChanged: { send: async () => undefined },
         recordProjectRevived: { send: async () => undefined },
@@ -847,18 +854,25 @@ describe("ProjectService", () => {
         logger: { error },
         projects: {
           findWithOrgAdmin: async () => null,
-          findIdsByOrganization: async () => [],
           findWithTeam: async () => null,
-          findLiveWithTeamByIds: async () => [],
         },
       });
       created.connect({
-        recordProjectCreated: { send: () => Promise.reject(new Error("queue down")) },
+        recordProjectCreated: {
+          send: () => Promise.reject(new Error("queue down")),
+          sendBatch: async () => undefined,
+        },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
-        recordPresenceSettingChanged: { send: async () => undefined },
+        recordPresenceSettingChanged: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectMoved: { send: async () => undefined },
         recordProjectArchived: { send: async () => undefined },
-        recordProjectDepartmentAssigned: { send: async () => undefined },
+        recordProjectDepartmentAssigned: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectTraceSharingDisabled: { send: async () => undefined },
         recordProjectAggregateRuleChanged: { send: async () => undefined },
         recordProjectRevived: { send: async () => undefined },
@@ -1466,18 +1480,22 @@ describe("ProjectService lifecycle facts for authz's lineage", () => {
       logger: { error },
       projects: {
         findWithOrgAdmin: async () => null,
-        findIdsByOrganization: async () => [],
         findWithTeam: async () => null,
-        findLiveWithTeamByIds: async () => [],
       },
     });
     created.connect({
-      recordProjectCreated: { send: async () => undefined },
+      recordProjectCreated: { send: async () => undefined, sendBatch: async () => undefined },
       recordProjectLegacyKeyRevoked: { send: async () => undefined },
-      recordPresenceSettingChanged: { send: async () => undefined },
+      recordPresenceSettingChanged: {
+        send: async () => undefined,
+        sendBatch: async () => undefined,
+      },
       recordProjectMoved: { send: moved },
       recordProjectArchived: { send: archived },
-      recordProjectDepartmentAssigned: { send: async () => undefined },
+      recordProjectDepartmentAssigned: {
+        send: async () => undefined,
+        sendBatch: async () => undefined,
+      },
       recordProjectTraceSharingDisabled: { send: async () => undefined },
       recordProjectAggregateRuleChanged: { send: async () => undefined },
       recordProjectRevived: { send: async () => undefined },
@@ -1597,18 +1615,19 @@ describe("ProjectService department facts for data privacy's fold", () => {
       logger: { error: vi.fn() },
       projects: {
         findWithOrgAdmin: async () => null,
-        findIdsByOrganization: async () => [],
         findWithTeam: async () => projectWithTeam({ teamId: "team_alpha", departmentId: "risk" }),
-        findLiveWithTeamByIds: async () => [],
       },
     });
     created.connect({
-      recordProjectCreated: { send: async () => undefined },
+      recordProjectCreated: { send: async () => undefined, sendBatch: async () => undefined },
       recordProjectLegacyKeyRevoked: { send: async () => undefined },
-      recordPresenceSettingChanged: { send: async () => undefined },
+      recordPresenceSettingChanged: {
+        send: async () => undefined,
+        sendBatch: async () => undefined,
+      },
       recordProjectMoved: { send: async () => undefined },
       recordProjectArchived: { send: async () => undefined },
-      recordProjectDepartmentAssigned: { send: departments },
+      recordProjectDepartmentAssigned: { send: departments, sendBatch: async () => undefined },
       recordProjectTraceSharingDisabled: { send: async () => undefined },
       recordProjectAggregateRuleChanged: { send: async () => undefined },
       recordProjectRevived: { send: async () => undefined },

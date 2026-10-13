@@ -17,8 +17,10 @@ import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { testRedisUrl } from "../../../../__tests__/support/test-redis-url.ts";
+import { MemoryLangyLocalWorkspaceChannel } from "../../../../channels/memory/memory.langy-local-workspace.channel.ts";
 import type { LangyConversationProcessingEvent } from "../../../../eventing/langy-conversation-state.projection.ts";
 import { createAgentTurnLivenessSubscriber } from "../../../../eventing/langy-conversation.subscriber.ts";
+import { LangyLocalCallMemoryRepository } from "../../../../repositories/memory/memory.langy-local-call.repository.ts";
 import { LangyLocalPresenceRedisRepository } from "../../../../repositories/redis/redis.langy-local-presence.repository.ts";
 import { LangyTokenBufferRedisRepository } from "../../../../repositories/redis/redis.langy-token-buffer.repository.ts";
 import { LANGY_LIVENESS } from "../../../../rules/langy-streaming-constants.rules.ts";
@@ -146,7 +148,8 @@ describe("given a command running on the developer's machine", () => {
       const presence = LangyLocalPresenceRedisRepository.create({ store, now: () => now });
       await presence.register(workspace(conversationId));
       const dispatcher = LocalCallDispatcherService.create({
-        store,
+        calls: LangyLocalCallMemoryRepository.create({ now: () => now }),
+        workspace: MemoryLangyLocalWorkspaceChannel.create(),
         presence,
         buffer,
         now: () => now,
@@ -203,7 +206,8 @@ describe("given a command running on the developer's machine", () => {
       const presence = LangyLocalPresenceRedisRepository.create({ store, now: () => now });
       await presence.register(workspace(conversationId));
       const dispatcher = LocalCallDispatcherService.create({
-        store,
+        calls: LangyLocalCallMemoryRepository.create({ now: () => now }),
+        workspace: MemoryLangyLocalWorkspaceChannel.create(),
         presence,
         now: () => now,
         offlineWaitMs: 0,

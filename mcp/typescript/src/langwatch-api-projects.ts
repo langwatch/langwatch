@@ -35,11 +35,11 @@ export async function listProjects(params?: {
   if (params?.page) query.set("page", String(params.page));
   if (params?.limit) query.set("limit", String(params.limit));
   const qs = query.toString() ? `?${query}` : "";
-  return makeRequest("GET", `/api/projects${qs}`) as Promise<ProjectListResponse>;
+  return makeRequest("GET", `/api/v1/projects${qs}`) as Promise<ProjectListResponse>;
 }
 
 export async function getProject(id: string): Promise<ProjectSummary> {
-  return makeRequest("GET", `/api/projects/${encodeURIComponent(id)}`) as Promise<ProjectSummary>;
+  return makeRequest("GET", `/api/v1/projects/${encodeURIComponent(id)}`) as Promise<ProjectSummary>;
 }
 
 /** Identity of the project the calling API key belongs to. */
@@ -66,7 +66,7 @@ export async function createProject(data: {
   teamId?: string;
   newTeamName?: string;
 }): Promise<ProjectCreateResponse> {
-  return makeRequest("POST", "/api/projects", data) as Promise<ProjectCreateResponse>;
+  return makeRequest("POST", "/api/v1/projects", data) as Promise<ProjectCreateResponse>;
 }
 
 export async function updateProject(params: {
@@ -79,7 +79,7 @@ export async function updateProject(params: {
   const { id, ...data } = params;
   return makeRequest(
     "PATCH",
-    `/api/projects/${encodeURIComponent(id)}`,
+    `/api/v1/projects/${encodeURIComponent(id)}`,
     data,
   ) as Promise<ProjectSummary>;
 }
@@ -89,7 +89,7 @@ export async function archiveProject(id: string): Promise<{
   name: string;
   archivedAt: string;
 }> {
-  return makeRequest("DELETE", `/api/projects/${encodeURIComponent(id)}`) as Promise<{
+  return makeRequest("DELETE", `/api/v1/projects/${encodeURIComponent(id)}`) as Promise<{
     id: string;
     name: string;
     archivedAt: string;

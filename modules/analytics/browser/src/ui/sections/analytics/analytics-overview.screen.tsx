@@ -37,7 +37,7 @@ function AnalyticsContent() {
             title="No traces received yet"
             action={
               <BannerAction asChild>
-                <a href={`/${project.slug}/traces`}>Set up tracing</a>
+                <Link href={`/${project.slug}/traces`}>Set up tracing</Link>
               </BannerAction>
             }
           >

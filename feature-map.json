@@ -1224,7 +1224,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/projects",
+            "api": "/api/v1/projects",
             "docs": null
           },
           "sync": null,

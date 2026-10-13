@@ -55,9 +55,7 @@ func splitKey(key string) []string {
 		return []string{key}
 	}
 	parts := []string{head}
-	for _, seg := range strings.Split(strings.TrimSuffix(rest, "]"), "][") {
-		parts = append(parts, seg)
-	}
+	parts = append(parts, strings.Split(strings.TrimSuffix(rest, "]"), "][")...)
 	return parts
 }
 

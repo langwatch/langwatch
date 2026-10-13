@@ -1,3 +1,4 @@
+import { Link } from "@langwatch/browser-host/link";
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
 import { Box, GridItem, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
@@ -414,7 +415,9 @@ function EvaluationsContent() {
             title="No online evaluations yet"
             action={
               <BannerAction asChild>
-                <a href={`/${project?.slug}/online-evaluations`}>Set up an online evaluation</a>
+                <Link href={`/${project?.slug}/online-evaluations`}>
+                  Set up an online evaluation
+                </Link>
               </BannerAction>
             }
           >
@@ -429,7 +432,9 @@ function EvaluationsContent() {
             title={selectedEvaluation.name}
             action={
               <BannerAction asChild>
-                <a href={`/${project?.slug}/analytics/evaluations`}>View all online evaluations</a>
+                <Link href={`/${project?.slug}/analytics/evaluations`}>
+                  View all online evaluations
+                </Link>
               </BannerAction>
             }
           >

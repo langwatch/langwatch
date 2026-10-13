@@ -3,6 +3,7 @@ package scenario
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 )
 
@@ -28,7 +29,7 @@ type UserSimulatorAgent struct {
 
 // NewUserSimulatorAgent returns a user simulator.
 func NewUserSimulatorAgent(cfg UserSimulatorAgentConfig) *UserSimulatorAgent {
-	return &UserSimulatorAgent{cfg: cfg}
+	return &UserSimulatorAgent{cfg: cfg, invoker: invoker{role: AgentRoleUser}}
 }
 
 // Role implements AgentAdapter.
@@ -72,6 +73,8 @@ Your goal (assistant) is to interact with the Agent Under Test (user) as if you 
 const maxEmptyCompletionAttempts = 3
 
 // errNoUserContent is the error the platform classifies; keep it verbatim.
+//
+//lint:ignore ST1005 the platform matches the JS SDK's exact message
 var errNoUserContent = errors.New("No response content from LLM")
 
 // Call implements AgentAdapter.
@@ -80,12 +83,15 @@ func (u *UserSimulatorAgent) Call(ctx context.Context, in AgentInput) (*AgentRet
 	if system == "" {
 		system = buildUserSimulatorPrompt(in.ScenarioConfig.Description, u.cfg.Persona)
 	}
-	model := u.cfg.ModelConfig.merged(currentSettings().DefaultModel)
-	if model.LLM == nil {
-		return nil, ErrNoModel
+	model, err := u.cfg.ModelConfig.merged(currentSettings().DefaultModel)
+	if err != nil {
+		return nil, err
 	}
 	history := in.Messages
 	if in.Executor != nil && hasAudioWithoutTranscript(history) {
+		// The executor hands the simulator a view of the stored
+		// conversation; extensions get a copy they may modify.
+		history = slices.Clone(history)
 		for _, p := range in.Executor.hooks.userSimInput {
 			prepared, err := p.PreprocessUserSimulatorInput(ctx, in.Executor, history)
 			if err != nil {
@@ -95,12 +101,23 @@ func (u *UserSimulatorAgent) Call(ctx context.Context, in AgentInput) (*AgentRet
 			history = prepared
 		}
 	}
+	// One slice for the whole prompt: audio stripped and roles reversed in
+	// place, message by message.
 	msgs := make([]Message, 0, len(history)+2)
 	msgs = append(msgs, SystemMsg(system), AssistantMsg("Hello, how can I help you today"))
-	msgs = append(msgs, stripAudio(history)...)
+	for _, m := range history {
+		msgs = append(msgs, stripAudioMessage(m))
+	}
+	var names map[string]string
+	for i, m := range msgs {
+		if m.Role == RoleTool && m.ToolName == "" && names == nil {
+			names = toolNamesByCallID(history)
+		}
+		msgs[i] = reverseRole(m, names)
+	}
 	params := InferenceParams{
 		Model:       model.Model,
-		Messages:    reverseRoles(msgs),
+		Messages:    msgs,
 		Temperature: model.Temperature,
 		MaxTokens:   model.MaxTokens,
 	}
@@ -131,68 +148,57 @@ func hasAudioWithoutTranscript(msgs []Message) bool {
 	return false
 }
 
-// stripAudio prepares audio messages for a text-only model: their text
+// stripAudioMessage prepares an audio message for a text-only model: its text
 // parts are kept (an assistant turn with audio and text is reframed as
 // "[the agent said: …]" so the simulator does not parrot it), and an
-// audio-only message becomes "[audio message]". Other messages pass through.
-func stripAudio(msgs []Message) []Message {
-	out := make([]Message, len(msgs))
-	for i, m := range msgs {
-		if !m.HasAudio() {
-			out[i] = m
-			continue
-		}
-		var texts []string
-		for _, p := range m.Parts {
-			if p.Type == PartText {
-				texts = append(texts, p.Text)
-			}
-		}
-		stripped := m
-		stripped.Parts = nil
-		switch {
-		case len(texts) == 0:
-			stripped.Content = "[audio message]"
-		case m.Role == RoleAssistant:
-			stripped.Content = "[the agent said: " + strings.Join(texts, " ") + "]"
-		default:
-			stripped.Content = strings.Join(texts, " ")
-		}
-		out[i] = stripped
+// audio-only message becomes "[audio message]". Other messages pass
+// through.
+func stripAudioMessage(m Message) Message {
+	if !m.HasAudio() {
+		return m
 	}
-	return out
+	var texts []string
+	for _, p := range m.Parts {
+		if p.Type == PartText {
+			texts = append(texts, p.Text)
+		}
+	}
+	stripped := m
+	stripped.Parts = nil
+	switch {
+	case len(texts) == 0:
+		stripped.Content = "[audio message]"
+	case m.Role == RoleAssistant:
+		stripped.Content = "[the agent said: " + strings.Join(texts, " ") + "]"
+	default:
+		stripped.Content = strings.Join(texts, " ")
+	}
+	return stripped
 }
 
-// reverseRoles swaps user and assistant for the simulator, because models
+// reverseRole swaps user and assistant for the simulator, because models
 // are biased to answer as the assistant. Tool calls and results become
-// plain-text summaries on the user side.
-func reverseRoles(msgs []Message) []Message {
-	out := make([]Message, 0, len(msgs))
-	for _, m := range msgs {
-		switch {
-		case m.Role == RoleTool:
-			name := m.ToolName
-			if name == "" {
-				name = "unknown tool"
-			}
-			out = append(out, UserMsg("[Tool result from "+name+": "+m.Text()+"]"))
-		case m.Role == RoleAssistant && len(m.ToolCalls) > 0:
-			lines := make([]string, len(m.ToolCalls))
-			for i, tc := range m.ToolCalls {
-				lines[i] = "[Called tool " + tc.Name + " with: " + string(appendToolInput(nil, tc.Arguments)) + "]"
-			}
-			out = append(out, UserMsg(strings.Join(lines, "\n")))
-		case m.Role == RoleAssistant:
-			r := m
-			r.Role = RoleUser
-			out = append(out, r)
-		case m.Role == RoleUser:
-			r := m
-			r.Role = RoleAssistant
-			out = append(out, r)
-		default:
-			out = append(out, m)
+// plain-text summaries on the user side. A tool result without a ToolName
+// (as ToolMsg builds it) is named after the assistant call it answers, from
+// names (toolNamesByCallID of the conversation).
+func reverseRole(m Message, names map[string]string) Message {
+	switch {
+	case m.Role == RoleTool:
+		name := resultToolName(m, names)
+		if name == "" {
+			name = "unknown tool"
 		}
+		return UserMsg("[Tool result from " + name + ": " + m.Text() + "]")
+	case m.Role == RoleAssistant && len(m.ToolCalls) > 0:
+		lines := make([]string, len(m.ToolCalls))
+		for i, tc := range m.ToolCalls {
+			lines[i] = "[Called tool " + tc.Name + " with: " + string(appendToolInput(nil, tc.Arguments)) + "]"
+		}
+		return UserMsg(strings.Join(lines, "\n"))
+	case m.Role == RoleAssistant:
+		m.Role = RoleUser
+	case m.Role == RoleUser:
+		m.Role = RoleAssistant
 	}
-	return out
+	return m
 }

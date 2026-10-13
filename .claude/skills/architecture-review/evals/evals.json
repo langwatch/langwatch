@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "Review this merge lane's slice before I commit it. It adds `relayExecuteSync(input: { projectId; event; signal }): Promise<Response>` to the WorkflowApi interface in modules/workflow/contract/src and a REST route in workflow that calls it. Lint is green.",
-      "expected_output": "Runs the scoped instruments first (lint:changed, lint:architecture with the touched policies, check:feature-parity) and does not re-argue lint. Flags the new WorkflowApi member under checklist A, citing §8 (a one-to-one move from a handler is approved in advance; an operation adding behaviour or a new shape is asked for, Alex 2026-09-24) and §3.1. Searches ARCHITECTURE.md and .claude/coordinator/rulings-*.md for a dated ruling; with none, the verdict is 'needs a ruling' and the proposal with options goes to Risks. Does not design or rename the operation itself. Also checks the route's wire against origin/main (checklist D).",
+      "expected_output": "Runs the scoped instruments first (lint:changed, lint:architecture with the touched policies, check:feature-parity) and does not re-argue lint. Flags the new WorkflowApi member under checklist A, citing §8 (a one-to-one move from a handler is approved in advance; an operation adding behaviour or a new shape is asked for, Alex 2026-09-24) and §3.1. Searches ARCHITECTURE.md and the ADRs for a dated ruling; with none, the verdict is 'needs a ruling' and the proposal with options goes to Risks. Does not design or rename the operation itself. Also checks the route's wire against origin/main (checklist D).",
       "files": []
     },
     {
@@ -34,7 +34,7 @@
     {
       "id": 6,
       "prompt": "The relay route port answers a non-JSON body with 400 `malformed_request` where main answered `{\"error\":\"Bad request, expecting a JSON event\"}`, and a top-level projectId naming another project with 403 `scope_input_mismatch` where main forwarded it. The handoff lists both. Pass?",
-      "expected_output": "Checklist D, §8 and §12: finds main's shape with git grep on origin/main, confirms each difference is listed with its reason, and that each is ruled (non-JSON body ruled; the 403 ruled under L6b R2, both in rulings-2026-10-05.md and §8). Listed and ruled differences pass. States that a status collapsed to 200 or a setting no longer configurable would be a regression, not a listed difference. If a declaration change alters the OpenAPI document, asks for make sync-all-openapi.",
+      "expected_output": "Checklist D, §8 and §12: finds main's shape with git grep on origin/main, confirms each difference is listed with its reason, and that each is ruled (non-JSON body ruled; the 403 ruled under L6b R2, recorded in §8). Listed and ruled differences pass. States that a status collapsed to 200 or a setting no longer configurable would be a regression, not a listed difference. If a declaration change alters the OpenAPI document, asks for make sync-all-openapi.",
       "files": []
     },
     {

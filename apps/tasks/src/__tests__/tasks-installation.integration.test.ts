@@ -146,7 +146,6 @@ describe("the tasks process installation", () => {
     try {
       const names = runtime.tasks(isTask).map((task) => task.name);
       expect(names).toEqual([
-        "backfill-annotations-to-clickhouse",
         "clear-stale-pending-sso-setup",
         "slack-alert",
         "tiered-free-to-seat-event",
@@ -162,10 +161,6 @@ describe("the tasks process installation", () => {
         "grant-platform-operator",
         "system-migrations-pass",
         "request-system-migrations-pass",
-        "backfill-organization-presence-setting",
-        "backfill-project-created",
-        "backfill-project-presence-setting",
-        "backfill-project-department-assigned",
         "topic-clustering-run",
         "user-data-erase",
         "webhook-signature-vectors",

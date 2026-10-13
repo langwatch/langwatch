@@ -29,6 +29,8 @@ type eventReporter struct {
 	url       string
 	apiKey    string
 	projectID string
+	// auth is the Authorization header value, built once per run.
+	auth      string
 	client    *http.Client
 	retryBase time.Duration
 }
@@ -68,7 +70,7 @@ func resolveLangWatch(cfgs ...LangWatchConfig) LangWatchConfig {
 }
 
 func newEventReporter(lw LangWatchConfig) *eventReporter {
-	r := &eventReporter{apiKey: lw.APIKey, projectID: lw.ProjectID, client: sharedHTTPClient(), retryBase: eventRetryBase}
+	r := &eventReporter{apiKey: lw.APIKey, projectID: lw.ProjectID, auth: "Bearer " + lw.APIKey, client: sharedHTTPClient(), retryBase: eventRetryBase}
 	if base, err := url.Parse(lw.Endpoint); err == nil {
 		r.url = base.ResolveReference(&url.URL{Path: eventsAPIPath}).String()
 	}
@@ -139,7 +141,7 @@ func (r *eventReporter) post(ctx context.Context, ev Event) (string, error) {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+r.apiKey)
+	req.Header.Set("Authorization", r.auth)
 	if r.projectID != "" {
 		req.Header.Set("X-Project-Id", r.projectID)
 	}

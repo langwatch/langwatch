@@ -56,7 +56,7 @@ Feature: Langy service capability
 
   @unit
   Scenario: A new conversation takes its placeholder title in sentence case
-    Given a new conversation whose first user message reads "apidiff question"
+    Given a new conversation whose first user message reads "pricing question"
     When its first turn is accepted
-    Then the recorded message carries the title "Apidiff question"
+    Then the recorded message carries the title "Pricing question"
     And the conversation starts with no chosen title, so a generated title can replace it

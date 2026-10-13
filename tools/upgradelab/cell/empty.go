@@ -122,7 +122,8 @@ func (cell *run) emptyChecks(ctx context.Context) error {
 func notNeededVerdict(rows []LedgerRow) Verdict {
 	var wrong []string
 	data := 0
-	for _, row := range rows {
+	for i := range rows {
+		row := &rows[i]
 		if strings.HasSuffix(row.Kind, "-schema") || row.Kind == "seed" || row.Mode == "operator" {
 			continue
 		}

@@ -75,10 +75,13 @@ const backends: readonly Backend[] = [
 
 describe.each(backends)("given the $name authz backend", (backend) => {
   describe("when no row has been written", () => {
-    it("reads no cutover for an organization", async () => {
+    it("reads the legacy path for an organization", async () => {
       const { cutover } = backend.create();
 
-      await expect(cutover.findCutover({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
+      await expect(cutover.getEngineSwitch({ organizationId: ORGANIZATION_ID })).resolves.toEqual({
+        onEngine: false,
+        switchedAt: null,
+      });
     });
 
     it("reads no admission marker for a membership", async () => {
@@ -106,32 +109,32 @@ describe.each(backends)("given the $name authz backend", (backend) => {
     });
   });
 
-  describe("when a finalized cutover has been written", () => {
-    it("reads the status and the business time back", async () => {
+  describe("when the engine switch has been turned on", () => {
+    it("reads the switch and its time back", async () => {
       const repositories = backend.create();
-      const occurredAt = Temporal.Instant.from("2026-08-18T09:00:00.000Z");
+      const switchedAt = Temporal.Instant.from("2026-08-18T09:00:00.000Z");
       repositories.store.cutovers.set(ORGANIZATION_ID, {
         organizationId: ORGANIZATION_ID,
-        status: "finalized",
-        occurredAt,
+        onEngine: true,
+        switchedAt,
       });
 
       await expect(
-        repositories.cutover.findCutover({ organizationId: ORGANIZATION_ID }),
-      ).resolves.toEqual({ status: "finalized", occurredAt });
+        repositories.cutover.getEngineSwitch({ organizationId: ORGANIZATION_ID }),
+      ).resolves.toEqual({ onEngine: true, switchedAt });
     });
 
-    it("keeps another organization's cutover absent", async () => {
+    it("keeps another organization on the legacy path", async () => {
       const repositories = backend.create();
       repositories.store.cutovers.set(ORGANIZATION_ID, {
         organizationId: ORGANIZATION_ID,
-        status: "finalized",
-        occurredAt: null,
+        onEngine: true,
+        switchedAt: Temporal.Instant.from("2026-08-18T09:00:00.000Z"),
       });
 
       await expect(
-        repositories.cutover.findCutover({ organizationId: "org_other" }),
-      ).resolves.toBeNull();
+        repositories.cutover.getEngineSwitch({ organizationId: "org_other" }),
+      ).resolves.toEqual({ onEngine: false, switchedAt: null });
     });
   });
 

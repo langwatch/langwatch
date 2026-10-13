@@ -2660,6 +2660,44 @@
                                     "properties": {
                                       "type": {
                                         "type": "string",
+                                        "const": "tool-call"
+                                      },
+                                      "toolName": {
+                                        "type": "string"
+                                      },
+                                      "toolCallId": {
+                                        "type": "string"
+                                      },
+                                      "input": {}
+                                    },
+                                    "required": [
+                                      "type"
+                                    ]
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "const": "tool-result"
+                                      },
+                                      "toolName": {
+                                        "type": "string"
+                                      },
+                                      "toolCallId": {
+                                        "type": "string"
+                                      },
+                                      "output": {}
+                                    },
+                                    "required": [
+                                      "type"
+                                    ]
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
                                         "const": "binary"
                                       },
                                       "mimeType": {
@@ -2944,6 +2982,44 @@
                                 "type": "string"
                               },
                               "result": {}
+                            },
+                            "required": [
+                              "type"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "tool-call"
+                              },
+                              "toolName": {
+                                "type": "string"
+                              },
+                              "toolCallId": {
+                                "type": "string"
+                              },
+                              "input": {}
+                            },
+                            "required": [
+                              "type"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "tool-result"
+                              },
+                              "toolName": {
+                                "type": "string"
+                              },
+                              "toolCallId": {
+                                "type": "string"
+                              },
+                              "output": {}
                             },
                             "required": [
                               "type"
@@ -19304,7 +19380,7 @@
         }
       }
     },
-    "/api/projects": {
+    "/api/v1/projects": {
       "get": {
         "operationId": "listProjects",
         "responses": {
@@ -46882,7 +46958,7 @@
         }
       }
     },
-    "/api/elevenlabs/webhook/{modelProviderId}": {
+    "/api/v1/elevenlabs/webhook/{modelProviderId}": {
       "post": {
         "operationId": "receiveElevenLabsWebhook",
         "responses": {
@@ -71441,7 +71517,7 @@
         }
       }
     },
-    "/api/langy/ui/actions": {
+    "/api/v1/langy/ui/actions": {
       "post": {
         "operationId": "langyUiActionsDispatch",
         "responses": {
@@ -71746,7 +71822,7 @@
         }
       }
     },
-    "/api/langy/local/workspace": {
+    "/api/v1/langy/local/workspace": {
       "get": {
         "operationId": "langyLocalWorkspace",
         "responses": {
@@ -71918,7 +71994,7 @@
         ]
       }
     },
-    "/api/langy/local/requests": {
+    "/api/v1/langy/local/requests": {
       "post": {
         "operationId": "langyLocalCreateRequest",
         "responses": {
@@ -72017,7 +72093,7 @@
         }
       }
     },
-    "/api/langy/local/calls": {
+    "/api/v1/langy/local/calls": {
       "post": {
         "operationId": "langyLocalStartCall",
         "responses": {
@@ -72062,7 +72138,7 @@
         }
       }
     },
-    "/api/langy/local/calls/{callId}": {
+    "/api/v1/langy/local/calls/{callId}": {
       "get": {
         "operationId": "langyLocalReadCall",
         "responses": {
@@ -72203,7 +72279,7 @@
         ]
       }
     },
-    "/api/langy/local/calls/{callId}/cancel": {
+    "/api/v1/langy/local/calls/{callId}/cancel": {
       "post": {
         "operationId": "langyLocalCancelCall",
         "responses": {
@@ -72258,7 +72334,7 @@
         ]
       }
     },
-    "/api/langy/waits": {
+    "/api/v1/langy/waits": {
       "post": {
         "operationId": "langyLocalStartWait",
         "responses": {
@@ -72388,7 +72464,7 @@
         }
       }
     },
-    "/api/langy/waits/{waitId}": {
+    "/api/v1/langy/waits/{waitId}": {
       "get": {
         "operationId": "langyLocalReadWait",
         "responses": {
@@ -76282,7 +76358,11 @@
                               "type": "string"
                             }
                           }
-                        }
+                        },
+                        "required": [
+                          "mapping",
+                          "expansions"
+                        ]
                       },
                       {
                         "type": "null"
@@ -76658,7 +76738,11 @@
                               "type": "string"
                             }
                           }
-                        }
+                        },
+                        "required": [
+                          "mapping",
+                          "expansions"
+                        ]
                       },
                       {
                         "type": "null"
@@ -77164,12 +77248,18 @@
         },
         "description": "released CLI and MCP builds parse the intake's own bodies: { id } on 201, { error, details } on a rejected report, { error, code } on a named refusal",
         "summary": "File an issue report from a coding agent",
-        "security": [],
+        "security": [
+          {},
+          {
+            "project_api_key": []
+          }
+        ],
         "x-access-policy": {
-          "kind": "public",
+          "kind": "handlerManaged",
           "credential": [
-            "none"
-          ]
+            "project_api_key"
+          ],
+          "permissions": []
         },
         "requestBody": {
           "required": true,
@@ -81603,7 +81693,7 @@
         ]
       }
     },
-    "/api/projects/{id}": {
+    "/api/v1/projects/{id}": {
       "get": {
         "operationId": "getProject",
         "responses": {
@@ -81923,7 +82013,7 @@
         ]
       }
     },
-    "/api/projects/{id}/api-key": {
+    "/api/v1/projects/{id}/api-key": {
       "get": {
         "operationId": "getProjectApiKey",
         "responses": {
@@ -81983,7 +82073,7 @@
         ]
       }
     },
-    "/api/projects/{id}/regenerate-api-key": {
+    "/api/v1/projects/{id}/regenerate-api-key": {
       "post": {
         "operationId": "regenerateProjectApiKey",
         "responses": {
@@ -88083,7 +88173,7 @@
             }
           }
         },
-        "description": "List the organization's roles with their permission sets: the built-in roles `admin`, `member` and `viewer` first (marked `builtIn`), then the custom roles. `?builtIn=true` lists only the built-in roles, `?builtIn=false` only the custom ones.",
+        "description": "List the organization's custom roles with their permission sets. Omitted `builtIn`: custom roles only. `?builtIn=true` lists only the built-in roles `admin`, `member` and `viewer`, `?builtIn=false` only the custom ones.",
         "tags": [
           "Roles"
         ],
@@ -110363,7 +110453,7 @@
         }
       }
     },
-    "/api/user-avatar/{projectId}/{userAvatarId}": {
+    "/api/v1/user-avatar/{projectId}/{userAvatarId}": {
       "get": {
         "operationId": "readUserAvatarBytes",
         "responses": {

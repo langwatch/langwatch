@@ -66,14 +66,20 @@ fix, not a style choice.
 ## 4. Name the level honestly
 
 - `*.unit.test.ts` - no rendering, no datastore.
-- `*.integration.test.ts` - renders a component and mocks its boundaries, **or**
-  reaches a datastore. Both are integration; the word states the level, not the
-  lane.
+- `*.integration.test.ts` - proves several components together: it renders a
+  component and mocks its boundaries, boots an installed list over memory twins
+  (`bootInstalledProcess`), **or** reaches a datastore. All are integration; the
+  word states the level, not the lane. The `test:integration` script is the
+  datastore lane.
 - A test that renders a component is an integration test. Naming it a unit test
   because it feels small is the single most common mis-classification here.
 
-Add `// @vitest-environment jsdom` as a docblock in files that need it. No config
-declares a global environment, on purpose.
+A package picks its environment through the shared factory
+(`defineModuleVitestConfig({ kind })` from `@langwatch/vitest-config`: `jsdom`, or
+`node`/`unit`). A package that renders only some files stays on node and adds
+`// @vitest-environment jsdom` as a docblock in each file that needs it
+(`modules/analytics/browser/vitest.config.ts`); a package whose tests all render sets
+`kind: "jsdom"` (`modules/organization/browser/vitest.config.ts`).
 
 ## 5. A regression test must execute the bug
 
@@ -99,8 +105,9 @@ than writing Given/When/Then as comments in a flat test.
 
 `check-feature-parity.ts` counts only scenarios carrying `@unit`,
 `@integration`, `@e2e` or `@regression`, and skips `@unimplemented`. An untagged
-`.feature` file reports `0/0 scenarios bound` and `all bound`, and reads green
-while enforcing nothing.
+`.feature` file reports `0/0 scenarios bound` and enforces nothing. A new feature file that is
+wholly inert (`newInert`) or mixes tagged and untagged scenarios (`newPartial`) fails the run;
+only files listed as legacy still pass untagged.
 
 So a scenario needs both:
 

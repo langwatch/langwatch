@@ -9,7 +9,7 @@ import (
 func TestBlockingStartedNamesTheStep(t *testing.T) {
 	line := `{"msg":"blocking step ops:copy-automation-migration-state started (from the start): Carries"}`
 	match := blockingStarted.FindStringSubmatch(line)
-	if match == nil || match[1] != "ops:copy-automation-migration-state" {
+	if len(match) < 2 || match[1] != "ops:copy-automation-migration-state" {
 		t.Fatalf("got %v", match)
 	}
 	if blockingStarted.MatchString(`{"msg":"blocking step ops:x done in 76 ms"}`) {
@@ -37,7 +37,7 @@ func TestCompareUpgradedIgnoresTheLedgerAndRedis(t *testing.T) {
 
 func TestAlterTableNamesTheTable(t *testing.T) {
 	match := alterTable.FindStringSubmatch("-- x\nALTER TABLE \"Project\" ADD COLUMN \"y\" TEXT;")
-	if match == nil || match[1] != "Project" {
+	if len(match) < 2 || match[1] != "Project" {
 		t.Fatalf("got %v", match)
 	}
 }

@@ -8,13 +8,14 @@ import type { AddressInfo } from "node:net";
 import type { Duplex } from "node:stream";
 
 import { PROTOCOL_VERSION, relayPayloadCaps } from "@langwatch/agent-contract";
-import type { AgentConnectCaller } from "@langwatch/agent-contract";
+import type { AgentConnectCaller, StoredCall } from "@langwatch/agent-contract";
 import type { ConnectUpgradeRouter, UpgradeHandler } from "@langwatch/api";
-import { memorySessionState } from "@langwatch/process-stores";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import WebSocket from "ws";
 
 import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fixture.ts";
+import { MemoryConnectedAgentRelayChannel } from "../../channels/memory/memory.connected-agent-relay.channel.ts";
+import { MemoryConnectedAgentStateRepository } from "../../repositories/memory/memory.connected-agent-state.repository.ts";
 import { detectResultCapViolation } from "../../rules/connected-agent-caps.rules.ts";
 import { UNREADABLE_RESULT_MESSAGE } from "../../rules/connected-agent-frame.rules.ts";
 import type { AgentService } from "../../services/agent.service.ts";
@@ -97,7 +98,8 @@ describe("ConnectGateway without Redis", () => {
   beforeAll(async () => {
     const runtime = ConnectedAgentRuntimeService.create({
       podId: "pod_solo",
-      store: memorySessionState(),
+      state: MemoryConnectedAgentStateRepository.create(),
+      relay: MemoryConnectedAgentRelayChannel.create(),
     });
     server = createServer((_request, response) => {
       response.statusCode = 404;
@@ -201,7 +203,8 @@ async function startPod({
 } = {}) {
   const runtime = ConnectedAgentRuntimeService.create({
     podId: `pod_${Math.random().toString(36).slice(2)}`,
-    store: memorySessionState(),
+    state: MemoryConnectedAgentStateRepository.create(),
+    relay: MemoryConnectedAgentRelayChannel.create(),
   });
   const server = createServer((_request, response) => {
     response.statusCode = 404;
@@ -294,7 +297,7 @@ describe("ConnectGateway socket lifecycle", () => {
   it("retires registration and closes the socket when subscribing to the instance fails", async () => {
     pod = await startPod();
     const registration = vi.spyOn(pod.runtime.registry, "register");
-    vi.spyOn(pod.runtime.store, "subscribe").mockRejectedValue(
+    vi.spyOn(pod.runtime.relay, "listenToInstance").mockRejectedValue(
       new Error("Redis subscription failed"),
     );
     const { socket, registered } = connectAndRegister(pod.url, registerFrame());
@@ -362,7 +365,8 @@ describe("ConnectGateway socket lifecycle", () => {
 
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_slow",
-        store: memorySessionState(),
+        state: MemoryConnectedAgentStateRepository.create(),
+        relay: MemoryConnectedAgentRelayChannel.create(),
       });
       const server = createServer((_request, response) => {
         response.statusCode = 404;
@@ -494,8 +498,12 @@ describe("AgentSessionService.findCallForSession", () => {
   describe("given an instance that registered agent A only, and a call routed at it for agent B", () => {
     /** @scenario "An instance never receives a call for an agent it did not register" */
     it("is not handed the call and leaves its result unchanged", async () => {
-      const store = memorySessionState();
-      const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
+      const state = MemoryConnectedAgentStateRepository.create();
+      const runtime = ConnectedAgentRuntimeService.create({
+        podId: "pod_solo",
+        state,
+        relay: MemoryConnectedAgentRelayChannel.create(),
+      });
       const core = AgentSessionService.create({
         runtime,
         agents: registeringAgentService(),
@@ -521,7 +529,7 @@ describe("AgentSessionService.findCallForSession", () => {
           maxConcurrency: 1,
         },
       };
-      const stored = {
+      const stored: StoredCall = {
         projectId: "proj_1",
         instanceId: "inst_1",
         replyTo: "pod_solo",
@@ -538,13 +546,14 @@ describe("AgentSessionService.findCallForSession", () => {
           run: {},
         },
       };
-      await store.set("agent_call:v1:proj_1:call_1", JSON.stringify(stored), 60);
+      await state.saveCall({ call: stored, ttlSeconds: 60 });
 
       const call = await core.findCallForSession(session, "call_1");
 
       expect(call).toBeNull();
-      const result = await store.tryGet("agent_result:v1:proj_1:call_1");
-      expect(result).toBeNull();
+      expect(await state.readResult({ projectId: "proj_1", callId: "call_1" })).toEqual({
+        kind: "miss",
+      });
     });
   });
 });

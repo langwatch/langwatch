@@ -6,11 +6,16 @@ import {
 } from "@langwatch/eventing";
 import { USER_ERASED_EVENT_TYPE, userErasedPayloadSchema } from "@langwatch/identity-contract";
 import {
+  TENANT_MIGRATION_ROLLED_BACK_EVENT_TYPE,
+  tenantMigrationRolledBackEventDataSchema,
+} from "@langwatch/ops-contract";
+import {
   PROJECT_ARCHIVED_EVENT_TYPE,
   PROJECT_MOVED_EVENT_TYPE,
   projectArchivedEventDataSchema,
   projectMovedEventDataSchema,
 } from "@langwatch/project-contract";
+import { Temporal } from "@langwatch/time";
 import {
   USER_DEACTIVATED_EVENT_TYPE,
   USER_REACTIVATED_EVENT_TYPE,
@@ -21,6 +26,8 @@ import type { AuthzModule } from "../app/authz.app.ts";
 import type { AuthzAuditTrailRepository } from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzGrantProjectionRepository } from "../repositories/authz-grant-projection.repository.ts";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
+import { isEngineMigrationStep } from "../rules/authz-engine-switch.rules.ts";
+import type { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import type { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
 import type { AuthzUserStandingService } from "../services/authz-user-standing.service.ts";
 import type { AuthzService } from "../services/authz.service.ts";
@@ -51,6 +58,8 @@ interface EventingAuthzAdapterOptions {
   userStandings?: AuthzUserStandingService;
   /** Absent on the consumer-only twin, which holds no scope lineage. */
   scopeLineage?: Pick<AuthzService, "lineageChanged">;
+  /** Absent on the consumer-only twin, which keeps no engine switch. */
+  engineSwitch?: Pick<AuthzCutoverGateService, "pin">;
 }
 
 const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
@@ -85,7 +94,23 @@ const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
     .withCommand("defineRole", DefineRoleCommand)
     .withCommand("changeRolePermissions", ChangeRolePermissionsCommand)
     .withCommand("deleteRole", DeleteRoleCommand);
-  const { sessionVersions, userStandings, scopeLineage } = options;
+  const { sessionVersions, userStandings, scopeLineage, engineSwitch } = options;
+  if (engineSwitch) {
+    // An operator's rollback is ops' fact; authz turns its own switch off (Alex, 2026-10-12).
+    pipeline.withPeerSubscriber("engineMigrationRolledBack", {
+      eventType: TENANT_MIGRATION_ROLLED_BACK_EVENT_TYPE,
+      data: tenantMigrationRolledBackEventDataSchema,
+      options: { enqueue: { filter: (data) => isEngineMigrationStep(data.stepId) } },
+      handle: (data, { eventId, occurredAt }) =>
+        isEngineMigrationStep(data.stepId)
+          ? engineSwitch.pin({
+              organizationId: data.rolledBackTenantId,
+              at: Temporal.Instant.fromEpochMilliseconds(occurredAt),
+              eventId,
+            })
+          : Promise.resolve(),
+    });
+  }
   if (scopeLineage) {
     // Where a project sits is project's fact; authz moves its own lineage signal from it (§9).
     pipeline

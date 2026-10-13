@@ -68,6 +68,24 @@ for i = 1, #data, 2 do
   redis.call("HSET", dstDataKey, data[i], data[i+1])
 end
 
+-- A dead worker's claimed jobs (no active key; ":active" is 7 chars) go to the dead-letter queue
+-- with the rest, in order. A live worker's claim is dropped with its active key, as before.
+local claimedKey = string.sub(activeKey, 1, #activeKey - 7) .. ":claimed"
+if redis.call("EXISTS", activeKey) == 0 then
+  local claimed = redis.call("HGETALL", claimedKey)
+  for i = 1, #claimed, 2 do
+    if string.sub(claimed[i], 1, 2) == "s:" then
+      local claimedJobId = string.sub(claimed[i], 3)
+      local body = redis.call("HGET", claimedKey, "d:" .. claimedJobId)
+      if body and redis.call("ZADD", dstJobsKey, "NX", claimed[i + 1], claimedJobId) == 1 then
+        redis.call("HSET", dstDataKey, claimedJobId, body)
+        count = count + 1
+      end
+    end
+  end
+end
+redis.call("DEL", claimedKey)
+
 local errorData = redis.call("HGETALL", srcErrorKey)
 for i = 1, #errorData, 2 do
   redis.call("HSET", dstErrorKey, errorData[i], errorData[i+1])
@@ -201,12 +219,21 @@ local errorMessage = ARGV[6]
 local errorStack   = ARGV[7]
 local ttl          = tonumber(ARGV[8])
 local nowMs        = ARGV[9]
+local claimToken   = ARGV[10] or ""
 
 local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
 local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
 local dlqJobsKey   = keyPrefix .. "dlq:" .. groupId .. ":jobs"
 local dlqDataKey   = keyPrefix .. "dlq:" .. groupId .. ":data"
 local dlqErrorKey  = keyPrefix .. "dlq:" .. groupId .. ":error"
+local claimedKey   = keyPrefix .. "group:" .. groupId .. ":claimed"
+-- A worker whose claim another worker recovered dead-letters nothing; empty token: an older caller.
+if claimToken ~= "" and redis.call("HGET", claimedKey, "token") ~= claimToken then
+  return -1
+end
+-- A dead-lettered job leaves its claim's record too, so a death before the slot is completed
+-- cannot bring it back (packages/group-queue/specs/claimed-job-recovery.feature).
+redis.call("HDEL", claimedKey, "s:" .. jobId, "d:" .. jobId)
 
 if value == "" then
   -- A staged sibling keeps its value and lease; it leaves the live group and its pending count.
@@ -246,7 +273,8 @@ const deadLetterJobScript = new CachedLuaScript(DEAD_LETTER_JOB_LUA);
 
 /**
  * Moves one job into its group's dead-letter entries, where ops lists, redrives and discards it.
- * `jobDataJson` "" takes a re-staged sibling off the live group. Answers whether a job moved.
+ * `jobDataJson` "" takes a re-staged sibling off the live group. With the claim's token, a worker
+ * whose claim was recovered moves nothing and hears "claim-lost".
  */
 export async function deadLetterJob({
   redis,
@@ -257,6 +285,7 @@ export async function deadLetterJob({
   jobDataJson,
   errorMessage,
   errorStack,
+  claimToken = "",
 }: {
   redis: IORedis | Cluster;
   keyPrefix: string;
@@ -266,7 +295,8 @@ export async function deadLetterJob({
   jobDataJson: string;
   errorMessage: string;
   errorStack: string;
-}): Promise<boolean> {
+  claimToken?: string;
+}): Promise<"moved" | "missing" | "claim-lost"> {
   const moved = await deadLetterJobScript.run(
     redis,
     3,
@@ -282,6 +312,8 @@ export async function deadLetterJob({
     errorStack,
     String(DLQ_TTL_SECONDS),
     String(nowInstant().epochMilliseconds),
+    claimToken,
   );
-  return moved === 1;
+  if (Number(moved) === -1) return "claim-lost";
+  return Number(moved) === 1 ? "moved" : "missing";
 }

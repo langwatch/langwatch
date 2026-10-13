@@ -23,16 +23,15 @@ import (
 var v1Families = strings.Fields(`agent-cache analytics annotations api-keys bug-reports
 	coding-agent dashboards dataset dspy evaluations evaluators events experiment experiments
 	governance graphs groups guardrails langy me model-defaults model-providers monitors
-	optimization organization organizations playground prompts role-bindings roles
+	optimization organization organizations playground projects prompts role-bindings roles
 	scenario-events scenarios scim-tokens simulation-runs suites teams trace traces
-	trigger triggers workflows`)
+	trigger triggers user-avatar elevenlabs workflows`)
 
 var (
 	barePathPattern = regexp.MustCompile(`/api/([a-zA-Z0-9_-]+)((?:/[a-zA-Z0-9_%-]+)*)`)
 	versionSegment  = regexp.MustCompile(`^v\d+$`)
-	// Routes the document keeps bare because they have no /api/v1 twin, including
-	// Langy's in-process worker families, declared literal.
-	bareOnly = regexp.MustCompile(`^/api/trace/(search|[^/]+(/share|/unshare)?)$|^/api/langy/(local|waits|ui)(/|$)`)
+	// Routes the document keeps bare because they have no /api/v1 twin.
+	bareOnly = regexp.MustCompile(`^/api/trace/(search|[^/]+(/share|/unshare)?)$`)
 )
 
 // @scenario "The track-event path is v1-form"

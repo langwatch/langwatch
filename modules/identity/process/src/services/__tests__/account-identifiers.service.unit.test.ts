@@ -104,6 +104,7 @@ function session(overrides: Partial<BrowserSessionInventoryEntry>): BrowserSessi
     signedInAt: "2026-09-01T00:00:00.000Z",
     lastActiveAt: "2026-09-01T00:00:00.000Z",
     expiresAt: "2026-10-01T00:00:00.000Z",
+    startedBySignUp: false,
     current: false,
     ...overrides,
   };

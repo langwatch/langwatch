@@ -32,3 +32,14 @@ Feature: Identifier backfill throughput
     When a migration pass reaches its next page of users
     Then it waits briefly and reads again
     And it queues users only after a read at or under the limit
+
+  # On the worker the pass runs on a queue list of its own and counts only its own jobs, so other
+  # steps' backlog never holds it (Alex, 2026-10-12); the whole queue's depth is read only where
+  # no listed work runs.
+  @unit
+  Scenario: A large unrelated backlog does not hold the identifier backfill
+    Given the queue holds a million jobs that are not the backfill's
+    And the pass runs on a queue list of its own on the worker
+    When the pass runs
+    Then it waits before each page only for its own jobs to drop to its limit
+    And it migrates every user without reading the whole queue's depth

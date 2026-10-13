@@ -106,6 +106,10 @@ type Message struct {
 	// ToolName is the tool a tool message answers. Optional: when empty it is
 	// resolved from the assistant call with the same ToolCallID.
 	ToolName string
+	// IsError marks a tool message whose result reports that the tool call
+	// failed, like the AI SDK's "error-text" tool output and Anthropic's
+	// is_error. Providers that support it tell the model; others ignore it.
+	IsError bool
 	// TraceID is the OpenTelemetry trace id of the agent call that produced
 	// the message, stamped by the executor.
 	TraceID string

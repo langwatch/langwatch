@@ -206,9 +206,11 @@ function refuseUndefinedMembers(supplied: {
 function eventingMember({
   config,
   read,
+  tenantDirectory,
 }: {
   config: ProcessConfig;
   read: ReadMember;
+  tenantDirectory: () => TenantDirectory;
 }): BuiltMember<StoreClients["eventing"]> {
   const eventing = config.eventing;
   if (!eventing) {
@@ -240,7 +242,12 @@ function eventingMember({
     ...(eventing.groupQueue === undefined ? {} : { redis: read("redis") }),
     ...(eventing.store.kind === "producer-only" && !clickhouseConfigured(config)
       ? {}
-      : { eventLog: { clickhouse: read("clickhouse") } }),
+      : {
+          eventLog: {
+            clickhouse: read("clickhouse"),
+            organizationOf: (tenantId: string) => tenantDirectory().organizationForTenant(tenantId),
+          },
+        }),
   });
 }
 
@@ -379,7 +386,7 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
       }
       return buildRedis(config.redis);
     },
-    eventing: () => eventingMember({ config, read }),
+    eventing: () => eventingMember({ config, read, tenantDirectory }),
     eventReadSeat: () => eventReadSeatMember({ config, supplied, read }),
 
     // Redis-backed, so each inherits Redis's own refusal rather than repeating

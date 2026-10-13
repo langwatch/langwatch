@@ -36,8 +36,5 @@
   "apps/sims/package.json",
   "dev/tests/agentic-e2e/package.json",
   "dev/tests/e2e-stack/package.json",
-  "tools/visualdiff/runner/package.json",
-  "tools/fuzz/runner/package.json",
-  "tools/interactionsimulator/package.json",
   "tools/seedgen/runner/package.json"
 ]

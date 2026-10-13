@@ -9,7 +9,7 @@ export default defineConfig({
   test: {
     fsModuleCache: true,
     environment: "node",
-    include: ["src/**/*.integration.test.ts", "tests/**/*.integration.test.ts"],
+    include: ["src/**/*.integration.test.ts"],
     pool: "forks",
     fileParallelism: false,
     testTimeout: 60_000,

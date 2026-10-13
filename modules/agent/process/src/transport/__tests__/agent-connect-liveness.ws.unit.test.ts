@@ -10,11 +10,12 @@ import type { Duplex } from "node:stream";
 import { PROTOCOL_VERSION } from "@langwatch/agent-contract";
 import type { AgentConnectCaller } from "@langwatch/agent-contract";
 import type { ConnectUpgradeRouter, UpgradeHandler } from "@langwatch/api";
-import { memorySessionState } from "@langwatch/process-stores";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 
 import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fixture.ts";
+import { MemoryConnectedAgentRelayChannel } from "../../channels/memory/memory.connected-agent-relay.channel.ts";
+import { MemoryConnectedAgentStateRepository } from "../../repositories/memory/memory.connected-agent-state.repository.ts";
 import { ConnectedAgentRuntimeService } from "../../services/connected-agent-runtime.service.ts";
 import { CONNECT_PATH } from "../agent-connect.ws.ts";
 import { ConnectGatewayFixture } from "./agent-connect-gateway.fixture.ts";
@@ -72,7 +73,8 @@ function registerFrame(instanceId: string) {
 async function startGateway(options: { pingIntervalMs: number; pongWaitMs: number }) {
   const runtime = ConnectedAgentRuntimeService.create({
     podId: "pod_a",
-    store: memorySessionState(),
+    state: MemoryConnectedAgentStateRepository.create(),
+    relay: MemoryConnectedAgentRelayChannel.create(),
   });
   const server = createServer((_request, response) => {
     response.statusCode = 404;
@@ -176,7 +178,8 @@ describe("ConnectGateway liveness", () => {
     it("holds no connection for it once registration finishes", async () => {
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_a",
-        store: memorySessionState(),
+        state: MemoryConnectedAgentStateRepository.create(),
+        relay: MemoryConnectedAgentRelayChannel.create(),
       });
       const server = createServer((_request, response) => {
         response.statusCode = 404;

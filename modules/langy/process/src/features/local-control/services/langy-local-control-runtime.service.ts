@@ -1,12 +1,14 @@
 /**
- * Per-process composition of local control: store, presence, dispatcher, wait service and
- * control requests (ADR-129). The store is chosen by the process's own composition root
- * (ADR-093/ADR-128); this only assembles around it.
+ * Per-process composition of local control: repositories, presence, the workspace channel,
+ * dispatcher, wait service, control requests and the skip policy (ADR-129). The tiers are
+ * chosen by the process's own composition root (ADR-093/ADR-128); this only assembles them.
  */
 
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-
+import type { LangyLocalWorkspaceChannel } from "../../../channels/langy-local-workspace.channel.ts";
+import type { LangyLocalCallRepository } from "../../../repositories/langy-local-call.repository.ts";
+import type { LangyLocalControlRequestRepository } from "../../../repositories/langy-local-control-request.repository.ts";
 import type { LangyLocalPresenceRepository } from "../../../repositories/langy-local-presence.repository.ts";
+import type { LangyLocalUserWaitRepository } from "../../../repositories/langy-local-user-wait.repository.ts";
 import type { LocalCallBuffer } from "../../../rules/langy-local-call-record.rules.ts";
 import type {
   UserWaitBuffer,
@@ -18,56 +20,67 @@ import {
   type ControlRequestKeyMinter,
   type ControlRequestProjects,
 } from "./langy-local-control-request.service.ts";
+import { LocalSkipPolicyService } from "./langy-local-skip-policy.service.ts";
 import { UserWaitService } from "./langy-local-user-wait.service.ts";
 
-/** One process's local-control composition around one session store (ADR-129). */
+/** One process's local-control composition (ADR-129). */
 export interface LocalControlRuntime {
-  store: SessionStateStore;
+  workspace: LangyLocalWorkspaceChannel;
   presence: LangyLocalPresenceRepository;
   dispatcher: LocalCallDispatcherService;
   waits: UserWaitService;
   requests: ControlRequestService;
+  skipPolicy: LocalSkipPolicyService;
 }
+
+/** The local-control state, one repository per record family. */
+export type LocalControlRepositories = {
+  calls: LangyLocalCallRepository;
+  userWaits: LangyLocalUserWaitRepository;
+  controlRequests: LangyLocalControlRequestRepository;
+  presence: LangyLocalPresenceRepository;
+};
 
 type Timing = { offlineWaitMs?: number; pollIntervalMs?: number; now?: () => number };
 
-/** One process's local control, built around one store and the presence kept in it. */
+/** One process's local control, built over its repositories and workspace channel. */
 export class LangyLocalControlRuntimeService implements LocalControlRuntime {
   /**
-   * Tests build two over one memory store to play two pods, exactly as the connected agents
-   * tests do.
+   * Tests build two over one set of memory repositories and one memory channel to play two
+   * pods, exactly as the connected agents tests do.
    */
-  static create(input: {
-    store: SessionStateStore;
-    presence: LangyLocalPresenceRepository;
-    projects: ControlRequestProjects;
-    mintSessionKey: ControlRequestKeyMinter;
-    events: UserWaitEvents;
-    buffer: UserWaitBuffer & LocalCallBuffer;
-    offlineWaitMs?: number;
-    pollIntervalMs?: number;
-    now?: () => number;
-  }): LangyLocalControlRuntimeService {
+  static create(
+    input: LocalControlRepositories & {
+      workspace: LangyLocalWorkspaceChannel;
+      projects: ControlRequestProjects;
+      mintSessionKey: ControlRequestKeyMinter;
+      events: UserWaitEvents;
+      buffer: UserWaitBuffer & LocalCallBuffer;
+    } & Timing,
+  ): LangyLocalControlRuntimeService {
     return new LangyLocalControlRuntimeService(input);
   }
 
-  readonly store: SessionStateStore;
+  readonly workspace: LangyLocalWorkspaceChannel;
   readonly presence: LangyLocalPresenceRepository;
   readonly dispatcher: LocalCallDispatcherService;
   readonly waits: UserWaitService;
   readonly requests: ControlRequestService;
+  readonly skipPolicy: LocalSkipPolicyService;
 
   private constructor({
-    store,
+    calls,
+    userWaits,
+    controlRequests,
     presence,
+    workspace,
     projects,
     mintSessionKey,
     events,
     buffer,
     ...timing
-  }: {
-    store: SessionStateStore;
-    presence: LangyLocalPresenceRepository;
+  }: LocalControlRepositories & {
+    workspace: LangyLocalWorkspaceChannel;
     projects: ControlRequestProjects;
     mintSessionKey: ControlRequestKeyMinter;
     events: UserWaitEvents;
@@ -76,10 +89,11 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
     const { offlineWaitMs, pollIntervalMs, now } = timing;
     const clock = now ? { now } : {};
     const polling = pollIntervalMs !== undefined ? { pollIntervalMs } : {};
-    this.store = store;
+    this.workspace = workspace;
     this.presence = presence;
     this.dispatcher = LocalCallDispatcherService.create({
-      store,
+      calls,
+      workspace,
       presence,
       buffer,
       ...clock,
@@ -88,13 +102,19 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
     });
     const dispatcher = this.dispatcher;
     this.waits = UserWaitService.create({
-      store,
+      waits: userWaits,
       events,
       buffer,
       sendPermission: (args) => dispatcher.sendPermission(args),
       ...clock,
       ...polling,
     });
-    this.requests = ControlRequestService.create({ store, projects, mintSessionKey, ...clock });
+    this.requests = ControlRequestService.create({
+      requests: controlRequests,
+      projects,
+      mintSessionKey,
+      ...clock,
+    });
+    this.skipPolicy = LocalSkipPolicyService.create({ presence, workspace });
   }
 }

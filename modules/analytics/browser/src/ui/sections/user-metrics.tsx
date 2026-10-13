@@ -1,13 +1,6 @@
 import { Card } from "@langwatch/design-system/card";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import {
-  Box,
-  Card as LegacyCard,
-  Grid,
-  GridItem,
-  Heading,
-  Tabs,
-} from "@langwatch/design-system/primitives";
+import { Box, Grid, GridItem, Tabs } from "@langwatch/design-system/primitives";
 import { Users } from "lucide-react";
 
 import { analyticsMetrics } from "../../model/analytics-registry.ts";
@@ -176,24 +169,16 @@ export function UserMetrics() {
         </Card>
       </GridItem>
       <GridItem rowSpan={2}>
-        <LegacyCard.Root width="100%" height="100%">
-          <LegacyCard.Header paddingBottom={4}>
-            <Heading textStyle="cardTitle">Top topics</Heading>
-          </LegacyCard.Header>
-          <LegacyCard.Body overflowY="auto">
+        <Card variant="panel-fill" padding="lg" title="Top topics">
+          <Box overflowY="auto" flex={1} minHeight={0}>
             <TopicsSelector showTitle={false} />
-          </LegacyCard.Body>
-        </LegacyCard.Root>
+          </Box>
+        </Card>
       </GridItem>
       <GridItem>
-        <LegacyCard.Root overflow="auto">
-          <LegacyCard.Header>
-            <Heading textStyle="cardTitle">Thread metrics</Heading>
-          </LegacyCard.Header>
-          <LegacyCard.Body>
-            <CustomGraph input={threadMetrics} />
-          </LegacyCard.Body>
-        </LegacyCard.Root>
+        <Card padding="lg" title="Thread metrics">
+          <CustomGraph input={threadMetrics} />
+        </Card>
       </GridItem>
     </Grid>
   );

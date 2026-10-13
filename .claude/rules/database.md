@@ -26,5 +26,6 @@ ClickHouse query.
 | One `ALTER TABLE` per goose `StatementBegin`/`StatementEnd` block                           | ClickHouse has no multi-statement queries                                  |
 | ClickHouse down-migrations stay commented out                                               | Note: "To roll back, uncomment and run manually"                           |
 
-Migrations run as tasks (`pnpm prisma:migrate`, `pnpm clickhouse:migrate`),
-before serve, never in the api.
+Migrations are applied by `pnpm task upgrade` (the root `pnpm prisma:migrate` and
+`pnpm clickhouse:migrate` are aliases of it), which a worker runs before it takes jobs; never in the api.
+A backfill walks a table once, in pages with `sendBatch`, as a registered step; a re-run is Retry in Ops.

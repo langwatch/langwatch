@@ -13,11 +13,12 @@ Read the nearest `README.md` before you edit here; where a folder has no page ye
 `tools/readmegen` (plan: `dev/docs/plans/module-readmes-2026-10-06.md`), so they say who owns what
 without drift.
 
-| Rule                                                                                 | Why / how                                                                                                     |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| The owns and peers tables decide where a change goes                                 | `modules/README.md` maps subject to module; a module page lists what it owns, its peers and who depends on it |
-| A change that touches two modules calls the owner's `*Api` (§3)                      | it never edits the owner's tables or files; load the `ownership` skill                                        |
-| Never edit between `<!-- readme:generated:start` and `<!-- readme:generated:end -->` | change the code, then run `pnpm generate:readmes`                                                             |
-| Every page has a hand-written paragraph above the generated block                    | `pnpm check:readmes` fails with "describe <name> in a paragraph above the generated block"                    |
-| A new route, pipeline, task, peer, table claim or config leaf regenerates its page   | run `pnpm generate:readmes` and commit the page with the code; the page is part of what a reviewer reads      |
-| A wrong or `≈` fact on a page is a generator gap, not a page edit                    | load the `readmes` skill                                                                                      |
+| Rule                                                                                 | Why / how                                                                                                                                                    |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The owns and peers tables decide where a change goes                                 | `modules/README.md` maps subject to module; a module page lists what it owns, its peers and who depends on it                                                |
+| A change that touches two modules calls the owner's `*Api` (§3)                      | it never edits the owner's tables or files; a table the owner declares shared for reading is read by the named modules only (§7); load the `ownership` skill |
+| Never edit between `<!-- readme:generated:start` and `<!-- readme:generated:end -->` | change the code, then run `pnpm generate:readmes`                                                                                                            |
+| Every page has a hand-written paragraph above the generated block                    | `pnpm check:readmes` fails with "describe <name> in a paragraph above the generated block"                                                                   |
+| A new route, pipeline, task, peer, table claim or config leaf regenerates its page   | run `pnpm generate:readmes` and commit the page with the code; the page is part of what a reviewer reads                                                     |
+| A wrong or `≈` fact on a page is a generator gap, not a page edit                    | load the `readmes` skill                                                                                                                                     |
+| A page that disagrees with the code is a useful index, not the authority             | check `modules/catalogue.json`, the owner's claim and the share policy before acting on a label such as "accessed not claimed"                               |

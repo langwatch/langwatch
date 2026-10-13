@@ -6,6 +6,7 @@ export type {
   EventSourcedQueueProcessor,
   EventSourcedQueueProcessorOptions,
   JobDelivery,
+  ListedRun,
   ListedWork,
   QueueSendOptions,
 } from "./queue.types.ts";

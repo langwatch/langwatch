@@ -27,6 +27,9 @@
       "path": "../../workflow/client/tsconfig.build.json"
     },
     {
+      "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../trace/client/tsconfig.build.json"
     },
     {

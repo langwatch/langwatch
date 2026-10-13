@@ -39,7 +39,7 @@ only the part you need.
 | One-shot health of every stack              | `haven status --agent` (`--json <fields>` for a machine; bare `--json` lists the fields) |
 | Read a service's log                        | `haven logs api --since 10m --agent`                                                     |
 | Last distinct failures, grouped             | `haven errors --agent`                                                                   |
-| Restart one lane                            | `haven restart sims`                                                                     |
+| Restart one lane                            | `haven restart api`                                                                      |
 | Logins and stack credentials                | `haven db seed --json --reveal`, `haven env --reveal` (never paste)                      |
 | Keyed REST call, key never printed          | `haven api GET /api/... [--key project\|org\|personal] [--project slug]`                 |
 | Which principal and scope a key has         | `haven api whoami --key org`                                                             |
@@ -88,7 +88,7 @@ Every haven web console is a build served by Go; none runs Vite, Storybook dev o
 | Console                                                                             | Where                                                                    | Served by                                                                                                                                                           |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Hub, stack home, seed console                                                       | `hub.langwatch.localhost`, `<slug>.langwatch.localhost`                  | the haven daemon (`apps/haven-web`, embedded)                                                                                                                       |
-| Simulators: idp, mail, storage, voice, llm, analytics, outbound, payment, telemetry | `<sim>.<slug>.langwatch.localhost`                                       | the sim's Go binary in the `go` lane (its page of `apps/sims`, embedded)                                                                                                |
+| Simulators: idp, mail, storage, voice, llm, analytics, outbound, payment, telemetry | `<sim>.<slug>.langwatch.localhost`                                       | the sim's Go binary in the `go` lane (its page of `apps/sims`, embedded)                                                                                            |
 | Design system Storybook (`+design-system`)                                          | `design-system.<slug>` (or `ds.<slug>`), and `/design-system` in the app | the `design-system` lane: `storybook build`, then `haven static`                                                                                                    |
 | Mail studio (`+mail-room`)                                                          | `mail-room.<slug>`                                                       | the `mail-room` lane: `build:studio` renders every fixture at build time, then `haven static`; props are read-only (`pnpm --filter @langwatch/mail dev` edits live) |
 

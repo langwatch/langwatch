@@ -113,9 +113,9 @@ beforeEach(() => {
 
 describe("projects move", () => {
   beforeEach(() => {
-    respond("GET", /^\/api\/projects$/, () => PROJECTS_PAGE);
+    respond("GET", /^\/api\/v1\/projects$/, () => PROJECTS_PAGE);
     respond("GET", /^\/api\/v1\/teams$/, () => TEAMS_PAGE);
-    respond("PATCH", /^\/api\/projects\/project_checkout$/, ({ body }) => ({
+    respond("PATCH", /^\/api\/v1\/projects\/project_checkout$/, ({ body }) => ({
       ...PROJECTS_PAGE.data[0],
       ...(body as object),
     }));
@@ -127,7 +127,7 @@ describe("projects move", () => {
       const result = await moveProjectCommand({ project: "checkout", team: "Payments" });
 
       const update = requests.find((request) => request.method === "PATCH");
-      expect(update?.url.pathname).toBe("/api/projects/project_checkout");
+      expect(update?.url.pathname).toBe("/api/v1/projects/project_checkout");
       expect(update?.body).toEqual({ teamId: "team_payments" });
       expect(stripColour(spinnerLines.succeeded.at(-1) ?? "")).toBe(
         'Moved project "Checkout" to team "Payments"',

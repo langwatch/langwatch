@@ -98,14 +98,14 @@ func (s *Server) forward(r *http.Request, event *functionURLEvent) (*http.Respon
 	if event.RawQueryString != "" {
 		target += "?" + event.RawQueryString
 	}
-	req, err := http.NewRequestWithContext(r.Context(), cmp.Or(event.RequestContext.HTTP.Method, http.MethodGet), target, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(r.Context(), cmp.Or(event.RequestContext.HTTP.Method, http.MethodGet), target, bytes.NewReader(body)) //nolint:gosec // G704: the sim forwards to its configured target by design
 	if err != nil {
 		return nil, err
 	}
 	for k, v := range event.Headers {
 		req.Header.Set(k, v)
 	}
-	return s.client.Do(req)
+	return s.client.Do(req) //nolint:gosec // G704: the sim forwards to its configured target by design
 }
 
 // prelude is the adapter's JSON head naming nlpgo's status and headers, then its separator.

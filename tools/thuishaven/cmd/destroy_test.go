@@ -22,13 +22,13 @@ func TestConfirmDestroy(t *testing.T) {
 		wantSaid string
 		wantCode int
 	}{
-		{name: "a person typing the slug proceeds", slug: "apidiff-run1-branch", answer: "apidiff-run1-branch\n", proceed: true},
-		{name: "a person answering y aborts: only the slug counts", slug: "apidiff-run1-branch", answer: "y\n", wantSaid: "aborted"},
-		{name: "a person answering nothing aborts", slug: "apidiff-run1-branch", answer: "\n", wantSaid: "aborted"},
-		{name: "a person answering no aborts", slug: "apidiff-run1-branch", answer: "n\n", wantSaid: "aborted"},
-		{name: "--yes proceeds without a prompt", slug: "apidiff-run1-branch", yes: true, proceed: true},
-		{name: "an agent without --yes is refused", slug: "apidiff-run1-branch", isAgent: true, wantErr: true, wantCode: exitUsage},
-		{name: "an agent with --yes proceeds", slug: "apidiff-run1-branch", isAgent: true, yes: true, proceed: true},
+		{name: "a person typing the slug proceeds", slug: "run1-branch", answer: "run1-branch\n", proceed: true},
+		{name: "a person answering y aborts: only the slug counts", slug: "run1-branch", answer: "y\n", wantSaid: "aborted"},
+		{name: "a person answering nothing aborts", slug: "run1-branch", answer: "\n", wantSaid: "aborted"},
+		{name: "a person answering no aborts", slug: "run1-branch", answer: "n\n", wantSaid: "aborted"},
+		{name: "--yes proceeds without a prompt", slug: "run1-branch", yes: true, proceed: true},
+		{name: "an agent without --yes is refused", slug: "run1-branch", isAgent: true, wantErr: true, wantCode: exitUsage},
+		{name: "an agent with --yes proceeds", slug: "run1-branch", isAgent: true, yes: true, proceed: true},
 		{name: "the shared main database is refused even with --yes", slug: "main", yes: true, wantErr: true},
 		{name: "the shared main database is refused for an agent", slug: "main", isAgent: true, yes: true, wantErr: true},
 	}
@@ -68,7 +68,7 @@ func TestDownDeclaresDestroy(t *testing.T) {
 	if _, err := parse(spec, []string{"--destroy", "--yes"}); err != nil {
 		t.Errorf("down must accept --destroy --yes: %v", err)
 	}
-	if _, err := parse(spec, []string{"apidiff-run1-branch"}); err == nil {
+	if _, err := parse(spec, []string{"run1-branch"}); err == nil {
 		t.Error("down takes no positional: the stack is named with --stack")
 	}
 }

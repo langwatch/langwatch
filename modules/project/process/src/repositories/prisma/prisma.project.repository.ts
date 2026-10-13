@@ -41,6 +41,7 @@ import {
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import type {
+  ProjectBackfillRow,
   ProjectRepository,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
@@ -400,6 +401,55 @@ export class PrismaProjectRepository
         : null,
       adminUserId: project.team?.organization?.members?.[0]?.userId ?? null,
     };
+  }
+
+  async findBackfillPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<ProjectBackfillRow[]> {
+    const rows = await this.prisma.project.findMany({
+      where: afterId === null ? {} : { id: { gt: afterId } },
+      orderBy: { id: "asc" },
+      take: limit,
+      select: {
+        id: true,
+        createdAt: true,
+        teamId: true,
+        isPersonal: true,
+        departmentId: true,
+        presenceEnabled: true,
+        archivedAt: true,
+        team: {
+          select: {
+            organizationId: true,
+            organization: {
+              select: {
+                members: {
+                  where: { role: "ADMIN" },
+                  select: { userId: true },
+                  orderBy: { createdAt: "asc" },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      createdAt: fromDate(row.createdAt),
+      organizationId: row.team.organizationId,
+      teamId: row.teamId,
+      isPersonal: row.isPersonal,
+      departmentId: row.departmentId,
+      presenceEnabled: row.presenceEnabled,
+      isArchived: row.archivedAt !== null,
+      adminUserId: row.team.organization.members[0]?.userId ?? null,
+    }));
   }
 
   async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {

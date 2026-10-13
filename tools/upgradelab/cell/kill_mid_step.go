@@ -29,7 +29,7 @@ type midStepOptions struct {
 	factEvent     string // the event the step records, one per row
 }
 
-var defaultMidStep = midStepOptions{step: "user:record-created-facts", checkpointKey: "afterUserId", countKey: "users", pageSize: 500, plantUsers: 40000, factEvent: "lw.user.created"}
+var defaultMidStep = midStepOptions{step: "user:record-created-facts", checkpointKey: "afterUserId", countKey: "users", pageSize: 2000, plantUsers: 40000, factEvent: "lw.user.created"}
 
 // stepRow is one ledger row's status and report, read straight from Postgres.
 type stepRow struct {
@@ -68,12 +68,12 @@ type killMoment struct {
 	death      deathProof
 }
 
-// deathProof is what shows the killed worker really ended: no signalled pid survives and its log
-// names only pids that were signalled, with no line stamped after the kill.
+// deathProof is what shows the killed worker really ended: no signaled pid survives and its log
+// names only pids that were signaled, with no line stamped after the kill.
 type deathProof struct {
 	killedAt   time.Time
-	killed     []int // the leader and every descendant, signalled with SIGKILL
-	survivors  []int // signalled pids still running once the wait ended
+	killed     []int // the leader and every descendant, signaled with SIGKILL
+	survivors  []int // signaled pids still running once the wait ended
 	loggedPids []int // pids the killed worker's log lines carry
 	linesAfter int   // log lines stamped after the kill
 }
@@ -91,7 +91,7 @@ func (proof deathProof) died() bool {
 }
 
 func (proof deathProof) String() string {
-	return fmt.Sprintf("signalled pids %v, still running %v, pids in its log %v, log lines after the kill %d", proof.killed, proof.survivors, proof.loggedPids, proof.linesAfter)
+	return fmt.Sprintf("signaled pids %v, still running %v, pids in its log %v, log lines after the kill %d", proof.killed, proof.survivors, proof.loggedPids, proof.linesAfter)
 }
 
 // readWorkerLog lists the pids a worker's JSON log lines carry and counts the lines stamped after killedAt.
@@ -170,14 +170,19 @@ func (cell *run) runMidStep(ctx context.Context, options midStepOptions, pass mi
 		return result, fmt.Errorf("planting accounts: %w", err)
 	}
 	result.planted, _ = psql(ctx, cell.stores.psqlURL(), `SELECT count(*) FROM mydb."User"`)
+	progress(name, "planted; %s accounts; running head's upgrade task", strings.TrimSpace(result.planted))
 	if code, err := cell.upgradeTask(ctx, name+"-upgrade", nil); code != 0 {
 		return result, fmt.Errorf("head's upgrade task exited %d: %w", code, err)
 	}
+	progress(name, "upgrade task finished; asserting old writers gone")
 	cell.assertOldWritersGone(ctx)
 	if err := cell.startHeadWorker(); err != nil {
 		return result, err
 	}
 	defer cell.stopWorkerAs(name + "-worker")
+	if err := cell.awaitWorkerBoot(ctx, name); err != nil {
+		return result, err
+	}
 	if kill {
 		var err error
 		if result.kill, err = cell.killAndRestart(ctx, options, name); err != nil {
@@ -185,19 +190,64 @@ func (cell *run) runMidStep(ctx context.Context, options midStepOptions, pass mi
 		}
 	}
 	// An attempt may pass the step's 15-minute deadline on a loaded machine and retry after a backoff.
+	every := progressEvery(time.Minute)
 	if err := waitFor(ctx, 60*time.Minute, func() bool {
 		row, err := cell.readStep(ctx, options.step)
+		every(func() {
+			progress(name, "waiting for %s: %q %s=%q (%d rows)", options.step, row.status, options.checkpointKey, row.cursor(options.checkpointKey), row.count(options.countKey))
+		})
 		return err == nil && row.status == "done"
 	}); err != nil {
 		return result, fmt.Errorf("%s never finished: %w", options.step, err)
 	}
+	progress(name, "%s done; settling the ledger and queues (up to 25 min)", options.step)
 	return cell.collectMidStep(ctx, options, result)
+}
+
+// progress prints one timestamped line to stderr, so a long wait shows what it waits on.
+func progress(pass, format string, args ...any) {
+	fmt.Fprintf(os.Stderr, "%s UD-1 %s: %s\n", time.Now().Format("15:04:05"), pass, fmt.Sprintf(format, args...))
+}
+
+// progressEvery runs say at most once per interval, so a poll loop's status never floods stderr.
+func progressEvery(interval time.Duration) func(say func()) {
+	var last time.Time
+	return func(say func()) {
+		if time.Since(last) >= interval {
+			last = time.Now()
+			say()
+		}
+	}
+}
+
+// awaitWorkerBoot waits for head's worker's first log line: on a loaded host node takes minutes to
+// load the worker, and the kill's window must not start until it runs.
+func (cell *run) awaitWorkerBoot(ctx context.Context, name string) error {
+	started, every := time.Now(), progressEvery(30*time.Second)
+	err := waitFor(ctx, 30*time.Minute, func() bool {
+		if exited, _ := cell.proc("head-worker").Exited(); exited {
+			return true
+		}
+		booted := strings.Contains(readText(cell.logPath("head-worker")), `"pid":`)
+		every(func() {
+			progress(name, "head's worker started %s ago; booted %t", time.Since(started).Round(time.Second), booted)
+		})
+		return booted
+	})
+	if exited, exitErr := cell.proc("head-worker").Exited(); exited {
+		return fmt.Errorf("head's worker exited while booting (%w); see %s", exitErr, cell.logPath("head-worker"))
+	}
+	if err != nil {
+		return fmt.Errorf("head's worker wrote no log line: %w", err)
+	}
+	progress(name, "head's worker booted in %s", time.Since(started).Round(time.Second))
+	return nil
 }
 
 // collectMidStep reads what the finished run left: the step's row, its worker lines, its events and the stores.
 func (cell *run) collectMidStep(ctx context.Context, options midStepOptions, result midStepRun) (midStepRun, error) {
 	result.final, _ = cell.readStep(ctx, options.step)
-	_ = waitFor(ctx, 15*time.Minute, func() bool {
+	_ = waitFor(ctx, 25*time.Minute, func() bool { // settle: queue work a killed worker held must come back
 		rows, err := Ledger(ctx, cell.stores)
 		return err == nil && len(Outstanding(rows)) == 0 && cell.queueDrained(ctx)
 	})
@@ -231,11 +281,15 @@ func resumedSuffix(line string) string {
 }
 
 // killWhenMidStep polls the ledger every 100 ms and kills head's worker, node included, the first
-// time the step is running with a checkpoint saved, then waits for every signalled pid to end.
+// time the step is running with a checkpoint saved, then waits for every signaled pid to end.
 func (cell *run) killWhenMidStep(ctx context.Context, options midStepOptions) (killMoment, error) {
 	var moment killMoment
+	every := progressEvery(30 * time.Second)
 	err := pollLedger(ctx, 25*time.Minute, func() bool {
 		row, err := cell.readStep(ctx, options.step)
+		every(func() {
+			progress("kill", "watching %s: %q %s=%q (%d rows), read error %v", options.step, row.status, options.checkpointKey, row.cursor(options.checkpointKey), row.count(options.countKey), err)
+		})
 		if err != nil {
 			return false
 		}
@@ -260,6 +314,7 @@ func (cell *run) killWhenMidStep(ctx context.Context, options midStepOptions) (k
 	_ = pollLedger(waitCtx, 10*time.Second, func() bool { return len(alive(moment.death.killed)) == 0 })
 	moment.death.survivors = alive(moment.death.killed)
 	moment.after, _ = cell.readStep(ctx, options.step)
+	progress("kill", "killed pids %v at %s=%q (%d rows); still running %v; ledger after %q", moment.death.killed, options.checkpointKey, moment.at.cursor(options.checkpointKey), moment.at.count(options.countKey), moment.death.survivors, moment.after.status)
 	return moment, nil
 }
 
@@ -274,11 +329,15 @@ func (cell *run) killAndRestart(ctx context.Context, options midStepOptions, nam
 	if err := cell.startHeadWorker(); err != nil {
 		return moment, err
 	}
+	if err := cell.awaitWorkerBoot(ctx, name+" restart"); err != nil {
+		return moment, err
+	}
 	_ = pollLedger(ctx, 10*time.Minute, func() bool { // the restarted worker's first saved checkpoint
 		row, err := cell.readStep(ctx, options.step)
 		moment.firstAfter = row
 		return err == nil && (row.status == "done" || row.cursor(options.checkpointKey) != moment.after.cursor(options.checkpointKey))
 	})
+	progress(name, "restarted worker's first checkpoint: %q %s=%q (%d rows)", moment.firstAfter.status, options.checkpointKey, moment.firstAfter.cursor(options.checkpointKey), moment.firstAfter.count(options.countKey))
 	return moment, nil
 }
 

@@ -14,6 +14,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { evaluatorClient } from "@langwatch/evaluator-client";
+import { createLogger } from "@langwatch/observability/browser";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -23,6 +24,8 @@ import { getRandomWorkflowIcon } from "../../../model/workflow/random-workflow-i
 import { customEvaluatorTemplate } from "../../../model/workflow/templates/custom-evaluator.template.ts";
 import { FormServerError } from "../../elements/workflow/studio-host/errors.tsx";
 import { EmojiPickerModal } from "../workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx";
+
+const logger = createLogger("langwatch:evaluator:workflow-selector");
 
 /** What a caller hands evaluator's drawer that creates a workflow-based evaluator. */
 export type WorkflowSelectorForEvaluatorDrawerProps = {
@@ -137,7 +140,7 @@ export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEva
         onClose();
         void router.push(`/${project.slug}/studio/${createdWorkflow.workflow.id}`);
       } catch (error) {
-        console.error("Error creating workflow evaluator:", error);
+        logger.error({ error }, "Error creating workflow evaluator");
         if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
         showErrorToast({
           error,

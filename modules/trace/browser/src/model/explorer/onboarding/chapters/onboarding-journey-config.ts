@@ -1,3 +1,6 @@
+import { createLogger } from "@langwatch/observability/browser";
+
+const logger = createLogger("langwatch:trace:onboarding-journey");
 /**
  * The empty-state onboarding journey, as one editable config.
  */
@@ -242,7 +245,7 @@ export function findStageDef(id: StageId): StageDef {
   // Defensive fallback — a stage id from an older shape of the journey can still be
   // sitting in the (in-memory) zustand store after HMR or a code change that drops a
   // stage.
-  console.warn(`[onboarding] Unknown stage "${id}", falling back to "${INITIAL_STAGE}"`);
+  logger.warn(`Unknown onboarding stage "${id}", falling back to "${INITIAL_STAGE}"`);
   return ONBOARDING_JOURNEY[0]!;
 }
 

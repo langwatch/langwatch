@@ -1,10 +1,9 @@
 # haven boots the layout the checkout actually has. This branch's layout is
 # modular - apps/ui and apps/api, two Node lanes - and origin/main is still the
 # monolith - platform/app, one Node process serving the browser application and
-# its API together. apidiff and visualdiff boot a base ref as its own haven
-# stack (tools/havenrun, specs/tooling/visualdiff-on-haven.feature), and that
-# base ref is main, so haven has to be able to start a checkout that has neither
-# @langwatch/ui nor @langwatch/dev-runtime in it.
+# its API together. A checkout of main can run as its own haven stack, so haven
+# has to be able to start a checkout that has neither @langwatch/ui nor
+# @langwatch/dev-runtime in it.
 #
 # Nothing about the modular stack changes here. The layout is detected once, at
 # up, recorded on the stack, and everything downstream reads that one answer.
@@ -64,6 +63,12 @@ Feature: Booting a monolith checkout through haven
       When the app lane is planned
       Then it is told to start neither the gateway nor the NLP engine itself
       And haven starts each Go service on the port it allocated for that service's hostname
+
+    @unit
+    Scenario: The app lane hosts the workers, as that checkout's dev script does
+      Given a monolith stack
+      When the app lane is planned
+      Then it is given WORKERS_IN_PROCESS=1, so the app starts its workers and projects traces
 
     @unit
     Scenario: The app lane writes its own log capture

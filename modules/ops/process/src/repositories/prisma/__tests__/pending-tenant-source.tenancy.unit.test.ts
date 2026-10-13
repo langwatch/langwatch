@@ -16,8 +16,8 @@ const walkedRows = {
   findMany: async () => [],
 };
 
-/** The `Sql` shape `db.ts` hands the guard — anything else makes it read
- *  nothing and wave the query through, proving nothing. */
+/** The `[sql, ...values]` shape the query extension hands the guard for an unsafe raw query;
+ *  the ledger schema lookup is answered first, the walk second. */
 function guardedPrisma(rows: unknown[]): {
   prisma: PrismaOrganizationTenantDatabase & PrismaUserTenantDatabase;
   queryRaw: ReturnType<typeof vi.fn>;
@@ -28,27 +28,26 @@ function guardedPrisma(rows: unknown[]): {
     prisma: {
       organization: walkedRows,
       user: walkedRows,
-      $queryRaw: async (
-        strings: TemplateStringsArray,
-        ...values: unknown[]
-      ): Promise<{ id: string }[]> => {
-        let answered: { id: string }[] = [];
+      $queryRawUnsafe: async <Row>(query: string, ...values: unknown[]): Promise<Row[]> => {
+        let answered: unknown[] = [];
         await guardProjectId(
           {
             model: void 0,
-            action: "queryRaw",
-            args: { strings, values },
+            action: "queryRawUnsafe",
+            args: [query, ...values],
             dataPath: [],
             runInTransaction: false,
           } as never,
           async () => {
-            answered = await queryRaw(strings, ...values);
+            answered = query.includes("current_schema()")
+              ? [{ schema: "public" }]
+              : await queryRaw(query, ...values);
 
             return answered;
           },
         );
 
-        return answered;
+        return answered as Row[];
       },
     },
     queryRaw,
@@ -62,10 +61,11 @@ describe("given a pass asks which tenants still have work for its migrations", (
 
     await expect(
       PrismaUserTenantSourceRepository.create({ prisma })
-        .pendingFor({ migrationNames: ["identity-identifier-backfill"] })
+        .pendingFor({ migrationNames: ["identity:identifier-backfill"] })
         .findTenantIdsAfter({ cursor: null, limit: 100 }),
     ).resolves.toEqual(["user-1"]);
     expect(queryRaw).toHaveBeenCalledOnce();
+    expect(queryRaw.mock.calls[0]?.[0]).toContain('"_langwatch_upgrade_tenant_state"');
   });
 
   /** @scenario "A pass may ask which tenants have work left across the whole installation" */
@@ -74,7 +74,7 @@ describe("given a pass asks which tenants still have work for its migrations", (
 
     await expect(
       PrismaOrganizationTenantSourceRepository.create({ prisma })
-        .pendingFor({ migrationNames: ["authz-engine"] })
+        .pendingFor({ migrationNames: ["authz:engine"] })
         .findTenantIdsAfter({ cursor: "org-0", limit: 100 }),
     ).resolves.toEqual(["org-1"]);
     expect(queryRaw).toHaveBeenCalledOnce();

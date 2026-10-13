@@ -1,6 +1,6 @@
 import { githubRepositoryRefSchema } from "@langwatch/github-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { fromDate } from "@langwatch/time";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
 import {
   GithubInstallationsRepository,
@@ -179,7 +179,7 @@ export class PrismaGithubInstallationsRepository extends GithubInstallationsRepo
   }): Promise<void> {
     await this.prisma.githubInstallation.updateMany({
       where: { installationId },
-      data: { suspendedAt: suspended ? new Date() : null },
+      data: { suspendedAt: suspended ? toDate(nowInstant()) : null },
     });
   }
 

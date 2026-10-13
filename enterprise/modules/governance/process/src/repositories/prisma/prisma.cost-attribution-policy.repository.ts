@@ -12,6 +12,15 @@ type CostAttributionPrismaClient = {
       select: { config: true };
     }): Promise<{ config: unknown }[]>;
     findMany(input: {
+      where: {
+        organizationId: { in: string[] };
+        type: "coding_assistant";
+        enabled: true;
+        archivedAt: null;
+      };
+      select: { organizationId: true; config: true };
+    }): Promise<{ organizationId: string; config: unknown }[]>;
+    findMany(input: {
       where: { type: "coding_assistant"; enabled: true; archivedAt: null };
       distinct: ["organizationId"];
       select: { organizationId: true };

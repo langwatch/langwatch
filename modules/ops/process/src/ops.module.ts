@@ -16,6 +16,7 @@ import { usageReportEventing } from "#eventing/ops-usage-report.pipeline";
 import { CheckupCanaryProjectService } from "#features/checkup/services/checkup-canary-project.service";
 import { upgradeAlertsEventing } from "#features/upgrades/eventing/ops-upgrade-alerts.pipeline";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
+import { MOVED_TO_OWNERS } from "#rules/system-migration-support.rules";
 import { CredentialsResealTask, credentialsResealCiphers } from "#tasks/credentials-reseal.task";
 import { GrantPlatformOperatorTask } from "#tasks/grant-platform-operator.task";
 import { ProcessManagerPurgeTask } from "#tasks/process-manager-purge.task";
@@ -103,6 +104,63 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
           return dryRun
             ? { wouldCopy: copied, wouldCopyEnrolments: enrolmentsCopied }
             : { copied, enrolmentsCopied };
+        },
+      }),
+      // Background, as the older tables predate this release (upgrade-sign-in-tables); it runs as
+      // the new worker starts, while the five owner steps still wait for old writers to go.
+      defineMigrationStep({
+        id: "ops:copy-identity-authz-migration-state",
+        kind: "data",
+        mode: "background",
+        description:
+          "Carries users and organizations that finished, were rolled back in or were enrolled in the sign-in, credential repair, SSO and authorization engine migrations over to their new steps, so none runs for them again.",
+        run: async ({ dryRun }) => {
+          const copied = await repositories.migration.copyTenantState({
+            moves: MOVED_TO_OWNERS,
+            dryRun,
+          });
+          const enrolmentsCopied = await repositories.migration.copyEnrolments({
+            moves: MOVED_TO_OWNERS,
+            dryRun,
+          });
+          return dryRun
+            ? { wouldCopy: copied, wouldCopyEnrolments: enrolmentsCopied }
+            : { copied, enrolmentsCopied };
+        },
+      }),
+      // An older image keeps finishing, rolling back and enrolling under the old names until it
+      // is gone, and identity reopens unproven accounts there first; this carries that over.
+      defineMigrationStep({
+        id: "ops:recopy-identity-authz-migration-state-after-rollout",
+        kind: "data",
+        mode: "background",
+        description:
+          "Carries over what an older image changed in the sign-in, credential repair, SSO and authorization engine migrations during the rollout, once no older image is running.",
+        needsOldWritersGone: true,
+        after: [
+          "ops:copy-identity-authz-migration-state",
+          "identity:reopen-unproven-accounts-after-rollout",
+        ],
+        run: async ({ dryRun }) => {
+          const copied = await repositories.migration.recopyTenantStateAfterRollout({
+            moves: MOVED_TO_OWNERS,
+            dryRun,
+          });
+          const enrolmentsCopied = await repositories.migration.copyEnrolments({
+            moves: MOVED_TO_OWNERS,
+            dryRun,
+          });
+          const enrolmentsWithdrawn = await repositories.migration.withdrawEnrolmentsAfterRollout({
+            moves: MOVED_TO_OWNERS,
+            dryRun,
+          });
+          return dryRun
+            ? {
+                wouldCopy: copied,
+                wouldCopyEnrolments: enrolmentsCopied,
+                wouldWithdrawEnrolments: enrolmentsWithdrawn,
+              }
+            : { copied, enrolmentsCopied, enrolmentsWithdrawn };
         },
       }),
       defineMigrationStep({

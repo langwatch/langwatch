@@ -219,6 +219,7 @@ func (run *heavyRun) wave(ctx context.Context, pool *chunkPool, waves *int) erro
 		case paceGo:
 			run.logf("upgradelab: telemetry wave %d sent (%d requests so far), queue depth %d (unread: %v), next wave goes\n", *waves, pool.sent.Load(), depth, err)
 			return nil
+		case paceWait:
 		case paceExpired:
 			return fmt.Errorf("%w: %d jobs above %d after %s", ErrPaceExpired, depth, pace.Above, pace.Within)
 		}
@@ -422,7 +423,7 @@ func resendWith(ctx context.Context, in resendInput) (seedgen.Reply, error) {
 	wait := in.wait
 	for attempt := 1; ; attempt++ {
 		reply, err := in.door.Send(ctx, in.action)
-		if err != nil || reply.OK || !(reply.Retryable || in.always) || attempt == in.attempts {
+		if err != nil || reply.OK || (!reply.Retryable && !in.always) || attempt == in.attempts {
 			return reply, err
 		}
 		select {

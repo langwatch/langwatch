@@ -16,7 +16,8 @@ import {
   SystemMigrationRecordNotFoundError,
   TENANT_MIGRATION_STATUSES,
 } from "@langwatch/system-migrations";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
+import type { TenantStepStateRow } from "@langwatch/upgrade/step/tenant-state";
 
 import { SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER } from "../../../eventing/ops-system-migrations.process.ts";
 import {
@@ -112,7 +113,7 @@ export class SystemMigrationsService {
                   notEnrolledCount: Math.max(0, totalOrganizations - enrolledCount),
                 }
               : null,
-          attention,
+          attention: attention.map(onTheWire),
         };
       }),
     );
@@ -133,7 +134,7 @@ export class SystemMigrationsService {
       offset,
     });
     return {
-      items: rows.slice(0, limit),
+      items: rows.slice(0, limit).map(onTheWire),
       cursor: rows.length > limit ? String(offset + limit) : null,
     };
   }
@@ -292,6 +293,14 @@ export class SystemMigrationsService {
       "operator asserted that legacy-only writers are drained",
     );
   }
+}
+
+/** A tenant row as the page reads it: when it last moved, as a date. */
+function onTheWire({
+  updatedAt,
+  ...row
+}: TenantStepStateRow): MigrationOverview["attention"][number] {
+  return { ...row, updatedAt: toDate(updatedAt) };
 }
 
 function refuseWhenNotFound(error: unknown): never {

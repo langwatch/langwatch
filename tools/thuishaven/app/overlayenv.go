@@ -95,8 +95,8 @@ func (o *Orchestrator) ownStack(p UpParams) (domain.Stack, bool) {
 // StackEnv returns the resolved overlay for this worktree's registered stack —
 // the exact KEY=VALUE set every supervised child is started with.
 func (o *Orchestrator) StackEnv(p UpParams) ([]string, error) {
-	// A named slug wins: one checkout can run several stacks (visualdiff's
-	// check stack beside the developer's), and a tool reading one names it.
+	// A named slug wins: one checkout can run several stacks (the shared check
+	// stack beside the developer's), and a tool reading one names it.
 	if st, ok := o.stackBySlug(p.ExplicitSlug); ok && p.ExplicitSlug != "" {
 		return o.toolEnv(st), nil
 	}

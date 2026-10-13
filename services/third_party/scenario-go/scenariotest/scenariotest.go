@@ -1,15 +1,3 @@
-// Package scenariotest runs scenarios as Go tests, the counterpart of the JS
-// vitest integration and the Python pytest plugin: each run is tied to its
-// test (the chat log and verdict go to the test log, a failed verdict fails
-// the test), and Main prints a summary report of every scenario the test
-// binary ran. All runs of one `go test` invocation share a batch run id, so
-// LangWatch groups them.
-//
-//	func TestMain(m *testing.M) { os.Exit(scenariotest.Main(m)) }
-//
-//	func TestWeather(t *testing.T) {
-//		scenariotest.Run(t, scenario.ScenarioConfig{ /* … */ })
-//	}
 package scenariotest
 
 import (

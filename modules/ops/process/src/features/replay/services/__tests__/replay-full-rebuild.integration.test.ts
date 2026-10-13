@@ -25,6 +25,7 @@ type ReplayRedisPipeline = {
   sadd(key: string, ...members: string[]): ReplayRedisPipeline;
   smembers(key: string): ReplayRedisPipeline;
   get(key: string): ReplayRedisPipeline;
+  hget(key: string, field: string): ReplayRedisPipeline;
   set(key: string, value: string, expiry: "EX", seconds: number): ReplayRedisPipeline;
   expire(key: string, seconds: number): ReplayRedisPipeline;
   exec(): Promise<readonly [Error | null, unknown][] | null>;
@@ -81,6 +82,10 @@ class RedisReplayAdapter implements ReplayRedis {
       },
       get: (key) => {
         pipeline.get(key);
+        return this.pipelineResult(pipeline);
+      },
+      hget: (key, field) => {
+        pipeline.hget(key, field);
         return this.pipelineResult(pipeline);
       },
       set: (key, value, expiry, seconds) => {
@@ -153,6 +158,10 @@ class RedisReplayAdapter implements ReplayRedis {
       },
       get: (key) => {
         pipeline.get(key);
+        return this.pipelineResult(pipeline);
+      },
+      hget: (key, field) => {
+        pipeline.hget(key, field);
         return this.pipelineResult(pipeline);
       },
       set: (key, value, expiry, seconds) => {

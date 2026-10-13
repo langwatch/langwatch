@@ -41,6 +41,7 @@ import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useCopyExperiment } from "../../../behavior/experiments/use-copy-experiment.ts";
 import { useCreateExperiment } from "../../../behavior/experiments/use-create-experiment.ts";
 import { experimentContextChip } from "../../../behavior/langy/langy-context-chips.ts";
+import { SetupWithAgentButton } from "../../../behavior/lent-setup-with-agent-button.tsx";
 import type { ExperimentType } from "../../../model/prisma-types.ts";
 import { useWorkflowHost } from "../../../model/workflow/workflow-host.ts";
 import { formatEvaluationSummary } from "../../../ui/elements/experiments/BatchEvaluationV2/batch-evaluation-summary.tsx";
@@ -432,6 +433,7 @@ export function ExperimentsPage() {
               description="Test prompts, models and agents against a dataset before shipping changes."
               icon={<LuSquareCheckBig size={24} />}
               docsHref="https://langwatch.ai/docs/evaluations/experiments/overview"
+              secondaryAction={<SetupWithAgentButton surface="experiments" />}
             />
           )}
           {pageState === "list" && (

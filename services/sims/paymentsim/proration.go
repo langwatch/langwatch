@@ -3,7 +3,7 @@ package paymentsim
 import "fmt"
 
 // prorateAlwaysInvoice bills a subscription change's proration at once; the
-// other behaviours leave it for the next invoice or skip it.
+// other behaviors leave it for the next invoice or skip it.
 const prorateAlwaysInvoice = "always_invoice"
 
 // prorationLines prices the change from before to after against the unused part

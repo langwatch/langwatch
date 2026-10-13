@@ -9,6 +9,8 @@ import { memorySessionState } from "@langwatch/process-stores";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryConnectedAgentRelayChannel } from "../channels/memory/memory.connected-agent-relay.channel.ts";
+import { RedisConnectedAgentStateRepository } from "../repositories/redis/redis.connected-agent-state.repository.ts";
 import {
   callAckKey,
   callKey,
@@ -39,9 +41,14 @@ const fakeCredentials: AgentConnectCaller = {
 
 type MemoryStore = SessionStateStore;
 
+/** The Redis tier over an in-memory Redis, so a test can park a call under any project's key. */
 function build() {
   const store = memorySessionState();
-  const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
+  const runtime = ConnectedAgentRuntimeService.create({
+    podId: "pod_solo",
+    state: RedisConnectedAgentStateRepository.create(store),
+    relay: MemoryConnectedAgentRelayChannel.create(),
+  });
   const options = {
     runtime,
     agents: fakeAgents,

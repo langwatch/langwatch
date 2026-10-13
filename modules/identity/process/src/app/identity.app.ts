@@ -216,6 +216,8 @@ type IdentityAppParts = {
   newbornSweep: IdentityNewbornReconciliationService;
   signUpIdentifiers: SignUpIdentifierService;
   backfill: IdentityBackfillService;
+  /** Identity's own sign-in switch, which the identifier backfill answers from and turns on. */
+  signInLatch: IdentityRepositories["latch"];
   backfillMaxQueuedJobs: number;
   secrets: IdentitySecretCarryService;
   ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService;
@@ -883,6 +885,7 @@ export class IdentityModule
       signUpIdentifiers,
       backfill,
       backfillMaxQueuedJobs: setup.config.identifierBackfillMaxQueuedJobs,
+      signInLatch: setup.repositories.latch,
       secrets,
       ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService.create(
         setup.repositories.ssoDomainOwnership,
@@ -1191,25 +1194,31 @@ export class IdentityModule
     return this.#parts.signUpIdentifiers;
   }
 
-  userMigrations(): readonly SystemMigration[] {
-    return [
-      IdentityIdentifierBackfillMigrationService.create({
-        backfill: this.#parts.backfill,
-        maxQueuedJobs: this.#parts.backfillMaxQueuedJobs,
-      }),
-      IdentitySecretHealMigrationService.create(this.#parts.secrets),
-    ] as const;
+  /** D01, declared by identity.module.ts as the `identity:identifier-backfill` tenant step. */
+  identifierBackfillMigration(): SystemMigration {
+    return IdentityIdentifierBackfillMigrationService.create({
+      backfill: this.#parts.backfill,
+      latch: this.#parts.signInLatch,
+      maxQueuedJobs: this.#parts.backfillMaxQueuedJobs,
+    });
   }
 
-  registeredMigrations(): readonly SystemMigration[] {
-    const { ssoConnectionGrandfather, ssoDomainOwnershipBackfill } = this.#parts;
+  /** D01's reverse leg, declared as the `identity:secret-heal` tenant step. */
+  secretHealMigration(): SystemMigration {
+    return IdentitySecretHealMigrationService.create(this.#parts.secrets);
+  }
 
-    return [
-      ...(ssoConnectionGrandfather
-        ? [IdentityConnectionGrandfatherMigrationService.create(ssoConnectionGrandfather)]
-        : []),
-      SsoDomainOwnershipMigrationService.create(ssoDomainOwnershipBackfill),
-    ];
+  /** D04, declared as `identity:connection-grandfather` only where its store is composed. */
+  findConnectionGrandfatherMigrations(): readonly SystemMigration[] {
+    const { ssoConnectionGrandfather } = this.#parts;
+    return ssoConnectionGrandfather
+      ? [IdentityConnectionGrandfatherMigrationService.create(ssoConnectionGrandfather)]
+      : [];
+  }
+
+  /** Declared as the `identity:sso-domain-ownership-backfill` tenant step. */
+  ssoDomainOwnershipMigration(): SystemMigration {
+    return SsoDomainOwnershipMigrationService.create(this.#parts.ssoDomainOwnershipBackfill);
   }
 
   joinRequestGuards(): JoinRequestGuardsService {

@@ -314,6 +314,7 @@ export class BrowserSessionService {
         signedInAt: toDate(record.createdAt).toISOString(),
         lastActiveAt: toDate(record.updatedAt).toISOString(),
         expiresAt: toDate(record.expires).toISOString(),
+        startedBySignUp: record.startedBySignUp,
         current: record.id === currentSessionId,
       }),
     );

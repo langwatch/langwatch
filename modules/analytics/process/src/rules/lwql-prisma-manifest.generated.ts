@@ -44,6 +44,7 @@ export interface LwqlPrismaRows {
     readonly userAgent: "String?";
     readonly identifierId: "String?";
     readonly amr: "String[]";
+    readonly startedBySignUp: "Boolean";
     readonly impersonating: "Json?";
     readonly actorUserId: "String?";
     readonly subjectUserId: "String?";

@@ -20,8 +20,10 @@ Every subject has one owning module (`dev/docs/ARCHITECTURE.md` §3; the map is
 | An operation another module calls | the owner's `process/README.md`, "Module API": every operation, its signature and the token |
 | Who calls a module                | the module page's "Who depends on <id>" line                                                |
 
-A table listed as "Postgres, accessed not claimed" has no owner yet. Do not claim it in passing:
-the claim is its own change, and the pages show the gap so it gets one.
+A table listed as "Postgres, accessed not claimed" may have no owner yet, or the page may be stale.
+Check `modules/catalogue.json`, the owner's repository claim and the share policies before you
+conclude. Do not claim a table in passing: the claim is its own change, and the pages show the gap
+so it gets one.
 
 ## Decide
 
@@ -29,6 +31,11 @@ the claim is its own change, and the pages show the gap so it gets one.
 2. **It is owned by another module.** Do not edit that module's tables, repositories or files from
    here. Call its `*Api` token: add the peer to `static dependencies` and call the operation listed
    under "Module API". Load `module-dependencies` for how a peer is declared.
+   **Exception, a declared share (§7):** the owner may declare a table shared for reading by named
+   modules, in `SHARED_PRISMA_TABLES` (`packages/architecture-enforcer/src/policies/persistence/prisma-table-ownership.ts`)
+   or the ClickHouse table-ownership policy. A named reader then reads it directly and the policy admits
+   no write beyond a ruled one. Check the policy for your module's name; an undeclared read is a
+   defect, not a share, and a reader need not become an owner.
 3. **The owner has no operation that does it.** An operation that moves an existing handler over
    unchanged may be added (§8). One that adds behaviour or a new shape is asked for: name it (its
    name, input and result) and stop until it is ruled (`architecture-review`, check A).
@@ -48,12 +55,12 @@ slack". Its `process/README.md` lists `getUsableSlackConnection` under "Module A
 
 ## Traps
 
-| Trap                                                      | Do instead                                                              |
-| --------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Guessing the owner from imports or folder names           | read the index; `modules/catalogue.json` is the source the pages print  |
-| Editing the generated block to fix a wrong owner          | fix the code or the catalogue, then run `pnpm generate:readmes`         |
-| Reading a peer's Prisma model because it is in the schema | a table another module owns is reached through that module's `*Api`     |
-| Trusting a `≈` value on a page                            | `≈` marks a value the generator could not read; check the code it cites |
+| Trap                                                      | Do instead                                                                                       |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Guessing the owner from imports or folder names           | read the index; `modules/catalogue.json` is the source the pages print                           |
+| Editing the generated block to fix a wrong owner          | fix the code or the catalogue, then run `pnpm generate:readmes`                                  |
+| Reading a peer's Prisma model because it is in the schema | through that module's `*Api`, unless the owner declares your module a reader in the share policy |
+| Trusting a `≈` value on a page                            | `≈` marks a value the generator could not read; check the code it cites                          |
 
 ## Links
 

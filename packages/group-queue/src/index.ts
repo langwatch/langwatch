@@ -15,6 +15,7 @@ export type {
   GroupQueueHandlerContext,
   GroupQueuePayloadSchema,
   GroupQueuePolicy,
+  ListedRun,
   QueueSendOptions,
 } from "./contracts.ts";
 export { EXHAUSTED_OUTCOMES, type ExhaustedOutcome } from "./deadLetter.ts";

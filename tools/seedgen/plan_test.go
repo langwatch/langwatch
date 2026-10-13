@@ -234,7 +234,7 @@ func TestOrgFlagsReplaceTheTierOrgs(t *testing.T) {
 	if plan.Orgs[0].Key != "acme" || plan.Orgs[1].Persona != "enterprise" {
 		t.Fatalf("orgs %+v %+v", plan.Orgs[0], plan.Orgs[1])
 	}
-	for _, refused := range []string{"name=Acme", "name=acme,plan=enterprise", "name=acme,users=0", "name=acme,colour=red",
+	for _, refused := range []string{"name=Acme", "name=acme,plan=enterprise", "name=acme,users=0", "name=acme,color=red",
 		"name=acme,persona=nosuch", "acme"} {
 		if _, err := ParseFlags([]string{"--org", refused}, anchor); !isFlagError(err, "org") {
 			t.Errorf("--org %s: want a refusal naming --org, got %v", refused, err)
@@ -367,7 +367,7 @@ func TestTestStackOrgsCarryTheirPlans(t *testing.T) {
 	want := map[string]int{"$org:sso-test-org": 1, "$org:free-test-org": 0, "$org:enterprise-test-org": 1}
 	for org, n := range want {
 		if licensed[org] != n {
-			t.Errorf("%s licences = %d, want %d", org, licensed[org], n)
+			t.Errorf("%s licenses = %d, want %d", org, licensed[org], n)
 		}
 		if got := members[org]; len(got) == 0 || got[len(got)-1] != AdminRef {
 			t.Errorf("%s members %v: the seeded admin must join", org, got)

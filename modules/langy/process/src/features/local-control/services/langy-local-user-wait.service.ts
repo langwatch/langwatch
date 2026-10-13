@@ -20,11 +20,10 @@ import {
   type PollWaitResponse,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
 
 import { LANGY_ID_RESOURCES } from "../../../eventing/langy-conversation-process.schemas.ts";
-import { turnWaitsKey, waitKey } from "../../../rules/langy-local-control-keys.rules.ts";
+import type { LangyLocalUserWaitRepository } from "../../../repositories/langy-local-user-wait.repository.ts";
 import { LANGY_LIVENESS } from "../../../rules/langy-streaming-constants.rules.ts";
 
 const logger = createLogger("langwatch:langy:local-control:waits");
@@ -34,19 +33,36 @@ import {
   permissionCardEntry,
   questionCardEntry,
   refuseSettled,
-  storedUserWaitSchema,
   toPollResponse,
   type StoredUserWait,
   type UserWaitBuffer,
   type UserWaitEvents,
   type UserWaitQuestion,
-  type UserWaitServiceOptions,
 } from "../../../rules/langy-local-user-wait-record.rules.ts";
+
+interface UserWaitServiceOptions {
+  waits: LangyLocalUserWaitRepository;
+  events: UserWaitEvents;
+  buffer: UserWaitBuffer;
+  /**
+   * Sends the developer's answer to the folder holding the call. Injected, so
+   * the wait service never depends on the transport and a unit test proves the
+   * frame was asked for without a socket.
+   */
+  sendPermission?: (args: {
+    conversationId: string;
+    callId: string;
+    decision: "allow_once" | "allow_pattern" | "deny" | "expired";
+  }) => Promise<void>;
+  now?: () => number;
+  pollIntervalMs?: number;
+  keepaliveMs?: number;
+}
 
 /** One poll of a card, or `gone` once its record has expired. */
 type UserWaitPoll = { outcome: "polled"; answer: PollWaitResponse } | { outcome: "gone" };
 export class UserWaitService {
-  private readonly store: SessionStateStore;
+  private readonly waits: LangyLocalUserWaitRepository;
   private readonly events: UserWaitEvents;
   private readonly buffer: UserWaitBuffer;
   private readonly sendPermission: NonNullable<UserWaitServiceOptions["sendPermission"]>;
@@ -59,7 +75,7 @@ export class UserWaitService {
   }
 
   private constructor(options: UserWaitServiceOptions) {
-    this.store = options.store;
+    this.waits = options.waits;
     this.events = options.events;
     this.buffer = options.buffer;
     this.sendPermission = options.sendPermission ?? (async () => undefined);
@@ -297,7 +313,7 @@ export class UserWaitService {
     conversationId: string;
     turnId: string;
   }): Promise<StoredUserWait[]> {
-    const ids = await this.store.zrangebyscore(turnWaitsKey(conversationId, turnId), 0);
+    const ids = await this.waits.findPendingIds({ conversationId, turnId });
     const pending: StoredUserWait[] = [];
     for (const id of ids) {
       let wait: StoredUserWait;
@@ -329,18 +345,15 @@ export class UserWaitService {
    * under a code that tells the person at the command line to ask for the change again.
    */
   async getWait(waitId: string): Promise<StoredUserWait> {
-    const raw = await this.store.tryGet(waitKey(waitId));
-    if (!raw) {
+    const lookup = await this.waits.find(waitId);
+    if (lookup.kind === "miss") {
       throw new LangyLocalRecordNotFoundError();
     }
-
-    try {
-      return storedUserWaitSchema.parse(JSON.parse(raw));
-    } catch (error) {
-      throw new LangyLocalRecordUnreadableError({
-        reasons: error instanceof Error ? [error] : [],
-      });
+    if (lookup.kind === "unreadable") {
+      throw new LangyLocalRecordUnreadableError({ reasons: lookup.reasons });
     }
+
+    return lookup.value;
   }
 
   /** The wait, with its budget applied: a card past its time reads expired. */
@@ -412,7 +425,11 @@ export class UserWaitService {
           }
         : {}),
     });
-    await this.store.zrem(turnWaitsKey(wait.conversationId, wait.turnId), wait.waitId);
+    await this.waits.untrackPending({
+      conversationId: wait.conversationId,
+      turnId: wait.turnId,
+      waitId: wait.waitId,
+    });
   }
 
   /**
@@ -461,12 +478,13 @@ export class UserWaitService {
     // The record outlives its budget so a late answer can be told the card is
     // over, rather than that it never existed.
     const ttlSeconds = Math.max(60, Math.ceil((wait.expiresAt - this.now()) / 1000) + 300);
-    await this.store.set(waitKey(wait.waitId), JSON.stringify(wait), ttlSeconds);
+    await this.waits.save({ wait, ttlSeconds });
     if (wait.state === "pending") {
-      await this.store.zadd({
-        key: turnWaitsKey(wait.conversationId, wait.turnId),
-        score: wait.expiresAt,
-        member: wait.waitId,
+      await this.waits.trackPending({
+        conversationId: wait.conversationId,
+        turnId: wait.turnId,
+        waitId: wait.waitId,
+        expiresAt: wait.expiresAt,
         ttlSeconds,
       });
     }

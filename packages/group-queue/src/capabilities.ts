@@ -4,6 +4,7 @@ import type {
   GroupQueueHandlerContext,
   GroupQueueRuntimeDefinition,
   JobDelivery,
+  ListedRun,
   QueueSendOptions,
 } from "./contracts.ts";
 import { GroupQueueProcessor } from "./groupQueue.ts";
@@ -139,7 +140,7 @@ export class GroupQueueProducer<Payload extends Record<string, unknown>, Destina
   runListedWork<Result>(input: {
     name: string;
     timeoutMs: number;
-    work: () => Promise<Result>;
+    work: (list?: ListedRun) => Promise<Result>;
   }): Promise<Result> {
     return this.#processor.runListedWork(input);
   }

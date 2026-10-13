@@ -8,13 +8,13 @@ argument-hint: "[what changed, e.g. 'added dataset MCP tools']"
 # Maintain the feature map
 
 `feature-map.json` at the repo root is the product's public information architecture:
-ten top-level categories, each with `children`, each child a feature with its `surfaces`.
+the top-level categories (the `features` array; count them in the file, not here), each with `children`, each child a feature with its `surfaces`.
 `FEATURE_MAP.md` is the coverage table derived from it — edit both in one change. Use the
 underscore form; never create `FEATURE-MAP.md`.
 
 A **feature** here is a customer-facing capability, a row in this map, named the way a
 user would name it. It is not the same thing as a **module** (`modules/<name>`,
-the contract/server/web package trio); one feature can be served by several modules, and
+the contract, process, browser and client packages); one feature can be served by several modules, and
 one module can serve several features.
 
 ## The entry shape

@@ -14,7 +14,7 @@ installations, pull requests, fault count).
 
 ## Run it
 
-- Opt-in: `haven up +github` (sticky; restarts the stack). Hosted in the `sims` lane.
+- Opt-in: `haven up +github` (sticky; restarts the stack). Runs in the `go` lane by default (see `sims`).
 - The overlay sets `GITHUB_LANGY_APP_ID`, `_APP_SLUG`, `_PRIVATE_KEY` (a throwaway RSA key),
   `_WEBHOOK_SECRET`, and the two origin leaves `GITHUB_LANGY_API_BASE` and
   `GITHUB_LANGY_WEB_BASE` (both the sim). With `+github` the whole set beats a
@@ -22,8 +22,9 @@ installations, pull requests, fault count).
 - The sim is told the stack's `/api/github/webhook` and `/api/github/setup` and the same secret.
 - Seeded: installation `1001` on `langwatch-demo` with repos `langwatch-demo/app`,
   `langwatch-demo/docs`, and PR `#1` on `feat/demo`. User `octocat`.
-- Not covered: the better-auth GitHub social sign-in has its origins hard-wired in the auth
-  module, so the OAuth routes below are served but the product does not call them yet.
+- Social sign-in with GitHub is the IdP overlay's job, not the GitHub App's: with idpsim on, the
+  stack gets `GITHUB_SIGN_IN_BASE` pointing at idpsim (`tools/thuishaven/domain/overlay_idp_social.go`;
+  see `idpsim`). This sim's OAuth routes below serve the GitHub App flow.
 
 ## What it fakes
 

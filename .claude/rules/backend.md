@@ -7,6 +7,7 @@ paths:
   - "apps/api/**"
   - "apps/worker/**"
   - "apps/tasks/**"
+  - "apps/backend/**"
   - "modules/catalogue.json"
 ---
 
@@ -17,8 +18,11 @@ Load the `backend` skill for anything beyond a small edit here. The authority is
 eventing); all of the below is lint-enforced.
 
 - **Dependency direction:** apps → `*-process`/`*-browser` → `*-contract`.
-  Process never imports browser; contract imports no framework. Another module
-  imports only the owner's contract and calls its `*Api` token.
+  Process never imports browser; a contract imports no framework runtime, only
+  the light `@langwatch/module` core and the portable surfaces §2 names (config
+  and secret handles, errors, `@langwatch/eventing/tables`). Another module
+  imports only the owner's contract and calls its `*Api` token (a browser also
+  reads the owner's `<name>-client`).
 - **The contract** holds Zod schemas with `infer`, portable types,
   `HandledError` subclasses with stable codes, tRPC declarations, the module's
   config schema, and the `*Api` interface + token (`<name>.api.ts`).
@@ -33,14 +37,19 @@ eventing); all of the below is lint-enforced.
 - **No raw clients in module code.** Prisma, ClickHouse, Redis and object
   storage arrive only as repositories and channels built from a registry or
   channel factory. Only `repositories/prisma/**` names Prisma. Uploads go to a
-  signed URL and are attached by reference; no module buffers upload bytes
-  (ADR-158).
+  signed URL and are attached by reference (ADR-158); no new module buffers
+  upload bytes. Main's byte intakes (user avatar and AI tool icon data URLs,
+  bug-report transcripts, the deprecated multipart dataset routes, inline
+  scenario media) stay by name until each is ruled to move (§7).
 - **The four-way rule (§3.3):** every dependency is one of: a repository or
   channel built by the container from the module's own registry; a peer `*Api`
   token in `static dependencies`; a deployment fact from the module's declared
   config slice or secret handle (never `process.env`); or an availability the
   module decides from its own config and secrets, refusing by name when off.
-  There are no members, no supply tokens and no `.provide` (§15).
+  There are no members and no supply tokens (§15). A channel may be bound to
+  another module's `*Api` (`static readonly binds`), which is not a peer, and
+  `.provide` survives only as a test stand-in for such a bound API (§5);
+  a test stands in for any other uninstalled peer with `testPeer`.
 - **Transports declare, never implement.** Handlers receive
   `{ input, app, actor, scope, signal }`, call one API operation, and return a
   plain value or throw. No `c.json`, status branches, error envelopes or

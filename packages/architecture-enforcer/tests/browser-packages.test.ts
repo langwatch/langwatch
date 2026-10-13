@@ -232,6 +232,12 @@ describe("when one manifest edge onto a browser package could be read by three p
     writePackage("modules/scenario/browser", "@langwatch/scenario-browser", {
       dependencies: { "@langwatch/trace-browser": "workspace:*" },
     });
+    // Quoted but not imported: the dependency is read (so package-dependencies stays quiet)
+    // without a source import for the closure policy to report as well.
+    write(
+      "modules/scenario/browser/src/index.ts",
+      'export const edge = "@langwatch/trace-browser";\n',
+    );
 
     const registry = POLICIES.filter((policy) =>
       ["browser-package-closure", "manifests"].includes(policy.id),

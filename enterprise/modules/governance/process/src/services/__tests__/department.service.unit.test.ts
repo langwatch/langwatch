@@ -164,9 +164,15 @@ describe("DepartmentService", () => {
 
   /** ADR-177 decision 5: only an organisation admin sees an aggregate project. */
   it.each([
-    ["ADMIN", [PROJECT_KIND.INTERNAL_GOVERNANCE]],
-    ["MEMBER", [PROJECT_KIND.INTERNAL_GOVERNANCE, PROJECT_KIND.AGGREGATE]],
-    [null, [PROJECT_KIND.INTERNAL_GOVERNANCE, PROJECT_KIND.AGGREGATE]],
+    ["ADMIN", [PROJECT_KIND.INTERNAL_GOVERNANCE, PROJECT_KIND.INTERNAL_CHECKUP]],
+    [
+      "MEMBER",
+      [PROJECT_KIND.INTERNAL_GOVERNANCE, PROJECT_KIND.INTERNAL_CHECKUP, PROJECT_KIND.AGGREGATE],
+    ],
+    [
+      null,
+      [PROJECT_KIND.INTERNAL_GOVERNANCE, PROJECT_KIND.INTERNAL_CHECKUP, PROJECT_KIND.AGGREGATE],
+    ],
   ])("asks for the projects a %s caller may see", async (role, hidden) => {
     const { service, hiddenAsked } = await harness();
 

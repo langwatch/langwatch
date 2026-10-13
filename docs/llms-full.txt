@@ -70568,7 +70568,7 @@ That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one l
 | `0` | `done` | Every step the image needs is applied | Start or restart the app and the workers |
 | `1` | `failed_prisma_migration` | A PostgreSQL migration failed and cannot be retried by the upgrade (written before re-runnable migrations became the rule, or not shipped in this image) | Run the `prisma migrate resolve` command the message names, then run the upgrade again |
 | `1` | `rerunnable_migration_failed` | A re-runnable migration still failed on its last attempt | Fix what its error names (often a lock another session holds), then run the upgrade again. No resolve command is needed |
-| `1` | `prebuilt_index_differs` | A pending migration creates an index if it does not exist, and an index of that name already exists with another definition or invalid | Drop or rename the index the message names (nothing drops it for you), then run the upgrade again. A waiting worker retries by itself |
+| `1` | `prebuilt_index_differs` | A pending migration creates an index if it does not exist, and an index of that name already exists with another definition or invalid | Drop or rename the index the message names (the upgrade does not drop it for you), then run the upgrade again. A waiting worker retries by itself |
 | `1` | `schema_failed` | A PostgreSQL or ClickHouse target could not be applied, or the ledger schema could not be created | Check the named target is reachable (`DATABASE_URL`, `CLICKHOUSE_URL`) and that the `DATABASE_URL` user has `CREATE` on the database, then run the upgrade again |
 | `1` | `step_failed` | A blocking data step failed | Read its error with `pnpm task upgrade status`, fix the cause, then run the upgrade again. The step resumes from its checkpoint |
 | `1` | `reconciler_failed` | The ClickHouse TTL or LangWatchQL reconciler failed | Fix the store it names (`CLICKHOUSE_URL`), then run the upgrade again |
@@ -74183,7 +74183,7 @@ The slug is optional and is derived from the name when you leave it out. It is a
 
 ---
 title: "Archive project"
-openapi: "DELETE /api/projects/{id}"
+openapi: "DELETE /api/v1/projects/{id}"
 ---
 
 ---
@@ -74192,7 +74192,7 @@ openapi: "DELETE /api/projects/{id}"
 
 ---
 title: "Create project"
-openapi: "POST /api/projects"
+openapi: "POST /api/v1/projects"
 ---
 
 ---
@@ -74201,7 +74201,7 @@ openapi: "POST /api/projects"
 
 ---
 title: "Get project API key"
-openapi: "GET /api/projects/{id}/api-key"
+openapi: "GET /api/v1/projects/{id}/api-key"
 ---
 
 ---
@@ -74210,7 +74210,7 @@ openapi: "GET /api/projects/{id}/api-key"
 
 ---
 title: "Get project"
-openapi: "GET /api/projects/{id}"
+openapi: "GET /api/v1/projects/{id}"
 ---
 
 ---
@@ -74219,7 +74219,7 @@ openapi: "GET /api/projects/{id}"
 
 ---
 title: "List projects"
-openapi: "GET /api/projects"
+openapi: "GET /api/v1/projects"
 ---
 
 ---
@@ -74249,22 +74249,22 @@ Project API keys (`X-Auth-Token`) cannot be used here, because they lack organiz
 
 ## Endpoints
 
-| Method   | Path                                    | Description                                                  |
-| -------- | --------------------------------------- | ------------------------------------------------------------ |
-| `GET`    | `/api/projects`                         | List all projects in the organization                        |
-| `POST`   | `/api/projects`                         | Create a new project (returns a service API key)             |
-| `GET`    | `/api/projects/{id}`                    | Get project details                                          |
-| `PATCH`  | `/api/projects/{id}`                    | Update project fields (including moving to a different team) |
-| `DELETE` | `/api/projects/{id}`                    | Archive a project                                            |
-| `GET`    | `/api/projects/{id}/api-key`            | Get the project's API key                                    |
-| `POST`   | `/api/projects/{id}/regenerate-api-key` | Regenerate the project API key                               |
+| Method   | Path                                       | Description                                                  |
+| -------- | ------------------------------------------ | ------------------------------------------------------------ |
+| `GET`    | `/api/v1/projects`                         | List all projects in the organization                        |
+| `POST`   | `/api/v1/projects`                         | Create a new project (returns a service API key)             |
+| `GET`    | `/api/v1/projects/{id}`                    | Get project details                                          |
+| `PATCH`  | `/api/v1/projects/{id}`                    | Update project fields (including moving to a different team) |
+| `DELETE` | `/api/v1/projects/{id}`                    | Archive a project                                            |
+| `GET`    | `/api/v1/projects/{id}/api-key`            | Get the project's API key                                    |
+| `POST`   | `/api/v1/projects/{id}/regenerate-api-key` | Regenerate the project API key                               |
 
 ## Moving a Project to Another Team
 
 You can move a project to a different team by including `teamId` in the `PATCH` request:
 
 ```bash
-curl -X PATCH https://app.langwatch.ai/api/projects/<project_id> \
+curl -X PATCH https://app.langwatch.ai/api/v1/projects/<project_id> \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"teamId": "<destination_team_id>"}'
@@ -74279,7 +74279,7 @@ curl -X PATCH https://app.langwatch.ai/api/projects/<project_id> \
 ## Typical Flow
 
 1. Create an admin API key in Settings > API Keys with `organization:manage` permission
-2. Call `POST /api/projects` with the project name and either an existing `teamId` or a `newTeamName`
+2. Call `POST /api/v1/projects` with the project name and either an existing `teamId` or a `newTeamName`
 3. Store the returned `serviceApiKey` and project `id`
 4. Use both values in your application:
 
@@ -74299,7 +74299,7 @@ LANGWATCH_PROJECT_ID=<project id>
 
 ---
 title: "Regenerate project API key"
-openapi: "POST /api/projects/{id}/regenerate-api-key"
+openapi: "POST /api/v1/projects/{id}/regenerate-api-key"
 ---
 
 ---
@@ -74308,7 +74308,7 @@ openapi: "POST /api/projects/{id}/regenerate-api-key"
 
 ---
 title: "Update project"
-openapi: "PATCH /api/projects/{id}"
+openapi: "PATCH /api/v1/projects/{id}"
 ---
 
 ---
@@ -75224,7 +75224,7 @@ description: "Build custom roles out of the permission catalog and keep them up 
 
 ## Intro
 
-The Roles API manages custom roles: named permission sets your organization defines, for when the built-in roles are not the shape you need. It also lists the built-in roles, addressed by the stable ids `admin`, `member` and `viewer`.
+The Roles API manages custom roles: named permission sets your organization defines, for when the built-in roles are not the shape you need. It can also list the built-in roles, addressed by the stable ids `admin`, `member` and `viewer`.
 
 A role on its own grants no access. It becomes access when a [grant](/api-reference/grants/overview) hands it to a user, a group or an API key at a scope. Roles are what, grants are who and where. See [Roles & access](/platform/roles-and-access).
 
@@ -75241,7 +75241,7 @@ Authorization: Bearer sk-lw-<id>_<secret>
 | Method   | Path                     | Description                                 |
 | -------- | ------------------------ | ------------------------------------------- |
 | `GET`    | `/api/v1/roles/permissions` | The permission catalog roles are built from |
-| `GET`    | `/api/v1/roles`             | List the built-in roles, then custom ones   |
+| `GET`    | `/api/v1/roles`             | List the custom roles                        |
 | `POST`   | `/api/v1/roles`             | Create a custom role                        |
 | `GET`    | `/api/v1/roles/{id}`        | Read one custom role                        |
 | `PATCH`  | `/api/v1/roles/{id}`        | Update a custom role                        |
@@ -75271,7 +75271,7 @@ curl -X POST https://app.langwatch.ai/api/v1/roles \
 
 ## Built-in roles
 
-`GET /api/v1/roles` lists `admin`, `member` and `viewer` first, marked `"builtIn": true` with `createdAt` and `updatedAt` null, then the custom roles. `?builtIn=true` lists only the built-in roles and `?builtIn=false` only the custom ones; any other value is refused with 422. `GET /api/v1/roles/admin` reads a built-in role and its permissions. A built-in role cannot be changed or deleted: 409 `role_is_built_in`.
+`GET /api/v1/roles` lists only the custom roles. `?builtIn=true` lists only the built-in roles `admin`, `member` and `viewer` (marked `"builtIn": true`, with `createdAt` and `updatedAt` null) and `?builtIn=false` only the custom ones; any other value is refused with 422. `GET /api/v1/roles/admin` reads a built-in role and its permissions. A built-in role cannot be changed or deleted: 409 `role_is_built_in`.
 
 ## You cannot add a permission you do not hold
 
@@ -76183,7 +76183,7 @@ curl -X POST https://app.langwatch.ai/api/v1/teams \
   -d '{"name": "Engineering"}'
 
 # Use team ID to create a project
-curl -X POST https://app.langwatch.ai/api/projects \
+curl -X POST https://app.langwatch.ai/api/v1/projects \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"name": "My Project", "teamId": "<team_id>", "language": "python", "framework": "langchain"}'

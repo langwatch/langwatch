@@ -41,6 +41,7 @@ const metricNames = [
   // ADR-066 pillar 2 mixed-command isolation
   "gq_foreign_siblings_restaged_total",
   "gq_jobs_unroutable_total",
+  "gq_jobs_recovered_total",
   "gq_batch_bisections_total",
   // Work-conserving override visibility
   "gq_jobs_dispatched_override_total",
@@ -103,6 +104,12 @@ export const gqJobsDispatchedTotal = new Counter({
 export const gqJobsDispatchedOverrideTotal = new Counter({
   name: "gq_jobs_dispatched_override_total",
   help: "Jobs dispatched by the work-conserving override, past a tenant's fair share, into slots that would otherwise be idle",
+  labelNames: ["queue_name"] as const,
+});
+
+export const gqJobsRecoveredTotal = new Counter({
+  name: "gq_jobs_recovered_total",
+  help: "Claimed jobs put back at the front of their group because the worker running them died (specs/claimed-job-recovery.feature)",
   labelNames: ["queue_name"] as const,
 });
 

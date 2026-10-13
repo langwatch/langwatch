@@ -227,7 +227,7 @@ Messages:
 
 - `missingTenantPredicate`
   - what: This ClickHouse query reads `{{table}}` without a `TenantId` predicate in that table's own WHERE, so it can return another tenant's rows.
-  - fix: Add `TenantId = {tenantId:String}` (or `TenantId IN {tenantIds:Array(String)}`) to the WHERE that filters `{{table}}`. Read the `process-module` skill.
+  - fix: Add `TenantId = {tenantId:String}` (or `TenantId IN ({tenantIds:Array(String)})` with `tenantIds` declared) to the WHERE that filters `{{table}}`. Read the `process-module` skill.
   - why: No id but TenantId is unique across tenants.
 
 ## `langwatch/cognitive-complexity`

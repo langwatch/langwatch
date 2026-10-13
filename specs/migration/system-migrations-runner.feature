@@ -46,6 +46,23 @@ Feature: Running system migrations across organizations
     When the pass is still working on it
     Then the claim is renewed rather than expiring mid-migration
 
+  # On the worker every pass runs on a queue list of its own and is paced by default (Alex,
+  # 2026-10-12): a migration that declares no limit waits at 5,000 of its own jobs, so its
+  # fan-out never buries live work. One that queues nothing pays only the cheap check.
+  @unit
+  Scenario: A migration that declares no pacing limit is paced by default on the worker
+    Given a migration that declares no pacing limit, over many organizations
+    And each organization's commands fan out into many jobs
+    When a worker's pass runs it on a queue list of its own
+    Then no more than the default limit plus a page of organizations' jobs are ever outstanding
+    And every organization is finalized
+
+  @unit
+  Scenario: A migration can wait for queue room inside one organization
+    Given a migration that sends its commands in pages
+    When a worker's pass runs it on a queue list of its own
+    Then each wait it asks for between pages holds at the pass's own limit
+
   @unit
   Scenario: An organization that fails mid-migration is parked and retried
     Given the migration throws for "org_acme"
@@ -419,6 +436,14 @@ Feature: Running system migrations across organizations
     Then it does not read as failed
 
   @unit
+  Scenario: A paced pass leaves undrained queue work to the next pass but fails on a tenant fault
+    Given a paced migration whose pass runs on a queue list of its own
+    When the list's queue work stops draining
+    Then the pass completes and leaves the remaining tenants to the next pass
+    But when reading the next page of tenants fails
+    Then the pass fails with that error
+
+  @unit
   Scenario: A tenant whose queued work has not drained is held as pending
     Given a migration whose work for "org_acme" is queued but not drained
     When a pass runs
@@ -488,6 +513,13 @@ Feature: Running system migrations across organizations
     Then one scheduled process wakes on one of them
     And it asks for exactly one re-drive pass for that wake
 
+  @unit
+  Scenario: A pass whose worker died is taken again within one short lease
+    Given a pass running on a worker
+    When that worker dies mid-pass
+    Then another worker takes the pass within the outbox's short lease, not an hour later
+    And a pass that runs for an hour keeps its lease while it runs
+
   # D04 records the configured legacy route WITHOUT treating the old domain
   # string as ownership evidence, which is what let it join the shared
   # registry: existing sign-in stays compatible, while activation, linking and
@@ -502,8 +534,8 @@ Feature: Running system migrations across organizations
   @unit
   Scenario: The D04 connection grandfather migration is declared in the shared registry
     Given an organization has a staff-configured legacy SSO domain
-    When any system migration entry point reads the registry
-    Then the D04 connection grandfather migration is declared alongside the authorization engine migration
+    When a worker collects identity's declared steps
+    Then identity:connection-grandfather is declared beside identity's other tenant steps
     And the legacy SSO route is recorded without being treated as proof of ownership
 
   # ═══ Automatic enrollment ═════════════════════════════════════════════
@@ -859,25 +891,25 @@ Feature: Running system migrations across organizations
     When an operator opens the tenant migrations tab
     Then the migration is listed with that title and description
 
-  # Authz answers its grant import through AuthzApi, as identity answers D04; ops composes both in
-  # main's registry order and never imports either process package (Alex, 2026-09-28).
+  # Authz and identity declare their tenant steps (Alex, 2026-10-12); ops lists them in installation
+  # order, authz first as on main, and never imports either process package.
   @unit
   Scenario: The authorization engine answers the migration it registers
     Given a process that installed authz
-    When the migrations runner asks authz for its registered migrations
-    Then the grant import is answered under its existing name
+    When ops collects the declared tenant steps
+    Then authz declares the grant import as the authz:engine step
 
   @unit
   Scenario: An authorization app composed without its migration refuses to answer one
     Given an authz app composed from already-built services
-    When the migrations runner asks it for its registered migrations
-    Then it refuses by name rather than answering an empty registry
+    When its engine migration is asked for
+    Then it refuses by name rather than declaring an empty step
 
   @unit
   Scenario: The authorization engine's migration runs ahead of identity's, as on main
-    Given authz registers the grant import and identity registers D04
+    Given authz declares authz:engine and identity declares its SSO steps
     When an operator opens the tenant migrations tab
-    Then the grant import is listed first and D04 second
+    Then authz:engine is listed first and identity's steps after it
 
   # The exclusion list is the ClickHouse member's own routing table, parsed once at boot from the
   # CLICKHOUSE_URL__* family (ARCHITECTURE §7), never a second declaration of it.

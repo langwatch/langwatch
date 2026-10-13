@@ -129,21 +129,25 @@ func Run(ctx context.Context, cfg ScenarioConfig, opts ...RunOption) (*ScenarioR
 	}
 
 	ex := newExecutor(cfg, runID, batchID, publish, granular)
+	// Deferred so a run that panics or exits its goroutine (t.FailNow in a
+	// step) still delivers its events and releases its spans.
+	defer func() {
+		if bus != nil {
+			bus.drain(eventBusDrainTimeout)
+		}
+		tracing.flush(context.WithoutCancel(ctx))
+		DefaultSpanCollector().ClearThread(cfg.ThreadID)
+		if f := settings.RemoteTraceFetcher; f != nil {
+			f.ClearThread(cfg.ThreadID)
+		}
+		if f := defaultFetcher.Load(); f != nil {
+			f.ClearThread(cfg.ThreadID)
+		}
+	}()
 	result, err := ex.execute(ctx)
 
 	if cfg.Verbose && result != nil && !result.Success {
 		printFailure(os.Stdout, cfg.Name, result)
-	}
-	if bus != nil {
-		bus.drain(eventBusDrainTimeout)
-	}
-	tracing.flush(context.WithoutCancel(ctx))
-	DefaultSpanCollector().ClearThread(cfg.ThreadID)
-	if f := settings.RemoteTraceFetcher; f != nil {
-		f.ClearThread(cfg.ThreadID)
-	}
-	if f := defaultFetcher.Load(); f != nil {
-		f.ClearThread(cfg.ThreadID)
 	}
 	return result, err
 }

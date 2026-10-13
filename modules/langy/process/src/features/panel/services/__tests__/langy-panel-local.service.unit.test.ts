@@ -7,6 +7,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ConnectedWorkspace } from "../../../../repositories/langy-local-presence.repository.ts";
+import { LocalSkipPolicyService } from "../../../local-control/services/langy-local-skip-policy.service.ts";
 import { LangyPanelAccessService } from "../langy-panel-access.service.ts";
 import {
   LangyPanelLocalService,
@@ -63,13 +64,17 @@ function service({
     expiresAt: 1_000,
     command: "npx langwatch@latest langy --share-control",
   }));
+  const presence = createApiFixture<LangyPanelLocalMembers["runtime"]["presence"]>({
+    getByConversationId: async () => connected,
+    readPolicy: async () => false,
+    writePolicy: touched,
+    deregister: touched,
+  });
+  const workspace = createApiFixture<LangyPanelLocalMembers["runtime"]["workspace"]>({
+    nudge: touched,
+  });
   const runtime = createApiFixture<LangyPanelLocalMembers["runtime"]>({
-    presence: createApiFixture<LangyPanelLocalMembers["runtime"]["presence"]>({
-      getByConversationId: async () => connected,
-      readPolicy: async () => false,
-      writePolicy: touched,
-      deregister: touched,
-    }),
+    presence,
     requests: createApiFixture<LangyPanelLocalMembers["runtime"]["requests"]>({
       findOpenForConversation: async () => [],
       wasApproved: async () => false,
@@ -77,7 +82,8 @@ function service({
       create: created,
     }),
     waits: createApiFixture<LangyPanelLocalMembers["runtime"]["waits"]>({ answer: touched }),
-    store: createApiFixture<LangyPanelLocalMembers["runtime"]["store"]>({ publish: touched }),
+    workspace,
+    skipPolicy: LocalSkipPolicyService.create({ presence, workspace }),
   });
   const instance = LangyPanelLocalService.create({
     access: LangyPanelAccessService.create({

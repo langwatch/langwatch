@@ -1,27 +1,46 @@
 import { createTestLogger } from "@langwatch/test-harness";
-import { fromDate } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
-import {
-  type AuthzCutoverDatabase,
-  PrismaAuthzCutoverRepository,
-} from "../../repositories/prisma/prisma.authz-cutover.repository.ts";
+import { AuthzCutoverRepository } from "../../repositories/authz-cutover.repository.ts";
+import { AuthzMemoryStore } from "../../repositories/memory/authz-memory.store.ts";
+import { MemoryAuthzCutoverRepository } from "../../repositories/memory/memory.authz.repositories.ts";
+import type { AuthzEngineSwitch } from "../../rules/authz-engine-switch.rules.ts";
 import {
   AuthzCutoverGateService,
   ENGINE_GATE_CACHE_TTL_MS,
 } from "../authz-cutover-gate.service.ts";
 
 const ORG_ID = "org_gate";
+const SWITCHED_AT = Temporal.Instant.from("2026-08-18T09:00:00.000Z");
 
-function stateTable(status: string | null) {
-  const findUnique = vi.fn().mockResolvedValue(status === null ? null : { status });
-  const adapter = AuthzCutoverGateService.create({
-    repository: PrismaAuthzCutoverRepository.create({
-      database: { systemMigrationTenantState: { findUnique } } as AuthzCutoverDatabase,
-    }),
+/** A repository answering the switches it is handed, in order, then the last one. */
+class ScriptedCutoverRepository extends AuthzCutoverRepository {
+  readonly reads = vi.fn<(input: { organizationId: string }) => Promise<AuthzEngineSwitch>>();
+
+  async getEngineSwitch(input: { organizationId: string }): Promise<AuthzEngineSwitch> {
+    return this.reads(input);
+  }
+
+  async carryOverEngineSwitch(): Promise<number> {
+    return 0;
+  }
+
+  async switchOnEngine(): Promise<boolean> {
+    return true;
+  }
+
+  async pinEngineSwitch(): Promise<void> {}
+}
+
+function gateOver({ onEngine }: { onEngine: boolean | null }) {
+  const memory = AuthzMemoryStore.create();
+  if (onEngine !== null) {
+    memory.cutovers.set(ORG_ID, { organizationId: ORG_ID, onEngine, switchedAt: SWITCHED_AT });
+  }
+  return AuthzCutoverGateService.create({
+    repository: MemoryAuthzCutoverRepository.create({ memory }),
   });
-  return { adapter, findUnique };
 }
 
 describe("AuthzCutoverGateService", () => {
@@ -29,107 +48,69 @@ describe("AuthzCutoverGateService", () => {
     vi.useRealTimers();
   });
 
-  it("asks only for the canonical AuthZ migration", async () => {
-    const { adapter, findUnique } = stateTable("finalized");
-
-    await adapter.isOn({ organizationId: ORG_ID });
-
-    expect(findUnique.mock.calls[0]![0].where).toEqual({
-      migrationName_tenantId: {
-        migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
-        tenantId: ORG_ID,
-      },
-    });
-  });
-
   /** @scenario "Only a finalized migration counts as cut over" */
   it.each([
-    ["migrated", false],
-    ["finalized", true],
-    ["pending", false],
-    ["parked", false],
-    ["rolled_back", false],
+    [true, true],
+    [false, false],
     [null, false],
-  ])("reads %s as on-ledger=%s", async (status, expected) => {
-    const { adapter } = stateTable(status);
-    await expect(adapter.isOn({ organizationId: ORG_ID })).resolves.toBe(expected);
+  ])("reads an engine switch of %s as on-engine=%s", async (onEngine, expected) => {
+    await expect(gateOver({ onEngine }).isOn({ organizationId: ORG_ID })).resolves.toBe(expected);
   });
 
   /** @scenario "A failed migration-state read is reported" */
-  it("reports a failed state read and fails safe to legacy", async () => {
-    const error = new Error("pg is down");
+  it("reports a failed switch read and fails safe to legacy", async () => {
+    const repository = new ScriptedCutoverRepository();
+    repository.reads.mockRejectedValue(new Error("pg is down"));
     const { logger, lines } = createTestLogger();
-    const adapter = AuthzCutoverGateService.create({
-      repository: PrismaAuthzCutoverRepository.create({
-        database: {
-          systemMigrationTenantState: { findUnique: vi.fn().mockRejectedValue(error) },
-        } as AuthzCutoverDatabase,
-      }),
-      logger,
-    });
+    const gate = AuthzCutoverGateService.create({ repository, logger });
 
-    await expect(adapter.isOn({ organizationId: ORG_ID })).resolves.toBe(false);
+    await expect(gate.isOn({ organizationId: ORG_ID })).resolves.toBe(false);
     expect(lines.findLine("warn", "could not read the authz migration state")).toMatchObject({
       organizationId: ORG_ID,
       ttlMs: ENGINE_GATE_CACHE_TTL_MS,
     });
   });
 
-  it("returns only the finalized cutover business time", async () => {
-    const occurredAt = new Date("2026-08-18T09:00:00.000Z");
-    const findUnique = vi
-      .fn()
-      .mockResolvedValueOnce({ status: "finalized", occurredAt })
-      .mockResolvedValueOnce({ status: "migrated", occurredAt });
-    const adapter = AuthzCutoverGateService.create({
-      repository: PrismaAuthzCutoverRepository.create({
-        database: { systemMigrationTenantState: { findUnique } } as AuthzCutoverDatabase,
-      }),
-    });
-
-    await expect(adapter.findFinalizedAt({ organizationId: ORG_ID })).resolves.toEqual(
-      fromDate(occurredAt),
-    );
-    await expect(adapter.findFinalizedAt({ organizationId: ORG_ID })).resolves.toBeNull();
+  it("returns the switch time only while the engine answers", async () => {
+    await expect(
+      gateOver({ onEngine: true }).findFinalizedAt({ organizationId: ORG_ID }),
+    ).resolves.toEqual(SWITCHED_AT);
+    await expect(
+      gateOver({ onEngine: false }).findFinalizedAt({ organizationId: ORG_ID }),
+    ).resolves.toBeNull();
   });
 
   it("raises through the uncached read used by revocation routing", async () => {
-    const adapter = AuthzCutoverGateService.create({
-      repository: PrismaAuthzCutoverRepository.create({
-        database: {
-          systemMigrationTenantState: {
-            findUnique: vi.fn().mockRejectedValue(new Error("pg is down")),
-          },
-        } as AuthzCutoverDatabase,
-      }),
-    });
+    const repository = new ScriptedCutoverRepository();
+    repository.reads.mockRejectedValue(new Error("pg is down"));
+    const gate = AuthzCutoverGateService.create({ repository });
 
-    await expect(adapter.readUncached({ organizationId: ORG_ID })).rejects.toThrow("pg is down");
+    await expect(gate.readUncached({ organizationId: ORG_ID })).rejects.toThrow("pg is down");
   });
 
   it("coalesces repeated reads inside the cache window", async () => {
-    const { adapter, findUnique } = stateTable("finalized");
-    await adapter.isOn({ organizationId: ORG_ID });
-    await adapter.isOn({ organizationId: ORG_ID });
-    expect(findUnique).toHaveBeenCalledTimes(1);
+    const repository = new ScriptedCutoverRepository();
+    repository.reads.mockResolvedValue({ onEngine: true, switchedAt: SWITCHED_AT });
+    const gate = AuthzCutoverGateService.create({ repository });
+
+    await gate.isOn({ organizationId: ORG_ID });
+    await gate.isOn({ organizationId: ORG_ID });
+
+    expect(repository.reads).toHaveBeenCalledTimes(1);
   });
 
   /** @scenario "Rolling back returns an organization to the legacy path within the gate's cache window" */
   it("observes rollback after the cache TTL", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-18T09:00:00.000Z"));
-    const findUnique = vi
-      .fn()
-      .mockResolvedValueOnce({ status: "finalized" })
-      .mockResolvedValue({ status: "rolled_back" });
-    const adapter = AuthzCutoverGateService.create({
-      repository: PrismaAuthzCutoverRepository.create({
-        database: { systemMigrationTenantState: { findUnique } } as AuthzCutoverDatabase,
-      }),
-    });
+    const repository = new ScriptedCutoverRepository();
+    repository.reads
+      .mockResolvedValueOnce({ onEngine: true, switchedAt: SWITCHED_AT })
+      .mockResolvedValue({ onEngine: false, switchedAt: SWITCHED_AT });
+    const gate = AuthzCutoverGateService.create({ repository });
 
-    await expect(adapter.isOn({ organizationId: ORG_ID })).resolves.toBe(true);
+    await expect(gate.isOn({ organizationId: ORG_ID })).resolves.toBe(true);
     vi.setSystemTime(new Date("2026-08-18T09:05:00.000Z"));
-    await expect(adapter.isOn({ organizationId: ORG_ID })).resolves.toBe(false);
+    await expect(gate.isOn({ organizationId: ORG_ID })).resolves.toBe(false);
   });
 });

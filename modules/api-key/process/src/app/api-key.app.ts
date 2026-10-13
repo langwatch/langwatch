@@ -199,7 +199,11 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       }),
       tokens: ApiKeyTokenService.create(pepper, previousPepper),
     });
-    const runKeys = RunKeyMintService.create({ apiKeys: service, authz: authorization });
+    const runKeys = RunKeyMintService.create({
+      apiKeys: service,
+      authz: authorization,
+      held: setup.repositories.runKeys,
+    });
     const sandboxKeys = AgentSandboxKeyService.create({
       apiKeys: service,
       authz: authorization,

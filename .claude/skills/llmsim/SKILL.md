@@ -12,7 +12,7 @@ gets the same answer, at no cost. Code: `services/sims/llmsim`, console `apps/si
 
 ## Run it
 
-- Opt-in: `haven up +llm` (sticky). Hosted in the `sims` lane.
+- Opt-in: `haven up +llm` (sticky). Runs in the `go` lane by default (see `sims`).
 - Console: `https://llm.<slug>.langwatch.localhost`; `haven status` shows the loopback
   port for drivers (`POST /v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`).
   Also `POST /v1beta/models/<m>:generateContent` and `:streamGenerateContent` (`?alt=sse`
@@ -63,7 +63,7 @@ GET|PUT /_sim/api/settings      {"forcedError": 0|4xx|5xx, "seed": ""|"random"|"
 - No seeding needed: the corpus is built in.
 - Caps: `LLMSIM_MAX_CALLS` (default 500) and `LLMSIM_MAX_BODY_BYTES` (default 262144 per
   recorded request; larger bodies keep a size and a head).
-- A load run should hit the loopback port; the sims lane keeps it off the gateway's process.
+- A load run should hit the loopback port. By default the sim shares the `go` lane (one process) with the gateway, so a load run on it is gateway load too; `LANGWATCH_DEV_ONE_PROCESS=0` splits them (see `sims`).
 - SDK experiment runs on llmsim: `dev/scripts/dogfood/experiments/run.sh log_steps` (a small GEPA run, steps via
   `/api/dspy/log_steps`) or `run.sh compare` (SDK comparison; the judge needs langevals). Each prints the experiment URL.
 

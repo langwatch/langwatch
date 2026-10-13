@@ -57,7 +57,7 @@ func walkRoots(roots []string, keep func(string) bool) []string {
 // descending into one, skipping node_modules and not following symlinks.
 func discoverPackageSpecRoots(root string) ([]string, error) {
 	if _, err := os.Stat(root); err != nil {
-		return nil, nil
+		return nil, nil //nolint:nilerr // an absent or unreadable root holds no spec directories
 	}
 	var roots []string
 	if err := collectSpecDirs(root, &roots); err != nil {
@@ -76,7 +76,7 @@ func specRoots(repo string) ([]string, error) {
 		}
 		roots = append(roots, found...)
 	}
-	return append(roots, filepath.Join(repo, "sdks/typescript/specs")), nil
+	return append(roots, filepath.Join(repo, "sdks", "typescript", "specs")), nil
 }
 
 // DiscoverFeatureFiles lists the .feature files under roots, relative to repo
@@ -85,10 +85,10 @@ func DiscoverFeatureFiles(repo string, roots []string) ([]string, error) {
 	for _, root := range roots {
 		info, err := os.Stat(root)
 		if err != nil {
-			return nil, fmt.Errorf("Configured specs root does not exist: %s. Fix SPECS_ROOTS in scripts/check-feature-parity.ts, or restore the tree — a missing root would silently report every scenario under it as bound.", root)
+			return nil, fmt.Errorf("Configured specs root does not exist: %s. Fix SPECS_ROOTS in scripts/check-feature-parity.ts, or restore the tree — a missing root would silently report every scenario under it as bound.", root) //nolint:staticcheck // ST1005: the message matches the TypeScript checker word for word
 		}
 		if !info.IsDir() {
-			return nil, fmt.Errorf("Configured specs root is not a directory: %s. Fix SPECS_ROOTS in scripts/check-feature-parity.ts.", root)
+			return nil, fmt.Errorf("Configured specs root is not a directory: %s. Fix SPECS_ROOTS in scripts/check-feature-parity.ts.", root) //nolint:staticcheck // ST1005: the message matches the TypeScript checker word for word
 		}
 	}
 	files := walkRoots(roots, func(n string) bool { return strings.HasSuffix(n, ".feature") })

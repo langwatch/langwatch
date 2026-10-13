@@ -66,23 +66,32 @@ func (e *eventEmitter) snapshotLocked() {
 	if e.publish == nil {
 		return
 	}
-	rows := e.state.aguiRowsJSON()
-	e.emitLocked(EventMessageSnapshot, func(ts int64) []byte { return e.base.snapshotPayload(ts, rows) }, true)
+	e.emitLocked(EventMessageSnapshot, func(ts int64) []byte {
+		var payload []byte
+		e.state.withAGUIRowsJSON(func(rows [][]byte) { payload = e.base.snapshotPayload(ts, rows) })
+		return payload
+	}, true)
 }
 
-// messageAdded reports a message stored at index. stream is the stream of
-// the agent call the message answers, when it was bound to it.
-func (e *eventEmitter) messageAdded(m Message, index int, stream *MessageStream) {
+// messageAdded stores a message with store and reports it at the index it
+// was stored at. stream is the stream of the agent call the message
+// answers, when it was bound to it. Storing happens under the emitter lock,
+// so messages added concurrently (a non-blocking agent turn next to the
+// script) are reported in the order of their indices.
+func (e *eventEmitter) messageAdded(store func() (Message, int), stream *MessageStream) Message {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	m, index := store()
 	if !e.granular {
 		e.snapshotLocked()
-		return
+		return m
 	}
 	if e.publish == nil {
-		return
+		return m
 	}
-	row := aguiRows(m)[0]
+	row := aguiRowOf(m)
+	// A later snapshot (rollback, aborted stream) reuses this encoding.
+	e.state.keepAGUIRow(index, m.ID, row.json)
 	startIndex := index
 	if stream != nil && stream.started {
 		startIndex = stream.index
@@ -98,6 +107,7 @@ func (e *eventEmitter) messageAdded(m Message, index int, stream *MessageStream)
 	if startIndex != index {
 		e.snapshotLocked()
 	}
+	return m
 }
 
 // rolledBack reconciles a rollback, which only a snapshot can express.

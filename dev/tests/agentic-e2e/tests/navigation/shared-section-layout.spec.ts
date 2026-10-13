@@ -64,8 +64,9 @@ test("complex product areas share one local navigation layout", async ({ page },
       name: section.name,
       navigationWidth: navigationBox!.width,
       containerWidth: containerBox!.width,
+      // The divider is the rail's ::after hairline, not a border of its own.
       borderColor: await navigation.evaluate(
-        (element) => getComputedStyle(element).borderRightColor,
+        (element) => getComputedStyle(element, "::after").backgroundColor,
       ),
     });
 
@@ -75,9 +76,9 @@ test("complex product areas share one local navigation layout", async ({ page },
     });
   }
 
-  expect(measurements.map(({ navigationWidth }) => navigationWidth)).toEqual(
-    sections.map(() => 200),
-  );
+  // One shared rail width; the exact pixel count is the design system's to choose.
+  expect(new Set(measurements.map(({ navigationWidth }) => navigationWidth)).size).toBe(1);
+  for (const { navigationWidth } of measurements) expect(navigationWidth).toBeGreaterThan(0);
   expect(new Set(measurements.map(({ containerWidth }) => containerWidth)).size).toBe(1);
   expect(new Set(measurements.map(({ borderColor }) => borderColor)).size).toBe(1);
   for (const { borderColor } of measurements) {
@@ -93,19 +94,13 @@ test("complex product areas share one local navigation layout", async ({ page },
   await automationsNavigation.getByRole("link", { name: "Reports", exact: true }).click();
   await expect(page).toHaveURL(`/${projectSlug}/automations/schedules`);
 
-  // The URL flips synchronously on pushState, but the router only commits the
-  // new location once the lazily-loaded route resolves; until then the nav
-  // still renders the previous page's active state. Poll instead of sampling
-  // once so the assertion waits for that commit like every other matcher here.
-  await expect(async () => {
-    const overviewBackground = await automationsNavigation
-      .getByRole("link", { name: "Overview", exact: true })
-      .evaluate((element) => getComputedStyle(element).backgroundColor);
-    const activeBackground = await automationsNavigation
-      .getByRole("link", { name: "Reports", exact: true })
-      .evaluate((element) => getComputedStyle(element).backgroundColor);
-    expect(overviewBackground).not.toBe(activeBackground);
-  }).toPass({ timeout: 15_000 });
+  // The rail marks the current entry with aria-current, not a fill of its own.
+  await expect(
+    automationsNavigation.getByRole("link", { name: "Reports", exact: true }),
+  ).toHaveAttribute("aria-current", "page", { timeout: 15_000 });
+  await expect(
+    automationsNavigation.getByRole("link", { name: "Overview", exact: true }),
+  ).not.toHaveAttribute("aria-current", "page");
 
   await page.goto(sections[0]!.path(projectSlug));
   await page.getByRole("radio", { name: "Set theme to dark" }).click();

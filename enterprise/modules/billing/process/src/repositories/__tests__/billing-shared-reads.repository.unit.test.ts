@@ -1,7 +1,7 @@
 /**
  * @see enterprise/modules/billing/specs/billing.feature
  */
-import { PROJECT_KIND } from "@langwatch/project-contract";
+import { NON_DESTINATION_PROJECT_KINDS } from "@langwatch/project-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -100,7 +100,7 @@ describe("billing's shared reads", () => {
         {
           where: {
             team: { organizationId: "org-1" },
-            kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+            kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] },
           },
           select: { id: true, name: true },
           orderBy: { name: "asc" },

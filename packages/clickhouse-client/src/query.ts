@@ -62,6 +62,11 @@ export interface InsertRequest {
   tenantId: string;
   /** Route to the known billing organisation without changing the rows' tenant. */
   organizationId?: string;
+  /**
+   * A declared tenant set, one organisation's tenants: the rows' TenantIds must be exactly these,
+   * `tenantId` among them, and the router refuses a set that spans organisations, as for a read.
+   */
+  tenantIds?: readonly string[] | undefined;
   /** The table the rows are written to. */
   table: string;
   /**

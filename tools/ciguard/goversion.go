@@ -40,7 +40,8 @@ var GoDockerfileRoots = []string{"infra", "services", "platform", "tools"}
 // consumer who meets the SDK's directive cannot build a sibling module that
 // quietly asks for more.
 var ModuleFamilies = map[string]string{
-	"sdks/go/": "published SDK: its go directive is the floor consumers must meet, and raising it drops support for anyone below. sdk-go-ci and sdk-go-cd build the tree standalone with GOWORK=off precisely so that stays true, and examples/ and e2e/ sit outside the workspace so they compile against the SDK at the floor it really publishes.",
+	"sdks/go/":                          "published SDK: its go directive is the floor consumers must meet, and raising it drops support for anyone below. sdk-go-ci and sdk-go-cd build the tree standalone with GOWORK=off precisely so that stays true, and examples/ and e2e/ sit outside the workspace so they compile against the SDK at the floor it really publishes.",
+	"services/third_party/scenario-go/": "vendored third-party module: it keeps the go directive its upstream publishes (Go 1.25), and we do not raise it with the repo.",
 }
 
 var (
@@ -303,7 +304,7 @@ func goDockerfileImages(repoRoot, want string) ([]string, error) {
 // isSkippedDir also skips scratch trees and linked worktrees (a .git file).
 func isSkippedDir(path, name string) bool {
 	switch name {
-	case "node_modules", ".git", "dist", ".apidiff", ".visualdiff", ".fuzz", ".worktrees", ".claude", ".bin":
+	case "node_modules", ".git", "dist", ".fuzz", ".worktrees", ".claude", ".bin":
 		return true
 	}
 	info, err := os.Lstat(filepath.Join(path, ".git"))

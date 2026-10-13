@@ -15,6 +15,7 @@ import {
   getVersionValidator,
   parseRuntimeParameters,
 } from "@langwatch/prompt-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import {
   LlmConfigVersionsRepository,
@@ -224,7 +225,7 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
       // Update the parent config's updatedAt timestamp
       await tx.llmPromptConfig.update({
         where: { id: configId, projectId },
-        data: { updatedAt: new Date() },
+        data: { updatedAt: toDate(nowInstant()) },
       });
 
       return newVersion;

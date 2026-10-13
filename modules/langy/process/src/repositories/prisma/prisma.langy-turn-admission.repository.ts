@@ -1,6 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import { LangyAgentUnavailableError } from "@langwatch/langy-contract";
 import { Prisma } from "@langwatch/prisma-client/generated";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import { LangyTurnAdmissionRepository } from "../langy-turn-admission.repository.ts";
 import type { LangyTurnAdmissionClaim } from "../langy-turn-admission.repository.ts";
@@ -42,7 +43,7 @@ async function claimIn(
   tx: LangyDatabaseTransaction,
   input: ClaimInput,
 ): Promise<LangyTurnAdmissionClaim> {
-  const now = new Date();
+  const now = toDate(nowInstant());
   const lease = {
     now,
     leaseExpiresAt: new Date(now.getTime() + PREPARATION_LEASE_MS),

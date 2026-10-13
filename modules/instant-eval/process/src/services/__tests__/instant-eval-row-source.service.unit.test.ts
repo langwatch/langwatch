@@ -238,3 +238,35 @@ describe("given a page of keys", () => {
     });
   });
 });
+
+describe("given a query identity ClickHouse refuses to log in", () => {
+  /** @scenario "A query identity ClickHouse refuses to log in answers as not enabled" */
+  it("answers as not enabled rather than the raw ClickHouse error", async () => {
+    const failing: InstantEvalStatementRunner = {
+      executeLangWatchQLPass: async () => {
+        throw Object.assign(new Error("lwql: Authentication failed"), {
+          code: "516",
+          type: "AUTHENTICATION_FAILED",
+        });
+      },
+    };
+    const source = InstantEvalRowSourceService.create({ analytics: failing, access: OPEN_GATE });
+
+    await expect(
+      source.probe({ caller: CALLER, protections: PROTECTIONS, sql: SQL }),
+    ).rejects.toMatchObject({ code: "instant_eval_not_enabled", httpStatus: 403 });
+  });
+
+  it("leaves every other ClickHouse error as it was", async () => {
+    const failing: InstantEvalStatementRunner = {
+      executeLangWatchQLPass: async () => {
+        throw Object.assign(new Error("Memory limit exceeded"), { code: "241" });
+      },
+    };
+    const source = InstantEvalRowSourceService.create({ analytics: failing, access: OPEN_GATE });
+
+    await expect(
+      source.probe({ caller: CALLER, protections: PROTECTIONS, sql: SQL }),
+    ).rejects.toThrow("Memory limit exceeded");
+  });
+});

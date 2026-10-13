@@ -5,9 +5,16 @@
 import { createRequire } from "node:module";
 
 const { chromium } = createRequire(`${process.cwd()}/package.json`)("@playwright/test");
-const { url, email, password, out, signIn, path = "/ops/upgrades", open, expect } = JSON.parse(
-  process.argv[2],
-);
+const {
+  url,
+  email,
+  password,
+  out,
+  signIn,
+  path = "/ops/upgrades",
+  open,
+  expect,
+} = JSON.parse(process.argv[2]);
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -21,11 +28,15 @@ try {
       timeout: 30_000,
       waitUntil: "domcontentloaded",
     });
+    // The boot screen covers the form until the app draws; a busy worker host can take a minute.
+    await page
+      .waitForSelector("#lw-boot", { state: "detached", timeout: 60_000 })
+      .catch(() => undefined);
     // Identifier first: the email, Continue, then the password appears.
     await page
       .locator('input[type="email"], input[name="email"]:not([type="hidden"])')
       .first()
-      .fill(email);
+      .fill(email, { timeout: 60_000 });
     const passwordField = page.locator('input[type="password"]').first();
     if (!(await passwordField.isVisible()))
       await page.locator('button[type="submit"]').first().click();
@@ -67,7 +78,8 @@ try {
       .waitForFunction(() => document.body.innerText.trim() !== "", null, { timeout: 30_000 })
       .catch(() => undefined);
   }
-  await page.screenshot({ path: out, fullPage: true });
+  // A busy host can hold the fonts back; the shot is evidence, not the verdict.
+  await page.screenshot({ path: out, fullPage: true, timeout: 60_000 }).catch(() => undefined);
   const text = await page.innerText("body").catch(() => "");
   const selectedTab = await page
     .locator('[role="tab"][aria-selected="true"]')

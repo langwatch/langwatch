@@ -321,10 +321,12 @@ export class AuthzModule implements AuthzApi {
       sessionVersions,
       userStandings,
       scopeLineage: permissions,
+      engineSwitch: cutover,
     });
     const migration = LegacyImportAuthzGrantMigration.create({
       store: repositories.migration,
       ledger: new DispatcherAuthzEngineLedger(dispatcher),
+      engineSwitch: repositories.cutover,
       now: Date.now,
     });
 
@@ -564,14 +566,15 @@ export class AuthzModule implements AuthzApi {
     this.#permissions.findPermissionsBeyondCaller(a);
   applyMemberBindings: AuthzApi["applyMemberBindings"] = (a) => this.#grants.applyMemberBindings(a);
 
-  registeredMigrations(): readonly SystemMigration[] {
+  /** The engine cutover, declared by authz.module.ts as the `authz:engine` tenant step. */
+  engineMigration(): SystemMigration {
     if (!this.#migration) {
       throw new Error(
         "This AuthzModule was composed from already-built services, so it holds no migration: " +
-          "compose it through AuthzModule.create to answer its registered migrations.",
+          "compose it through AuthzModule.create to declare its engine migration.",
       );
     }
-    return [this.#migration];
+    return this.#migration;
   }
 
   private platformOperators(): AuthzPlatformOperatorsService {

@@ -1,6 +1,6 @@
 import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, Heading, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Suspense } from "react";
 
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";

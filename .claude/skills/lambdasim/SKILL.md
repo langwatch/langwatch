@@ -14,7 +14,7 @@ JSON prelude, eight zero bytes, body). Code: `services/sims/lambdasim`, console
 
 ## Run it
 
-- Opt-in: `haven up +lambda` (sticky; restarts the stack). Hosted in the `sims` lane.
+- Opt-in: `haven up +lambda` (sticky; restarts the stack). Runs in the `go` lane by default (see `sims`).
 - The overlay sets `LANGWATCH_NLP_LAMBDA_CONFIG` to a placeholder fleet and points
   `AWS_ENDPOINT_URL_LAMBDA` and `AWS_ENDPOINT_URL_CLOUDWATCH_LOGS` at lambdasim, so the
   workflow module takes the per-project path (studio streams and synchronous runs). A

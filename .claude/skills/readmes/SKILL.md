@@ -24,7 +24,7 @@ The extractor runs under `node` from `packages/architecture-enforcer`, so it nee
 and prepared workspace (`pnpm install`, `pnpm start:prepare:files`, `pnpm ensure:built`). It mounts
 the api describe-only for the REST cross-check; when that mount fails the check is skipped with
 "REST cross-check skipped". It also imports the installed REST declarations and every
-`defineTrpcContract` file to convert their zod schemas, as `tools/apidiff` does; when one of those
+`defineTrpcContract` file to convert their zod schemas; when one of those
 imports fails the run stops with "the zod schemas could not be read", so a page never loses its
 contracts because the checkout was unprepared.
 
@@ -43,13 +43,13 @@ Pages today: the indexes (`modules/`, `enterprise/modules/`, `enterprise/`, `pac
 half. Contract and client halves get no page; the contract is printed on the process page (plan §9,
 Q2). Per-app pages are planned (plan §2) but not generated yet.
 
-| Section                                  | Read from                                                                                                                                                                         |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| browser page: declaration, Screens       | the `defineBrowserModule(...)` chain (`extract/browser-facts.mts`); a screen without `path` takes its URL from `uiRouteTable`, marked "(route table)"                             |
-| browser page: Drawers, "Opened from"     | `withDrawers` keys and `.drawer(Token, …)`; other modules whose browser source has a literal `…Drawer("<name>")`, `?drawer.open=<name>` or the token (a constant is not followed) |
-| browser page: Calls                      | `withApi(x, { contracts })`, `-client` dependencies in package.json, `lends`, `withHosts` requires, capabilities, config slices                                                   |
-| process page: REST and tRPC `typescript` | JSON Schema from zod (`extract/schemas.mts`), printed by `tsschema.go`; over `maxPrintedLines`, or already printed on the page, it links to `file:line` instead                   |
-| `packages/README.md` group column (W-22) | `"langwatch": { "group" }` against `packageGroups` in `groups.go`; empty until the list is ruled, so the index keeps its Kind column                                              |
+| Section                                  | Read from                                                                                                                                                                                                                |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| browser page: declaration, Screens       | the `defineBrowserModule(...)` chain (`extract/browser-facts.mts`); a screen without `path` takes its URL from `uiRouteTable`, marked "(route table)"                                                                    |
+| browser page: Drawers, "Opened from"     | `withDrawers` keys and `.drawer(Token, …)`; other modules whose browser source has a literal `…Drawer("<name>")`, `?drawer.open=<name>` or the token (a constant is not followed)                                        |
+| browser page: Calls                      | `withApi(x, { contracts })`, `-client` dependencies in package.json, `lends`, `withHosts` requires, capabilities, config slices                                                                                          |
+| process page: REST and tRPC `typescript` | JSON Schema from zod (`extract/schemas.mts`), printed by `tsschema.go`; over `maxPrintedLines`, or already printed on the page, it links to `file:line` instead                                                          |
+| `packages/README.md` group column (W-22) | `"langwatch": { "group" }` against the closed `packageGroups` list in `tools/readmegen/groups.go` (framework, browser, data, telemetry, tooling, libraries); `--check` refuses a package without one or outside the list |
 
 A new page starts with a seeded paragraph ("The browser half of …" plus the declaration's own doc
 comment); edit it like any hand-written head.
