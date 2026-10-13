@@ -74,6 +74,7 @@ class TestToLitellmCostMap:
 
         assert list(cost_map) == ["acme/embed"]
 
+    # @scenario "The evaluator price table skips a router"
     def test_skips_routers_whose_rates_are_negative(self):
         # The catalog writes -1 for a router priced by whatever it routes to.
         # Copied through, LiteLLM would bill every call through it as a refund.

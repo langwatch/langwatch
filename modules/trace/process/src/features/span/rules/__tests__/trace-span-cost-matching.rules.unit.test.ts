@@ -13,6 +13,7 @@ describe("given a span whose model is a router the catalog prices at -1 per toke
   });
 
   describe("when the span is costed from the registry", () => {
+    /** @scenario A span through a router is never costed below zero */
     it.each(routerIds)("never costs %s below zero, nor at another model's price", (model) => {
       expect(
         computeSpanCost({

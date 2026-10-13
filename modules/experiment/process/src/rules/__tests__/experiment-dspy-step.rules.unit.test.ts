@@ -46,6 +46,7 @@ describe("given a DSPy step whose LLM call went through a router", () => {
   });
 
   describe("when the call is priced", () => {
+    /** @scenario A DSPy step's call through a router is left unpriced */
     it.each(routerIds)("leaves %s unpriced rather than negative", (model) => {
       // The catalog states -1 per token for a router, which priced this call at -$2,000,000.
       const [call] = stepCalling(model).llmCalls;

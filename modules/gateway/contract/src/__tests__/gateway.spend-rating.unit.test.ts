@@ -110,6 +110,7 @@ describe("given a router the catalog prices at -1 per token", () => {
   });
 
   describe("when a request through it is rated", () => {
+    /** @scenario A gateway request through a router is never rated below zero */
     it.each(routerIds)("never rates %s below zero", (model) => {
       const { costNanoUsd } = rateSpendNanoUsd({
         model,
@@ -118,6 +119,7 @@ describe("given a router the catalog prices at -1 per token", () => {
       expect(costNanoUsd).toBe(0);
     });
 
+    /** @scenario A gateway request through a router names the missing rule */
     it.each(routerIds)("names the missing rule for %s", (model) => {
       const faults = findSpendRatingFaults({
         model,

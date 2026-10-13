@@ -59,6 +59,7 @@ describe("given the committed catalog", () => {
   });
 
   describe("when the cost registry is built", () => {
+    /** @scenario The cost registry carries no negative rate */
     it("carries no negative rate for any model", () => {
       const negative = getStaticModelCostRates().filter((rate) =>
         Object.values(rate).some((value) => typeof value === "number" && value < 0),
@@ -66,6 +67,7 @@ describe("given the committed catalog", () => {
       expect(negative.map((rate) => rate.model)).toEqual([]);
     });
 
+    /** @scenario A router gets no cost rule of its own */
     it("gives no router a rule of its own", () => {
       const ruled = new Set(getStaticModelCostRates().map((rate) => rate.model));
       expect(catalogRouterIds.filter((id) => ruled.has(id))).toEqual([]);
@@ -73,11 +75,13 @@ describe("given the committed catalog", () => {
   });
 
   describe("when a router's cost is matched", () => {
+    /** @scenario A router never borrows another model's cost rule */
     it.each(catalogRouterIds)("finds no rule for %s, not even a borrowed one", (id) => {
       // `openrouter/pareto-code` prefix-matched `unbiased/pareto` and billed its price.
       expect(findMatchingModelCost(id, getStaticModelCostRates())).toEqual([]);
     });
 
+    /** @scenario A router id in another letter case borrows no cost rule */
     it("finds no borrowed rule when the router id arrives in another letter case", () => {
       // The case-insensitive fallbacks lent `OpenRouter/Pareto-Code` the `unbiased/pareto` price.
       for (const id of catalogRouterIds.map((routerId) => routerId.toUpperCase())) {
@@ -85,6 +89,7 @@ describe("given the committed catalog", () => {
       }
     });
 
+    /** @scenario A cost rule that names the router still prices it */
     it("still takes a rule that names the router itself", () => {
       const [router] = catalogRouterIds;
       const own: ModelCostRate = {

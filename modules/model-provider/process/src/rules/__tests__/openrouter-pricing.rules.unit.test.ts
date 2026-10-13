@@ -20,6 +20,7 @@ describe("toCatalogPricing", () => {
   });
 
   describe("given a router OpenRouter prices at -1 per token", () => {
+    /** @scenario A negative OpenRouter price becomes the router marker */
     it("writes the router marker, which the catalog reads as a router", () => {
       const pricing = toCatalogPricing({ pricing: { prompt: "-1", completion: "-1" } });
       expect(pricing).toEqual({
@@ -37,6 +38,7 @@ describe("toCatalogPricing", () => {
   });
 
   describe("given a model with no stated price", () => {
+    /** @scenario A model with no stated price is not a router */
     it("writes zero, which is not a router", () => {
       const pricing = toCatalogPricing({ pricing: { prompt: "", completion: "" } });
       expect(pricing).toEqual({ inputCostPerToken: 0, outputCostPerToken: 0 });
