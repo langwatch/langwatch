@@ -9,6 +9,7 @@ import {
 } from "../../../../behavior/langy.store.ts";
 import { useLangyDrawerContext } from "../../../../behavior/use-langy-drawer-context.ts";
 import {
+  dashboardContextChip,
   datasetContextChip,
   mergeContextChips,
   namedPageChips,
@@ -152,6 +153,12 @@ function routeChips(pathname: string): LangyContextChip[] {
       // Shared with the dataset list rows that register as context targets, so
       // a clicked dataset and a routed one are the same chip.
       return [datasetContextChip({ datasetId: rest[0]! })];
+    case "dashboards": {
+      // The templates library and a From LangWatch board hold no board Langy may place on.
+      const dashboardId = rest[0]!;
+      if (DASHBOARD_PAGE_TAILS.has(dashboardId)) return [];
+      return [dashboardContextChip({ dashboardId })];
+    }
     default: {
       const spec = SIMPLE_ROUTE_CHIPS[surface];
       if (!spec) return [];
@@ -173,8 +180,8 @@ function routeChips(pathname: string): LangyContextChip[] {
 
 /**
  * Surfaces whose `/<surface>/<id>` route names exactly one resource, so the chip is a
- * mechanical `kind:id`. The ones with shapes of their own — traces, experiments
- * (`/workbench/<slug>`), datasets — are handled above.
+ * mechanical `kind:id`. The ones with shapes of their own (traces, experiments
+ * with `/workbench/<slug>`, datasets, dashboards) are handled above.
  */
 const SIMPLE_ROUTE_CHIPS: Record<string, { kind: LangyContextChip["kind"]; noun: string }> = {
   prompts: { kind: "prompt", noun: "prompt" },
@@ -191,3 +198,6 @@ const SIMPLE_ROUTE_CHIPS: Record<string, { kind: LangyContextChip["kind"]; noun:
 
 /** Tails that are a page, not a resource. */
 const RESOURCELESS_TAILS = new Set(["new", "index", "create"]);
+
+/** `/dashboards/<tail>` pages that are not one of the project's boards. */
+const DASHBOARD_PAGE_TAILS = new Set(["templates", "curated"]);

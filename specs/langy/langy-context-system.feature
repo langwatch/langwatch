@@ -34,6 +34,17 @@ Feature: Langy captures what I am viewing as turn context
     Then the add-context control offers a chip for that dataset
 
   @integration
+  Scenario: Viewing a dashboard surfaces that board as context
+    Given I am viewing a dashboard
+    Then the add-context control offers a chip for that dashboard
+    And the chip carries the dashboard's id, so a chart Langy places lands on that board
+
+  @integration
+  Scenario: Dashboard pages that show no one board offer no board as context
+    Given I am on the dashboards list, the templates library or a From LangWatch board
+    Then the add-context control offers no dashboard chip
+
+  @integration
   Scenario: A context chip can be removed
     Given the composer shows a context chip for a trace
     When I remove the trace chip

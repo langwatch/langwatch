@@ -47,4 +47,24 @@ describe("given the user is viewing one resource", () => {
     expect(chips).toContainEqual(expect.objectContaining({ kind: "dataset" }));
     expect(chips.map((chip) => chip.id).join(" ")).toContain("ds_42");
   });
+
+  /** @scenario "Viewing a dashboard surfaces that board as context" */
+  it("offers a chip for the dashboard, carrying its id", () => {
+    expect(offeredAt("/demo/dashboards/dash_42")).toContainEqual(
+      expect.objectContaining({ id: "dashboard:dash_42", kind: "dashboard", ref: "dash_42" }),
+    );
+  });
+});
+
+describe("given the user is on a dashboards page that shows no one board", () => {
+  /** @scenario "Dashboard pages that show no one board offer no board as context" */
+  it("offers no dashboard chip on the list, the templates library or a curated board", () => {
+    for (const path of [
+      "/demo/dashboards",
+      "/demo/dashboards/templates",
+      "/demo/dashboards/curated/agent-health",
+    ]) {
+      expect(offeredAt(path).map((chip) => chip.kind)).not.toContain("dashboard");
+    }
+  });
 });
