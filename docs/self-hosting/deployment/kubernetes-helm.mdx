@@ -44,9 +44,15 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 ```
 
 <Warning>
-`autogen.enabled=true` generates random secrets on the first install. This is fine for testing but not for production. `helm upgrade` reads the existing Secrets back and keeps every value.
+  `autogen.enabled=true` generates random secrets on the first install. This is fine for testing but
+  not for production. `helm upgrade` reads the existing Secrets back and keeps every value.
 
-`helm uninstall` deletes the app Secret, so a reinstall generates new values: sessions end, stored model provider keys can no longer be decrypted, and API keys and virtual keys stop working (see [Credentials secret](/self-hosting/security#credentials-secret)). The chart-managed PostgreSQL also gets a new password while its retained volume keeps the old one. Under Argo CD it is worse: Argo renders without cluster access, so the secrets rotate on **every sync**. See [Production Deployment](#production-deployment) below.
+  `helm uninstall` deletes the app Secret, so a reinstall generates new values: sessions end, stored
+  model provider keys can no longer be decrypted, and API keys and virtual keys stop working (see
+  [Credentials secret](/self-hosting/security#credentials-secret)). The chart-managed PostgreSQL
+  also gets a new password while its retained volume keeps the old one. Under Argo CD it is worse:
+  Argo renders without cluster access, so the secrets rotate on **every sync**. See [Production
+  Deployment](#production-deployment) below.
 </Warning>
 
 ### Operator access and feature flags
@@ -100,6 +106,7 @@ This configures smaller resource limits, single replicas, and disables evaluator
 ## Production Deployment
 
 For production, you should:
+
 1. Use external managed databases (PostgreSQL, Redis)
 2. Provide Kubernetes Secrets from your secret manager
 3. Expose via Ingress with TLS
@@ -114,7 +121,6 @@ With `autogen.enabled: false` the chart creates no Secrets; it reads them from S
 | Key | Needed when |
 |-----|-------------|
 | `credentialsEncryptionKey` | Always |
-| `cronApiKey` | Always |
 | `nextAuthSecret` | Always |
 | `virtualKeyPepper` | Always |
 | `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET` | `gateway.chartManaged: true` (default) |
@@ -349,7 +355,7 @@ clickhouse:
     useEnvironmentCredentials: true
   cold:
     enabled: true
-    defaultTtlDays: 49  # Recommend multiples of 7 to align with weekly partition boundaries
+    defaultTtlDays: 49 # Recommend multiples of 7 to align with weekly partition boundaries
   backup:
     enabled: true
 
@@ -378,7 +384,8 @@ helm install langwatch langwatch/langwatch \
 ```
 
 <Note>
-Replicated ClickHouse requires an odd number of replicas (3, 5, 7) for Keeper consensus. Use 3 replicas unless you have a specific reason for more.
+  Replicated ClickHouse requires an odd number of replicas (3, 5, 7) for Keeper consensus. Use 3
+  replicas unless you have a specific reason for more.
 </Note>
 
 ## Overlay System
@@ -387,34 +394,36 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 
 ### Size Overlays
 
-| Overlay | Use Case | Approx Resources (requests) |
-|---------|----------|-----------------|
-| _(default, no overlay)_ | Quick start, small production | ~5 CPU, ~17 Gi |
-| `size-minimal.yaml` | CI smoke tests, tiny demos | ~2.6 CPU, ~5.2 Gi |
-| `size-dev.yaml` | Local dev, small teams | ~2.8 CPU, ~6.9 Gi |
-| `size-prod.yaml` | Production, single-node CH | ~8.9 CPU, ~23 Gi |
-| `size-ha.yaml` | HA production, replicated CH | ~23 CPU, ~85 Gi |
+| Overlay                 | Use Case                      | Approx Resources (requests) |
+| ----------------------- | ----------------------------- | --------------------------- |
+| _(default, no overlay)_ | Quick start, small production | ~5 CPU, ~17 Gi              |
+| `size-minimal.yaml`     | CI smoke tests, tiny demos    | ~2.6 CPU, ~5.2 Gi           |
+| `size-dev.yaml`         | Local dev, small teams        | ~2.8 CPU, ~6.9 Gi           |
+| `size-prod.yaml`        | Production, single-node CH    | ~8.9 CPU, ~23 Gi            |
+| `size-ha.yaml`          | HA production, replicated CH  | ~23 CPU, ~85 Gi             |
+
+`size-prod.yaml` and `size-ha.yaml` run more than one replica, so they need `app.dataplane` (S3 or Azure Blob) for stored objects. `cold-storage-s3.yaml` covers ClickHouse only.
 
 ### Access Overlays
 
-| Overlay | Description |
-|---------|-------------|
+| Overlay                | Description                          |
+| ---------------------- | ------------------------------------ |
 | `access-nodeport.yaml` | NodePort on 30560 (Kind, bare-metal) |
-| `access-ingress.yaml` | Nginx Ingress with TLS template |
+| `access-ingress.yaml`  | Nginx Ingress with TLS template      |
 
 ### Infrastructure Overlays
 
-| Overlay | Description |
-|---------|-------------|
-| `postgres-external.yaml` | External PostgreSQL (RDS, Cloud SQL) |
-| `redis-external.yaml` | External Redis (ElastiCache, Memorystore) |
-| `clickhouse-external.yaml` | External ClickHouse instance |
-| `clickhouse-replicated.yaml` | 3-node replicated ClickHouse |
-| `cold-storage-s3.yaml` | S3 cold storage + backups |
-| `local-images.yaml` | Local images with `pullPolicy: Never` |
-| `langy-disabled.yaml` | Runs without the Langy assistant pod |
-| `langy-gvisor.yaml` | Runs Langy under the gVisor sandbox runtime |
-| `strict-admission.yaml` | Pod Security Admission `restricted` clusters |
+| Overlay                      | Description                                  |
+| ---------------------------- | -------------------------------------------- |
+| `postgres-external.yaml`     | External PostgreSQL (RDS, Cloud SQL)         |
+| `redis-external.yaml`        | External Redis (ElastiCache, Memorystore)    |
+| `clickhouse-external.yaml`   | External ClickHouse instance                 |
+| `clickhouse-replicated.yaml` | 3-node replicated ClickHouse                 |
+| `cold-storage-s3.yaml`       | S3 cold storage + backups                    |
+| `local-images.yaml`          | Local images with `pullPolicy: Never`        |
+| `langy-disabled.yaml`        | Runs without the Langy assistant pod         |
+| `langy-gvisor.yaml`          | Runs Langy under the gVisor sandbox runtime  |
+| `strict-admission.yaml`      | Pod Security Admission `restricted` clusters |
 
 ### Composing Overlays
 
@@ -437,16 +446,16 @@ helm install langwatch langwatch/langwatch \
 
 ### Standalone vs Replicated
 
-| Mode | Replicas | Engine | When to Use |
-|------|----------|--------|-------------|
-| Standalone | 1 | MergeTree | Development, small production |
-| Replicated | 3+ (odd) | ReplicatedMergeTree + Keeper | HA production |
+| Mode       | Replicas | Engine                       | When to Use                   |
+| ---------- | -------- | ---------------------------- | ----------------------------- |
+| Standalone | 1        | MergeTree                    | Development, small production |
+| Replicated | 3+ (odd) | ReplicatedMergeTree + Keeper | HA production                 |
 
 Switch to replicated mode:
 
 ```yaml
 clickhouse:
-  replicas: 3  # Automatically uses ReplicatedMergeTree + Keeper
+  replicas: 3 # Automatically uses ReplicatedMergeTree + Keeper
 ```
 
 ### External ClickHouse
@@ -466,8 +475,8 @@ clickhouse:
 The chart-managed ClickHouse is pinned to a version the release is tested
 against. An external instance is yours, so the version is your choice.
 LangWatch supports ClickHouse 25.8 and later, including 26.x and ClickHouse
-Cloud. The app runs its ClickHouse migrations at startup, so the version has to
-accept every migration in the release you deploy.
+Cloud. The upgrade applies the release's ClickHouse migrations before the app
+starts, so the version has to accept every migration in the release you deploy.
 
 ### Auto-Tuning
 
@@ -475,7 +484,7 @@ The `clickhouse-serverless` subchart automatically tunes ClickHouse parameters b
 
 ```yaml
 clickhouse:
-  cpu: 4        # Tunes thread pools, merge concurrency
+  cpu: 4 # Tunes thread pools, merge concurrency
   memory: "8Gi" # Tunes memory limits, cache sizes, per-query limits
 ```
 
@@ -496,11 +505,11 @@ The defaults are a HorizontalPodAutoscaler running 2 to 10 replicas, a ClusterIP
 
 Three things to know when running it:
 
-1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
+1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `nextAuthSecret` and `virtualKeyPepper`.
 
    The [Production Deployment](#production-deployment) section above lists the keys the Secret needs. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key (under plain `helm`, a missing `LANGY_INTERNAL_SECRET` in an existing Secret stops the render instead); under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **A public route needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate route. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
-3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
+3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. The workers also run the upgrade, so the chart refuses `workers.enabled=false`.
 
 ## Upgrade
 
@@ -509,10 +518,12 @@ helm repo update
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
   -f values-production.yaml \
-  --wait --timeout 10m
+  --wait --timeout 45m
 ```
 
-Database migrations run automatically on startup. Set `SKIP_PRISMA_MIGRATE=true` to disable PostgreSQL migrations if needed.
+The new worker pods run `pnpm task upgrade` on start, and the new api pods are not ready until it completes, so the previous version keeps serving meanwhile and if it fails. When upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`), a pre-upgrade Job runs it on the new image before any pod rolls instead, and a failure fails the `helm upgrade`. On a first install the worker runs it once on its first boot.
+
+Follow it on **Ops > Upgrades** or with `pnpm task upgrade status`. With serialised upgrades, to run the upgrade from your own pipeline instead, set `app.migrations.preRoll: false` and run it before `helm upgrade`; until then the new api pods are not ready.
 
 See [Upgrade Guide](/self-hosting/upgrade) for version-specific instructions.
 
@@ -530,6 +541,7 @@ With `autogen.enabled=true`, the generated app Secret and the PostgreSQL and Red
 ```bash
 kubectl -n langwatch delete pvc --all
 ```
+
 </Warning>
 
 ## FAQ
@@ -582,6 +594,7 @@ redis:
 ### Air-Gapped Environments
 
 For clusters without internet access:
+
 1. Push LangWatch images to your private registry
 2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`, plus the bundled services listed in [Docker Images](/self-hosting/deployment/docker-images#private-registries)
 3. If your registry requires authentication, attach the pull secret to the ServiceAccount the pods use. The chart has no chart-wide `imagePullSecrets` value; see [Private Registries](/self-hosting/deployment/docker-images#private-registries)

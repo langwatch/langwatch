@@ -1,0 +1,319 @@
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import type { AuthzApi, AuthzTeamMemberBinding } from "@langwatch/authz-contract";
+import { moduleApi } from "@langwatch/module";
+/**
+ * `/api/teams` - the organization's teams, their members, and their projects.
+ * Routes that address a single team (`:id`) check permissions at team scope;
+ * collection routes stay at organization scope as they operate on that whole set.
+ */
+import {
+  type organizationTeamRestMemberSchema,
+  organizationTeamRestAddMemberSchema,
+  organizationTeamRestArchivedSchema,
+  organizationTeamRestCreateSchema,
+  organizationTeamRestMemberListSchema,
+  organizationTeamRestMemberParamsSchema,
+  organizationTeamRestPageSchema,
+  organizationTeamRestPaginationQuerySchema,
+  organizationTeamRestParamsSchema,
+  organizationTeamRestProjectListSchema,
+  organizationTeamRestSchema,
+  organizationTeamRestSuccessSchema,
+  organizationTeamRestUpdateSchema,
+  type OrganizationApi,
+  type OrganizationTeam,
+  type OrganizationTeamRest,
+  type UpdateOrganizationTeamInput,
+} from "@langwatch/organization-contract";
+import type { Project } from "@langwatch/project-contract";
+import type { z } from "zod";
+
+import { keyCallerOf, organizationKeyContext } from "./organization-management.rest.ts";
+
+/**
+ * What the `/api/teams` family reaches, as flat operations the organization's
+ * own application serves — taken off {@link OrganizationApi}/{@link AuthzApi}
+ * to avoid drift; `updateTeam` alone is `OrganizationService`'s, off the peer contract.
+ */
+export interface TeamManagementApi
+  extends
+    Pick<
+      OrganizationApi,
+      "listTeams" | "createTeam" | "getTeam" | "archiveTeam" | "addTeamMember" | "removeTeamMember"
+    >,
+    Pick<AuthzApi, "listTeamMemberBindings"> {
+  /**
+   * Renames one of this organization's teams. The body carries a name or
+   * nothing at all, and nothing else: a PATCH here never touches membership,
+   * which is what `updateTeamWithMembers` is for and why it is not this.
+   */
+  updateTeam(input: UpdateOrganizationTeamInput): Promise<OrganizationTeam>;
+  /** The live projects in one of this organization's teams, newest first. */
+  listProjectsByTeam(input: {
+    organizationId: string;
+    teamId: string;
+    /** The key owner; an aggregate is listed only to an organisation admin. */
+    callerUserId: string | null;
+  }): Promise<Pick<Project, "id" | "name" | "slug" | "createdAt" | "updatedAt">[]>;
+}
+
+export const TeamManagementApi = moduleApi<TeamManagementApi>()("organization");
+
+/**
+ * The team's response shape: the stored shape omits the personal flag and owner,
+ * so the wire is narrower.
+ */
+function teamResponse(team: OrganizationTeam): OrganizationTeamRest {
+  return {
+    id: team.id,
+    name: team.name,
+    slug: team.slug,
+    organizationId: team.organizationId,
+    createdAt: team.createdAt,
+    updatedAt: team.updatedAt,
+  };
+}
+
+/**
+ * A team member with the role their binding grants at the team's scope,
+ * converted from the authz service's binding shape to the wire shape.
+ */
+function memberResponse(
+  binding: AuthzTeamMemberBinding,
+): z.infer<typeof organizationTeamRestMemberSchema> {
+  return {
+    userId: binding.userId,
+    name: binding.user?.name ?? null,
+    email: binding.user?.email ?? null,
+    role: binding.role,
+  };
+}
+
+/**
+ * The `/api/teams` family, and its `/api/v1/teams` canonical twin.
+ */
+export const teamsRest = defineRestRouter(TeamManagementApi)
+  .withNamespace("teams")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .withCredential("organization")
+
+  .get("/", "listTeams")
+  .withPermission("team:view")
+  .withQuery(organizationTeamRestPaginationQuerySchema)
+  .withOutput(organizationTeamRestPageSchema)
+  .withDocs({
+    operationId: "getApiTeams",
+    tags: ["Teams"],
+    description: "List all non-archived teams for the organization (paginated)",
+  })
+  .handle(async ({ app, input, scope }) => {
+    const result = await app.listTeams({
+      organizationId: scope.id,
+      page: input.page,
+      limit: input.limit,
+    });
+
+    return {
+      data: result.data.map(teamResponse),
+      pagination: result.pagination,
+    };
+  })
+
+  .post("/", "createTeam")
+  .withPermission("team:manage")
+  .withInput(organizationTeamRestCreateSchema)
+  .withOutput(organizationTeamRestSchema)
+  .withStatus(201)
+  .withDocs({
+    operationId: "postApiTeams",
+    tags: ["Teams"],
+    description: "Create a new team that can group projects and members",
+  })
+  .withAudit("management.team.create-team-with-members")
+  .handle(async ({ app, input, scope }) =>
+    teamResponse(
+      await app.createTeam({
+        organizationId: scope.id,
+        name: input.name,
+      }),
+    ),
+  )
+
+  .get("/:teamId", "getTeam")
+  .withPermission("team:view", { at: "route", param: "teamId" })
+  .withParams(organizationTeamRestParamsSchema)
+  .withOutput(organizationTeamRestSchema)
+  .withDocs({
+    operationId: "getApiTeamsById",
+    tags: ["Teams"],
+    description: "Get a team by its id",
+  })
+  .handle(async ({ app, input, scope }) =>
+    teamResponse(
+      await app.getTeam({
+        teamId: input.teamId,
+        organizationId: scope.id,
+      }),
+    ),
+  )
+
+  .patch("/:teamId", "updateTeam")
+  .withPermission("team:manage", { at: "route", param: "teamId" })
+  .withParams(organizationTeamRestParamsSchema)
+  .withInput(organizationTeamRestUpdateSchema)
+  .withOutput(organizationTeamRestSchema)
+  .withDocs({
+    operationId: "patchApiTeamsById",
+    tags: ["Teams"],
+    description: "Update a team by its id",
+  })
+  .withAudit("management.team.update")
+  .handle(async ({ app, input, scope }) =>
+    teamResponse(
+      await app.updateTeam({
+        teamId: input.teamId,
+        organizationId: scope.id,
+        ...(input.name === undefined ? {} : { name: input.name }),
+      }),
+    ),
+  )
+
+  .delete("/:teamId", "archiveTeam")
+  .withPermission("team:manage", { at: "route", param: "teamId" })
+  .withParams(organizationTeamRestParamsSchema)
+  .withOutput(organizationTeamRestArchivedSchema)
+  .withDocs({
+    operationId: "deleteApiTeamsById",
+    tags: ["Teams"],
+    description: "Archive a team (soft-delete)",
+  })
+  .withAudit("management.team.archive-by-id")
+  .handle(async ({ app, input, scope }) => {
+    const team = await app.archiveTeam({
+      teamId: input.teamId,
+      organizationId: scope.id,
+    });
+
+    return {
+      id: team.id,
+      name: team.name,
+      archivedAt: team.archivedAt ?? null,
+    };
+  })
+
+  .get("/:teamId/members", "listTeamMembers")
+  .withPermission("team:view", { at: "route", param: "teamId" })
+  .withParams(organizationTeamRestParamsSchema)
+  .withOutput(organizationTeamRestMemberListSchema)
+  .withDocs({
+    operationId: "getApiTeamsByIdMembers",
+    tags: ["Teams"],
+    description: "List members of a team",
+  })
+  .handle(async ({ app, input, scope }) => {
+    // Reads the team first so a team outside the organization is a 404 rather
+    // than an empty membership list.
+    await app.getTeam({
+      teamId: input.teamId,
+      organizationId: scope.id,
+    });
+
+    const bindings = await app.listTeamMemberBindings({
+      organizationId: scope.id,
+      teamIds: [input.teamId],
+    });
+
+    return {
+      data: (bindings.get(input.teamId) ?? []).map(memberResponse),
+    };
+  })
+
+  .post("/:teamId/members", "addTeamMember")
+  .withPermission("team:manage", { at: "route", param: "teamId" })
+  .withParams(organizationTeamRestParamsSchema)
+  .withInput(organizationTeamRestAddMemberSchema)
+  .withOutput(organizationTeamRestSuccessSchema)
+  .withStatus(201)
+  .withDocs({
+    operationId: "postApiTeamsByIdMembers",
+    tags: ["Teams"],
+    description: "Add a member to a team",
+  })
+  .withMiddlewareContext(organizationKeyContext)
+  .withAudit("management.team.add-member")
+  .handle(async ({ app, input, scope, actor }, key) => {
+    const ledgerActor =
+      actor && actor.type === "user"
+        ? { type: "user" as const, id: actor.id ?? null }
+        : { type: "system" as const, id: null };
+
+    await app.addTeamMember({
+      teamId: input.teamId,
+      organizationId: scope.id,
+      userId: input.userId,
+      role: input.role,
+      // The key bounds what it grants, never its owner (authz.module.ts rules the same).
+      caller: { type: "apiKey", id: key.apiKeyId },
+      actor: ledgerActor,
+    });
+
+    return { success: true };
+  })
+
+  .delete("/:teamId/members/:userId", "removeTeamMember")
+  .withPermission("team:manage", { at: "route", param: "teamId" })
+  .withParams(organizationTeamRestMemberParamsSchema)
+  .withOutput(organizationTeamRestSuccessSchema)
+  .withDocs({
+    operationId: "deleteApiTeamsByIdMembersByUserId",
+    tags: ["Teams"],
+    description: "Remove a member from a team",
+  })
+  .withMiddlewareContext(organizationKeyContext)
+  .withAudit("management.team.remove-member")
+  .handle(async ({ app, input, scope, actor }, key) => {
+    await app.removeTeamMember(
+      {
+        teamId: input.teamId,
+        organizationId: scope.id,
+        userId: input.userId,
+      },
+      keyCallerOf({ actor, key }),
+    );
+
+    return { success: true };
+  })
+
+  .get("/:teamId/projects", "listTeamProjects")
+  .withPermission("team:view", { at: "route", param: "teamId" })
+  .withParams(organizationTeamRestParamsSchema)
+  .withOutput(organizationTeamRestProjectListSchema)
+  .withDocs({
+    operationId: "getApiTeamsByIdProjects",
+    tags: ["Teams"],
+    description: "List projects in a team",
+  })
+  .handle(async ({ app, input, scope, actor }) => {
+    await app.getTeam({
+      teamId: input.teamId,
+      organizationId: scope.id,
+    });
+
+    const projects = await app.listProjectsByTeam({
+      organizationId: scope.id,
+      teamId: input.teamId,
+      callerUserId: actor?.type === "user" ? (actor.id ?? null) : null,
+    });
+
+    return {
+      data: projects.map(({ id, name, slug, createdAt, updatedAt }) => ({
+        id,
+        name,
+        slug,
+        createdAt,
+        updatedAt,
+      })),
+    };
+  })
+
+  .build();

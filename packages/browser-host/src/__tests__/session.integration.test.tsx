@@ -1,0 +1,60 @@
+import { renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { describe, expect, it } from "vitest";
+
+import { UiHostServicesContextProvider, UiSession } from "../capabilities.ts";
+import type { UiSessionSnapshot } from "../session.ts";
+import { useSession } from "../session.ts";
+import { createUiHostServicesFromHost } from "../testing.ts";
+
+const host = { route: () => ({ params: {}, query: {} }), navigate: () => {} };
+
+describe("the shared UI session reading", () => {
+  it("reads the host service root's published snapshot", () => {
+    const reading: UiSessionSnapshot = {
+      session: { status: "anonymous", user: null },
+      scope: { status: "ready", organization: undefined, team: undefined, project: undefined },
+      permissions: {
+        status: "ready",
+        isLoading: false,
+        can: () => false,
+        canInOrganization: () => false,
+      },
+    };
+    const { result } = renderHook(() => useSession(), { wrapper: withSession(reading) });
+    expect(result.current).toEqual({ status: "anonymous", user: null });
+  });
+
+  it("refuses when the host service root is absent", () => {
+    expect(() => renderHook(() => useSession())).toThrow(/UI host services/);
+  });
+});
+
+function withSession(reading: UiSessionSnapshot) {
+  const session = new SnapshotSession(reading);
+  return function SessionProvider({ children }: { children: ReactNode }) {
+    return (
+      <UiHostServicesContextProvider value={createUiHostServicesFromHost(host, session)}>
+        {children}
+      </UiHostServicesContextProvider>
+    );
+  };
+}
+
+class SnapshotSession extends UiSession {
+  constructor(private readonly reading: UiSessionSnapshot) {
+    super();
+  }
+  currentUser() {
+    return this.reading.session.user;
+  }
+  hasPermission() {
+    return false;
+  }
+  isSettled() {
+    return false;
+  }
+  override snapshot() {
+    return this.reading;
+  }
+}

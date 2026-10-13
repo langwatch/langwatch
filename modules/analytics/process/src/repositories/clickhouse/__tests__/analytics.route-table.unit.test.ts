@@ -1,0 +1,133 @@
+import { describe, expect, it } from "vitest";
+
+import { pickAnalyticsTable } from "../clickhouse.analytics-route-table.mapper.ts";
+
+describe("Analytics timeseries route table", () => {
+  it("uses the evaluation rollup for safe evaluation sums", () => {
+    expect(
+      pickAnalyticsTable({
+        series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality" }],
+      }),
+    ).toBe("evaluation_analytics_rollup");
+  });
+
+  it("uses slim for supported trace dimensions", () => {
+    expect(
+      pickAnalyticsTable({
+        series: [{ metric: "performance.total_cost", aggregation: "avg" }],
+        groupBy: "metadata.user_id",
+      }),
+    ).toBe("trace_analytics");
+  });
+
+  it("does not route trimmed payload attributes to slim", () => {
+    expect(
+      pickAnalyticsTable({
+        series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+        filters: { "metadata.key": ["gen_ai.prompt.0.content"] },
+      }),
+    ).toBe("trace_summaries");
+  });
+
+  describe("given a query carrying negateFilters", () => {
+    // The fast-path builders do not implement filter negation — serving the
+    // query from slim/rollup would silently return NON-negated results.
+    /** @scenario Negated filters stay accurate on optimized analytics storage */
+    it("routes a trace-source query to trace_summaries", () => {
+      expect(
+        pickAnalyticsTable({
+          series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+          negateFilters: true,
+        }),
+      ).toBe("trace_summaries");
+    });
+
+    it("routes an eval-source query to evaluation_runs", () => {
+      expect(
+        pickAnalyticsTable({
+          series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality" }],
+          negateFilters: true,
+        }),
+      ).toBe("evaluation_runs");
+    });
+
+    it("still routes to the rollup when negateFilters is false", () => {
+      expect(
+        pickAnalyticsTable({
+          series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+          negateFilters: false,
+        }),
+      ).toBe("trace_analytics_rollup");
+    });
+  });
+
+  describe("given a query scoped to explicit trace ids", () => {
+    // The fast-path builders do not implement the TraceId narrowing — the
+    // result would silently cover ALL traces instead of the requested set.
+    /** @scenario Trace-scoped graphs stay accurate on optimized analytics storage */
+    it("routes a trace-source query to trace_summaries", () => {
+      expect(
+        pickAnalyticsTable({
+          series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+          traceIds: ["trace-1", "trace-2"],
+        }),
+      ).toBe("trace_summaries");
+    });
+
+    it("routes an eval-source query to evaluation_runs", () => {
+      expect(
+        pickAnalyticsTable({
+          series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality" }],
+          traceIds: ["trace-1"],
+        }),
+      ).toBe("evaluation_runs");
+    });
+  });
+
+  describe("given a query leaving out trace origins", () => {
+    // The rollup is keyed by bucket and holds no origin; the per-trace slim table keeps each
+    // trace's Origin, which its builder filters on (slim-rollup-builders.unit.test.ts).
+    /** @scenario Leaving out an origin stays accurate on optimized analytics storage */
+    it("routes a query the rollup could serve to the per-trace slim table instead", () => {
+      const series = [{ metric: "performance.total_cost" as const, aggregation: "sum" as const }];
+
+      expect(pickAnalyticsTable({ series })).toBe("trace_analytics_rollup");
+      expect(pickAnalyticsTable({ series, excludeOrigins: ["langy"] })).toBe("trace_analytics");
+    });
+
+    it("keeps the rollup when the list of origins to leave out is empty", () => {
+      expect(
+        pickAnalyticsTable({
+          series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+          excludeOrigins: [],
+        }),
+      ).toBe("trace_analytics_rollup");
+    });
+  });
+
+  describe("given a metadata.key filter on a blocklisted key sent with · for .", () => {
+    it("falls back to trace_summaries (the builders read the dotted key)", () => {
+      const table = pickAnalyticsTable({
+        series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+        filters: { "metadata.key": ["input·value"] },
+      });
+      expect(table).toBe("trace_summaries");
+    });
+  });
+
+  describe("given an evaluation metric filtered by custom metadata", () => {
+    // The eval slim row carries only the evaluation events' metadata, never
+    // the trace's, so it would count nothing (langwatch/tasks#919).
+    it.each([{ "metadata.key": ["outcome"] }, { "metadata.value": { outcome: ["ok"] } }])(
+      "routes %j to evaluation_runs",
+      (filters) => {
+        const query = {
+          series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality" }],
+          groupBy: "evaluations.evaluation_label",
+        };
+        expect(pickAnalyticsTable(query as never)).toBe("evaluation_analytics");
+        expect(pickAnalyticsTable({ ...query, filters } as never)).toBe("evaluation_runs");
+      },
+    );
+  });
+});

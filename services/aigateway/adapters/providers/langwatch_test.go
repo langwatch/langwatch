@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"go.uber.org/zap"
@@ -24,7 +26,7 @@ import (
 const langWatchTestToken = "lwl_" + "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 func langWatchTestRouter(logger *zap.Logger) *BifrostRouter {
-	return &BifrostRouter{langWatchClient: newLangWatchClient(), logger: logger}
+	return &BifrostRouter{langWatchClient: newLangWatchClient(customerEndpointPolicy{}), logger: logger}
 }
 
 func langWatchCredential(baseURL string) domain.Credential {
@@ -292,5 +294,54 @@ func TestLangWatchRoutesEmbeddingsToTheEmbeddingsPath(t *testing.T) {
 	}
 	if resp.Usage.TotalTokens != 4 {
 		t.Errorf("usage = %+v, want the answer's own counts", resp.Usage)
+	}
+}
+
+// The pre-flight endpoint check resolves the host itself, so the connection
+// must re-check the address it dials: a name may answer differently by then.
+func TestLangWatchRefusesToConnectToAPrivateAddressWhenLocalCallsAreBlocked(t *testing.T) {
+	var hit atomic.Bool
+	far := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hit.Store(true)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer far.Close()
+	router, err := NewBifrostRouter(context.Background(), BifrostOptions{Logger: zap.NewNop(), BlockLocalHTTPCalls: true})
+	if err != nil {
+		t.Fatalf("router: %v", err)
+	}
+	defer router.Close()
+	_, port, _ := net.SplitHostPort(strings.TrimPrefix(far.URL, "http://"))
+
+	_, err = router.dispatchLangWatch(context.Background(), langWatchChatCall("http://localhost:"+port+"/v1"))
+
+	if err == nil || hit.Load() {
+		t.Fatalf("err = %v, hit = %v: the call reached a loopback address the policy refuses", err, hit.Load())
+	}
+}
+
+func TestLangWatchDoesNotFollowRedirects(t *testing.T) {
+	var redirected atomic.Bool
+	elsewhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		redirected.Store(true)
+	}))
+	defer elsewhere.Close()
+	far := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, elsewhere.URL+"/steal", http.StatusTemporaryRedirect)
+	}))
+	defer far.Close()
+	router, err := NewBifrostRouter(context.Background(), BifrostOptions{Logger: zap.NewNop()})
+	if err != nil {
+		t.Fatalf("router: %v", err)
+	}
+	defer router.Close()
+
+	resp, err := router.dispatchLangWatch(context.Background(), langWatchChatCall(far.URL+"/v1"))
+
+	if redirected.Load() {
+		t.Fatal("the call followed a redirect to a host the endpoint check never saw")
+	}
+	if err != nil || resp.StatusCode != http.StatusTemporaryRedirect {
+		t.Fatalf("resp = %+v, err = %v: want the redirect relayed as it came", resp, err)
 	}
 }

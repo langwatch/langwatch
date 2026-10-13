@@ -22,7 +22,7 @@ Feature: License registry
   # ============================================================================
 
   @unit
-  Scenario: A license issued from the backoffice is recorded
+  Scenario: A license issued from the admin console is recorded
     When an operator issues a license for customer organization "ACME" with 50 seats
     Then the registry holds a row for that license linked to "ACME"
     And the row records the plan, the seats, the term and who issued it
@@ -61,10 +61,11 @@ Feature: License registry
     Then the registry holds a row for that license
 
   @unit
-  Scenario: The minted license and its registry row are written together
-    Given the mint script applied a license to an organization
+  Scenario: A minted license whose organization write fails leaves no registry row
+    Given the mint script recorded a license in the registry for an organization
     When writing the license onto the organization fails
-    Then the registry row is rolled back with it
+    Then the registry row is deleted again
+    And the mint fails
 
   @unit
   Scenario: The registry stores a hash of the token, not the token
@@ -81,13 +82,13 @@ Feature: License registry
     Then the held copy is erased
 
   @unit
-  Scenario: The backoffice organizations list does not carry license keys
-    When an operator lists organizations in the backoffice
+  Scenario: The instance admin organizations list does not carry license keys
+    When an operator lists organizations in the instance admin
     Then no organization in the response includes its license key
 
   @unit
   Scenario: A license key is never kept in the audit trail
-    When an organization activates a license, or an operator pastes one into the backoffice
+    When an organization activates a license, or an operator pastes one into the instance admin
     Then the audit entry for that action records that a license key was supplied
     And it does not hold the key
 
@@ -109,7 +110,7 @@ Feature: License registry
 
   @unit
   Scenario: Issuing a license never asks the operator for the private key
-    When an operator issues a license from the backoffice
+    When an operator issues a license from the instance admin
     Then the license is signed with the key from the server secret
     And the request carries no private key
 
@@ -133,21 +134,21 @@ Feature: License registry
   @unit
   Scenario: A license issued before the registry existed is registered by pasting it
     Given a license that LangWatch signed before the registry existed
-    When an operator pastes it into the backoffice and links it to customer organization "ACME"
+    When an operator pastes it into the instance admin and links it to customer organization "ACME"
     Then the signature is verified
     And the registry holds a row for it linked to "ACME" with the seats and term read from the license
 
   @unit
   Scenario: A pasted license with a bad signature is refused
     Given a license whose payload was edited after signing
-    When an operator pastes it into the backoffice
+    When an operator pastes it into the instance admin
     Then the request is refused because the signature does not verify
     And nothing is written to the registry
 
   @unit
   Scenario: Registering the same license twice is refused
     Given a license that is already in the registry
-    When an operator pastes it into the backoffice again
+    When an operator pastes it into the instance admin again
     Then the request is refused because the license is already registered
     And the existing row is unchanged
 
@@ -232,14 +233,24 @@ Feature: License registry
     When an operator changes it to 58 seats
     Then a replacement is signed for 58 seats and the same term
     And it is held for delivery to the install over sync
-    And billing is asked to invoice the 8 added seats
+    And the replacement records that it raised the seats from 50, in the same write
+    And billing reads that seat change from licensing to invoice the 8 added seats
+    And the operator is told billing invoices the added seats and the Billing section shows the outcome
+
+  @unit
+  Scenario: Seats raised on a license linked to no customer leave billing nothing to invoice
+    Given an active license linked to no customer organization
+    When an operator raises its seats
+    Then a replacement is signed for the new seats
+    And no seat change is recorded for billing
+    And the operator is told nothing is invoiced
 
   @unit
   Scenario: Seats changed on a revoked license are refused
     Given a revoked license
     When an operator changes its seats
     Then the change is refused as not active
-    And billing is asked for nothing
+    And no seat change is recorded for billing
 
   @unit
   Scenario: An overage maximum without overage enabled is refused
@@ -262,7 +273,7 @@ Feature: License registry
     Then the organization created for "ACME" has an id that starts with "organization_"
 
   @integration
-  Scenario: The backoffice lists licenses with their state
+  Scenario: The admin console lists licenses with their state
     Given licenses in the registry that are active, revoked and expired
     When an operator opens the licenses screen
     Then each license shows its customer, seats, term, status, entitled services and whether an instance is bound

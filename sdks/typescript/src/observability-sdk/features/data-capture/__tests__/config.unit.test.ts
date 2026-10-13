@@ -1,12 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { type Logger } from '../../../../logger/index.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+import { type Logger } from "../../../../logger/index.js";
 import {
   initializeObservabilitySdkConfig,
   resetObservabilitySdkConfig,
   getObservabilitySdkLogger,
   shouldCaptureInput,
   shouldCaptureOutput,
-} from '../../../config.js';
+} from "../../../config.js";
 
 class MockLogger implements Logger {
   debug = vi.fn();
@@ -15,7 +16,7 @@ class MockLogger implements Logger {
   error = vi.fn();
 }
 
-describe('Data Capture Config', () => {
+describe("Data Capture Config", () => {
   let originalConsoleError: any;
 
   beforeEach(() => {
@@ -29,8 +30,8 @@ describe('Data Capture Config', () => {
     resetObservabilitySdkConfig();
   });
 
-  describe('initialization', () => {
-    it('initializes config is allowed any number of times', () => {
+  describe("when initializing", () => {
+    it("initializes config is allowed any number of times", () => {
       const logger = new MockLogger();
       initializeObservabilitySdkConfig({ logger });
       expect(getObservabilitySdkLogger()).toBe(logger);
@@ -41,14 +42,14 @@ describe('Data Capture Config', () => {
       expect(getObservabilitySdkLogger()).toBe(logger2);
     });
 
-    it('returns defaults when config not set', () => {
+    it("returns defaults when config not set", () => {
       // Should fall back to default behavior (capture both)
       expect(shouldCaptureInput()).toBe(true);
       expect(shouldCaptureOutput()).toBe(true);
       // No console.error call expected since the config returns defaults silently
     });
 
-    it('can be reset for testing', () => {
+    it("can be reset for testing", () => {
       const logger = new MockLogger();
       initializeObservabilitySdkConfig({ logger });
       expect(getObservabilitySdkLogger()).toBe(logger);
@@ -62,12 +63,12 @@ describe('Data Capture Config', () => {
     });
   });
 
-  describe('data capture modes', () => {
+  describe("when using different data capture modes", () => {
     it('respects "none" mode', () => {
       const logger = new MockLogger();
       initializeObservabilitySdkConfig({
         logger,
-        dataCapture: "none"
+        dataCapture: "none",
       });
 
       expect(shouldCaptureInput()).toBe(false);
@@ -78,7 +79,7 @@ describe('Data Capture Config', () => {
       const logger = new MockLogger();
       initializeObservabilitySdkConfig({
         logger,
-        dataCapture: "input"
+        dataCapture: "input",
       });
 
       expect(shouldCaptureInput()).toBe(true);
@@ -89,7 +90,7 @@ describe('Data Capture Config', () => {
       const logger = new MockLogger();
       initializeObservabilitySdkConfig({
         logger,
-        dataCapture: "output"
+        dataCapture: "output",
       });
 
       expect(shouldCaptureInput()).toBe(false);
@@ -100,7 +101,7 @@ describe('Data Capture Config', () => {
       const logger = new MockLogger();
       initializeObservabilitySdkConfig({
         logger,
-        dataCapture: "all"
+        dataCapture: "all",
       });
 
       expect(shouldCaptureInput()).toBe(true);

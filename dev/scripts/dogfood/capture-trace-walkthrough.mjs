@@ -1,28 +1,10 @@
+import { mkdirSync } from "node:fs";
 /**
- * Trace + admin UX screenshot driver for dogfood walkthroughs.
- *
- * Uses an isolated chromium profile so it never collides with the
- * peer-agent playwright-mcp session on the shared host. Logs in via
- * the dogfood seed creds, then walks: `/me/traces` (personal Path B
- * view), admin governance pages, install drawer, and the trace
- * detail v2 drawer (`drawer.open=traceV2Details`).
- *
- * Env overrides:
- *   BASE_URL                  default http://localhost:5560
- *   DOGFOOD_USER_EMAIL        default dogfood@langwatch.local
- *   DOGFOOD_PASSWORD          default DogfoodPassword!2026
- *   OUT_DIR                   default ./.claude/dogfood-evidence/trace-walkthrough
- *   PERSONAL_PROJECT_SLUG     default personal-hc4fdei9kqog--yvcpd
- *   TRACE_IDS                 comma-separated trace ids for the detail loop
- *   TARGETS                   "all" or csv of:
- *                             me-home,me-traces,trace-details,me-configure,
- *                             me-sessions,admin-tool-catalog-templates,
- *                             admin-governance
- *   PLAYWRIGHT_TEST_PATH      absolute path to @playwright/test index.js
- *                             default = repo's platform/app/node_modules
+ * Trace + admin UX screenshot driver for dogfood walkthroughs, using an
+ * isolated chromium profile so it never collides with the peer-agent
+ * playwright-mcp session on the shared host.
  */
 import { createRequire } from "node:module";
-import { mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,7 +13,7 @@ const __dirname = dirname(__filename);
 
 const pwPath =
   process.env.PLAYWRIGHT_TEST_PATH ??
-  resolve(__dirname, "../../../platform/app/node_modules/@playwright/test/index.js");
+  resolve(__dirname, "../../../node_modules/@playwright/test/index.js");
 const require_ = createRequire(import.meta.url);
 const pwTest = require_(pwPath);
 const { chromium } = pwTest;
@@ -40,8 +22,7 @@ const BASE = process.env.BASE_URL ?? "http://localhost:5560";
 const EMAIL = process.env.DOGFOOD_USER_EMAIL ?? "dogfood@langwatch.local";
 const PASSWORD = process.env.DOGFOOD_PASSWORD ?? "DogfoodPassword!2026";
 const OUT = resolve(
-  process.env.OUT_DIR ??
-    resolve(__dirname, "../../../.claude/dogfood-evidence/trace-walkthrough"),
+  process.env.OUT_DIR ?? resolve(__dirname, "../../../.claude/dogfood-evidence/trace-walkthrough"),
 );
 mkdirSync(OUT, { recursive: true });
 
@@ -59,14 +40,10 @@ async function login(page) {
     waitUntil: "domcontentloaded",
     timeout: 45_000,
   });
-  const emailInput = page
-    .locator('input[name="email"], input[type="email"]')
-    .first();
+  const emailInput = page.locator('input[name="email"], input[type="email"]').first();
   await emailInput.waitFor({ state: "visible", timeout: 10_000 });
   await emailInput.fill(EMAIL);
-  const pwInput = page
-    .locator('input[name="password"], input[type="password"]')
-    .first();
+  const pwInput = page.locator('input[name="password"], input[type="password"]').first();
   await pwInput.fill(PASSWORD);
   const signIn = page.getByRole("button", { name: /sign in/i }).first();
   await signIn.click();
@@ -79,7 +56,39 @@ async function login(page) {
   await page.waitForTimeout(500);
 }
 
-(async () => {
+/** Opens each TRACE_IDS trace in the v2 drawer and shoots its thread and attribute tabs. */
+async function captureTraceDetails(page) {
+  const slug = process.env.PERSONAL_PROJECT_SLUG ?? "personal-hc4fdei9kqog--yvcpd";
+  const traceIds = (process.env.TRACE_IDS ?? "").split(",").filter(Boolean);
+  for (const [idx, tid] of traceIds.entries()) {
+    // v2 lives at /traces (not /messages, which is the pre-v2 page),
+    // and the v2 drawer is keyed by `drawer.open=traceV2Details`
+    // (not `traceDetails`, which renders the pre-v2 drawer).
+    const url = `${BASE}/${slug}/traces?view=table&drawer.open=traceV2Details&drawer.traceId=${tid}`;
+    await page.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: 45_000,
+    });
+    await page.waitForTimeout(3500);
+    await shot(page, `20-${idx}-trace-detail-thread-${tid.slice(0, 8)}`);
+    try {
+      await page
+        .getByRole("tab", { name: /^trace details$/i })
+        .first()
+        .click({ timeout: 3000 });
+      await page.waitForTimeout(2000);
+      await shot(page, `21-${idx}-trace-detail-attrs-${tid.slice(0, 8)}`);
+      await page.screenshot({
+        path: resolve(OUT, `21-${idx}-trace-detail-attrs-${tid.slice(0, 8)}-full.png`),
+        fullPage: true,
+      });
+    } catch (e) {
+      console.log("trace-details tab miss", e?.message ?? e);
+    }
+  }
+}
+
+await (async () => {
   const browser = await chromium.launch({
     headless: true,
     args: ["--no-sandbox"],
@@ -108,8 +117,7 @@ async function login(page) {
     }
 
     if (wants("me-traces")) {
-      const slug =
-        process.env.PERSONAL_PROJECT_SLUG ?? "personal-hc4fdei9kqog--yvcpd";
+      const slug = process.env.PERSONAL_PROJECT_SLUG ?? "personal-hc4fdei9kqog--yvcpd";
       await page.goto(`${BASE}/${slug}/traces`, {
         waitUntil: "domcontentloaded",
         timeout: 45_000,
@@ -118,42 +126,7 @@ async function login(page) {
       await shot(page, "02-me-traces-list");
     }
 
-    if (wants("trace-details")) {
-      const slug =
-        process.env.PERSONAL_PROJECT_SLUG ?? "personal-hc4fdei9kqog--yvcpd";
-      const traceIds = (process.env.TRACE_IDS ?? "")
-        .split(",")
-        .filter(Boolean);
-      for (const [idx, tid] of traceIds.entries()) {
-        // v2 lives at /traces (not /messages, which is the pre-v2 page),
-        // and the v2 drawer is keyed by `drawer.open=traceV2Details`
-        // (not `traceDetails`, which renders the pre-v2 drawer).
-        const url = `${BASE}/${slug}/traces?view=table&drawer.open=traceV2Details&drawer.traceId=${tid}`;
-        await page.goto(url, {
-          waitUntil: "domcontentloaded",
-          timeout: 45_000,
-        });
-        await page.waitForTimeout(3500);
-        await shot(page, `20-${idx}-trace-detail-thread-${tid.slice(0, 8)}`);
-        try {
-          await page
-            .getByRole("tab", { name: /^trace details$/i })
-            .first()
-            .click({ timeout: 3000 });
-          await page.waitForTimeout(2000);
-          await shot(page, `21-${idx}-trace-detail-attrs-${tid.slice(0, 8)}`);
-          await page.screenshot({
-            path: resolve(
-              OUT,
-              `21-${idx}-trace-detail-attrs-${tid.slice(0, 8)}-full.png`,
-            ),
-            fullPage: true,
-          });
-        } catch (e) {
-          console.log("trace-details tab miss", e?.message ?? e);
-        }
-      }
-    }
+    if (wants("trace-details")) await captureTraceDetails(page);
 
     if (wants("me-configure")) {
       await page.goto(`${BASE}/me/configure`, {

@@ -7,9 +7,7 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.patch_api_triggers_by_id_body_action import PatchApiTriggersByIdBodyAction
-from ..models.patch_api_triggers_by_id_body_alert_type_type_1 import PatchApiTriggersByIdBodyAlertTypeType1
-from ..models.patch_api_triggers_by_id_body_alert_type_type_2_type_1 import PatchApiTriggersByIdBodyAlertTypeType2Type1
-from ..models.patch_api_triggers_by_id_body_alert_type_type_3_type_1 import PatchApiTriggersByIdBodyAlertTypeType3Type1
+from ..models.patch_api_triggers_by_id_body_alert_type_type_0 import PatchApiTriggersByIdBodyAlertTypeType0
 from ..models.patch_api_triggers_by_id_body_notification_cadence import PatchApiTriggersByIdBodyNotificationCadence
 from ..types import UNSET, Unset
 
@@ -35,8 +33,7 @@ class PatchApiTriggersByIdBody:
         name (str | Unset):
         active (bool | Unset):
         message (None | str | Unset):
-        alert_type (None | PatchApiTriggersByIdBodyAlertTypeType1 | PatchApiTriggersByIdBodyAlertTypeType2Type1 |
-            PatchApiTriggersByIdBodyAlertTypeType3Type1 | Unset):
+        alert_type (None | PatchApiTriggersByIdBodyAlertTypeType0 | Unset):
         filters (PatchApiTriggersByIdBodyFilters | Unset):
         filter_query (None | str | Unset): The trace query this automation is about, in the syntax the traces view uses.
             When set it supersedes `filters`.
@@ -47,12 +44,12 @@ class PatchApiTriggersByIdBody:
         action_params (PatchApiTriggersByIdBodyActionParamsType0 | PatchApiTriggersByIdBodyActionParamsType1 |
             PatchApiTriggersByIdBodyActionParamsType2 | PatchApiTriggersByIdBodyActionParamsType3 |
             PatchApiTriggersByIdBodyActionParamsType4 | Unset): Replaces the delivery configuration as a whole rather than
-            merging into it: send the fields this automation should have from now on, and anything left out is removed —
-            omit `headers` and it delivers with none, omit `signingSecret` and its deliveries are no longer signed. The one
-            exception is a credential the read hid: send back the `[redacted]` placeholder and the stored credential is kept
-            (a Slack automation not yet on a connection has its stored secret moved into one), so reading an automation,
-            changing one field and writing the whole object back is safe. Only this channel's fields are accepted; anything
-            else is refused rather than dropped, and the rule this automation fires by belongs in `graphAlert` or `report`.
+            merging into it: send the fields this automation should have from now on, and anything left out is removed. The
+            one exception is a credential the read hid: send back the `[redacted]` placeholder and the stored credential is
+            kept (a Slack automation not yet on a connection has its stored secret moved into one), so reading an
+            automation, changing one field and writing the whole object back is safe. Only this channel's fields are
+            accepted; anything else is refused rather than dropped, and the rule this automation fires by belongs in
+            `graphAlert` or `report`.
         graph_alert (PatchApiTriggersByIdBodyGraphAlert | Unset): The rule this alert fires by. Only for an automation
             that is one.
         report (PatchApiTriggersByIdBodyReport | Unset): What this report renders and when. Only for one that is a
@@ -68,13 +65,7 @@ class PatchApiTriggersByIdBody:
     name: str | Unset = UNSET
     active: bool | Unset = UNSET
     message: None | str | Unset = UNSET
-    alert_type: (
-        None
-        | PatchApiTriggersByIdBodyAlertTypeType1
-        | PatchApiTriggersByIdBodyAlertTypeType2Type1
-        | PatchApiTriggersByIdBodyAlertTypeType3Type1
-        | Unset
-    ) = UNSET
+    alert_type: None | PatchApiTriggersByIdBodyAlertTypeType0 | Unset = UNSET
     filters: PatchApiTriggersByIdBodyFilters | Unset = UNSET
     filter_query: None | str | Unset = UNSET
     action: PatchApiTriggersByIdBodyAction | Unset = UNSET
@@ -121,11 +112,7 @@ class PatchApiTriggersByIdBody:
         alert_type: None | str | Unset
         if isinstance(self.alert_type, Unset):
             alert_type = UNSET
-        elif isinstance(self.alert_type, PatchApiTriggersByIdBodyAlertTypeType1):
-            alert_type = self.alert_type.value
-        elif isinstance(self.alert_type, PatchApiTriggersByIdBodyAlertTypeType2Type1):
-            alert_type = self.alert_type.value
-        elif isinstance(self.alert_type, PatchApiTriggersByIdBodyAlertTypeType3Type1):
+        elif isinstance(self.alert_type, PatchApiTriggersByIdBodyAlertTypeType0):
             alert_type = self.alert_type.value
         else:
             alert_type = self.alert_type
@@ -252,15 +239,7 @@ class PatchApiTriggersByIdBody:
 
         message = _parse_message(d.pop("message", UNSET))
 
-        def _parse_alert_type(
-            data: object,
-        ) -> (
-            None
-            | PatchApiTriggersByIdBodyAlertTypeType1
-            | PatchApiTriggersByIdBodyAlertTypeType2Type1
-            | PatchApiTriggersByIdBodyAlertTypeType3Type1
-            | Unset
-        ):
+        def _parse_alert_type(data: object) -> None | PatchApiTriggersByIdBodyAlertTypeType0 | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -268,35 +247,12 @@ class PatchApiTriggersByIdBody:
             try:
                 if not isinstance(data, str):
                     raise TypeError()
-                alert_type_type_1 = PatchApiTriggersByIdBodyAlertTypeType1(data)
+                alert_type_type_0 = PatchApiTriggersByIdBodyAlertTypeType0(data)
 
-                return alert_type_type_1
+                return alert_type_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                alert_type_type_2_type_1 = PatchApiTriggersByIdBodyAlertTypeType2Type1(data)
-
-                return alert_type_type_2_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                alert_type_type_3_type_1 = PatchApiTriggersByIdBodyAlertTypeType3Type1(data)
-
-                return alert_type_type_3_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(
-                None
-                | PatchApiTriggersByIdBodyAlertTypeType1
-                | PatchApiTriggersByIdBodyAlertTypeType2Type1
-                | PatchApiTriggersByIdBodyAlertTypeType3Type1
-                | Unset,
-                data,
-            )
+            return cast(None | PatchApiTriggersByIdBodyAlertTypeType0 | Unset, data)
 
         alert_type = _parse_alert_type(d.pop("alertType", UNSET))
 

@@ -75,17 +75,18 @@ Feature: Pending Mappings Validation
     Because thread mappings cannot be auto-inferred
     And the mapping sources should now show thread options
 
-  @unimplemented
-  Scenario: Cannot save with pending mappings
+  Scenario: Saving with pending mappings names them and sends nothing
     Given I have pending mappings for "expected_output"
-    Then the Save button should be disabled
-    When I hover over the Save button
-    Then a tooltip should explain "Complete all mappings first"
+    Then the Save button is available
+    When I press Save
+    Then the warning banner says "Complete all mappings first."
+    And focus moves to the banner's Configure button
+    And no online evaluation is saved
 
   @unimplemented
   Scenario: Save button enables after completing mappings
     Given I have pending mappings for "expected_output"
-    And the Save button is disabled
+    And I pressed Save and was told to complete the mappings
     When I open the editor and map "expected_output"
     And I close the editor
     Then the warning banner should disappear
@@ -105,7 +106,7 @@ Feature: Pending Mappings Validation
     Given I have an evaluator with pending mappings
     When I remove the evaluator from the selection box
     Then the pending mapping warning should disappear
-    And the Save button should be disabled (no evaluator selected)
+    And pressing Save says "Select an evaluator."
 
   @unimplemented
   Scenario: Change evaluator resets mappings

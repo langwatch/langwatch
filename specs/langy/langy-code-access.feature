@@ -175,6 +175,13 @@ Feature: Langy asks how to reach the customer's code, once
       And it says the question was asked again further down
       And only the newest card offers to share my local folder or to use GitHub
 
+    @integration
+    Scenario: A reply that only says a line and asks for code access shows both
+      Given Langy's reply is one said line followed by the code access call, with no other text or tool work
+      When the reply renders
+      Then the said line and the code access card are shown
+      And the reply does not read "No content"
+
     @e2e
     Scenario: Langy does not ask twice in one conversation
       Given a conversation with my local folder connected

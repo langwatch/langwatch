@@ -43,16 +43,16 @@ The gateway HTTP layer wraps `dispatcher` with a pipeline of interceptors (auth 
 
 ## Compared to the HTTP layer
 
-| Concern | HTTP layer | Dispatcher |
-|---|---|---|
-| Auth | VK resolver | caller-supplied `domain.Credential` |
-| Rate limit | yes | no |
-| Budget | yes | no |
-| Cache rules | yes | no |
-| Guardrails | yes | no |
-| Provider routing | Bifrost | Bifrost |
-| Error classification | yes | yes |
-| Streaming raw bytes | yes | yes |
+| Concern              | HTTP layer  | Dispatcher                          |
+| -------------------- | ----------- | ----------------------------------- |
+| Auth                 | VK resolver | caller-supplied `domain.Credential` |
+| Rate limit           | yes         | no                                  |
+| Budget               | yes         | no                                  |
+| Cache rules          | yes         | no                                  |
+| Guardrails           | yes         | no                                  |
+| Provider routing     | Bifrost     | Bifrost                             |
+| Error classification | yes         | yes                                 |
+| Streaming raw bytes  | yes         | yes                                 |
 
 ## Consumers
 

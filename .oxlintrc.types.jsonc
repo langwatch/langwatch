@@ -1,0 +1,49 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+
+  // The rules that need type information, and only those: `pnpm lint:types`
+  // runs this config with --type-aware beside the native and plugin processes.
+  // The correctness tier is off so nothing else runs; every type-aware rule
+  // the tier enables is named instead. ADR-150, amendment 2026-10-05.
+  "options": { "reportUnusedDisableDirectives": "error" },
+  "plugins": ["typescript"],
+  "categories": { "correctness": "off" },
+  "rules": {
+    "typescript/await-thenable": "error",
+    "typescript/no-array-delete": "error",
+    "typescript/no-base-to-string": "error",
+    "typescript/no-duplicate-type-constituents": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-for-in-array": "error",
+    "typescript/no-implied-eval": "error",
+    "typescript/no-meaningless-void-operator": "error",
+    "typescript/no-misused-spread": "error",
+    "typescript/no-redundant-type-constituents": "error",
+    "typescript/no-unsafe-unary-minus": "error",
+    "typescript/no-useless-default-assignment": "error",
+    "typescript/require-array-sort-compare": "error",
+    "typescript/restrict-template-expressions": "error",
+    "typescript/unbound-method": "error",
+  },
+
+  "overrides": [
+    {
+      // `return await` belongs inside a try, where it decides which handler
+      // sees the rejection; anywhere else it is noise.
+      "files": [
+        "modules/**",
+        "enterprise/modules/**",
+        "apps/**",
+        "packages/**",
+        "sdks/typescript/src/**",
+        "mcp/typescript/src/**",
+      ],
+      "rules": { "typescript/return-await": ["error", "in-try-catch"] },
+    },
+    {
+      // A type test's spread is the assertion itself (Alex, 2026-09-27); scoped to type-tests only.
+      "files": ["packages/*/type-tests/**"],
+      "rules": { "typescript/no-misused-spread": "off" },
+    },
+  ],
+}
