@@ -1,8 +1,7 @@
-# Keeps a pull request to one saved copy of a cache. Run it after the restore
-# and before the job's save: the newest copy is already on disk, so the older
-# ones can go and the save leaves exactly one. Entries ending in this run's
-# commit are never touched, so sibling jobs sharing a prefix keep what they
-# saved. Does nothing off a same-repository pull request (forks cannot delete).
+# Keeps a pull request to one saved copy of a cache: run it after the restore
+# (before a post-step save) or after an explicit save. Entries ending in this
+# run's commit are never touched, so the fresh save and sibling jobs sharing a
+# prefix keep theirs. Does nothing off a same-repository pull request.
 name: prune-pr-caches
 description: Delete this pull request's older entries for one cache key prefix. Never fails the job.
 
@@ -29,7 +28,7 @@ runs:
       run: |
         set +e
         case "$CACHE_REF" in refs/pull/*/merge) ;; *) exit 0 ;; esac
-        ids=$(gh cache list --ref "$CACHE_REF" --key "$CACHE_PREFIX" --limit 100 --json id,key |
+        ids=$(gh cache list --ref "$CACHE_REF" --key "$CACHE_PREFIX" --limit 1000 --json id,key |
           jq -r --arg p "$CACHE_PREFIX" --arg sha "$CACHE_SHA" '
             .[]
             | select(.key | startswith($p))

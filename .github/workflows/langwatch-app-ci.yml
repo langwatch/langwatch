@@ -535,10 +535,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pkg-dist-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.*.json') }}-
 
-      - uses: ./.github/actions/prune-pr-caches
-        with:
-          prefix: ${{ runner.os }}-pkg-dist-
-
       # A restored dist is trusted only where the package and its workspace
       # dependencies are unchanged since the snapshot: tsc 7 keeps a stale
       # declaration once read and dependants re-emit it as up to date. Each
@@ -596,6 +592,12 @@ jobs:
             apps/*/dist
             node_modules/.cache/typecheck-dist
           key: ${{ steps.tsbuildinfo.outputs.cache-primary-key }}
+
+      # After the save, so a run that fails before saving keeps the previous copy.
+      - uses: ./.github/actions/prune-pr-caches
+        if: ${{ !cancelled() && steps.typecheck.outcome != 'skipped' }}
+        with:
+          prefix: ${{ runner.os }}-pkg-dist-
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -1137,7 +1139,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          save-cache: ${{ github.ref == 'refs/heads/main' }}
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           cache-dependency-glob: uv.lock
 
       - name: Regenerate the clients and the docs copy

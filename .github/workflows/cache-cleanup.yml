@@ -22,7 +22,7 @@ jobs:
           CACHE_REF: refs/pull/${{ github.event.pull_request.number }}/merge
         run: |
           set +e
-          for id in $(gh cache list --ref "$CACHE_REF" --limit 100 --json id --jq '.[].id'); do
+          for id in $(gh cache list --ref "$CACHE_REF" --limit 1000 --json id --jq '.[].id'); do
             gh cache delete "$id" || echo "::warning::Could not delete cache $id; continuing."
           done
           exit 0
