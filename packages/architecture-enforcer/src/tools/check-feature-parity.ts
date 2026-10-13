@@ -510,7 +510,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-context-awareness.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
   "specs/langy/langy-panel-fold-motion.feature",
-  "specs/langy/langy-peek-dock.feature",
   "specs/langy/langy-selfhost-install.feature",
   "specs/langy/langy-session-key-lifecycle.feature",
   "specs/langy/langy-shutdown-handoff.feature",
@@ -666,6 +665,9 @@ const LEGACY_INERT: string[] = [
 
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when the launcher's place beside an open drawer
+  // was bound (#8588). The peek scenarios are still planned and stay untagged.
+  "specs/langy/langy-peek-dock.feature",
   // Reason: left LEGACY_INERT when the grouping relabel scenario was bound.
   // The other grouping scenarios describe the engine and stay untagged.
   "specs/traces-v2/grouping-engine.feature",

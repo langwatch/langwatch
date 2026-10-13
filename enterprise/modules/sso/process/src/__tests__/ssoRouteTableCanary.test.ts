@@ -29,9 +29,9 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Mirrors the production configuration's federation surface: a social
- * provider (auth0/okta ride `socialProviders`) plus `genericOAuth`, which is
- * what mounts the `/sign-in/oauth2` and `/oauth2/*` family. A narrower
- * instance would enumerate fewer routes and quietly weaken the check.
+ * provider plus `genericOAuth`, which since better-auth 1.7 registers its
+ * providers as social ones behind `/sign-in/social` and `/callback/:id`. A
+ * narrower instance would enumerate fewer routes and quietly weaken the check.
  */
 const buildAuth = () =>
   betterAuth({
@@ -77,9 +77,6 @@ const ROUTE_CLASSIFICATION: Record<string, "federating" | "local"> = {
   "/sign-in/social": "federating",
   "/callback/:id": "federating",
   "/link-social": "federating",
-  "/sign-in/oauth2": "federating",
-  "/oauth2/callback/:providerId": "federating",
-  "/oauth2/link": "federating",
 
   // Session and identity reads: gate-independent by construction.
   "/get-session": "local",

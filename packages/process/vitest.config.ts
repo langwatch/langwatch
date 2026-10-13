@@ -2,7 +2,7 @@ import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 
 export default defineModuleVitestConfig({
   kind: "node",
-  isolate: false,
+  isolate: true,
   exclude: ["**/node_modules/**", "**/dist/**", "src/**/*.integration.test.ts"],
   test: {
     watch: false,

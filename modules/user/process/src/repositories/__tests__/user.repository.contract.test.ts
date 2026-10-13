@@ -260,6 +260,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
         hasPasskey: false,
         twoStepEnabled: false,
         dismissedAt,
+        accountCreatedAt: expect.any(Date),
       });
     });
 

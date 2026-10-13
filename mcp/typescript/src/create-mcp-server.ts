@@ -1599,7 +1599,7 @@ function registerTriggerTools(server: McpServer): void {
     withToolLogging("platform_create_trigger", async (params) => {
       requireApiKey();
       const { handleCreateTrigger } = await import("./tools/create-trigger.ts");
-      return await handleCreateTrigger(params);
+      return handleCreateTrigger(params);
     }),
   );
 

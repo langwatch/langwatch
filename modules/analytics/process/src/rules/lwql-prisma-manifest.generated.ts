@@ -104,6 +104,14 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly IdentitySignInSwitch: {
+    readonly userId: "String";
+    readonly onIdentifiers: "Boolean";
+    readonly pinned: "Boolean";
+    readonly switchedAt: "DateTime";
+    readonly lastAppliedEventId: "String?";
+    readonly updatedAt: "DateTime";
+  };
   readonly IdentifierReservation: {
     readonly normalizedValue: "String";
     readonly userId: "String";
@@ -1548,6 +1556,14 @@ export interface LwqlPrismaRows {
     readonly deactivatedAt: "DateTime?";
     readonly erasedAt: "DateTime?";
     readonly standingChangedAt: "DateTime";
+  };
+  readonly AuthzEngineSwitch: {
+    readonly organizationId: "String";
+    readonly onEngine: "Boolean";
+    readonly pinned: "Boolean";
+    readonly switchedAt: "DateTime";
+    readonly lastAppliedEventId: "String?";
+    readonly updatedAt: "DateTime";
   };
   readonly RoleBinding: {
     readonly id: "String";
