@@ -41805,7 +41805,7 @@ data and read-only: you cannot move, edit or add anything on it, and LangWatch
 stores no copy.
 
 To change one, open its **⋮** menu in the sidebar and pick **Duplicate to
-edit**. That makes your own board named "<name> (copy)" with the template's
+edit**. That makes your own board named `<name> (copy)` with the template's
 widgets and opens it. The board's header has no such button.
 
 ## Period and grain
