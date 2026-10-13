@@ -1,15 +1,12 @@
 import {
-  getAllModels,
   getStaticModelCostRates,
-  isVariablePriceRouter,
+  getVariablePriceRouterIds,
 } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import { dspyStepOf } from "../experiment-dspy-step.rules.ts";
 
-const routerIds = Object.values(getAllModels())
-  .filter((entry) => isVariablePriceRouter(entry))
-  .map((entry) => entry.id);
+const routerIds = getVariablePriceRouterIds();
 
 function stepCalling(model: string) {
   return dspyStepOf({

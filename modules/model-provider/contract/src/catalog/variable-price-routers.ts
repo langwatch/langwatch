@@ -25,7 +25,16 @@ export function isVariablePriceRouter({ pricing }: { pricing: LLMModelPricing })
   return rates.length > 0 && rates.every((rate) => rate < 0);
 }
 
+let catalogRouterIds: readonly string[] | null = null;
 let routerIds: ReadonlySet<string> | null = null;
+
+/** The ids of every router in the catalog, as the catalog writes them. */
+export function getVariablePriceRouterIds(): readonly string[] {
+  catalogRouterIds ??= Object.entries(llmModels.models)
+    .filter(([, entry]) => isVariablePriceRouter(entry))
+    .map(([id]) => id);
+  return catalogRouterIds;
+}
 
 export type RouterMatch = { kind: "router"; routerId: string } | { kind: "not-router" };
 
@@ -35,11 +44,7 @@ export type RouterMatch = { kind: "router"; routerId: string } | { kind: "not-ro
  * and a `:variant` tag. A bare name with no provider is not read as a router.
  */
 export function matchVariablePriceRouter(modelId: string): RouterMatch {
-  routerIds ??= new Set(
-    Object.entries(llmModels.models)
-      .filter(([, entry]) => isVariablePriceRouter(entry))
-      .map(([id]) => id.toLowerCase()),
-  );
+  routerIds ??= new Set(getVariablePriceRouterIds().map((id) => id.toLowerCase()));
   const segments = modelId
     .toLowerCase()
     .replace(/:[^/]*$/, "")

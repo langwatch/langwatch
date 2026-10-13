@@ -7,17 +7,15 @@ import { describe, expect, it } from "vitest";
 
 import { findMatchingModelCost } from "../../model-cost.ts";
 import type { ModelCostRate } from "../../model-provider.ts";
-import { llmModels } from "../model-catalog.ts";
 import { getStaticModelCostRates } from "../static-model-costs.ts";
 import {
+  getVariablePriceRouterIds,
   isVariablePriceRouter,
   isVariablePriceRouterId,
   withoutNegativeRates,
 } from "../variable-price-routers.ts";
 
-const catalogRouterIds = Object.entries(llmModels.models)
-  .filter(([, entry]) => isVariablePriceRouter(entry))
-  .map(([id]) => id);
+const catalogRouterIds = getVariablePriceRouterIds();
 
 /** The ways a client writes a router id: letter case, a repeated provider, a variant tag. */
 const clientSpellings = (id: string): string[] => [

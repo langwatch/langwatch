@@ -1,11 +1,9 @@
-import { getAllModels, isVariablePriceRouter } from "@langwatch/model-provider-contract";
+import { getVariablePriceRouterIds } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import { computeSpanCost } from "../trace-span-cost-matching.rules.ts";
 
-const routerIds = Object.values(getAllModels())
-  .filter((entry) => isVariablePriceRouter(entry))
-  .map((entry) => entry.id);
+const routerIds = getVariablePriceRouterIds();
 
 describe("given a span whose model is a router the catalog prices at -1 per token", () => {
   it("has routers to check", () => {

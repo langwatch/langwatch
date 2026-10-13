@@ -1,4 +1,4 @@
-import { getAllModels, isVariablePriceRouter } from "@langwatch/model-provider-contract";
+import { getVariablePriceRouterIds } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import { spendUsageSchema, type SpendUsage } from "../features/spend/gateway-spend.schemas.ts";
@@ -101,9 +101,7 @@ describe("findSpendRatingFaults", () => {
 describe("given a router the catalog prices at -1 per token", () => {
   // A router is priced by the model it picks. Read as a rate, -1 per token billed a refund of
   // $2,000,000 for a million tokens each way.
-  const routerIds = Object.values(getAllModels())
-    .filter((entry) => isVariablePriceRouter(entry))
-    .map((entry) => entry.id);
+  const routerIds = getVariablePriceRouterIds();
 
   it("has routers to check", () => {
     expect(routerIds.length).toBeGreaterThan(0);
