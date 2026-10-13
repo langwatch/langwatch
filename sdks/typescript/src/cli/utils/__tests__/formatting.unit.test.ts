@@ -1,17 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  stripAnsi,
-  formatTable,
-  formatRelativeTime,
-  sanitizeTerminalText,
-} from "../formatting";
+
+import { stripAnsi, formatTable, formatRelativeTime, sanitizeTerminalText } from "../formatting";
 
 describe("sanitizeTerminalText()", () => {
   describe("given text carrying terminal control sequences", () => {
     it("replaces an embedded escape byte with the replacement character", () => {
-      expect(sanitizeTerminalText("safe\u001b[2Kmalicious")).toBe(
-        "safe\uFFFD[2Kmalicious",
-      );
+      expect(sanitizeTerminalText("safe\u001b[2Kmalicious")).toBe("safe\uFFFD[2Kmalicious");
     });
 
     it("neutralises a carriage return used to overwrite the line", () => {
@@ -148,10 +142,7 @@ describe("formatTable()", () => {
 
     it("pads columns to align with the longest value", () => {
       formatTable({
-        data: [
-          { Col: "short" },
-          { Col: "a longer value" },
-        ],
+        data: [{ Col: "short" }, { Col: "a longer value" }],
         headers: ["Col"],
       });
 

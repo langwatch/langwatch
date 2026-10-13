@@ -1,0 +1,75 @@
+import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
+/**
+ * @vitest-environment node
+ */
+import { describe, expect, it, vi } from "vitest";
+
+import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
+import { MemoryTraceEvaluationRunsRepository } from "../../../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
+import { CLICKHOUSE_FACET_CATALOG } from "../../../facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { TraceListService } from "../trace-list-read.service.ts";
+
+function serviceWithRepository(listAll: ReturnType<typeof vi.fn>) {
+  return TraceListService.create({
+    discoverUpdates: { publishProjectEvent: async () => {} },
+    facets: CLICKHOUSE_FACET_CATALOG,
+    repository: { listAll } as never,
+    evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
+    topicNames: { findNamesByIds: vi.fn().mockResolvedValue(new Map()) } as never,
+  });
+}
+
+const listParams = {
+  authorization: ownProof({ projectId: "tenant-1" }),
+  timeRange: { from: 1_700_000_000_000, to: 1_700_086_400_000 },
+  sort: { columnId: "timestamp", direction: "desc" as const },
+  pageSize: 50,
+};
+
+describe("TraceListService.getList position window", () => {
+  describe("given a page whose rows sit past the window", () => {
+    /** @scenario "A position read past the window is refused" */
+    it("refuses the read without touching the repository, naming the window", async () => {
+      const listAll = vi.fn();
+      const service = serviceWithRepository(listAll);
+
+      const pastTheWindow = TRACE_LIST_MAX_OFFSET_ROWS / listParams.pageSize + 1;
+      await expect(service.getList({ ...listParams, page: pastTheWindow })).rejects.toMatchObject({
+        code: "page_too_deep",
+        meta: { maxRows: TRACE_LIST_MAX_OFFSET_ROWS },
+      });
+      expect(listAll).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the same depth carried by a cursor", () => {
+    it("reads it, because keyset depth costs nothing", async () => {
+      const listAll = vi.fn().mockResolvedValue({ rows: [], totalHits: 500_000 });
+      const service = serviceWithRepository(listAll);
+
+      await service.getList({
+        ...listParams,
+        page: TRACE_LIST_MAX_OFFSET_ROWS,
+        cursor: { sortValue: 1_700_000_000_500, traceId: "trace-a" },
+      });
+
+      expect(listAll).toHaveBeenCalledWith(expect.objectContaining({ offset: 0 }));
+    });
+  });
+
+  describe("given a page whose last row is exactly the window's edge", () => {
+    it("still reads it", async () => {
+      const listAll = vi.fn().mockResolvedValue({ rows: [], totalHits: 500_000 });
+      const service = serviceWithRepository(listAll);
+
+      const edgePage = TRACE_LIST_MAX_OFFSET_ROWS / listParams.pageSize;
+      await service.getList({ ...listParams, page: edgePage });
+
+      expect(listAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          offset: TRACE_LIST_MAX_OFFSET_ROWS - listParams.pageSize,
+        }),
+      );
+    });
+  });
+});

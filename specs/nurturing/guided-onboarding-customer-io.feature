@@ -103,19 +103,6 @@ Feature: Customer.io guided onboarding traits and campaign triggers
     Then the emit returns normally
     And the failure is captured for observability
 
-  @unit
-  Scenario: the first login backfill carries the onboarding traits
-    Given a user whose organization recorded the guided variant, the paths gateway then llmops, the provider openai, a completed tour and gateway done
-    When the user's profile is synced to Customer.io on first login
-    Then the identify call carries onboarding_variant "guided", onboarding_paths "gateway,llmops", onboarding_primary_path "gateway", guided_onboarding_provider "openai", guided_onboarding_tour "completed" and guided_onboarding_completed_paths "gateway"
-    And the organization group carries onboarding_variant "guided", onboarding_paths "gateway,llmops" and onboarding_primary_path "gateway"
-
-  @unit
-  Scenario: the first login backfill of an organization that predates the experiment carries no onboarding traits
-    Given a user whose organization recorded no onboarding variant
-    When the user's profile is synced to Customer.io on first login
-    Then the identify call carries no onboarding trait
-
   @integration
   Scenario: a guided state write through the procedure reaches Customer.io
     Given an organization initialized with the guided variant

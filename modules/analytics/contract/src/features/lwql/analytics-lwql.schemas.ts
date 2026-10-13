@@ -1,0 +1,142 @@
+/**
+ * The wire shape of one submitted LangWatchQL statement, shared by the
+ * workbench's tRPC mutation and `POST /api/v1/query`. The ceiling and the
+ * accepted steps ARE the published contract, so both doors read one copy.
+ */
+import { authzPermissionSchema, type RestKeyCredentialPrincipal } from "@langwatch/authorization";
+import { defineMiddlewareContext, type Named } from "@langwatch/module";
+import { z } from "zod";
+
+import { LWQL_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
+import { lwqlTimeWindowSchema, type LangWatchQLProtections } from "./analytics.lwql.ts";
+import { MAX_LWQL_LENGTH } from "./langwatch-ql-limits.ts";
+
+/**
+ * The caller-specific content gates the catalog understands, as a value a
+ * transport can carry across a boundary. Annotated with the type it stands for,
+ * so the two stop compiling together rather than drifting apart.
+ */
+export const langWatchQLProtectionsSchema: z.ZodType<LangWatchQLProtections> = z
+  .object({
+    canSeeCosts: z.boolean().nullable().optional(),
+    canSeeCapturedInput: z.boolean().nullable().optional(),
+    canSeeCapturedOutput: z.boolean().nullable().optional(),
+    catalogue: z.object({ permissions: z.array(authzPermissionSchema).readonly() }).strict(),
+  })
+  .strict();
+
+/**
+ * What this credential may see of its project's content. A fact rather than
+ * an operation: the answer is the KEY's own cut, shared by every REST family
+ * that layers LangWatchQL content gates over its own routes.
+ */
+export const langWatchQLCallerProtections = defineMiddlewareContext(
+  "langWatchQLCallerProtections",
+  langWatchQLProtectionsSchema,
+);
+
+/**
+ * Who an API key is, as the key door resolved it: a legacy project key IS its own project; any
+ * other key reaches the projects of its organization it holds `analytics:view` on. Annotated with
+ * the framework's type, so the two stop compiling together rather than drifting apart.
+ */
+export type LangWatchQLKeyReach = RestKeyCredentialPrincipal;
+export const langWatchQLKeyReachSchema: z.ZodType<LangWatchQLKeyReach> = z.discriminatedUnion(
+  "kind",
+  [
+    z.object({ kind: z.literal("project"), projectId: z.string().min(1) }).strict(),
+    z
+      .object({
+        kind: z.literal("apiKey"),
+        apiKeyId: z.string().min(1),
+        userId: z.string().min(1).nullable(),
+        organizationId: z.string().min(1),
+        resolvedProject: z
+          .object({ id: z.string().min(1), teamId: z.string().min(1) })
+          .strict()
+          .optional(),
+      })
+      .strict(),
+  ],
+);
+
+/** The key the query door authenticated, resolved by the process rather than the handler. */
+export const langWatchQLKeyReach = defineMiddlewareContext(
+  "langWatchQLKeyReach",
+  langWatchQLKeyReachSchema,
+);
+
+export { MAX_LWQL_LENGTH };
+
+/**
+ * A bound parameter's value. Scalars only: a parameter is a *value*, and
+ * anything structured would be one whose shape a declared ClickHouse type
+ * cannot describe.
+ */
+const lwqlParameterValueSchemaDefinition = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+export interface LwqlParameterValueSchema extends Named<
+  typeof lwqlParameterValueSchemaDefinition
+> {}
+export const lwqlParameterValueSchema: LwqlParameterValueSchema =
+  lwqlParameterValueSchemaDefinition;
+
+/**
+ * The datapoint step a caller may request, as every door accepts it — one of
+ * the offered {@link LWQL_GRANULARITY_STEPS}, nothing else, so an off-list
+ * value is a schema rejection rather than the service's backstop.
+ */
+const lwqlGranularityStepSchemaDefinition = z.union(
+  LWQL_GRANULARITY_STEPS.map((step) => z.literal(step)) as [
+    z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>,
+    z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>,
+    ...z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>[],
+  ],
+);
+export interface LwqlGranularityStepSchema extends Named<
+  typeof lwqlGranularityStepSchemaDefinition
+> {}
+export const lwqlGranularityStepSchema: LwqlGranularityStepSchema =
+  lwqlGranularityStepSchemaDefinition;
+
+/** One submitted statement, as both doors accept it. */
+const lwqlStatementSchemaDefinition = z.object({
+  // Deliberately not `.trim()`: the statement the database runs must be the one
+  // that was submitted, and normalising it here — however harmlessly — is the
+  // first step of the rewriting this API promises never to do.
+  sql: z.string().min(1).max(MAX_LWQL_LENGTH),
+  parameters: z.record(z.string(), lwqlParameterValueSchema).optional(),
+  /**
+   * The period this caller is reporting over. Honoured on both doors, because
+   * the same saved chart is readable from both and a statement that follows the
+   * period must not have two meanings depending on which surface asked.
+   */
+  timeWindow: lwqlTimeWindowSchema.optional(),
+  /**
+   * The datapoint step for a statement that declares
+   * `{period_granularity_seconds:UInt32}`, in seconds.
+   */
+  granularitySeconds: lwqlGranularityStepSchema.optional(),
+});
+export interface LwqlStatementSchema extends Named<typeof lwqlStatementSchemaDefinition> {}
+export const lwqlStatementSchema: LwqlStatementSchema = lwqlStatementSchemaDefinition;
+
+export type LangWatchQLStatementRequest = z.infer<typeof lwqlStatementSchema>;
+
+/**
+ * `POST /api/v1/query`'s body: a statement, optionally narrowed to one project the key reads.
+ * The workbench runs inside one project already, so only the key door accepts `projectId`.
+ */
+const lwqlKeyStatementSchemaDefinition = z.object({
+  ...lwqlStatementSchema.shape,
+  projectId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read.",
+    ),
+});
+export interface LwqlKeyStatementSchema extends Named<typeof lwqlKeyStatementSchemaDefinition> {}
+export const lwqlKeyStatementSchema: LwqlKeyStatementSchema = lwqlKeyStatementSchemaDefinition;
+
+export type LangWatchQLKeyStatementRequest = z.infer<typeof lwqlKeyStatementSchema>;

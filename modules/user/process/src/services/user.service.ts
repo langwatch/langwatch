@@ -1,0 +1,445 @@
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { PersonalWorkspacePendingError } from "@langwatch/organization-contract";
+import { fromDate, nowInstant, type Instant } from "@langwatch/time";
+import {
+  UserEmailAmbiguousError,
+  UserLastPlatformOperatorError,
+  UserNotFoundError,
+  createCredentialUserInputSchema,
+  createPasskeyUserInputSchema,
+  createUserInputSchema,
+  removeUserAvatarInputSchema,
+  setUserAvatarInputSchema,
+  setUserHomePathInputSchema,
+  setFirstUserPasswordInputSchema,
+  updateUserEmailInputSchema,
+  updateUserProfileInputSchema,
+  userEmailInputSchema,
+  userIdInputSchema,
+  userNotificationTopicInputSchema,
+  setUserNotificationPreferenceInputSchema,
+  userLifecycleChangeInputSchema,
+  userProfilesInputSchema,
+  type AdoptUnconfirmedAccountOutcome,
+  type CreateUserInput,
+  type CreateCredentialUserInput,
+  type CreatePasskeyUserInput,
+  type CreatedUser,
+  type RemoveUserAvatarInput,
+  type SetUserAvatarInput,
+  type SetUserHomePathInput,
+  type SetFirstUserPasswordInput,
+  type SetFirstUserPasswordResult,
+  type UpdateUserEmailInput,
+  type UpdateUserProfileInput,
+  type UserAccountInfo,
+  type UserAvatarResult,
+  type UserEmailInput,
+  type UserFullProfile,
+  type UserPasskeyNudgeStatus,
+  type UserIdInput,
+  type UserLifecycleChangeInput,
+  type UserProfile,
+  type UserProfilesInput,
+  type UserSsoStatus,
+  type UserTourPreference,
+  type UserCodeAccessPreference,
+  type UserNotificationPreference,
+  type UserNotificationTopicInput,
+  type SetUserNotificationPreferenceInput,
+  type UserUsageCount,
+} from "@langwatch/user-contract";
+
+import type { UserOrganizationDirectoryRepository } from "../repositories/user-organization-directory.repository.ts";
+import type { CreatedCredentialUser, UserRepository } from "../repositories/user.repository.ts";
+import type { UserAvatarStorage } from "./user-avatar-object.service.ts";
+import { UserAvatarCodecService } from "./user-avatar.service.ts";
+import type { UserLifecycleNoticeService } from "./user-lifecycle-notice.service.ts";
+
+type PlatformOperatorList = Pick<AuthzApi, "listPlatformOperators">;
+
+/** What the service asks of auth: the SSO set-up read, over user's bound channel. */
+type UserAuthCalls = Pick<AuthApi, "getSsoSetupStatus">;
+
+/** The caller's personal-workspace project an avatar is stored under (U1-AVATAR a). */
+type PersonalProjects = Pick<UserOrganizationDirectoryRepository, "findPersonalProjectId">;
+
+export class UserService {
+  private readonly avatars = UserAvatarCodecService.create();
+  private readonly repository: UserRepository;
+  private readonly personalProjects: PersonalProjects;
+  private readonly auth: UserAuthCalls;
+  private readonly avatarStorage: UserAvatarStorage;
+  /** The issuer every credential account row this service mints is stored under. */
+  private readonly credentialIssuer: string;
+  private readonly now: () => Instant;
+  private readonly platformOperators: PlatformOperatorList;
+  private readonly lifecycle: UserLifecycleNoticeService;
+
+  private constructor({
+    repository,
+    personalProjects,
+    auth,
+    avatarStorage,
+    credentialIssuer,
+    now,
+    platformOperators,
+    lifecycle,
+  }: {
+    repository: UserRepository;
+    personalProjects: PersonalProjects;
+    auth: UserAuthCalls;
+    avatarStorage: UserAvatarStorage;
+    credentialIssuer: string;
+    now: () => Instant;
+    platformOperators: PlatformOperatorList;
+    lifecycle: UserLifecycleNoticeService;
+  }) {
+    this.repository = repository;
+    this.personalProjects = personalProjects;
+    this.auth = auth;
+    this.avatarStorage = avatarStorage;
+    this.credentialIssuer = credentialIssuer;
+    this.now = now;
+    this.platformOperators = platformOperators;
+    this.lifecycle = lifecycle;
+  }
+
+  static create(options: {
+    repository: UserRepository;
+    personalProjects: PersonalProjects;
+    auth: UserAuthCalls;
+    avatarStorage: UserAvatarStorage;
+    credentialIssuer: string;
+    now?: () => Instant;
+    platformOperators: PlatformOperatorList;
+    lifecycle: UserLifecycleNoticeService;
+  }): UserService {
+    return new UserService({
+      repository: options.repository,
+      personalProjects: options.personalProjects,
+      auth: options.auth,
+      avatarStorage: options.avatarStorage,
+      credentialIssuer: options.credentialIssuer,
+      now: options.now ?? nowInstant,
+      platformOperators: options.platformOperators,
+      lifecycle: options.lifecycle,
+    });
+  }
+
+  countUsage(): Promise<UserUsageCount> {
+    return this.repository.countUsage();
+  }
+
+  countUsageForMembers({
+    memberUserIds,
+  }: {
+    memberUserIds: readonly string[];
+  }): Promise<UserUsageCount> {
+    return this.repository.countUsageAmong({ userIds: memberUserIds });
+  }
+
+  /** A domain with a wildcard in it is no domain, so it matches nobody. */
+  hasAccountOnDomain({ domain }: { domain: string }): Promise<boolean> {
+    const normalised = domain.trim().toLowerCase();
+    if (!normalised || normalised.includes("%")) return Promise.resolve(false);
+    return this.repository.hasAccountOnDomain(normalised);
+  }
+
+  hasAnyAccount(): Promise<boolean> {
+    return this.repository.hasAnyAccount();
+  }
+
+  getProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {
+    const parsed = userProfilesInputSchema.parse(input);
+
+    return this.repository.findProfiles([...new Set(parsed.userIds)]);
+  }
+
+  findById(input: UserIdInput): Promise<UserProfile | null> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.findById(parsed.id);
+  }
+
+  /** The exact address wins; case-twins with no exact holder are refused rather than guessed. */
+  async findByEmail(input: UserEmailInput): Promise<UserProfile | null> {
+    const parsed = userEmailInputSchema.parse(input);
+    const accounts = await this.repository.findByEmail(parsed.email);
+    const exact = accounts.find((account) => account.email === parsed.email);
+    if (exact) return exact;
+    if (accounts.length > 1) throw new UserEmailAmbiguousError();
+
+    return accounts[0] ?? null;
+  }
+
+  /**
+   * Adoption by an address proof (rulings 2026-10-06, Auth 32): the methods set before the proof
+   * go. Auth, which asked, ends the sessions opened with them (round 48, A1-d).
+   */
+  async adoptUnconfirmedAccount(input: UserEmailInput): Promise<AdoptUnconfirmedAccountOutcome> {
+    const account = await this.findByEmail(input);
+    if (!account) return "no_account";
+
+    return this.repository.adoptUnconfirmed({ id: account.id });
+  }
+
+  /** A case-twin beside a taken address would leave two accounts answering for one person. */
+  async emailIsTaken(input: UserEmailInput): Promise<boolean> {
+    const parsed = userEmailInputSchema.parse(input);
+
+    return (await this.repository.findByEmail(parsed.email)).length > 0;
+  }
+
+  /** Every mint commits user's created fact with the row, through the repository's outbox. */
+  create(input: CreateUserInput): Promise<UserProfile> {
+    return this.repository.create(createUserInputSchema.parse(input));
+  }
+
+  /**
+   * The signup form's mint: its registered fact commits with the account. Born confirmed when a
+   * spent mailbox proof confirmed the address.
+   */
+  registerCredentialUser({
+    account,
+    addressConfirmed,
+  }: {
+    account: CreateCredentialUserInput;
+    addressConfirmed: boolean;
+  }): Promise<CreatedCredentialUser> {
+    return this.repository.createCredentialUser({
+      ...createCredentialUserInputSchema.parse(account),
+      issuer: this.credentialIssuer,
+      emailVerified: addressConfirmed,
+      selfRegistered: true,
+    });
+  }
+
+  /** Only passkey sign-up mints this, after it spent the address proof: born confirmed. */
+  createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser> {
+    return this.repository.createPasskeyUser({
+      ...createPasskeyUserInputSchema.parse(input),
+      issuer: this.credentialIssuer,
+      emailVerified: true,
+    });
+  }
+
+  hasPassword(input: UserIdInput): Promise<boolean> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.hasPassword(parsed.id);
+  }
+
+  setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult> {
+    return this.repository.setFirstPassword({
+      ...setFirstUserPasswordInputSchema.parse(input),
+      issuer: this.credentialIssuer,
+    });
+  }
+
+  getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.findPasskeyNudgeStatus(parsed.id);
+  }
+
+  async dismissPasskeyNudge(input: UserIdInput): Promise<void> {
+    const parsed = userIdInputSchema.parse(input);
+    await this.repository.setPasskeyNudgeDismissedAt({ id: parsed.id, dismissedAt: this.now() });
+  }
+
+  findJoinOfferDismissedDomains(input: UserIdInput): Promise<string[]> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.findJoinOfferDismissedDomains(parsed.id);
+  }
+
+  /** Read first, so a second "no thanks" for the same domain writes nothing. */
+  async dismissJoinOffer(input: UserIdInput & { domain: string }): Promise<void> {
+    const parsed = userIdInputSchema.parse({ id: input.id });
+    const held = await this.repository.findJoinOfferDismissedDomains(parsed.id);
+    if (held.includes(input.domain)) return;
+    await this.repository.addJoinOfferDismissedDomain({ id: parsed.id, domain: input.domain });
+  }
+
+  async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
+    const parsed = updateUserProfileInputSchema.parse(input);
+    const update: UpdateUserProfileInput = { id: parsed.id };
+    if (parsed.name !== undefined) update.name = parsed.name;
+
+    return this.repository.updateProfile(update);
+  }
+
+  /** Normalized before it is stored; auth's door ends the sessions that cached the old one. */
+  async updateEmail(input: UpdateUserEmailInput): Promise<UserProfile> {
+    const parsed = updateUserEmailInputSchema.parse(input);
+    if (!(await this.repository.findById(parsed.id))) throw new UserNotFoundError(parsed.id);
+
+    return this.repository.updateProfile({
+      id: parsed.id,
+      email: parsed.email.trim().toLowerCase(),
+    });
+  }
+
+  async getAccountInfo(input: UserIdInput): Promise<UserAccountInfo> {
+    const parsed = userIdInputSchema.parse(input);
+    const account = await this.repository.findAccountInfo(parsed.id);
+    if (!account) {
+      throw new UserNotFoundError(parsed.id);
+    }
+
+    return account;
+  }
+
+  /** The stored flag is only cleared by a later sign-in, so once it is set
+   *  auth re-asks the question against the accounts held now. */
+  async getSsoStatus(input: UserIdInput): Promise<UserSsoStatus> {
+    const parsed = userIdInputSchema.parse(input);
+    const user = await this.repository.findById(parsed.id);
+    if (!user?.pendingSsoSetup) return { pendingSsoSetup: false };
+    if (!user.email) return { pendingSsoSetup: true };
+
+    return this.auth.getSsoSetupStatus({ userId: parsed.id, email: user.email });
+  }
+
+  getTraceExplorerTourPreference(input: UserIdInput): Promise<UserTourPreference> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.findTraceExplorerTourPreference(parsed.id);
+  }
+
+  getLangyCodeAccessPreference(input: UserIdInput): Promise<UserCodeAccessPreference> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.getLangyCodeAccessPreference(parsed.id);
+  }
+
+  async setLangyCodeAccessPreference(input: UserIdInput & UserCodeAccessPreference): Promise<void> {
+    const parsed = userIdInputSchema.parse(input);
+
+    await this.repository.setLangyCodeAccessPreference(parsed.id, input.preference);
+  }
+
+  dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.setTraceExplorerTourDismissedAt({
+      id: parsed.id,
+      dismissedAt: this.now(),
+    });
+  }
+
+  async getNotificationPreference(
+    input: UserNotificationTopicInput,
+  ): Promise<UserNotificationPreference> {
+    const parsed = userNotificationTopicInputSchema.parse(input);
+    const stored = await this.repository.findNotificationPreferences(parsed.id);
+
+    return { topic: parsed.topic, choice: stored[parsed.topic] ?? null };
+  }
+
+  async setNotificationPreference(
+    input: SetUserNotificationPreferenceInput,
+  ): Promise<UserNotificationPreference> {
+    const parsed = setUserNotificationPreferenceInputSchema.parse(input);
+    await this.repository.setNotificationPreference(parsed);
+
+    return { topic: parsed.topic, choice: parsed.choice };
+  }
+
+  async updateLastLogin(input: UserIdInput): Promise<void> {
+    const parsed = userIdInputSchema.parse(input);
+    await this.repository.setLastLoginAt({ id: parsed.id, lastLoginAt: this.now() });
+  }
+
+  findLastHomePath(input: UserIdInput): Promise<string | null> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.findLastHomePath(parsed.id);
+  }
+
+  async setLastHomePath(input: SetUserHomePathInput): Promise<void> {
+    const parsed = setUserHomePathInputSchema.parse(input);
+    await this.repository.setLastHomePath({ id: parsed.id, path: parsed.path });
+  }
+
+  /** Never the last active platform operator, checked inside the write; records no fact. */
+  async deactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
+    const parsed = userLifecycleChangeInputSchema.parse(input);
+    const at = await this.repository.readClock();
+
+    return this.writeDeactivation({ id: parsed.id, at });
+  }
+
+  /** The fact carries the stored stamp; an account reactivated since has nothing to record. */
+  async recordDeactivated(input: UserLifecycleChangeInput): Promise<void> {
+    const parsed = userLifecycleChangeInputSchema.parse(input);
+    const user = await this.repository.findById(parsed.id);
+    if (!user) throw new UserNotFoundError(parsed.id);
+    if (user.deactivatedAt === null) return;
+
+    await this.lifecycle.deactivated({
+      userId: parsed.id,
+      actor: parsed.actor,
+      at: fromDate(user.deactivatedAt),
+    });
+  }
+
+  /** Stamped from the database's clock, like deactivation, so the two order across servers. */
+  async reactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
+    const parsed = userLifecycleChangeInputSchema.parse(input);
+    const at = await this.repository.readClock();
+    const user = await this.repository.setDeactivatedAt({ id: parsed.id, deactivatedAt: null });
+    await this.lifecycle.reactivated({ userId: parsed.id, actor: parsed.actor, at });
+
+    return user;
+  }
+
+  /** Another operator must stay active by user's own flag, since authz's list lags behind it. */
+  private async writeDeactivation({ id, at }: { id: string; at: Instant }): Promise<UserProfile> {
+    const operators = (await this.platformOperators.listPlatformOperators()).map(
+      (operator) => operator.userId,
+    );
+    if (!operators.includes(id)) {
+      return this.repository.setDeactivatedAt({ id, deactivatedAt: at });
+    }
+
+    const written = await this.repository.deactivateWhileOthersActive({
+      id,
+      deactivatedAt: at,
+      others: operators.filter((userId) => userId !== id),
+    });
+    if (written.outcome === "none_active") throw new UserLastPlatformOperatorError(id);
+
+    return written.user;
+  }
+
+  async setAvatar(input: SetUserAvatarInput): Promise<UserAvatarResult> {
+    const parsed = setUserAvatarInputSchema.parse(input);
+    const { mediaType, bytes } = this.avatars.parse(parsed.imageDataUrl);
+    const projectId = await this.personalProjects.findPersonalProjectId({
+      userId: parsed.userId,
+      organizationId: parsed.organizationId,
+    });
+    if (!projectId) throw new PersonalWorkspacePendingError();
+    const stored = await this.avatarStorage.store({
+      projectId,
+      userId: parsed.userId,
+      mediaType,
+      bytes,
+    });
+    const image = this.avatars.buildUrl({
+      projectId,
+      id: stored.id,
+    });
+    await this.repository.setAvatar({ id: parsed.userId, image });
+
+    return { image };
+  }
+
+  async removeAvatar(input: RemoveUserAvatarInput): Promise<void> {
+    const parsed = removeUserAvatarInputSchema.parse(input);
+    await this.repository.setAvatar({ id: parsed.userId, image: null });
+  }
+}

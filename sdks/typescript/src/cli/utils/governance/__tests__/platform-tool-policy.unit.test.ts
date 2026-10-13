@@ -6,7 +6,7 @@ import {
 } from "@/cli/utils/governance/platform-tool-policy";
 
 describe("PLATFORM_TOOL_POLICIES", () => {
-  describe("Stage A defaults", () => {
+  describe("when checking Stage A defaults", () => {
     it("allows both paths for the four terminal-based tools", () => {
       for (const slug of ["claude", "codex", "gemini", "opencode"] as const) {
         expect(PLATFORM_TOOL_POLICIES[slug]).toEqual({

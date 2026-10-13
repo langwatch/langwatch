@@ -1,0 +1,42 @@
+import type { Named } from "@langwatch/module";
+import { z } from "zod";
+
+/** How long a run's key lives when no caller needs it to outlast a longer bound. */
+export const RUN_KEY_LIFETIME_MS = 15 * 60 * 1000;
+
+/**
+ * The longest life a caller may ask a handed-out run key to still have; a run outliving it is
+ * refused.
+ */
+export const RUN_KEY_MAX_REMAINING_MS = 60 * 60 * 1000;
+
+/** All a code agent's sandbox reaches: the project's agent cache, which user code may read. */
+export const AGENT_SANDBOX_PERMISSIONS: readonly string[] = ["agentCache:manage"];
+
+/** The key a project's code agent runs share (specs/agent-cache/agent-cache.feature). */
+const mintAgentSandboxKeyInputSchemaDefinition = z
+  .object({ projectId: z.string().min(1) })
+  .strict();
+export interface MintAgentSandboxKeyInputSchema extends Named<
+  typeof mintAgentSandboxKeyInputSchemaDefinition
+> {}
+export const mintAgentSandboxKeyInputSchema: MintAgentSandboxKeyInputSchema =
+  mintAgentSandboxKeyInputSchemaDefinition;
+export type MintAgentSandboxKeyInput = z.infer<typeof mintAgentSandboxKeyInputSchema>;
+
+/** One run's key (ARCHITECTURE.md §10): the starter's, or nobody's when nobody started it. */
+const mintRunKeyInputSchemaDefinition = z
+  .object({
+    /** The member who started the run; null with no calling key acts as the system. */
+    userId: z.string().min(1).nullable(),
+    /** The key the run was started with: it bounds the run's key and is its parent. */
+    callerApiKeyId: z.string().min(1).nullable().optional(),
+    projectId: z.string().min(1),
+    permissions: z.array(z.string().min(1)).min(1),
+    /** The life the handed-out key must still have: the bound of whatever will hold it. */
+    minRemainingMs: z.number().int().positive().max(RUN_KEY_MAX_REMAINING_MS).optional(),
+  })
+  .strict();
+export interface MintRunKeyInputSchema extends Named<typeof mintRunKeyInputSchemaDefinition> {}
+export const mintRunKeyInputSchema: MintRunKeyInputSchema = mintRunKeyInputSchemaDefinition;
+export type MintRunKeyInput = z.infer<typeof mintRunKeyInputSchema>;

@@ -21,6 +21,18 @@ Feature: Langy drives the open page through typed UI actions
     Then the page claims the action and applies it through the workbench store
 
   @unit
+  Scenario: The CLI's UI-action door is served where main served it
+    Given the langy module is installed in the api process
+    When a worker's session key calls POST or GET /api/langy/ui/actions
+    Then the call reaches langy's own UI-action operations rather than an unmounted path
+
+  @unit
+  Scenario: A project the UI-action rollout has not reached answers a bare 404
+    Given the UI-action rollout is off for the key's project
+    When the worker lists or dispatches UI actions
+    Then the answer is the plain 404 an unmounted path gives
+
+  @unit
   Scenario: The action's result returns to the agent within the same CLI call
     Given the page executed a dispatched action
     When the page reports the action's result
@@ -72,6 +84,13 @@ Feature: Langy drives the open page through typed UI actions
     When I send a turn from a page that accepts UI actions
     Then the turn does not tell the agent about the ui commands
     And the agent is still told what I am looking at
+
+  @unit
+  Scenario: A flag-store blip must not stop the turn, and must not advertise a surface it could not confirm
+    Given the feature-flag store throws while resolving whether ui actions are offered
+    When a turn starts, or the ui-action surface is resolved directly
+    Then the surface resolves to false rather than throwing
+    And the turn starts with the ui-action channel closed
 
   @unit
   Scenario: An action outside a running turn is refused
@@ -321,13 +340,12 @@ Feature: Langy drives the open page through typed UI actions
     the parts are spread across a CLI, an HTTP route, Redis, an SSE stream, a
     browser store and an execution pipeline.
 
-    A headless stand-in for the page closes that gap
-    (platform/app/e2e/langy/fake-workbench-tab.ts). It listens to the same turn
-    stream the panel listens to, claims through the same mutation, applies the
-    same transforms to the same store, saves the same document, and starts runs
-    through the same route. What it stands in for is the rendering, not the
-    behavior, so a suite with one attached exercises the leg the no-page suites
-    can never reach.
+    The real workbench page closes that gap, opened in a headless browser
+    (apps/ui/e2e/langy/workbench-page.ts). Its Langy panel follows the
+    suite's conversation, claims through the same mutation, applies the same
+    transforms to the same store, saves the same document, and starts runs
+    through its own run buttons, so a suite with it attached exercises the leg
+    the no-page suites can never reach.
 
     @e2e
     Scenario: A live conversation's actions are claimed and carried out by the open page
@@ -369,3 +387,19 @@ Feature: Langy drives the open page through typed UI actions
       Given listed actions that carry a display name as well
       When Langy shows the list
       Then each row reads as its display name
+
+  @unit
+  Scenario: An action that arrives while its page is still mounting is held for that page
+    Given the browser is on the page that owns the dispatched kind
+    And the page has not registered its handlers yet
+    When the action entry reaches it
+    Then the page claims the action at once, so the server does not fall back to saved state
+    And the handler runs as soon as the page registers it
+    And the completion reports what the live page did
+
+  @unit
+  Scenario: A page that never finishes mounting reports it instead of leaving the agent waiting
+    Given the browser is on the page that owns the dispatched kind
+    And the page never registers a handler for it
+    When the hold runs out
+    Then the action completes as failed with the code "langy_ui_page_not_ready"

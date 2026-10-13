@@ -1,40 +1,7 @@
 /**
- * Runtime path-selection UX for the `langwatch <tool>` wrapper.
- *
- * Before env injection + spawn, the wrapper has to decide which routing
- * shape to apply for this run:
- *
- *   - Path A "gateway"   - LLM calls route through the LangWatch gateway
- *                          via the user's personal virtual key. LLM usage
- *                          is billed to the gateway.
- *   - Path B "ingestion" - the tool calls its own provider with the
- *                          user's own plan/auth; only OTLP telemetry is
- *                          sent to LangWatch via the personal ingest key.
- *
- * Historically the wrapper silently picked the gateway whenever a VK was
- * present and never asked, even when the org policy allowed BOTH paths.
- * This module fixes that: when both paths are allowed, on a TTY, with no
- * remembered answer, it shows an interactive select and remembers the
- * choice in cfg.tool_mode[tool] (the existing per-tool routing field, so
- * the rest of the wrapper reads it the same way it always has).
- *
- * Precedence (highest first):
- *   1. explicit override - `--tool-mode=gateway|otlp` flag, then
- *      `LANGWATCH_TOOL_MODE=gateway|otlp` env. Never prompts, never persists.
- *   2. remembered answer - cfg.tool_mode[tool] pinned to gateway/ingestion.
- *   3. exactly one allowed path (policy gate) - used silently.
- *   4. both allowed + TTY + not forced-auto-login - PROMPT, persist the
- *      answer, print a one-line tip.
- *   5. both allowed + non-TTY / CI / LANGWATCH_AUTO_LOGIN - direct OTLP,
- *      no prompt, no persist. Nobody is there to consent to the gateway
- *      billing model usage to the org, so it is never chosen implicitly.
- *
- * Cancelling the prompt in case 4 cancels the run rather than picking a
- * path on the user's behalf.
- *
- * The `--tool-mode` flag is a WRAPPER flag: it is stripped from the args
- * before they are forwarded to the real tool. Every other arg is
- * forwarded verbatim and in order.
+ * Runtime path-selection UX for the `langwatch <tool>` wrapper: gateway
+ * (billed via the org's key) vs ingestion (tool's own provider). Precedence:
+ * override > remembered choice > policy > TTY prompt > silent ingestion.
  */
 
 import prompts from "prompts";
@@ -42,11 +9,8 @@ import prompts from "prompts";
 import { lwTag } from "./brand";
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
+import { resolvePlatformToolPolicy, type PlatformToolPolicyMap } from "./platform-tool-policy";
 import { copilotSeatBypassSuffix, type WrapperMode } from "./wrapper-mode";
-import {
-  resolvePlatformToolPolicy,
-  type PlatformToolPolicyMap,
-} from "./platform-tool-policy";
 
 /** Wrapper-only flag name. */
 const TOOL_MODE_FLAG = "--tool-mode";
@@ -71,14 +35,9 @@ export interface ParsedToolMode {
 }
 
 /**
- * Strip the wrapper-only `--tool-mode` flag from the forwarded args and
- * resolve any explicit override. Supports both `--tool-mode=gateway` and
- * the space-separated `--tool-mode gateway` form. Falls back to the
- * `LANGWATCH_TOOL_MODE` env var when the flag is absent (the flag wins).
- *
- * CRITICAL: only `--tool-mode` is consumed. Every other arg (including
- * flags like `--dangerously-skip-permissions` and quoted positional
- * values) is forwarded untouched and in order.
+ * Strips the wrapper-only `--tool-mode` flag (falls back to
+ * `LANGWATCH_TOOL_MODE`). Only this flag is consumed — every other arg is
+ * forwarded untouched and in order.
  */
 export function parseToolModeFlag(
   args: string[],
@@ -124,11 +83,9 @@ export interface ParsedProjectScope {
 }
 
 /**
- * Strip the wrapper-only telemetry-scope flags from the forwarded args:
- * `--project <id-or-slug>` pins the tool's telemetry to a team project
- * (minting a project ingest key), `--personal` clears the pin. Same
- * contract as `parseToolModeFlag`: only these flags are consumed, every
- * other arg is forwarded untouched and in order.
+ * Strip the wrapper-only telemetry-scope flags: `--project <id-or-slug>`
+ * pins telemetry to a team project (minting an ingest key), `--personal`
+ * clears it. Other args forwarded untouched, same contract as `parseToolModeFlag`.
  */
 export function parseProjectScopeFlags(args: string[]): ParsedProjectScope {
   const out: string[] = [];
@@ -167,10 +124,9 @@ export function parseProjectScopeFlags(args: string[]): ParsedProjectScope {
 }
 
 /**
- * Whether an explicit forced-auto-login signal is set. The path prompt
- * is skipped in that case (CI / agent contexts that opted into the
- * non-interactive device flow shouldn't get stuck on an extra select).
- * Mirrors the LANGWATCH_AUTO_LOGIN handling in the wrapper's login gate.
+ * Whether forced-auto-login is set — skips the path prompt so CI/agent
+ * contexts opted into the non-interactive device flow don't stall on a
+ * select. Mirrors LANGWATCH_AUTO_LOGIN in the wrapper's login gate.
  */
 function isForcedAutoLogin(env: NodeJS.ProcessEnv): boolean {
   const flag = env.LANGWATCH_AUTO_LOGIN;
@@ -194,22 +150,18 @@ export interface ResolveWrapperPathOptions {
   writeImpl?: (s: string) => void;
   env?: NodeJS.ProcessEnv;
   /**
-   * Re-fetch the org's per-tool path policy at run time. Invoked only when
-   * the decision rides on policy (no override, no remembered answer), so a
-   * path the admin disabled AFTER login is honored without a re-login. Returns
-   * null (or throws) when offline; the resolver then keeps the cached map.
+   * Re-fetch the org's per-tool policy at run time, only when the decision
+   * rides on it (no override/remembered answer) — an admin's post-login
+   * change is honored without a re-login. Null/throws keeps the cached map.
    */
-  refreshPolicies?: (
-    cfg: GovernanceConfig,
-  ) => Promise<PlatformToolPolicyMap | null>;
+  refreshPolicies?: (cfg: GovernanceConfig) => Promise<PlatformToolPolicyMap | null>;
 }
 
 export interface ResolveWrapperPathResult {
   /**
-   * The mode to force into resolveWrapperMode. Always concrete so the
-   * wrapper never falls back to the silent VK-present-implies-gateway
-   * default. resolveWrapperMode still applies the policy gates on top
-   * (downgrade / throw) so a forced mode the admin disabled is handled.
+   * The mode to force into resolveWrapperMode — always concrete, so the
+   * wrapper never falls back to the silent VK-implies-gateway default.
+   * Policy gates (downgrade/throw) still apply on top of a forced mode.
    */
   mode: WrapperMode;
   /** True when this run made a fresh interactive choice (and persisted it). */
@@ -222,13 +174,9 @@ export interface ResolveWrapperPathResult {
 }
 
 /**
- * Human-readable copy for the interactive select. Kept as exported
- * helpers so tests can assert it and the wording stays in one place.
- *
- * The OTLP (ingestion) option is listed first and is the default: most
- * users reaching this prompt already pay for the tool's own subscription
- * and want LangWatch to observe their usage, not re-bill it. The gateway
- * (API key) path is the explicit opt-in.
+ * Copy for the interactive select (exported for tests). OTLP is listed
+ * first and default: most users already pay for the tool's own
+ * subscription and want observability, not re-billing.
  */
 export function pathChoiceMessage(tool: string): string {
   return `How should \`langwatch ${tool}\` run?`;
@@ -243,11 +191,9 @@ export function gatewayChoiceDescription(): string {
 }
 
 /**
- * Per-tool subscription noun for the OTLP (bring-your-own-plan) option:
- * claude runs on a Claude subscription, codex on a ChatGPT subscription,
- * gemini on a Gemini subscription, cursor on a Cursor subscription.
- * Tools without a well-known subscription (opencode is a bring-your-own
- * client) fall back to a neutral "your own <tool> plan".
+ * Per-tool subscription noun for the OTLP (bring-your-own-plan) option.
+ * Tools without a well-known subscription (e.g. opencode) fall back to a
+ * neutral "your own <tool> plan".
  */
 const OTLP_TITLE_BY_TOOL = {
   claude: "Using a Claude subscription",
@@ -271,10 +217,9 @@ export function otlpChoiceDescription(): string {
 }
 
 /**
- * Resolve the path for this `langwatch <tool>` run. Prompts (and
- * persists) only when both paths are allowed, on a TTY, with no
- * remembered answer and no forced-auto-login. See the module header for
- * the full precedence.
+ * Resolve the path for this `langwatch <tool>` run. Prompts (and persists)
+ * only when both paths are allowed, on a TTY, with no remembered answer
+ * and no forced-auto-login — see the module header for full precedence.
  */
 export async function resolveWrapperPath(
   opts: ResolveWrapperPathOptions,
@@ -288,8 +233,9 @@ export async function resolveWrapperPath(
     writeImpl = (s: string) => void process.stderr.write(s),
     env = process.env,
   } = opts;
-  const isTTY =
-    opts.isTTY ?? (Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY));
+  const isTTY = opts.isTTY ?? (Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY));
+
+  const context: PathContext = { cfg, tool, promptImpl, saveImpl, writeImpl };
 
   // 1. Explicit override (flag or env) wins outright - no prompt, no persist.
   if (override) {
@@ -297,34 +243,16 @@ export async function resolveWrapperPath(
     // Copilot seat — every route that lands there names the shift (ADR-039
     // D3): here, the pinned branch below, the policy branches, and
     // resolveWrapperMode's downgrade.
-    if (
-      override === "gateway" &&
-      resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk
-    ) {
-      // Policy gate: when the org disables the gateway, resolveWrapperMode
-      // downgrades this run to ingestion with its own notice — warning about
-      // a billing shift that then doesn't happen would be false.
-      const suffix = copilotSeatBypassSuffix(tool);
-      if (suffix) {
-        writeImpl(`${lwTag()} using the gateway (--tool-mode).${suffix}\n`);
-      }
-    }
+    if (override === "gateway")
+      announceGatewayShift({ context, lead: "using the gateway (--tool-mode)." });
     return { mode: override, prompted: false };
   }
 
   // 2. Remembered answer pinned in cfg.tool_mode[tool].
   const pinned = cfg.tool_mode?.[tool];
   if (pinned === "gateway" || pinned === "ingestion") {
-    if (
-      pinned === "gateway" &&
-      resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk
-    ) {
-      const suffix = copilotSeatBypassSuffix(tool);
-      if (suffix) {
-        writeImpl(
-          `${lwTag()} using your saved gateway preference for ${tool}.${suffix}\n`,
-        );
-      }
+    if (pinned === "gateway") {
+      announceGatewayShift({ context, lead: `using your saved gateway preference for ${tool}.` });
     }
     return { mode: pinned, prompted: false };
   }
@@ -335,21 +263,68 @@ export async function resolveWrapperPath(
   // then re-cache it. A saved tool_mode short-circuits above, so this costs a
   // request only on the runs before the user pins a path.
   if (opts.refreshPolicies) {
-    try {
-      const fresh = await opts.refreshPolicies(cfg);
-      if (fresh) {
-        cfg.tool_policies = fresh;
-        try {
-          saveImpl({ ...cfg, tool_policies: fresh });
-        } catch {
-          // best-effort re-cache; a write failure must not block the run.
-        }
-      }
-    } catch {
-      // offline / server error: fall back to the cached policy map.
-    }
+    await refreshCachedPolicies({ cfg, refreshPolicies: opts.refreshPolicies, saveImpl });
   }
 
+  return pathForPolicy({ context, isTTY, env });
+}
+
+type PathContext = {
+  cfg: GovernanceConfig;
+  tool: string;
+  promptImpl: NonNullable<ResolveWrapperPathOptions["promptImpl"]>;
+  saveImpl: NonNullable<ResolveWrapperPathOptions["saveImpl"]>;
+  writeImpl: NonNullable<ResolveWrapperPathOptions["writeImpl"]>;
+};
+
+/**
+ * Names the Copilot seat shift when the gateway route is allowed. When the
+ * org disables the gateway, resolveWrapperMode downgrades the run with its
+ * own notice, so warning about a shift that then doesn't happen would be false.
+ */
+function announceGatewayShift({ context, lead }: { context: PathContext; lead: string }): void {
+  const { cfg, tool, writeImpl } = context;
+  if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk) return;
+  const suffix = copilotSeatBypassSuffix(tool);
+  if (suffix) writeImpl(`${lwTag()} ${lead}${suffix}\n`);
+}
+
+async function refreshCachedPolicies({
+  cfg,
+  refreshPolicies,
+  saveImpl,
+}: {
+  cfg: GovernanceConfig;
+  refreshPolicies: NonNullable<ResolveWrapperPathOptions["refreshPolicies"]>;
+  saveImpl: PathContext["saveImpl"];
+}): Promise<void> {
+  let fresh: Awaited<ReturnType<typeof refreshPolicies>>;
+  try {
+    fresh = await refreshPolicies(cfg);
+  } catch {
+    // offline / server error: fall back to the cached policy map.
+    return;
+  }
+  if (!fresh) return;
+  cfg.tool_policies = fresh;
+  try {
+    saveImpl({ ...cfg, tool_policies: fresh });
+  } catch {
+    // best-effort re-cache; a write failure must not block the run.
+    void 0;
+  }
+}
+
+async function pathForPolicy({
+  context,
+  isTTY,
+  env,
+}: {
+  context: PathContext;
+  isTTY: boolean;
+  env: NodeJS.ProcessEnv;
+}): Promise<ResolveWrapperPathResult> {
+  const { cfg, tool, writeImpl } = context;
   // Resolve which paths the org policy permits for this tool.
   const policy = resolvePlatformToolPolicy(tool, cfg.tool_policies);
   const allowGateway = policy.allowVk;
@@ -383,16 +358,18 @@ export async function resolveWrapperPath(
   // 4 / 5. Both paths allowed.
   const canPrompt = isTTY && !isForcedAutoLogin(env);
   if (!canPrompt) {
-    // Non-TTY / CI / forced-auto-login: nobody is there to answer, and the
-    // gateway bills model usage to the organization. Take the same option
-    // the prompt pre-selects, which costs nothing beyond telemetry. A CI
-    // job that wants the gateway asks for it with --tool-mode=gateway,
-    // LANGWATCH_TOOL_MODE=gateway, or a pinned tool_mode. This also keeps
-    // copilot billing-safe (ADR-039 D3): its gateway path rides
-    // COPILOT_PROVIDER_* BYOK keys, shifting spend off the user's seat.
+    // Non-TTY / CI / forced-auto-login: nobody is there to answer, so take
+    // the option that costs nothing beyond telemetry (gateway bills the
+    // org). Ask for gateway explicitly via --tool-mode/LANGWATCH_TOOL_MODE.
+    // Also keeps copilot billing-safe — see ADR-039 Decision 3.
     return { mode: "ingestion", prompted: false };
   }
 
+  return askAndRememberPath(context);
+}
+
+async function askAndRememberPath(context: PathContext): Promise<ResolveWrapperPathResult> {
+  const { cfg, tool, promptImpl, saveImpl, writeImpl } = context;
   const res = await promptImpl({
     type: "select",
     name: "path",
@@ -426,7 +403,7 @@ export async function resolveWrapperPath(
   // Remember the choice so subsequent runs don't prompt.
   const next: GovernanceConfig = {
     ...cfg,
-    tool_mode: { ...(cfg.tool_mode ?? {}), [tool]: chosen },
+    tool_mode: { ...cfg.tool_mode, [tool]: chosen },
   };
   try {
     saveImpl(next);
@@ -434,16 +411,15 @@ export async function resolveWrapperPath(
     cfg.tool_mode = next.tool_mode;
   } catch {
     // Best-effort persist - a write failure shouldn't block the run.
+    void 0;
   }
 
-  const label =
-    chosen === "gateway" ? "an API key (gateway)" : "your own plan (otlp)";
+  const label = chosen === "gateway" ? "an API key (gateway)" : "your own plan (otlp)";
   // The prompt answer is the route that actually moves copilot spend off
   // the user's seat — it must name the shift like every other gateway
   // route (ADR-039 D3), not leave the user to learn it from the pinned
   // branch on run 2.
-  const seatSuffix =
-    chosen === "gateway" ? copilotSeatBypassSuffix(tool) : "";
+  const seatSuffix = chosen === "gateway" ? copilotSeatBypassSuffix(tool) : "";
   writeImpl(
     `${lwTag()} saved. \`${tool}\` will use ${label}. ` +
       `Override with --tool-mode=${chosen === "gateway" ? "otlp" : "gateway"}, ` +

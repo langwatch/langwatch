@@ -6,7 +6,11 @@
 
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
+import * as path from "node:path";
+
 import chalk from "chalk";
+
+import { configPath } from "../../../utils/governance/config";
 
 /** How long to wait for the tunnel to report its public URL. */
 const TUNNEL_URL_TIMEOUT_MS = 30_000;
@@ -20,21 +24,16 @@ const CLOUDFLARE_TERMS_URL = "https://www.cloudflare.com/website-terms/";
 const CLOUDFLARED_RELEASE = "2026.8.2";
 
 /**
- * SHA-256 of each raw-binary asset of {@link CLOUDFLARED_RELEASE}, from the
- * GitHub release's own asset digests, keyed `platform-arch`. macOS ships a
- * tarball whose digest covers the archive, not the extracted binary, so the
- * darwin platforms are not listed and rely on the pinned tag over TLS.
+ * SHA-256 of each raw-binary asset of {@link CLOUDFLARED_RELEASE}, keyed
+ * `platform-arch`. Darwin platforms are not listed (see UNVERIFIED_PLATFORMS).
  */
 const CLOUDFLARED_SHA256: Record<string, string> = {
   "linux-x64": "fcfb02b575a52ca1af2e3267af4e1517bcdeb30ac48c834c69abaed3c0576ad2",
-  "linux-arm64":
-    "7747d94570fb390cf47dcb4f9555c193c6355cda9793f0d878d9049e5d6a7790",
-  "linux-ia32":
-    "39845d980a4b74b9c84530a28d8fea1fe6c476de26460275602162b349f1cbef",
+  "linux-arm64": "7747d94570fb390cf47dcb4f9555c193c6355cda9793f0d878d9049e5d6a7790",
+  "linux-ia32": "39845d980a4b74b9c84530a28d8fea1fe6c476de26460275602162b349f1cbef",
   "linux-arm": "19809425f60a6261241dfa66a42b4115bab07c295396a3c4d5d7c247fc4e1412",
   "win32-x64": "c29eee2b121f5436a642eed69fd9767da7e7b8c510fa50aaa130337f931357b5",
-  "win32-ia32":
-    "6acb072357618fa16c53c43e05438ed728aacd47119f1c6c3aa1a668c3299b43",
+  "win32-ia32": "6acb072357618fa16c53c43e05438ed728aacd47119f1c6c3aa1a668c3299b43",
 };
 
 /** The tunnel process surface the session needs, satisfied by cloudflared's Tunnel. */
@@ -42,10 +41,7 @@ export interface TunnelHandle {
   stop: () => void;
   once(event: "url", listener: (url: string) => void): unknown;
   once(event: "error", listener: (error: Error) => void): unknown;
-  once(
-    event: "exit",
-    listener: (code: number | null, signal: unknown) => void,
-  ): unknown;
+  once(event: "exit", listener: (code: number | null, signal: unknown) => void): unknown;
 }
 
 /**
@@ -54,6 +50,15 @@ export interface TunnelHandle {
  * those installs rely on the pinned tag over TLS.
  */
 const UNVERIFIED_PLATFORMS = new Set(["darwin-x64", "darwin-arm64"]);
+
+/**
+ * Where the binary is cached: beside the CLI config, so it follows
+ * LANGWATCH_CLI_CONFIG and survives package upgrades.
+ */
+function cloudflaredBinPath(): string {
+  const name = process.platform === "win32" ? "cloudflared.exe" : "cloudflared";
+  return path.join(path.dirname(configPath()), "bin", name);
+}
 
 /** Verifies the binary about to run against the pinned release digest. */
 function verifyBinary(binPath: string): void {
@@ -68,10 +73,7 @@ function verifyBinary(binPath: string): void {
       `No pinned cloudflared checksum for ${platformKey}. Refusing to run an unverified binary. Bring your own tunnel with --tunnel-url.`,
     );
   }
-  const actual = crypto
-    .createHash("sha256")
-    .update(fs.readFileSync(binPath))
-    .digest("hex");
+  const actual = crypto.createHash("sha256").update(fs.readFileSync(binPath)).digest("hex");
   if (actual !== expected) {
     // Removing it makes the next run download the pinned release, so the
     // advice below resolves the mismatch instead of repeating it.
@@ -84,13 +86,8 @@ function verifyBinary(binPath: string): void {
 
 /**
  * Provision the Cloudflare quick tunnel via the `cloudflared` package,
- * downloading the pinned binary release on first use (with the Cloudflare
- * terms notice printed before the download) and verifying its checksum.
- * Resolves with the public URL and a handle to stop the tunnel; rejects when
- * no URL arrives within the timeout.
- *
- * The import is lazy on purpose: only tunnel-provisioning runs pay for it,
- * and `--tunnel-url` sessions never load it (CLI boot-graph rule).
+ * downloading the pinned binary release on first use and verifying its
+ * checksum. The import is lazy so `--tunnel-url` sessions never load it.
  */
 export async function startQuickTunnel({
   localUrl,
@@ -98,21 +95,24 @@ export async function startQuickTunnel({
   localUrl: string;
 }): Promise<{ url: string; tunnel: TunnelHandle }> {
   const cloudflared = await import("cloudflared");
+  const binPath = cloudflaredBinPath();
+  cloudflared.use(binPath);
 
-  if (!fs.existsSync(cloudflared.bin)) {
+  if (!fs.existsSync(binPath)) {
     console.log(
       chalk.gray(
         `First run: downloading the cloudflared binary (release ${CLOUDFLARED_RELEASE}). Quick tunnels are a Cloudflare service, subject to the Cloudflare terms: ${CLOUDFLARE_TERMS_URL}`,
       ),
     );
-    await cloudflared.install(cloudflared.bin, CLOUDFLARED_RELEASE);
+    fs.mkdirSync(path.dirname(binPath), { recursive: true });
+    await cloudflared.install(binPath, CLOUDFLARED_RELEASE);
   }
 
   // Every run, not only the run that downloaded: a binary already on disk
   // comes from an earlier release, another tool, or a tampered cache, and
   // executing it unverified would break the checksum guarantee this path
   // advertises.
-  verifyBinary(cloudflared.bin);
+  verifyBinary(binPath);
 
   const tunnel = cloudflared.Tunnel.quick(localUrl);
   const url = await new Promise<string>((resolve, reject) => {

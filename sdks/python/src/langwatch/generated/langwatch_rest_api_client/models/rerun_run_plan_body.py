@@ -20,7 +20,8 @@ class RerunRunPlanBody:
     """
     Attributes:
         idempotency_key (str | Unset): Repeat the same key to make a retry join the batch the first call started instead
-            of running everything again. Defaults to a new key per call.
+            of running everything again. Send the same request with it: the same key over a different configuration starts
+            its own batch. Defaults to a new key per call.
         parameters (RerunRunPlanBodyParameters | Unset): Constant values applied to every scenario in the run, e.g. a
             fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target
             that names the same parameter in its runParameters overrides it for that target.
