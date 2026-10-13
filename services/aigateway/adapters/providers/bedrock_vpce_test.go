@@ -145,7 +145,7 @@ func TestValidateBedrockEndpoint(t *testing.T) {
 		"https://bedrock-runtime-fips.us-west-2.amazonaws.com",
 	}
 	for _, e := range valid {
-		if err := validateBedrockEndpoint(e); err != nil {
+		if err := validateBedrockEndpoint(e, customerEndpointPolicy{}); err != nil {
 			t.Errorf("expected %q to be valid, got %v", e, err)
 		}
 	}
@@ -162,7 +162,7 @@ func TestValidateBedrockEndpoint(t *testing.T) {
 		"http://bedrock-runtime.us-east-1.amazonaws.com", // plaintext public bedrock (must be https; http only for .vpce hosts)
 	}
 	for _, e := range invalid {
-		if err := validateBedrockEndpoint(e); err == nil {
+		if err := validateBedrockEndpoint(e, customerEndpointPolicy{}); err == nil {
 			t.Errorf("expected %q to be rejected, got nil error", e)
 		}
 	}
@@ -175,21 +175,74 @@ func TestValidateBedrockEndpoint(t *testing.T) {
 // endpoint is present but untrusted.
 func TestBedrockVPCEEndpoint_Gate(t *testing.T) {
 	// non-bedrock provider → stay on bifrost
-	if ep, err := bedrockVPCEEndpoint(domain.Credential{ProviderID: domain.ProviderOpenAI, Extra: map[string]string{"bedrock_runtime_endpoint": "https://bedrock-runtime.us-east-1.amazonaws.com"}}); ep != "" || err != nil {
+	if ep, err := bedrockVPCEEndpoint(domain.Credential{ProviderID: domain.ProviderOpenAI, Extra: map[string]string{"bedrock_runtime_endpoint": "https://bedrock-runtime.us-east-1.amazonaws.com"}}, customerEndpointPolicy{}); ep != "" || err != nil {
 		t.Errorf("non-bedrock cred: got (%q, %v), want (\"\", nil)", ep, err)
 	}
 	// bedrock without endpoint → stay on bifrost
-	if ep, err := bedrockVPCEEndpoint(domain.Credential{ProviderID: domain.ProviderBedrock}); ep != "" || err != nil {
+	if ep, err := bedrockVPCEEndpoint(domain.Credential{ProviderID: domain.ProviderBedrock}, customerEndpointPolicy{}); ep != "" || err != nil {
 		t.Errorf("endpoint-less bedrock cred: got (%q, %v), want (\"\", nil)", ep, err)
 	}
 	// bedrock with valid endpoint → dispatch through it
 	good := "http://vpce-abc.vpce-svc.us-east-1.vpce.amazonaws.com:80"
-	if ep, err := bedrockVPCEEndpoint(domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{"bedrock_runtime_endpoint": good}}); ep != good || err != nil {
+	if ep, err := bedrockVPCEEndpoint(domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{"bedrock_runtime_endpoint": good}}, customerEndpointPolicy{}); ep != good || err != nil {
 		t.Errorf("valid bedrock cred: got (%q, %v), want (%q, nil)", ep, err, good)
 	}
 	// bedrock with untrusted endpoint → fail closed
-	if ep, err := bedrockVPCEEndpoint(domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{"bedrock_runtime_endpoint": "http://169.254.169.254"}}); err == nil || ep != "" {
+	if ep, err := bedrockVPCEEndpoint(domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{"bedrock_runtime_endpoint": "http://169.254.169.254"}}, customerEndpointPolicy{}); err == nil || ep != "" {
 		t.Errorf("untrusted endpoint: got (%q, %v), want (\"\", error)", ep, err)
+	}
+}
+
+// given a Bedrock credential with no runtime endpoint and plain
+// bedrock:InvokeModel access keys
+// when the Converse endpoint is resolved for an OpenAI model (the global.openai.*
+// inference profiles, gpt-oss, or a deployment mapped onto one)
+// then it resolves to the public regional runtime host, so the request never
+// reaches the bedrock-mantle endpoint bifrost would pick (which needs a separate
+// bedrock-mantle permission and answered 403 access_denied), while other Bedrock
+// models stay on bifrost.
+/** @scenario "OpenAI models on Bedrock are served through Converse with InvokeModel access" */
+func TestBedrockConverseEndpoint_OpenAIModelsUseRegionalRuntime(t *testing.T) {
+	cred := domain.Credential{
+		ProviderID: domain.ProviderBedrock,
+		Extra:      map[string]string{"access_key": "AKIAEXAMPLE", "secret_key": "secretexample", "region": "eu-central-1"},
+	}
+	const want = "https://bedrock-runtime.eu-central-1.amazonaws.com"
+	for _, model := range []string{"global.openai.gpt-5.5", "global.openai.gpt-6-luna", "openai.gpt-oss-120b-1:0"} {
+		if ep, err := bedrockConverseEndpoint(cred, model, customerEndpointPolicy{}); ep != want || err != nil {
+			t.Errorf("%s: got (%q, %v), want (%q, nil)", model, ep, err, want)
+		}
+	}
+
+	mapped := cred
+	mapped.DeploymentMap = map[string]string{"helpdesk": "global.openai.gpt-5.5"}
+	if ep, err := bedrockConverseEndpoint(mapped, "helpdesk", customerEndpointPolicy{}); ep != want || err != nil {
+		t.Errorf("mapped deployment: got (%q, %v), want (%q, nil)", ep, err, want)
+	}
+
+	if ep, err := bedrockConverseEndpoint(cred, "eu.anthropic.claude-haiku-4-5-20251001-v1:0", customerEndpointPolicy{}); ep != "" || err != nil {
+		t.Errorf("anthropic model: got (%q, %v), want (\"\", nil)", ep, err)
+	}
+
+	noRegion := domain.Credential{ProviderID: domain.ProviderBedrock}
+	if ep, _ := bedrockConverseEndpoint(noRegion, "global.openai.gpt-5.5", customerEndpointPolicy{}); ep != "https://bedrock-runtime.us-east-1.amazonaws.com" {
+		t.Errorf("region-less credential: got %q, want the us-east-1 runtime host", ep)
+	}
+
+	vpce := "http://vpce-abc.vpce-svc.eu-central-1.vpce.amazonaws.com:80"
+	withVPCE := domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{"bedrock_runtime_endpoint": vpce, "region": "eu-central-1"}}
+	if ep, err := bedrockConverseEndpoint(withVPCE, "global.openai.gpt-5.5", customerEndpointPolicy{}); ep != vpce || err != nil {
+		t.Errorf("vpce credential: got (%q, %v), want the VPC endpoint", ep, err)
+	}
+
+	hostile := domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{"region": "evil.example/x"}}
+	if ep, err := bedrockConverseEndpoint(hostile, "global.openai.gpt-5.5", customerEndpointPolicy{}); ep != "" || err == nil {
+		t.Errorf("hostile region: got (%q, %v), want (\"\", error)", ep, err)
+	}
+
+	openai := domain.Credential{ProviderID: domain.ProviderOpenAI}
+	if ep, err := bedrockConverseEndpoint(openai, "gpt-5.5", customerEndpointPolicy{}); ep != "" || err != nil {
+		t.Errorf("non-bedrock credential: got (%q, %v), want (\"\", nil)", ep, err)
 	}
 }
 

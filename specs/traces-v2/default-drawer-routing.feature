@@ -1,14 +1,13 @@
 # Trace Explorer default routing — Gherkin Spec
-# Implementation: platform/app/src/hooks/useDrawer.ts (routeTraceDrawerForV2 +
-# the openDrawer interception), the legacy path redirects under
-# platform/app/src/pages/[project]/messages/, and the legacy drawer redirect
-# in platform/app/src/components/LegacyTraceDrawerRedirect.tsx
+# Implementation: the `traceDetails` drawer registered in modules/trace/browser/src/trace.web.ts,
+# which renders modules/trace/browser/src/ui/sections/legacy-trace-drawer-redirect.tsx, and the
+# legacy path redirects under [gone] src/pages/[project]/messages/
 #
 # The Trace Explorer is the default trace experience. The former per-device
 # opt-in is gone: every request to open a trace's details (no matter which
 # screen triggered it — evaluation results, a workflow run panel, the command
-# bar, a feedback row) goes through the same open-drawer call, which routes to
-# the Trace Explorer drawer.
+# bar, a feedback row) goes through the same open-drawer call, and the legacy drawer name
+# redirects to the Trace Explorer drawer.
 #
 # Both legacy surfaces are gone. The legacy Traces page path survives as a
 # redirect to the Trace Explorer, and the legacy trace drawer name survives as
@@ -30,7 +29,8 @@ Feature: Trace Explorer is the default trace experience from every entry point
 
   Rule: All trace views open the Trace Explorer drawer by default
 
-    @integration
+    # Results views call openDrawer("traceV2Details") inline (batch-evaluation-results.tsx); no render test yet.
+    @unimplemented
     Scenario: A trace opened from a results view uses the Trace Explorer
       When I open a trace's details from a results view
       Then the Trace Explorer drawer opens for that trace
@@ -44,6 +44,24 @@ Feature: Trace Explorer is the default trace experience from every entry point
     Scenario: A trace ID searched in the command bar opens in the Trace Explorer
       When I search for a trace ID in the command bar and select the result
       Then the Trace Explorer opens with that trace's drawer
+
+  Rule: The Trace Explorer drawer is mounted once, on every page
+
+    # The address opens this drawer from the installed registry like every other
+    # drawer; a page never mounts its own copy.
+    @integration
+    Scenario: The trace drawer opens over a page that is not the Trace Explorer
+      Given I am on a page that is not the Trace Explorer
+      When I open a trace's details from that page
+      Then the Trace Explorer drawer opens over that page
+      And I am still on the page I was on
+
+    # The routed drawer serves the Trace Explorer too, so one trace has one drawer.
+    @integration
+    Scenario: The Trace Explorer gets the one routed trace drawer
+      Given I am on the Trace Explorer
+      When a trace's details are open
+      Then exactly one trace drawer is on screen
 
   Rule: The legacy Traces page is gone and its path redirects
 
@@ -100,7 +118,8 @@ Feature: Trace Explorer is the default trace experience from every entry point
 
   Rule: Non-trace drawers and incomplete requests are never rerouted
 
-    @integration
+    # Nothing reroutes drawer opens since the host's open rewrite was deleted; nothing left to pin.
+    @unimplemented
     Scenario: Opening a non-trace drawer is unaffected
       When a screen opens a drawer that is not a trace drawer
       Then that drawer opens unchanged

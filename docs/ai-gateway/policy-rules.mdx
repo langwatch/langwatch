@@ -13,12 +13,12 @@ Each of the four targets has two lists:
 - **Refuse**: a request that matches any pattern is refused.
 - **Allow only**: when the list is not empty, every candidate in the request must match at least one pattern, or the request is refused.
 
-| Target | What the gateway matches the patterns against |
-|---|---|
-| Tools | Every tool name in the body: `tools[].function.name` (OpenAI shape) or `tools[].name` (Anthropic shape). |
-| MCP servers | Every entry of `mcp`, `mcps` or `mcp_servers` in the body, by `name`, then `id`, then the raw string. |
-| Web addresses | Every `http://` and `https://` string anywhere in the body, longer than 8 characters, deduplicated. |
-| Models | The resolved model, judged in both spellings, `provider/model` and the bare model id. |
+| Target        | What the gateway matches the patterns against                                                            |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| Tools         | Every tool name in the body: `tools[].function.name` (OpenAI shape) or `tools[].name` (Anthropic shape). |
+| MCP servers   | Every entry of `mcp`, `mcps` or `mcp_servers` in the body, by `name`, then `id`, then the raw string.    |
+| Web addresses | Every `http://` and `https://` string anywhere in the body, longer than 8 characters, deduplicated.      |
+| Models        | The resolved model, judged in both spellings, `provider/model` and the bare model id.                    |
 
 Patterns are regular expressions. They are not anchored: `shell` matches `run_shell_command`. Write `^shell_.*` to match a prefix.
 
@@ -59,6 +59,7 @@ The message names the target and the value: `is blocked by policy` for a refuse 
     <Frame caption="The Restrictions section: a refuse pattern on tools and an allow-only list on models.">
       <img src="/images/ai-gateway/routing-policy-restrictions.png" alt="The Restrictions section of the routing policy drawer with Refuse and Allow only boxes for tools, MCP servers, web addresses and models" />
     </Frame>
+
   </Step>
   <Step title="Verify">
     Send a request that names a refused tool through a key on that policy and check the response for `403` and `"code": "policy_violation"`.

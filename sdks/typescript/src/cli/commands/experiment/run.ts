@@ -1,10 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const runExperimentCommand = async (
   slug: string,
@@ -52,47 +54,57 @@ export const runExperimentCommand = async (
     if (status.status === "failed") {
       failSpinner({
         spinner: pollSpinner,
-        error: new Error(
-          `Experiment failed after ${status.progress}/${status.total} cells`,
-        ),
+        error: new Error(`Experiment failed after ${status.progress}/${status.total} cells`),
         action: "run experiment",
       });
       process.exit(1);
     }
 
     if (status.status === "completed") {
-      pollSpinner.succeed(
-        `Experiment completed! ${status.progress}/${status.total} cells`,
-      );
+      pollSpinner.succeed(`Experiment completed! ${status.progress}/${status.total} cells`);
     } else {
       pollSpinner.warn(`Experiment ${status.status}`);
     }
 
     return {
       data: status,
-      table: () => {
-        if (runResult.runUrl) {
-          console.log(chalk.gray(`  View at: ${runResult.runUrl}`));
-        }
-        if (status.status !== "completed" || !status.summary) return;
-        console.log();
-        console.log(chalk.bold("  Summary:"));
-        console.log(`    ${chalk.gray("Total cells:")}    ${status.summary.totalCells ?? status.total}`);
-        console.log(`    ${chalk.gray("Completed:")}      ${chalk.green(String(status.summary.completedCells ?? status.progress))}`);
-        if (status.summary.failedCells) {
-          console.log(`    ${chalk.gray("Failed:")}         ${chalk.red(String(status.summary.failedCells))}`);
-        }
-        if (status.summary.duration) {
-          console.log(`    ${chalk.gray("Duration:")}       ${(status.summary.duration / 1000).toFixed(1)}s`);
-        }
-        if (status.summary.runUrl) {
-          console.log(`    ${chalk.gray("View results:")}  ${status.summary.runUrl}`);
-        }
-        console.log();
-      },
+      table: () => printRunStatus({ runUrl: runResult.runUrl, status }),
     };
   } catch (error) {
     failSpinner({ spinner, error, action: "run experiment" });
     process.exit(1);
   }
 };
+
+function printRunStatus({
+  runUrl,
+  status,
+}: {
+  runUrl: string | undefined;
+  status: Awaited<ReturnType<ExperimentsApiService["getRunStatus"]>>;
+}): void {
+  if (runUrl) {
+    console.log(chalk.gray(`  View at: ${runUrl}`));
+  }
+  if (status.status !== "completed" || !status.summary) return;
+  console.log();
+  console.log(chalk.bold("  Summary:"));
+  console.log(`    ${chalk.gray("Total cells:")}    ${status.summary.totalCells ?? status.total}`);
+  console.log(
+    `    ${chalk.gray("Completed:")}      ${chalk.green(String(status.summary.completedCells ?? status.progress))}`,
+  );
+  if (status.summary.failedCells) {
+    console.log(
+      `    ${chalk.gray("Failed:")}         ${chalk.red(String(status.summary.failedCells))}`,
+    );
+  }
+  if (status.summary.duration) {
+    console.log(
+      `    ${chalk.gray("Duration:")}       ${(status.summary.duration / 1000).toFixed(1)}s`,
+    );
+  }
+  if (status.summary.runUrl) {
+    console.log(`    ${chalk.gray("View results:")}  ${status.summary.runUrl}`);
+  }
+  console.log();
+}

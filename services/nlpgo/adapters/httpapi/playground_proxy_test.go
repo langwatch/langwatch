@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/langwatch/langwatch/pkg/health"
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -344,6 +345,32 @@ func TestPlaygroundProxy_DispatcherErrorReturns502(t *testing.T) {
 	}
 }
 
+// A refusal the dispatcher made of the caller keeps its own status, so a
+// scenario judge that hits a rate limit reads the limit, not "Bad Gateway".
+func TestPlaygroundProxy_DispatcherRefusalKeepsItsStatus(t *testing.T) {
+	refusal := herr.New(context.Background(), domain.ErrRateLimited, herr.M{"message": "rpm 1 exceeded"})
+	fake := &fakeProxy{syncErr: refusal}
+	srv := newProxyTestServer(t, fake)
+
+	body := `{"model":"openai/gpt-5-mini","messages":[]}`
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/go/proxy/v1/chat/completions", strings.NewReader(body))
+	req.Header.Set("x-litellm-model", "openai/gpt-5-mini")
+	req.Header.Set("x-litellm-api_key", "sk-test")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429; body %s", resp.StatusCode, raw)
+	}
+	if !strings.Contains(string(raw), "rate_limited") {
+		t.Errorf("body does not name the rate limit: %s", raw)
+	}
+}
+
 // TestPlaygroundProxy_PassthroughStreamPathDetectsActionSuffix pins
 // CodeRabbit feedback on PR #3607: Gemini-native streaming endpoints
 // (`:streamGenerateContent`, `:streamRawPredict`) signal streaming via
@@ -537,5 +564,34 @@ func TestPlaygroundProxy_NilDispatcherFallsBackTo501(t *testing.T) {
 	_ = json.Unmarshal(respBody, &env)
 	if env["error"] == nil {
 		t.Errorf("body = %s, want herr-formatted error envelope", respBody)
+	}
+}
+
+// TestFilterPassthroughHeaders_StripsTheInternalSecret keeps the credential
+// the app authenticates this hop with out of the upstream call.
+//
+// This list is a denylist over everything else, so a new internal header is
+// forwarded by default. On a passthrough call the upstream is a model provider
+// or a customer-configured endpoint, which makes "forwarded by default" the
+// wrong default for a secret of ours. RequireInternalSecret has already
+// consumed the header by the time a request reaches here, so nothing
+// downstream needs it.
+func TestFilterPassthroughHeaders_StripsTheInternalSecret(t *testing.T) {
+	in := http.Header{}
+	in.Set(InternalSecretHeader, "shared-with-the-app")
+	in.Set("Accept", "application/json")
+
+	out := filterPassthroughHeaders(in)
+
+	for name, value := range out {
+		if strings.EqualFold(name, InternalSecretHeader) {
+			t.Errorf("%s must not be forwarded upstream, got %q", InternalSecretHeader, value)
+		}
+		if value == "shared-with-the-app" {
+			t.Errorf("header %q carries the internal secret upstream", name)
+		}
+	}
+	if out["Accept"] != "application/json" {
+		t.Errorf("Accept lost while stripping the secret: %v", out)
 	}
 }

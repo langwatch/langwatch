@@ -429,7 +429,12 @@ func checkVersions(in Inputs) []Finding {
 				"names release %s, but the chart ships %s",
 				ref.Version, in.ChartVersion,
 			),
-			Fix: fmt.Sprintf("update it to %s", in.ChartVersion),
+			Fix: fmt.Sprintf(
+				"update it to %s, mark the line x-release-please-version and list the page "+
+					"in .github/release-please-config.json extra-files so each release bumps it, "+
+					"or drop the pin if the command can install the latest release",
+				in.ChartVersion,
+			),
 		})
 	}
 	return findings

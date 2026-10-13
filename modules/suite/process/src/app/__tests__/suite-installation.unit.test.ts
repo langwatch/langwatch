@@ -1,0 +1,225 @@
+/**
+ * @vitest-environment node
+ * The installer over memory persistence, in both roles that boot it.
+ */
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import type { ScenarioApi as ScenarioApiContract } from "@langwatch/scenario-contract";
+import { SuiteApi, SuiteNameTakenError } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { isMigrationStep, type MigrationStepReport } from "@langwatch/upgrade/step";
+import { describe, expect, it } from "vitest";
+
+import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";
+import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
+import { suiteProcessModule } from "../../suite.module.ts";
+import {
+  memoryAgentApi,
+  memoryScenarioApi,
+  SuiteWorld,
+  TEST_PROJECT,
+} from "../../transport/__tests__/suite-rest.harness.ts";
+
+function process(role: "api" | "worker") {
+  return createApp({ role })
+    .withModules([suiteProcessModule])
+    .withStores(memoryStores())
+    .withConfig({ suite: { publicBaseUrl: undefined, foldCacheTtlSeconds: 300 } })
+    .provide({
+      scenario: createApiFixture<ScenarioApiContract>({ findTestSuite: async () => null }),
+      agent: createApiFixture<AgentApi>({}),
+      prompt: createApiFixture<PromptApi>({}),
+      evaluator: createApiFixture<EvaluatorApi>({}),
+      project: createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
+      "data-retention": createApiFixture<DataRetentionApi>({
+        getPlatformDefaultRetentionDays: () => 49,
+        getResolvedForProject: async () => RETAINED,
+      }),
+      "feature-flag": createApiFixture<FeatureFlagApi>({}),
+      "model-provider": createApiFixture<ModelProviderApi>({}),
+    });
+}
+
+const RETAINED = { traces: 30, scenarios: 365, experiments: 30 };
+
+const plan = { projectId: "project-1", name: "Nightly", scenarioIds: ["scenario-1"] };
+
+describe("suite app installation", () => {
+  /** @scenario "A module's pipeline declares each tenant's retention from data retention" */
+  it("declares each tenant's retention on its pipeline as data retention resolves it", async () => {
+    const eventing = new EventSourcing({
+      enabled: false,
+      processStore: InMemoryProcessStore.createForTesting(),
+    });
+    const runtime = await process("worker").withEventing(eventing).boot();
+
+    try {
+      const pipeline = eventing.definitions.find(
+        (definition) => definition.metadata.name === "suite_run_processing",
+      );
+
+      await expect(
+        pipeline?.open((definition) => definition.retentionPolicyResolver?.resolve("project-1")),
+      ).resolves.toEqual(RETAINED);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker hosts the subscriber that reports a run into its suite run" */
+  it("hosts suite's peer lanes on scenario's run facts on the worker", async () => {
+    const eventing = new EventSourcing({
+      enabled: false,
+      processStore: InMemoryProcessStore.createForTesting(),
+    });
+    const runtime = await process("worker").withEventing(eventing).boot();
+
+    try {
+      const lanes = eventing.definitions
+        .find((definition) => definition.metadata.name === "suite_run_processing")
+        ?.open((definition) => definition.globalProjections?.map(({ name }) => name));
+
+      expect(lanes).toEqual(
+        expect.arrayContaining([
+          "suite_run_processing.scenarioRunStarted",
+          "suite_run_processing.scenarioRunFinished",
+          "suite_run_processing.scenarioRunEvaluated",
+        ]),
+      );
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
+    const runtime = await process(role).boot();
+
+    try {
+      const app = runtime.service(SuiteApi);
+      const created = await app.create(plan);
+
+      expect(runtime.module(suiteProcessModule).provided).toBe(app);
+      expect(created.slug).toBe("nightly");
+
+      await expect(app.list({ projectId: plan.projectId })).resolves.toMatchObject([
+        { id: created.id },
+      ]);
+      await expect(app.create(plan)).rejects.toBeInstanceOf(SuiteNameTakenError);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker collects suite's replay step as a background step" */
+  it("collects the replay step on the worker and a second pass over it changes nothing", async () => {
+    const runtime = await process("worker").boot();
+
+    try {
+      await runtime.service(SuiteApi).create(plan);
+      const step = runtime
+        .migrationSteps(isMigrationStep)
+        .find(({ id }) => id === "suite:replay-scenario-facts-for-open-runs");
+      const saved: MigrationStepReport[] = [];
+      const pass = () =>
+        step?.run({
+          checkpoint: { resumeFrom: null, save: async ({ report }) => void saved.push(report) },
+          dryRun: false,
+          signal: new AbortController().signal,
+        });
+      const nothingBehind = { openRuns: 0, behindRuns: 0, startsSent: 0, finishesSent: 0 };
+
+      expect(step).toMatchObject({ kind: "data", mode: "background", needsOldWritersGone: true });
+      await expect(pass()).resolves.toMatchObject(nothingBehind);
+      await expect(pass()).resolves.toMatchObject(nothingBehind);
+      expect(saved.map((report) => report.afterTenantId)).toEqual(["project-1", "project-1"]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  it("allocates independent memory repositories for each installation", async () => {
+    const first = await process("api").boot();
+    const second = await process("api").boot();
+
+    try {
+      await first.service(SuiteApi).create(plan);
+
+      await expect(
+        second.service(SuiteApi).list({ projectId: plan.projectId }),
+      ).resolves.toHaveLength(0);
+    } finally {
+      await Promise.all([first.stop(), second.stop()]);
+    }
+  });
+});
+
+describe("given a stored run plan in the api role", () => {
+  /** @scenario "Running a stored run plan through the process schedules its runs" */
+  it("starts the suite run and has the scenario owner queue its run", async () => {
+    const world = new SuiteWorld(MemorySuiteDatabase.create());
+    const commands = new CollapsingRunCommands();
+    const scenario = world.addScenario({ name: "Refund flow" });
+    const agent = world.addAgent();
+    const runtime = await createApp({ role: "api" })
+      .withModules([suiteProcessModule])
+      .withStores(memoryStores())
+      .withEventing(
+        new EventSourcing({
+          eventStore: EventStoreMemory.createForTesting(),
+          executionTarget: "api",
+          consumersEnabled: false,
+          processManagerMode: "producer-only",
+        }),
+      )
+      .withConfig({
+        suite: { publicBaseUrl: "https://app.langwatch.test", foldCacheTtlSeconds: 300 },
+      })
+      .provide({
+        scenario: memoryScenarioApi(world, commands),
+        agent: memoryAgentApi(world),
+        prompt: createApiFixture<PromptApi>({ getExistingIds: async () => [] }),
+        evaluator: createApiFixture<EvaluatorApi>({}),
+        project: createApiFixture<ProjectApi>({
+          findOrganizationId: async () => TEST_PROJECT.organizationId,
+        }),
+        "data-retention": createApiFixture<DataRetentionApi>({
+          getPlatformDefaultRetentionDays: () => 49,
+        }),
+        "feature-flag": createApiFixture<FeatureFlagApi>({}),
+        "model-provider": createApiFixture<ModelProviderApi>({}),
+      })
+      .boot();
+
+    try {
+      const app = runtime.service(SuiteApi);
+      const plan = await app.create({
+        projectId: TEST_PROJECT.id,
+        name: "Nightly",
+        scenarioIds: [scenario.id],
+        targets: [{ type: "http", referenceId: agent.id }],
+      });
+
+      const result = await app.run({
+        id: plan.id,
+        projectId: TEST_PROJECT.id,
+        idempotencyKey: "installation-run-1",
+      });
+
+      expect(result.jobCount).toBe(1);
+      expect(commands.queued).toMatchObject([
+        { projectId: TEST_PROJECT.id, scenarioId: scenario.id, batchRunId: result.batchRunId },
+      ]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+});

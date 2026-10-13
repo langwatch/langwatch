@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
 
-// pickOpenPR is `haven play` with no argument in a terminal: list the repo's
+// pickOpenPR is `haven pr --throwaway` with no argument in a terminal: list the repo's
 // open PRs (via gh) and let the user pick one. Returns picked=false when the
 // user quit without choosing. Style-wise it is the hub's smaller sibling:
 // plain bubbletea, arrow/j/k to move, enter to choose, q/esc to leave.
@@ -75,7 +75,7 @@ func (m playPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m playPickerModel) View() string {
 	var b strings.Builder
-	b.WriteString("\x1b[1m haven play\x1b[0m \x1b[2m· pick a PR to run in a throwaway sandbox · enter runs · q quits\x1b[0m\n\n")
+	b.WriteString("\x1b[1m haven pr --throwaway\x1b[0m \x1b[2m· pick a PR to run in a throwaway sandbox · enter runs · q quits\x1b[0m\n\n")
 	rows := m.height - 4
 	if rows < 1 {
 		rows = 20

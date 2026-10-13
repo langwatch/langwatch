@@ -1,0 +1,118 @@
+/* Layout glue for the mail room only: tokens, never literals of colour or type. */
+
+.mailroom-inspect {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "messages preview"
+    "props preview";
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.mailroom-messages {
+  grid-area: messages;
+  min-width: 0;
+}
+
+/* Twenty-odd messages would push the props a screen down; the list scrolls instead. */
+.mailroom-message-list {
+  max-height: 440px;
+}
+
+.mailroom-preview {
+  grid-area: preview;
+  min-width: 0;
+}
+
+.mailroom-props {
+  grid-area: props;
+  min-width: 0;
+}
+
+/* Only the mail's own paint sits on this stage; the frame is the one line around it. */
+.mailroom-stage {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-6);
+  overflow-x: auto;
+  background: var(--paper-soft);
+}
+
+.mailroom-frame {
+  flex-shrink: 0;
+  height: max(640px, calc(100vh - 280px));
+  display: flex;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: clip;
+}
+
+.mailroom-frame > iframe {
+  flex: 1;
+  border: 0;
+}
+
+.mailroom-text {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.mailroom-gallery {
+  display: grid;
+  grid-auto-rows: max-content;
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.mailroom-gallery[data-density="compact"] {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.mailroom-gallery[data-density="comfortable"] {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.mailroom-card-preview {
+  position: relative;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.mailroom-card-preview[data-scrollable] {
+  overflow-y: auto;
+}
+
+.mailroom-card-window {
+  position: relative;
+  overflow: hidden;
+}
+
+.mailroom-card-window > iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  pointer-events: none;
+  transform-origin: top left;
+}
+
+@media (max-width: 1023px) {
+  .mailroom-inspect {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas:
+      "messages"
+      "preview"
+      "props";
+  }
+}
+
+@media (max-width: 719px) {
+  .mailroom-stage {
+    padding: var(--space-4);
+    justify-content: flex-start;
+  }
+}

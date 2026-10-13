@@ -17,6 +17,27 @@ Feature: Langy prompts for a model when the project has none configured
     Then the panel shows a prompt to add a model provider
     And the user can choose a provider and enter an API key without leaving Langy
 
+  # The panel is a narrow column, so the setup is the compact one: small provider
+  # marks and the credentials the chosen provider needs. Naming, scope and
+  # advanced settings stay in Settings; the save lands at the widest scope the
+  # user manages.
+  @integration
+  Scenario: The inline setup offers provider marks with Codex first and recommended
+    Given the Langy panel is showing the inline model setup
+    Then the providers show as small marks, Codex first with a Recommended badge
+    And Codex is selected, offering its sign-in
+    When the user picks OpenAI
+    Then the setup asks for the OpenAI credentials
+
+  @integration
+  Scenario: The inline setup asks only for credentials and a default chat model
+    Given the inline setup shows an API key provider
+    Then it asks for the provider's credentials and a default chat model
+    And it does not ask for a name, a scope or advanced settings
+    When the user enters a key, picks a chat model and saves
+    Then the provider is saved at the organization
+    And the picked model becomes the default model
+
   @integration
   Scenario: Saving a key and default model from Langy unblocks the assistant
     Given the Langy panel is showing the inline model setup
@@ -43,3 +64,16 @@ Feature: Langy prompts for a model when the project has none configured
     When the user opens the Langy panel
     Then the inline model setup is not shown
     And the conversation surface is left intact
+
+  # A page can hand Langy a question ("Ask Langy to set it up"). With no model
+  # configured the server refuses the turn, so the question stays queued behind
+  # the setup prompt and is sent once a model resolves.
+  @integration
+  Scenario: A question handed to Langy waits for a model instead of failing
+    Given a project with no model provider configured
+    When a page opens Langy with a question
+    Then the panel shows a prompt to add a model provider
+    And the question is not sent
+    And the question is shown above the prompt, with a line saying it is sent once a model is set up
+    When a model resolves for the project
+    Then the question is sent once

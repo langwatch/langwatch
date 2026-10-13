@@ -3,13 +3,11 @@ Feature: Dialog backdrop transparency and blur
   I want dialogs to use only a backdrop blur and never a dark grey overlay
   So that the content behind stays visible and the dialog feels lightweight
 
-  # Pair with drawer-backdrop-transparency-blur.feature. The base Dialog
-  # wrapper at src/components/ui/dialog.tsx forces the backdrop to render
-  # with backdrop-filter blur + a transparent background (no `bg`). Chakra's
-  # default backdrop ships with `bg: blackAlpha.500` which is the dark
-  # overlay we explicitly do not want. The wrapper also drops any caller
-  # supplied `bg` on `backdropProps` so a downstream component cannot bring
-  # the dark overlay back accidentally.
+  # Pair with drawer-backdrop-transparency-blur.feature. The design system's
+  # Dialog (packages/design-system/src/components/overlays/views/dialog-view.tsx)
+  # forces the backdrop to render with backdrop-filter blur + a transparent
+  # background, drops any caller `bg` on `backdropProps`, and exposes no
+  # Backdrop sub-component, so the dark Chakra default cannot come back.
 
   Background:
     Given the application is loaded

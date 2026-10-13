@@ -139,3 +139,53 @@ Feature: API keys management REST API
   Scenario: Creating a key with a reserved name names the code
     When I create a key under a name LangWatch reserves for itself
     Then the request is refused with code api_key_reserved_name and status 422
+
+  # `langwatch login --project` mints the app's ingestion key from the person's
+  # project-bound session (coordinator, 2026-10-01; ARCHITECTURE.md OAuth sentences).
+  @integration
+  Scenario: A person's project session mints its own ingestion key
+    Given a person signed in to one project, holding traces:create there
+    When they create a personal key with one CUSTOM binding to that project and only the ingestion permissions
+    Then the key is created for them, holding only traces:create on that project
+    And it never expires when no expiry is given
+
+  @integration
+  Scenario: The ingestion key route refuses any other shape
+    Given a person signed in to one project
+    When they ask for a service key, another project, another member, extra permissions or more bindings
+    Then the request is refused with code api_key_scope_violation and status 403
+
+  @integration
+  Scenario: An API key cannot mint an ingestion key
+    Given an API key holding traces:create on the project
+    When it asks the ingestion key route for a key
+    Then the request is refused with code api_key_scope_violation and status 403
+
+  # `langwatch login --project` writes a key that does project work beyond tracing:
+  # versioning prompts, reading datasets, running evaluations and simulations. The
+  # person's project-bound session mints their own key with that reach, behind
+  # project:manage; no project API key is minted (founder, 2026-10-02).
+  @integration
+  Scenario: A person's project session mints its own full-access key
+    Given a person signed in to one project, holding project:manage there
+    When they create a personal key with one ADMIN binding to that project and every permission
+    Then the key is created for them, with full access to that project and nothing else
+    And it never expires when no expiry is given
+
+  @integration
+  Scenario: The full-access key route refuses any other shape
+    Given a person signed in to one project
+    When they ask for a service key, another project, another member, restricted permissions or more bindings
+    Then the request is refused with code api_key_scope_violation and status 403
+
+  @integration
+  Scenario: A person without project:manage cannot mint a full-access key
+    Given a person signed in to one project, holding traces:create but not project:manage there
+    When they create a personal key with one ADMIN binding to that project and every permission
+    Then the request is refused before any key is minted
+
+  @integration
+  Scenario: An API key cannot mint a full-access key
+    Given an API key holding project:manage on the project
+    When it asks the full-access key route for a key
+    Then the request is refused with code api_key_scope_violation and status 403

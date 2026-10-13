@@ -1,0 +1,182 @@
+/**
+ * @vitest-environment node
+ * The memory audit log repository reads back what it writes through the same instances, proving the
+ * in-memory backend is not a stub.
+ */
+import { instantiateRepositories } from "@langwatch/process";
+import { describe, expect, it } from "vitest";
+
+import { auditLogRepositories } from "../../audit-log-repositories.registry.ts";
+
+const PROJECT_ID = "project-1";
+const USER_ID = "user-1";
+
+describe("given the memory-backed audit log repositories", () => {
+  describe("when writing an audit log entry", () => {
+    it("reads back the entry it just wrote", async () => {
+      const repositories = instantiateRepositories(auditLogRepositories, {
+        tier: "memory",
+        members: {},
+      });
+
+      await repositories.entries.create({
+        userId: USER_ID,
+        projectId: PROJECT_ID,
+        action: "test.create",
+        args: { entityId: "entity-1", name: "Test" },
+      });
+
+      const history = await repositories.entries.findEntityHistory({
+        projectId: PROJECT_ID,
+        actionPrefix: "test.",
+        entityId: "entity-1",
+        argumentNames: ["entityId"],
+        limit: 10,
+      });
+
+      expect(history).toHaveLength(1);
+      expect(history[0]?.userId).toBe(USER_ID);
+      expect(history[0]?.action).toBe("test.create");
+      expect(history[0]?.args).toEqual({ entityId: "entity-1", name: "Test" });
+    });
+
+    it("sorts history by creation date descending", async () => {
+      const repositories = instantiateRepositories(auditLogRepositories, {
+        tier: "memory",
+        members: {},
+      });
+
+      await repositories.entries.create({
+        userId: USER_ID,
+        projectId: PROJECT_ID,
+        action: "test.update",
+        args: { entityId: "entity-2" },
+      });
+
+      await repositories.entries.create({
+        userId: USER_ID,
+        projectId: PROJECT_ID,
+        action: "test.update",
+        args: { entityId: "entity-2" },
+      });
+
+      const history = await repositories.entries.findEntityHistory({
+        projectId: PROJECT_ID,
+        actionPrefix: "test.update",
+        entityId: "entity-2",
+        argumentNames: ["entityId"],
+        limit: 10,
+      });
+
+      expect(history).toHaveLength(2);
+      expect(history[0]?.createdAt.getTime()).toBeGreaterThanOrEqual(
+        history[1]?.createdAt.getTime() ?? 0,
+      );
+    });
+
+    it("respects the limit parameter", async () => {
+      const repositories = instantiateRepositories(auditLogRepositories, {
+        tier: "memory",
+        members: {},
+      });
+
+      await repositories.entries.create({
+        userId: USER_ID,
+        projectId: PROJECT_ID,
+        action: "test.delete",
+        args: { entityId: "entity-3" },
+      });
+
+      await repositories.entries.create({
+        userId: USER_ID,
+        projectId: PROJECT_ID,
+        action: "test.delete",
+        args: { entityId: "entity-3" },
+      });
+
+      const history = await repositories.entries.findEntityHistory({
+        projectId: PROJECT_ID,
+        actionPrefix: "test.delete",
+        entityId: "entity-3",
+        argumentNames: ["entityId"],
+        limit: 1,
+      });
+
+      expect(history).toHaveLength(1);
+    });
+  });
+
+  describe("when reading one person's recent touches", () => {
+    it("answers only their rows in the project and families asked, newest first", async () => {
+      const repositories = instantiateRepositories(auditLogRepositories, {
+        tier: "memory",
+        members: {},
+      });
+      const write = (userId: string, projectId: string, action: string) =>
+        repositories.entries.create({ userId, projectId, action, args: { action } });
+
+      await write(USER_ID, PROJECT_ID, "workflow.create");
+      await write(USER_ID, PROJECT_ID, "dataset.update");
+      await write("someone-else", PROJECT_ID, "workflow.update");
+      await write(USER_ID, "project-2", "workflow.update");
+      await write(USER_ID, PROJECT_ID, "project.update");
+
+      const touches = await repositories.recentTouches.findRecentTouches({
+        userId: USER_ID,
+        projectId: PROJECT_ID,
+        actionPrefixes: ["workflow.", "dataset."],
+        limit: 10,
+      });
+
+      expect(touches.map((touch) => touch.action)).toEqual(["dataset.update", "workflow.create"]);
+    });
+  });
+
+  describe("when reading a trail by target kind", () => {
+    /** @scenario "A trail lists the entries recorded under its target kind, newest first" */
+    it("answers only that kind, newest first, up to the limit, with absent fields as null", async () => {
+      const { entries } = instantiateRepositories(auditLogRepositories, {
+        tier: "memory",
+        members: {},
+      });
+      const write = (targetId: string, targetKind: string, occurredAt: number) =>
+        entries.createOnce({
+          entry: { action: "ops.scheduler.run_now", targetKind, targetId },
+          idempotencyKey: `key-${targetId}`,
+          occurredAt,
+        });
+      await write("schedule-1", "scheduled_job", 1_000);
+      await write("schedule-3", "scheduled_job", 3_000);
+      await write("queue-1", "queue", 4_000);
+      await write("schedule-2", "scheduled_job", 2_000);
+
+      const trail = await entries.findByTargetKind({ targetKind: "scheduled_job", limit: 2 });
+
+      expect(trail).toEqual([
+        {
+          id: expect.any(String),
+          createdAt: new Date(3_000),
+          action: "ops.scheduler.run_now",
+          targetId: "schedule-3",
+          projectId: null,
+          userId: null,
+          metadata: null,
+        },
+        expect.objectContaining({ targetId: "schedule-2" }),
+      ]);
+    });
+
+    /** @scenario "A target kind nothing was recorded under lists nothing" */
+    it("answers an empty list for a kind nothing was recorded under", async () => {
+      const { entries } = instantiateRepositories(auditLogRepositories, {
+        tier: "memory",
+        members: {},
+      });
+      await entries.create({ action: "queue_drain_group", targetKind: "queue", targetId: "q" });
+
+      await expect(
+        entries.findByTargetKind({ targetKind: "no_such_kind", limit: 10 }),
+      ).resolves.toEqual([]);
+    });
+  });
+});

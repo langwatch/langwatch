@@ -7,6 +7,8 @@ src/internal/generated/filters/*
 src/internal/generated/openapi/*
 !src/internal/generated/types/.gitkeep
 !src/internal/generated/openapi/.gitkeep
+# Generated from the api route declarations by `pnpm generate:openapi-types`, and committed.
+!src/internal/generated/openapi/api-client.ts
 coverage/
 
 prompts/*

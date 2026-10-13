@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -20,10 +21,13 @@ import (
 	"github.com/langwatch/langwatch/pkg/herr"
 )
 
+// handledReasonCode returns the leading reason: the provider's own
+// discriminant, or the status reason when the body carried none. A 401 or 403
+// may carry the status reason after it.
 func handledReasonCode(t *testing.T, e herr.E) herr.Code {
 	t.Helper()
-	if len(e.Reasons) != 1 {
-		t.Fatalf("reasons = %v, want one handled reason", e.Reasons)
+	if len(e.Reasons) == 0 {
+		t.Fatalf("reasons = %v, want a handled reason", e.Reasons)
 	}
 	var reason herr.E
 	if !errors.As(e.Reasons[0], &reason) {
@@ -202,6 +206,16 @@ func TestDecodeProviderErrorBody_ObservedProductionShapes(t *testing.T) {
 			status:      http.StatusBadRequest,
 			contentType: "application/json",
 			wantCode:    "upstream_bad_request",
+			wantKind:    "json",
+		},
+		{
+			// The gateway forwards a Bedrock refusal under Bedrock's status and
+			// exception name, with no handled-error marker.
+			name:        "Bedrock refusal forwarded by the gateway keeps the exception name",
+			body:        []byte(`{"error":{"type":"ValidationException","code":"ValidationException","message":"Expected toolResult blocks at messages.2.content for the following Ids: call_b2","meta":{"status":400,"provider":"bedrock"}}}`),
+			status:      http.StatusBadRequest,
+			contentType: "application/json",
+			wantCode:    "ValidationException",
 			wantKind:    "json",
 		},
 		{
@@ -628,5 +642,71 @@ func TestLLMProxy_LogsOnlyTheHandledClassification(t *testing.T) {
 				t.Errorf("secret leaked in log field %q: %v", key, value)
 			}
 		}
+	}
+}
+
+func reasonCodes(e herr.E) []herr.Code {
+	codes := make([]herr.Code, 0, len(e.Reasons))
+	for _, reason := range e.Reasons {
+		if nested, ok := reason.(herr.E); ok {
+			codes = append(codes, nested.Code)
+		}
+	}
+	return codes
+}
+
+// @scenario "A refused credential in a dialect the client does not know still reads as a credential to check"
+func TestDecodeProviderErrorBody_RefusedCredentialAlsoCarriesTheStatusReason(t *testing.T) {
+	tests := []struct {
+		name   string
+		body   string
+		status int
+		want   []herr.Code
+	}{
+		{
+			name:   "Bedrock wrong secret",
+			body:   `{"error":{"type":"InvalidSignatureException","code":"InvalidSignatureException","message":"redacted"}}`,
+			status: http.StatusForbidden,
+			want:   []herr.Code{"InvalidSignatureException", "upstream_forbidden"},
+		},
+		{
+			name:   "Bedrock unknown access key",
+			body:   `{"error":{"type":"UnrecognizedClientException","code":"UnrecognizedClientException","message":"redacted"}}`,
+			status: http.StatusForbidden,
+			want:   []herr.Code{"UnrecognizedClientException", "upstream_forbidden"},
+		},
+		{
+			name:   "OpenAI 401 with a broad type and no code",
+			body:   `{"error":{"type":"invalid_request_error","code":null,"message":"redacted"}}`,
+			status: http.StatusUnauthorized,
+			want:   []herr.Code{"invalid_request_error", "upstream_unauthorized"},
+		},
+		{
+			name:   "Gemini 403",
+			body:   `{"error":{"code":403,"status":"PERMISSION_DENIED","message":"redacted"}}`,
+			status: http.StatusForbidden,
+			want:   []herr.Code{"PERMISSION_DENIED", "upstream_forbidden"},
+		},
+		{
+			name:   "a body with no discriminant keeps the status reason once",
+			body:   `{"message":"redacted"}`,
+			status: http.StatusForbidden,
+			want:   []herr.Code{"upstream_forbidden"},
+		},
+		{
+			name:   "any other status carries only the provider's code",
+			body:   `{"error":{"type":"ValidationException","code":"ValidationException","message":"redacted"}}`,
+			status: http.StatusBadRequest,
+			want:   []herr.Code{"ValidationException"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e := decodeProviderErrorBody([]byte(tc.body), tc.status, "application/json")
+
+			if got := reasonCodes(e); !slices.Equal(got, tc.want) {
+				t.Fatalf("reasons = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

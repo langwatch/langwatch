@@ -1,0 +1,468 @@
+# See ../adrs/20260908-transport-declaration-split.md and
+# dev/docs/plans/api-transport-split.md.
+Feature: Transport declaration split
+  A feature's contract declares each tRPC procedure once: its name, kind, input and
+  output. The feature's server binds a permission and a handler to a procedure the
+  contract already named. REST stays one complete endpoint per route, declared in the
+  server. Each transport has one runtime, built by the process from its own ports, and
+  a declaration is mounted on it; a feature declaration carries no runtime import and
+  never carries the process's tRPC generics.
+
+  @unit @architecture
+  Scenario: A contract declares a procedure once, in a browser-safe module
+    Given a contract module built with defineTrpcContract from @langwatch/module
+    When it declares a query with an input and an output schema and a mutation with only an input
+    Then the module's value-import graph reaches no server framework, tRPC server runtime or Node API
+    And the declaration carries the procedure names, kinds and schemas as types the browser can read
+
+  @unit @typecheck
+  Scenario: A server implementation may only name procedures the contract declared
+    Given a server router built with defineTrpcRouter over a feature API token and its contract
+    When it selects a procedure name the contract does not declare
+    Then the router does not compile
+
+  @unit @typecheck
+  Scenario: A procedure cannot be implemented twice or left unimplemented
+    Given a contract declaring two procedures
+    When the server implements one of them twice, or builds with one of them missing
+    Then the router does not compile
+    And the build names the procedure that was duplicated or omitted
+
+  @unit @typecheck
+  Scenario: A procedure without an access decision has no handler to call
+    Given a server selects a declared procedure
+    When it calls handle before withPermission, noPermission or serviceAuthorized
+    Then the router does not compile
+
+  @unit @typecheck
+  Scenario: The server repeats nothing the contract said
+    Given a declared query with an input and an output schema
+    When the server implements it
+    Then the handler's input parameter is the contract's parsed input type
+    And a handler that returns a value for a procedure declared without output does not compile
+    And a handler whose return the output schema refuses does not compile
+
+  @unit @typecheck
+  Scenario: A query declared without an output is refused at build
+    Given a contract that declares a query with an input and no output
+    When the contract is built
+    Then the build throws naming the query, and the builder offers no build step before withOutput
+    And a write or a stream may still be declared without an output
+
+  @unit
+  Scenario: A tRPC call runs one execution path
+    Given a mounted contract procedure with a permission
+    When a caller invokes it
+    Then the framework authenticates, parses the input, authorizes the exact declared target, runs the handler, checks the output and serializes, in that order
+    And the handler receives input, app, actor, scope and signal, and nothing else
+    And middleware context the process's mount resolved reaches the handler beside input, never inside it
+
+  @unit
+  Scenario: A tRPC check reads the validated input, never the unparsed request
+    Given a mounted contract procedure whose declaration names a scope field
+    When the process installs its tracing, logging, error boundary, check and audit trail
+    Then each of them runs after the contract's own parser
+    And a request the parser refuses is answered as a bad request, before any check runs
+    And the access decision reaches the handler through the request context the check extended, not through the caller's own object
+
+  @unit
+  Scenario: A mutation is recorded with the arguments its owner redacted
+    Given a mounted contract mutation and a process that records audit rows
+    When a caller invokes it
+    Then one row is written naming the caller, the procedure, and the scope ids the input carried
+    And the arguments on the row are the ones the process's redaction answered
+    And a procedure the process exempts writes no row
+
+  @unit
+  Scenario: A process mounts a declaration on the runtime it built
+    Given a process that composed one runtime per transport from its own ports
+    When it mounts a feature's declaration and names the application slice to bind
+    Then the declaration itself names no root, no port and no application
+    And the feature's server and contract value-import no runtime
+
+  @unit
+  Scenario: A procedure whose answer breaks its output schema refuses rather than answering
+    Given a procedure or a REST route whose handler answers a shape its output schema refuses
+    When the caller asks for it
+    Then the failure is logged with the procedure name, the issue path and request metadata
+    And the log carries no response contents
+    And the caller receives an internal error and never the handler's answer
+
+  @unit @typecheck
+  Scenario: The browser derives its client from the contract
+    Given a contract built with defineTrpcContract
+    When a web package derives its typed client from the contract's type
+    Then each procedure's input and output types are the contract's, and no hand-written map is needed
+    And the web package names no AppRouter
+
+  @unit
+  Scenario: A REST endpoint is one complete declaration in the server
+    Given a server router built with defineRestRouter over a feature API token
+    When it declares a namespace, a version and a route with method, path, params, permission, output and docs
+    Then a params schema whose keys differ from the path's parameters does not compile
+    And a route without a permission has no handler to call
+    And a route declared without output is served as 204 with an empty body
+
+  @unit
+  Scenario: A REST request is parsed before its credential is resolved
+    Given a mounted REST declaration whose door resolves a project credential
+    When a caller sends a request the declared schemas refuse
+    Then a caller with no valid credential is answered 401 before the schemas are consulted
+    And an authenticated caller is answered with the schema refusal
+
+  @unit
+  Scenario: A declared route answers at every address its family already served
+    Given a REST declaration mounted under its namespace and version
+    When a caller addresses it by its dated path, by latest, by the bare path or by the /api/v1 twin
+    Then each answers the same, and names the version it answered and that version's status
+    And a real date the router never registered is served by the registration before it
+    And a version segment that names no servable version is refused
+
+  @integration
+  Scenario: A route answers one of several shapes, told apart by a field
+    Given a create that either finds what the caller asked for or starts the work of making it
+    When it declares the two shapes its answer takes and the field that tells them apart
+    Then each shape it returns is served, and one it never declared is diagnosed
+    And the published document offers both shapes with that field as the discriminator
+    And a union that names no field telling its shapes apart does not compile
+
+  @integration
+  Scenario: A collection route is addressed at the family root, with no trailing slash
+    Given a REST declaration carrying a collection route and a by-id route beside it
+    When a caller addresses the collection by its dated path, by latest, by the bare path or by the /api/v1 twin
+    Then no address the family registers ends in a slash
+    And each one reaches the collection handler rather than the by-id handler
+
+  @integration
+  Scenario: A declared body cap is measured before the body is parsed
+    Given a route declaring both a body cap and a body schema
+    When a caller sends a body under the cap
+    Then the route is served
+    And a body over the cap is refused as the declared refusal, with the status that refusal carries
+    And neither answer is a server fault
+
+  @integration
+  Scenario: A route's declared tags reach the published document
+    Given a route whose docs name the groups it belongs to
+    When the process publishes the OpenAPI document
+    Then the operation is filed under exactly those tags
+
+  @integration
+  Scenario: A route's declared responses reach the published document
+    Given a route whose docs name an answer beyond the one it declares on success
+    When the process publishes the OpenAPI document
+    Then the operation lists that answer beside its success, with the status's own name
+
+  @integration
+  Scenario: A route's declared middleware context is provided by its module and reaches every handler
+    Given routes declaring middleware context their module resolves, rather than the caller sends
+    When the module provides one value for each context with provideMiddlewareContext
+    Then each handler is handed the context it declared, parsed, in the order it declared it
+    And every address the route answers at resolves it the same way
+    And a module that provides no value for a declared context does not compile, and a mount without one is refused, naming the context and the route
+
+  @unit
+  Scenario: A declaration names the credential its routes accept
+    Given a REST declaration built with defineRestRouter
+    When it names the door its routes answer behind, before its first route
+    Then the declaration carries that credential, and one that names none carries the project key
+    And a door named after the first route is refused, because the routes are already typed
+
+  @unit @typecheck
+  Scenario: A handler on an organization door receives the organization scope
+    Given a declaration that names the organization door
+    When a route on it reads the scope it is handed
+    Then the scope is the organization the credential resolved
+    And the same route on a project door does not compile
+    And a door for a credential nothing resolves a scope for does not compile
+
+  @unit
+  Scenario: A mount cannot answer a declaration behind the other door
+    Given a declaration that names the organization door
+    When a process mounts it naming the project credential instead
+    Then the mount is refused, naming the declared door and the one the mount named
+
+  @integration
+  Scenario: An organization id the credential did not resolve is a handled refusal
+    Given a credential that resolved one organization
+    When the request body names a different organization
+    Then the caller is refused as forbidden, with a stable code a client renders copy from
+    And the refusal names the offending field and neither organization
+    And a body naming the organization the credential resolved is served
+
+  @integration
+  Scenario: A door that resolves the wrong tier is a wiring failure, not an answer
+    Given a declaration that names the organization door
+    When the process's own door resolves a project instead
+    Then the request fails rather than handing a project scope to an organization handler
+
+  @integration
+  Scenario: An organization route publishes the organization security scheme
+    Given a route declared behind the organization door
+    When the process mounts it and reads the route registry
+    Then the route records the organization credential class
+    And the class publishes the organization API key scheme in the document
+
+  @unit
+  Scenario: A route the family's own door alone gates asks no permission of it
+    Given a declaration whose door resolves a credential
+    When one of its routes declares authenticated access, with the written reason that suffices
+    Then the door still resolves the credential and the scope it names, and asks no permission
+    And the registry records the family's own credential class and the reason the route gave
+    And the document keeps the family's security scheme for it
+    And a route naming both a permission and authenticated access is refused at declaration
+    And a mount that cannot open the door without a permission is refused, naming the route
+
+  @unit
+  Scenario: A route checks its permission at the scope its own path names
+    Given a family behind an organization key whose routes each address one project
+    When a route declares its permission at the scope its path names
+    Then the credential is authenticated as ever, and the permission is asked about that project
+    And the handler is handed the credential's scope and the route's target both
+    And a caller the process refuses at that scope is denied, naming neither
+    And a route whose sources parse no such field is refused at declaration
+    And a route whose path spells that scope under another name names the field, and is asked about that project the same way
+    And a mount that cannot ask the question is refused, naming the route
+
+  @unit
+  Scenario: A route says how far the key door asks its permission
+    Given a family behind the key door, whose keys need not name a project
+    When a route declares its permission at the key's grants, or at the organization
+    Then the door is asked that permission with the reach the route declared
+    And a route that declares no reach asks the door the permission alone
+    And a caller the door refuses never reaches the handler
+    And a mount that puts such a route behind any other door is refused, naming the route
+
+  @unit
+  Scenario: A family behind a deployment secret names no tenant
+    Given a declaration that names the deployment-secret door
+    When the process's door accepts the secret and resolves no scope
+    Then the handler is handed no actor and no scope
+    And the registry records the internal-secret credential class, not a public route
+    And a door that resolved a tenant scope for it fails rather than answering
+
+  @unit
+  Scenario: The deployment-secret door reads its bearer as RFC 6750 spells it
+    Given a family behind a deployment secret (Alex, 2026-10-06, Q52)
+    When a caller presents the secret after the "Bearer" scheme in any letter case, with whitespace around the header or between scheme and secret
+    Then the door admits the caller
+    And a secret presented with no scheme, or under another scheme, is refused as unverified
+    And a configured secret with whitespace around it is compared trimmed
+
+  @unit
+  Scenario: A family behind a deployment secret publishes the secret's own scheme
+    Given the deployment-secret and SCIM-token credentials
+    When the document asks what each of them publishes
+    Then each names the scheme its holder presents
+    And neither is published as an operation needing no credential
+
+  @unit
+  Scenario: A declaration may name the SCIM token as its door
+    Given a family provisioned through one directory connection's own token
+    When it names that door
+    Then its handlers are handed the organization the token resolved
+    And the registry records the SCIM credential class, which publishes the SCIM bearer scheme
+
+  @integration
+  Scenario: A family behind the instance administrator's own key names no tenant
+    Given a family that creates the first organization of a deployment
+    When it names the instance administrator key as its door
+    Then its handlers are handed no scope, because the key names no tenant
+    And the registry records the instance administrator credential class
+    And the document publishes that key's own scheme for it
+
+  @integration
+  Scenario: A family behind a browser session serves the person the cookie identified
+    Given a family whose callers are the application's own pages
+    When it names the session door
+    Then the door resolves the person and the project scope, and the handler reads both
+    And an answer the handler streams is written as it opened it
+    And the family publishes no operation, because no API client can present a cookie
+
+  @integration
+  Scenario: A route answers with or without the family's credential
+    Given a route declared to take the family's credential optionally, with the written reason
+    When a caller reaches it presenting nothing
+    Then the handler is handed no actor and no scope, and answers
+    And a caller presenting the credential is resolved as any other, scope and all
+    And the published document offers the operation both the empty requirement and the family's scheme
+    And a mount that cannot open the door for an absent credential is refused, naming the route
+
+  @integration
+  Scenario: A route answers a credential its door refuses as no credential
+    Given a route declared to take the family's credential optionally, answering a refused one as none
+    When a caller presents a credential the door verifies
+    Then the handler is handed the scope the door resolved
+    And a caller presenting a missing or bad credential is answered with no actor and no scope, never a 401
+    And a door failing for a reason that is not a refusal is logged and answered with no actor and no scope
+
+  @integration
+  Scenario: A route whose resource names its own owner resolves the scope in its handler
+    Given a route declared to defer its scope, with the written reason the handler resolves it
+    When a caller the door authenticates reaches it
+    Then the handler is handed the caller and no scope, and the owner is its own to resolve
+    And the registry records the family's credential class and the reason the route gave
+    And a mount that cannot open the door without a permission is refused, naming the route
+
+  @unimplemented
+  Scenario: A project key presented to an organization route is refused with the body the family already publishes
+    Given a family declared behind the organization door
+    When a caller presents a project API key
+    Then the door refuses it as a credential class mismatch, naming the key class required
+    And a request carrying no credential at all is refused as missing credentials
+
+  @unit
+  Scenario: A project id the credential did not resolve is a handled refusal
+    Given a credential that resolved one project
+    When the request body names a different project
+    Then the caller is refused as forbidden, with a stable code a client renders copy from
+    And the refusal names the offending field and neither project
+
+  @integration
+  Scenario: The declarations publish the OpenAPI document
+    Given a REST router declared with docs on every route
+    And its application provider refuses resolution before the process boots
+    When the process mounts it under its namespace and version
+    Then every route appears in the OpenAPI document at its /api/v1 address with its summary
+    And no bare, dated or latest address of a route appears in the document
+    And no route is documented that the router did not declare
+    And mounting and documenting routes never resolve the application provider
+
+  @unit
+  Scenario: Handled failures cross the boundary as handled errors
+    Given a handler throws a HandledError with a stable code
+    When the transport answers
+    Then the wire carries the code and the declared HTTP status
+    And a plain Error degrades to the generic unknown answer with a trace id
+
+  @unit @architecture
+  Scenario: A feature declaration carries no process generics
+    Given annotation's contract, server transports and web client are written against the split
+    When their sources are read
+    Then none names TContext, TRoot, TOptions, a mount type or a tRPC root
+    And the process mount binds the framework's request context on its own side
+
+  @unit
+  Scenario: A namespace too large for one declaration is claimed once
+    Given two routers built under the same namespace
+    When the process mounts the composition of them
+    Then it serves every procedure both routers declared, on one router
+
+  @unit
+  Scenario: Two routers that declare the same procedure are refused
+    Given two routers under one namespace that both declare "getById"
+    When they are composed
+    Then the composition is refused, naming the procedure
+
+  @unit
+  Scenario: A route may require several permissions together
+    Given a family behind a key door
+    When a route names two permissions in one declaration (Alex, 2026-10-05, E2)
+    Then the door is asked every one of them, in the order declared, before the body is read
+    And a route asking them at the scope its own path names asks each one there, and the first the caller lacks is the refusal, before the handler
+    And the registry and the document record every permission the route asks
+    And a set naming fewer than two, repeating one, or sharing no scope that grants them all is refused where it is written
+
+  @unit
+  Scenario: A route chooses its permission from its parsed input
+    Given a route whose permission depends on a value its input carries
+    When it declares a map from each value of that field to the permission it asks, and optionally the scope it is asked at (Alex, 2026-10-05, E3)
+    Then the door only identifies the caller before the body is read
+    And once the body is validated, the permission the value chose is asked at the scope its entry names, else at the route's own target, else at the credential's scope
+    And a caller lacking it is refused 403 permission_denied naming that permission, and the handler never runs
+    And the registry records every permission the map can ask
+    And a map whose keys are not exactly the values the field parses as, an entry naming a tier that cannot grant its permission, or a choice asked at a key's reach is refused where it is written
+    And a mount whose door cannot identify or authorize, or a browser route asking a bare entry at the credential's scope, is refused, naming the route
+
+  @integration
+  Scenario: A platform route asks the operator's platform grant at its door
+    Given a route behind the browser door declares a platform-tier permission at the platform (Alex, 2026-10-05, E4)
+    When a signed-in caller holding that permission at the platform calls it
+    Then the door asks the platform question before the body is read, and the handler runs
+    And a caller acting as another user is asked about the grant of the operator behind them
+    And a caller lacking it is refused 403 permission_denied naming the permission, and a caller with no session 401, before the body is read
+    And a non-platform permission asked at the platform, or a platform permission asked anywhere else, is refused where it is written
+    And a mount whose door cannot identify the caller or answer the platform question is refused, naming the route
+
+  @integration
+  Scenario: A hidden platform route answers not found to everyone it refuses
+    Given a platform route declares its refusal hidden (Alex, 2026-10-05, E4)
+    When a caller with no session, or a signed-in caller lacking the permission, calls it with a body over the route's cap
+    Then each is answered 404 not_found, the same answer, before the body is read
+
+  @integration
+  Scenario: A staff platform route hides from non-staff and refuses staff by name
+    Given a platform route asks a write permission and hides from callers lacking a staff permission (Alex, 2026-10-06, Q42)
+    When a caller with no session, a signed-in caller lacking the staff permission, and a staff caller lacking the write permission call it
+    Then they are answered 401, 404 not_found and 403 permission_denied naming the write permission, each before the body is read
+    And a caller holding both reaches the handler
+    And a staff permission that is not platform-tier, or a staff route that also names a refusal, is refused where it is written
+
+  @integration
+  Scenario: A route hands its handler the key the door resolved
+    Given a route behind a key door declares that its handler reads the key (Alex, 2026-10-05, E5)
+    When a caller presents an API key, a person's access token or a legacy project key
+    Then the handler is handed the key's kind, its key id and its owner beside the actor, with no key id for a token or a legacy key and no owner for an ownerless key
+    And an ingestion key and a Langy session key are handed as their own kinds
+    And a route that did not declare it is handed no key
+    And a door that resolves no key cannot declare it: refused by the compiler and where it is written
+
+  @integration
+  Scenario: The session key door hands its holder as the route's session
+    Given a route behind the session key door declares a session schema (Alex, round 86, E1)
+    When a caller presents a minted session key the minting module accepts
+    Then the handler is handed what the module said of the key, parsed by the route's schema
+    And the handler reads none of the key's headers
+
+  @integration
+  Scenario: The OTLP ingest door verifies the exporter's key before the body
+    Given a family behind the OTLP ingest door, bound by the module that owns ingestion keys (Alex, 2026-10-10, W02-DOOR-SHAPE)
+    When an exporter presents a key the owning module accepts
+    Then the handler is handed the holder's actor, its project as the scope and the resolution as the session
+    When an exporter presents no key, or one the module refuses
+    Then the module's own refusal answers before the body is read, and the handler never runs
+
+  @integration
+  Scenario: The licence token door verifies a connect host bearer before the body
+    Given a family behind the licence token door, bound by the module that issues licences (Alex, 2026-10-10, W02-DOOR-SHAPE)
+    When an install presents a bearer the owning module accepts
+    Then the handler is handed no actor, the holder's organization as the scope and the resolution as the session
+    When an install presents a bearer the module refuses, with a body that fails the schema
+    Then the module's own refusal answers with its code and status, before the body is read
+
+  @integration
+  Scenario: A route naming a credential nobody bound refuses the boot
+    Given a family whose routes answer behind a module-bound credential (Alex, 2026-10-10, TYPED-DOORS)
+    And neither the module nor the host binds a door for it
+    When the host mounts the family
+    Then the mount throws naming the credential nobody bound, and no request is ever served
+
+  @integration
+  Scenario: The framework hands a module-bound door the bearer
+    Given a door declared with defineRestDoor for a module-bound credential (Alex, 2026-10-10, W02-DOOR-BEARER)
+    When a caller presents an Authorization header with the Bearer scheme in any case
+    Then the door's identify is handed the token alone as the bearer, and the request beside it
+    When a caller presents no Bearer scheme
+    Then the door is handed no bearer
+
+  @unit
+  Scenario: A module's doors must match the credentials its routes name
+    Given a module whose routes answer behind module-bound credentials (Alex, 2026-10-10, TYPED-DOORS)
+    When it binds .withDoors with a key missing, an extra key, a door of another credential, or a door needing an Api it cannot reach
+    Then the module does not compile
+
+  @integration
+  Scenario: A route admits only the key kinds it names
+    Given a route behind the project door names the key kinds it admits (Alex, 2026-10-05, E7)
+    When a caller presents a key of a kind the route does not name
+    Then the door is told the admitted kinds, and the caller is refused 403 key_type_not_allowed before the body is read and before the handler
+    And a door that ignored the list is backed by the runtime, which refuses the same key after the door
+    And a list that is empty or repeats a kind, or a list on any door but the project door, is refused where it is written
+
+  @integration
+  Scenario: A permission behind the CLI token door is asked of the token's person at its organization
+    Given a route behind the CLI token door declares a permission, with no target or at the organization (Alex, 2026-10-05, E8)
+    When a caller presents a live CLI token
+    Then the door asks whether the token's person holds the permission at the token's organization, before the body is read
+    And a caller lacking it is refused 403 permission_denied, and the handler never runs
+    And a CLI token door built with no way to ask that question refuses the mount of such a route, naming it

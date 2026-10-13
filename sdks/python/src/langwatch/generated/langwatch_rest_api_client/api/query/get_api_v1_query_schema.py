@@ -95,17 +95,23 @@ def sync_detailed(
 ]:
     """Discover the queryable LangWatchQL schema
 
-     Lists the LangWatchQL analytics datasets this key may query, with each column's type, description,
-    the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join
-    keys, partition-pruning time column, freshness and a runnable example query.
+     Lists the LangWatchQL analytics views this key may query, with each column's type, description, the
+    permissions that unlock it, and whether this caller holds them — plus each view's grain, join keys,
+    partition-pruning time column, freshness and a runnable example query. It also lists, under
+    `functions`, every function name a query may call.
 
-    Also lists the app functions a projection may call (`functions`), each with its signature, the type
-    and encoding of the value it returns, how many distinct keys one run may read, and the permissions
-    it needs.
+    Under `appFunctions` it lists the app functions a projection may call, each with its signature, the
+    type and encoding of the value it returns, how many distinct keys one run may read, and the
+    permissions it needs.
 
-    Scoped to the credential's own project and its permissions: a column or function this key cannot
-    read is listed with `available: false` rather than hidden, so a caller can see what a wider key
-    would unlock.
+    Scoped to the projects the credential can read and their permissions: a column or app function this
+    key cannot read in every one of them is listed with `available: false` rather than hidden, so a
+    caller can see what a wider key would unlock.
+
+    Any LangWatch API key — project, organization or personal — reaches every project it can read
+    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
+    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
+    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -137,17 +143,23 @@ def sync(
 ):
     """Discover the queryable LangWatchQL schema
 
-     Lists the LangWatchQL analytics datasets this key may query, with each column's type, description,
-    the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join
-    keys, partition-pruning time column, freshness and a runnable example query.
+     Lists the LangWatchQL analytics views this key may query, with each column's type, description, the
+    permissions that unlock it, and whether this caller holds them — plus each view's grain, join keys,
+    partition-pruning time column, freshness and a runnable example query. It also lists, under
+    `functions`, every function name a query may call.
 
-    Also lists the app functions a projection may call (`functions`), each with its signature, the type
-    and encoding of the value it returns, how many distinct keys one run may read, and the permissions
-    it needs.
+    Under `appFunctions` it lists the app functions a projection may call, each with its signature, the
+    type and encoding of the value it returns, how many distinct keys one run may read, and the
+    permissions it needs.
 
-    Scoped to the credential's own project and its permissions: a column or function this key cannot
-    read is listed with `available: false` rather than hidden, so a caller can see what a wider key
-    would unlock.
+    Scoped to the projects the credential can read and their permissions: a column or app function this
+    key cannot read in every one of them is listed with `available: false` rather than hidden, so a
+    caller can see what a wider key would unlock.
+
+    Any LangWatch API key — project, organization or personal — reaches every project it can read
+    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
+    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
+    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -174,17 +186,23 @@ async def asyncio_detailed(
 ]:
     """Discover the queryable LangWatchQL schema
 
-     Lists the LangWatchQL analytics datasets this key may query, with each column's type, description,
-    the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join
-    keys, partition-pruning time column, freshness and a runnable example query.
+     Lists the LangWatchQL analytics views this key may query, with each column's type, description, the
+    permissions that unlock it, and whether this caller holds them — plus each view's grain, join keys,
+    partition-pruning time column, freshness and a runnable example query. It also lists, under
+    `functions`, every function name a query may call.
 
-    Also lists the app functions a projection may call (`functions`), each with its signature, the type
-    and encoding of the value it returns, how many distinct keys one run may read, and the permissions
-    it needs.
+    Under `appFunctions` it lists the app functions a projection may call, each with its signature, the
+    type and encoding of the value it returns, how many distinct keys one run may read, and the
+    permissions it needs.
 
-    Scoped to the credential's own project and its permissions: a column or function this key cannot
-    read is listed with `available: false` rather than hidden, so a caller can see what a wider key
-    would unlock.
+    Scoped to the projects the credential can read and their permissions: a column or app function this
+    key cannot read in every one of them is listed with `available: false` rather than hidden, so a
+    caller can see what a wider key would unlock.
+
+    Any LangWatch API key — project, organization or personal — reaches every project it can read
+    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
+    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
+    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -214,17 +232,23 @@ async def asyncio(
 ):
     """Discover the queryable LangWatchQL schema
 
-     Lists the LangWatchQL analytics datasets this key may query, with each column's type, description,
-    the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join
-    keys, partition-pruning time column, freshness and a runnable example query.
+     Lists the LangWatchQL analytics views this key may query, with each column's type, description, the
+    permissions that unlock it, and whether this caller holds them — plus each view's grain, join keys,
+    partition-pruning time column, freshness and a runnable example query. It also lists, under
+    `functions`, every function name a query may call.
 
-    Also lists the app functions a projection may call (`functions`), each with its signature, the type
-    and encoding of the value it returns, how many distinct keys one run may read, and the permissions
-    it needs.
+    Under `appFunctions` it lists the app functions a projection may call, each with its signature, the
+    type and encoding of the value it returns, how many distinct keys one run may read, and the
+    permissions it needs.
 
-    Scoped to the credential's own project and its permissions: a column or function this key cannot
-    read is listed with `available: false` rather than hidden, so a caller can see what a wider key
-    would unlock.
+    Scoped to the projects the credential can read and their permissions: a column or app function this
+    key cannot read in every one of them is listed with `available: false` rather than hidden, so a
+    caller can see what a wider key would unlock.
+
+    Any LangWatch API key — project, organization or personal — reaches every project it can read
+    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
+    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
+    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

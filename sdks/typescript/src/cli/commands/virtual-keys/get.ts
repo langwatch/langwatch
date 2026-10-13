@@ -1,20 +1,19 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatScope, formatStatus, virtualKeyDetailUrl } from "./_shared";
-import type { CommandResult } from "../../utils/output";
 
 /**
- * Returns the virtual key rather than printing it: the output port renders it
- * in whatever format the caller asked for (utils/output.ts). The read model
- * carries no secret — only `display_prefix`, exactly what the human view
- * shows — so the raw record is safe to hand to a machine caller.
+ * Returns the virtual key rather than printing it (output port renders
+ * per-format). The read model carries no secret -- only `display_prefix`,
+ * what the human view shows -- so it's safe for a machine caller.
  */
-export const getVirtualKeyCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const getVirtualKeyCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new VirtualKeysApiService();
@@ -38,25 +37,29 @@ export const getVirtualKeyCommand = async (
         console.log(`${chalk.bold("Purpose:")}        ${vk.purpose}`);
         console.log(`${chalk.bold("Prefix:")}         ${vk.display_prefix}...`);
         console.log(`${chalk.bold("Principal:")}      ${vk.principal_user_id ?? chalk.gray("—")}`);
-        console.log(`${chalk.bold("Scopes:")}         ${vk.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
+        console.log(
+          `${chalk.bold("Scopes:")}         ${vk.scopes.map(formatScope).join(", ") || chalk.gray("—")}`,
+        );
         if (vk.trace_project_id) {
           // The key keeps tracing into a deleted project on purpose, so the
           // only way anyone finds out is if the read says so.
-          const deletedSuffix = vk.trace_project_archived
-            ? ` ${chalk.yellow("(deleted)")}`
-            : "";
-          console.log(
-            `${chalk.bold("Trace project:")}  ${vk.trace_project_id}${deletedSuffix}`
-          );
+          const deletedSuffix = vk.trace_project_archived ? ` ${chalk.yellow("(deleted)")}` : "";
+          console.log(`${chalk.bold("Trace project:")}  ${vk.trace_project_id}${deletedSuffix}`);
         }
         console.log(`${chalk.bold("Routing mode:")}   ${vk.routing_mode}`);
-        console.log(`${chalk.bold("Routing policy:")} ${vk.routing_policy_id ?? chalk.gray("(none)")}`);
+        console.log(
+          `${chalk.bold("Routing policy:")} ${vk.routing_policy_id ?? chalk.gray("(none)")}`,
+        );
         console.log(`${chalk.bold("Created:")}        ${new Date(vk.created_at).toLocaleString()}`);
         if (vk.last_used_at) {
-          console.log(`${chalk.bold("Last used:")}      ${new Date(vk.last_used_at).toLocaleString()}`);
+          console.log(
+            `${chalk.bold("Last used:")}      ${new Date(vk.last_used_at).toLocaleString()}`,
+          );
         }
         if (vk.revoked_at) {
-          console.log(`${chalk.bold("Revoked:")}        ${chalk.red(new Date(vk.revoked_at).toLocaleString())}`);
+          console.log(
+            `${chalk.bold("Revoked:")}        ${chalk.red(new Date(vk.revoked_at).toLocaleString())}`,
+          );
         }
         const detailUrl = virtualKeyDetailUrl(vk.id);
         if (detailUrl) {

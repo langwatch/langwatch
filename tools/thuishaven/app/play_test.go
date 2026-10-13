@@ -384,7 +384,7 @@ func TestPlayTeardownRunsEveryStepInOrderBestEffort(t *testing.T) {
 			}), nil)
 
 			if slices.Contains(ran, "remove record") {
-				t.Error("the record must be kept after a failed teardown so `haven clean` can finish it")
+				t.Error("the record must be kept after a failed teardown so `haven machine clean` can finish it")
 			}
 			// Best-effort still holds for everything else.
 			if !slices.Contains(ran, "remove checkout") {

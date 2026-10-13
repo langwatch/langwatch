@@ -54,5 +54,5 @@ Feature: The LangWatchQL catalog is opt-in — a table or model is queryable onl
     Scenario: The catalog view names match the pinned list
       Given the assembled LangWatchQL catalog
       When its view names and source tables are listed
-      Then they equal the pinned list of 129 views
+      Then they equal the pinned list of 128 views
       And the list fails when a view is added or removed without updating it

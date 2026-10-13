@@ -1,10 +1,17 @@
-import { PromptsApiService, type AssignTagResult } from "./prompts-api.service";
-import { Prompt } from "./prompt";
-import type { CreatePromptBody, UpdatePromptBody, PromptData, TagDefinition, CreatedTag } from "./types";
-import { FetchPolicy } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
-import { LocalPromptsService } from "./local-prompts.service";
+
 import { PromptsError } from "./errors";
+import { LocalPromptsService } from "./local-prompts.service";
+import { Prompt } from "./prompt";
+import { PromptsApiService, type AssignTagResult } from "./prompts-api.service";
+import type {
+  CreatePromptBody,
+  UpdatePromptBody,
+  PromptData,
+  TagDefinition,
+  CreatedTag,
+} from "./types";
+import { FetchPolicy } from "./types";
 
 /**
  * Options for fetching a prompt.
@@ -34,7 +41,7 @@ interface PromptsFacadeDependencies {
  * Facade for prompt operations in the LangWatch SDK.
  * Provides a simplified interface for common prompt management tasks.
  */
-export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">{
+export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete"> {
   private readonly promptsApiService: PromptsApiService;
   private readonly localPromptsService: LocalPromptsService;
   private readonly cache = new Map<string, CacheEntry>();
@@ -50,8 +57,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     this.promptsApiService = config.promptsApiService ?? new PromptsApiService(config);
     this.localPromptsService = config.localPromptsService ?? new LocalPromptsService();
     this.tags = {
-      assign: (id, { tag, versionId }) =>
-        this.promptsApiService.assignTag({ id, tag, versionId }),
+      assign: (id, { tag, versionId }) => this.promptsApiService.assignTag({ id, tag, versionId }),
       list: () => this.promptsApiService.listTags(),
       create: ({ name }) => this.promptsApiService.createTag({ name }),
       delete: (tagName) => this.promptsApiService.deleteTag(tagName),
@@ -72,20 +78,13 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   }
 
   /**
-   * Retrieves a prompt by handle or ID.
-   *
-   * Supports shorthand `handle:tag` syntax — e.g. `get("pizza-prompt:production")`.
-   * Shorthand is parsed server-side; the SDK passes the string through as-is.
-   *
+   * Retrieves a prompt by handle or ID (supports `handle:tag` shorthand, parsed server-side).
    * @param handleOrId The prompt's handle, unique identifier, or `handle:tag` shorthand.
    * @param options Optional parameters for the request.
    * @returns The Prompt instance.
    * @throws {PromptsError} If the prompt is not found or the API call fails.
    */
-  async get(
-    handleOrId: string,
-    options?: GetPromptOptions,
-  ): Promise<Prompt> {
+  async get(handleOrId: string, options?: GetPromptOptions): Promise<Prompt> {
     const fetchPolicy = options?.fetchPolicy ?? FetchPolicy.MATERIALIZED_FIRST;
 
     switch (fetchPolicy) {
@@ -116,10 +115,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     return new Prompt(serverPrompt);
   }
 
-  private async getAlwaysFetch(
-    handleOrId: string,
-    options?: GetPromptOptions,
-  ): Promise<Prompt> {
+  private async getAlwaysFetch(handleOrId: string, options?: GetPromptOptions): Promise<Prompt> {
     try {
       const serverPrompt = await this.promptsApiService.get(handleOrId, options);
       return new Prompt(serverPrompt);
@@ -141,14 +137,11 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   }
 
   private buildCacheKey(handleOrId: string, options?: GetPromptOptions): string {
-    const tagSegment = options?.tag != null ? `::tag:${options.tag}` : '';
-    return `${handleOrId}::version:${options?.version ?? ''}${tagSegment}`;
+    const tagSegment = options?.tag != null ? `::tag:${options.tag}` : "";
+    return `${handleOrId}::version:${options?.version ?? ""}${tagSegment}`;
   }
 
-  private async getCacheTtl(
-    handleOrId: string,
-    options?: GetPromptOptions,
-  ): Promise<Prompt> {
+  private async getCacheTtl(handleOrId: string, options?: GetPromptOptions): Promise<Prompt> {
     const cacheKey = this.buildCacheKey(handleOrId, options);
     const ttlMs = (options?.cacheTtlMinutes ?? 5) * 60 * 1000;
     const cached = this.cache.get(cacheKey);

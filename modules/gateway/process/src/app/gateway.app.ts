@@ -1,0 +1,2870 @@
+// The application's own refusal for "the store these figures live in is not
+// reachable": one taxonomy for an unreachable ClickHouse, shared with every
+// other read of it.
+import { ClickHouseUnavailableError } from "@langwatch/analytics-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { RestIdentity } from "@langwatch/api/hosting";
+import type { RestDeclaredResult } from "@langwatch/api/rest";
+import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type {
+  EventingCommandSender,
+  EventingParticipation,
+  Projection,
+  RegisteredCommand,
+  StaticPipelineDefinition,
+} from "@langwatch/eventing";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import {
+  virtualKeyBudgetInputSchema,
+  type GatewayBudgetOverviewForUser,
+  type GatewayPersonalBudget,
+  type GatewayAuthorizedKeyCaller,
+  type GatewayAuthorizedVirtualKeyCaller,
+  type GatewayKeyCaller,
+  type GatewayVirtualKeyCaller,
+  type GatewayRequestCredential,
+  type GatewayVirtualKeyScope,
+  type VirtualKeyWithScopes,
+  GatewayApi as GatewayApiToken,
+  type GatewayBucketSpendInput,
+  type GatewayBucketSpendResult,
+  type GatewayChangeFeed,
+  type GatewayCodexRefreshInput,
+  type GatewayInternalCodexRefreshResult,
+  type GatewayGuardrailCheckInput,
+  type GatewayGuardrailCheckResult,
+  type GatewayJwtClaimsInput,
+  type GatewayRealtimeCorrelation,
+  type GatewayRealtimeRelease,
+  type GatewayRealtimeReservation,
+  type GatewayRealtimeReservationResult,
+  type GatewayRealtimeSessionUpdate,
+  type GatewayRealtimeUsageOutcome,
+  type GatewayRealtimeUsageReport,
+  type GatewaySignedJwt,
+  type GatewayEndUserSpendQuery,
+  type GatewayEndUserSpendResponse,
+  type GatewaySpendEventsPage,
+  type GatewaySpendEventsQuery,
+  type GatewaySpendSummariesPage,
+  type GatewaySpendSummariesQuery,
+  type GatewaySpendByRequestTypeQuery,
+  type GatewayConfirmedSpendPage,
+  type GatewayConfirmedSpendQuery,
+  type GatewaySpendEventPage,
+  type GatewayCaller,
+  GatewayWindow,
+  type VirtualKeyApiApplicableBudgetsInput,
+  type VirtualKeySpendThisMonth,
+  type GatewaySpendEventsPageQuery,
+  type GatewaySpendEventsAcrossTenantsQuery,
+  type GatewaySpendEventsAcrossTenantsPage,
+  type GatewaySpendEventAcrossTenantsQuery,
+  type SpendEventRow,
+  type gatewayInternalBucketSpendAnswers,
+  type gatewayInternalChangesAnswers,
+  type gatewayInternalCodexRefreshAnswers,
+  type gatewayInternalConfigAnswers,
+  type gatewayInternalGuardrailAnswers,
+  type gatewayInternalPatchSessionAnswers,
+  type gatewayInternalReportUsageAnswers,
+  type gatewayInternalReserveSessionAnswers,
+  type gatewayInternalResolveKeyAnswers,
+  type gatewayInternalSpendCommandsAnswers,
+  parseVirtualKeyConfig,
+  type ArchiveGatewayBudgetInput,
+  type ArchiveGatewayCacheRuleInput,
+  type ArchiveGatewayGuardrailInput,
+  type CreateGatewayBudgetInput,
+  type CreateGatewayCacheRuleInput,
+  type CreateGatewayGuardrailInput,
+  type GatewayApplicableBudget,
+  type GatewayAgentCacheWriteInput,
+  type GatewayBudgetChangeInput,
+  type GatewayBudgetCheckInput,
+  type GatewayBudgetCheckResult,
+  type GatewayBudgetDebitRow,
+  type GatewayBudgetResolutionTarget,
+  type GatewayElevenLabsApiCredential,
+  type GatewayTwilioCredential,
+  type GatewayElevenLabsWebhookAnswer,
+  type GatewayVirtualKeyDirectBudget,
+  type GuardrailAttachment,
+  type VirtualKeyConfig,
+  type ResetGatewayBudgetInput,
+  type UpdateGatewayBudgetInput,
+  type UpdateGatewayCacheRuleInput,
+  type UpdateGatewayGuardrailInput,
+  type GatewayApi,
+  type GatewaySpendEventEnvelope,
+  gatewaySpendEventEnvelopeSchema,
+  type GatewayUsageCount,
+  gatewayBrowserConfig,
+  gatewayConfig,
+  type GatewayDeploymentAddresses,
+  type GatewayLicenseTokenResolution,
+  type GatewayServerConfig,
+  type GatewayResolvedBudget,
+  type VirtualKeyBudgetInput,
+  type GatewayMintedVirtualKey,
+  type GatewayVirtualKeyUsageSummary,
+  type GatewayUsageSummary,
+  type GatewayGuardrailResource,
+  type GatewayBudgetResource,
+  type GatewayBudgetDetail,
+  type GatewayBudgetScopeTarget,
+  type GatewayCacheRuleResource,
+  type GatewayBudgetScopeReachResult,
+  type GatewayBudgetHealth,
+  type GatewayBudgetListWithHealth,
+  type GatewayBudgetPageWithHealth,
+  type GatewayPricedSpend,
+  type GatewayPricedSpendResult,
+  type GatewaySpendDay,
+  type GatewayInternalSpendCommandRecord,
+  type GatewayInternalSpendSubmission,
+  type GatewayVirtualKeyRecord,
+  GatewayBudgetNotFoundError,
+  GatewayCacheRuleNotFoundError,
+  GatewaySpendSourceUnavailableError,
+  type GatewayPrincipalDailySpend,
+  type GatewayPrincipalModelSpend,
+  type GatewayPrincipalSpendSummary,
+  type GatewayPrincipalSpendWindow,
+  VirtualKeyNotFoundError,
+} from "@langwatch/gateway-contract";
+import { ValidationError } from "@langwatch/handled-error";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
+import { createLogger } from "@langwatch/observability";
+import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
+import { ProjectApi } from "@langwatch/project-contract";
+import { SecretApi } from "@langwatch/secret-contract";
+import { gatewayInternalSecret, Secret, virtualKeyPepper } from "@langwatch/secrets";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { recordSpanCommandDataSchema, TraceApi } from "@langwatch/trace-contract";
+// The billing envelope is the webhook platform's, and a reconciliation pull has
+// to answer the same bytes a push delivers, so it ARRIVES from that contract.
+import {
+  webhookEnvelopeFromSpendRow,
+  type WebhookSpendEventRow,
+} from "@langwatch/webhook-contract";
+import type { z } from "zod";
+
+import type { GatewayChannels } from "../channels/gateway.channels.ts";
+import {
+  buildGatewayConnectManagedKeyPipeline,
+  type GatewayConnectManagedKeyPipeline,
+} from "../eventing/gateway-connect-managed-key.pipeline.ts";
+import {
+  GATEWAY_DEBITS_PROCESS_NAME,
+  GatewayDebitProcess,
+} from "../eventing/gateway-debit.process.ts";
+import {
+  buildGatewayGovernanceEventsPipeline,
+  type GatewayGovernanceEventsDefinition,
+} from "../eventing/gateway-governance-events.pipeline.ts";
+import {
+  buildGatewayInstantEvalJudgeSpendPipeline,
+  type GatewayInstantEvalJudgeSpendPipeline,
+} from "../eventing/gateway-instant-eval-judge-spend.pipeline.ts";
+import {
+  buildGatewayPulledUsageLedgerPipeline,
+  type GatewayPulledUsageLedgerPipeline,
+} from "../eventing/gateway-pulled-usage-ledger.pipeline.ts";
+import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
+import type { GatewaySpendProcessingEvent } from "../eventing/gateway-spend.intent.ts";
+import {
+  EventingGatewaySpendAdapter,
+  GatewaySpendProducerAdapter,
+} from "../eventing/gateway-spend.pipeline.ts";
+import { GatewayApplicableBudgetsService } from "../features/budget/services/gateway-applicable-budgets.service.ts";
+import { GatewayBudgetChangeDedupeService } from "../features/budget/services/gateway-budget-change-dedupe.service.ts";
+import { GatewayBudgetCrossingService } from "../features/budget/services/gateway-budget-crossing.service.ts";
+import { GatewayBudgetLedgerService } from "../features/budget/services/gateway-budget-ledger.service.ts";
+import { BudgetOverviewService } from "../features/budget/services/gateway-budget-overview.service.ts";
+/**
+ * The gateway feature's application: the one typed thing every door is given. A caller arrives
+ * as {@link GatewayActor}, an argument rather than read from session/request, so one check
+ * serves both a browser session and an API key.
+ */
+import {
+  GatewayEndUserCapsService,
+  type GatewayEndUserCap,
+} from "../features/budget/services/gateway-end-user-caps.service.ts";
+import { GatewayPersonalBudgetService } from "../features/budget/services/gateway-personal-budget.service.ts";
+import {
+  GatewayRealtimeSessionReconciliationService,
+  realtimeSessionReconciliationConfig,
+} from "../features/realtime-session/services/gateway-realtime-session-reconciliation.service.ts";
+import { GatewayRealtimeSessionSweepService } from "../features/realtime-session/services/gateway-realtime-session-sweep.service.ts";
+import type { GatewayRealtimeSessionCollaborators } from "../features/realtime-session/services/gateway-realtime-session.service.ts";
+import { FixedGatewaySettlementPolicyService } from "../features/spend/services/fixed-gateway-settlement-policy.service.ts";
+import { GatewayInstantEvalJudgeSpendService } from "../features/spend/services/gateway-instant-eval-judge-spend.service.ts";
+import { GatewaySpendDebitService } from "../features/spend/services/gateway-spend-debit.service.ts";
+import { GatewaySpendEventsService } from "../features/spend/services/gateway-spend-events.service.ts";
+import {
+  GatewaySpendReconciliationService,
+  type GatewaySpendScope,
+  type GatewaySpendScopeQuery,
+} from "../features/spend/services/gateway-spend-reconciliation.service.ts";
+import { GatewaySpendScopeService } from "../features/spend/services/gateway-spend-scope.service.ts";
+import {
+  GatewayUsageService,
+  type UsageWindow,
+} from "../features/spend/services/gateway-spend-summary.service.ts";
+import { ModelCatalogGatewaySpendRatingService } from "../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
+import {
+  GatewayVirtualKeyDtoService,
+  type VirtualKeyCamelDto,
+  type VirtualKeySnakeDto,
+} from "../features/virtual-key/services/gateway-virtual-key-dto.service.ts";
+import {
+  VirtualKeyAuthorizationService,
+  type VirtualKeyActor,
+} from "../features/virtual-key/services/virtual-key-authorization.service.ts";
+import { VirtualKeyCryptoService } from "../features/virtual-key/services/virtual-key-crypto.service.ts";
+import { VirtualKeyDirectBudgetService } from "../features/virtual-key/services/virtual-key-direct-budget.service.ts";
+import { VirtualKeyService } from "../features/virtual-key/services/virtual-key.service.ts";
+import type { GatewayAgentCacheEntryRepository } from "../repositories/gateway-agent-cache.repository.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
+import type { GatewayBudgetRepository } from "../repositories/gateway-budget.repository.ts";
+import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
+import type { GatewayOpenAdmissionsRepository } from "../repositories/gateway-open-admissions.repository.ts";
+import type { GatewayPrincipalSpendRepository } from "../repositories/gateway-principal-spend.repository.ts";
+import type { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
+import type { GatewaySpendFoldCacheRepository } from "../repositories/gateway-spend-fold-cache.repository.ts";
+import type { GatewaySpendScopeRepository } from "../repositories/gateway-spend-scope.repository.ts";
+import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.repository.ts";
+import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
+import {
+  ConnectManagedKeyService,
+  type ManagedKeyProvisionedSender,
+} from "../services/connect-managed-key.service.ts";
+import { GatewayAgentCacheService } from "../services/gateway-agent-cache.service.ts";
+import { GatewayAuthzScopePermissionsService } from "../services/gateway-authz-scope-permissions.service.ts";
+import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
+import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
+import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
+import { GatewayConnectUpstreamService } from "../services/gateway-connect-upstream.service.ts";
+import { GatewayElevenLabsCredentialService } from "../services/gateway-elevenlabs-credential.service.ts";
+import { GatewayElevenLabsWebhookService } from "../services/gateway-elevenlabs-webhook.service.ts";
+import {
+  GatewayGovernanceEventsService,
+  type GatewayGovernanceSignals,
+} from "../services/gateway-governance-events.service.ts";
+import { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service.ts";
+import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
+import { GatewayInternalDoorService } from "../services/gateway-internal-door.service.ts";
+import { GatewayInternalIdentityService } from "../services/gateway-internal-identity.service.ts";
+import { GatewayInternalProtocolService } from "../services/gateway-internal-protocol.service.ts";
+import type { GatewaySpendCommandSender } from "../services/gateway-internal-protocol.service.ts";
+import { GatewayJwtService } from "../services/gateway-jwt.service.ts";
+import { GatewayOrganizationDirectoryService } from "../services/gateway-organization-directory.service.ts";
+import {
+  GatewayScopeResolutionService,
+  type GatewayPlatformProviders,
+} from "../services/gateway-scope-resolution.service.ts";
+import { GatewayTraceExportKeyService } from "../services/gateway-trace-export-key.service.ts";
+import { GatewayService } from "../services/gateway.service.ts";
+import { TwilioCredentialService } from "../services/twilio-credential.service.ts";
+import type {
+  GatewayInternalBucketRequest,
+  GatewayInternalChangesRequest,
+  GatewayInternalConfigRequest,
+  GatewayInternalDoorApi,
+  GatewayInternalGuardrailRequest,
+  GatewayInternalRawRequest,
+  GatewayInternalResolveKeyRequest,
+  GatewayInternalSessionRequest,
+} from "../transport/gateway-internal.rest.ts";
+import type { GatewaySpendDoorApi } from "../transport/gateway-spend.rest.ts";
+
+/**
+ * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped
+ * API key or legacy project key. What it IS belongs to the process's authentication, not this
+ * feature — the doors hand one straight to the checks below and never read it.
+ */
+type GatewayActor = unknown;
+
+/**
+ * A key's own budget, as the write service takes it. The canonical parser is
+ * schemas.virtualKeyBudgetInput, so its decimal regex and positive-amount refinement are never
+ * restated here.
+ */
+type GatewayVirtualKeyBudgetInput = Readonly<{
+  limitUsd: string;
+  window: "DAY" | "WEEK" | "MONTH";
+  onBreach?: "BLOCK" | "WARN";
+  name?: string;
+}>;
+
+/**
+ * Virtual-key read/write capability, as every door calls it — one description where there were
+ * three, which differed only in which optional fields each remembered to mention.
+ */
+type GatewayVirtualKeyOperations = Readonly<{
+  getAll(organizationId: string): Promise<VirtualKeyWithScopes[]>;
+  findById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null>;
+  findLiveWithPrincipal(input: {
+    organizationId?: string;
+    principalUserId?: string;
+  }): Promise<VirtualKeyWithScopes[]>;
+  getPage(input: {
+    organizationId: string;
+    limit: number;
+    cursor: { createdAt: Instant; id: string } | null;
+    externalId?: string;
+  }): Promise<VirtualKeyWithScopes[]>;
+  create(input: {
+    organizationId: string;
+    name: string;
+    description?: string | null;
+    principalUserId?: string | null;
+    scopes: GatewayVirtualKeyScope[];
+    traceProjectId?: string | null;
+    routingPolicyId?: string | null;
+    routingMode?: "FALLBACK_ALL" | "NONE" | "POLICY";
+    expiresAt?: Instant | null;
+    budget?: GatewayVirtualKeyBudgetInput | null;
+    config?: Partial<VirtualKeyConfig>;
+    externalId?: string | null;
+    metadata?: Record<string, string>;
+    actorUserId: string;
+    /** Anything other than USER marks the key product-managed. */
+    purpose?: "USER" | "LANGY" | "CONNECT";
+  }): Promise<{ virtualKey: VirtualKeyWithScopes; secret: string }>;
+  update(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+    name?: string;
+    description?: string | null;
+    scopes?: GatewayVirtualKeyScope[];
+    traceProjectId?: string | null;
+    routingPolicyId?: string | null;
+    routingMode?: "FALLBACK_ALL" | "NONE" | "POLICY";
+    expiresAt?: Instant | null;
+    budget?: GatewayVirtualKeyBudgetInput | null;
+    config?: Partial<VirtualKeyConfig>;
+    externalId?: string | null;
+    metadata?: Record<string, string>;
+  }): Promise<VirtualKeyWithScopes>;
+  rotate(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<{ virtualKey: VirtualKeyWithScopes; secret: string }>;
+  revoke(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<VirtualKeyWithScopes>;
+  /** Ends a product-managed key for the feature that owns it. Safe to repeat. */
+  revokeManagedInternal(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<void>;
+  /** Makes every gateway resolve a product-managed key again, unchanged. */
+  invalidateManagedInternal(input: { id: string; organizationId: string }): Promise<void>;
+  /** Replaces the platform services a CONNECT key may serve. Safe to repeat. */
+  setConnectServicesInternal(input: {
+    id: string;
+    organizationId: string;
+    services: readonly string[];
+  }): Promise<void>;
+  /** Records the license a CONNECT key serves. Safe to repeat. */
+  setLicenseFactsInternal(input: {
+    id: string;
+    organizationId: string;
+    licenseId?: string;
+    tokenHash: string;
+    instanceId: string | null;
+    expiresAt: Instant | null;
+  }): Promise<void>;
+  findConnectKeyIdsForLicenseInternal(input: {
+    organizationId: string;
+    licenseId: string;
+  }): Promise<string[]>;
+  /** A CONNECT key by the registry hash of its license token. */
+  findByLicenseTokenHashInternal(tokenHash: string): Promise<GatewayLicensedKey | null>;
+  disable(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+    reason: string | null;
+  }): Promise<VirtualKeyWithScopes>;
+  enable(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<VirtualKeyWithScopes>;
+}>;
+
+type GatewayVirtualKeyCreateInput = GatewayVirtualKeyOperations extends {
+  create(input: infer Input): unknown;
+}
+  ? Input
+  : never;
+type GatewayVirtualKeyUpdateInput = GatewayVirtualKeyOperations extends {
+  update(input: infer Input): unknown;
+}
+  ? Input
+  : never;
+type GatewayVirtualKeyRotateInput = GatewayVirtualKeyOperations extends {
+  rotate(input: infer Input): unknown;
+}
+  ? Input
+  : never;
+type GatewayVirtualKeyRevokeInput = GatewayVirtualKeyOperations extends {
+  revoke(input: infer Input): unknown;
+}
+  ? Input
+  : never;
+type GatewayVirtualKeyDisableInput = GatewayVirtualKeyOperations extends {
+  disable(input: infer Input): unknown;
+}
+  ? Input
+  : never;
+type GatewayVirtualKeyEnableInput = GatewayVirtualKeyOperations extends {
+  enable(input: infer Input): unknown;
+}
+  ? Input
+  : never;
+type GatewayBudgetPageInput = GatewayService extends {
+  listPageWithHealth(input: infer Input): unknown;
+}
+  ? Input
+  : never;
+type GatewayBudgetScopeReachInput = GatewayService extends {
+  scopeReach(input: infer Input): unknown;
+}
+  ? Input
+  : never;
+type GatewayCacheRulePageInput = GatewayService extends {
+  cacheRuleListPage(input: infer Input): unknown;
+}
+  ? Input
+  : never;
+
+/** A draft or existing key, as the applicable-budget resolver takes it. */
+type GatewayApplicableBudgetTarget = Readonly<{
+  organizationId: string;
+  virtualKeyId: string | null;
+  scopes: readonly GatewayVirtualKeyScope[];
+  traceProjectId: string | null;
+  principalUserId: string | null;
+}>;
+
+/**
+ * What the process composes this application from: capabilities built over persistence this
+ * package cannot reach, or decisions against role bindings/memberships it cannot see. Everything
+ * else lives in this package directly.
+ */
+type GatewayRestInfrastructure = Readonly<{
+  /** Absent only where this process mounts no agent-cache family. */
+  agentCache?: GatewayAgentCacheEntryRepository | undefined;
+}>;
+
+interface GatewayAppDependencies extends GatewayRestInfrastructure {
+  // ── The feature's own services and stores ────────────────────────────────
+
+  /** The virtual-key read and write capability. */
+  virtualKeys: GatewayVirtualKeyOperations;
+  /**
+   * The one canonical Gateway service: budget decisions plus the cache-rule and guardrail
+   * catalogues it owns. The process used to build the latter two a second time over its own
+   * copies of the same tables, so a rule written through one was invisible to the other.
+   */
+  budgetDecisions: GatewayService;
+  /**
+   * The ClickHouse budget-spend source. Absent on a deployment without it,
+   * which is why every read of it degrades explicitly rather than reporting a
+   * confident zero.
+   */
+  budgetSpend: GatewayBudgetSpendRepository | undefined;
+  /** The change feed the Go data plane long-polls for budget and key revisions. */
+  changeEvents: GatewayChangeEventsRepository;
+  /** The ClickHouse principal-scope ledger reader. Absent likewise. */
+  principalSpend: GatewayPrincipalSpendRepository | undefined;
+  /** The spend-event ledger reader. Absent likewise. */
+  spendEvents: GatewaySpendEventsService | undefined;
+  /** Project reads: organization resolution and trace-destination facts. */
+  projects: ProjectApi;
+  /** The usage reader, already bound to the spend sources above. */
+  usage: GatewayUsageService;
+  /**
+   * Whether this deployment has the ClickHouse spend source key spend is read
+   * from. False answers `spend_source_unavailable` rather than a $0.00 that
+   * cannot be told apart from a key that genuinely spent nothing.
+   */
+  spendSourceAvailable: boolean;
+  /**
+   * The canonical budget parser, taken rather than restated: its decimal regex
+   * and positive-amount refinement are the write path's contract and must not
+   * be able to drift from a second copy in a transport.
+   */
+  schemas: Readonly<{ virtualKeyBudgetInput: z.ZodType<GatewayVirtualKeyBudgetInput> }>;
+
+  // ── Tenancy anchors and directory reads ──────────────────────────────────
+
+  /**
+   * The organization behind the project a credential authenticated as. Every
+   * gateway resource is organization-owned, so it is the tenancy key for the
+   * whole public surface.
+   */
+  organizationIdForProject(projectId: string): Promise<string>;
+  /**
+   * Refuses an organization id that names no organization. A tenancy anchor,
+   * not an authorization check — the transports' policies decide access.
+   */
+  assertOrganizationExists(organizationId: string): Promise<void>;
+  /** Provider row id to its display label, for a whole page in one read. */
+  resolveProviderLabels(
+    budgets: readonly { providerKey: string | null }[],
+  ): Promise<Map<string, string>>;
+  /** The groups a per-member budget can target, with their sizes. */
+  listGroupTargets(
+    organizationId: string,
+  ): Promise<readonly { id: string; name: string; memberCount: number }[]>;
+  /**
+   * How many members a per-member GROUP allowance currently covers, batched
+   * over however many GROUP rows a response carries.
+   */
+  groupMemberCounts(
+    budgets: readonly { scopeType: string; scopeId: string }[],
+  ): Promise<Map<string, number>>;
+  /**
+   * Display names for the keys a page of spend rows names. VirtualKey is
+   * organization-scoped, so the lookup is fenced by the owning organization
+   * and never by the raw ids off the rows alone.
+   */
+  resolveVirtualKeyNames(input: {
+    organizationId: string;
+    virtualKeyIds: readonly string[];
+  }): Promise<readonly { id: string; name: string }[]>;
+  /** Whether a user belongs to this organization. */
+  isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean>;
+  /**
+   * Identity a REST credential authorizes as, plus the audit-row id: a scoped API key acts as
+   * its owning user; a legacy project key carries none and acts as a stable synthetic machine
+   * principal for its project, keeping audit entries traceable back to the credential.
+   */
+  actorForCredential(input: { projectId: string; credential: GatewayRequestCredential }): {
+    actor: GatewayActor;
+    actorUserId: string;
+  };
+
+  // ── Visibility ───────────────────────────────────────────────────────────
+
+  /**
+   * Org keys narrowed to what this USER can see. Visibility is membership-based, not
+   * permission-based: a caller sees a key when one of its scopes intersects their membership
+   * set, so a non-member gets an empty summary rather than a refusal.
+   */
+  listVisibleVirtualKeys(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<VirtualKeyWithScopes[]>;
+  /** Whether one already-loaded key is visible to this user. */
+  isVirtualKeyVisible(input: {
+    organizationId: string;
+    userId: string;
+    virtualKey: VirtualKeyWithScopes;
+  }): Promise<boolean>;
+  /**
+   * One key for a by-id READ under the list's visibility rule: a key outside the caller's
+   * membership set is indistinguishable from nonexistent. Mutations don't use this — their
+   * contract is permission-based, so an unauthorized caller gets FORBIDDEN instead.
+   */
+  getVisibleVirtualKeyForUser(input: {
+    organizationId: string;
+    id: string;
+    userId: string;
+  }): Promise<VirtualKeyWithScopes>;
+  /**
+   * Keys a credential acting in ONE PROJECT may see on a page: org-scoped keys, its own team's,
+   * its own project's, never a sibling team's. Applied to the page, not the query, so a page
+   * can be shorter than `limit` without the walk being done.
+   */
+  visibleInProject(input: {
+    projectId: string;
+    virtualKeys: readonly VirtualKeyWithScopes[];
+  }): Promise<VirtualKeyWithScopes[]>;
+  /** Of a page, the keys the actor holds the permission on at one of their scopes or more. */
+  heldOnAnyScope(input: {
+    actor: GatewayActor;
+    virtualKeys: readonly VirtualKeyWithScopes[];
+    permission: AuthzPermission;
+  }): Promise<VirtualKeyWithScopes[]>;
+  /** One key anchored to this organization, without any visibility rule. */
+  getExistingVirtualKey(input: {
+    organizationId: string;
+    id: string;
+  }): Promise<VirtualKeyWithScopes>;
+
+  // ── The checks ───────────────────────────────────────────────────────────
+
+  /** `virtualKeys:manage` on EVERY named scope, fail-closed. */
+  assertCanManageAllScopes(input: {
+    actor: GatewayActor;
+    scopes: readonly GatewayVirtualKeyScope[];
+  }): Promise<void>;
+  /** A project credential's own project needs `virtualKeys:create`; anything wider, manage. */
+  assertCanCreateScopes(input: {
+    actor: GatewayActor;
+    scopes: readonly GatewayVirtualKeyScope[];
+    callerProjectId: string;
+  }): Promise<void>;
+  /** One named permission at EVERY one of the key's existing scopes (Alex, 2026-10-01). */
+  assertCanOperateOnAnyScope(input: {
+    actor: GatewayActor;
+    scopes: readonly GatewayVirtualKeyScope[];
+    permission: AuthzPermission;
+  }): Promise<void>;
+  /** One named permission at the organization; a legacy project key passes, as on main. */
+  assertCanOperateAtOrganization(input: {
+    actor: GatewayActor;
+    organizationId: string;
+    permission: AuthzPermission;
+  }): Promise<void>;
+  /** Anchors every scope in the set to this organization. */
+  assertScopesBelongToOrganization(input: {
+    organizationId: string;
+    scopes: readonly GatewayVirtualKeyScope[];
+  }): Promise<void>;
+  /** Anchors the trace destination to this organization. */
+  assertTraceProjectBelongsToOrganization(input: {
+    organizationId: string;
+    traceProjectId: string | null | undefined;
+  }): Promise<void>;
+  /** Refuses a guardrail attachment the caller may not make in the key's guardrail project. */
+  assertGuardrailAttachmentsAllowed(input: {
+    actor: GatewayActor;
+    organizationId: string;
+    virtualKeyId: string | null;
+    scopes: readonly GatewayVirtualKeyScope[] | undefined;
+    traceProjectId: string | null;
+    attachments: readonly GuardrailAttachment[] | undefined;
+  }): Promise<void>;
+
+  // ── Projections and spend ────────────────────────────────────────────────
+
+  /**
+   * The camelCase projection the app surfaces publish, for a page of keys in
+   * ONE read of the trace destinations however long the page: a listing must
+   * not cost a query per key to say where each one's traffic goes.
+   */
+  toVirtualKeyCamelDtos(input: {
+    virtualKeys: readonly VirtualKeyWithScopes[];
+  }): Promise<VirtualKeyCamelDto[]>;
+  /** The published snake_case projection, batched the same way. */
+  toVirtualKeySnakeDtos(input: {
+    virtualKeys: readonly VirtualKeyWithScopes[];
+  }): Promise<VirtualKeySnakeDto[]>;
+  /** Every budget that would constrain a draft or existing key. */
+  listApplicableBudgets(input: {
+    target: GatewayApplicableBudgetTarget;
+  }): Promise<GatewayApplicableBudget[]>;
+  /** The budget each named key carries of its own, with this period's spend. */
+  loadDirectBudgetsForKeys(input: {
+    organizationId: string;
+    virtualKeyIds: readonly string[];
+    now: Instant;
+  }): Promise<Map<string, GatewayVirtualKeyDirectBudget>>;
+  /**
+   * Spend and request count per key over a window, from the cost path — the
+   * same source the dashboard's key list and the Usage tab read, so the number
+   * in a table, the API and the Usage page agree by construction.
+   */
+  spendByVirtualKey(input: {
+    organizationId: string;
+    virtualKeyIds: readonly string[];
+    window: { fromDate: Instant; toDate: Instant };
+  }): Promise<Map<string, { spentUsd: string; requests: number }>>;
+}
+
+type GatewayInfrastructure = GatewayAppDependencies | GatewayRestInfrastructure;
+
+/** The brokered-voice services, each derived from this module's own stores and peers. */
+type GatewayVoiceServices = Readonly<{
+  webhook: GatewayElevenLabsWebhookService;
+  elevenLabsCredential: GatewayElevenLabsCredentialService;
+  twilioCredential: TwilioCredentialService;
+  reconciliation: GatewayRealtimeSessionReconciliationService;
+}>;
+
+/** A grouped spend command record, as the queue takes it; anything else is a composition bug. */
+function spendCommandRecord(command: string, payload: unknown): Record<string, unknown> {
+  if (typeof payload === "object" && payload !== null && !Array.isArray(payload)) {
+    return Object.fromEntries(Object.entries(payload));
+  }
+  throw new TypeError(`gateway_spend ${command} was handed a payload that is not a record.`);
+}
+
+/** The ledger gateway_spend folds into, its settlement read, and its registered senders. */
+type GatewaySpendPipelineParts = Readonly<{
+  ledger: GatewaySpendEventsRepository;
+  commands: Record<string, GatewaySpendCommandSender | undefined>;
+  openAdmissions: GatewayOpenAdmissionsRepository;
+  settlementGraceMs: number;
+  foldCache: GatewaySpendFoldCacheRepository;
+  /** Absent without the ClickHouse budget ledger, the only store a debit lands in. */
+  debits: GatewaySpendDebitService | undefined;
+}>;
+
+type GatewaySpendDefinition = StaticPipelineDefinition<
+  GatewaySpendProcessingEvent,
+  Record<string, Projection>,
+  RegisteredCommand
+>;
+
+/**
+ * What the billing reconciliation family reads that is neither the gateway's
+ * own ledger nor a peer's application: the one guarded Postgres connection its
+ * two resolutions run on, and how long after a request an outcome may still arrive.
+ */
+type GatewaySpendCollaborators = Readonly<{
+  spendScope: GatewaySpendScopeRepository;
+  budgets: GatewayBudgetRepository;
+  settlementGraceMs: number;
+}>;
+
+/**
+ * The two peers the per-member budget overview reads: organization
+ * membership plus personal-workspace resolution, and the governance flag.
+ */
+type GatewayBudgetOverviewDeps = Readonly<{
+  organizations: OrganizationApi;
+  featureFlags: FeatureFlagApi;
+  traces: Pick<TraceApi, "findModelSpend">;
+  /** Where the /me banner's request-increase link points; absent, it carries none. */
+  publicBaseUrl: string | undefined;
+}>;
+
+const virtualKeyDtos = GatewayVirtualKeyDtoService.create();
+
+/** The other features the gateway control plane reaches, one by one. */
+type GatewayControlPlanePeers = Readonly<{
+  /** The permission service every other surface on this process authorizes with. */
+  authz: AuthzApi;
+  /** The project directory the tenancy graph composed. */
+  projects: ProjectApi;
+  /** The organization directory: existence, membership, groups and their members. */
+  organizations: OrganizationApi;
+  /** The evaluators a guardrail rule runs, as the budget-decision store reads them. */
+  evaluators: EvaluatorApi;
+  /** The monitors a guardrail attachment names. */
+  monitors: MonitorApi;
+  /** The deployment's own providers, which a license's managed key dispatches on. */
+  platformProviders: GatewayPlatformProviders;
+  /** The per-virtual-key spend the usage surfaces read. */
+  traces: Pick<
+    TraceApi,
+    "findSpendByProjectAndValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
+  >;
+}>;
+
+type GatewayControlPlaneOptions = Readonly<{
+  repositories: GatewayRepositories;
+  peers: GatewayControlPlanePeers;
+  /** The HMAC key a virtual key's stored secret is hashed under. */
+  virtualKeyPepper: string | undefined;
+  /** Where a virtual key's lifecycle is announced, where the deployment composed a ledger. */
+  governanceSignals?: GatewayGovernanceSignals | undefined;
+}>;
+
+type GatewayControlPlane = GatewayAppDependencies &
+  Readonly<{
+    internalVirtualKeys: VirtualKeyService;
+    internalChanges: GatewayChangeEventsRepository;
+    internalScopeResolution: GatewayScopeResolutionService;
+    /** The spend ledger the gateway_spend fold writes. */
+    spendLedger: GatewaySpendEventsRepository;
+    /** The settlement sweeper's read of every server's open admissions. */
+    openAdmissions: GatewayOpenAdmissionsRepository;
+  }>;
+
+/**
+ * Composes the gateway control plane over the module's repositories: the
+ * whole of what {@link GatewayModule}'s core surface answers from.
+ */
+function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayControlPlane {
+  const { repositories, peers } = options;
+  const { projects, organizations } = peers;
+  const permissions = GatewayAuthzScopePermissionsService.create(peers.authz);
+  const organizationFacts = GatewayOrganizationDirectoryService.create({ organizations });
+  const virtualKeyAuthorization = VirtualKeyAuthorizationService.create({
+    directory: repositories.virtualKeyAuthorization,
+    organizations,
+    projects,
+  });
+  const scopeResolution = GatewayScopeResolutionService.create({
+    repository: repositories.scopeResolution,
+    platformProviders: peers.platformProviders,
+    projects,
+  });
+  const changes = repositories.changeEvents;
+  const virtualKeys = VirtualKeyService.create({
+    transactions: repositories.transactions,
+    keyBudgets: repositories.keyBudgets,
+    scopeResolution,
+    projects,
+    repository: repositories.virtualKeys,
+    changeEvents: changes,
+    auditLog: repositories.audit,
+    crypto: VirtualKeyCryptoService.create({ pepper: options.virtualKeyPepper }),
+    ...(options.governanceSignals ? { governanceSignals: options.governanceSignals } : {}),
+  });
+  const { budgetSpend, principalSpend, openAdmissions } = repositories;
+  const spendLedger = repositories.spendEvents;
+  const spendEvents = GatewaySpendEventsService.create(spendLedger);
+  // The cache-rule and guardrail catalogues live on the one budget service, so
+  // a rule written through one door is the rule every other door reads.
+  const budgetDecisions = GatewayService.create({
+    repository: repositories.budgets,
+    projects,
+    organizations,
+    cacheRules: GatewayCacheRuleService.create(repositories.cacheRules),
+    guardrails: GatewayGuardrailService.create({
+      repository: repositories.guardrails,
+      evaluators: peers.evaluators,
+      monitors: peers.monitors,
+      projects,
+      audit: repositories.audit,
+    }),
+  });
+  // The usage rollup labels each key the ledger reported spend against, which
+  // is a repository read; `virtualKeys` above is the operations service.
+  const usage = GatewayUsageService.create({
+    projects,
+    virtualKeys: repositories.virtualKeys,
+    chRepo: budgetSpend,
+    traces: peers.traces,
+  });
+
+  return {
+    virtualKeys,
+    budgetDecisions,
+    budgetSpend,
+    changeEvents: changes,
+    principalSpend,
+    spendEvents,
+    projects,
+    usage,
+    // The repositories hold a spend ledger in every tier, so the spend source
+    // is present whenever the control plane is.
+    spendSourceAvailable: true,
+    schemas: { virtualKeyBudgetInput: virtualKeyBudgetInputSchema },
+    internalVirtualKeys: virtualKeys,
+    internalChanges: changes,
+    internalScopeResolution: scopeResolution,
+    spendLedger,
+    openAdmissions,
+
+    organizationIdForProject: async (projectId) => {
+      const organizationId = await projects.findOrganizationId(projectId);
+      if (!organizationId) throw new Error(`project ${projectId} missing team`);
+
+      return organizationId;
+    },
+    // The refusal the deleted composition raised, unchanged: the anchor is
+    // read from both doors and a second taxonomy here would change what a
+    // tRPC caller already sees.
+    assertOrganizationExists: (organizationId) => organizationFacts.assertExists(organizationId),
+    resolveProviderLabels: (budgets) =>
+      repositories.providerLabels.resolveProviderLabels([...budgets]),
+    listGroupTargets: (organizationId) =>
+      repositories.organizationDirectory.findGroupTargets(organizationId),
+    groupMemberCounts: (budgets) => repositories.organizationDirectory.groupMemberCounts(budgets),
+    // The label per key a page of spend rows carries, read through this
+    // feature's OWN persistence rather than by a key-table `findMany`.
+    resolveVirtualKeyNames: (input) => virtualKeys.resolveNames(input),
+    isOrganizationMember: (input) => organizationFacts.isMember(input),
+    // A scoped API key acts as its owning user; a legacy project key carries
+    // none, so it acts as a stable machine principal for its project, which
+    // keeps an audit row traceable back to the credential that wrote it.
+    actorForCredential: ({ projectId, credential }) => {
+      if (credential.kind === "user") {
+        return {
+          actor: { kind: "cliAccessToken", userId: credential.userId, projectId },
+          actorUserId: credential.userId,
+        } satisfies { actor: VirtualKeyActor; actorUserId: string };
+      }
+      return credential.kind === "apiKey"
+        ? {
+            actor: {
+              kind: "apiKey",
+              apiKeyId: credential.apiKeyId,
+              userId: credential.userId,
+              organizationId: credential.organizationId,
+            } satisfies VirtualKeyActor,
+            actorUserId: credential.userId ?? `svc_${projectId}`,
+          }
+        : {
+            actor: { kind: "legacyProjectKey", projectId } satisfies VirtualKeyActor,
+            actorUserId: `svc_${projectId}`,
+          };
+    },
+
+    listVisibleVirtualKeys: async ({ organizationId, userId }) => {
+      const membership = await virtualKeyAuthorization.loadMembershipSet({
+        organizationId,
+        userId,
+      });
+
+      return (await virtualKeys.getAll(organizationId)).filter((virtualKey) =>
+        virtualKeyAuthorization.isVisibleToMembership(membership, virtualKey.scopes),
+      );
+    },
+    isVirtualKeyVisible: async ({ organizationId, userId, virtualKey }) =>
+      virtualKeyAuthorization.isVisibleToMembership(
+        await virtualKeyAuthorization.loadMembershipSet({ organizationId, userId }),
+        virtualKey.scopes,
+      ),
+    getVisibleVirtualKeyForUser: async ({ organizationId, id, userId }) =>
+      virtualKeyAuthorization.getVisibleVk(
+        virtualKeys,
+        await virtualKeyAuthorization.loadMembershipSet({ organizationId, userId }),
+        { id, organizationId },
+      ),
+    visibleInProject: async ({ projectId, virtualKeys: page }) => {
+      const membership = await virtualKeyAuthorization.membershipOfProject(projectId);
+
+      return page.filter((virtualKey) =>
+        virtualKeyAuthorization.isVisibleToMembership(membership, virtualKey.scopes),
+      );
+    },
+    heldOnAnyScope: ({ actor, virtualKeys: page, permission }) =>
+      virtualKeyAuthorization.heldByActor(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        page,
+        permission,
+      ),
+    getExistingVirtualKey: ({ organizationId, id }) =>
+      virtualKeyAuthorization.getExistingVk(virtualKeys, id, organizationId),
+
+    assertCanManageAllScopes: ({ actor, scopes }) =>
+      virtualKeyAuthorization.assertActorCanManageAllScopes(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        [...scopes],
+      ),
+    assertCanCreateScopes: ({ actor, scopes, callerProjectId }) =>
+      virtualKeyAuthorization.assertActorCanCreateScopes(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        { scopes: [...scopes], callerProjectId },
+      ),
+    assertCanOperateOnAnyScope: ({ actor, scopes, permission }) =>
+      virtualKeyAuthorization.assertActorCanOperateOnAnyScope(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        [...scopes],
+        permission,
+      ),
+    assertCanOperateAtOrganization: ({ actor, organizationId, permission }) =>
+      virtualKeyAuthorization.assertActorCanOperateAtOrganization(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        { organizationId, permission },
+      ),
+    assertScopesBelongToOrganization: ({ organizationId, scopes }) =>
+      virtualKeyAuthorization.assertScopesBelongToOrg({ organizationId, scopes: [...scopes] }),
+    assertTraceProjectBelongsToOrganization: ({ organizationId, traceProjectId }) =>
+      virtualKeyAuthorization.assertTraceProjectBelongsToOrg({ organizationId, traceProjectId }),
+    assertGuardrailAttachmentsAllowed: ({
+      actor,
+      organizationId,
+      virtualKeyId,
+      scopes,
+      traceProjectId,
+      attachments,
+    }) =>
+      virtualKeyAuthorization.assertGuardrailAttachmentsAllowed(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        {
+          organizationId,
+          vkId: virtualKeyId,
+          inputScopes: scopes ? [...scopes] : undefined,
+          traceProjectId,
+        },
+        attachments ? [...attachments] : undefined,
+      ),
+
+    // One read of the destinations for a whole page, in both casings: a
+    // listing must not cost a query per key to say where its traffic goes.
+    toVirtualKeyCamelDtos: async ({ virtualKeys: page }) => {
+      const facts = await virtualKeyDtos.loadTraceDestinationFacts({
+        projects,
+        virtualKeys: [...page],
+      });
+
+      return page.map((virtualKey) => virtualKeyDtos.toVirtualKeyCamelDto({ virtualKey, facts }));
+    },
+    toVirtualKeySnakeDtos: async ({ virtualKeys: page }) => {
+      const facts = await virtualKeyDtos.loadTraceDestinationFacts({
+        projects,
+        virtualKeys: [...page],
+      });
+
+      return page.map((virtualKey) => virtualKeyDtos.toVirtualKeySnakeDto({ virtualKey, facts }));
+    },
+    listApplicableBudgets: ({ target }) =>
+      GatewayApplicableBudgetsService.create({
+        budgetDecisions,
+        providerLabels: repositories.providerLabels,
+      }).resolveApplicableBudgetsForDraftKey(
+        projects,
+        { ...target, scopes: [...target.scopes] },
+        budgetSpend,
+      ),
+    loadDirectBudgetsForKeys: ({ organizationId, virtualKeyIds, now }) =>
+      VirtualKeyDirectBudgetService.create({
+        repository: repositories.directBudgets,
+        projects,
+      }).loadDirectBudgetsForKeys({
+        organizationId,
+        virtualKeyIds: [...virtualKeyIds],
+        chRepo: budgetSpend,
+        now,
+      }),
+    spendByVirtualKey: ({ organizationId, virtualKeyIds, window }) =>
+      usage.spendByVirtualKey({
+        organizationId,
+        virtualKeyIds: [...virtualKeyIds],
+        window,
+      }),
+  };
+}
+
+/**
+ * The caller as the virtual-key authorization vocabulary names them,
+ * whichever door they arrived through.
+ */
+function gatewayVirtualKeyActor(actor: unknown): VirtualKeyActor {
+  if (typeof actor !== "object" || actor === null) {
+    return { kind: "session", session: null };
+  }
+  if (!("kind" in actor)) {
+    return { kind: "session", session: extractSessionActor(actor) };
+  }
+  if (isApiKeyActor(actor)) {
+    return {
+      kind: "apiKey",
+      apiKeyId: actor.apiKeyId,
+      userId: actor.userId,
+      organizationId: actor.organizationId,
+    };
+  }
+  if (actor.kind === "cliAccessToken") {
+    const userId = "userId" in actor ? actor.userId : null;
+    const projectId = "projectId" in actor ? actor.projectId : null;
+    if (typeof userId === "string" && typeof projectId === "string") {
+      return { kind: "cliAccessToken", userId, projectId };
+    }
+  }
+  if (
+    actor.kind === "legacyProjectKey" &&
+    "projectId" in actor &&
+    typeof actor.projectId === "string"
+  ) {
+    return { kind: "legacyProjectKey", projectId: actor.projectId };
+  }
+
+  return { kind: "session", session: null };
+}
+
+/** Whether the actor is an API key with every member the gateway reads, each well-typed. */
+function isApiKeyActor(actor: {
+  kind: unknown;
+}): actor is { kind: "apiKey"; apiKeyId: string; organizationId: string; userId: string | null } {
+  if (actor.kind !== "apiKey") return false;
+  if (!("apiKeyId" in actor) || typeof actor.apiKeyId !== "string") return false;
+  if (!("organizationId" in actor) || typeof actor.organizationId !== "string") return false;
+  if (!("userId" in actor)) return false;
+  return typeof actor.userId === "string" || actor.userId === null;
+}
+
+/**
+ * The one member the authorization vocabulary reads off a browser session: the
+ * signed-in person's id.
+ */
+function extractSessionActor(value: object): { user: { id: string } } | null {
+  if (!("user" in value)) return null;
+  const user = value.user;
+  if (typeof user !== "object" || user === null) return null;
+  if (!("id" in user) || typeof user.id !== "string") return null;
+
+  return { user: { id: user.id } };
+}
+
+type GatewaySetup = FeatureSetup<
+  typeof GatewayModule.dependencies,
+  GatewayServerConfig,
+  GatewayRepositories,
+  GatewayChannels
+>;
+
+export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, GatewaySpendDoorApi {
+  static readonly contract = GatewayApiToken;
+  static readonly dependencies = {
+    /**
+     * The four capabilities the control plane reaches that belong to other features, resolved
+     * as peers rather than rebuilt. A guardrail attachment and the monitor page it points at
+     * must agree about what one runs, so they are the SAME applications the process reads.
+     */
+    authz: AuthzApi,
+    projects: ProjectApi,
+    evaluators: EvaluatorApi,
+    /** Runs the evaluator a gateway guardrail binds, as every other evaluate door does. */
+    evaluations: EvaluationApi,
+    monitors: MonitorApi,
+    /**
+     * The two peers the per-member budget overview reads: organization
+     * membership plus personal-workspace resolution, and the governance
+     * kill switch it fails closed against.
+     */
+    organizations: OrganizationApi,
+    featureFlags: FeatureFlagApi,
+    /** The deployment's own providers, the only chain a license's managed key may dispatch on. */
+    modelProviders: ModelProviderApi,
+    /** The per-model spend a personal budget lists its top models from. */
+    traces: TraceApi,
+    /** Parks a fresh key's secret for one later read, when its create asks for `revealOnce`. */
+    oneTimeReveals: SecretApi,
+    /** Mints the ownerless key each trace project's gateway spans are exported with. */
+    apiKeys: ApiKeyApi,
+    /** Derives the install's Connect upstream token; gateway pulls it on licensing's fact. */
+    licensing: LicensingApi,
+  };
+  static readonly config = gatewayConfig;
+  static readonly publicConfig = gatewayBrowserConfig.project;
+  /**
+   * The three AI Gateway credentials, all-or-none per
+   * `assertGatewaySecretsAllOrNone` — optional here because a deployment that
+   * runs no gateway needs none.
+   */
+  static readonly secrets = {
+    internalSecret: gatewayInternalSecret,
+    jwtSecret: Secret.load("LW_GATEWAY_JWT_SECRET", { optional: true }),
+    virtualKeyPepper,
+  } as const;
+  static async create(setup: GatewaySetup): Promise<GatewayModule> {
+    return setup.secrets.into(GatewayModule.secrets.internalSecret, (internalSecret) =>
+      setup.secrets.into(GatewayModule.secrets.jwtSecret, (jwtSecret) =>
+        setup.secrets.into(GatewayModule.secrets.virtualKeyPepper, (virtualKeyPepper) =>
+          GatewayModule.#createWithSecrets(setup, { internalSecret, jwtSecret, virtualKeyPepper }),
+        ),
+      ),
+    );
+  }
+
+  static #createWithSecrets(
+    setup: GatewaySetup,
+    secrets: Readonly<{
+      internalSecret: string | undefined;
+      jwtSecret: string | undefined;
+      virtualKeyPepper: string | undefined;
+    }>,
+  ): GatewayModule {
+    const governanceEvents = GatewayGovernanceEventsService.create({
+      projects: setup.dependencies.projects,
+    });
+    const { repositories } = setup;
+    const controlPlane = gatewayControlPlane({
+      repositories,
+      peers: {
+        authz: setup.dependencies.authz,
+        projects: setup.dependencies.projects,
+        organizations: setup.dependencies.organizations,
+        evaluators: setup.dependencies.evaluators,
+        monitors: setup.dependencies.monitors,
+        platformProviders: setup.dependencies.modelProviders,
+        traces: setup.dependencies.traces,
+      },
+      virtualKeyPepper: secrets.virtualKeyPepper,
+      governanceSignals: governanceEvents,
+    });
+    // `settlementGraceMs` owns the parse, the bound and the warning on the raw
+    // `LW_SPEND_SETTLEMENT_GRACE_MS` string, so the reconciliation door and the
+    // sweeper carry one answer. `setup.config` is undefined only in a test stub.
+    const graceMs = settlementGraceMs(setup.config?.spendSettlementGraceMs);
+    const connectUpstream = GatewayConnectUpstreamService.create({
+      repository: repositories.connectUpstream,
+      licensing: setup.dependencies.licensing,
+    });
+    const spendCommands: Record<string, GatewaySpendCommandSender | undefined> = {};
+    const spend = {
+      commands: spendCommands,
+      rating: ModelCatalogGatewaySpendRatingService.create(),
+    };
+    const realtimeSessions: GatewayRealtimeSessionCollaborators = {
+      sessions: repositories.realtimeSessions,
+      spendRating: spend.rating,
+      // The senders `connectSpend` fills once the pipeline registers, read at call time.
+      spendConfirmation: {
+        confirmSpend: async (data) => {
+          const sender = spend.commands.confirmSpend;
+          if (!sender) throw new Error("gateway_spend registered no confirmSpend sender here");
+          await sender.send(data);
+        },
+      },
+      attribution: {
+        findSessionAttribution: async ({ virtualKeyId, projectId }) => {
+          const [[key], project] = await Promise.all([
+            repositories.internalStore.findVirtualKeysForAttribution([virtualKeyId]),
+            setup.dependencies.projects.findTraceDestination(projectId),
+          ]);
+          return { principalUserId: key?.principalUserId ?? null, teamId: project?.teamId ?? null };
+        },
+      },
+      budgets: controlPlane.budgetDecisions,
+      // The settled span rides the trace module's ingress command, like any collected span.
+      spanIngestion: {
+        ingestNormalizedSpan: async (input) => {
+          await setup.dependencies.traces.recordSpan(
+            recordSpanCommandDataSchema.parse({
+              ...input,
+              occurredAt: nowInstant().epochMilliseconds,
+            }),
+          );
+        },
+      },
+    };
+    const config = GatewayConfigMaterialiserService.create({
+      scopeResolution: controlPlane.internalScopeResolution,
+      projects: setup.dependencies.projects,
+      chRepo: controlPlane.budgetSpend ?? null,
+      budgetDecisions: controlPlane.budgetDecisions,
+      modelProviders: setup.dependencies.modelProviders,
+      assembly: GatewayConfigAssemblyService.create({
+        repository: repositories.scopeResolution,
+        platformProviders: setup.dependencies.modelProviders,
+        projects: setup.dependencies.projects,
+      }),
+      connectUpstream,
+      traceExportKeys: GatewayTraceExportKeyService.create({
+        repository: repositories.traceExportKeys,
+        apiKeys: setup.dependencies.apiKeys,
+      }),
+    });
+    const guardrails = GatewayGuardrailEvaluationService.create({
+      repository: repositories.guardrails,
+      monitors: setup.dependencies.monitors,
+      evaluations: setup.dependencies.evaluations,
+    });
+    const voiceCredentials = {
+      modelProviders: setup.dependencies.modelProviders,
+      allowLoopbackVoiceProviders: setup.config?.allowLoopbackVoiceProviders ?? false,
+    };
+    const elevenLabsCredential = GatewayElevenLabsCredentialService.create(voiceCredentials);
+    const internalProtocol = GatewayInternalProtocolService.create({
+      virtualKeys: controlPlane.internalVirtualKeys,
+      projects: setup.dependencies.projects,
+      jwt: secrets.jwtSecret ? GatewayJwtService.create({ secret: secrets.jwtSecret }) : void 0,
+      store: repositories.internalStore,
+      changes: controlPlane.internalChanges,
+      config,
+      budgetSpend: controlPlane.budgetSpend,
+      modelProviders: setup.dependencies.modelProviders,
+      guardrails,
+      spend,
+      realtimeSessions,
+    });
+
+    return new GatewayModule({
+      infrastructure: { ...controlPlane, agentCache: repositories.agentCache },
+      voice: {
+        webhook: GatewayElevenLabsWebhookService.create({
+          credentials: voiceCredentials,
+          sessions: realtimeSessions,
+        }),
+        elevenLabsCredential,
+        twilioCredential: TwilioCredentialService.create(voiceCredentials),
+        reconciliation: GatewayRealtimeSessionReconciliationService.create({
+          repository: GatewayRealtimeSessionSweepService.create(realtimeSessions),
+          credentials: elevenLabsCredential,
+          conversations: setup.channels.conversations,
+          logger: createLogger("langwatch:gateway:realtime-session-reconciliation"),
+          config: realtimeSessionReconciliationConfig,
+          clock: { now: () => nowInstant() },
+        }),
+      },
+      internalProtocol,
+      internalDoor: GatewayInternalIdentityService.create({ secret: secrets.internalSecret }),
+      spendPipeline: {
+        ledger: controlPlane.spendLedger,
+        commands: spendCommands,
+        openAdmissions: controlPlane.openAdmissions,
+        settlementGraceMs: graceMs,
+        foldCache: repositories.spendFoldCache,
+        debits: controlPlane.budgetSpend
+          ? GatewaySpendDebitService.create({
+              budgets: controlPlane.budgetDecisions,
+              spend: controlPlane.budgetSpend,
+              dedupe: GatewayBudgetChangeDedupeService.create(repositories.budgetChangeDedupe),
+              changes: controlPlane.changeEvents,
+              crossings: GatewayBudgetCrossingService.create({
+                budgets: controlPlane.budgetDecisions,
+                spend: controlPlane.budgetSpend,
+                facts: governanceEvents,
+              }),
+            })
+          : void 0,
+      },
+      spend: {
+        spendScope: repositories.spendScope,
+        budgets: repositories.budgets,
+        settlementGraceMs: graceMs,
+      },
+      budgetOverviewDeps: {
+        organizations: setup.dependencies.organizations,
+        featureFlags: setup.dependencies.featureFlags,
+        traces: setup.dependencies.traces,
+        publicBaseUrl: setup.config?.publicBaseUrl,
+      },
+      addresses: {
+        baseUrl: setup.config?.internalUrl ?? setup.config?.baseUrl,
+        publicUrl: setup.config?.publicUrl ?? setup.config?.baseUrl,
+        expectedControlPlaneUrl: setup.config?.controlPlaneUrl ?? setup.config?.publicBaseUrl,
+      },
+      connectUpstream,
+      oneTimeReveals: setup.dependencies.oneTimeReveals,
+      governanceEvents,
+    });
+  }
+
+  #coreDependencies: GatewayAppDependencies | undefined;
+  #agentCache: GatewayAgentCacheService | undefined;
+  #connectManagedKeys: ConnectManagedKeyService | undefined;
+  #voice: GatewayVoiceServices;
+  #spend: GatewaySpendCollaborators | undefined;
+  #spendPipeline: GatewaySpendPipelineParts | undefined;
+  #spendProcessing: EventingGatewaySpendAdapter | undefined;
+  #spendScope: GatewaySpendScopeService | undefined;
+  #settlementPolicy: FixedGatewaySettlementPolicyService | undefined;
+  #budgetOverviewDeps: GatewayBudgetOverviewDeps | undefined;
+  #budgetOverview: BudgetOverviewService | undefined;
+  #personalBudget: GatewayPersonalBudgetService | undefined;
+  #budgetLedger: GatewayBudgetLedgerService | undefined;
+  #internalProtocol: GatewayInternalProtocolService;
+  #internalAnswers: GatewayInternalDoorService;
+  #spendAnswers: GatewaySpendReconciliationService;
+  #internalDoor: RestIdentity;
+  #connectUpstream: GatewayConnectUpstreamService | undefined;
+  #addresses: GatewayDeploymentAddresses;
+  #oneTimeReveals: SecretApi | undefined;
+  #governanceEvents: GatewayGovernanceEventsService | undefined;
+
+  private constructor({
+    infrastructure,
+    voice,
+    internalProtocol,
+    internalDoor,
+    spendPipeline,
+    spend,
+    budgetOverviewDeps,
+    addresses = {
+      baseUrl: void 0,
+      publicUrl: void 0,
+      expectedControlPlaneUrl: void 0,
+    },
+    connectUpstream,
+    oneTimeReveals,
+    governanceEvents,
+  }: {
+    infrastructure: GatewayInfrastructure;
+    voice: GatewayVoiceServices;
+    internalProtocol: GatewayInternalProtocolService;
+    internalDoor: RestIdentity;
+    spendPipeline?: GatewaySpendPipelineParts;
+    spend?: GatewaySpendCollaborators;
+    budgetOverviewDeps?: GatewayBudgetOverviewDeps;
+    addresses?: GatewayDeploymentAddresses;
+    connectUpstream?: GatewayConnectUpstreamService;
+    oneTimeReveals?: SecretApi;
+    governanceEvents?: GatewayGovernanceEventsService;
+  }) {
+    this.#addresses = addresses;
+    this.#oneTimeReveals = oneTimeReveals;
+    this.#governanceEvents = governanceEvents;
+    this.#connectUpstream = connectUpstream;
+    this.#spend = spend;
+    this.#spendPipeline = spendPipeline;
+    this.#internalProtocol = internalProtocol;
+    this.#internalAnswers = GatewayInternalDoorService.create({ protocol: internalProtocol });
+    this.#spendAnswers = GatewaySpendReconciliationService.create({ collaborators: this });
+    this.#internalDoor = internalDoor;
+    this.#budgetOverviewDeps = budgetOverviewDeps;
+    // The union's second arm exists for the REST-only composition (agent cache
+    // and the ElevenLabs callback), which carries no control plane. Every
+    // installed process now takes the first.
+    this.#coreDependencies = "virtualKeys" in infrastructure ? infrastructure : void 0;
+    this.#agentCache = infrastructure.agentCache
+      ? GatewayAgentCacheService.create({ store: infrastructure.agentCache })
+      : void 0;
+    this.#voice = voice;
+  }
+
+  /** gateway_spend as this role registers it: the worker folds the ledger, the api only sends. */
+  spendPipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): GatewaySpendDefinition {
+    const parts = this.#spendPipeline;
+    if (participation === "produce" || (participation === "describe" && !parts)) {
+      return GatewaySpendProducerAdapter.create().createGatewaySpendProducerPipeline({
+        processName: "langwatch-api",
+      });
+    }
+    if (!parts) throw this.spendStoreUnavailable();
+    const { openAdmissions, foldCache, debits } = parts;
+    const processing = EventingGatewaySpendAdapter.create({
+      spendEvents: parts.ledger,
+      cacheStore: (inner) => foldCache.cached(inner),
+      gatewayDebits: debits
+        ? {
+            name: GATEWAY_DEBITS_PROCESS_NAME,
+            applier: GatewayDebitProcess.create({ debits }).processManager(),
+          }
+        : void 0,
+      settlement: {
+        findOpenAdmissions: (query) => openAdmissions.findOpenAdmissions(query),
+        graceMs: parts.settlementGraceMs,
+      },
+    });
+    if (participation === "consume") this.#spendProcessing = processing;
+    return processing.buildProcessing();
+  }
+
+  /** governance_events_processing: the same commands in every role; webhook subscribes itself. */
+  governanceEventsPipeline(): GatewayGovernanceEventsDefinition {
+    return buildGatewayGovernanceEventsPipeline();
+  }
+
+  /** gateway_pulled_usage_ledger: the ledger debits governance's priced pulled usage (Q208C). */
+  pulledUsageLedgerPipeline(): GatewayPulledUsageLedgerPipeline {
+    return buildGatewayPulledUsageLedgerPipeline({
+      ledger: this.#dependencies.budgetSpend ? this.#budgetLedgerService : void 0,
+    });
+  }
+
+  /** gateway_instant_eval_judge_spend: the ledger row for each judge call (ADR-174 dec. 13). */
+  instantEvalJudgeSpendPipeline(): GatewayInstantEvalJudgeSpendPipeline {
+    return buildGatewayInstantEvalJudgeSpendPipeline({
+      spend: GatewayInstantEvalJudgeSpendService.create({
+        projects: this.#dependencies.projects,
+        recordPricedSpend: (input) => this.#internalProtocol.recordPricedSpend(input),
+      }),
+    });
+  }
+
+  /** gateway_connect_managed_key: ends or re-resolves a licence's managed key from its facts. */
+  connectManagedKeyPipeline(): GatewayConnectManagedKeyPipeline {
+    return buildGatewayConnectManagedKeyPipeline({
+      managedKeys: this.#connectManagedKeyService(),
+      upstream: this.#connectUpstreamService(),
+    });
+  }
+
+  /** Binds the sender the managed-key service records the provisioned fact through. */
+  connectManagedKeyCommands(commands: ManagedKeyProvisionedSender): void {
+    this.#connectManagedKeyService().connect(commands);
+  }
+
+  /** Binds the crossing and lifecycle senders the debit writer and key services record through. */
+  connectGovernanceEvents(
+    commands: Readonly<Record<string, EventingCommandSender<unknown>>>,
+  ): void {
+    this.#governanceEvents?.connect(commands);
+  }
+
+  /** The registered senders the data plane's /spend-commands and priced spend append through. */
+  connectSpend(commands: Readonly<Record<string, EventingCommandSender<unknown>>>): void {
+    const connected = this.#spendPipeline?.commands;
+    if (!connected) return;
+    for (const [name, sender] of Object.entries(commands)) {
+      connected[name] = {
+        send: (payload) => sender.send(spendCommandRecord(name, payload)),
+        sendBatch: (payloads) =>
+          sender.sendBatch(payloads.map((payload) => spendCommandRecord(name, payload))),
+      };
+    }
+    const settle = commands.settleSpend;
+    if (settle) {
+      this.#spendProcessing?.connectSettlement(async (data) => {
+        await settle.send(spendCommandRecord("settleSpend", data));
+      });
+    }
+  }
+
+  internalDoor(): RestIdentity {
+    return this.#internalDoor;
+  }
+
+  findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null> {
+    return this.#internalProtocol.findVirtualKeyBySecret(secret);
+  }
+
+  resolveLicenseToken(input: {
+    token: string;
+    instanceId: string | undefined;
+  }): Promise<GatewayLicenseTokenResolution> {
+    return this.#internalProtocol.resolveLicenseToken(input);
+  }
+
+  findTraceDestination(projectId: string): Promise<{
+    id: string;
+    teamId: string;
+  } | null> {
+    return this.#internalProtocol.findTraceDestination(projectId);
+  }
+
+  signJwt(input: GatewayJwtClaimsInput): GatewaySignedJwt {
+    return this.#internalProtocol.signJwt(input);
+  }
+
+  touchVirtualKeyUsage(id: string): Promise<void> {
+    return this.#internalProtocol.touchVirtualKeyUsage(id);
+  }
+
+  refreshCodex(input: GatewayCodexRefreshInput): Promise<GatewayInternalCodexRefreshResult> {
+    return this.#internalProtocol.refreshCodex(input);
+  }
+
+  findVirtualKeyForConfig(id: string): Promise<VirtualKeyWithScopes | null> {
+    return this.#internalProtocol.findVirtualKeyForConfig(id);
+  }
+
+  configVersionToken(input: VirtualKeyWithScopes): Promise<string> {
+    return this.#internalProtocol.configVersionToken(input);
+  }
+
+  materialiseConfig(input: VirtualKeyWithScopes): Promise<unknown> {
+    return this.#internalProtocol.materialiseConfig(input);
+  }
+
+  listChanges(organizationId: string, since: bigint, limit: number): Promise<GatewayChangeFeed> {
+    return this.#internalProtocol.listChanges(organizationId, since, limit);
+  }
+
+  currentRevision(organizationId: string): Promise<bigint> {
+    return this.#internalProtocol.currentRevision(organizationId);
+  }
+
+  checkGuardrails(input: GatewayGuardrailCheckInput): Promise<GatewayGuardrailCheckResult> {
+    return this.#internalProtocol.checkGuardrails(input);
+  }
+
+  budgetBucketSpend(input: GatewayBucketSpendInput): Promise<GatewayBucketSpendResult> {
+    return this.#internalProtocol.budgetBucketSpend(input);
+  }
+
+  submitSpendCommands(
+    records: GatewayInternalSpendCommandRecord[],
+  ): Promise<GatewayInternalSpendSubmission> {
+    return this.#internalProtocol.submitSpendCommands(records);
+  }
+
+  recordPricedSpend(input: GatewayPricedSpend): Promise<GatewayPricedSpendResult> {
+    return this.#internalProtocol.recordPricedSpend(input);
+  }
+
+  reserveRealtimeSession(
+    input: GatewayRealtimeReservation,
+  ): Promise<GatewayRealtimeReservationResult> {
+    return this.#internalProtocol.reserveRealtimeSession(input);
+  }
+
+  correlateRealtimeSession(
+    input: GatewayRealtimeCorrelation,
+  ): Promise<GatewayRealtimeSessionUpdate> {
+    return this.#internalProtocol.correlateRealtimeSession(input);
+  }
+
+  releaseRealtimeSession(input: GatewayRealtimeRelease): Promise<GatewayRealtimeSessionUpdate> {
+    return this.#internalProtocol.releaseRealtimeSession(input);
+  }
+
+  reportRealtimeSessionUsage(
+    input: GatewayRealtimeUsageReport,
+  ): Promise<GatewayRealtimeUsageOutcome> {
+    return this.#internalProtocol.reportRealtimeSessionUsage(input);
+  }
+
+  answerSpendSummaries(input: {
+    organizationId: string;
+    query: GatewaySpendSummariesQuery;
+  }): Promise<GatewaySpendSummariesPage> {
+    return this.#spendAnswers.answerSpendSummaries(input);
+  }
+
+  answerSpendEvents(input: {
+    organizationId: string;
+    query: GatewaySpendEventsQuery;
+  }): Promise<GatewaySpendEventsPage> {
+    return this.#spendAnswers.answerSpendEvents(input);
+  }
+
+  answerEndUserSpend(input: {
+    organizationId: string;
+    query: GatewayEndUserSpendQuery;
+  }): Promise<GatewayEndUserSpendResponse> {
+    return this.#spendAnswers.answerEndUserSpend(input);
+  }
+
+  answerInternalResolveKey(
+    input: GatewayInternalResolveKeyRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalResolveKeyAnswers>> {
+    return this.#internalAnswers.answerResolveKey(input);
+  }
+
+  answerInternalCodexRefresh(
+    input: GatewayInternalRawRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalCodexRefreshAnswers>> {
+    return this.#internalAnswers.answerCodexRefresh(input);
+  }
+
+  answerInternalConfig(
+    input: GatewayInternalConfigRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalConfigAnswers>> {
+    return this.#internalAnswers.answerConfig(input);
+  }
+
+  answerInternalChanges(
+    input: GatewayInternalChangesRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalChangesAnswers>> {
+    return this.#internalAnswers.answerChanges(input);
+  }
+
+  answerInternalGuardrailCheck(
+    input: GatewayInternalGuardrailRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalGuardrailAnswers>> {
+    return this.#internalAnswers.answerGuardrailCheck(input);
+  }
+
+  answerInternalBudgetBucketSpend(
+    input: GatewayInternalBucketRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalBucketSpendAnswers>> {
+    return this.#internalAnswers.answerBudgetBucketSpend(input);
+  }
+
+  answerInternalSpendCommands(
+    input: GatewayInternalRawRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalSpendCommandsAnswers>> {
+    return this.#internalAnswers.answerSpendCommands(input);
+  }
+
+  answerInternalReserveRealtimeSession(
+    input: GatewayInternalRawRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalReserveSessionAnswers>> {
+    return this.#internalAnswers.answerReserveRealtimeSession(input);
+  }
+
+  answerInternalPatchRealtimeSession(
+    input: GatewayInternalSessionRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalPatchSessionAnswers>> {
+    return this.#internalAnswers.answerPatchRealtimeSession(input);
+  }
+
+  answerInternalReportRealtimeUsage(
+    input: GatewayInternalSessionRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalReportUsageAnswers>> {
+    return this.#internalAnswers.answerReportRealtimeUsage(input);
+  }
+
+  getAgentCacheEntry(input: { projectId: string; name: string }): Promise<{
+    name: string;
+    value: string;
+  }> {
+    return this.#agentCacheService().get(input);
+  }
+
+  putAgentCacheEntry(input: GatewayAgentCacheWriteInput): Promise<{
+    name: string;
+    ttl_seconds: number;
+  }> {
+    return this.#agentCacheService().put(input);
+  }
+
+  claimAgentCacheEntry(input: GatewayAgentCacheWriteInput): Promise<{
+    name: string;
+    claimed: boolean;
+    ttl_seconds: number;
+  }> {
+    return this.#agentCacheService().claim(input);
+  }
+
+  deleteAgentCacheEntry(input: { projectId: string; name: string }): Promise<void> {
+    return this.#agentCacheService().delete(input);
+  }
+
+  receiveElevenLabsWebhook(input: {
+    modelProviderId: string;
+    rawBody: string;
+    signature: string | undefined;
+  }): Promise<GatewayElevenLabsWebhookAnswer> {
+    return this.#voice.webhook.receive(input);
+  }
+
+  getElevenLabsApiCredential(input: {
+    modelProviderId: string;
+  }): Promise<GatewayElevenLabsApiCredential> {
+    return this.#voice.elevenLabsCredential.getApiCredential(input);
+  }
+
+  getTwilioCredential(input: { modelProviderId: string }): Promise<GatewayTwilioCredential> {
+    return this.#voice.twilioCredential.getCredential(input);
+  }
+
+  /** One voice reconciliation tick, what the reconcile process manager's intent runs. */
+  reconcileRealtimeSessions(): Promise<{
+    examined: number;
+    confirmed: number;
+    expired: number;
+    settled: number;
+    estimated: number;
+  }> {
+    return this.#voice.reconciliation.poll();
+  }
+
+  // ── The billing reconciliation family (ADR-072) ─────────────────────────
+  // The four `/api/gateway/v1` spend routes read the members below, answered
+  // HERE rather than filled by composition, so a deployment cannot mix the
+  // pull surface's envelope/subscription/settlement-grace format with a
+  // different one than the push half already uses.
+
+  /** One spend row rendered as the canonical billing envelope. */
+  spendEventEnvelope(row: WebhookSpendEventRow): GatewaySpendEventEnvelope {
+    return gatewaySpendEventEnvelopeSchema.parse(webhookEnvelopeFromSpendRow(row));
+  }
+
+  /** How long after a request an outcome may still arrive. */
+  settlementPolicy(): FixedGatewaySettlementPolicyService {
+    return (this.#settlementPolicy ??= FixedGatewaySettlementPolicyService.create(
+      this.#spendCollaborators.settlementGraceMs,
+    ));
+  }
+
+  /** Resolves Postgres filters to ClickHouse ids. A no-match resolves to EMPTY. */
+  resolveSpendScope(input: GatewaySpendScopeQuery): Promise<GatewaySpendScope> {
+    // Held rather than rebuilt per call: the adapter keeps a project cache, and
+    // a fresh one per request would resolve every filter from cold.
+    this.#spendScope ??= GatewaySpendScopeService.create({
+      projects: this.#dependencies.projects,
+      virtualKeys: this.#spendCollaborators.spendScope,
+    });
+
+    return this.#spendScope.resolveSpendScope(input);
+  }
+
+  /** Every attributed-user budget that applies to one end user, with spend. */
+  endUserCaps(input: {
+    organizationId: string;
+    endUserId: string;
+    tenantIds: string[];
+    virtualKeyId?: string;
+    budgetRepository: GatewayBudgetSpendRepository;
+  }): Promise<GatewayEndUserCap[]> {
+    const { budgetRepository, organizationId, endUserId, tenantIds, virtualKeyId } = input;
+
+    return GatewayEndUserCapsService.create({
+      budgets: this.#spendCollaborators.budgets,
+      spend: budgetRepository,
+    }).forEndUser({
+      organizationId,
+      endUserId,
+      tenantIds,
+      ...(virtualKeyId === undefined ? {} : { virtualKeyId }),
+    });
+  }
+
+  getPrincipalSpendSummary(input: {
+    projectId: string;
+    userId: string;
+    window: GatewayPrincipalSpendWindow;
+  }): Promise<GatewayPrincipalSpendSummary> {
+    return this.#principalSpendRead().getSummary({
+      tenantId: input.projectId,
+      userId: input.userId,
+      window: input.window,
+    });
+  }
+
+  findPrincipalDailySpend(input: {
+    projectId: string;
+    userId: string;
+    window: GatewayPrincipalSpendWindow;
+  }): Promise<GatewayPrincipalDailySpend[]> {
+    return this.#principalSpendRead().findDailySpend({
+      tenantId: input.projectId,
+      userId: input.userId,
+      window: input.window,
+    });
+  }
+
+  findPrincipalModelSpend(input: {
+    projectId: string;
+    userId: string;
+    window: GatewayPrincipalSpendWindow;
+  }): Promise<GatewayPrincipalModelSpend[]> {
+    return this.#principalSpendRead().findModelSpend({
+      tenantId: input.projectId,
+      userId: input.userId,
+      window: input.window,
+    });
+  }
+
+  #principalSpendRead(): GatewayPrincipalSpendRepository {
+    const principalSpend = this.#coreDependencies?.principalSpend;
+    if (!principalSpend) throw this.spendStoreUnavailable();
+    return principalSpend;
+  }
+
+  /** The refusal for "the store these figures live in is not reachable". */
+  spendStoreUnavailable(): Error {
+    return new ClickHouseUnavailableError();
+  }
+
+  /**
+   * The spend-event ledger reader and the budget ledger, as the reconciliation
+   * routes read them. Refused by name where this process composed no gateway control
+   * plane, rather than answering with a confident zero.
+   */
+  getSpendEvents(): GatewaySpendEventsService {
+    const spendEvents = this.#coreDependencies?.spendEvents;
+    if (!spendEvents) throw this.spendStoreUnavailable();
+    return spendEvents;
+  }
+
+  /** The usage report's figures (ADR-156 section 10); refused where no spend ledger is composed. */
+  async countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<GatewayUsageCount> {
+    return this.getSpendEvents().countUsage(input);
+  }
+
+  getBudgetSpend(): GatewayBudgetSpendRepository {
+    const budgetSpend = this.#coreDependencies?.budgetSpend;
+    if (!budgetSpend) throw this.spendStoreUnavailable();
+    return budgetSpend;
+  }
+
+  get #spendCollaborators(): GatewaySpendCollaborators {
+    const spend = this.#spend;
+    if (!spend) throw new Error("The gateway billing family was mounted without its members");
+
+    return spend;
+  }
+
+  /** Built once and reused, on a path an org's own /me page reads often. */
+  get #budgetOverviewService(): BudgetOverviewService {
+    const deps = this.#budgetOverviewDeps;
+    if (!deps)
+      throw new Error("The gateway budget-overview family was mounted without its members");
+
+    return (this.#budgetOverview ??= BudgetOverviewService.create({
+      organizations: deps.organizations,
+      featureFlags: deps.featureFlags,
+      personalVirtualKeys: {
+        listActiveForPrincipal: async ({ userId, organizationId }) =>
+          (
+            await this.#dependencies.virtualKeys.findLiveWithPrincipal({
+              organizationId,
+              principalUserId: userId,
+            })
+          ).map((vk) => ({ id: vk.id })),
+      },
+      budgetDecisions: this.#dependencies.budgetDecisions,
+      providerLabels: {
+        resolveProviderLabels: (budgets) => this.#dependencies.resolveProviderLabels(budgets),
+      },
+      budgetRepository: this.#dependencies.budgetSpend,
+      modelSpend: deps.traces,
+    }));
+  }
+
+  budgetOverviewForUser(input: {
+    organizationId: string;
+    userId: string;
+    includeTopModels?: boolean;
+  }): Promise<GatewayBudgetOverviewForUser> {
+    return this.#budgetOverviewService.overviewForUser(input);
+  }
+
+  /** Built once and reused, on the /me banner every personal page reads. */
+  get #personalBudgetService(): GatewayPersonalBudgetService {
+    const deps = this.#budgetOverviewDeps;
+    if (!deps)
+      throw new Error("The gateway personal-budget family was mounted without its members");
+
+    return (this.#personalBudget ??= GatewayPersonalBudgetService.create({
+      personalKeys: this.#dependencies.virtualKeys,
+      budgetDecisions: this.#dependencies.budgetDecisions,
+      organizations: deps.organizations,
+      publicBaseUrl: deps.publicBaseUrl,
+    }));
+  }
+
+  getPersonalBudget(input: {
+    userId: string;
+    organizationId: string;
+  }): Promise<GatewayPersonalBudget> {
+    return this.#personalBudgetService.getPersonalBudget(input);
+  }
+
+  #agentCacheService(): GatewayAgentCacheService {
+    const service = this.#agentCache;
+    if (!service) throw new Error("The agent-cache family was mounted without its members");
+
+    return service;
+  }
+
+  get #dependencies(): GatewayAppDependencies {
+    const dependencies = this.#coreDependencies;
+    if (!dependencies) throw new Error("The gateway control plane was not installed");
+
+    return dependencies;
+  }
+
+  listBudgetsWithHealth(organizationId: string): Promise<GatewayBudgetListWithHealth> {
+    return this.#dependencies.budgetDecisions.listWithHealth(organizationId);
+  }
+
+  listBudgetPageWithHealth(input: GatewayBudgetPageInput): Promise<GatewayBudgetPageWithHealth> {
+    return this.#dependencies.budgetDecisions.listPageWithHealth(input);
+  }
+
+  async getBudgetWithHealth(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayBudgetHealth> {
+    const found = await this.#dependencies.budgetDecisions.findHealthById(input);
+    if (!found) throw new GatewayBudgetNotFoundError();
+    return found;
+  }
+
+  budgetScopeReach(input: GatewayBudgetScopeReachInput): Promise<GatewayBudgetScopeReachResult> {
+    return this.#dependencies.budgetDecisions.scopeReach(input);
+  }
+
+  listCacheRulePage(input: GatewayCacheRulePageInput): Promise<GatewayCacheRuleResource[]> {
+    return this.#dependencies.budgetDecisions.cacheRuleListPage(input);
+  }
+
+  listProjectBudgetsWithHealth(projectId: string): Promise<GatewayBudgetListWithHealth> {
+    return this.#dependencies.budgetDecisions.listForProjectWithHealth(projectId);
+  }
+
+  listBudgetScopeTargets(
+    budgets: { scopeType: string; scopeId: string }[],
+    organizationId: string | null,
+  ): Promise<Map<string, GatewayBudgetScopeTarget>> {
+    return this.#dependencies.budgetDecisions.resolveScopeTargets(budgets, organizationId);
+  }
+
+  findBudgetDetail(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayBudgetDetail | null> {
+    return this.#dependencies.budgetDecisions.findDetailById(input);
+  }
+
+  async getBudgetDetail(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayBudgetDetail> {
+    const detail = await this.findBudgetDetail(input);
+    if (!detail) throw new GatewayBudgetNotFoundError();
+    return detail;
+  }
+
+  createBudget(input: CreateGatewayBudgetInput): Promise<GatewayBudgetResource> {
+    return this.#dependencies.budgetDecisions.create(input);
+  }
+
+  updateBudget(input: UpdateGatewayBudgetInput): Promise<GatewayBudgetResource> {
+    return this.#dependencies.budgetDecisions.update(input);
+  }
+
+  archiveBudget(input: ArchiveGatewayBudgetInput): Promise<GatewayBudgetResource> {
+    return this.#dependencies.budgetDecisions.archive(input);
+  }
+
+  resetBudget(input: ResetGatewayBudgetInput): Promise<GatewayBudgetResource> {
+    return this.#dependencies.budgetDecisions.reset(input);
+  }
+
+  listGuardrails(projectId: string): Promise<GatewayGuardrailResource[]> {
+    return this.#dependencies.budgetDecisions.guardrailList(projectId);
+  }
+
+  findGuardrail(input: {
+    id: string;
+    projectId: string;
+  }): Promise<GatewayGuardrailResource | null> {
+    return this.#dependencies.budgetDecisions.findGuardrail(input);
+  }
+
+  createGuardrail(input: CreateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
+    return this.#dependencies.budgetDecisions.guardrailCreate(input);
+  }
+
+  updateGuardrail(input: UpdateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
+    return this.#dependencies.budgetDecisions.guardrailUpdate(input);
+  }
+
+  archiveGuardrail(input: ArchiveGatewayGuardrailInput): Promise<void> {
+    return this.#dependencies.budgetDecisions.guardrailArchive(input);
+  }
+
+  listCacheRules(organizationId: string): Promise<GatewayCacheRuleResource[]> {
+    return this.#dependencies.budgetDecisions.cacheRuleList(organizationId);
+  }
+
+  findCacheRule(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayCacheRuleResource | null> {
+    return this.#dependencies.budgetDecisions.findCacheRule(input);
+  }
+
+  async getCacheRule(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayCacheRuleResource> {
+    const row = await this.findCacheRule(input);
+    if (!row) throw new GatewayCacheRuleNotFoundError();
+    return row;
+  }
+
+  createCacheRule(input: CreateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
+    return this.#dependencies.budgetDecisions.cacheRuleCreate(input);
+  }
+
+  updateCacheRule(input: UpdateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
+    return this.#dependencies.budgetDecisions.cacheRuleUpdate(input);
+  }
+
+  archiveCacheRule(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
+    return this.#dependencies.budgetDecisions.cacheRuleArchive(input);
+  }
+
+  async findProjectOrganization(projectId: string): Promise<string | null> {
+    // The directory answers `undefined` for a project it does not hold; the
+    // gateway's own vocabulary for "no such row" is null throughout.
+    return (await this.#dependencies.projects.findOrganizationId(projectId)) ?? null;
+  }
+
+  usageSummary(input: {
+    organizationId: string;
+    virtualKeyIds: string[];
+    window: UsageWindow;
+  }): Promise<GatewayUsageSummary> {
+    return this.#dependencies.usage.summary(input);
+  }
+
+  usageSummaryForVirtualKey(input: {
+    organizationId: string;
+    virtualKeyId: string;
+    window: UsageWindow;
+    model?: string;
+  }): Promise<GatewayVirtualKeyUsageSummary> {
+    return this.#dependencies.usage.summaryForVirtualKey(input);
+  }
+
+  async sumSpendNanoUsdByRequestType(input: GatewaySpendByRequestTypeQuery): Promise<number> {
+    const service = this.#dependencies.spendEvents;
+    // No ledger means nothing was ever recorded on it, so nothing was spent.
+    if (!service) return 0;
+
+    return service.sumSpendNanoUsdByRequestType({
+      ...input,
+      tenantIds: [...input.tenantIds],
+    });
+  }
+
+  async listConfirmedSpendByRequestType(
+    input: GatewayConfirmedSpendQuery,
+  ): Promise<GatewayConfirmedSpendPage> {
+    const service = this.#dependencies.spendEvents;
+    // No ledger means nothing was ever recorded on it, so there is nothing to copy.
+    if (!service) return { rows: [], nextCursor: null };
+    return service.listConfirmedSpendByRequestType({
+      ...input,
+      tenantIds: [...input.tenantIds],
+    });
+  }
+
+  async findSpendDaysForOrganizationProjects(input: {
+    tenantIds: readonly string[];
+    fromDay: string;
+    toDay: string;
+  }): Promise<GatewaySpendDay[]> {
+    const service = this.#dependencies.spendEvents;
+    if (!service) return [];
+    return service.findSpendDaysForOrganizationProjects(input);
+  }
+
+  async listSpendEventsAcrossTenants(
+    input: GatewaySpendEventsAcrossTenantsQuery,
+  ): Promise<GatewaySpendEventsAcrossTenantsPage> {
+    const service = this.#dependencies.spendEvents;
+    if (!service) return { rows: [], nextCursor: null };
+    return service.getSpendEventsAcrossTenants({
+      ...input,
+      tenantIds: [...input.tenantIds],
+      statuses: [...input.statuses],
+    });
+  }
+
+  async findSpendEventAcrossTenants(
+    input: GatewaySpendEventAcrossTenantsQuery,
+  ): Promise<SpendEventRow | null> {
+    const service = this.#dependencies.spendEvents;
+    if (!service) return null;
+    return service.findSpendEventAcrossTenants({
+      ...input,
+      tenantIds: [...input.tenantIds],
+      statuses: [...input.statuses],
+    });
+  }
+
+  async listSpendEventsPage(input: GatewaySpendEventsPageQuery): Promise<GatewaySpendEventPage> {
+    const service = this.#dependencies.spendEvents;
+    // No ClickHouse spend source: an empty page that says so, never a confident zero.
+    if (!service) {
+      return { rows: [], nextCursor: null, virtualKeyNames: {}, clickHouseDisabled: true };
+    }
+
+    const { rows, nextCursor } = await service.getSpendEventsPage({
+      tenantId: input.projectId,
+      fromMs: input.fromMs,
+      toMs: input.toMs,
+      filters: input.filters ?? {},
+      cursor: input.cursor,
+      limit: input.limit ?? 50,
+    });
+
+    const vkIds = [...new Set(rows.map((r) => r.virtualKeyId))].filter((id) => id.length > 0);
+    // The ids come from this project's own tenant-filtered spend rows, and the
+    // Project service resolves the owning-organization fence without exposing
+    // Project persistence to this transport.
+    const organizationId = await this.findProjectOrganization(input.projectId);
+    const vks =
+      vkIds.length && organizationId
+        ? await this.resolveVirtualKeyNames({ organizationId, virtualKeyIds: vkIds })
+        : [];
+    const virtualKeyNames = Object.fromEntries(vks.map((vk) => [vk.id, vk.name]));
+
+    // The wire still carries a Date on this row, so the instant the ledger
+    // reads becomes one here rather than anywhere above.
+    return {
+      rows: rows.map((row) => ({ ...row, occurredAt: toDate(row.occurredAt) })),
+      nextCursor,
+      virtualKeyNames,
+      clickHouseDisabled: false,
+    };
+  }
+
+  findPersonalVirtualKeys(input: {
+    organizationId?: string;
+    principalUserId?: string;
+  }): Promise<GatewayVirtualKeyRecord[]> {
+    return this.#dependencies.virtualKeys.findLiveWithPrincipal(input);
+  }
+
+  findVirtualKeyById(id: string, organizationId: string): Promise<GatewayVirtualKeyRecord | null> {
+    return this.#dependencies.virtualKeys.findById(id, organizationId);
+  }
+
+  async createVirtualKey({
+    revealOnce,
+    ...input
+  }: GatewayVirtualKeyCreateInput &
+    Readonly<{ revealOnce?: boolean }>): Promise<GatewayMintedVirtualKey> {
+    const minted = await this.#dependencies.virtualKeys.create(input);
+    if (!revealOnce) return minted;
+    const reveals = this.#oneTimeReveals;
+    if (!reveals) throw new Error("The one-time reveal store was not installed");
+    const preview = minted.virtualKey.displayPrefix;
+    const { revealId } = await reveals.stashReveal({
+      organizationId: input.organizationId,
+      kind: "virtual_key",
+      keyId: minted.virtualKey.id,
+      preview,
+      secret: minted.secret,
+      recipientUserId: input.principalUserId ?? input.actorUserId,
+    });
+    return { ...minted, reveal: { revealId, preview } };
+  }
+
+  updateVirtualKey(input: GatewayVirtualKeyUpdateInput): Promise<GatewayVirtualKeyRecord> {
+    return this.#dependencies.virtualKeys.update(input);
+  }
+
+  rotateVirtualKey(input: GatewayVirtualKeyRotateInput): Promise<GatewayMintedVirtualKey> {
+    return this.#dependencies.virtualKeys.rotate(input);
+  }
+
+  revokeVirtualKey(input: GatewayVirtualKeyRevokeInput): Promise<GatewayVirtualKeyRecord> {
+    return this.#dependencies.virtualKeys.revoke(input);
+  }
+
+  #connectUpstreamService(): GatewayConnectUpstreamService {
+    if (!this.#connectUpstream) {
+      throw new Error("this process composes no hosted provider slot for connected installs");
+    }
+    return this.#connectUpstream;
+  }
+
+  #connectManagedKeyService(): ConnectManagedKeyService {
+    const dependencies = this.#dependencies;
+    this.#connectManagedKeys ??= ConnectManagedKeyService.create({
+      virtualKeys: dependencies.virtualKeys,
+      home: dependencies.projects,
+    });
+
+    return this.#connectManagedKeys;
+  }
+
+  disableVirtualKey(input: GatewayVirtualKeyDisableInput): Promise<GatewayVirtualKeyRecord> {
+    return this.#dependencies.virtualKeys.disable(input);
+  }
+
+  enableVirtualKey(input: GatewayVirtualKeyEnableInput): Promise<GatewayVirtualKeyRecord> {
+    return this.#dependencies.virtualKeys.enable(input);
+  }
+
+  isSpendSourceAvailable(): boolean {
+    return this.#dependencies.spendSourceAvailable;
+  }
+
+  getDeploymentAddresses(): GatewayDeploymentAddresses {
+    return this.#addresses;
+  }
+
+  parseVirtualKeyBudget(input: unknown):
+    | {
+        success: true;
+        data: VirtualKeyBudgetInput;
+      }
+    | {
+        success: false;
+        error: {
+          message: string;
+        };
+      } {
+    return this.#dependencies.schemas.virtualKeyBudgetInput.safeParse(input);
+  }
+
+  getVirtualKeyPage(
+    input: GatewayVirtualKeyOperations extends {
+      getPage(input: infer Input): unknown;
+    }
+      ? Input
+      : never,
+  ): Promise<GatewayVirtualKeyRecord[]> {
+    return this.#dependencies.virtualKeys.getPage(input);
+  }
+
+  // ── Tenancy anchors and directory reads ──────────────────────────────────
+
+  organizationIdForProject(projectId: string): Promise<string> {
+    return this.#dependencies.organizationIdForProject(projectId);
+  }
+
+  assertOrganizationExists(organizationId: string): Promise<void> {
+    return this.#dependencies.assertOrganizationExists(organizationId);
+  }
+
+  resolveProviderLabels(
+    budgets: readonly { providerKey: string | null }[],
+  ): Promise<Map<string, string>> {
+    return this.#dependencies.resolveProviderLabels(budgets);
+  }
+
+  listGroupTargets(
+    organizationId: string,
+  ): Promise<readonly { id: string; name: string; memberCount: number }[]> {
+    return this.#dependencies.listGroupTargets(organizationId);
+  }
+
+  groupMemberCounts(
+    budgets: readonly { scopeType: string; scopeId: string }[],
+  ): Promise<Map<string, number>> {
+    return this.#dependencies.groupMemberCounts(budgets);
+  }
+
+  resolveVirtualKeyNames(input: {
+    organizationId: string;
+    virtualKeyIds: readonly string[];
+  }): Promise<readonly { id: string; name: string }[]> {
+    return this.#dependencies.resolveVirtualKeyNames(input);
+  }
+
+  isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean> {
+    return this.#dependencies.isOrganizationMember(input);
+  }
+  async listApplicableBudgetsForSelection({
+    selection,
+    userId,
+    caller,
+  }: {
+    selection: VirtualKeyApiApplicableBudgetsInput;
+    userId: string;
+    caller: GatewayCaller;
+  }): Promise<GatewayApplicableBudget[]> {
+    const { organizationId } = selection;
+    // For an existing key the caller must SEE it, and resolution binds to STORED ownership:
+    // caller-supplied scopes, destination and principal are ignored.
+    if (selection.virtualKeyId) {
+      const vk = await this.getVisibleVirtualKeyForUser({
+        organizationId,
+        id: selection.virtualKeyId,
+        userId,
+      });
+      return this.listApplicableBudgets({
+        target: {
+          organizationId,
+          virtualKeyId: vk.id,
+          scopes: vk.scopes.map((scope) => ({
+            scopeType: scope.scopeType,
+            scopeId: scope.scopeId,
+          })),
+          traceProjectId: vk.traceProjectId,
+          principalUserId: vk.principalUserId,
+        },
+      });
+    }
+
+    // A draft is held to the exact boundary `create` holds it to: manage on every scope and on
+    // the chosen trace destination, and a principal pinned to this organization.
+    await this.authorizeVirtualKeyScopeSelection({
+      actor: caller,
+      organizationId,
+      scopes: selection.scopes,
+      traceProjectId: selection.traceProjectId,
+    });
+    await this.#assertOrganizationPrincipal({
+      organizationId,
+      principalUserId: selection.principalUserId,
+    });
+    return this.listApplicableBudgets({
+      target: {
+        organizationId,
+        virtualKeyId: null,
+        scopes: selection.scopes,
+        traceProjectId: selection.traceProjectId ?? null,
+        principalUserId: selection.principalUserId ?? null,
+      },
+    });
+  }
+
+  async #assertOrganizationPrincipal(input: {
+    organizationId: string;
+    principalUserId: string | null | undefined;
+  }): Promise<void> {
+    if (!input.principalUserId) return;
+    const member = await this.isOrganizationMember({
+      organizationId: input.organizationId,
+      userId: input.principalUserId,
+    });
+    if (member) return;
+    const message = "principalUserId is not a member of this organization.";
+    throw new ValidationError(message, { meta: { fieldErrors: { principalUserId: [message] } } });
+  }
+
+  async listVirtualKeySpendThisMonth(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<VirtualKeySpendThisMonth> {
+    if (!this.isSpendSourceAvailable()) throw new GatewaySpendSourceUnavailableError();
+
+    const keys = await this.listVisibleVirtualKeys(input);
+    const now = nowInstant();
+    const virtualKeyIds = keys.map((k) => k.id);
+    const [spend, directBudgets] = await Promise.all([
+      this.spendByVirtualKey({
+        organizationId: input.organizationId,
+        virtualKeyIds,
+        window: { fromDate: GatewayWindow.startOfCurrentMonthUTC(now), toDate: now },
+      }),
+      this.loadDirectBudgetsForKeys({ organizationId: input.organizationId, virtualKeyIds, now }),
+    ]);
+
+    // With the spend source present, a missing entry means the key genuinely spent nothing.
+    return keys.map((k) => ({
+      virtualKeyId: k.id,
+      spentUsd: spend.get(k.id)?.spentUsd ?? "0",
+      requests: spend.get(k.id)?.requests ?? 0,
+      budget: directBudgets.get(k.id) ?? null,
+    }));
+  }
+
+  actorForCredential(input: { projectId: string; credential: GatewayRequestCredential }): {
+    actor: GatewayActor;
+    actorUserId: string;
+  } {
+    return this.#dependencies.actorForCredential(input);
+  }
+
+  // ── Visibility ───────────────────────────────────────────────────────────
+
+  listVisibleVirtualKeys(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<VirtualKeyWithScopes[]> {
+    return this.#dependencies.listVisibleVirtualKeys(input);
+  }
+
+  isVirtualKeyVisible(input: {
+    organizationId: string;
+    userId: string;
+    virtualKey: VirtualKeyWithScopes;
+  }): Promise<boolean> {
+    return this.#dependencies.isVirtualKeyVisible(input);
+  }
+
+  getVisibleVirtualKeyForUser(input: {
+    organizationId: string;
+    id: string;
+    userId: string;
+  }): Promise<VirtualKeyWithScopes> {
+    return this.#dependencies.getVisibleVirtualKeyForUser(input);
+  }
+
+  /**
+   * A page narrowed to what the caller reads. A credential acting in one project sees what that
+   * project reaches; a key that names none sees the keys its own grants reach (`virtualKeys:view`).
+   */
+  visibleToVirtualKeyCaller(input: {
+    caller: GatewayAuthorizedVirtualKeyCaller;
+    virtualKeys: readonly VirtualKeyWithScopes[];
+  }): Promise<VirtualKeyWithScopes[]> {
+    const { caller, virtualKeys } = input;
+    if (caller.projectId !== null) {
+      return this.#dependencies.visibleInProject({ projectId: caller.projectId, virtualKeys });
+    }
+
+    return this.#dependencies.heldOnAnyScope({
+      actor: caller.actor,
+      virtualKeys,
+      permission: "virtualKeys:view",
+    });
+  }
+
+  /**
+   * One key under that same rule: a key the caller cannot see answers not found. A key that
+   * names no project must also hold the route's own permission on a scope the key lives in.
+   */
+  async getVirtualKeyForCaller(input: {
+    caller: GatewayAuthorizedVirtualKeyCaller;
+    id: string;
+    permission: AuthzPermission;
+  }): Promise<VirtualKeyWithScopes> {
+    const { caller, id, permission } = input;
+    const existing = await this.#dependencies.getExistingVirtualKey({
+      organizationId: caller.organizationId,
+      id,
+    });
+    const [visible] = await this.visibleToVirtualKeyCaller({ caller, virtualKeys: [existing] });
+    if (!visible) throw new VirtualKeyNotFoundError();
+    if (caller.projectId !== null || permission === "virtualKeys:view") return visible;
+
+    const [held] = await this.#dependencies.heldOnAnyScope({
+      actor: caller.actor,
+      virtualKeys: [visible],
+      permission,
+    });
+    if (!held) {
+      throw new PermissionDeniedError({
+        permission,
+        scope: { type: "organization", id: caller.organizationId },
+        denialReason: "no-grant",
+      });
+    }
+
+    return held;
+  }
+
+  getExistingVirtualKey(input: {
+    organizationId: string;
+    id: string;
+  }): Promise<VirtualKeyWithScopes> {
+    return this.#dependencies.getExistingVirtualKey(input);
+  }
+
+  // ── Projections and spend ────────────────────────────────────────────────
+
+  toVirtualKeyCamelDtos(input: {
+    virtualKeys: readonly VirtualKeyWithScopes[];
+  }): Promise<VirtualKeyCamelDto[]> {
+    return this.#dependencies.toVirtualKeyCamelDtos(input);
+  }
+
+  toVirtualKeySnakeDtos(input: {
+    virtualKeys: readonly VirtualKeyWithScopes[];
+  }): Promise<VirtualKeySnakeDto[]> {
+    return this.#dependencies.toVirtualKeySnakeDtos(input);
+  }
+
+  /**
+   * One key projected through the batched read a listing uses — a page of one, not a second
+   * projection, since a key's destination fact belongs to the PROJECT row, and a per-key path
+   * would be the one place a deleted destination could still read as live.
+   */
+  async toVirtualKeyCamelDto(virtualKey: VirtualKeyWithScopes): Promise<VirtualKeyCamelDto> {
+    const [dto] = await this.#dependencies.toVirtualKeyCamelDtos({ virtualKeys: [virtualKey] });
+    if (!dto) throw new Error("the virtual key projection returned no row");
+    return dto;
+  }
+
+  /** One key projected into the published snake_case shape. */
+  async toVirtualKeySnakeDto(virtualKey: VirtualKeyWithScopes): Promise<VirtualKeySnakeDto> {
+    const [dto] = await this.#dependencies.toVirtualKeySnakeDtos({ virtualKeys: [virtualKey] });
+    if (!dto) throw new Error("the virtual key projection returned no row");
+    return dto;
+  }
+
+  listApplicableBudgets(input: {
+    target: GatewayApplicableBudgetTarget;
+  }): Promise<GatewayApplicableBudget[]> {
+    return this.#dependencies.listApplicableBudgets(input);
+  }
+
+  resolveApplicableBudgets(input: GatewayBudgetResolutionTarget): Promise<GatewayResolvedBudget[]> {
+    return this.#dependencies.budgetDecisions.resolveApplicableBudgets(input);
+  }
+
+  checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult> {
+    return this.#dependencies.budgetDecisions.checkBudget(input);
+  }
+
+  insertSpendDebit(rows: readonly GatewayBudgetDebitRow[]): Promise<void> {
+    return this.#budgetLedgerService.insertDebit(rows);
+  }
+
+  appendBudgetChange(input: GatewayBudgetChangeInput): Promise<void> {
+    return this.#budgetLedgerService.appendBudgetChange(input);
+  }
+
+  get #budgetLedgerService(): GatewayBudgetLedgerService {
+    return (this.#budgetLedger ??= GatewayBudgetLedgerService.create({
+      spend: this.#dependencies.budgetSpend,
+      changes: this.#dependencies.changeEvents,
+    }));
+  }
+
+  loadDirectBudgetsForKeys(input: {
+    organizationId: string;
+    virtualKeyIds: readonly string[];
+    now: Instant;
+  }): Promise<Map<string, GatewayVirtualKeyDirectBudget>> {
+    return this.#dependencies.loadDirectBudgetsForKeys(input);
+  }
+
+  spendByVirtualKey(input: {
+    organizationId: string;
+    virtualKeyIds: readonly string[];
+    window: { fromDate: Instant; toDate: Instant };
+  }): Promise<Map<string, { spentUsd: string; requests: number }>> {
+    return this.#dependencies.spendByVirtualKey(input);
+  }
+
+  async getVirtualKeySpend(input: {
+    organizationId: string;
+    virtualKeyId: string;
+    window: { fromDate: Instant; toDate: Instant };
+  }): Promise<{ spentUsd: string; requests: number }> {
+    if (!this.isSpendSourceAvailable()) throw new GatewaySpendSourceUnavailableError();
+    const spend = await this.spendByVirtualKey({
+      organizationId: input.organizationId,
+      virtualKeyIds: [input.virtualKeyId],
+      window: input.window,
+    });
+    const row = spend.get(input.virtualKeyId);
+    return { spentUsd: row?.spentUsd ?? "0", requests: row?.requests ?? 0 };
+  }
+
+  // ── The virtual-key write pre-flights ────────────────────────────────────
+
+  /**
+   * Requires manage on every requested scope (anchored to this org) and manage on the
+   * destination project too — NOT mere tenancy, since the destination also routes budget debits
+   * and tenancy alone would let a team manager point a key at a sibling team's budget.
+   */
+  async authorizeVirtualKeyScopeSelection(input: {
+    actor: GatewayActor;
+    organizationId: string;
+    scopes: readonly GatewayVirtualKeyScope[];
+    traceProjectId: string | null | undefined;
+  }): Promise<void> {
+    const { actor, organizationId, scopes, traceProjectId } = input;
+    await this.#dependencies.assertCanManageAllScopes({ actor, scopes });
+    await this.#dependencies.assertScopesBelongToOrganization({ organizationId, scopes });
+    await this.#dependencies.assertTraceProjectBelongsToOrganization({
+      organizationId,
+      traceProjectId,
+    });
+    if (traceProjectId) {
+      await this.#dependencies.assertCanManageAllScopes({
+        actor,
+        scopes: [{ scopeType: "PROJECT", scopeId: traceProjectId }],
+      });
+    }
+  }
+
+  /**
+   * A project credential's create: integrity before permission, so a scope outside this
+   * organization answers `gateway_scope_org_mismatch` rather than a generic denial.
+   */
+  private async authorizeProjectCredentialScopes(input: {
+    actor: GatewayActor;
+    organizationId: string;
+    scopes: readonly GatewayVirtualKeyScope[];
+    traceProjectId: string | null | undefined;
+    callerProjectId: string;
+  }): Promise<void> {
+    const { actor, organizationId, scopes, traceProjectId, callerProjectId } = input;
+    await this.#dependencies.assertScopesBelongToOrganization({ organizationId, scopes });
+    await this.#dependencies.assertCanCreateScopes({ actor, scopes, callerProjectId });
+    await this.#dependencies.assertTraceProjectBelongsToOrganization({
+      organizationId,
+      traceProjectId,
+    });
+    if (traceProjectId) {
+      await this.#dependencies.assertCanManageAllScopes({
+        actor,
+        scopes: [{ scopeType: "PROJECT", scopeId: traceProjectId }],
+      });
+    }
+  }
+
+  /**
+   * Everything that must hold before a key is minted: scope selection, then guardrail
+   * attachments against the resolved project. Read-only, not folded into the mint — the
+   * public create dispatches via an idempotency receipt, and skipping this trusts a stale grant.
+   */
+  async authorizeVirtualKeyCreate(input: {
+    actor: GatewayActor;
+    impersonatorId?: string | undefined;
+    organizationId: string;
+    scopes: readonly GatewayVirtualKeyScope[];
+    traceProjectId: string | null | undefined;
+    guardrailAttachments: readonly GuardrailAttachment[] | undefined;
+    callerProjectId?: string | undefined;
+  }): Promise<void> {
+    const { actor, organizationId, scopes, traceProjectId, guardrailAttachments } = input;
+    refuseImpersonatedMint({
+      impersonatorId: input.impersonatorId,
+      permission: "virtualKeys:create",
+      organizationId,
+    });
+    if (input.callerProjectId === undefined) {
+      await this.authorizeVirtualKeyScopeSelection({
+        actor,
+        organizationId,
+        scopes,
+        traceProjectId,
+      });
+    } else {
+      await this.authorizeProjectCredentialScopes({
+        actor,
+        organizationId,
+        scopes,
+        traceProjectId,
+        callerProjectId: input.callerProjectId,
+      });
+    }
+    await this.#dependencies.assertGuardrailAttachmentsAllowed({
+      actor,
+      organizationId,
+      virtualKeyId: null,
+      scopes,
+      traceProjectId: traceProjectId ?? null,
+      attachments: guardrailAttachments,
+    });
+  }
+
+  /**
+   * Mutating needs update on a scope the key ALREADY lives in; re-scoping additionally needs
+   * manage on every NEW scope. scopes/traceProjectId absent means "not changing" — but a scope
+   * change without re-sent config still revalidates STORED attachments against the new project.
+   */
+  async authorizeVirtualKeyUpdate(input: {
+    actor: GatewayActor;
+    organizationId: string;
+    id: string;
+    scopes?: readonly GatewayVirtualKeyScope[] | undefined;
+    traceProjectId?: string | null | undefined;
+    guardrailAttachments?: readonly GuardrailAttachment[] | undefined;
+  }): Promise<VirtualKeyWithScopes> {
+    const { actor, organizationId, id, scopes, guardrailAttachments } = input;
+    const existing = await this.#dependencies.getExistingVirtualKey({ organizationId, id });
+    await this.#dependencies.assertCanOperateOnAnyScope({
+      actor,
+      scopes: existing.scopes,
+      permission: "virtualKeys:update",
+    });
+
+    if (scopes) {
+      await this.#dependencies.assertCanManageAllScopes({ actor, scopes });
+      await this.#dependencies.assertScopesBelongToOrganization({ organizationId, scopes });
+    }
+
+    if (input.traceProjectId !== undefined) {
+      await this.#dependencies.assertTraceProjectBelongsToOrganization({
+        organizationId,
+        traceProjectId: input.traceProjectId,
+      });
+      if (input.traceProjectId) {
+        await this.#dependencies.assertCanManageAllScopes({
+          actor,
+          scopes: [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
+        });
+      }
+    }
+
+    const attachments =
+      guardrailAttachments ??
+      (scopes !== undefined
+        ? parseVirtualKeyConfig(existing.config).guardrailAttachments
+        : undefined);
+    await this.#dependencies.assertGuardrailAttachmentsAllowed({
+      actor,
+      organizationId,
+      virtualKeyId: id,
+      scopes,
+      traceProjectId:
+        input.traceProjectId !== undefined ? input.traceProjectId : existing.traceProjectId,
+      attachments,
+    });
+
+    return existing;
+  }
+
+  /**
+   * Gate for every other key mutation (rotate/revoke/disable/enable): key exists in this org,
+   * caller holds the operation's permission on a scope it lives in. Deliberately NOT the
+   * visibility rule — an unauthorized caller gets FORBIDDEN rather than a hidden not-found.
+   */
+  async authorizeVirtualKeyOperation(input: {
+    actor: GatewayActor;
+    impersonatorId?: string | undefined;
+    organizationId: string;
+    id: string;
+    permission: AuthzPermission;
+  }): Promise<VirtualKeyWithScopes> {
+    if (input.permission === "virtualKeys:rotate") {
+      refuseImpersonatedMint({
+        impersonatorId: input.impersonatorId,
+        permission: input.permission,
+        organizationId: input.organizationId,
+      });
+    }
+    const existing = await this.#dependencies.getExistingVirtualKey({
+      organizationId: input.organizationId,
+      id: input.id,
+    });
+    await this.#dependencies.assertCanOperateOnAnyScope({
+      actor: input.actor,
+      scopes: existing.scopes,
+      permission: input.permission,
+    });
+    return existing;
+  }
+
+  /**
+   * Gate for a tenant-wide write: budgets and cache rules are org-owned rows, addressed by id,
+   * that a project credential can name regardless of which project they belong to — so this
+   * checks at the organization, the scope the write actually acts on.
+   */
+  async authorizeOrganizationWideOperation(input: {
+    actor: GatewayActor;
+    organizationId: string;
+    permission: AuthzPermission;
+  }): Promise<void> {
+    await this.#dependencies.assertCanOperateAtOrganization(input);
+  }
+
+  /**
+   * Who a virtual key route was called by. The door asked the route's permission at the
+   * credential's reach; a key that names no project is asked again per virtual key it touches.
+   */
+  async getVirtualKeyCaller(input: {
+    caller: GatewayVirtualKeyCaller;
+  }): Promise<GatewayAuthorizedVirtualKeyCaller> {
+    const { caller } = input;
+    switch (caller.kind) {
+      case "project":
+        return {
+          organizationId: await this.organizationIdForProject(caller.projectId),
+          projectId: caller.projectId,
+          actor: { kind: "legacyProjectKey", projectId: caller.projectId },
+          actorUserId: `svc_${caller.projectId}`,
+        };
+      case "cliAccessToken":
+        return {
+          organizationId: caller.organizationId,
+          projectId: caller.projectId,
+          actor: { kind: "cliAccessToken", userId: caller.userId, projectId: caller.projectId },
+          actorUserId: caller.userId,
+        };
+      case "apiKey":
+        return {
+          organizationId: caller.organizationId,
+          projectId: caller.resolvedProject?.id ?? null,
+          actor: {
+            kind: "apiKey",
+            apiKeyId: caller.apiKeyId,
+            userId: caller.userId,
+            organizationId: caller.organizationId,
+          },
+          actorUserId: caller.userId ?? `svc_${caller.resolvedProject?.id ?? caller.apiKeyId}`,
+        };
+    }
+  }
+
+  /** Any API key the key door admitted. A legacy project key is its project's organization. */
+  async getKeyCaller(input: { caller: GatewayKeyCaller }): Promise<GatewayAuthorizedKeyCaller> {
+    const { caller } = input;
+    if (caller.kind === "project") {
+      return {
+        organizationId: await this.organizationIdForProject(caller.projectId),
+        actor: { kind: "legacyProjectKey", projectId: caller.projectId },
+        actorUserId: `svc_${caller.projectId}`,
+      };
+    }
+
+    return {
+      organizationId: caller.organizationId,
+      actor: {
+        kind: "apiKey",
+        apiKeyId: caller.apiKeyId,
+        userId: caller.userId,
+        organizationId: caller.organizationId,
+      },
+      actorUserId: caller.userId ?? `svc_${caller.resolvedProject?.id ?? caller.apiKeyId}`,
+    };
+  }
+}
+
+/** An operator acting as a member holds no grant to issue credentials as them (F05). */
+function refuseImpersonatedMint(input: {
+  impersonatorId: string | undefined;
+  permission: AuthzPermission;
+  organizationId: string;
+}): void {
+  if (!input.impersonatorId) return;
+  throw new PermissionDeniedError({
+    permission: input.permission,
+    scope: { type: "organization", id: input.organizationId },
+    denialReason: "no-grant",
+  });
+}

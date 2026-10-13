@@ -18,7 +18,7 @@ Feature: Langy renders domain-capability cards for tool calls
     When Langy runs the trace-search capability and it returns matching traces
     Then Langy shows a traces card listing the matched traces
     And each trace row links to that trace
-    And the card offers an "Open in Traces" link
+    And the card offers a "View in Trace Explorer" link
     And the card shows no Apply or Discard action
 
   @integration
@@ -32,7 +32,40 @@ Feature: Langy renders domain-capability cards for tool calls
     When Langy runs the analytics capability and it returns numbers
     Then Langy shows a metrics card with the reported figures
     And each figure rolls up from zero as a rolling number
-    And the card offers an "Open in Analytics" link
+    And the card offers no deep link, since a link that did not carry the query would mislead
+
+  @integration
+  Scenario: A trace count split by model reads as a count of traces
+    Given the project has 7 traces, all on one model
+    When Langy counts the project's traces over the whole range, split by model
+    Then the metrics card is titled "Traces"
+    And its headline figure reads 7, captioned "traces"
+    And the model's own figure sits beside it, captioned by the model's name
+    And the card never shows the aggregation name or a count of result buckets
+
+  @integration @unit
+  Scenario: A grouped average is never summed into one figure
+    When Langy averages a metric split by model, with the models averaging 1 and 3
+    Then the metrics card shows each model's average beside its name
+    And it never shows their sum as the period's figure
+    And when every model spans several days, the card says the result has no single figure rather than that there is no data
+    And the CLI draws one line per model instead of one summed line, with no period-over-period total
+
+  @integration @unit
+  Scenario: A distinct count is added up only where each id falls once
+    When Langy counts distinct traces per day
+    Then the card and the CLI total the days, since each trace falls on one day
+    When Langy counts distinct users per day
+    Then neither totals the days, since a user can come back on another day
+    When Langy counts distinct traces split by model
+    Then the CLI draws one line per model and totals nothing, since one trace can carry two models
+
+  @unit
+  Scenario: A metrics card names its aggregation in words
+    When Langy reads a metric aggregated as a total, an average, a minimum, a maximum, a median or a percentile
+    Then the card keeps the metric as its heading
+    And the caption under the figure names the aggregation in words, such as "total" or "95th percentile"
+    And an aggregation it does not know is shown with its separators turned into spaces
 
   @integration
   Scenario: An evaluation run renders its result
@@ -138,8 +171,9 @@ Feature: Langy renders domain-capability cards for tool calls
 
   @integration
   Scenario: An unmapped tool falls through to the raw view
+    Given developer mode is on
     When Langy runs a tool that is not a LangWatch action and has no capability card
-    Then Langy shows the tool's raw name, state, input, and output
+    Then I can show the tool's raw name, state, input, and output
     And it does not fabricate a card it has no mapping for
 
   @integration
@@ -401,6 +435,16 @@ Feature: Langy renders domain-capability cards for tool calls
       When the turn is recorded
       Then the recorded parts are the paragraphs and the calls in the order they happened
       And no paragraph written between two calls is dropped
+
+    # GPT-5 on the Responses API writes a commentary message and a final
+    # message in one reply. They reached the panel as one run of text with no
+    # break, so one sentence ran into the next ("met both criteria.Evals &
+    # LLM Ops is already complete.").
+    @unit
+    Scenario: Two text blocks of one reply are separated by a paragraph break
+      Given Langy wrote two text blocks with no tool call between them
+      When the turn streams to the panel
+      Then the second block starts on a new paragraph
 
     @unit
     Scenario: A card is recorded where the work began

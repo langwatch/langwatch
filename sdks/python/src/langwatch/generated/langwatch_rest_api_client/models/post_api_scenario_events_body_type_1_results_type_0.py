@@ -12,6 +12,9 @@ from ..models.post_api_scenario_events_body_type_1_results_type_0_verdict import
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.post_api_scenario_events_body_type_1_results_type_0_criteria_item import (
+        PostApiScenarioEventsBodyType1ResultsType0CriteriaItem,
+    )
     from ..models.post_api_scenario_events_body_type_1_results_type_0_evaluations_item import (
         PostApiScenarioEventsBodyType1ResultsType0EvaluationsItem,
     )
@@ -28,6 +31,8 @@ class PostApiScenarioEventsBodyType1ResultsType0:
         met_criteria (list[str]):
         unmet_criteria (list[str]):
         reasoning (str | Unset):
+        inconclusive_criteria (list[str] | Unset):
+        criteria (list[PostApiScenarioEventsBodyType1ResultsType0CriteriaItem] | Unset):
         error (str | Unset):
         evaluations (list[PostApiScenarioEventsBodyType1ResultsType0EvaluationsItem] | Unset):
     """
@@ -36,6 +41,8 @@ class PostApiScenarioEventsBodyType1ResultsType0:
     met_criteria: list[str]
     unmet_criteria: list[str]
     reasoning: str | Unset = UNSET
+    inconclusive_criteria: list[str] | Unset = UNSET
+    criteria: list[PostApiScenarioEventsBodyType1ResultsType0CriteriaItem] | Unset = UNSET
     error: str | Unset = UNSET
     evaluations: list[PostApiScenarioEventsBodyType1ResultsType0EvaluationsItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -48,6 +55,17 @@ class PostApiScenarioEventsBodyType1ResultsType0:
         unmet_criteria = self.unmet_criteria
 
         reasoning = self.reasoning
+
+        inconclusive_criteria: list[str] | Unset = UNSET
+        if not isinstance(self.inconclusive_criteria, Unset):
+            inconclusive_criteria = self.inconclusive_criteria
+
+        criteria: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.criteria, Unset):
+            criteria = []
+            for criteria_item_data in self.criteria:
+                criteria_item = criteria_item_data.to_dict()
+                criteria.append(criteria_item)
 
         error = self.error
 
@@ -69,6 +87,10 @@ class PostApiScenarioEventsBodyType1ResultsType0:
         )
         if reasoning is not UNSET:
             field_dict["reasoning"] = reasoning
+        if inconclusive_criteria is not UNSET:
+            field_dict["inconclusiveCriteria"] = inconclusive_criteria
+        if criteria is not UNSET:
+            field_dict["criteria"] = criteria
         if error is not UNSET:
             field_dict["error"] = error
         if evaluations is not UNSET:
@@ -78,6 +100,9 @@ class PostApiScenarioEventsBodyType1ResultsType0:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.post_api_scenario_events_body_type_1_results_type_0_criteria_item import (
+            PostApiScenarioEventsBodyType1ResultsType0CriteriaItem,
+        )
         from ..models.post_api_scenario_events_body_type_1_results_type_0_evaluations_item import (
             PostApiScenarioEventsBodyType1ResultsType0EvaluationsItem,
         )
@@ -90,6 +115,17 @@ class PostApiScenarioEventsBodyType1ResultsType0:
         unmet_criteria = cast(list[str], d.pop("unmetCriteria"))
 
         reasoning = d.pop("reasoning", UNSET)
+
+        inconclusive_criteria = cast(list[str], d.pop("inconclusiveCriteria", UNSET))
+
+        _criteria = d.pop("criteria", UNSET)
+        criteria: list[PostApiScenarioEventsBodyType1ResultsType0CriteriaItem] | Unset = UNSET
+        if _criteria is not UNSET:
+            criteria = []
+            for criteria_item_data in _criteria:
+                criteria_item = PostApiScenarioEventsBodyType1ResultsType0CriteriaItem.from_dict(criteria_item_data)
+
+                criteria.append(criteria_item)
 
         error = d.pop("error", UNSET)
 
@@ -109,6 +145,8 @@ class PostApiScenarioEventsBodyType1ResultsType0:
             met_criteria=met_criteria,
             unmet_criteria=unmet_criteria,
             reasoning=reasoning,
+            inconclusive_criteria=inconclusive_criteria,
+            criteria=criteria,
             error=error,
             evaluations=evaluations,
         )

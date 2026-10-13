@@ -27,6 +27,7 @@ type App struct {
 	traces     AITraceEmitter
 	spend      pipeline.SpendEmitter
 	realtime   RealtimeSessionRegistry
+	voice      VoiceSupervisor
 	hosted     HostedServices
 	metrics    MetricsRecorder
 	breaker    CircuitBreaker
@@ -56,6 +57,12 @@ func WithSpend(e pipeline.SpendEmitter) Option { return func(app *App) { app.spe
 // nobody recorded is unbillable voice.
 func WithRealtimeSessions(r RealtimeSessionRegistry) Option {
 	return func(app *App) { app.realtime = r }
+}
+
+// WithVoiceSupervisor wires the supervisor of brokered voice calls. Without
+// it the broker routes refuse: a call no socket watches cannot be metered.
+func WithVoiceSupervisor(v VoiceSupervisor) Option {
+	return func(app *App) { app.voice = v }
 }
 func WithMetrics(m MetricsRecorder) Option       { return func(app *App) { app.metrics = m } }
 func WithCircuitBreaker(b CircuitBreaker) Option { return func(app *App) { app.breaker = b } }
@@ -369,13 +376,18 @@ func reachableProviders(bundle *domain.Bundle) func(domain.ProviderID) bool {
 	}
 }
 
-// soleCredentialProviderID returns the credential chain's provider when
-// every credential shares one, and "" when the chain is empty or spans
-// more than one provider (nothing to unambiguously attribute to).
+// soleCredentialProviderID returns the provider a bare model name would be
+// dispatched to when every credential that serves bare names shares one, and
+// "" when there is none or they span more than one provider (nothing to
+// unambiguously attribute to). The LangWatch-managed models slot never serves
+// a bare name, so it never claims one here either.
 func soleCredentialProviderID(creds []domain.Credential) domain.ProviderID {
 	var providerID domain.ProviderID
-	for i, cred := range creds {
-		if i == 0 {
+	for _, cred := range creds {
+		if !cred.ServesBareModels() {
+			continue
+		}
+		if providerID == "" {
 			providerID = cred.ProviderID
 			continue
 		}

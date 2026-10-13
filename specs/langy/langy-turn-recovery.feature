@@ -34,6 +34,14 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And Langy gives up to an error card once its attempts are exhausted
 
   @unit
+  Scenario: An unreachable agent is retried with a countdown, not an error
+    Given Langy's agent cannot be reached
+    When the turn fails because Langy is unavailable
+    Then the user does not see a red error card
+    And Langy shows a quiet line saying it is unavailable and counting down to the retry
+    And Langy gives up to an error card once its attempts are exhausted
+
+  @unit
   Scenario: A lost session is terminal and is never retried
     Given Langy lost the session backing this conversation
     When the turn fails
@@ -273,6 +281,17 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Then the conversation holds exactly one copy of the user's message
     And the retried turn runs against the message already on record
 
+  # The retried turn continues the same agent session, so the plan the failed
+  # turn wrote and the calls it ran are still the context it works in. The
+  # retry used to drop the failed reply from the panel, and the plan card went
+  # with it.
+  @unit
+  Scenario: Trying again keeps the plan the failed turn wrote
+    Given a Langy turn wrote a plan and then failed
+    When the user tries again from the error card
+    Then the failed reply stays on screen with its plan
+    And the retried turn's answer appears below it
+
   # ---------------------------------------------------------------------------
   # The control plane must never fail a turn that already finished
   # ---------------------------------------------------------------------------
@@ -475,3 +494,22 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Given the live connection drops before Langy can say what went wrong
     When the turn's failure is already on the conversation's record
     Then the user sees the card naming that recorded failure, not a generic apology
+
+  @unit
+  Scenario: A deployment with no Langy agent says so instead of an unexpected error
+    Given the api runs without a Langy agent and refuses the turn with langy_agent_not_configured
+    When the refusal reaches the panel, with or without its tRPC envelope
+    Then the card reads "Langy isn't set up on this deployment" and says how to enable the agent
+    And it offers no "Try again", since a retry is refused the same way
+
+  @unit
+  Scenario: Refusals that answer the same way every time offer no retry
+    Given a turn refused with langy_not_enabled, langy_skill_not_available or langy_dispatch_rejected
+    Then the card shows that code's registered copy and no "Try again" action
+
+  @unit
+  Scenario: A bare failure code still reads the reasons on the durable record
+    Given a turn failed and its typed failure is on the durable record
+    When the live error carries only the code langy_agent_errored
+    Then the card is chosen from the durable record's reasons
+    But a turn-start refusal with a different code is shown ahead of an older durable failure

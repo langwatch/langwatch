@@ -1,0 +1,75 @@
+Feature: The standalone API process serves its own metrics
+  As an operator scraping a LangWatch API deployment
+  I want the API process to expose the metrics its own work records
+  So that a tier running without the web process is not an observability hole
+
+  # WHY THIS EXISTS
+  #
+  # The API process could be handed a metrics transport by a host, and no host
+  # ever handed it one — so the tier had no /metrics at all, and the Group
+  # Queue and eventing counters it records went nowhere. The process now
+  # composes its own.
+  #
+  # The operator-visible contract is deliberately the SAME credential and the
+  # same rules the web and worker tiers already carry
+  # (specs/server/metrics-collection.feature), so an operator holds one rule
+  # about METRICS_API_KEY rather than one per tier. What is process-specific,
+  # and what these scenarios pin, is the composition decision: a tier that
+  # cannot serve metrics safely serves no metrics endpoint at all.
+
+  Rule: A configured key gates the endpoint and nothing else opens it
+
+    @unit
+    Scenario: An authenticated scrape renders what this process recorded
+      Given the API process is configured with a metrics API key
+      When a caller scrapes its metrics endpoint with that key
+      Then the response is successful
+      And it carries the samples this process recorded, not an empty registry
+
+    @unit
+    Scenario: A scrape with no credential or the wrong one is rejected
+      Given the API process is configured with a metrics API key
+      When a caller scrapes its metrics endpoint with no credential or an incorrect one
+      Then the request is rejected as unauthorized
+      And no metric samples are returned
+
+  Rule: A process that cannot serve metrics safely serves no endpoint
+
+    @unit
+    Scenario: In production an unset key leaves the process with no metrics endpoint
+      Given the API process runs in production with no metrics API key configured
+      When it composes
+      Then its metrics endpoint is absent rather than open
+      # Fail-closed, as the worker tier is: an unset key is a misconfiguration,
+      # not an invitation. Absent rather than refusing, because a route that
+      # answers every caller with a refusal is a surface with no purpose.
+
+    @unit
+    Scenario: In production an unset key is named at boot
+      Given the API process runs in production with no metrics API key configured
+      When it composes
+      Then it names the absence at boot
+
+    @unit
+    Scenario: Outside production an unset key leaves no metrics endpoint either
+      Given the API process runs outside production with no metrics API key configured
+      When it composes
+      Then its metrics endpoint is absent rather than open
+      # ADR-175 (2026-10-09, TS-METRICS-NO-KEY): closed in every environment, as the Go gateway's door is.
+
+  Rule: Composing metrics twice does not cost the process its metrics
+
+    @unit
+    Scenario: A registry that already carries default collectors is left intact
+      Given a process whose registry already carries its default collectors
+      When the API composition installs them again
+      Then composition succeeds
+      And a scrape still renders every sample the registry holds
+      # Registering a collector twice is refused by the registry, so a process
+      # that hosts a second composition would otherwise fail at boot.
+
+    @unit
+    Scenario: The scrape carries Node's default collectors
+      Given the API process serves its metrics endpoint
+      When a caller scrapes it
+      Then the response carries Node's default process and runtime series

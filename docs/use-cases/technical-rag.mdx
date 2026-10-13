@@ -9,15 +9,17 @@ This guide shows you how to evaluate a RAG (Retrieval-Augmented Generation) chat
 The goal is to verify that the chatbot provides accurate, relevant, and faithful answers based on the official documentation. We'll use LangWatch to automate this evaluation so it can run in a CI/CD workflow.
 
 ### **1. The Scenario**
+
 Our RAG chatbot must answer precise technical questions from operators and technicians. The quality of its answers is critical for safety and proper machine maintenance.
 
-* **Knowledge Base**: A collection of long, dense PDF manuals for different machine models.
-* **Input**: A technical question like, "What is the recommended torque setting for the Model A primary valve?"
-* **Output**: A concise, accurate answer with citations from the manuals.
+- **Knowledge Base**: A collection of long, dense PDF manuals for different machine models.
+- **Input**: A technical question like, "What is the recommended torque setting for the Model A primary valve?"
+- **Output**: A concise, accurate answer with citations from the manuals.
 
 We need to evaluate if the RAG pipeline can reliably retrieve the correct information and synthesize an accurate answer.
 
 ### **2. Setup and Data Preparation**
+
 First, let's set up the environment. For this evaluation, we'll use a "golden dataset" that contains question-answer pairs.
 
 ```python
@@ -45,6 +47,7 @@ df = pd.DataFrame(data)
 ```
 
 ### **3. Defining the RAG Pipeline**
+
 Next, we'll define placeholder functions for our RAG pipeline. In a real application, these would contain your logic for vector search and calling an LLM.
 
 ```python
@@ -80,6 +83,7 @@ def generate_answer(question: str, contexts: List[str]) -> str:
 ```
 
 ### **4. Implementing the Evaluation Script**
+
 Now, we'll use LangWatch to evaluate our RAG pipeline against the golden dataset. We'll initialize an evaluation run, loop through our questions, and use LangWatch's built-in evaluators to score the results.
 
 This script can be triggered automatically in a CI workflow whenever the RAG pipeline or its underlying model is updated.
@@ -139,11 +143,12 @@ print("Evaluation complete! Check your results in the LangWatch dashboard.")
 ```
 
 ### **5. Analyzing the Results**
+
 Once the script finishes, you can go to the LangWatch dashboard to analyze the performance of your RAG pipeline. The dashboard allows you to:
 
-* **Compare Experiments**: Compare the performance of `model-a-rag-evaluation-v1` against `v2` to see if your changes had a positive impact on metrics like faithfulness and accuracy.
-* **Drill into Failures**: Filter for all samples where `expected_answer_accuracy` failed. For each failure, you can inspect the question, the contexts that were retrieved, the generated answer, and the expected answer to quickly diagnose the root cause (e.g. a retrieval issue or a generation problem).
-* **Collaborate with Experts**: Share direct links to evaluation results with the domain experts who created the dataset, so they can close the feedback loop.
+- **Compare Experiments**: Compare the performance of `model-a-rag-evaluation-v1` against `v2` to see if your changes had a positive impact on metrics like faithfulness and accuracy.
+- **Drill into Failures**: Filter for all samples where `expected_answer_accuracy` failed. For each failure, you can inspect the question, the contexts that were retrieved, the generated answer, and the expected answer to quickly diagnose the root cause (e.g. a retrieval issue or a generation problem).
+- **Collaborate with Experts**: Share direct links to evaluation results with the domain experts who created the dataset, so they can close the feedback loop.
 
 ### **6. Conclusion**
 

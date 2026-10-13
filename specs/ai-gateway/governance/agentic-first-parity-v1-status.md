@@ -12,20 +12,20 @@
 
 Legend: 🟢 shipped + tested · 🟡 shipped tRPC-only (UI-functional, agent-blocked) · ⚪ tracked v1.1+ deferral · 🔵 lives at non-`/api/governance` REST namespace · ❌ no service yet
 
-| Resource | Service file | tRPC | Hono REST | CLI | MCP | v1 status |
-|---|---|---|---|---|---|---|
-| `ingestion-templates` | `ee/governance/services/ingestionTemplate.service.ts` | 🟢 `ee/governance/routers/ingestionTemplates.ts` | 🟢 `/api/governance/ingestion-templates` (`0bb951160`) | 🟢 `langwatch governance ingestion-templates` (`ed51b0ea1`) | 🟢 `governance_ingestion_templates_*` (7 verbs, `7639b6c2b`) | **FULL PARITY** |
-| `user-ingestion-bindings` | `ee/governance/services/userIngestionBinding.service.ts` | 🟢 `ee/governance/routers/userIngestionBindings.ts` | 🟢 `/api/governance/user-ingestion-bindings` (`5275e7e11`) | 🟢 `langwatch governance user-ingestion-bindings` (`ed51b0ea1`) | 🟢 `governance_user_ingestion_bindings_*` (4 verbs, `7639b6c2b`) | **FULL PARITY** |
-| `routing-policies` | `ee/governance/services/routingPolicy.service.ts` | 🟢 (router referenced from `governance.ts`) | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
-| `anomaly-rules` | `ee/governance/services/activity-monitor/anomalyRule.service.ts` | 🟢 `ee/governance/routers/anomalyRules.ts` | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
-| `ai-tool-entries` | `ee/governance/services/aiToolEntry.service.ts` | 🟢 `ee/governance/routers/aiTools.ts` | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
-| `ingestion-sources` | `ee/governance/services/activity-monitor/*` | 🟢 `ee/governance/routers/ingestionSources.ts` | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
-| `cli-sessions` (per-user) | `ee/governance/services/cliSessionInventory.service.ts` | 🟢 `ee/governance/routers/personalSessions.ts` | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
-| `session-policy` (max duration per org) | implied via `personalSessions` shape | 🟢 `ee/governance/routers/sessionPolicy.ts` | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
-| `virtual-keys` | `platform/app/src/server/gateway/virtualKey.service.ts` | 🟢 (existing tRPC) | 🔵 `/api/gateway/v1/virtual-keys` (PR #3168) | 🔵 `langwatch gateway-providers` (existing) | 🟡 — | non-`/api/governance` REST already; MCP gap |
-| `gateway-budgets` | `platform/app/src/server/gateway/budget.service.ts` | 🟢 (existing tRPC) | 🔵 `/api/gateway/v1/budgets` | 🔵 `langwatch gateway-budgets` | 🟡 — | non-`/api/governance` REST already; MCP gap |
-| `role-bindings` | `platform/app/src/server/rbac/role-binding-resolver.ts` | 🟢 (existing) | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
-| `audit-log` (read) | `platform/app/src/server/api/routers/auditLog.ts` (or equivalent) | 🟢 (existing) | 🟡 — | 🟡 — | 🟡 — | tRPC-only; agent-blocked |
+| Resource                                | Service file                                                      | tRPC                                                | Hono REST                                                  | CLI                                                             | MCP                                                              | v1 status                                   |
+| --------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------- |
+| `ingestion-templates`                   | `ee/governance/services/ingestionTemplate.service.ts`             | 🟢 `ee/governance/routers/ingestionTemplates.ts`    | 🟢 `/api/governance/ingestion-templates` (`0bb951160`)     | 🟢 `langwatch governance ingestion-templates` (`ed51b0ea1`)     | 🟢 `governance_ingestion_templates_*` (7 verbs, `7639b6c2b`)     | **FULL PARITY**                             |
+| `user-ingestion-bindings`               | `ee/governance/services/userIngestionBinding.service.ts`          | 🟢 `ee/governance/routers/userIngestionBindings.ts` | 🟢 `/api/governance/user-ingestion-bindings` (`5275e7e11`) | 🟢 `langwatch governance user-ingestion-bindings` (`ed51b0ea1`) | 🟢 `governance_user_ingestion_bindings_*` (4 verbs, `7639b6c2b`) | **FULL PARITY**                             |
+| `routing-policies`                      | `ee/governance/services/routingPolicy.service.ts`                 | 🟢 (router referenced from `governance.ts`)         | 🟡 —                                                       | 🟡 —                                                            | 🟡 —                                                             | tRPC-only; agent-blocked                    |
+| `anomaly-rules`                         | `ee/governance/services/activity-monitor/anomalyRule.service.ts`  | 🟢 `ee/governance/routers/anomalyRules.ts`          | 🟡 —                                                       | 🟡 —                                                            | 🟡 —                                                             | tRPC-only; agent-blocked                    |
+| `ai-tool-entries`                       | `ee/governance/services/aiToolEntry.service.ts`                   | 🟢 `ee/governance/routers/aiTools.ts`               | 🟡 —                                                       | 🟡 —                                                            | 🟡 —                                                             | tRPC-only; agent-blocked                    |
+| `ingestion-sources`                     | `ee/governance/services/activity-monitor/*`                       | 🟢 `ee/governance/routers/ingestionSources.ts`      | 🟡 —                                                       | 🟡 —                                                            | 🟡 —                                                             | tRPC-only; agent-blocked                    |
+| `cli-sessions` (per-user)               | `ee/governance/services/cliSessionInventory.service.ts`           | 🟢 `ee/governance/routers/personalSessions.ts`      | 🟡 —                                                       | 🟡 —                                                            | 🟡 —                                                             | tRPC-only; agent-blocked                    |
+| `session-policy` (max duration per org) | implied via `personalSessions` shape                              | 🟢 `ee/governance/routers/sessionPolicy.ts`         | 🟡 —                                                       | 🟡 —                                                            | 🟡 —                                                             | tRPC-only; agent-blocked                    |
+| `virtual-keys`                          | `platform/app/src/server/gateway/virtualKey.service.ts`           | 🟢 (existing tRPC)                                  | 🔵 `/api/gateway/v1/virtual-keys` (PR #3168)               | 🔵 `langwatch gateway-providers` (existing)                     | 🟡 —                                                             | non-`/api/governance` REST already; MCP gap |
+| `gateway-budgets`                       | `platform/app/src/server/gateway/budget.service.ts`               | 🟢 (existing tRPC)                                  | 🔵 `/api/gateway/v1/budgets`                               | 🔵 `langwatch gateway-budgets`                                  | 🟡 —                                                             | non-`/api/governance` REST already; MCP gap |
+| `role-bindings`                         | `platform/app/src/server/rbac/role-binding-resolver.ts`           | 🟢 (existing)                                       | 🟡 —                                                       | 🟡 —                                                            | 🟡 —                                                             | tRPC-only; agent-blocked                    |
+| `audit-log` (read)                      | `platform/app/src/server/api/routers/auditLog.ts` (or equivalent) | 🟢 (existing)                                       | 🟡 —                                                       | 🟡 —                                                            | 🟡 —                                                             | tRPC-only; agent-blocked                    |
 
 **Score**: 2/12 governance resources have **FULL** four-surface agentic-first parity in v1. 8/12 are tRPC-only. 2/12 (`virtual-keys` + `gateway-budgets`) live at `/api/gateway/v1/*` rather than `/api/governance/*` and have CLI but no MCP.
 
@@ -40,7 +40,7 @@ auto-gen, audit attribution via `metadata.surface`, and CI-enforced
 
 **v1 ships the load-bearing two**: `ingestion-templates` and
 `user-ingestion-bindings`. These are the resources where agentic-first
-parity is genuinely needed *today* per rchaves's "company governance
+parity is genuinely needed _today_ per rchaves's "company governance
 over Claude Code 20x usage" framing — admins fork OTTL templates,
 users install bindings, all four surfaces (dashboard / REST / CLI /
 agent-tooling) are exercisable end-to-end.
@@ -80,18 +80,18 @@ Numbers are approximate per-resource costs based on the
 ingestion-templates path (which took ~9 SHAs). See "Pre-flight
 checklist" below for the gates.
 
-| Resource | Pre-flight | Hono port (LOC est) | CLI commands | MCP tools | Repo-pattern lift | Total est PRs |
-|---|---|---|---|---|---|---|
-| `routing-policies` | ✅ service exists | ~250 | ~150 | ~120 | required (uses `prisma` directly) | 1 medium PR |
-| `anomaly-rules` | ✅ service exists | ~300 (CRUD + threshold subset) | ~180 | ~140 | required | 1 medium PR |
-| `ai-tool-entries` | ✅ service exists | ~280 | ~160 | ~130 | required | 1 medium PR |
-| `ingestion-sources` | ✅ service exists | ~320 (mint-token + pull-config) | ~190 | ~150 | required | 1 medium PR |
-| `cli-sessions` | ✅ service exists | ~180 (read-mostly) | ~120 | ~100 | optional (read-only path) | 1 small PR |
-| `session-policy` | ✅ service exists | ~150 (single-row-per-org) | ~80 | ~70 | optional | 1 small PR |
-| `virtual-keys` | ✅ at `/api/gateway/v1` | n/a (already shipped) | n/a (already shipped) | ~150 (mirror existing REST) | already done | 1 small MCP-only PR |
-| `gateway-budgets` | ✅ at `/api/gateway/v1` | n/a (already shipped) | n/a (already shipped) | ~140 | already done | 1 small MCP-only PR |
-| `role-bindings` | tRPC exists | ~280 (3-principal-type input shape) | ~180 | ~150 | required | 1 medium PR |
-| `audit-log` (read) | tRPC exists | ~120 (paginated read) | ~80 | ~80 | n/a | 1 small read-only PR |
+| Resource            | Pre-flight              | Hono port (LOC est)                 | CLI commands          | MCP tools                   | Repo-pattern lift                 | Total est PRs        |
+| ------------------- | ----------------------- | ----------------------------------- | --------------------- | --------------------------- | --------------------------------- | -------------------- |
+| `routing-policies`  | ✅ service exists       | ~250                                | ~150                  | ~120                        | required (uses `prisma` directly) | 1 medium PR          |
+| `anomaly-rules`     | ✅ service exists       | ~300 (CRUD + threshold subset)      | ~180                  | ~140                        | required                          | 1 medium PR          |
+| `ai-tool-entries`   | ✅ service exists       | ~280                                | ~160                  | ~130                        | required                          | 1 medium PR          |
+| `ingestion-sources` | ✅ service exists       | ~320 (mint-token + pull-config)     | ~190                  | ~150                        | required                          | 1 medium PR          |
+| `cli-sessions`      | ✅ service exists       | ~180 (read-mostly)                  | ~120                  | ~100                        | optional (read-only path)         | 1 small PR           |
+| `session-policy`    | ✅ service exists       | ~150 (single-row-per-org)           | ~80                   | ~70                         | optional                          | 1 small PR           |
+| `virtual-keys`      | ✅ at `/api/gateway/v1` | n/a (already shipped)               | n/a (already shipped) | ~150 (mirror existing REST) | already done                      | 1 small MCP-only PR  |
+| `gateway-budgets`   | ✅ at `/api/gateway/v1` | n/a (already shipped)               | n/a (already shipped) | ~140                        | already done                      | 1 small MCP-only PR  |
+| `role-bindings`     | tRPC exists             | ~280 (3-principal-type input shape) | ~180                  | ~150                        | required                          | 1 medium PR          |
+| `audit-log` (read)  | tRPC exists             | ~120 (paginated read)               | ~80                   | ~80                         | n/a                               | 1 small read-only PR |
 
 Total: **8-10 follow-on PRs** to bring all 12 resources to v1.x full
 parity. Each PR is a self-contained `<resource>` slice that mirrors
@@ -105,9 +105,9 @@ For each resource, do these in order before opening the route file:
 
 1. **Repository-pattern extraction** (skip if service already uses it).
    Pattern: see `ee/governance/repositories/ingestionTemplate.repository.ts`
-   + `userIngestionBinding.repository.ts`. Service constructor accepts
-   the repo via DI, methods take `Prisma.TransactionClient | PrismaClient`
-   per call so they work both inside and outside `$transaction` blocks.
+   - `userIngestionBinding.repository.ts`. Service constructor accepts
+     the repo via DI, methods take `Prisma.TransactionClient | PrismaClient`
+     per call so they work both inside and outside `$transaction` blocks.
 
 2. **Audit `surface` thread-through**. Add optional
    `surface?: GovernanceCallSurface` to every mutating service method,
@@ -125,11 +125,11 @@ For each resource, do these in order before opening the route file:
    on Hono mutations, `mapServiceError` helper for service→HTTP code mapping.
 
 5. **CLI commands**. Mirror `sdks/typescript/src/cli/commands/governance/ingestion-templates.ts`
-   + `user-ingestion-bindings.ts` + add to the subcommand tree in
-   `sdks/typescript/src/cli/index.ts`. Commands are always available
-   once the CLI is installed; per-account entitlement is enforced
-   server-side. Use `requestREST` from `cli/utils/governance/cli-api.ts`
-   so `X-LangWatch-Surface: cli` is sent automatically.
+   - `user-ingestion-bindings.ts` + add to the subcommand tree in
+     `sdks/typescript/src/cli/index.ts`. Commands are always available
+     once the CLI is installed; per-account entitlement is enforced
+     server-side. Use `requestREST` from `cli/utils/governance/cli-api.ts`
+     so `X-LangWatch-Surface: cli` is sent automatically.
 
 6. **MCP tools**. Mirror `src/mcp/governance-tools.ts`
    `governance_<resource>_<verb>` registration. Read tools allowed for
@@ -152,11 +152,11 @@ For each resource, do these in order before opening the route file:
 
 ## v1.1+ deferred work (explicitly out of scope per umbrella spec)
 
-| Item | Reason for deferral | Reference |
-|---|---|---|
-| 16-key B6 attribution restamp on binding-routed traces | v1 closes 5-key bindingProvenance no-spy gate; 16-key principal-field guard for binding traces is separate forge-defense surface | `eabfb84d6` no-spy v1 scope-fence |
-| pnpm SDK regen script names | Minor TBD-IMPL pending the regen target SHA | `docs/ai-governance/api.mdx` |
-| Hono routes for the 10 governance resources beyond ingestion-templates+bindings | Requires repo-pattern extraction + audit-surface threading per resource; ships as 8-10 follow-on PRs per the matrix above | this doc |
+| Item                                                                            | Reason for deferral                                                                                                              | Reference                         |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| 16-key B6 attribution restamp on binding-routed traces                          | v1 closes 5-key bindingProvenance no-spy gate; 16-key principal-field guard for binding traces is separate forge-defense surface | `eabfb84d6` no-spy v1 scope-fence |
+| pnpm SDK regen script names                                                     | Minor TBD-IMPL pending the regen target SHA                                                                                      | `docs/ai-governance/api.mdx`      |
+| Hono routes for the 10 governance resources beyond ingestion-templates+bindings | Requires repo-pattern extraction + audit-surface threading per resource; ships as 8-10 follow-on PRs per the matrix above        | this doc                          |
 
 ## Cross-surface uniformity proven for v1 resources
 

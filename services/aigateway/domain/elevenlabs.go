@@ -34,7 +34,23 @@ type ElevenLabsAudioRequest struct {
 	// there on this vendor's wire rather than in the body, so dropping it
 	// would silently return audio in a format the caller did not ask for.
 	RawQuery string
+	// Variant is the synthesis path under the voice: the plain one, the
+	// chunked stream, or the stream of JSON chunks that carry timings.
+	// Empty on transcription.
+	Variant ElevenLabsSpeechVariant
 }
+
+// ElevenLabsSpeechVariant is the path suffix after the voice id on ElevenLabs'
+// synthesis routes.
+type ElevenLabsSpeechVariant string
+
+// The synthesis paths: one complete body, a chunked audio stream, and a
+// stream of JSON chunks that carry the audio with its character timings.
+const (
+	ElevenLabsSpeechPlain                ElevenLabsSpeechVariant = ""
+	ElevenLabsSpeechStream               ElevenLabsSpeechVariant = "/stream"
+	ElevenLabsSpeechStreamWithTimestamps ElevenLabsSpeechVariant = "/stream/with-timestamps"
+)
 
 // ElevenLabsSpeechSurface is POST /v1/text-to-speech/{voice_id}: ElevenLabs'
 // own synthesis path, served only by an ElevenLabs credential.
