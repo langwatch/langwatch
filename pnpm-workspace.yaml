@@ -314,7 +314,7 @@ overrides:
   js-yaml@>=5.0.0 <5.4.1: '>=5.4.1 <6'
   kysely: 0.28.17
   langchain@<0.3.37: '>=0.3.37'
-  langsmith@<0.6.0: '>=0.6.0'
+  langsmith@<0.8.0: '>=0.8.0 <1'
   liquidjs: '>=10.27.2 <11'
   lodash: ^4.18.1
   merge@<2.1.1: '>=2.1.1'
