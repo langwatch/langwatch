@@ -836,7 +836,6 @@ export const APP_ERROR_CODES = [
   "upgrade_plan_unavailable",
   "upgrade_step_not_failed",
   "usage_report_failed",
-  "user_email_ambiguous",
   "user_last_platform_operator",
   "user_not_in_organization",
   "user_to_impersonate_not_found",
