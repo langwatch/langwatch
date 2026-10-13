@@ -353,8 +353,9 @@ void describe("given the job is split into shards", () => {
       );
     });
 
-    void it("refuses a missing, zero, non-numeric or repeated weight", () => {
-      for (const bad of ["@fix/a", "@fix/a  0", "@fix/a  slow", "@fix/a 1\n@fix/a 2"]) {
+    void it("refuses a missing, zero, non-numeric, infinite or repeated weight", () => {
+      const infinite = `@fix/a  ${"9".repeat(400)}`;
+      for (const bad of ["@fix/a", "@fix/a  0", "@fix/a  slow", infinite, "@fix/a 1\n@fix/a 2"]) {
         assert.equal(parseWeights(bad, "weights").errors.length, 1, bad);
       }
     });

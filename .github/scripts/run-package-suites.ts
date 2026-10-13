@@ -159,7 +159,7 @@ export const parseWeights = (
     if (line === "") return;
     const match = /^(\S+)\s+(\d+(?:\.\d+)?)$/.exec(line);
     const seconds = match ? Number(match[2]) : Number.NaN;
-    if (!match || !(seconds > 0) || weights.has(match[1])) {
+    if (!match || !Number.isFinite(seconds) || seconds <= 0 || weights.has(match[1])) {
       errors.push(
         `::error file=${file},line=${index + 1}::'${line}' is not '<package>  <seconds>' with a positive number, once per package.`,
       );
