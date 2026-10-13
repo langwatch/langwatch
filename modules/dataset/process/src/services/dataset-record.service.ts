@@ -26,6 +26,7 @@ import {
   type UpdateDatasetRecordInput,
 } from "@langwatch/dataset-contract";
 
+import type { DatasetContent } from "../app/dataset.app.ts";
 import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
 import {
   assertPageWithinLimit,
@@ -39,6 +40,7 @@ import {
   sanitizedEntry,
   selectDatasetRecords,
 } from "../rules/dataset-selection.rules.ts";
+import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
 import type { InlineAttachmentScope } from "./dataset-inline-attachment.service.ts";
 import { DatasetRecordSearchService } from "./dataset-record-search.service.ts";
 import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
@@ -64,6 +66,9 @@ type DatasetRecordServiceOptions = {
   requestBounds: DatasetRequestBoundsService;
 };
 
+/** The record operations both object-backed layouts answer. */
+type DatasetRecordContent = Omit<DatasetContent, "copyDataset" | "updateColumns">;
+
 export class DatasetRecordService {
   static create(deps: DatasetRecordServiceOptions): DatasetRecordService {
     return new DatasetRecordService(deps);
@@ -75,6 +80,7 @@ export class DatasetRecordService {
     this.search = DatasetRecordSearchService.create({
       records: deps.options.records,
       content: deps.options.content,
+      singleFile: deps.options.singleFile,
       requestBounds: deps.requestBounds,
     });
   }
@@ -85,6 +91,13 @@ export class DatasetRecordService {
 
   private getBySlugOrId(input: DatasetLookupInput): Promise<Dataset> {
     return this.deps.getBySlugOrId(input);
+  }
+
+  /** Where a dataset's records live when not in the record table: chunks, or one single file. */
+  private contentOf(dataset: Dataset): DatasetRecordContent | undefined {
+    if (dataset.contentLayout === "s3_jsonl") return this.options.content;
+    if (isSingleFileDataset(dataset)) return this.options.singleFile;
+    return undefined;
   }
 
   /**
@@ -123,8 +136,9 @@ export class DatasetRecordService {
     if (search) {
       return this.search.searchRecords({ dataset, input: parsed, search });
     }
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.listRecords({ dataset, input: parsed });
+    const content = this.contentOf(dataset);
+    if (content) {
+      return content.listRecords({ dataset, input: parsed });
     }
 
     const result = await this.options.records.listAll({
@@ -168,8 +182,9 @@ export class DatasetRecordService {
         totalPages: matches.pagination.totalPages,
       };
     }
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.getDatasetPage({ dataset, input: parsed });
+    const content = this.contentOf(dataset);
+    if (content) {
+      return content.getDatasetPage({ dataset, input: parsed });
     }
 
     const page = await this.options.records.listAll({
@@ -232,8 +247,9 @@ export class DatasetRecordService {
     limitBytes: number;
   }): Promise<DatasetWithRecords> {
     const { parsed, dataset, limitBytes } = input;
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.getDatasetWithRecords({
+    const content = this.contentOf(dataset);
+    if (content) {
+      return content.getDatasetWithRecords({
         dataset,
         projectId: parsed.projectId,
         entrySelection: parsed.entrySelection,
@@ -299,8 +315,9 @@ export class DatasetRecordService {
       projectId: parsed.projectId,
     });
     this.deps.assertReady(dataset);
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.getDatasetHead({ dataset });
+    const content = this.contentOf(dataset);
+    if (content) {
+      return content.getDatasetHead({ dataset });
     }
 
     const page = await this.readRecordsPage({
@@ -331,8 +348,9 @@ export class DatasetRecordService {
       findHeld: () => this.findHeldEntries(dataset, parsed.projectId, parsed.recordId),
       maxBytes: scope.maxBytes,
     });
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.upsertRecord({ dataset, input: parsed });
+    const content = this.contentOf(dataset);
+    if (content) {
+      return content.upsertRecord({ dataset, input: parsed });
     }
 
     try {
@@ -378,8 +396,9 @@ export class DatasetRecordService {
     projectId: string,
     recordId: string,
   ): Promise<Record<string, unknown>[]> {
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.findEntries({ dataset, projectId, recordIds: [recordId] });
+    const content = this.contentOf(dataset);
+    if (content) {
+      return content.findEntries({ dataset, projectId, recordIds: [recordId] });
     }
     const records = await this.options.records.findByIds({
       datasetId: dataset.id,
@@ -412,8 +431,9 @@ export class DatasetRecordService {
       entries: parsed.entries,
       maxBytes: scope.maxBytes,
     });
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.batchCreateRecords({ dataset, input: parsed });
+    const content = this.contentOf(dataset);
+    if (content) {
+      return content.batchCreateRecords({ dataset, input: parsed });
     }
 
     return this.options.records.createMany({
@@ -448,8 +468,9 @@ export class DatasetRecordService {
       findHeld: () => this.findHeldEntries(dataset, parsed.projectId, parsed.recordId),
       maxBytes: scope.maxBytes,
     });
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      const result = await this.options.content.upsertRecord({
+    const content = this.contentOf(dataset);
+    if (content) {
+      const result = await content.upsertRecord({
         dataset,
         input: { ...parsed, recordId: parsed.recordId },
       });
@@ -481,8 +502,9 @@ export class DatasetRecordService {
       projectId: parsed.projectId,
     });
     this.deps.assertReady(dataset);
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.deleteRecords({ dataset, input: parsed });
+    const content = this.contentOf(dataset);
+    if (content) {
+      return content.deleteRecords({ dataset, input: parsed });
     }
 
     const count = await this.options.records.deleteMany({

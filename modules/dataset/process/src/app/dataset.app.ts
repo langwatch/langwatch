@@ -72,6 +72,7 @@ import { DatasetContentService } from "../services/dataset-content.service.ts";
 import { DatasetInlineAttachmentService } from "../services/dataset-inline-attachment.service.ts";
 import { DatasetNormalizeService } from "../services/dataset-normalize.service.ts";
 import { DatasetRequestBoundsService } from "../services/dataset-request-bounds.service.ts";
+import { DatasetSingleFileService } from "../services/dataset-single-file.service.ts";
 import { DatasetUploadService } from "../services/dataset-upload.service.ts";
 import { DatasetService } from "../services/dataset.service.ts";
 
@@ -152,6 +153,12 @@ export class DatasetModule implements DatasetApi {
       inlineAttachments,
     });
 
+    const singleFile = DatasetSingleFileService.create({
+      files: repositories.singleFiles,
+      datasets: repositories.content,
+      generateId: () => generate(DATASET_RECORD_KSUID_RESOURCE).toString(),
+    });
+
     this.#datasets = DatasetService.create({
       repository: repositories.datasets,
       records: repositories.records,
@@ -162,9 +169,11 @@ export class DatasetModule implements DatasetApi {
         storedObjects: dependencies.storedObjects,
         requestBounds: this.#requestBounds,
         inlineAttachments,
+        singleFile,
       }),
       queue: this.#normalization,
       content: DatasetContentService.create({ datasets: repositories.content, storage: chunks }),
+      singleFile,
       // The identifier format a new entry is written under is this module's
       // own business, not something a composing process supplies: every real
       // composition that ever wired this feature left it unset, and the
