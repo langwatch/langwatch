@@ -191,7 +191,6 @@ import {
 import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
-import { OutboxAggregateReconcile } from "../eventing/aggregate-reconcile.intent.ts";
 import {
   OutboxAnomalyAlertDelivery,
   requestAnomalyAlertDelivery,
@@ -295,7 +294,6 @@ import { governanceOperatorReads } from "../repositories/prisma/prisma.suppressi
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
 import { exemptOriginsOf, vendorBasesOf, type VendorBases } from "../rules/vendor-bases.rules.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
-import { AggregateReconcileBackfillService } from "../services/aggregate-reconcile-backfill.service.ts";
 import { AggregateReconcilerService } from "../services/aggregate-reconciler.service.ts";
 import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catalog.service.ts";
 import { ModelProviderAiToolCatalogService } from "../services/ai-tool-provider-catalog.service.ts";
@@ -351,7 +349,6 @@ interface GovernanceAppDependencies {
     | "findIdentity"
     | "findAggregate"
     | "findLiveAggregateIds"
-    | "findAllLiveAggregates"
     | "findPersonalProjectIds"
     | "findReadableProjectIds"
   >;
@@ -615,10 +612,6 @@ export class GovernanceModule implements GovernanceRestApi {
       organizations: dependencies.organizations,
       grants: dependencies.permissions,
       now: nowInstant,
-    });
-    this.aggregateReconcileBackfill = AggregateReconcileBackfillService.create({
-      reconciler: this.aggregateReconciler,
-      outbox: () => this.#aggregateReconcileOutbox,
     });
     this.anomalyWebhookMigration = AnomalyWebhookDestinationMigrationService.create({
       rules: repositories.anomalyRules,
@@ -982,8 +975,6 @@ export class GovernanceModule implements GovernanceRestApi {
   readonly codingAssistantBilling: CodingAssistantBillingFactService;
   /** ADR-177 decision 3: aggregate members as shared reads; the reconcile process manager runs it. */
   readonly aggregateReconciler: AggregateReconcilerService;
-  /** ADR-177 v4.11: the deploy step queueing one reconcile per live aggregate, once. */
-  readonly aggregateReconcileBackfill: AggregateReconcileBackfillService;
   /** W-11: the deploy step moving inline anomaly webhooks onto endpoints. */
   readonly anomalyWebhookMigration: AnomalyWebhookDestinationMigrationService;
   private readonly people: GovernancePeopleScreenService;
@@ -1083,17 +1074,6 @@ export class GovernanceModule implements GovernanceRestApi {
   /** Main's `spendSpikeAnomalyWorker` tick: every active spend_spike rule against `governance_kpis`. */
   evaluateSpendSpikes(): Promise<SpendSpikeEvaluationSummary> {
     return this.spendSpikes.evaluateAll();
-  }
-
-  #aggregateReconcileOutbox: OutboxAggregateReconcile | undefined;
-
-  /** A built pipeline means an outbox: the one-off backfill queues its reconciles in it. */
-  connectAggregateReconcileOutbox({
-    processStore,
-  }: {
-    processStore: Pick<ProcessStore, "appendIntents">;
-  }): void {
-    this.#aggregateReconcileOutbox = OutboxAggregateReconcile.create(processStore);
   }
 
   #anomalyAlertOutbox: OutboxAnomalyAlertDelivery | undefined;

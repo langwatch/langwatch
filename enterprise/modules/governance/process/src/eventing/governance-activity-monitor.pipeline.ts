@@ -150,12 +150,10 @@ function buildGovernanceActivityMonitor({
     | "departmentResolveByNameOrCreate"
     | "departmentAssignUser"
     | "aggregateReconciler"
-    | "connectAggregateReconcileOutbox"
     | "governanceAuditWorkspaceView"
   >
 >): StaticPipelineDefinition<never> {
   app.connectAnomalyAlertOutbox({ processStore });
-  app.connectAggregateReconcileOutbox({ processStore });
   const reconciler = app.aggregateReconciler;
   const aggregateOutbox = OutboxAggregateReconcile.create(processStore);
   const affected = (trigger: string) =>

@@ -794,8 +794,8 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   (null when it no longer parses), and the reconciler compares it with the
   rule's window: a wrong start is revoked with reason
   `aggregate_read_window_changed` and attached again, after the dropped
-  members are revoked, and the nightly sweep brings every existing
-  aggregate across. A department read with any attach-time start is left
+  members are revoked, on the next reconcile the aggregate's facts queue
+  (v4.11). A department read with any attach-time start is left
   alone, so nothing is rewritten on a later run. A member is unread
   between its revoke and its new attach; a failed attach is retried by the
   next reconcile, like any other.
@@ -811,8 +811,6 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   one. Why no re-check of every aggregate: a hidden fix-all hides the
   trigger that missed (ADR-025), and a dead reconcile already says which
   one. Governance's own department write no longer queues a reconcile of
-  its own: organisation's `member_department_changed` fact does. Existing
-  aggregates widen to full history (v4.10) through the one-off deploy step
-  that replaces the sweep: one reconcile per live aggregate, keyed
-  `backfill:full-history` so a re-run inside the two-day retention queues
-  nothing new, and a later one only repeats a harmless reconcile.
+  its own: organisation's `member_department_changed` fact does. No
+  deploy step re-checks existing aggregates for the v4.10 window: none
+  exist yet, and a later aggregate is created with the full-history read.

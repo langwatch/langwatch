@@ -425,16 +425,6 @@ Feature: An aggregate project reads its member projects
     Then that read is revoked as a window change
     And the member is attached again with a read from the beginning of time
 
-  # A one-off background deploy step, not a nightly sweep (ADR-177 v4.11).
-  @unit
-  Scenario: Existing aggregates are re-checked once after the full-history change
-    Given two live aggregate projects in different organisations
-    When the worker runs the one-off full-history deploy step
-    Then one reconcile is queued for each aggregate, keyed "backfill:full-history"
-    And the step saves its place after each aggregate
-    And running the step again queues no second reconcile
-    And a dry run queues nothing
-
   @unit
   Scenario: A department aggregate narrows a full-history read to the day it is attached again
     Given an aggregate project whose rule was changed to "personal projects in department Engineering"

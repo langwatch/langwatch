@@ -5,7 +5,6 @@ import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type {
   AggregateRule,
-  LiveAggregate,
   ProjectApi,
   StoredAggregateProject,
 } from "@langwatch/project-contract";
@@ -55,11 +54,7 @@ type AggregateReconcilerDependencies = {
   lock: AggregateReconcileLockRepository;
   projects: Pick<
     ProjectApi,
-    | "findAggregate"
-    | "findLiveAggregateIds"
-    | "findAllLiveAggregates"
-    | "findPersonalProjectIds"
-    | "findReadableProjectIds"
+    "findAggregate" | "findLiveAggregateIds" | "findPersonalProjectIds" | "findReadableProjectIds"
   >;
   organizations: Pick<OrganizationApi, "findMembersWithDepartments">;
   grants: Pick<
@@ -111,11 +106,6 @@ export class AggregateReconcilerService {
     ]);
     const retiring = own.filter((aggregate) => aggregate.archived).map((aggregate) => aggregate.id);
     return [...live, ...retiring];
-  }
-
-  /** Every live aggregate of every organisation, for the one-off full-history backfill. */
-  liveAggregates(): Promise<LiveAggregate[]> {
-    return this.deps.projects.findAllLiveAggregates();
   }
 
   private async reconcileHoldingLock({

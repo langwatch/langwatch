@@ -44,18 +44,13 @@ function world({ rule }: { rule: AggregateRule }) {
   };
   const projects: Pick<
     ProjectApi,
-    | "findAggregate"
-    | "findLiveAggregateIds"
-    | "findAllLiveAggregates"
-    | "findPersonalProjectIds"
-    | "findReadableProjectIds"
+    "findAggregate" | "findLiveAggregateIds" | "findPersonalProjectIds" | "findReadableProjectIds"
   > = {
     findAggregate: async ({ aggregateProjectId }) =>
       aggregateProjectId === AGG
         ? [{ id: AGG, organizationId: ORG, archived: false, rule: state.rule }]
         : [],
     findLiveAggregateIds: async () => [AGG],
-    findAllLiveAggregates: async () => [{ id: AGG, organizationId: ORG }],
     findPersonalProjectIds: async ({ ownerUserIds }) =>
       [...state.personal]
         .filter(([, owner]) => ownerUserIds === undefined || ownerUserIds.includes(owner))

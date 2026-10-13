@@ -117,14 +117,6 @@
     "needsOldWritersGone": true
   },
   {
-    "id": "governance:reconcile-aggregates-for-full-history",
-    "kind": "data",
-    "mode": "background",
-    "owner": "governance",
-    "description": "Re-checks every live aggregate project once, so its member reads cover full history.",
-    "needsOldWritersGone": true
-  },
-  {
     "id": "governance:replay-cost-charges",
     "kind": "data",
     "mode": "background",

@@ -143,26 +143,6 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
           return { ...report, dryRun };
         },
       }),
-      // ADR-177 v4.11: replaces the nightly sweep for widening existing aggregates to full history.
-      defineMigrationStep({
-        id: "governance:reconcile-aggregates-for-full-history",
-        kind: "data",
-        mode: "background",
-        description:
-          "Re-checks every live aggregate project once, so its member reads cover full history.",
-        needsOldWritersGone: true,
-        run: async ({ checkpoint, dryRun, signal }) => {
-          const resumed = checkpoint.resumeFrom?.afterAggregateProjectId;
-          const report = await app.aggregateReconcileBackfill.enqueueAll({
-            after: typeof resumed === "string" ? resumed : undefined,
-            dryRun,
-            signal,
-            onAggregate: (progress) =>
-              dryRun ? Promise.resolve() : checkpoint.save({ report: progress }),
-          });
-          return { ...report, dryRun };
-        },
-      }),
       defineProjectionReplayStep({
         id: "governance:replay-cost-charges",
         description:
