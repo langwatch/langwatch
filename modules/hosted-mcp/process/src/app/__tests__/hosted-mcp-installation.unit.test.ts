@@ -1,0 +1,142 @@
+import { createServer, type Server } from "node:http";
+
+import { RawHttpHost } from "@langwatch/api";
+/**
+ * @vitest-environment node
+ *
+ * The hosted MCP feature, booted over the memory stores and its peers alone.
+ */
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import { HostedMcpApi } from "@langwatch/hosted-mcp-contract";
+import { createApp, ResourceScope } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { hostedMcpProcessModule } from "../../hosted-mcp.module.ts";
+
+function process() {
+  return createApp({ role: "api" })
+    .withModules([hostedMcpProcessModule])
+    .withStores(memoryStores())
+    .withConfig({ "hosted-mcp": { publicBaseUrl: "https://app.langwatch.ai" } })
+    .provide({
+      project: createApiFixture<ProjectApi>(),
+      auth: createApiFixture<AuthApi>(),
+      authz: createApiFixture<AuthzApi>(),
+      governance: createApiFixture<GovernanceRestApi>(),
+    });
+}
+
+describe("hosted MCP app installation", () => {
+  /** @scenario "The hosted MCP feature installs from store members and peers alone" */
+  it("installs a working app with no bespoke composition", async () => {
+    const runtime = await process().boot();
+
+    try {
+      const app = runtime.service(HostedMcpApi);
+      expect(runtime.module(hostedMcpProcessModule).provided).toBe(app);
+
+      const handler = app.createHandler();
+      expect(handler.isMcpRoute("/mcp")).toBe(true);
+      await handler.closeAllSessions();
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "A process without authorization refuses to boot by name" */
+  it("refuses at boot, naming authz, when the process composed no authorization service", async () => {
+    const withoutAuthz = createApp({ role: "api" })
+      .withModules([hostedMcpProcessModule])
+      .withStores(memoryStores())
+      .withConfig({ "hosted-mcp": { publicBaseUrl: "https://app.langwatch.ai" } })
+      .provide({
+        project: createApiFixture<ProjectApi>(),
+        auth: createApiFixture<AuthApi>(),
+        governance: createApiFixture<GovernanceRestApi>(),
+      });
+
+    // wrong-typed input: the types already refuse a missing peer; boot must too
+    const bootWithoutAuthz = (withoutAuthz as unknown as { boot(): Promise<unknown> }).boot();
+
+    await expect(bootWithoutAuthz).rejects.toThrow(/authz/i);
+  });
+
+  it("refuses at boot, naming redis, when a live process has no Redis", async () => {
+    const resources = new ResourceScope();
+
+    await expect(
+      hostedMcpProcessModule.install({
+        resources,
+        config: { publicBaseUrl: "https://app.langwatch.ai" },
+        repositorySelection: {
+          tier: "live",
+          members: {
+            encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+          },
+        },
+        role: "api",
+        resolve: () => createApiFixture<ProjectApi>(),
+      }),
+    ).rejects.toThrow(/redis/i);
+    await resources.close();
+  });
+});
+
+describe("hosted MCP door installation", () => {
+  const doors = RawHttpHost.create();
+  let stopRuntime: () => Promise<void> = () => Promise.resolve();
+  let server: Server;
+  let origin = "";
+
+  beforeAll(async () => {
+    const runtime = await process()
+      .expose(() => ({
+        hosts: { rest: { mount: () => undefined }, rawhttp: doors },
+        serve: () => undefined,
+      }))
+      .boot();
+    stopRuntime = () => runtime.stop();
+    server = createServer(
+      doors.ahead((_request, response) => {
+        response.writeHead(404, { "Content-Type": "text/plain" }).end("routes");
+      }),
+    );
+    await new Promise<void>((listening) => server.listen(0, "127.0.0.1", listening));
+    const address = server.address();
+    if (address === null || typeof address === "string") throw new Error("no port bound");
+    origin = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await doors.close();
+    await new Promise<void>((stopped) => server.close(() => stopped()));
+    await stopRuntime();
+  });
+
+  /** @scenario "The hosted MCP door mounts on the api process and its health path answers" */
+  it("answers the health path through the mounted door", async () => {
+    const response = await fetch(`${origin}/mcp/health`);
+
+    expect({ status: response.status, body: await response.json() }).toEqual({
+      status: 200,
+      body: { status: "ok" },
+    });
+  });
+
+  /** @scenario "An unpublished metadata suffix answers main's JSON 404" */
+  it("answers an unpublished metadata suffix with a JSON 404", async () => {
+    const response = await fetch(`${origin}/.well-known/oauth-protected-resource/elsewhere`);
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toContain("application/json");
+  });
+
+  it("leaves every path it does not claim to the routes", async () => {
+    expect(await (await fetch(`${origin}/api/mcp/authorize`)).text()).toBe("routes");
+  });
+});

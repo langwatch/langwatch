@@ -1,9 +1,6 @@
 /*
-  This file contains the values for the OpenTelemetry semantic conventions for Gen AI,
-  some of which are still in development and therefor currently considered to be
-  experimental.
-
-  👉 https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-events/
+  OpenTelemetry semantic conventions for Gen AI (some still experimental).
+  https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-events/
 */
 
 /**

@@ -1,0 +1,147 @@
+/**
+ * What the executor answers when the server does not know a function: a
+ * statement calling one of our app functions names a deployment gap, never an
+ * unknown error. Driven through a stubbed driver; the claim is the mapping.
+ * @see specs/lwql/app-functions.feature
+ * @see specs/analytics/dashboard-widget-resilience.feature
+ */
+import { describe, expect, it, vi } from "vitest";
+
+import { ClickHouseLangWatchQLExecutorRepository } from "../clickhouse.langwatch-ql-executor.repository.ts";
+
+const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
+
+vi.mock("@clickhouse/client", () => ({
+  createClient: () => ({ query: queryMock, close: async () => undefined }),
+}));
+
+const executor = ClickHouseLangWatchQLExecutorRepository.create({
+  connection: {
+    url: "http://clickhouse.invalid:8123",
+    username: "lwql_reader",
+    password: "unused",
+    database: "analytics",
+    tenantSetting: "custom_api_key_hash",
+  },
+});
+
+const refusalOf = (sql: string) =>
+  executor.execute({ sql, tenantCapability: "tenant-a" }).then(
+    () => ({ code: "none", fault: "none", httpStatus: 0 }),
+    (error: { code?: string; fault?: string; httpStatus?: number }) => ({
+      code: error.code,
+      fault: error.fault,
+      httpStatus: error.httpStatus,
+    }),
+  );
+
+const unknownFunction = () =>
+  Object.assign(
+    new Error("Code: 46. DB::Exception: Unknown function conversation. (UNKNOWN_FUNCTION)"),
+    { code: "46", type: "UNKNOWN_FUNCTION" },
+  );
+
+describe("given a statement calling a catalogued app function", () => {
+  describe("when the server has no such function", () => {
+    /** @scenario "A query using an app function against a server with no such function refuses clearly" */
+    it("refuses with lwql_app_function_unavailable, a platform fault, rather than an unknown error", async () => {
+      queryMock.mockRejectedValueOnce(unknownFunction());
+
+      const refusal = await refusalOf(
+        "SELECT TraceId, conversation(ConversationId) AS transcript FROM analytics.traces",
+      );
+
+      expect(refusal).toEqual({
+        code: "lwql_app_function_unavailable",
+        fault: "platform",
+        httpStatus: 503,
+      });
+    });
+  });
+});
+
+describe("given a statement that calls no app function", () => {
+  describe("when the server does not know a native function it used", () => {
+    /** @scenario "An unknown native function is not reported as a missing app function" */
+    it("translates the error normally rather than blaming the extraction functions", async () => {
+      queryMock.mockRejectedValueOnce(unknownFunction());
+
+      const refusal = await refusalOf("SELECT toBool(1) AS flag FROM analytics.traces");
+
+      expect(refusal.code).not.toBe("lwql_app_function_unavailable");
+    });
+  });
+});
+
+describe("given the LangWatchQL identity is running as many statements as it may", () => {
+  describe("when the server refuses one more", () => {
+    /** @scenario "A busy query service is a named, retryable refusal" */
+    it("refuses with lwql_busy, a retryable platform fault, rather than an unknown error", async () => {
+      queryMock.mockRejectedValueOnce(
+        Object.assign(
+          new Error(
+            "Code: 202. DB::Exception: Too many simultaneous queries for user lwql_reader. Current: 10, maximum: 10. (TOO_MANY_SIMULTANEOUS_QUERIES)",
+          ),
+          { code: "202", type: "TOO_MANY_SIMULTANEOUS_QUERIES" },
+        ),
+      );
+
+      const refusal = await executor
+        .execute({ sql: "SELECT 1", tenantCapability: "tenant-a" })
+        .then(
+          () => ({}),
+          (error: { code?: string; fault?: string; httpStatus?: number; retryable?: boolean }) => ({
+            code: error.code,
+            fault: error.fault,
+            httpStatus: error.httpStatus,
+            retryable: error.retryable,
+          }),
+        );
+
+      expect(refusal).toEqual({
+        code: "lwql_busy",
+        fault: "platform",
+        httpStatus: 503,
+        retryable: true,
+      });
+    });
+  });
+});
+
+describe("given a bound parameter whose value does not fit its declared type", () => {
+  describe("when the server refuses it as BAD_QUERY_PARAMETER", () => {
+    /** @scenario "A parameter value that does not fit its declared type is refused with the parameter named" */
+    it("refuses with lwql_parameter_invalid, a customer 400 naming only the parameter", async () => {
+      queryMock.mockRejectedValueOnce(
+        Object.assign(
+          new Error(
+            "Value 2026-09-10T00:00:00.000Z cannot be parsed as DateTime64(3) for query parameter 'start' because it isn't parsed completely: only 23 of 24 bytes was parsed: 2026-09-10T00:00:00.000.",
+          ),
+          { code: "457", type: "BAD_QUERY_PARAMETER" },
+        ),
+      );
+
+      const refusal = await executor
+        .execute({
+          sql: "SELECT count() FROM analytics.traces WHERE OccurredAt >= {start:DateTime64(3)}",
+          tenantCapability: "tenant-a",
+        })
+        .then(
+          () => null,
+          (error: { code?: string; fault?: string; httpStatus?: number; meta?: unknown }) => ({
+            code: error.code,
+            fault: error.fault,
+            httpStatus: error.httpStatus,
+            meta: error.meta,
+          }),
+        );
+
+      expect(refusal).toEqual({
+        code: "lwql_parameter_invalid",
+        fault: "customer",
+        httpStatus: 400,
+        meta: { parameter: "start" },
+      });
+    });
+  });
+});

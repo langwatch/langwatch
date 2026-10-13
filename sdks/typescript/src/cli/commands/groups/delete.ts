@@ -1,11 +1,11 @@
 import chalk from "chalk";
+
 import { GroupsApiService } from "@/client-sdk/services/groups/groups-api.service";
+
 import type { CommandResult } from "../../utils/output";
 import { runManagement } from "../management/_shared";
 
-export const deleteGroupCommand = async (
-  id: string,
-): Promise<CommandResult | void> =>
+export const deleteGroupCommand = async (id: string): Promise<CommandResult | void> =>
   runManagement({
     action: "delete group",
     pending: `Deleting group "${id}"...`,

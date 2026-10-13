@@ -71,6 +71,18 @@ Feature: Coding agent transcript over REST and CLI
     When GET /api/traces/{traceId}/transcript is called for a trace id that does not exist
     Then the request fails with a not found error
 
+  # The transcript is derived from a trace's log records, and canonical
+  # `log_records` is the only table still taking writes. The trace module cannot
+  # be composed without its canonical log read, so the transcript door is always
+  # served and always derives from that read; an empty transcript is then a
+  # statement about the agent, never about a missing read.
+
+  @coding-agent @unit
+  Scenario: the transcript is derived from the canonical log read the trace module is composed with
+    Given a trace module composed with its canonical log read
+    When a trace's transcript is read
+    Then the log records come from that read, for that project and trace
+
   @unit
   Scenario: the CLI prints a trace transcript
     Given the transcript endpoint returns entries for a trace

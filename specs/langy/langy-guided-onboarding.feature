@@ -207,6 +207,14 @@ Feature: Langy guides the first setup after sign-up
       Then the prompt handed to the worker carries the settled Virtual key line with the reveal id
       And it never says none was minted
 
+    @unit
+    Scenario: A kickoff the guided state cannot be read for goes out as the panel composed it
+      Given the panel composed a kickoff
+      And the guided state cannot be read when the kickoff turn starts
+      When the kickoff turn starts
+      Then the turn still starts
+      And the recorded kickoff and the brief are as the panel sent them
+
     # The suite composed its kickoff from the guided state after the key was
     # minted, so its brief carried the reveal id before it reached the server
     # and the settle was never exercised end to end. This case sends what the

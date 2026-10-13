@@ -1,8 +1,9 @@
-import { getLangWatchTracer } from "langwatch";
+import * as readline from "readline";
+
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
-import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
+import { getLangWatchTracer } from "langwatch";
 import { setupObservability } from "langwatch/observability/node";
 
 // Use LangWatch observability setup
@@ -21,10 +22,10 @@ async function main() {
   console.log('🤖 AI Chatbot started! Type "quit" to exit.');
   console.log("---");
 
-  const conversationHistory: Array<{
+  const conversationHistory: {
     role: "user" | "assistant" | "system";
     content: string;
-  }> = [
+  }[] = [
     {
       role: "system",
       content:
@@ -35,68 +36,69 @@ async function main() {
   while (true) {
     let finish = false;
 
-    await tracer.withActiveSpan("iteration", {
-      attributes: {
-        'langwatch.thread.id': threadId,
+    await tracer.withActiveSpan(
+      "iteration",
+      {
+        attributes: {
+          "langwatch.thread.id": threadId,
+        },
       },
-    }, async (span) => {
-      try {
-        // Get user input
-        const userInput = await new Promise<string>((resolve) => {
-          rl.question("You: ", resolve);
-        });
+      async (_span) => {
+        try {
+          // Get user input
+          const userInput = await new Promise<string>((resolve) => {
+            rl.question("You: ", resolve);
+          });
 
-        // Check for exit command
-        if (
-          userInput.toLowerCase() === "quit" ||
-          userInput.toLowerCase() === "exit"
-        ) {
-          console.log("👋 Goodbye!");
-          finish = true;
-          return;
+          // Check for exit command
+          if (userInput.toLowerCase() === "quit" || userInput.toLowerCase() === "exit") {
+            console.log("👋 Goodbye!");
+            finish = true;
+            return;
+          }
+
+          // Skip empty input
+          if (!userInput.trim()) {
+            return;
+          }
+
+          // Add user message to conversation history
+          conversationHistory.push({ role: "user", content: userInput });
+
+          // Generate AI response
+          console.log("🤖 Thinking...");
+
+          const result = await generateText({
+            model: openai("gpt-5-mini"),
+            messages: conversationHistory,
+            experimental_telemetry: { isEnabled: true },
+          });
+
+          const aiResponse = result.text;
+
+          // Add AI response to conversation history
+          conversationHistory.push({ role: "assistant", content: aiResponse });
+
+          // Display AI response with markdown formatting
+          console.log("AI:");
+          console.log(
+            `${cliMarkdown(aiResponse, {
+              colors: true,
+              maxWidth: 80,
+              theme: {
+                heading: "cyan",
+                link: "blue",
+                code: "green",
+                blockquote: "yellow",
+              },
+            })}---`,
+          );
+        } catch (error) {
+          console.error("❌ Error:", error);
+          console.log("Please try again.");
         }
-
-        // Skip empty input
-        if (!userInput.trim()) {
-          return;
-        }
-
-        // Add user message to conversation history
-        conversationHistory.push({ role: "user", content: userInput });
-
-        // Generate AI response
-        console.log("🤖 Thinking...");
-
-        const result = await generateText({
-          model: openai("gpt-5-mini"),
-          messages: conversationHistory,
-          experimental_telemetry: { isEnabled: true },
-        });
-
-        const aiResponse = result.text;
-
-        // Add AI response to conversation history
-        conversationHistory.push({ role: "assistant", content: aiResponse });
-
-        // Display AI response with markdown formatting
-        console.log("AI:");
-        console.log(
-          `${cliMarkdown(aiResponse, {
-            colors: true,
-            maxWidth: 80,
-            theme: {
-              heading: "cyan",
-              link: "blue",
-              code: "green",
-              blockquote: "yellow",
-            },
-          })}---`,
-        );
-      } catch (error) {
-        console.error("❌ Error:", error);
-        console.log("Please try again.");
-      }
-    });
+      },
+    );
 
     if (finish) {
       break;

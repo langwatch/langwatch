@@ -3,10 +3,19 @@
   "compilerOptions": {
     "noEmit": false,
     "outDir": "./dist",
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/langyworker-build.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    // tsc is the whole build: .ts specifiers are rewritten to .js in dist.
+    "rewriteRelativeImportExtensions": true,
     "declaration": false,
     "sourceMap": false
   },
   "include": ["src/**/*.ts", "package.json"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts"],
+  "references": [],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/vitest-config"]
+    }
+  }
 }

@@ -1,19 +1,18 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import type * as ExperimentsApiModule from "@/client-sdk/services/experiments/experiments-api.service";
 
-vi.mock(
-  "@/client-sdk/services/experiments/experiments-api.service",
-  async (importOriginal) => {
-    const actual = await importOriginal<typeof ExperimentsApiModule>();
-    return {
-      ...actual,
-      ExperimentsApiService: vi.fn(),
-    };
-  },
-);
+vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (importOriginal) => {
+  const actual = await importOriginal<typeof ExperimentsApiModule>();
+  return {
+    ...actual,
+    ExperimentsApiService: vi.fn(),
+  };
+});
 
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
@@ -34,11 +33,12 @@ vi.mock("ora", () => ({
 }));
 
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+
 import { experimentCreateCommand } from "../create";
 import { experimentGetStateCommand } from "../get-state";
+import { experimentRestoreCommand } from "../restore";
 import { experimentSetStateCommand } from "../set-state";
 import { experimentVersionsCommand } from "../versions";
-import { experimentRestoreCommand } from "../restore";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -190,9 +190,7 @@ describe("the experiment workbench commands", () => {
 
     describe("when no file is given", () => {
       it("refuses and exits", async () => {
-        await expect(
-          experimentSetStateCommand("checkout", {}),
-        ).rejects.toThrow(ProcessExitError);
+        await expect(experimentSetStateCommand("checkout", {})).rejects.toThrow(ProcessExitError);
         expect(mockSetWorkbenchState).not.toHaveBeenCalled();
       });
     });
@@ -203,9 +201,9 @@ describe("the experiment workbench commands", () => {
         const file = join(directory, "state.json");
         await writeFile(file, "not json at all", "utf8");
 
-        await expect(
-          experimentSetStateCommand("checkout", { file }),
-        ).rejects.toThrow(ProcessExitError);
+        await expect(experimentSetStateCommand("checkout", { file })).rejects.toThrow(
+          ProcessExitError,
+        );
         expect(mockSetWorkbenchState).not.toHaveBeenCalled();
       });
     });
@@ -229,10 +227,9 @@ describe("the experiment workbench commands", () => {
 
   describe("given a versions call", () => {
     /**
-     * A history the seam wrote: two deliberate versions numbered without gaps,
-     * and the one autosave row a session of typing left behind. The autosave
-     * keeps a number so a script can restore it, and the table names it for
-     * what it is instead.
+     * A history the seam wrote: two deliberate versions numbered without
+     * gaps, plus one autosave row from a typing session. The autosave keeps
+     * a number so a script can restore it, but the table names it instead.
      */
     const historyWithAnAutosave = {
       versions: [
@@ -341,9 +338,7 @@ describe("the experiment workbench commands", () => {
 
         // --limit is capped at the page size, so raising it cannot reach the
         // rest of the history; the cursor is the only way through.
-        expect(printed).toContain(
-          "langwatch experiment versions checkout --cursor 100",
-        );
+        expect(printed).toContain("langwatch experiment versions checkout --cursor 100");
       });
     });
 
@@ -363,9 +358,9 @@ describe("the experiment workbench commands", () => {
 
     describe("when the cursor is not a version number", () => {
       it("refuses instead of silently serving page one again", async () => {
-        await expect(
-          experimentVersionsCommand("checkout", { cursor: "abc" }),
-        ).rejects.toThrow(ProcessExitError);
+        await expect(experimentVersionsCommand("checkout", { cursor: "abc" })).rejects.toThrow(
+          ProcessExitError,
+        );
         expect(mockListVersions).not.toHaveBeenCalled();
       });
     });
@@ -394,9 +389,9 @@ describe("the experiment workbench commands", () => {
       it.each(["latest", "3abc", "1.5", "0", "-2"])(
         "refuses %j instead of restoring a version nobody named",
         async (version) => {
-          await expect(
-            experimentRestoreCommand("checkout", version),
-          ).rejects.toThrow(ProcessExitError);
+          await expect(experimentRestoreCommand("checkout", version)).rejects.toThrow(
+            ProcessExitError,
+          );
           expect(mockRestoreVersion).not.toHaveBeenCalled();
         },
       );

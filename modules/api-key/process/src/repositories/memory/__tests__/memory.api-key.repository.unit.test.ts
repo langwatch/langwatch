@@ -1,0 +1,208 @@
+import {
+  AGENT_SANDBOX_API_KEY_NAME,
+  CLI_LOGIN_KEY_NAME_PREFIX,
+  HIDDEN_SYSTEM_KEY_NAMES,
+  WORKFLOW_RUN_API_KEY_NAME,
+} from "@langwatch/api-key-contract";
+import { fromDate } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
+import type { ApiKeyCreateRecord } from "../../api-key.repository.ts";
+import { MemoryApiKeyDatabase } from "../memory.api-key.database.ts";
+import { MemoryApiKeyRepository } from "../memory.api-key.repository.ts";
+
+const ORGANIZATION = "org_1";
+
+function repository(): { repository: MemoryApiKeyRepository; memory: MemoryApiKeyDatabase } {
+  const memory = MemoryApiKeyDatabase.create();
+
+  return { repository: MemoryApiKeyRepository.create({ memory }), memory };
+}
+
+function record(overrides: Partial<ApiKeyCreateRecord> = {}): ApiKeyCreateRecord {
+  return {
+    name: "Deploy key",
+    description: null,
+    lookupId: `lookup_${Math.random().toString(36).slice(2)}`,
+    hashedSecret: "hashed",
+    permissionMode: "all",
+    userId: null,
+    createdByUserId: null,
+    organizationId: ORGANIZATION,
+    expiresAt: null,
+    ingestSourceType: null,
+    ingestionTemplateId: null,
+    startsDisabled: false,
+    grants: [],
+    ...overrides,
+  };
+}
+
+describe("given the memory API-key repository", () => {
+  describe("when a key is created", () => {
+    it("reads it back live, carrying no bindings of its own, as the Prisma create does", async () => {
+      const { repository: keys } = repository();
+
+      const created = await keys.create(record({ name: "Personal key", userId: "user_1" }));
+
+      expect(created.revokedAt).toBeNull();
+      expect(created).not.toHaveProperty("grants");
+      expect(await keys.findById({ id: created.id })).toMatchObject({ name: "Personal key" });
+    });
+
+    it("stores a key that starts disabled as already revoked", async () => {
+      const { repository: keys } = repository();
+
+      const created = await keys.create(record({ startsDisabled: true }));
+
+      expect(created.revokedAt).not.toBeNull();
+    });
+  });
+
+  describe("when a key is looked up by its lookup id", () => {
+    it("answers nothing for a key whose owner is deactivated", async () => {
+      const { repository: keys, memory } = repository();
+      const created = await keys.create(record({ userId: "user_1", lookupId: "lookup_1" }));
+      memory.deactivateUser("user_1");
+
+      expect(await keys.findByLookupId({ lookupId: created.lookupId })).toBeNull();
+    });
+
+    it("answers the key of an active owner", async () => {
+      const { repository: keys } = repository();
+      await keys.create(record({ userId: "user_1", lookupId: "lookup_2" }));
+
+      expect(await keys.findByLookupId({ lookupId: "lookup_2" })).not.toBeNull();
+    });
+  });
+
+  describe("when an organization's keys are listed", () => {
+    it("hides the system-managed names and the revoked rows", async () => {
+      const { repository: keys } = repository();
+      await keys.create(record({ name: HIDDEN_SYSTEM_KEY_NAMES[0] ?? AGENT_SANDBOX_API_KEY_NAME }));
+      const revoked = await keys.create(record({ name: "Retired" }));
+      await keys.revoke({ id: revoked.id, organizationId: ORGANIZATION, cause: "user" });
+      await keys.create(record({ name: "Live" }));
+
+      const listed = await keys.findForOrganization({ organizationId: ORGANIZATION });
+
+      expect(listed.map((key) => key.name)).toEqual(["Live"]);
+    });
+
+    /** @scenario "A customer key named like a system key stays visible and manageable" */
+    it("hides a key the system minted and lists a customer key under the same name", async () => {
+      const { repository: keys } = repository();
+      await keys.create(record({ name: WORKFLOW_RUN_API_KEY_NAME, isSystemManaged: true }));
+      const customers = await keys.create(record({ name: WORKFLOW_RUN_API_KEY_NAME }));
+
+      const listed = await keys.findForOrganization({ organizationId: ORGANIZATION });
+
+      expect(listed.map((key) => key.id)).toEqual([customers.id]);
+    });
+
+    it("gives a member their own keys and the ownerless non-ingestion ones", async () => {
+      const { repository: keys } = repository();
+      await keys.create(record({ name: "Mine", userId: "user_1" }));
+      await keys.create(record({ name: "Somebody else", userId: "user_2" }));
+      await keys.create(record({ name: "Shared" }));
+      await keys.create(record({ name: "Ingest", ingestSourceType: "cli" }));
+
+      const listed = await keys.findForUser({ organizationId: ORGANIZATION, userId: "user_1" });
+
+      expect(listed.map((key) => key.name).toSorted()).toEqual(["Mine", "Shared"]);
+    });
+  });
+
+  describe("when a key is revoked twice", () => {
+    it("keeps the first cause", async () => {
+      const { repository: keys } = repository();
+      const created = await keys.create(record());
+
+      await keys.revoke({ id: created.id, organizationId: ORGANIZATION, cause: "user" });
+      const second = await keys.revoke({
+        id: created.id,
+        organizationId: ORGANIZATION,
+        cause: "cap",
+      });
+
+      expect(second.revocationCause).toBe("user");
+    });
+  });
+
+  describe("when the expired keys of one reserved name are swept", () => {
+    it("revokes only the elapsed ones and never a key without an expiry", async () => {
+      const { repository: keys } = repository();
+      const past = new Date(Date.now() - 60_000);
+      const future = new Date(Date.now() + 60_000);
+      const elapsed = await keys.create(
+        record({ name: AGENT_SANDBOX_API_KEY_NAME, expiresAt: fromDate(past) }),
+      );
+      const live = await keys.create(
+        record({ name: AGENT_SANDBOX_API_KEY_NAME, expiresAt: fromDate(future) }),
+      );
+      const endless = await keys.create(record({ name: AGENT_SANDBOX_API_KEY_NAME }));
+
+      const swept = await keys.revokeExpiredByName({
+        name: AGENT_SANDBOX_API_KEY_NAME,
+        now: fromDate(new Date()),
+      });
+
+      expect(swept).toBe(1);
+      expect((await keys.findById({ id: elapsed.id }))?.revokedAt).not.toBeNull();
+      expect((await keys.findById({ id: live.id }))?.revokedAt).toBeNull();
+      expect((await keys.findById({ id: endless.id }))?.revokedAt).toBeNull();
+    });
+
+    it("leaves a customer key of that name alone when only system-minted keys are swept", async () => {
+      const { repository: keys } = repository();
+      const past = fromDate(new Date(Date.now() - 60_000));
+      const minted = await keys.create(
+        record({ name: WORKFLOW_RUN_API_KEY_NAME, expiresAt: past, isSystemManaged: true }),
+      );
+      const customers = await keys.create(
+        record({ name: WORKFLOW_RUN_API_KEY_NAME, expiresAt: past }),
+      );
+
+      const swept = await keys.revokeExpiredByName({
+        name: WORKFLOW_RUN_API_KEY_NAME,
+        now: fromDate(new Date()),
+        systemManagedOnly: true,
+      });
+
+      expect(swept).toBe(1);
+      expect((await keys.findById({ id: minted.id }))?.revokedAt).not.toBeNull();
+      expect((await keys.findById({ id: customers.id }))?.revokedAt).toBeNull();
+    });
+  });
+
+  describe("when elapsed CLI login keys are read", () => {
+    async function seedTwoOrganizations() {
+      const { repository: keys } = repository();
+      const past = fromDate(new Date(Date.now() - 60_000));
+      const login = (organizationId: string) =>
+        record({ name: `${CLI_LOGIN_KEY_NAME_PREFIX}laptop`, organizationId, expiresAt: past });
+      const mine = await keys.create(login(ORGANIZATION));
+      const theirs = await keys.create(login("org_2"));
+      return { keys, mine, theirs };
+    }
+
+    it("answers one organization's keys and never another organization's", async () => {
+      const { keys, mine } = await seedTwoOrganizations();
+
+      const found = await keys.findElapsedLoginKeys({
+        organizationId: ORGANIZATION,
+        now: fromDate(new Date()),
+      });
+
+      expect(found.map((key) => key.id)).toEqual([mine.id]);
+    });
+
+    it("sweeps every organization's elapsed keys", async () => {
+      const { keys, mine, theirs } = await seedTwoOrganizations();
+
+      const swept = await keys.sweepElapsedLoginKeys({ before: fromDate(new Date()) });
+
+      expect(swept.map((key) => key.id).toSorted()).toEqual([mine.id, theirs.id].toSorted());
+    });
+  });
+});

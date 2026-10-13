@@ -138,11 +138,13 @@ exporter, err := langwatch.NewExporter(ctx,
 ```
 
 **Filter semantics:**
+
 - Multiple filters: AND (all must pass)
 - Multiple matchers in a field: OR (any can match)
 - Multiple fields in Criteria: AND (all fields must match)
 
 **Available matchers:**
+
 - `Equals(s)` / `EqualsIgnoreCase(s)`
 - `StartsWith(prefix)` / `StartsWithIgnoreCase(prefix)`
 - `MatchRegex(re)` / `MustMatchRegex(pattern)`
@@ -163,13 +165,13 @@ The OpenAI instrumentation automatically captures:
 
 The same code works with multiple AI providers that support the OpenAI API specification:
 
-| Provider | What to Change | Example Model |
-|----------|---------------|---------------|
-| **OpenAI** | Nothing! | `gpt-4o` |
-| **Anthropic** | Base URL + API key | `claude-3-5-sonnet-20241022` |
-| **Azure OpenAI** | Base URL + API key | `gpt-4` |
-| **OpenRouter** | Base URL + API key | `anthropic/claude-3.5-sonnet` |
-| **Local (Ollama)** | Base URL only | `llama3.1` |
+| Provider           | What to Change     | Example Model                 |
+| ------------------ | ------------------ | ----------------------------- |
+| **OpenAI**         | Nothing!           | `gpt-4o`                      |
+| **Anthropic**      | Base URL + API key | `claude-3-5-sonnet-20241022`  |
+| **Azure OpenAI**   | Base URL + API key | `gpt-4`                       |
+| **OpenRouter**     | Base URL + API key | `anthropic/claude-3.5-sonnet` |
+| **Local (Ollama)** | Base URL only      | `llama3.1`                    |
 
 #### Example: Anthropic (Claude)
 
@@ -213,16 +215,16 @@ Each provider instrumentation is a **separate Go module** so that importing one
 never pulls in the others' SDKs — and the core SDK (`github.com/langwatch/langwatch/sdks/go`)
 has **no provider dependencies at all**. Add only the one(s) you use:
 
-| Module | Provider SDK | Hook | What it captures |
-|--------|--------------|------|------------------|
-| `…/instrumentation/openai` | `github.com/openai/openai-go/v3` | `option.Middleware` | Chat / Responses / Embeddings, streaming, all token + cached/reasoning |
-| `…/instrumentation/anthropic` | `github.com/anthropics/anthropic-sdk-go` | `option.Middleware` | Messages API, streaming, input/output/**cache-read + cache-creation** tokens, thinking |
-| `…/instrumentation/gopenai` | `github.com/sashabaranov/go-openai` | `http.RoundTripper` | OpenAI-wire chat/embeddings (+ OpenAI-compatible providers), cached/reasoning |
-| `…/instrumentation/googlegenai` | `google.golang.org/genai` | `http.RoundTripper` | Gemini generateContent (+ Vertex), streaming, cached + thoughts(reasoning) tokens |
-| `…/instrumentation/bedrock` | `github.com/aws/aws-sdk-go-v2/service/bedrockruntime` | smithy-go middleware | Converse / ConverseStream / InvokeModel, cache read+write tokens, latency |
-| `…/instrumentation/ollama` | `github.com/ollama/ollama/api` | `http.RoundTripper` | Native `/api/chat`/`generate`/`embed`, NDJSON streaming, eval-count tokens, durations |
-| `…/instrumentation/azureopenai` | (via the openai module) | `option.Middleware` | Azure OpenAI — reuses all OpenAI capture, provider `azure.openai` |
-| `…/instrumentation/genkit` | `github.com/firebase/genkit/go` | OTel-native | Exports Genkit's own flow/model/tool spans to LangWatch |
+| Module                          | Provider SDK                                          | Hook                 | What it captures                                                                       |
+| ------------------------------- | ----------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------- |
+| `…/instrumentation/openai`      | `github.com/openai/openai-go/v3`                      | `option.Middleware`  | Chat / Responses / Embeddings, streaming, all token + cached/reasoning                 |
+| `…/instrumentation/anthropic`   | `github.com/anthropics/anthropic-sdk-go`              | `option.Middleware`  | Messages API, streaming, input/output/**cache-read + cache-creation** tokens, thinking |
+| `…/instrumentation/gopenai`     | `github.com/sashabaranov/go-openai`                   | `http.RoundTripper`  | OpenAI-wire chat/embeddings (+ OpenAI-compatible providers), cached/reasoning          |
+| `…/instrumentation/googlegenai` | `google.golang.org/genai`                             | `http.RoundTripper`  | Gemini generateContent (+ Vertex), streaming, cached + thoughts(reasoning) tokens      |
+| `…/instrumentation/bedrock`     | `github.com/aws/aws-sdk-go-v2/service/bedrockruntime` | smithy-go middleware | Converse / ConverseStream / InvokeModel, cache read+write tokens, latency              |
+| `…/instrumentation/ollama`      | `github.com/ollama/ollama/api`                        | `http.RoundTripper`  | Native `/api/chat`/`generate`/`embed`, NDJSON streaming, eval-count tokens, durations  |
+| `…/instrumentation/azureopenai` | (via the openai module)                               | `option.Middleware`  | Azure OpenAI — reuses all OpenAI capture, provider `azure.openai`                      |
+| `…/instrumentation/genkit`      | `github.com/firebase/genkit/go`                       | OTel-native          | Exports Genkit's own flow/model/tool spans to LangWatch                                |
 
 All HTTP-based instrumentations (openai, anthropic, gopenai, googlegenai) share a
 lightweight base, `…/instrumentation/otelhttp`, which **passes request/response
@@ -272,8 +274,8 @@ service list, pagination, retries and typed error handling.
 
 No API keys required:
 
-| Example | Description |
-|---------|-------------|
+| Example                               | Description                                             |
+| ------------------------------------- | ------------------------------------------------------- |
 | [`filtering/`](./examples/filtering/) | Demonstrates all filter capabilities with mock exporter |
 
 ```bash
@@ -284,14 +286,14 @@ cd examples && go run ./filtering
 
 Require `LANGWATCH_API_KEY` and `OPENAI_API_KEY`:
 
-| Example | Description |
-|---------|-------------|
-| [`openai-simple/`](./e2e/openai-simple/) | Basic OpenAI instrumentation |
-| [`openai-filtered/`](./e2e/openai-filtered/) | Filtering spans by scope |
-| [`openai-streaming/`](./e2e/openai-streaming/) | Streaming completions |
-| [`openai-threads/`](./e2e/openai-threads/) | Grouping conversations |
-| [`openai-responses/`](./e2e/openai-responses/) | OpenAI Responses API |
-| [`custom-input-output/`](./e2e/custom-input-output/) | Recording custom data |
+| Example                                              | Description                  |
+| ---------------------------------------------------- | ---------------------------- |
+| [`openai-simple/`](./e2e/openai-simple/)             | Basic OpenAI instrumentation |
+| [`openai-filtered/`](./e2e/openai-filtered/)         | Filtering spans by scope     |
+| [`openai-streaming/`](./e2e/openai-streaming/)       | Streaming completions        |
+| [`openai-threads/`](./e2e/openai-threads/)           | Grouping conversations       |
+| [`openai-responses/`](./e2e/openai-responses/)       | OpenAI Responses API         |
+| [`custom-input-output/`](./e2e/custom-input-output/) | Recording custom data        |
 
 ```bash
 cd e2e
@@ -301,15 +303,15 @@ go run cmd/main.go run-examples                # Run all
 
 ## Features
 
-* 🔗 **Seamless OpenTelemetry integration** - Works with your existing OTel setup
-* 🚀 **OpenAI instrumentation** - Automatic tracing for OpenAI API calls
-* 🌐 **Multi-provider support** - OpenAI, Anthropic, Azure, local models, and more
-* 📊 **Rich LLM telemetry** - Capture inputs, outputs, token usage, and model information
-* 🔍 **Specialized span types** - LLM, Chain, Tool, Agent, RAG, and more
-* 🧵 **Thread support** - Group related LLM interactions together
-* 📝 **Custom input/output recording** - Fine-grained control over what's captured
-* 🔄 **Streaming support** - Real-time capture of streaming responses
-* 🎛️ **Span filtering** - Control exactly which spans are exported
+- 🔗 **Seamless OpenTelemetry integration** - Works with your existing OTel setup
+- 🚀 **OpenAI instrumentation** - Automatic tracing for OpenAI API calls
+- 🌐 **Multi-provider support** - OpenAI, Anthropic, Azure, local models, and more
+- 📊 **Rich LLM telemetry** - Capture inputs, outputs, token usage, and model information
+- 🔍 **Specialized span types** - LLM, Chain, Tool, Agent, RAG, and more
+- 🧵 **Thread support** - Group related LLM interactions together
+- 📝 **Custom input/output recording** - Fine-grained control over what's captured
+- 🔄 **Streaming support** - Real-time capture of streaming responses
+- 🎛️ **Span filtering** - Control exactly which spans are exported
 
 ## Core Concepts
 
@@ -550,6 +552,7 @@ langwatch.MustMatchRegex(pattern)
 The `*Span` embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you can use all standard OpenTelemetry span methods. The LangWatch helpers below all return the span for chaining.
 
 **Input/Output (`langwatch.input` / `langwatch.output`):**
+
 - `SetInput(input any)` / `SetOutput(output any)` - Records a value, inferring the type (text, json, chat_messages, list, …)
 - `SetInputText` / `SetOutputText` - Force the `text` type
 - `SetInputJSON` / `SetOutputJSON` - Force the `json` type
@@ -560,6 +563,7 @@ The `*Span` embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you ca
 - `SetInputTyped` / `SetOutputTyped` - Record an explicit `langwatch.TypedValue`
 
 **Metrics, metadata & identity:**
+
 - `SetMetrics(metrics SpanMetrics)` - Cost and `tokens_estimated` flag (`langwatch.metrics`); token counts go via `SetGenAIUsage`
 - `SetMetadata(metadata map[string]any)` - Metadata blob hoisted to the trace (`langwatch.metadata`)
 - `SetThreadID` / `SetUserID` / `SetCustomerID` / `SetLabels(...string)` - Reserved trace identity
@@ -567,6 +571,7 @@ The `*Span` embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you ca
 - `SetSelectedPrompt(prompt SelectedPrompt)` - Attach a saved prompt to the trace
 
 **Model, provider & GenAI (handy for manual instrumentation):**
+
 - `SetRequestModel(model string)` - `gen_ai.request.model`
 - `SetResponseModel(model string)` - `gen_ai.response.model`
 - `SetGenAIProvider(provider string)` - `gen_ai.provider.name`
@@ -576,15 +581,18 @@ The `*Span` embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you ca
 - `SetGenAIResponseFinishReasons(...string)` - `gen_ai.response.finish_reasons`
 
 **Categorization & context:**
+
 - `SetType(spanType SpanType)` - Span type for LangWatch processing
 - `SetRAGContexts(contexts []SpanRAGContextChunk)` / `SetRAGContext(context)` - RAG context (`langwatch.rag.contexts`)
 - `SetTimestamps(timestamps SpanTimestamps)` - Fine-grained timing
 
 **Multimodal content helpers:**
+
 - `TextMessage`, `MultiContentMessage` - Build `ChatMessage` values
 - `TextPart`, `ImageURLPart`, `BinaryPart`, `BinaryURLPart`, `BinaryRefPart` - Build `ChatRichContent` parts (incl. binary attachments)
 
 **Tracer:**
+
 - `tracer.WithActiveSpan(ctx, name, fn)` - Run `fn` with a span that auto-ends and records error status
 
 ## Environment Variables

@@ -13,10 +13,10 @@ Feature: A skipped evaluation shows as skipped in the workbench
   # and had to work out that the row had not been evaluated at all.
   #
   # Bindings:
-  #   platform/app/src/server/experiments-v3/execution/resultMapper.ts
-  #   platform/app/src/server/experiments-v3/execution/orchestrator.ts
-  #   platform/app/src/server/experiments-v3/execution/__tests__/resultMapper.test.ts
-  #   platform/app/src/server/experiments-v3/execution/__tests__/orchestratorStorageDispatch.unit.test.ts
+  #   modules/experiment/process/src/eventing/experiment-result-mapping.process.ts
+  #   modules/experiment/process/src/services/experiment-result-dispatch.service.ts
+  #   modules/experiment/process/src/eventing/__tests__/experiment-result-mapping.unit.test.ts
+  #   modules/experiment/process/src/services/__tests__/experiment-result-dispatch.unit.test.ts
 
   @unit
   Scenario: A skipped verdict from a component evaluator is reported as skipped

@@ -4,9 +4,11 @@
  * Spec: specs/typescript-sdk/run-plans-and-test-suites.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { RunPlansApiError, RunPlansApiService } from "../run-plans-api.service";
-import { isLangWatchHandledError } from "@/internal/api/errors";
+
 import type { LangwatchApiClient } from "@/internal/api/client";
+import { isLangWatchHandledError } from "@/internal/api/errors";
+
+import { RunPlansApiError, RunPlansApiService } from "../run-plans-api.service";
 
 /** The flat @langwatch/api envelope: the code sits at the top level. */
 const flatNotFound = {
@@ -17,11 +19,7 @@ const flatNotFound = {
   meta: {},
 };
 
-const clientWith = (result: {
-  data?: unknown;
-  error?: unknown;
-  response?: Response;
-}) => {
+const clientWith = (result: { data?: unknown; error?: unknown; response?: Response }) => {
   const calls = {
     GET: vi.fn(async (_path: string, _init?: RequestInit) => result),
     POST: vi.fn(async (_path: string, init?: { body?: Record<string, unknown> }) => {
@@ -35,11 +33,7 @@ const clientWith = (result: {
   return { client: calls as unknown as LangwatchApiClient, calls };
 };
 
-const serviceWith = (result: {
-  data?: unknown;
-  error?: unknown;
-  response?: Response;
-}) => {
+const serviceWith = (result: { data?: unknown; error?: unknown; response?: Response }) => {
   const { client, calls } = clientWith(result);
   return {
     service: new RunPlansApiService({ langwatchApiClient: client }),

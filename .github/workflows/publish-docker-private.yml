@@ -3,19 +3,19 @@ name: publish-docker-private
 # Manual build of the one platform image from any ref into the artifacts ECR.
 # Dispatch it from main: the OIDC role trusts refs/heads/main only, so the run
 # assumes the role as main and builds the `ref` input. Arm64 only, as
-# publish-docker-ecr.yml. Tags carry a `ref-` prefix so main's `git-<sha>` stays
-# main's alone; `latest` is never written.
+# publish-docker-ecr.yml. Every tag starts with `ref-`, so it can never replace
+# main's `git-<sha>`, a release version or `latest`.
 
 on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch, tag or sha to build"
+        description: "Branch or tag of this repository to build"
         required: false
         default: main
         type: string
       image_tag:
-        description: "Custom image tag (default: ref-<short-sha> of the built ref)"
+        description: "Custom image tag, starting with ref- (default: ref-<short-sha> of the built ref)"
         required: false
         type: string
 
@@ -45,10 +45,42 @@ jobs:
           echo "::error::Dispatch this workflow from main (Use workflow from: main) and put the branch to build in 'ref'."
           exit 1
 
+      # Only a branch or tag of this repository: a raw sha or refs/pull/* could be
+      # a commit that lives only in a fork, which GitHub serves across the network.
+      - name: Resolve ref to a branch or tag of this repository
+        id: ref
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          case "${INPUT_REF}" in
+            "" | *[!A-Za-z0-9._/@-]* | refs/pull/* | -*)
+              echo "::error::ref must be a branch or tag name of this repository"; exit 1 ;;
+          esac
+          # An explicit refs/heads/ or refs/tags/ prefix is kept; a bare name tries the branch, then the tag.
+          case "${INPUT_REF}" in
+            refs/heads/* | refs/tags/*) CANDIDATES="${INPUT_REF}" ;;
+            *) CANDIDATES="refs/heads/${INPUT_REF} refs/tags/${INPUT_REF}" ;;
+          esac
+          NAME="${INPUT_REF#refs/heads/}"; NAME="${NAME#refs/tags/}"
+          SHA=""
+          for CANDIDATE in ${CANDIDATES}; do
+            # An annotated tag lists its object and, as `^{}`, the commit; take the commit.
+            SHA=$(git ls-remote "${REPO_URL}" "${CANDIDATE}" "${CANDIDATE}^{}" |
+              awk -v ref="${CANDIDATE}" '$2 == ref "^{}" {print $1; exit} $2 == ref {first=$1} END {if (first) print first}' |
+              head -n1)
+            [ -n "${SHA}" ] && break
+          done
+          if [ -z "${SHA}" ]; then
+            echo "::error::'${NAME}' is not a branch or tag of this repository"; exit 1
+          fi
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ steps.ref.outputs.sha }}
           persist-credentials: false
 
       # `case` matches the whole string, newlines included, unlike `grep -E`.
@@ -61,9 +93,9 @@ jobs:
           SHA=$(git rev-parse HEAD)
           IMAGE_TAG="${INPUT_IMAGE_TAG:-ref-${SHA:0:10}}"
           case "${IMAGE_TAG}" in
-            latest | git-*) echo "::error::image_tag must not be 'latest' or start with 'git-'"; exit 1 ;;
-            *[!A-Za-z0-9._-]* | [!A-Za-z0-9_]*)
-              echo "::error::image_tag is not a valid Docker tag"; exit 1 ;;
+            *[!A-Za-z0-9._-]*) echo "::error::image_tag is not a valid Docker tag"; exit 1 ;;
+            ref-?*) ;;
+            *) echo "::error::image_tag must start with 'ref-' so it can never replace a main or release tag"; exit 1 ;;
           esac
           if [ "${#IMAGE_TAG}" -gt 128 ]; then
             echo "::error::image_tag is longer than 128 characters"; exit 1
@@ -107,10 +139,11 @@ jobs:
           platforms: linux/arm64/v8
           provenance: false
           cache-from: type=gha,scope=private-langwatch-app-arm64
-          cache-to: type=gha,mode=max,scope=private-langwatch-app-arm64
+          cache-to: type=gha,mode=max,scope=private-langwatch-app-arm64,ignore-error=true
           build-args: |
             VERSION=${{ steps.meta.outputs.image_tag }}
             SERVICE_VERSION=${{ steps.meta.outputs.image_tag }}
+            LANGWATCH_BUILD_COMMIT=${{ steps.meta.outputs.sha }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:${{ steps.meta.outputs.image_tag }}
 
