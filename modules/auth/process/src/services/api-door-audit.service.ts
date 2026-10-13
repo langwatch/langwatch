@@ -69,7 +69,7 @@ export class ApiDoorAuditService {
           }),
         );
       },
-      organizationOf: (scope) => this.#organizationOf(scope),
+      organizationOf: (scope) => this.organizationOf(scope),
     };
   }
 
@@ -85,7 +85,7 @@ export class ApiDoorAuditService {
     }
     if (scope?.tier === "project" || scope?.tier === "team") {
       const organizationId =
-        (await this.#organizationOf({ tier: scope.tier, id: scope.id })) ?? param("organizationId");
+        (await this.organizationOf({ tier: scope.tier, id: scope.id })) ?? param("organizationId");
       const projectId = scope.tier === "project" ? scope.id : param("projectId");
       return { organizationId, projectId };
     }
@@ -93,8 +93,11 @@ export class ApiDoorAuditService {
     return { organizationId: param("organizationId"), projectId: param("projectId") };
   }
 
-  /** The organization holding a project or team; null where authz resolves no such scope. */
-  async #organizationOf(scope: { tier: "project" | "team"; id: string }): Promise<string | null> {
+  /**
+   * The organization holding a project or team; null where authz resolves no such scope. The
+   * door's authorization asks this same resolver, so audit rows and access never disagree.
+   */
+  async organizationOf(scope: { tier: "project" | "team"; id: string }): Promise<string | null> {
     const ids = scope.tier === "project" ? { projectId: scope.id } : { teamId: scope.id };
     const resolved = await this.#peers.authz.getScope(ids).catch((error: unknown) => {
       if (AuthzScopeNotFoundError.is(error)) return null;
