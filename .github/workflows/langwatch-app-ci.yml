@@ -705,8 +705,8 @@ jobs:
     # pool, and several at once on a 4-core runner produce "[vitest-pool]:
     # Worker forks emitted error", which reads as a broken test and is not one.
     # Parallel across legs: over two hundred package suites run one after
-    # another take well past two hours, so the list is split round-robin
-    # (PACKAGE_SUITES_SHARD) over separate runners.
+    # another take well past two hours, so the list is split by measured weight
+    # (PACKAGE_SUITES_SHARD, .github/package-suites.weights) over separate runners.
     strategy:
       fail-fast: false
       matrix:
