@@ -3,17 +3,21 @@ package aigateway
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/httpapi"
 )
 
 // Config is the top-level service configuration.
 type Config struct {
-	Environment                   string                    `env:"ENVIRONMENT"`
+	Environment string `env:"ENVIRONMENT"`
+	// MetricsAPIKey is METRICS_API_KEY, the pull door's scrape bearer (ADR-175).
+	MetricsAPIKey                 string                    `env:"METRICS_API_KEY"`
 	BlockLocalHTTPCalls           bool                      `env:"BLOCK_LOCAL_HTTP_CALLS"`
 	RequireHTTPSCustomerEndpoints bool                      `env:"REQUIRE_HTTPS_CUSTOM_ENDPOINTS"`
 	AllowedProxyHosts             string                    `env:"ALLOWED_PROXY_HOSTS"`
@@ -26,6 +30,12 @@ type Config struct {
 	LangyMirror                   LangyMirrorConfig         `env:"LANGY_MIRROR"`
 	SpendEmitter                  SpendEmitterConfig        `env:"LW_GATEWAY_SPEND"`
 	OTel                          config.OTel               `env:"OTEL"`
+	Voice                         VoiceConfig               `env:"LW_GATEWAY_VOICE"`
+	CORS                          CORSConfig                `env:"LW_GATEWAY_CORS"`
+	// CodexAPIBase is where codex model calls go (CODEX_API_BASE, the root
+	// that `/responses` hangs off); unset is OpenAI's own codex backend.
+	// haven's +outbound names outboundsim.
+	CodexAPIBase string `env:"CODEX_API_BASE"`
 	// NonStreamingHeartbeatIntervalSeconds sets how often (in seconds) a
 	// non-streaming response writes a keep-alive byte while dispatch is
 	// still in flight. 0 falls back to config.DefaultNonStreamingHeartbeatInterval;
@@ -69,6 +79,31 @@ type SpendEmitterConfig struct {
 	// IngestBaseURL overrides where batches ship. Empty defaults to
 	// ControlPlane.BaseURL.
 	IngestBaseURL string `env:"INGEST_BASE_URL"`
+}
+
+// VoiceConfig governs the brokered voice calls this process supervises.
+type VoiceConfig struct {
+	// DrainSeconds is how long supervised calls may keep running after
+	// SIGTERM before the gateway ends them and sends their final reports.
+	// It runs from the signal, beside the HTTP drain, and must fit inside the
+	// pod's terminationGracePeriodSeconds with about 30 seconds to spare.
+	DrainSeconds int64 `env:"DRAIN_SECONDS"`
+	// MaxSupervisedSessions caps the calls one process supervises. A setup
+	// request past it is refused with 503 before anything is booked.
+	MaxSupervisedSessions int `env:"MAX_SUPERVISED_SESSIONS"`
+}
+
+// CORSConfig lets browser pages call the public /v1 routes directly.
+type CORSConfig struct {
+	// AllowedOrigins is a comma separated list of exact origins
+	// (https://app.example.com), or "*" alone. Empty sends no CORS headers.
+	AllowedOrigins string `env:"ALLOWED_ORIGINS"`
+}
+
+// AllowedOriginList is AllowedOrigins parsed; LoadConfig has validated it.
+func (c CORSConfig) AllowedOriginList() []string {
+	origins, _ := httpapi.ParseCORSAllowedOrigins(c.AllowedOrigins)
+	return origins
 }
 
 // ControlPlaneConfig holds control plane connection settings.
@@ -190,6 +225,12 @@ func defaultConfig() Config {
 		SpendEmitter: SpendEmitterConfig{
 			Enabled: true,
 		},
+		// 570 fits the 620 second termination grace period production runs
+		// with. The chart sets it from shutdown.voiceDrainSeconds.
+		Voice: VoiceConfig{
+			DrainSeconds:          570,
+			MaxSupervisedSessions: 2000,
+		},
 		OTel: config.OTel{
 			// Left unset so an operator-supplied ratio is distinguishable from
 			// the default; resolved in LoadConfig.
@@ -223,6 +264,12 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := validateSecondsFields(cfg); err != nil {
 		return Config{}, err
 	}
+	if err := validateCodexAPIBase(cfg.CodexAPIBase); err != nil {
+		return Config{}, err
+	}
+	if _, err := httpapi.ParseCORSAllowedOrigins(cfg.CORS.AllowedOrigins); err != nil {
+		return Config{}, err
+	}
 	if cfg.CustomerTraceBridge.BaseURL == "" {
 		cfg.CustomerTraceBridge.BaseURL = cfg.ControlPlane.BaseURL
 	}
@@ -233,6 +280,28 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// validateCodexAPIBase refuses a CODEX_API_BASE that is set but is not an
+// absolute http(s) URL, so a typo fails at boot instead of on the first turn.
+func validateCodexAPIBase(base string) error {
+	if strings.TrimSpace(base) == "" {
+		return nil
+	}
+	parsed, err := url.Parse(base)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return fmt.Errorf("CODEX_API_BASE must be an absolute http(s) URL, got %q", base)
+	}
+	return nil
+}
+
+// codexBackendURL is the codex Responses endpoint under the configured base;
+// empty leaves the router on OpenAI's own backend.
+func codexBackendURL(base string) string {
+	if strings.TrimSpace(base) == "" {
+		return ""
+	}
+	return strings.TrimRight(strings.TrimSpace(base), "/") + "/responses"
 }
 
 // MaxConfigurableSeconds bounds every seconds-valued time span in the
@@ -263,6 +332,7 @@ func validateSecondsFields(cfg Config) error {
 	}{
 		{env: "SERVER_GRACEFUL_SECONDS", value: int64(cfg.Server.GracefulSeconds), rejectNegative: true},
 		{env: "SERVER_DRAIN_DELAY_SECONDS", value: int64(cfg.Server.DrainDelaySeconds), rejectNegative: true},
+		{env: "LW_GATEWAY_VOICE_DRAIN_SECONDS", value: cfg.Voice.DrainSeconds, rejectNegative: true},
 		{env: "NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS", value: cfg.NonStreamingHeartbeatIntervalSeconds},
 		{env: "LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS", value: cfg.AuthCache.SoftBumpSeconds},
 		{env: "LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS", value: cfg.AuthCache.HardGraceSeconds},

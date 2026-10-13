@@ -115,3 +115,53 @@ Feature: The TypeScript compiler can never take the machine down
     # A ceiling is one the runtime expands toward, so a generous cap is spent
     # rather than saved; a cap below the live heap is missed anyway, at the
     # price of collecting continuously. See ADR-100.
+
+  # LangWatch's headless browsers are the second governed class: Playwright
+  # shells started from a checkout (haven browser, upgradelab walkers, e2e)
+  # climb to cores and gigabytes after hours under software GL. Only a shell
+  # from the Playwright cache whose parent runs a path under the checkout (or is
+  # haven's browser daemon) is touched. Its memory ceiling is the browser-memory-mb
+  # limit plus headroom; knobs: HAVEN_BROWSER_SHELL_MAX_CPU_PCT, _CPU_SUSTAIN,
+  # _MAX_AGE, _IDLE_TTL (0 disables each).
+
+  @unit
+  Scenario: The browser governor only ever touches LangWatch's headless browsers
+    Given headless shells started by haven's browser daemon and by a checkout script
+    And the person's Chrome, an Electron app and another repository's headless shell
+    When the daemon takes its next sample
+    Then only the LangWatch shells are candidates
+    And each reap names the script or daemon that owns the shell
+
+  @unit
+  Scenario: A headless browser above its memory ceiling is reaped whole
+    Given haven's headless shell whose renderers together exceed the memory ceiling
+    When the daemon takes its next sample
+    Then the shell's whole process group is reaped
+    And the reap is recorded with the kind "browser" and the shell's owner
+
+  @unit
+  Scenario: A headless browser is reaped only for sustained CPU, never a spike
+    Given haven's headless shell above the CPU ceiling for one sample
+    When the daemon takes its next sample and the shell has calmed down
+    Then nothing is reaped
+    But a shell that stays above the CPU ceiling for the sustain period is reaped
+
+  @unit
+  Scenario: An idle headless browser past its maximum age is reaped
+    Given haven's headless shell older than the maximum age
+    And its CPU has stayed below the idle floor for the idle period
+    When the daemon takes its next sample
+    Then it is reaped
+    And a shell of the same age that is still working is left alone
+
+  @unit
+  Scenario: The next haven browser command works after a reap
+    Given haven's headless browser was reaped and its daemon exited
+    When a lane runs its next haven browser command
+    Then a fresh browser daemon is started for it
+
+  @unit
+  Scenario: The shared browser between its memory limit and the headroom is not reaped
+    Given the shared browser between its memory limit and the limit plus headroom
+    When the daemon takes its next sample
+    Then the browser is not reaped

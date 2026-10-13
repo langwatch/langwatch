@@ -210,6 +210,45 @@ Feature: AI Gateway — transparent upstream error forwarding
       | the provider slot has no deployment map            | provider_config_invalid     |
       | the provider does not implement the operation      | provider_config_invalid     |
 
+  # A provider row can be stored enabled with no credentials. It reaches the
+  # gateway as a slot whose API key is empty, the engine drops the key and
+  # answers "no keys found that support model", and the customer was told to
+  # check the models and deployments of a provider that had no key at all. The
+  # engine uses that one sentence for a missing key and for a key that lists
+  # other models, so the gateway checks the credential itself before dispatch.
+  #
+  # Bindings: services/aigateway/adapters/providers/credential_gap_test.go
+  @bdd @error-transparency @unit
+  Scenario: A provider saved without its API key is refused before dispatch and says so
+    Given a provider slot that authenticates with an API key and holds none
+    When the client calls the gateway with "vk-demo"
+    Then the error code is "provider_config_invalid" with the problem "api_key_missing"
+    And the message says the provider has no API key saved
+    And it does not tell the customer to check their models or deployments
+    And no request is sent to the provider
+
+  # One code covers several different settings to change, so the answer names
+  # which: the client picks its sentence from the problem, and the remediation
+  # steps are written for it.
+  #
+  # Bindings: services/aigateway/adapters/providers/credential_gap_test.go,
+  # services/aigateway/domain/remediation_test.go,
+  # platform/app/src/features/errors/logic/__tests__/presentation.unit.test.ts
+  @bdd @error-transparency @unit
+  Scenario Outline: Each provider setup gap gets its own instruction
+    Given a request fails because <gap>
+    When the gateway answers the caller
+    Then the error code is "provider_config_invalid" with the problem "<problem>"
+    And the customer reads an instruction naming <setting> in the model provider settings
+
+    Examples:
+      | gap                                                  | problem               | setting                |
+      | the provider holds no API key                        | api_key_missing       | the API key            |
+      | the provider holds no endpoint URL                   | endpoint_missing      | the endpoint           |
+      | the provider maps no deployment for the model        | deployment_missing    | the deployment mapping |
+      | the provider has no API for this kind of request     | operation_unsupported | another provider       |
+      | the provider is complete and still serves no such model | model_not_served   | the model              |
+
   @bdd @error-transparency @unit
   Scenario: A genuine timeout is still called a timeout
     Given the engine stamps the failure with its request-timed-out signal

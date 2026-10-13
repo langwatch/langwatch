@@ -1,0 +1,120 @@
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+/**
+ * @vitest-environment node
+ * `POST /api/workflows/:workflowId/run` over the real app and the runtime a process mounts
+ * it on: the run's typed refusals keep their statuses, and an untyped failure stays opaque.
+ */
+import {
+  bindMiddlewareContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
+import { describe, expect, it } from "vitest";
+
+import { HttpWorkflowChannels } from "../../channels/http/http.workflow.channels.ts";
+import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
+import type { WorkflowRepositories } from "../../repositories/workflow-repositories.registry.ts";
+import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
+import { workflowRunCallerKey, workflowRunRest } from "../../transport/workflow-run.rest.ts";
+import { WorkflowModule } from "../workflow.app.ts";
+
+async function postRun({ repositories }: { repositories: WorkflowRepositories }) {
+  const config = {
+    nlpServiceUrl: void 0,
+    stagingThresholdBytes: void 0,
+    stagingTtlSeconds: 600,
+    relayTurnCeilingMs: void 0,
+    publicBaseUrl: void 0,
+    nlpCodeBlockTimeoutSeconds: void 0,
+  };
+  const secrets = new ScopedSecrets(async (_handle, build) => build(undefined));
+  const app = await WorkflowModule.create({
+    dependencies: {
+      modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
+      agents: createApiFixture<AgentApi>({}, "AgentApi"),
+      authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
+      apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
+      datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
+      secrets: createApiFixture<SecretApi>({}, "SecretApi"),
+    },
+    config,
+    resources: { own: () => void 0, ownService: () => void 0 },
+    secrets,
+    channels: await HttpWorkflowChannels.create({ config, secrets }),
+    repositories,
+  });
+  const runtime = createRestRuntime({
+    authorization: restTestAuthorization(),
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project_1" } as const }),
+    },
+  });
+
+  return runtime
+    .mount(workflowRunRest.router(), {
+      app: () => app,
+      credential: "project",
+      onError: canonicalErrorResponse,
+      middlewareContext: [bindMiddlewareContext(workflowRunCallerKey, () => null)],
+    })
+    .request("/api/workflows/workflow_1/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question: "hello" }),
+    });
+}
+
+describe("running a workflow over the public API", () => {
+  /** @scenario "Running a nonexistent workflow returns 404" */
+  it("answers 404 with workflow_not_found for a workflow that does not exist", async () => {
+    const response = await postRun({ repositories: MemoryWorkflowRepositories.create() });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ code: "workflow_not_found" });
+  });
+
+  /** @scenario "Running a workflow that has never been published returns 422" */
+  it("answers 422 for a workflow that was never published", async () => {
+    const repositories = MemoryWorkflowRepositories.create();
+    await repositories.workflows.createWorkflow({
+      id: "workflow_1",
+      projectId: "project_1",
+      name: "Triage",
+      icon: null,
+      description: null,
+    });
+
+    const response = await postRun({ repositories });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ code: "validation_error" });
+  });
+
+  /** @scenario "An untyped runWorkflow error still returns a safe 500, not a leaked message" */
+  it("answers 500 without the internal message for an untyped failure", async () => {
+    const response = await postRun({
+      repositories: {
+        ...MemoryWorkflowRepositories.create(),
+        workflows: createApiFixture<WorkflowRepository>(
+          {
+            findById: () => {
+              throw new Error("connect ECONNREFUSED 10.0.0.7:5432");
+            },
+          },
+          "WorkflowRepository",
+        ),
+      },
+    });
+
+    expect(response.status).toBe(500);
+    expect(JSON.stringify(await response.json())).not.toContain("ECONNREFUSED");
+  });
+});

@@ -1,9 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { resolveScenarioOrExit } from "./resolveScenario";
 
 /** Archives one scenario, named by its id or by its name. */
@@ -34,9 +36,7 @@ export const deleteScenarioCommand = async (reference: string): Promise<CommandR
 
   try {
     await service.delete(id);
-    deleteSpinner.succeed(
-      `Archived scenario "${chalk.cyan(scenarioName)}"`,
-    );
+    deleteSpinner.succeed(`Archived scenario "${chalk.cyan(scenarioName)}"`);
   } catch (error) {
     failSpinner({
       spinner: deleteSpinner,

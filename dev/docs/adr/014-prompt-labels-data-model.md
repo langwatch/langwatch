@@ -68,6 +68,7 @@ Not storing `latest` avoids a maintenance burden — auto-updating a label row o
 ## Revision History
 
 **v2 (2026-03-27):** Simplified from the original design:
+
 - Renamed table from `LlmPromptConfigLabel` to `PromptVersionTag`
 - Renamed `name` column to `label` for clarity
 - Removed label CRUD endpoints (createLabel, listLabels, updateLabel, deleteLabel) — replaced with single `assignLabel` upsert
@@ -76,6 +77,7 @@ Not storing `latest` avoids a maintenance burden — auto-updating a label row o
 - Hardcoded valid labels to `production` and `staging` only (was open-ended with regex validation)
 
 **v3 (2026-03-27):** Added REST API surface with both patterns:
+
 - `PUT /:id/labels/:label` sub-resource — move a label to an existing version (like PromptLayer)
 - Optional `labels` array in `POST /` and `PUT /:id` payloads — assign labels to newly created versions (like Langfuse)
 - Both patterns are needed: sub-resource for label promotion without version changes, payloads for label assignment during version creation
@@ -101,6 +103,7 @@ model PromptTag {
 ```
 
 New API surface added:
+
 - `POST /api/orgs/:orgId/prompt-tags` — create custom tag (admin only)
 - `GET /api/orgs/:orgId/prompt-tags` — list all tags for the org
 - `DELETE /api/orgs/:orgId/prompt-tags/:tagId` — delete custom tag + cascade assignments
@@ -123,16 +126,16 @@ The following are explicitly deferred to future issues:
 
 The label feature follows both Langfuse's "labels in create payload" pattern and PromptLayer's "dedicated sub-resource" pattern:
 
-| Method | Path / Endpoint | Description |
-|--------|----------------|-------------|
-| `PUT` | `/api/v1/prompts/:id/labels/:label` | Move a label to an existing version |
-| `POST` | `/api/v1/prompts` | Create prompt with optional `tags` array (assigned to v1) |
-| `PUT` | `/api/v1/prompts/:id` | Update prompt with optional `tags` array (assigned to new version) |
-| `GET` | `/api/v1/prompts/:id?label=production` | Fetch the version a label points to |
-| `GET` | `/api/v1/prompts/:id?version=2` | Fetch a specific version by number |
-| `GET` | `/api/v1/prompts/:id` | Fetch latest version (highest version number) |
-| tRPC mutation | `prompts.assignTag` | Assign or reassign a tag directly |
-| tRPC query | `prompts.getByIdOrHandle` | Fetch with optional `label` param |
+| Method        | Path / Endpoint                        | Description                                                        |
+| ------------- | -------------------------------------- | ------------------------------------------------------------------ |
+| `PUT`         | `/api/v1/prompts/:id/labels/:label`    | Move a label to an existing version                                |
+| `POST`        | `/api/v1/prompts`                      | Create prompt with optional `tags` array (assigned to v1)          |
+| `PUT`         | `/api/v1/prompts/:id`                  | Update prompt with optional `tags` array (assigned to new version) |
+| `GET`         | `/api/v1/prompts/:id?label=production` | Fetch the version a label points to                                |
+| `GET`         | `/api/v1/prompts/:id?version=2`        | Fetch a specific version by number                                 |
+| `GET`         | `/api/v1/prompts/:id`                  | Fetch latest version (highest version number)                      |
+| tRPC mutation | `prompts.assignTag`                    | Assign or reassign a tag directly                                  |
+| tRPC query    | `prompts.getByIdOrHandle`              | Fetch with optional `label` param                                  |
 
 `version`/`versionId` and `label` are mutually exclusive — providing both returns 422.
 

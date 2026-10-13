@@ -1,0 +1,1729 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { FoldProjectionStore } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
+import { RefreshMetadataCommand } from "../simulation-processing.commands.ts";
+import {
+  SIMULATION_EVENT_VERSIONS,
+  SIMULATION_RUN_EVENT_TYPES,
+} from "@langwatch/scenario-contract";
+import type {
+  SimulationMessageSnapshotEvent,
+  SimulationProcessingEvent,
+  SimulationRunCancelRequestedEvent,
+  SimulationRunDeletedEvent,
+  SimulationRunFinishedEvent,
+  SimulationRunMetadataRefreshedEvent,
+  SimulationRunMetricsComputedEvent,
+  SimulationRunQueuedEvent,
+  SimulationRunStartedEvent,
+  SimulationTextMessageEndEvent,
+  SimulationTextMessageStartEvent,
+} from "@langwatch/scenario-contract";
+
+import {
+  type SimulationRunStateData,
+  SimulationRunStateFoldProjection,
+} from "../simulation-run-state.projection.ts";
+
+// Create a dummy store -- only init/apply are tested, not persistence
+const noopStore: FoldProjectionStore<SimulationRunStateData> = {
+  store: async () => {},
+  get: async () => ({ kind: "empty" as const }),
+};
+const foldProjection = SimulationRunStateFoldProjection.create({
+  store: noopStore,
+});
+
+const TEST_TENANT_ID = createTenantId("tenant-1");
+
+function createRunStartedEvent(
+  overrides: Partial<SimulationRunStartedEvent["data"]> = {},
+  eventOverrides: Partial<SimulationRunStartedEvent> = {},
+): SimulationRunStartedEvent {
+  return {
+    id: "event-1",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 1000,
+    occurredAt: 1000,
+    type: SIMULATION_RUN_EVENT_TYPES.STARTED,
+    version: SIMULATION_EVENT_VERSIONS.STARTED,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      scenarioId: "scenario-1",
+      batchRunId: "batch-1",
+      scenarioSetId: "set-1",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createRunQueuedEvent(
+  overrides: Partial<SimulationRunQueuedEvent["data"]> = {},
+  eventOverrides: Partial<SimulationRunQueuedEvent> = {},
+): SimulationRunQueuedEvent {
+  return {
+    id: "event-0",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 500,
+    occurredAt: 500,
+    type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+    version: SIMULATION_EVENT_VERSIONS.QUEUED,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      scenarioId: "scenario-1",
+      batchRunId: "batch-1",
+      scenarioSetId: "set-1",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createMessageSnapshotEvent(
+  overrides: Partial<SimulationMessageSnapshotEvent["data"]> = {},
+  eventOverrides: Partial<SimulationMessageSnapshotEvent> = {},
+): SimulationMessageSnapshotEvent {
+  return {
+    id: "event-2",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 2000,
+    occurredAt: 2000,
+    type: SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
+    version: SIMULATION_EVENT_VERSIONS.MESSAGE_SNAPSHOT,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      messages: [{ role: "user", content: "hello" }],
+      traceIds: ["trace-1"],
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createRunFinishedEvent(
+  overrides: Partial<SimulationRunFinishedEvent["data"]> = {},
+  eventOverrides: Partial<SimulationRunFinishedEvent> = {},
+): SimulationRunFinishedEvent {
+  return {
+    id: "event-3",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 3000,
+    occurredAt: 3000,
+    type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+    version: SIMULATION_EVENT_VERSIONS.FINISHED,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createMetadataRefreshedEvent(
+  overrides: Partial<SimulationRunMetadataRefreshedEvent["data"]> = {},
+  eventOverrides: Partial<SimulationRunMetadataRefreshedEvent> = {},
+): SimulationRunMetadataRefreshedEvent {
+  return {
+    id: "event-metadata-refreshed",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 3000,
+    occurredAt: 3000,
+    type: SIMULATION_RUN_EVENT_TYPES.METADATA_REFRESHED,
+    version: SIMULATION_EVENT_VERSIONS.METADATA_REFRESHED,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      attemptId: "attempt-1",
+      metadata: {},
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createMetricsComputedEvent(
+  overrides: Partial<SimulationRunMetricsComputedEvent["data"]> = {},
+  eventOverrides: Partial<SimulationRunMetricsComputedEvent> = {},
+): SimulationRunMetricsComputedEvent {
+  return {
+    id: "event-metrics-1",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 2000,
+    occurredAt: 2000,
+    type: SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED,
+    version: SIMULATION_EVENT_VERSIONS.METRICS_COMPUTED,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      traceId: "trace-1",
+      totalCost: 0.003,
+      roleCosts: { Agent: 0.003 },
+      roleLatencies: { Agent: 1200 },
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createRunDeletedEvent(
+  overrides: Partial<SimulationRunDeletedEvent["data"]> = {},
+  eventOverrides: Partial<SimulationRunDeletedEvent> = {},
+): SimulationRunDeletedEvent {
+  return {
+    id: "event-4",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 4000,
+    occurredAt: 4000,
+    type: SIMULATION_RUN_EVENT_TYPES.DELETED,
+    version: SIMULATION_EVENT_VERSIONS.DELETED,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createCancelRequestedEvent(
+  overrides: Partial<SimulationRunCancelRequestedEvent["data"]> = {},
+  eventOverrides: Partial<SimulationRunCancelRequestedEvent> = {},
+): SimulationRunCancelRequestedEvent {
+  return {
+    id: "event-cancel-1",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 5000,
+    occurredAt: 5000,
+    type: SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED,
+    version: SIMULATION_EVENT_VERSIONS.CANCEL_REQUESTED,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createTextMessageStartEvent(
+  overrides: Partial<SimulationTextMessageStartEvent["data"]> = {},
+  eventOverrides: Partial<SimulationTextMessageStartEvent> = {},
+): SimulationTextMessageStartEvent {
+  return {
+    id: "event-tms-1",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 1500,
+    occurredAt: 1500,
+    type: SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_START,
+    version: SIMULATION_EVENT_VERSIONS.TEXT_MESSAGE_START,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      messageId: "msg-1",
+      role: "user",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createTextMessageEndEvent(
+  overrides: Partial<SimulationTextMessageEndEvent["data"]> = {},
+  eventOverrides: Partial<SimulationTextMessageEndEvent> = {},
+): SimulationTextMessageEndEvent {
+  return {
+    id: "event-tme-1",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 2000,
+    occurredAt: 2000,
+    type: SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END,
+    version: SIMULATION_EVENT_VERSIONS.TEXT_MESSAGE_END,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      messageId: "msg-1",
+      role: "user",
+      content: "hello",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+/**
+ * Helper to fold a sequence of events through init() + apply().
+ */
+function foldEvents(events: SimulationProcessingEvent[]): SimulationRunStateData {
+  let state = foldProjection.init();
+  for (const event of events) {
+    state = foldProjection.apply(state, event);
+  }
+  return state;
+}
+
+const FAKE_NOW = 99999;
+
+describe("simulationRunStateFoldProjection", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FAKE_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("init()", () => {
+    it("returns PENDING status with empty fields", () => {
+      const state = foldProjection.init();
+
+      expect(state.Status).toBe("PENDING");
+      expect(state.ScenarioRunId).toBe("");
+      expect(state.ScenarioSetId).toBe("");
+      expect(state.Messages).toEqual([]);
+      expect(state.TraceIds).toEqual([]);
+      expect(state.MetCriteria).toEqual([]);
+      expect(state.UnmetCriteria).toEqual([]);
+      expect(state.Verdict).toBeNull();
+      expect(state.ArchivedAt).toBeNull();
+    });
+  });
+
+  describe("when RunStarted event is applied", () => {
+    it("sets run identifiers and transitions to IN_PROGRESS", () => {
+      const state = foldEvents([
+        createRunStartedEvent({
+          name: "Test Scenario",
+          description: "A test description",
+        }),
+      ]);
+
+      expect(state.ScenarioRunId).toBe("scenario-run-1");
+      expect(state.ScenarioId).toBe("scenario-1");
+      expect(state.BatchRunId).toBe("batch-1");
+      expect(state.ScenarioSetId).toBe("set-1");
+      expect(state.Name).toBe("Test Scenario");
+      expect(state.Description).toBe("A test description");
+      expect(state.Status).toBe("IN_PROGRESS");
+      expect(state.StartedAt).toBe(1000);
+      expect(state.CreatedAt).toBe(FAKE_NOW);
+      // UpdatedAt is monotonic: max(Date.now(), state.UpdatedAt + 1)
+      expect(state.UpdatedAt).toBeGreaterThanOrEqual(1000);
+    });
+  });
+
+  describe("when RunStarted event carries metadata", () => {
+    /** @scenario Custom metadata passes through from ingestion to read projection */
+    it("serializes custom fields and the langwatch namespace into Metadata JSON", () => {
+      const state = foldEvents([
+        createRunStartedEvent({
+          name: "Login flow",
+          description: "Tests login",
+          metadata: {
+            name: "Login flow",
+            description: "Tests login",
+            environment: "staging",
+            commit_sha: "abc123",
+            langwatch: {
+              targetReferenceId: "prompt_abc123",
+              targetType: "prompt",
+              simulationSuiteId: "suite_456",
+            },
+          },
+        }),
+      ]);
+
+      expect(state.Metadata).not.toBeNull();
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata.name).toBe("Login flow");
+      expect(metadata.description).toBe("Tests login");
+      expect(metadata.environment).toBe("staging");
+      expect(metadata.commit_sha).toBe("abc123");
+      expect(metadata.langwatch).toEqual({
+        targetReferenceId: "prompt_abc123",
+        targetType: "prompt",
+        simulationSuiteId: "suite_456",
+      });
+    });
+
+    /** @scenario Events with only name and description remain valid */
+    it("preserves standard-only metadata without inventing extra keys", () => {
+      const state = foldEvents([
+        createRunStartedEvent({
+          metadata: { name: "Login flow", description: "Tests login" },
+        }),
+      ]);
+
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata).toEqual({
+        name: "Login flow",
+        description: "Tests login",
+      });
+    });
+
+    it("stores null Metadata when the event carries none", () => {
+      const state = foldEvents([createRunStartedEvent()]);
+
+      expect(state.Metadata).toBeNull();
+    });
+  });
+
+  describe("when a re-drive refreshes the run's metadata", () => {
+    /** @scenario "A re-driven finish refreshes the run's metadata to the second attempt" */
+    it("takes the refresh event's fields over the first attempt's and keeps the run's other metadata", () => {
+      const state = foldEvents([
+        createRunStartedEvent(
+          {
+            metadata: {
+              source: "browser",
+              agentId: "agent_row_1",
+              langwatch: { targetType: "voice", callerKind: "human" },
+            },
+          },
+          { id: "event-started-1", occurredAt: 1000 },
+        ),
+        // The retry's second started event is first-wins in the fold and, in
+        // production, deduped by the per-run start idempotency key — it cannot
+        // carry the new fields. The refresh event does.
+        createRunStartedEvent(
+          { metadata: { source: "provider" } },
+          { id: "event-started-2", occurredAt: 1500 },
+        ),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: "hello" }],
+        }),
+        createMetadataRefreshedEvent(
+          {
+            metadata: {
+              source: "provider",
+              audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+              langwatch: { isCutAtLimit: false },
+            },
+          },
+          { id: "event-metadata-refreshed", occurredAt: 3000 },
+        ),
+        createRunFinishedEvent({
+          results: {
+            verdict: "success",
+            reasoning: "done",
+            metCriteria: [],
+            unmetCriteria: [],
+          },
+        }),
+      ]);
+
+      // The second attempt's fields win through the refresh (#8032): a
+      // "browser, no recording" first attempt becomes the "provider, with
+      // audio" the retry actually saw, so `findExistingRun` reads it back
+      // correctly on any later retry.
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata.source).toBe("provider");
+      expect(metadata.audioUrl).toBe(
+        "/api/voice/session/conv_1/audio?projectId=p1",
+      );
+      // The run's other top-level metadata is left as it was — only the keys
+      // the refresh carried are touched.
+      expect(metadata.agentId).toBe("agent_row_1");
+      // The reserved namespace is deep-merged, not replaced: the refresh's
+      // isCutAtLimit lands beside the run's targetType / callerKind.
+      expect(metadata.langwatch).toEqual({
+        targetType: "voice",
+        callerKind: "human",
+        isCutAtLimit: false,
+      });
+
+      expect(state.Status).toBe("SUCCESS");
+      expect(state.FinishedAt).toBe(3000);
+      expect(state.Messages).toHaveLength(1);
+      expect(state.Messages[0]?.Role).toBe("user");
+      expect(state.Messages[0]?.Content).toBe("hello");
+    });
+
+    /** @scenario "A metadata refresh does not disturb the run's terminal status" */
+    it("leaves a finished run finished", () => {
+      const state = foldEvents([
+        createRunStartedEvent(
+          { metadata: { source: "browser" } },
+          { id: "event-started-1", occurredAt: 1000 },
+        ),
+        createRunFinishedEvent(
+          {
+            results: {
+              verdict: "success",
+              reasoning: "done",
+              metCriteria: [],
+              unmetCriteria: [],
+            },
+          },
+          { id: "event-finished", occurredAt: 2000 },
+        ),
+        createMetadataRefreshedEvent(
+          { metadata: { source: "provider" } },
+          { id: "event-metadata-refreshed", occurredAt: 3000 },
+        ),
+      ]);
+
+      expect(state.Status).toBe("SUCCESS");
+      expect(state.FinishedAt).toBe(2000);
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata.source).toBe("provider");
+    });
+
+    /** @scenario "A re-drive that lost its recording clears the run's audio link" */
+    it("clears a stale audioUrl when the refresh carries null", () => {
+      const state = foldEvents([
+        // The first attempt had a recording and wrote its proxy url.
+        createRunStartedEvent(
+          {
+            metadata: {
+              source: "provider",
+              audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+              langwatch: { targetType: "voice" },
+            },
+          },
+          { id: "event-started-1", occurredAt: 1000 },
+        ),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: "hello" }],
+        }),
+        // The retry has no recording, so its refresh carries audioUrl: null.
+        createMetadataRefreshedEvent(
+          {
+            metadata: {
+              source: "browser",
+              audioUrl: null,
+              langwatch: { isCutAtLimit: false },
+            },
+          },
+          { id: "event-metadata-refreshed", occurredAt: 3000 },
+        ),
+        createRunFinishedEvent({
+          results: {
+            verdict: "success",
+            reasoning: "done",
+            metCriteria: [],
+            unmetCriteria: [],
+          },
+        }),
+      ]);
+
+      // The stale link is gone: the run must not offer a Play control for a
+      // recording the latest attempt does not have (#8032).
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata.audioUrl).toBeNull();
+      expect(metadata.source).toBe("browser");
+      // The reserved namespace is still deep-merged, not dropped.
+      expect(metadata.langwatch).toEqual({
+        targetType: "voice",
+        isCutAtLimit: false,
+      });
+    });
+
+    /** @scenario "Two re-drives at the same end time each keep their own refresh" */
+    it("keeps the later re-drive's refresh on a refold when both share the call's end time", () => {
+      // Two re-drives of one finished call: same end time, different recording
+      // metadata. Built through the real command so the idempotency key is the
+      // one the event log dedupes on.
+      const CALL_ENDED_AT = 2000;
+      const refreshFrom = ({
+        attemptId,
+        writtenAt,
+        audioUrl,
+      }: {
+        attemptId: string;
+        writtenAt: number;
+        audioUrl: string | null;
+      }) => {
+        vi.setSystemTime(writtenAt);
+        const [event] = new RefreshMetadataCommand().handle({
+          tenantId: TEST_TENANT_ID,
+          aggregateId: "scenario-run-1",
+          data: {
+            tenantId: TEST_TENANT_ID,
+            occurredAt: CALL_ENDED_AT,
+            scenarioRunId: "scenario-run-1",
+            attemptId,
+            metadata: { source: "provider", audioUrl },
+          },
+        } as never);
+        return event as SimulationRunMetadataRefreshedEvent;
+      };
+      // The first re-drive found no recording; its finish then failed, and a
+      // second re-drive found the provider recording.
+      const firstRedrive = refreshFrom({
+        attemptId: "attempt-a",
+        writtenAt: 5000,
+        audioUrl: null,
+      });
+      const secondRedrive = refreshFrom({
+        attemptId: "attempt-b",
+        writtenAt: 6000,
+        audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+      });
+
+      // Replay the event log the way a refold does: dedupe on the
+      // idempotency key, then fold in occurredAt-then-arrival order.
+      const log = [
+        createRunStartedEvent(
+          {
+            metadata: { source: "browser", langwatch: { targetType: "voice" } },
+          },
+          { id: "event-started-1", occurredAt: 1000 },
+        ),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: "hello" }],
+        }),
+        firstRedrive,
+        secondRedrive,
+      ];
+      const replayed = deduplicateEvents(log as SimulationProcessingEvent[]);
+
+      // Both refreshes survive the dedupe: they are different attempts.
+      expect(
+        replayed.filter(
+          (e) => e.type === SIMULATION_RUN_EVENT_TYPES.METADATA_REFRESHED,
+        ),
+      ).toHaveLength(2);
+
+      const state = foldEvents(replayed);
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      // The latest attempt's recording is what the run shows (#8032).
+      expect(metadata.audioUrl).toBe(
+        "/api/voice/session/conv_1/audio?projectId=p1",
+      );
+    });
+
+    it("still dedupes a retry of the same attempt", () => {
+      const handleOnce = () =>
+        new RefreshMetadataCommand().handle({
+          tenantId: TEST_TENANT_ID,
+          aggregateId: "scenario-run-1",
+          data: {
+            tenantId: TEST_TENANT_ID,
+            occurredAt: 2000,
+            scenarioRunId: "scenario-run-1",
+            attemptId: "attempt-a",
+            metadata: { source: "provider" },
+          },
+        } as never)[0]!;
+
+      const [original, retried] = [handleOnce(), handleOnce()];
+
+      expect(retried.idempotencyKey).toBe(original.idempotencyKey);
+      expect(deduplicateEvents([original, retried])).toHaveLength(1);
+    });
+  });
+
+  describe("when an event carries secret parameters on its metadata", () => {
+    // The queued command puts the encrypted values beside the metadata, not
+    // inside it. The started event is the one a caller can shape: the SDK
+    // ingestion route forwards external metadata as it arrives.
+    /** @scenario "A secret value is never written to the simulation runs store" */
+    it("keeps the names and drops the values on a started event", () => {
+      const state = foldEvents([
+        createRunStartedEvent({
+          metadata: {
+            secretParameterNames: ["api_token"],
+            secretParameters: { api_token: "ciphertext-of-tok-live-1" },
+            environment: "staging",
+          },
+        }),
+      ]);
+
+      expect(state.Metadata).not.toContain("ciphertext-of-tok-live-1");
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata).toEqual({
+        secretParameterNames: ["api_token"],
+        environment: "staging",
+      });
+    });
+
+    /** @scenario "A secret value is never written to the simulation runs store" */
+    it("keeps the names and drops the values on a queued event", () => {
+      const state = foldEvents([
+        createRunQueuedEvent({
+          metadata: {
+            parameters: { region: "eu-central" },
+            secretParameterNames: ["api_token"],
+            secretParameters: { api_token: "ciphertext-of-tok-live-1" },
+          },
+        }),
+      ]);
+
+      expect(state.Metadata).not.toContain("ciphertext-of-tok-live-1");
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata).toEqual({
+        parameters: { region: "eu-central" },
+        secretParameterNames: ["api_token"],
+      });
+    });
+
+    /** @scenario "A secret value is never written to the simulation runs store" */
+    it("stores nothing from the encrypted values beside the metadata", () => {
+      const state = foldEvents([
+        createRunQueuedEvent({
+          metadata: { parameters: { region: "eu-central" } },
+          secretParameters: { api_token: "ciphertext-of-tok-live-1" },
+        }),
+      ]);
+
+      expect(state.Metadata).not.toContain("ciphertext-of-tok-live-1");
+      expect(state.Metadata).not.toContain("api_token");
+    });
+  });
+
+  describe("when MessageSnapshot event is applied", () => {
+    it("updates Messages, TraceIds, and UpdatedAt", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createMessageSnapshotEvent({
+          messages: [
+            { role: "user", content: "hello" },
+            { role: "assistant", content: "hi" },
+          ],
+          traceIds: ["trace-1", "trace-2"],
+        }),
+      ]);
+
+      expect(state.Messages).toEqual([
+        { Id: "", Role: "user", Content: "hello", TraceId: "", Rest: "" },
+        { Id: "", Role: "assistant", Content: "hi", TraceId: "", Rest: "" },
+      ]);
+      expect(state.TraceIds).toEqual(["trace-1", "trace-2"]);
+      // UpdatedAt is monotonic: always advances
+      expect(state.UpdatedAt).toBeGreaterThanOrEqual(2000);
+    });
+
+    it("updates Status when provided", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createMessageSnapshotEvent({ status: "IN_PROGRESS" }),
+      ]);
+
+      expect(state.Status).toBe("IN_PROGRESS");
+    });
+
+    it("preserves existing Status when not provided", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createMessageSnapshotEvent({ status: undefined }),
+      ]);
+
+      expect(state.Status).toBe("IN_PROGRESS");
+    });
+
+    it("caps oversized message Content (defence vs SDKs shipping inline media that wasn't externalised)", () => {
+      // 80 KiB string — over the 64 KiB cap. Models the symptom we hit when a
+      // voice SDK ships full base64 audio inline because the stored-objects
+      // pipeline failed to externalise the file part. Without this cap the
+      // bytes land verbatim in ClickHouse Messages.Content and re-leak on
+      // every list query.
+      const oversizedContent = "x".repeat(80 * 1024);
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: oversizedContent }],
+        }),
+      ]);
+
+      expect(state.Messages).toHaveLength(1);
+      const persisted = state.Messages[0]!.Content;
+      // Truncated to a clearly-marked placeholder, not the original payload.
+      expect(persisted.length).toBeLessThan(oversizedContent.length);
+      expect(persisted).toContain("[truncated:");
+      expect(persisted).toContain("inline media");
+    });
+
+    it("caps oversized multi-byte (UTF-8) Content (fast-path doesn't bypass on character count)", () => {
+      // A char-count fast-path (`value.length <= maxBytes`) would WRONGLY bypass this string: 30
+      // KiB of chars = under the 64 KiB length, but each 4-byte UTF-8 emoji (😀) pushes the actual
+      // byte length to ~120 KiB. The safe fast-path uses `value.length * 3 <= maxBytes`, so this
+      // string falls through to the real Buffer.byteLength check and gets truncated.
+      const oversizedMultibyte = "😀".repeat(30 * 1024);
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: oversizedMultibyte }],
+        }),
+      ]);
+
+      const persisted = state.Messages[0]!.Content;
+      expect(persisted.length).toBeLessThan(oversizedMultibyte.length);
+      expect(persisted).toContain("[truncated:");
+    });
+
+    it("preserves normal-sized Content unchanged (no false-positive truncation)", () => {
+      // Below the cap — a long but reasonable assistant reply.
+      const longButReasonable = "a sentence. ".repeat(2000); // ~24 KiB
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createMessageSnapshotEvent({
+          messages: [{ role: "assistant", content: longButReasonable }],
+        }),
+      ]);
+
+      expect(state.Messages[0]!.Content).toBe(longButReasonable);
+    });
+
+    it("caps oversized Rest (covers array-content paths that route audio into Rest)", () => {
+      // Array content gets duplicated into Rest by buildMessageRestJson; cap
+      // there too so a misbehaving SDK can't punt the leak into Rest while
+      // Content stays small.
+      const oversizedPart = "y".repeat(80 * 1024);
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createMessageSnapshotEvent({
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "hi" },
+                // The actual symptom is a file/input_audio part with base64 in
+                // `data`; an oversized text part is the simplest way to model
+                // the byte volume without coupling the test to a wire shape.
+                { type: "text", text: oversizedPart },
+              ],
+            },
+          ],
+        }),
+      ]);
+
+      const rest = state.Messages[0]!.Rest;
+      expect(rest.length).toBeLessThan(oversizedPart.length);
+      expect(rest).toContain("[truncated:");
+    });
+
+    it("ignores snapshots with older timestamps (out-of-order protection)", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createMessageSnapshotEvent(
+          { messages: [{ role: "user", content: "second" }] },
+          { id: "event-2a", occurredAt: 2000, createdAt: 2000 },
+        ),
+        // This older event arrives later but has an earlier timestamp
+        createMessageSnapshotEvent(
+          { messages: [{ role: "user", content: "first" }] },
+          { id: "event-2b", occurredAt: 1500, createdAt: 1500 },
+        ),
+      ]);
+
+      // The newer snapshot's data is preserved
+      expect(state.Messages).toEqual([
+        { Id: "", Role: "user", Content: "second", TraceId: "", Rest: "" },
+      ]);
+      // UpdatedAt stays at the newer snapshot's level (older was ignored)
+      expect(state.UpdatedAt).toBeGreaterThanOrEqual(2000);
+    });
+  });
+
+  describe("when RunFinished event is applied", () => {
+    it("sets SUCCESS status for success verdict", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "success",
+            reasoning: "All criteria met",
+            metCriteria: ["criterion-1"],
+            unmetCriteria: [],
+          },
+          durationMs: 5000,
+        }),
+      ]);
+
+      expect(state.Status).toBe("SUCCESS");
+      expect(state.Verdict).toBe("success");
+      expect(state.Reasoning).toBe("All criteria met");
+      expect(state.MetCriteria).toEqual(["criterion-1"]);
+      expect(state.UnmetCriteria).toEqual([]);
+      expect(state.DurationMs).toBe(5000);
+      expect(state.FinishedAt).toBe(3000);
+    });
+
+    it("derives DurationMs from the run's own timestamps when the event omits it", () => {
+      // Every real run takes this path: the SDK ingest dispatches finishRun
+      // with results and status only, so an underived DurationMs was null for
+      // every run a customer executed and set only for seeded ones.
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+        }),
+      ]);
+
+      expect(state.StartedAt).toBe(1000);
+      expect(state.FinishedAt).toBe(3000);
+      expect(state.DurationMs).toBe(2000);
+    });
+
+    it("prefers a supplied duration over the derived one", () => {
+      // The runner knows its own elapsed time better than two projected
+      // timestamps do.
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+          durationMs: 42,
+        }),
+      ]);
+
+      expect(state.DurationMs).toBe(42);
+    });
+
+    it("leaves DurationMs null when the run never started", () => {
+      const state = foldEvents([
+        createRunFinishedEvent({
+          results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+        }),
+      ]);
+
+      expect(state.DurationMs).toBeNull();
+    });
+
+    it("leaves DurationMs null when the finish event precedes the start", () => {
+      // Events can arrive out of order. Subtracting these two timestamps would
+      // report a negative duration, so the derivation declines instead.
+      const state = foldEvents([
+        createRunStartedEvent({}, { occurredAt: 4000 }),
+        createRunFinishedEvent(
+          {
+            results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+          },
+          { occurredAt: 3000 },
+        ),
+      ]);
+
+      expect(state.DurationMs).toBeNull();
+    });
+
+    /** @scenario "A finished event may name inconclusive criteria" */
+    it("keeps the criteria the judge could not decide apart, and still unmet", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "failure",
+            metCriteria: ["stays polite"],
+            unmetCriteria: ["names the refund window", "opens a ticket"],
+            inconclusiveCriteria: ["opens a ticket"],
+          },
+        }),
+      ]);
+
+      expect(state.UnmetCriteria).toEqual(["names the refund window", "opens a ticket"]);
+      expect(state.InconclusiveCriteria).toEqual(["opens a ticket"]);
+    });
+
+    /** @scenario "A finished event with per-criterion verdicts is folded into the run" */
+    it("keeps each criterion with its status, requirement and reasoning in declared order", () => {
+      const criteria = [
+        {
+          criterion: "stays polite",
+          requirement: "The agent stays polite",
+          status: "passed" as const,
+          reasoning: "Every reply was courteous.",
+        },
+        {
+          criterion: "names the refund window",
+          requirement: "The agent names the refund window",
+          status: "failed" as const,
+          reasoning: "The agent never mentioned a time limit.",
+        },
+      ];
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "failure",
+            metCriteria: ["stays polite"],
+            unmetCriteria: ["names the refund window"],
+            criteria,
+          },
+        }),
+      ]);
+
+      expect(state.Criteria).toEqual(criteria);
+    });
+
+    /** @scenario "Inconclusive criteria are taken from the per-criterion verdicts when the list is absent" */
+    it("lists a criterion its verdicts mark inconclusive when the event names no list", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "failure",
+            metCriteria: [],
+            unmetCriteria: ["opens a ticket"],
+            criteria: [
+              {
+                criterion: "opens a ticket",
+                status: "inconclusive",
+                reasoning: "No tool spans arrived.",
+              },
+            ],
+          },
+        }),
+      ]);
+
+      expect(state.InconclusiveCriteria).toEqual(["opens a ticket"]);
+    });
+
+    /** @scenario "Met and unmet criteria are taken from the per-criterion verdicts when the lists are absent" */
+    it("derives the met, unmet and inconclusive lists from an event that sends only its verdicts", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "failure",
+            metCriteria: [],
+            unmetCriteria: [],
+            criteria: [
+              { criterion: "stays polite", status: "passed", reasoning: "Courteous." },
+              { criterion: "opens a ticket", status: "inconclusive", reasoning: "No spans." },
+              { criterion: "names the refund window", status: "failed", reasoning: "Never said." },
+            ],
+          },
+        }),
+      ]);
+
+      expect(state.MetCriteria).toEqual(["stays polite"]);
+      expect(state.UnmetCriteria).toEqual(["opens a ticket", "names the refund window"]);
+      expect(state.InconclusiveCriteria).toEqual(["opens a ticket"]);
+    });
+
+    it("stores no inconclusive criteria when the event names none", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "success",
+            metCriteria: ["a"],
+            unmetCriteria: [],
+          },
+        }),
+      ]);
+
+      expect(state.InconclusiveCriteria).toEqual([]);
+    });
+
+    it("sets FAILURE status for failure verdict", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "failure",
+            reasoning: "Criteria not met",
+            metCriteria: [],
+            unmetCriteria: ["criterion-1"],
+            error: "Something went wrong",
+          },
+        }),
+      ]);
+
+      expect(state.Status).toBe("FAILURE");
+      expect(state.Verdict).toBe("failure");
+      expect(state.Error).toBe("Something went wrong");
+    });
+
+    it("sets FAILURE status for inconclusive verdict", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "inconclusive",
+            reasoning: "Could not determine",
+            metCriteria: [],
+            unmetCriteria: [],
+          },
+        }),
+      ]);
+
+      expect(state.Status).toBe("FAILURE");
+      expect(state.Verdict).toBe("inconclusive");
+    });
+
+    it("uses explicit status when provided", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          status: "ERROR",
+        }),
+      ]);
+
+      expect(state.Status).toBe("ERROR");
+    });
+
+    it("defaults to FAILURE when no verdict and no explicit status", () => {
+      const state = foldEvents([createRunStartedEvent(), createRunFinishedEvent({})]);
+
+      expect(state.Status).toBe("FAILURE");
+    });
+  });
+
+  describe("when RunDeleted event is applied", () => {
+    it("sets ArchivedAt timestamp", () => {
+      const state = foldEvents([createRunStartedEvent(), createRunDeletedEvent()]);
+
+      expect(state.ArchivedAt).toBe(4000); // RunDeleted occurredAt
+      expect(state.UpdatedAt).toBeGreaterThanOrEqual(4000);
+    });
+  });
+
+  describe("when CancelRequested event is applied to an in-progress run", () => {
+    /** @scenario "Fold projection sets CancellationRequestedAt without changing Status" */
+    it("sets CancellationRequestedAt without changing Status", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createCancelRequestedEvent({}, { occurredAt: 5500 }),
+      ]);
+
+      expect(state.CancellationRequestedAt).toBe(5500);
+      expect(state.Status).toBe("IN_PROGRESS");
+    });
+  });
+
+  describe("when CancelRequested event is applied a second time", () => {
+    /** @scenario "Cancel request is idempotent" */
+    it("preserves the original CancellationRequestedAt", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createCancelRequestedEvent({}, { id: "event-cancel-first", occurredAt: 5500 }),
+        createCancelRequestedEvent({}, { id: "event-cancel-second", occurredAt: 7000 }),
+      ]);
+
+      expect(state.CancellationRequestedAt).toBe(5500);
+    });
+  });
+
+  describe("when TextMessageStart event is applied", () => {
+    it("creates a placeholder message row", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent({ messageId: "msg-1", role: "user" }),
+      ]);
+
+      expect(state.Messages).toEqual([
+        { Id: "msg-1", Role: "user", Content: "", TraceId: "", Rest: "" },
+      ]);
+      expect(state.UpdatedAt).toBeGreaterThanOrEqual(1500);
+    });
+
+    it("transitions PENDING to IN_PROGRESS", () => {
+      const state = foldEvents([createTextMessageStartEvent({ messageId: "msg-1", role: "user" })]);
+
+      expect(state.Status).toBe("IN_PROGRESS");
+      expect(state.StartedAt).toBe(1500);
+    });
+
+    it("deduplicates by messageId", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent({ messageId: "msg-1", role: "user" }),
+        createTextMessageStartEvent({ messageId: "msg-1", role: "user" }, { id: "event-tms-dup" }),
+      ]);
+
+      expect(state.Messages).toHaveLength(1);
+    });
+
+    it("accumulates multiple messages in order", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent(
+          { messageId: "msg-1", role: "user" },
+          { id: "event-tms-1", occurredAt: 1500 },
+        ),
+        createTextMessageStartEvent(
+          { messageId: "msg-2", role: "assistant" },
+          { id: "event-tms-2", occurredAt: 1600 },
+        ),
+      ]);
+
+      expect(state.Messages).toHaveLength(2);
+      expect(state.Messages[0]!.Id).toBe("msg-1");
+      expect(state.Messages[1]!.Id).toBe("msg-2");
+    });
+  });
+
+  describe("when TextMessageEnd event is applied", () => {
+    it("completes a placeholder from START", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent({ messageId: "msg-1", role: "user" }),
+        createTextMessageEndEvent({
+          messageId: "msg-1",
+          role: "user",
+          content: "hello world",
+          traceId: "trace-abc",
+        }),
+      ]);
+
+      expect(state.Messages).toEqual([
+        {
+          Id: "msg-1",
+          Role: "user",
+          Content: "hello world",
+          TraceId: "trace-abc",
+          Rest: "",
+        },
+      ]);
+      expect(state.TraceIds).toEqual(["trace-abc"]);
+    });
+
+    it("handles missing START (out-of-order) by appending directly", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageEndEvent({
+          messageId: "msg-1",
+          role: "user",
+          content: "hello",
+        }),
+      ]);
+
+      expect(state.Messages).toHaveLength(1);
+      expect(state.Messages[0]!.Content).toBe("hello");
+    });
+
+    it("accumulates traceId without duplicates", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageEndEvent(
+          {
+            messageId: "msg-1",
+            role: "user",
+            content: "hello",
+            traceId: "trace-1",
+          },
+          { id: "event-tme-1", occurredAt: 1500 },
+        ),
+        createTextMessageEndEvent(
+          {
+            messageId: "msg-2",
+            role: "assistant",
+            content: "hi",
+            traceId: "trace-1",
+          },
+          { id: "event-tme-2", occurredAt: 1600 },
+        ),
+      ]);
+
+      // trace-1 should not be duplicated
+      expect(state.TraceIds).toEqual(["trace-1"]);
+    });
+
+    it("replaces message content when same messageId arrives twice", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent({ messageId: "msg-1", role: "assistant" }),
+        createTextMessageEndEvent(
+          { messageId: "msg-1", role: "assistant", content: "first" },
+          { id: "event-tme-1", occurredAt: 2000 },
+        ),
+        createTextMessageEndEvent(
+          { messageId: "msg-1", role: "assistant", content: "second" },
+          { id: "event-tme-2", occurredAt: 2500 },
+        ),
+      ]);
+
+      expect(state.Messages).toHaveLength(1);
+      expect(state.Messages[0]!.Content).toBe("second");
+    });
+
+    it("builds Rest from extra message fields", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageEndEvent({
+          messageId: "msg-1",
+          role: "assistant",
+          content: "hi",
+          message: {
+            id: "msg-1",
+            role: "assistant",
+            content: "hi",
+            toolCalls: [{ id: "tc1" }],
+          },
+        }),
+      ]);
+
+      expect(state.Messages[0]!.Rest).toContain("toolCalls");
+    });
+
+    it("caps oversized Content on TextMessageEnd (same defence as snapshot path)", () => {
+      const oversized = "z".repeat(80 * 1024);
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageEndEvent({
+          messageId: "msg-leak",
+          role: "assistant",
+          content: oversized,
+        }),
+      ]);
+
+      const persisted = state.Messages[0]!.Content;
+      expect(persisted.length).toBeLessThan(oversized.length);
+      expect(persisted).toContain("[truncated:");
+    });
+  });
+
+  describe("when START→END lifecycle", () => {
+    it("tracks a full message lifecycle", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent(
+          { messageId: "msg-1", role: "user" },
+          { id: "e1", occurredAt: 1500 },
+        ),
+        createTextMessageEndEvent(
+          { messageId: "msg-1", role: "user", content: "hello", traceId: "t1" },
+          { id: "e2", occurredAt: 2000 },
+        ),
+        createTextMessageStartEvent(
+          { messageId: "msg-2", role: "assistant" },
+          { id: "e3", occurredAt: 2100 },
+        ),
+        createTextMessageEndEvent(
+          {
+            messageId: "msg-2",
+            role: "assistant",
+            content: "hi back",
+            traceId: "t2",
+          },
+          { id: "e4", occurredAt: 2500 },
+        ),
+      ]);
+
+      expect(state.Messages).toHaveLength(2);
+      expect(state.Messages[0]).toEqual({
+        Id: "msg-1",
+        Role: "user",
+        Content: "hello",
+        TraceId: "t1",
+        Rest: "",
+      });
+      expect(state.Messages[1]).toEqual({
+        Id: "msg-2",
+        Role: "assistant",
+        Content: "hi back",
+        TraceId: "t2",
+        Rest: "",
+      });
+      expect(state.TraceIds).toEqual(["t1", "t2"]);
+    });
+  });
+
+  describe("when snapshot arrives after START/END", () => {
+    it("snapshot overwrites all messages (snapshot wins)", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent(
+          { messageId: "msg-1", role: "user" },
+          { id: "e1", occurredAt: 1500 },
+        ),
+        createTextMessageEndEvent(
+          { messageId: "msg-1", role: "user", content: "hello" },
+          { id: "e2", occurredAt: 2000 },
+        ),
+        createMessageSnapshotEvent(
+          {
+            messages: [
+              { role: "user", content: "snapshot-msg" },
+              { role: "assistant", content: "snapshot-reply" },
+            ],
+            traceIds: ["snap-trace"],
+          },
+          { id: "e3", occurredAt: 3000, createdAt: 3000 },
+        ),
+      ]);
+
+      // Snapshot replaces everything
+      expect(state.Messages).toEqual([
+        {
+          Id: "",
+          Role: "user",
+          Content: "snapshot-msg",
+          TraceId: "",
+          Rest: "",
+        },
+        {
+          Id: "",
+          Role: "assistant",
+          Content: "snapshot-reply",
+          TraceId: "",
+          Rest: "",
+        },
+      ]);
+      expect(state.TraceIds).toEqual(["snap-trace"]);
+    });
+  });
+
+  describe("when full lifecycle events are applied", () => {
+    it("tracks complete simulation run lifecycle", () => {
+      const state = foldEvents([
+        createRunStartedEvent({ name: "Full Test" }),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: "hello" }],
+          traceIds: ["trace-1"],
+        }),
+        createRunFinishedEvent({
+          results: {
+            verdict: "success",
+            reasoning: "Passed",
+            metCriteria: ["criterion-1"],
+            unmetCriteria: [],
+          },
+          durationMs: 3000,
+        }),
+      ]);
+
+      expect(state.ScenarioRunId).toBe("scenario-run-1");
+      expect(state.Name).toBe("Full Test");
+      expect(state.Status).toBe("SUCCESS");
+      expect(state.Verdict).toBe("success");
+      expect(state.DurationMs).toBe(3000);
+      expect(state.Messages).toHaveLength(1);
+      expect(state.TraceIds).toEqual(["trace-1"]);
+      expect(state.FinishedAt).toBe(3000);
+    });
+  });
+
+  describe("when SimulationRunCancelRequested event is applied", () => {
+    function cancelRequestedEvent(occurredAt = 5000): SimulationProcessingEvent {
+      return {
+        id: "event-cancel",
+        aggregateId: "scenario-run-1",
+        aggregateType: "simulation_run",
+        tenantId: TEST_TENANT_ID,
+        createdAt: occurredAt,
+        occurredAt,
+        type: SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED,
+        version: SIMULATION_EVENT_VERSIONS.CANCEL_REQUESTED,
+        data: { scenarioRunId: "scenario-run-1" },
+      } as SimulationProcessingEvent;
+    }
+
+    /** @scenario Fold projection sets CancellationRequestedAt without changing Status */
+    it("sets CancellationRequestedAt to event occurredAt while preserving Status", () => {
+      const initial = foldProjection.init();
+      const inProgress = foldProjection.apply(
+        initial,
+        createRunStartedEvent({}, { occurredAt: 1000 }),
+      );
+      expect(inProgress.Status).toBe("IN_PROGRESS");
+      expect(inProgress.CancellationRequestedAt).toBeNull();
+
+      const after = foldProjection.apply(inProgress, cancelRequestedEvent(5000));
+
+      expect(after.CancellationRequestedAt).toBe(5000);
+      expect(after.Status).toBe("IN_PROGRESS");
+    });
+
+    /** @scenario Cancel request is idempotent */
+    it("preserves the original CancellationRequestedAt when applied a second time", () => {
+      const initial = foldProjection.init();
+      const inProgress = foldProjection.apply(
+        initial,
+        createRunStartedEvent({}, { occurredAt: 1000 }),
+      );
+      const afterFirst = foldProjection.apply(inProgress, cancelRequestedEvent(5000));
+      expect(afterFirst.CancellationRequestedAt).toBe(5000);
+
+      const afterSecond = foldProjection.apply(afterFirst, cancelRequestedEvent(8000));
+
+      expect(afterSecond.CancellationRequestedAt).toBe(5000);
+      expect(afterSecond.Status).toBe("IN_PROGRESS");
+    });
+  });
+});
+
+describe("simulationRunStateFoldProjection finalized-status guard", () => {
+  // Orphaned-run reconciliation writes a terminal `finished` event for a run whose worker died.
+  describe("given a run that already finished", () => {
+    describe("when a later started event arrives", () => {
+      it("keeps the terminal status instead of resurrecting IN_PROGRESS", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createRunStartedEvent({}, { occurredAt: 5000 }),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    describe("when a later message snapshot carrying a status arrives", () => {
+      it("keeps the terminal status", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createMessageSnapshotEvent({ status: "IN_PROGRESS" }, { occurredAt: 5000 }),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    // Note: this pins the OUTCOME, not the guard. At this call site the status
+    // candidate is `state.Status === "PENDING" ? "IN_PROGRESS" : state.Status`,
+    // which already preserves a terminal status on its own -- so removing
+    // statusAfter here would not turn this test red. The guard stays as defence
+    // in depth against that candidate expression changing.
+    describe("when a later text_message_start arrives", () => {
+      it("keeps the terminal status", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createTextMessageStartEvent({}, { occurredAt: 5000 }),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    // The fourth non-terminal Status writer. A `queued` event is in the fold
+    // set, so one arriving after `finished` resurrected Status=QUEUED while
+    // FinishedAt stayed set -- an unrecoverable run: the orphan reconciler skips
+    // it (FinishedAt IS NULL) and no read-time derivation remains to mask it.
+    describe("when a later queued event arrives", () => {
+      it("keeps the terminal status instead of resurrecting QUEUED", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createRunQueuedEvent({}, { occurredAt: 5000 }),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    // A late child that outlived the parent this run's reconciliation already
+    // failed must not rewrite the terminal record the downstream subscribers have
+    // already acted on -- nor split it into an ERROR status carrying the late
+    // child's SUCCESS verdict.
+    describe("when a second finished event arrives", () => {
+      it("keeps the first terminal record and ignores the late one", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createRunFinishedEvent(
+            {
+              status: "SUCCESS",
+              results: {
+                verdict: "success",
+                reasoning: "late child finished for real",
+                metCriteria: [],
+                unmetCriteria: [],
+              },
+            },
+            { occurredAt: 5000, id: "event-late-finish" },
+          ),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.Verdict).toBeNull();
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+  });
+
+  // The scenario-events ingest route types the finished status as the full
+  // ScenarioRunStatus enum, non-terminal members included. Writing one straight
+  // through would set a non-terminal Status alongside FinishedAt -- a run the
+  // orphan reconciler skips (FinishedAt IS NULL) and no read-time derivation
+  // remains to mask. Nothing could ever recover it.
+  describe("given a finished event carrying a non-terminal status", () => {
+    describe("when it is folded", () => {
+      it("refuses the non-terminal status and finishes the run terminally", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+          createRunFinishedEvent({ status: "IN_PROGRESS" }, { occurredAt: 3000 }),
+        ]);
+
+        expect(state.Status).not.toBe("IN_PROGRESS");
+        expect(state.Status).toBe("FAILURE");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    describe("when it carries a success verdict", () => {
+      it("derives the terminal status from the verdict", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+          createRunFinishedEvent(
+            {
+              status: "QUEUED",
+              results: {
+                verdict: "success",
+                reasoning: "ok",
+                metCriteria: [],
+                unmetCriteria: [],
+              },
+            },
+            { occurredAt: 3000 },
+          ),
+        ]);
+
+        expect(state.Status).toBe("SUCCESS");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    // Every non-terminal member of ScenarioRunStatus, not just the two that
+    // happened to be interesting -- the ingest field is an unconstrained string
+    // on the internal event schema, so the whole enum can arrive here.
+    describe.each(["PENDING", "QUEUED", "IN_PROGRESS", "RUNNING"])(
+      "when the non-terminal status is %s",
+      (nonTerminal) => {
+        it("never leaves the run non-terminal once FinishedAt is set", () => {
+          const state = foldEvents([
+            createRunStartedEvent({}, { occurredAt: 1000 }),
+            createRunFinishedEvent({ status: nonTerminal }, { occurredAt: 3000 }),
+          ]);
+
+          expect(state.FinishedAt).toBe(3000);
+          expect(state.Status).not.toBe(nonTerminal);
+          expect(["SUCCESS", "FAILURE", "FAILED", "ERROR", "CANCELLED"]).toContain(state.Status);
+        });
+      },
+    );
+  });
+
+  describe("given a run that has not finished", () => {
+    describe("when a started event arrives", () => {
+      it("still transitions to IN_PROGRESS (guard does not affect the live path)", () => {
+        const state = foldEvents([createRunStartedEvent({}, { occurredAt: 1000 })]);
+
+        expect(state.Status).toBe("IN_PROGRESS");
+        expect(state.FinishedAt).toBeNull();
+      });
+    });
+  });
+});
+
+describe("simulationRunStateFoldProjection metrics_computed handling", () => {
+  describe("given a run with no metrics yet", () => {
+    /** @scenario "Simulation fold stores per-trace metrics and recomputes aggregates" */
+    it("stores a per-trace entry and recomputes aggregates as more traces arrive", () => {
+      const afterFirst = foldEvents([
+        createMetricsComputedEvent({
+          traceId: "trace-1",
+          totalCost: 0.003,
+          roleCosts: { Agent: 0.003 },
+        }),
+      ]);
+
+      expect(afterFirst.TraceMetrics["trace-1"]).toBeDefined();
+      expect(afterFirst.TotalCost).toBe(0.003);
+      expect(afterFirst.RoleCosts["Agent"]).toEqual([0.003]);
+
+      const afterSecond = foldEvents([
+        createMetricsComputedEvent({
+          traceId: "trace-1",
+          totalCost: 0.003,
+          roleCosts: { Agent: 0.003 },
+        }),
+        createMetricsComputedEvent({
+          traceId: "trace-2",
+          totalCost: 0.002,
+          roleCosts: { Judge: 0.002 },
+        }),
+      ]);
+
+      expect(afterSecond.TotalCost).toBe(0.005);
+      expect(afterSecond.RoleCosts["Agent"]).toEqual([0.003]);
+      expect(afterSecond.RoleCosts["Judge"]).toEqual([0.002]);
+    });
+  });
+
+  describe("given a run whose trace already has metrics stored", () => {
+    /** @scenario "Reprocessing a trace replaces its entry (idempotent)" */
+    it("replaces the trace's entry instead of accumulating a second contribution", () => {
+      const state = foldEvents([
+        createMetricsComputedEvent({ traceId: "trace-1", totalCost: 0.003 }),
+        createMetricsComputedEvent({ traceId: "trace-1", totalCost: 0.004 }),
+      ]);
+
+      expect(state.TraceMetrics["trace-1"]?.totalCost).toBe(0.004);
+      expect(state.TotalCost).toBe(0.004);
+    });
+  });
+
+  describe("given metrics arriving in either order relative to which trace finishes first", () => {
+    /** @scenario "Metrics computed regardless of arrival order — trace first" */
+    it("accepts a metrics_computed event that arrives before the run finishes", () => {
+      const state = foldEvents([
+        createMetricsComputedEvent(
+          { traceId: "trace-abc", totalCost: 0.003 },
+          { occurredAt: 1000 },
+        ),
+        createRunFinishedEvent({}, { occurredAt: 2000 }),
+      ]);
+
+      expect(state.TraceMetrics["trace-abc"]?.totalCost).toBe(0.003);
+      expect(state.TotalCost).toBe(0.003);
+      expect(state.FinishedAt).toBe(2000);
+    });
+
+    /** @scenario "Metrics computed regardless of arrival order — simulation first" */
+    it("accepts a metrics_computed event that arrives after the run finishes", () => {
+      const state = foldEvents([
+        createRunFinishedEvent({}, { occurredAt: 1000 }),
+        createMetricsComputedEvent(
+          { traceId: "trace-abc", totalCost: 0.003 },
+          { occurredAt: 2000 },
+        ),
+      ]);
+
+      expect(state.TraceMetrics["trace-abc"]?.totalCost).toBe(0.003);
+      expect(state.TotalCost).toBe(0.003);
+      expect(state.FinishedAt).toBe(1000);
+    });
+  });
+
+  describe("given a run with two trace ids arriving one at a time", () => {
+    /** @scenario "Metrics aggregate across multiple trace IDs as they arrive" */
+    it("computes partial metrics from the first trace, then complete metrics once the second arrives", () => {
+      const partial = foldEvents([
+        createMetricsComputedEvent({
+          traceId: "trace-1",
+          totalCost: 0.003,
+          roleCosts: { Agent: 0.003 },
+          roleLatencies: { Agent: 1200 },
+        }),
+      ]);
+
+      expect(partial.TotalCost).toBe(0.003);
+      expect(Object.keys(partial.TraceMetrics)).toEqual(["trace-1"]);
+
+      const complete = foldEvents([
+        createMetricsComputedEvent({
+          traceId: "trace-1",
+          totalCost: 0.003,
+          roleCosts: { Agent: 0.003 },
+          roleLatencies: { Agent: 1200 },
+        }),
+        createMetricsComputedEvent({
+          traceId: "trace-2",
+          totalCost: 0.002,
+          roleCosts: { Agent: 0.002 },
+          roleLatencies: { Agent: 800 },
+        }),
+      ]);
+
+      expect(Object.keys(complete.TraceMetrics).toSorted()).toEqual(["trace-1", "trace-2"]);
+      expect(complete.TotalCost).toBe(0.005);
+    });
+  });
+});

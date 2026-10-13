@@ -1,35 +1,29 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
+
+import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
-import {
-  printResult,
-  resolveOutputOptions,
-  type RawOutputFlags,
-} from "../../utils/output";
-import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
 import { parseInstantOrNull } from "../../utils/instant";
+import { printResult, resolveOutputOptions, type RawOutputFlags } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { parseOriginOption } from "./origin-filter";
 
 /** Traces are walked in chunks so the progress bar moves rather than jumping 0 → 1. */
 const PROGRESS_CHUNK = 5;
 
 /**
- * The text query is matched as a phrase, so a Lucene-style query returns zero
- * rows rather than an error, and zero rows reads like "you have none of those".
- * Measured against a project with 638 traces: "validation failed" matched 40,
- * "validation AND failed" matched 0. Named here so an empty result says which
- * of the two it is.
+ * The text query is matched as a phrase, so a Lucene-style query returns
+ * zero rows rather than an error -- reading like "you have none of those".
+ * Named here so an empty result says which of the two it is.
  */
 const BOOLEAN_OPERATORS = /(^|\s)(AND|OR|NOT)(\s|$)/;
 
 /**
- * A query carrying an email address. Email addresses are redacted before a
- * trace is stored whenever the project's data privacy settings redact PII,
- * which they do by default, so the text never holds one and the search finds
- * nothing however many traces mention it. Named so an empty result says so.
+ * A query carrying an email address. PII redaction (on by default) strips
+ * them before a trace is stored, so such a search always finds nothing.
  */
 const EMAIL_ADDRESS = /[^\s@<>"']+@[^\s@<>"']+\.[A-Za-z]{2,}/;
 
@@ -39,10 +33,12 @@ const EMAIL_HINT =
 /** What an empty result should say about the query, or nothing. */
 export function emptySearchHint({
   query,
+  found,
 }: {
   query: string | undefined;
+  found: number;
 }): string | undefined {
-  if (!query) return undefined;
+  if (found > 0 || !query) return undefined;
   if (BOOLEAN_OPERATORS.test(query)) {
     return "The query is matched as plain text, so AND, OR and NOT are searched for as words. Try one phrase.";
   }
@@ -58,22 +54,22 @@ export function emptySearchHint({
 const parseInstantFlag = (value: string, flag: string): number => {
   const parsed = parseInstantOrNull(value);
   if (parsed !== null) return parsed;
-  console.error(
-    `Invalid ${flag}: pass an ISO-8601 instant or epoch milliseconds.`,
-  );
+  console.error(`Invalid ${flag}: pass an ISO-8601 instant or epoch milliseconds.`);
   process.exit(1);
 };
 
-export const searchTracesCommand = async (options: {
-  query?: string;
-  filter?: string;
-  startDate?: string;
-  endDate?: string;
-  limit?: string;
-  origin?: string;
-  errorsOnly?: boolean;
-  project?: string;
-} & RawOutputFlags): Promise<void> => {
+export const searchTracesCommand = async (
+  options: {
+    query?: string;
+    filter?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: string;
+    origin?: string;
+    errorsOnly?: boolean;
+    project?: string;
+  } & RawOutputFlags,
+): Promise<void> => {
   await resolveCredentials({ project: options.project });
 
   const service = new TracesApiService();
@@ -91,9 +87,7 @@ export const searchTracesCommand = async (options: {
     const startDate = options.startDate
       ? parseInstantFlag(options.startDate, "--start-date")
       : oneDayAgo;
-    const endDate = options.endDate
-      ? parseInstantFlag(options.endDate, "--end-date")
-      : now;
+    const endDate = options.endDate ? parseInstantFlag(options.endDate, "--end-date") : now;
     const pageSize = options.limit ? parseInt(options.limit, 10) : 25;
     const originFilter = parseOriginOption(options.origin);
     // "Show me my failed traces" has no text to search for: the error lives on
@@ -149,40 +143,25 @@ export const searchTracesCommand = async (options: {
     await events.flush();
   }
 
-  const traces = result.traces as Array<Record<string, unknown>>;
+  const traces = result.traces as Record<string, unknown>[];
   const matched = result.pagination.totalHits;
 
-  // Rendering stays OUTSIDE the search try: a printResult rejection (invalid
-  // --jq) is a rendering failure, not a search failure.
-  //
-  // The machine branch comes FIRST: a machine caller must get the document
-  // even when it holds zero traces — an empty `{ traces: [], pagination }`
-  // is a parseable answer, prose on stdout is a corrupted one.
+  // Rendering stays OUTSIDE the search try: a printResult rejection is a
+  // rendering failure, not a search failure.
+
+  // The machine branch comes FIRST: an empty `{ traces: [], pagination }` is
+  // a parseable answer; prose on stdout is a corrupted one.
   if (resolveOutputOptions(options).format !== "table") {
     reportProgress({ events, total: traces.length, matched });
   }
   // The hint rides on the document too, so a machine caller reading zero
   // traces is told the cause the same way a person is.
-  const hint =
-    traces.length === 0 ? emptySearchHint({ query: options.query }) : undefined;
-  await printResult(hint ? { ...result, hint } : result, {
+  const hint = emptySearchHint({ query: options.query, found: traces.length });
+  await printResult(withHint({ document: result, hint }), {
     ...options,
     table: () => {
       if (traces.length === 0) {
-        console.log();
-        console.log(chalk.gray("No traces found matching your criteria."));
-        if (hint) console.log(chalk.gray(hint));
-        if (options.filter) {
-          // A filter that parses and matches nothing is almost always a value
-          // spelled the way a person would spell it rather than the way the
-          // project records it, which is the one question facets answers.
-          console.log(
-            chalk.gray(
-              `The filter parsed, so a value may be spelled differently here. Check with ${chalk.cyan("langwatch trace facets <field>")}.`,
-            ),
-          );
-        }
-        console.log(chalk.gray("Try widening your date range or search query."));
+        printEmptySearch({ hint, filter: options.filter });
       } else {
         printTable({ events, traces, matched });
       }
@@ -198,15 +177,9 @@ export const searchTracesCommand = async (options: {
 };
 
 /**
- * Walk the returned traces in chunks, reporting how far along we are.
- *
- * WHAT THIS FRACTION HONESTLY MEANS: the command issues ONE request — search
- * renders a single page (the API does return a scrollId cursor, and `trace
- * export` is the command that walks it) — so this is progress over the traces
- * already in hand, not over a multi-page fetch. The rows really are being
- * processed, so the bar is not a lie; but it is not the long-running bar that
- * paging would give. Making the fetch page would change what a *disabled* CLI
- * does, and that is not a trade this feature is allowed to make.
+ * Walks the returned traces in chunks, reporting progress -- over traces
+ * already in hand from one request (search renders a single page; `trace
+ * export` walks the scrollId cursor), not a multi-page fetch.
  */
 const reportProgress = ({
   events,
@@ -237,7 +210,7 @@ const printTable = ({
   matched,
 }: {
   events: CommandEvents;
-  traces: Array<Record<string, unknown>>;
+  traces: Record<string, unknown>[];
   matched: number;
 }): void => {
   console.log();
@@ -264,15 +237,11 @@ const printTable = ({
   console.log();
   if (matched > traces.length) {
     console.log(
-      chalk.gray(
-        `Showing ${traces.length} of ${matched} total. Use --limit to see more.`,
-      ),
+      chalk.gray(`Showing ${traces.length} of ${matched} total. Use --limit to see more.`),
     );
   }
   console.log(
-    chalk.gray(
-      `Use ${chalk.cyan("langwatch trace get <traceId>")} to view full details`,
-    ),
+    chalk.gray(`Use ${chalk.cyan("langwatch trace get <traceId>")} to view full details`),
   );
 };
 
@@ -281,7 +250,10 @@ function toRow(trace: Record<string, unknown>): Record<string, string> {
   const rawInput = trace.input ?? trace.ComputedInput ?? "—";
   const rawOutput = trace.output ?? trace.ComputedOutput ?? "—";
   const input = truncate(typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput), 60);
-  const output = truncate(typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput), 40);
+  const output = truncate(
+    typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput),
+    40,
+  );
   const timestamps = trace.timestamps as Record<string, unknown> | undefined;
   const startedAt = timestamps?.started_at ?? trace.StartedAt ?? trace.startedAt;
   const timeStr = startedAt ? formatRelativeTime(new Date(startedAt as number).toISOString()) : "—";
@@ -298,4 +270,37 @@ function truncate(str: string, maxLen: number): string {
   const cleaned = str.replace(/\n/g, " ").trim();
   if (cleaned.length <= maxLen) return cleaned;
   return cleaned.substring(0, maxLen - 1) + "…";
+}
+
+function withHint<T extends object>({
+  document,
+  hint,
+}: {
+  document: T;
+  hint: string | undefined;
+}): T | (T & { hint: string }) {
+  return hint ? { ...document, hint } : document;
+}
+
+function printEmptySearch({
+  hint,
+  filter,
+}: {
+  hint: string | undefined;
+  filter: string | undefined;
+}): void {
+  console.log();
+  console.log(chalk.gray("No traces found matching your criteria."));
+  if (hint) console.log(chalk.gray(hint));
+  if (filter) {
+    // A filter that parses and matches nothing is almost always a value
+    // spelled the way a person would spell it rather than the way the
+    // project records it, which is the one question facets answers.
+    console.log(
+      chalk.gray(
+        `The filter parsed, so a value may be spelled differently here. Check with ${chalk.cyan("langwatch trace facets <field>")}.`,
+      ),
+    );
+  }
+  console.log(chalk.gray("Try widening your date range or search query."));
 }

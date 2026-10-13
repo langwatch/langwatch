@@ -33,12 +33,12 @@ Feature: Telemetry — every span carries the correct origin
 
     Examples:
       | call_site                                                        | origin           |
-      | platform/app/src/server/workflows/runWorkflow.ts                 | workflow         |
-      | platform/app/src/server/routes/playground.ts                     | playground       |
-      | platform/app/src/server/scenarios/.../workflow-agent.adapter.ts  | scenario         |
-      | platform/app/src/server/scenarios/.../code-agent.adapter.ts      | scenario         |
-      | platform/app/src/server/app-layer/topic-clustering/clustering.ts | topic_clustering |
-      | platform/app/src/server/evaluations/runEvaluation.ts             | evaluation       |
+      | modules/workflow/process/src/services/workflow-studio-dispatch.service.ts | workflow |
+      | modules/model-provider/process/src/transport/api-rest/playground.api.ts   | playground |
+      | modules/scenario/process/src/adapters/serialized-workflow-agent.adapter.ts | scenario |
+      | modules/scenario/process/src/adapters/serialized-code-agent.adapter.ts     | scenario |
+      | modules/topic/process/src/intents/topic-clustering-runner.intent.ts | topic_clustering |
+      | modules/evaluation/process/src/                                           | evaluation |
 
   @integration @v1 @unimplemented
   Scenario: missing X-LangWatch-Origin header defaults to "unknown" and emits a warning log

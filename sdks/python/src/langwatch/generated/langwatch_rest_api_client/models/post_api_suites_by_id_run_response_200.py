@@ -4,7 +4,8 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
+
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.post_api_suites_by_id_run_response_200_items_item import PostApiSuitesByIdRunResponse200ItemsItem
@@ -26,6 +27,9 @@ class PostApiSuitesByIdRunResponse200:
         job_count (float):
         skipped_archived (PostApiSuitesByIdRunResponse200SkippedArchived):
         items (list[PostApiSuitesByIdRunResponse200ItemsItem]):
+        plan_slug (str):
+        plan_name (str | Unset):
+        created (bool | Unset):
     """
 
     scheduled: bool
@@ -34,7 +38,9 @@ class PostApiSuitesByIdRunResponse200:
     job_count: float
     skipped_archived: PostApiSuitesByIdRunResponse200SkippedArchived
     items: list[PostApiSuitesByIdRunResponse200ItemsItem]
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    plan_slug: str
+    plan_name: str | Unset = UNSET
+    created: bool | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         scheduled = self.scheduled
@@ -52,8 +58,14 @@ class PostApiSuitesByIdRunResponse200:
             items_item = items_item_data.to_dict()
             items.append(items_item)
 
+        plan_slug = self.plan_slug
+
+        plan_name = self.plan_name
+
+        created = self.created
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "scheduled": scheduled,
@@ -62,8 +74,13 @@ class PostApiSuitesByIdRunResponse200:
                 "jobCount": job_count,
                 "skippedArchived": skipped_archived,
                 "items": items,
+                "planSlug": plan_slug,
             }
         )
+        if plan_name is not UNSET:
+            field_dict["planName"] = plan_name
+        if created is not UNSET:
+            field_dict["created"] = created
 
         return field_dict
 
@@ -92,6 +109,12 @@ class PostApiSuitesByIdRunResponse200:
 
             items.append(items_item)
 
+        plan_slug = d.pop("planSlug")
+
+        plan_name = d.pop("planName", UNSET)
+
+        created = d.pop("created", UNSET)
+
         post_api_suites_by_id_run_response_200 = cls(
             scheduled=scheduled,
             batch_run_id=batch_run_id,
@@ -99,23 +122,9 @@ class PostApiSuitesByIdRunResponse200:
             job_count=job_count,
             skipped_archived=skipped_archived,
             items=items,
+            plan_slug=plan_slug,
+            plan_name=plan_name,
+            created=created,
         )
 
-        post_api_suites_by_id_run_response_200.additional_properties = d
         return post_api_suites_by_id_run_response_200
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

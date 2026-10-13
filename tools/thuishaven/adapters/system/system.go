@@ -54,6 +54,24 @@ func (System) ProcessAlive(pid int) bool {
 	return p.Signal(syscall.Signal(0)) == nil
 }
 
+// ProcessStart is pid's start time as ps prints it, or "" when ps cannot say.
+// With the pid it is a process's identity (D6): a pid whose start differs is a
+// stranger the kernel reused it for. C locale and UTC make it a stable string.
+func (System) ProcessStart(pid int) string {
+	if pid <= 0 {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "ps", "-o", "lstart=", "-p", strconv.Itoa(pid)) //nolint:gosec // G204: a fixed binary and an integer pid
+	cmd.Env = append(os.Environ(), "LC_ALL=C", "TZ=UTC")
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
 // Terminate sends SIGTERM so a launcher can clean up its own children.
 func (System) Terminate(pid int) {
 	if p, err := os.FindProcess(pid); err == nil {
@@ -106,6 +124,12 @@ func (System) TerminateGroup(pid int) {
 	System{}.Terminate(pid)
 }
 
+// Reload signals pid to reload in place.
+func (System) Reload(pid int) { _ = syscall.Kill(pid, syscall.SIGUSR2) }
+
+// Replan sends a keeper SIGHUP: reread its plan and apply the difference.
+func (System) Replan(pid int) { _ = syscall.Kill(pid, syscall.SIGHUP) }
+
 // PIDsOnPort lists the pids LISTENing on a TCP port, via lsof (macOS has no
 // /proc; lsof is the same "ask the OS's own tool" approach used elsewhere).
 func (System) PIDsOnPort(port int) []int {
@@ -131,8 +155,10 @@ func (System) SpawnDetached(argv []string, dir, logPath string) error {
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = dir
 	cmd.Env = os.Environ()
-	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	// Owner-only: a keeper's or an up's output carries seed secrets.
+	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if ferr == nil {
+		_ = f.Chmod(0o600)
 		cmd.Stdout, cmd.Stderr = f, f
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
@@ -146,7 +172,10 @@ func (System) SpawnDetached(argv []string, dir, logPath string) error {
 	if ferr == nil {
 		_ = f.Close()
 	}
-	return cmd.Process.Release()
+	// Reaped, not released: a long-lived parent (the daemon respawning a keeper)
+	// would otherwise keep a dead child as a zombie that still answers kill 0.
+	go func() { _ = cmd.Wait() }()
+	return nil
 }
 
 // Now returns the current time. Getpid returns this process's pid.
@@ -184,16 +213,11 @@ func (System) GroupRSS(pid int) uint64 {
 }
 
 // TotalMemory returns the machine's physical RAM in bytes (0 if undetectable).
-// darwin: sysctl hw.memsize; linux: /proc/meminfo MemTotal.
+// darwin: the hw.memsize sysctl, read in-process; linux: /proc/meminfo MemTotal.
 func (System) TotalMemory() uint64 {
 	switch runtime.GOOS {
 	case "darwin":
-		out, err := probe("sysctl", "-n", "hw.memsize")
-		if err != nil {
-			return 0
-		}
-		n, _ := strconv.ParseUint(strings.TrimSpace(string(out)), 10, 64)
-		return n
+		return darwinMemSize()
 	case "linux":
 		f, err := os.Open("/proc/meminfo")
 		if err != nil {
@@ -230,6 +254,9 @@ func (s System) MemStat() domain.MemStat {
 		if pageSize, occupied, ok := domain.ParseVMStat(string(out)); ok {
 			m.CompressedBytes = occupied * pageSize
 		}
+		if available, ok := domain.ParseVMStatAvailable(string(out)); ok {
+			m.AvailableBytes = available
+		}
 	}
 	if out, err := probe("sysctl", "-n", "vm.swapusage"); err == nil {
 		if used, total, ok := domain.ParseSwapUsage(string(out)); ok {
@@ -238,6 +265,10 @@ func (s System) MemStat() domain.MemStat {
 	}
 	return m
 }
+
+// LoadAverage is the 1-minute load average, or -1 when unreadable: a sysctl
+// on macOS, /proc/loadavg on Linux, no process spawned either way.
+func (System) LoadAverage() float64 { return loadAverage() }
 
 // probeTimeout bounds every external command the governor shells out to.
 //
@@ -254,33 +285,39 @@ func probe(name string, args ...string) ([]byte, error) {
 	return exec.CommandContext(ctx, name, args...).Output()
 }
 
-// DemoteGroup moves every process in pid's group into the throttled background
-// band, and RestoreGroup moves them back out.
+// DemoteGroup lowers every process in pid's group to nice 10, and
+// RestoreGroup asks for nice 0 back. Nice, not `taskpolicy -b`: background QoS
+// pins the stack to Apple Silicon's efficiency cores.
 //
-// It walks the group rather than signaling the launcher, because the policy is
-// inherited by processes forked AFTER it is set — it does not reach back into a
-// tree that is already running, and a live stack is exactly that: vite, node
-// and workers already spawned under the launcher. Signaling the launcher alone
-// would demote the launcher alone.
-func (s System) DemoteGroup(pid int) { s.retierGroup(pid, "-b") }
+// It walks the group because a priority reaches only processes forked after it.
+func (s System) DemoteGroup(pid int) { s.reniceGroup(pid, demotedNice) }
 
-// RestoreGroup undoes DemoteGroup. A process spawned while its stack was
-// demoted inherits the band, so restoring walks the group again rather than
-// trying to remember what was demoted.
-func (s System) RestoreGroup(pid int) { s.retierGroup(pid, "-B") }
-
-func (System) retierGroup(pid int, flag string) {
+// RestoreGroup undoes DemoteGroup. Raising priority back needs root, so for a
+// normal user the group stays at nice 10 until it restarts; it also clears the
+// background band an older haven may have set.
+func (s System) RestoreGroup(pid int) {
+	s.reniceGroup(pid, 0)
 	if runtime.GOOS != "darwin" || pid <= 0 {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
 	defer cancel()
 	for _, member := range groupMembers(pid) {
-		// Best effort per process: one that exits between listing and signaling
-		// is not an error, and must not stop the rest of the group being moved.
-		// The deadline is shared across the group for the same reason it exists at
-		// all — this runs on the daemon's tick and must always return to it.
-		_ = exec.CommandContext(ctx, "taskpolicy", flag, "-p", strconv.Itoa(member)).Run()
+		_ = exec.CommandContext(ctx, "taskpolicy", "-B", "-p", strconv.Itoa(member)).Run()
+	}
+}
+
+// demotedNice is a demoted stack's priority: below interactive work, on every core.
+const demotedNice = 10
+
+// reniceGroup sets nice on each member, best effort: one that exits between
+// listing and setting must not stop the rest of the group being moved.
+func (System) reniceGroup(pid, nice int) {
+	if runtime.GOOS != "darwin" || pid <= 0 {
+		return
+	}
+	for _, member := range groupMembers(pid) {
+		_ = syscall.Setpriority(syscall.PRIO_PROCESS, member, nice)
 	}
 }
 
@@ -413,4 +450,37 @@ func (System) OrphanedWorkers(marker string) []int {
 		}
 	}
 	return orphans
+}
+
+// ProcessCwds reads each pid's working directory with one lsof call (macOS has
+// no /proc). lsof exits non-zero when any pid has gone, so its output is read
+// whatever the exit status.
+func (System) ProcessCwds(pids []int) map[int]string {
+	out := map[int]string{}
+	if len(pids) == 0 {
+		return out
+	}
+	list := make([]string, 0, len(pids))
+	for _, pid := range pids {
+		if pid > 0 {
+			list = append(list, strconv.Itoa(pid))
+		}
+	}
+	raw, _ := probe("lsof", "-a", "-d", "cwd", "-Fn", "-p", strings.Join(list, ","))
+	return parseLsofCwds(string(raw))
+}
+
+// parseLsofCwds reads lsof's field output: a "p<pid>" line, then "n<path>".
+func parseLsofCwds(raw string) map[int]string {
+	out := map[int]string{}
+	pid := 0
+	for line := range strings.SplitSeq(raw, "\n") {
+		switch {
+		case strings.HasPrefix(line, "p"):
+			pid, _ = strconv.Atoi(line[1:])
+		case strings.HasPrefix(line, "n") && pid > 0:
+			out[pid] = line[1:]
+		}
+	}
+	return out
 }

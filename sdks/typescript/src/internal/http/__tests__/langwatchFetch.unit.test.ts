@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { Logger } from "../../../logger";
 import { createLangWatchApiClient } from "../../api/client";
 import {
@@ -12,13 +13,7 @@ const HTTPS_URL = "https://app.langwatch.ai/api/traces/search?limit=1";
 const OTHER_PATH = "https://app.langwatch.ai/api/traces/search/?limit=1";
 const OTHER_HOST = "https://other.example.com/api/traces/search?limit=1";
 
-const redirect = ({
-  status,
-  location,
-}: {
-  status: number;
-  location?: string;
-}): Response =>
+const redirect = ({ status, location }: { status: number; location?: string }): Response =>
   new Response(null, {
     status,
     headers: location ? { location } : {},
@@ -31,7 +26,7 @@ const opaqueRedirect = (): Response =>
 
 /** A transport answering each call from the script, in order. */
 const scripted = (...responses: Response[]) => {
-  const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+  const calls: { input: RequestInfo | URL; init?: RequestInit }[] = [];
   const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     calls.push({ input, init });
     const next = responses.shift();
@@ -41,8 +36,10 @@ const scripted = (...responses: Response[]) => {
   return { fetchImpl, calls };
 };
 
-const urlOf = (input: RequestInfo | URL): string =>
-  typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+const urlOf = (input: RequestInfo | URL): string => {
+  if (typeof input === "string") return input;
+  return input instanceof URL ? input.href : input.url;
+};
 
 const headersOf = (call: { input: RequestInfo | URL; init?: RequestInit }): Headers =>
   call.input instanceof Request ? call.input.headers : new Headers(call.init?.headers);
@@ -87,7 +84,10 @@ describe("langwatchFetch", () => {
       /** @scenario follows a redirect that only upgrades http to https */
       it("follows the redirect once and returns the https response", async () => {
         for (const method of ["GET", "POST"]) {
-          const { fetchImpl, calls } = scripted(redirect({ status: 301, location: HTTPS_URL }), ok("https answer"));
+          const { fetchImpl, calls } = scripted(
+            redirect({ status: 301, location: HTTPS_URL }),
+            ok("https answer"),
+          );
           const fetchLangWatch = createLangWatchFetch({ fetch: fetchImpl, logger: silentLogger() });
 
           const response = await fetchLangWatch(HTTP_URL, { method });
@@ -285,7 +285,10 @@ describe("langwatchFetch", () => {
   describe("given a GET or HEAD answered with a redirect", () => {
     /** @scenario a GET follows a redirect to another path */
     it("follows a GET to another path on the same host", async () => {
-      const { fetchImpl, calls } = scripted(redirect({ status: 301, location: OTHER_PATH }), ok("moved"));
+      const { fetchImpl, calls } = scripted(
+        redirect({ status: 301, location: OTHER_PATH }),
+        ok("moved"),
+      );
       const fetchLangWatch = createLangWatchFetch({ fetch: fetchImpl, logger: silentLogger() });
 
       const response = await fetchLangWatch(HTTPS_URL, { method: "GET" });
@@ -298,7 +301,10 @@ describe("langwatchFetch", () => {
 
     /** @scenario a GET follows a redirect to another path */
     it("follows a GET given as a Request object and keeps the Request shape", async () => {
-      const { fetchImpl, calls } = scripted(redirect({ status: 302, location: "/api/other" }), ok());
+      const { fetchImpl, calls } = scripted(
+        redirect({ status: 302, location: "/api/other" }),
+        ok(),
+      );
       const fetchLangWatch = createLangWatchFetch({ fetch: fetchImpl, logger: silentLogger() });
 
       await fetchLangWatch(new Request(HTTPS_URL, { headers: CREDENTIALS }));
@@ -314,7 +320,9 @@ describe("langwatchFetch", () => {
     it("follows five redirects in a row and returns the final response", async () => {
       const hops = [1, 2, 3, 4, 5].map((n) => `https://app.langwatch.ai/hop/${n}`);
       const { fetchImpl, calls } = scripted(
-        ...hops.map((location, index) => redirect({ status: index % 2 === 0 ? 301 : 307, location })),
+        ...hops.map((location, index) =>
+          redirect({ status: index % 2 === 0 ? 301 : 307, location }),
+        ),
         ok("final"),
       );
       const fetchLangWatch = createLangWatchFetch({ fetch: fetchImpl, logger: silentLogger() });
@@ -412,7 +420,10 @@ describe("langwatchFetch", () => {
     /** @scenario a GET drops credential headers on a cross origin redirect */
     it("drops credential headers on a hop to another port of the same host", async () => {
       const { fetchImpl, calls } = scripted(
-        redirect({ status: 302, location: "https://app.langwatch.ai:8443/api/traces/search?limit=1" }),
+        redirect({
+          status: 302,
+          location: "https://app.langwatch.ai:8443/api/traces/search?limit=1",
+        }),
         ok(),
       );
       const fetchLangWatch = createLangWatchFetch({ fetch: fetchImpl, logger: silentLogger() });
@@ -464,7 +475,10 @@ describe("langwatchFetch", () => {
 
     /** @scenario a HEAD follows a redirect like a GET */
     it("follows a HEAD with the same method", async () => {
-      const { fetchImpl, calls } = scripted(redirect({ status: 301, location: OTHER_PATH }), new Response(null, { status: 200 }));
+      const { fetchImpl, calls } = scripted(
+        redirect({ status: 301, location: OTHER_PATH }),
+        new Response(null, { status: 200 }),
+      );
       const fetchLangWatch = createLangWatchFetch({ fetch: fetchImpl, logger: silentLogger() });
 
       const response = await fetchLangWatch(HTTPS_URL, { method: "head", headers: CREDENTIALS });
@@ -522,23 +536,34 @@ describe("langwatchFetch", () => {
 
     /** @scenario a POST refuses a redirect to another host */
     it("refuses a redirect to another port on the same host", async () => {
-      await refuses({ status: 301, location: "https://app.langwatch.ai:8443/api/traces/search?limit=1" });
+      const location = "https://app.langwatch.ai:8443/api/traces/search?limit=1";
+      const error = await refuses({ status: 301, location });
+
+      expect(error.location).toBe(location);
     });
 
     /** @scenario a POST still refuses a redirect to another path */
     it("refuses a redirect that changes the path", async () => {
-      await refuses({ status: 308, location: OTHER_PATH });
+      const error = await refuses({ status: 308, location: OTHER_PATH });
+
+      expect(error.location).toBe(OTHER_PATH);
     });
 
     /** @scenario a POST still refuses a redirect to another path */
     it("refuses a redirect that changes the query", async () => {
-      await refuses({ status: 308, location: "https://app.langwatch.ai/api/traces/search?limit=2" });
+      const location = "https://app.langwatch.ai/api/traces/search?limit=2";
+      const error = await refuses({ status: 308, location });
+
+      expect(error.location).toBe(location);
     });
 
     /** @scenario a POST still refuses a redirect to another path */
     it("refuses a PUT, PATCH and DELETE redirect to another path as well", async () => {
       for (const method of ["PUT", "PATCH", "DELETE"]) {
-        const { fetchImpl, calls } = scripted(redirect({ status: 301, location: OTHER_PATH }), ok());
+        const { fetchImpl, calls } = scripted(
+          redirect({ status: 301, location: OTHER_PATH }),
+          ok(),
+        );
         const fetchLangWatch = createLangWatchFetch({ fetch: fetchImpl, logger: silentLogger() });
 
         const error = await refusal(() => fetchLangWatch(HTTPS_URL, { method }));
@@ -550,12 +575,16 @@ describe("langwatchFetch", () => {
 
     /** @scenario a POST refuses a downgrade from https to http */
     it("refuses a downgrade from https to http", async () => {
-      await refuses({ url: HTTPS_URL, status: 301, location: HTTP_URL });
+      const error = await refuses({ url: HTTPS_URL, status: 301, location: HTTP_URL });
+
+      expect(error.location).toBe(HTTP_URL);
     });
 
     /** @scenario a POST refuses a 303 */
     it("refuses a 303 even when it only upgrades the scheme", async () => {
-      await refuses({ status: 303, location: HTTPS_URL });
+      const error = await refuses({ status: 303, location: HTTPS_URL });
+
+      expect(error.status).toBe(303);
     });
 
     /** @scenario refuses a redirect without a location */
@@ -621,19 +650,19 @@ describe("langwatchFetch", () => {
     /** @scenario the generated API client uses the shared transport */
     it("sends through the shared transport and replays the upgrade with its headers", async () => {
       const { fetchImpl, calls } = scripted(
-        redirect({ status: 301, location: "https://app.langwatch.ai/api/annotations" }),
+        redirect({ status: 301, location: "https://app.langwatch.ai/api/v1/annotations" }),
         new Response("[]", { status: 200, headers: { "content-type": "application/json" } }),
       );
       globalThis.fetch = fetchImpl;
       const client = createLangWatchApiClient("sk-lw-secret", "http://app.langwatch.ai");
 
-      const { data, error } = await client.GET("/api/annotations");
+      const { data, error } = await client.GET("/api/v1/annotations");
 
       expect(error).toBeUndefined();
       expect(data).toEqual([]);
       expect(calls.map((call) => urlOf(call.input))).toEqual([
-        "http://app.langwatch.ai/api/annotations",
-        "https://app.langwatch.ai/api/annotations",
+        "http://app.langwatch.ai/api/v1/annotations",
+        "https://app.langwatch.ai/api/v1/annotations",
       ]);
       const replay = calls[1]!.input as Request;
       expect(replay.headers.get("x-auth-token")).toBe("sk-lw-secret");

@@ -69,6 +69,10 @@ provider:
 
 Under the door setting, **Seat for people who join** decides what a person admitted without an invitation lands on: **Member** (the default, a full seat that can be added to shared teams and projects) or **Developer** (a project of their own, with access to no shared team or project). The same choice applies to people your identity provider admits. Invitations always name their own seat and ignore this setting.
 
+Somebody who signs up from the terminal, by running `langwatch login` and creating their account on the page it opens, lands on a **Developer** seat whichever option is chosen here, both when you approve their request and when the door is automatic. The pending requests list shows the seat each request will land on. Raising them to a Member seat afterwards is done from the member dialog, as for anyone else.
+
+When a person reaches the welcome screen with an invitation already waiting on their verified address, accepting that invitation is offered first and asking to join is not. The seat is the one the invitation names.
+
 The **Account lockout** and **Session limits** cards in the same section apply
 to password sign-in for the organization. They remain available when you stop
 using single sign-on. Changing a policy requires `organization:manage`.
@@ -85,7 +89,7 @@ A Developer cannot open, be invited to, or be added to any shared team or projec
 
 Moving a member to a Developer seat removes their bindings on every shared team, shared project and the organization, and records each removal in the audit log. Their personal project, its traces and their API keys stay. A key that pointed at a shared project stops working on its own, because a key can never do more than its owner can. Moving a Developer to a Member seat grants no team access on its own; add teams afterwards.
 
-The CLI honours the seat too: `langwatch login` offers a Developer their personal project only and refuses a shared one.
+The CLI honours the seat too: `langwatch login` offers a Developer their personal project only and refuses a shared one, and `langwatch instrument <tool> --project` cannot pin a coding agent to a shared project. A person who joins the organization by domain after signing up from `langwatch login` lands on this seat regardless of the **Seat for people who join** setting (see [Let colleagues join by domain](#let-colleagues-join-by-domain)).
 
 ## Teams
 
