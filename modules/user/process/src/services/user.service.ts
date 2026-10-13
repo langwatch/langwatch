@@ -3,7 +3,6 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import { PersonalWorkspacePendingError } from "@langwatch/organization-contract";
 import { fromDate, nowInstant, type Instant } from "@langwatch/time";
 import {
-  UserEmailAmbiguousError,
   UserLastPlatformOperatorError,
   UserNotFoundError,
   createCredentialUserInputSchema,
@@ -163,15 +162,12 @@ export class UserService {
     return this.repository.findById(parsed.id);
   }
 
-  /** The exact address wins; case-twins with no exact holder are refused rather than guessed. */
+  /** The parse lower-cases the address, so the holder of its stored, lower-cased form answers. */
   async findByEmail(input: UserEmailInput): Promise<UserProfile | null> {
     const parsed = userEmailInputSchema.parse(input);
-    const accounts = await this.repository.findByEmail(parsed.email);
-    const exact = accounts.find((account) => account.email === parsed.email);
-    if (exact) return exact;
-    if (accounts.length > 1) throw new UserEmailAmbiguousError();
+    const [account] = await this.repository.findByEmail(parsed.email);
 
-    return accounts[0] ?? null;
+    return account ?? null;
   }
 
   /**
@@ -185,7 +181,6 @@ export class UserService {
     return this.repository.adoptUnconfirmed({ id: account.id });
   }
 
-  /** A case-twin beside a taken address would leave two accounts answering for one person. */
   async emailIsTaken(input: UserEmailInput): Promise<boolean> {
     const parsed = userEmailInputSchema.parse(input);
 
@@ -271,15 +266,12 @@ export class UserService {
     return this.repository.updateProfile(update);
   }
 
-  /** Normalized before it is stored; auth's door ends the sessions that cached the old one. */
+  /** Stored trimmed and lower-cased, as the parse left it; auth's door ends the old sessions. */
   async updateEmail(input: UpdateUserEmailInput): Promise<UserProfile> {
     const parsed = updateUserEmailInputSchema.parse(input);
     if (!(await this.repository.findById(parsed.id))) throw new UserNotFoundError(parsed.id);
 
-    return this.repository.updateProfile({
-      id: parsed.id,
-      email: parsed.email.trim().toLowerCase(),
-    });
+    return this.repository.updateProfile({ id: parsed.id, email: parsed.email });
   }
 
   async getAccountInfo(input: UserIdInput): Promise<UserAccountInfo> {

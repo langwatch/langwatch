@@ -56,6 +56,8 @@ class StubRepository implements UserRepository {
   hasAccountOnDomain = vi.fn(async () => false);
   hasAnyAccount = vi.fn(async () => true);
   findBackfillPage = vi.fn(async () => []);
+  findMixedCaseAddressPage = vi.fn(async () => []);
+  replaceAddress = vi.fn(async () => "replaced" as const);
   findProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async (): Promise<UserFullProfile | null> => user);
   findByEmail = vi.fn(async (): Promise<UserFullProfile[]> => [user]);
@@ -557,47 +559,25 @@ describe("getSsoStatus()", () => {
 });
 
 describe("findByEmail()", () => {
-  const twin = (id: string, email: string): UserFullProfile => ({ ...user, id, email });
-
-  describe("given case-twins where one holds the address exactly", () => {
-    /** @scenario "A lookup by address never guesses between case-twins" */
-    it("answers the exact holder", async () => {
+  describe("given an address typed with capitals and spaces", () => {
+    /** @scenario "A mixed-case sign-in still finds the account" */
+    it("asks the repository for the trimmed, lower-cased address only", async () => {
       const { service, repository } = createService();
-      repository.findByEmail.mockResolvedValue([
-        twin("user-capitals", "Ada@example.com"),
-        twin("user-exact", "ada@example.com"),
-      ]);
 
-      await expect(service.findByEmail({ email: "ada@example.com" })).resolves.toMatchObject({
-        id: "user-exact",
+      await expect(service.findByEmail({ email: " Ada@Example.COM " })).resolves.toMatchObject({
+        id: user.id,
       });
+      await expect(service.emailIsTaken({ email: "ADA@example.com" })).resolves.toBe(true);
+      expect(repository.findByEmail.mock.calls).toEqual([["ada@example.com"], ["ada@example.com"]]);
     });
   });
 
-  describe("given case-twins and no exact holder", () => {
-    /** @scenario "A lookup by address never guesses between case-twins" */
-    it("refuses with user_email_ambiguous, yet still reports the address taken", async () => {
+  describe("given nobody holds the address", () => {
+    it("answers null", async () => {
       const { service, repository } = createService();
-      repository.findByEmail.mockResolvedValue([
-        twin("user-1", "Ada@example.com"),
-        twin("user-2", "ADA@example.com"),
-      ]);
+      repository.findByEmail.mockResolvedValue([]);
 
-      await expect(service.findByEmail({ email: "ada@example.com" })).rejects.toMatchObject({
-        code: "user_email_ambiguous",
-      });
-      await expect(service.emailIsTaken({ email: "ada@example.com" })).resolves.toBe(true);
-    });
-  });
-
-  describe("given one account on the address in other case", () => {
-    it("answers it, case aside", async () => {
-      const { service, repository } = createService();
-      repository.findByEmail.mockResolvedValue([twin("user-1", "Ada@Example.com")]);
-
-      await expect(service.findByEmail({ email: "ada@example.com" })).resolves.toMatchObject({
-        id: "user-1",
-      });
+      await expect(service.findByEmail({ email: "nobody@example.com" })).resolves.toBeNull();
     });
   });
 });

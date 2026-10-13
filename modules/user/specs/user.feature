@@ -28,13 +28,44 @@ Feature: Canonical user lifecycle
     Then one is deactivated and the other is refused
     And one active operator remains
 
+  # Addresses are stored lower-cased (Alex, 2026-10-13): every lookup is a plain match on the
+  # unique index, never a case-insensitive read of every account.
   @unit
-  Scenario: A lookup by address never guesses between case-twins
-    Given accounts whose addresses differ only in case
-    When an account is looked up by address
-    Then the account holding the address exactly is answered
-    And with no exact holder the lookup is refused with code user_email_ambiguous
-    And the address still counts as taken
+  Scenario: Stored addresses are lower-cased
+    When an account is minted, or its address changed, with capitals or spaces in the address
+    Then the account stores the trimmed, lower-cased address
+
+  @unit @integration
+  Scenario: A mixed-case sign-in still finds the account
+    Given an account whose address is stored lower-cased
+    When it is looked up by the address typed with capitals
+    Then that account is answered
+    And the store is asked for the lower-cased address only, matched exactly
+
+  @unit @integration
+  Scenario: The address step lower-cases every stored address
+    Given accounts stored with capitals before addresses were lower-cased
+    When the background step "user:lower-case-stored-addresses" runs, as soon as the upgrade starts
+    Then each such address is stored lower-cased, and a mixed-case lookup finds the account
+
+  @unit @integration
+  Scenario: A case-only duplicate gets a plus tag
+    Given another account already holds an address's lower-cased form
+    When the address step runs
+    Then the address is stored as "local+2@domain", or the next free "+N"
+    And nothing is merged or removed
+
+  @integration
+  Scenario: The address step never overwrites a save made during its pass
+    Given an address that changed after the step read it
+    When the step writes
+    Then the row keeps the newer address
+
+  @unit
+  Scenario: Running the address step twice changes nothing more
+    Given the address step has run
+    When it runs again
+    Then it finds no address to change
 
   @unit
   Scenario: Deactivating the last active platform operator is refused
