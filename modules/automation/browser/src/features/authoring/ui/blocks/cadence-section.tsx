@@ -1,0 +1,297 @@
+import {
+  CADENCE_CHOICE_LABELS,
+  GRAPH_ALERT_TIME_PERIODS,
+  type GraphAlertOperator,
+  type GraphAlertTimePeriod,
+  type NotificationCadence,
+} from "@langwatch/automation-contract";
+import {
+  Field,
+  HStack,
+  Input,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { useState } from "react";
+
+import { describeCron, isValidCron } from "../../model/report-schedule.ts";
+import { FacetSection, type FacetAccordionProps } from "../elements/facet-section.tsx";
+import { ReceiveCadenceField } from "../elements/receive-cadence-field.tsx";
+import { ReportScheduleField } from "../elements/report-schedule-field.tsx";
+import { AutomationTraceDebounceField } from "../elements/trace-debounce-field.tsx";
+
+export type AutomationSource = "trace" | "customGraph" | "report";
+
+export interface AutomationGraphAlertDraft {
+  seriesName: string;
+  operator: GraphAlertOperator;
+  threshold: number;
+  timePeriod: GraphAlertTimePeriod;
+}
+
+export interface AutomationReportDraft {
+  sourceKind: "traceQuery" | "customGraph" | "dashboard";
+  cron: string;
+  timezone: string;
+}
+
+export interface AutomationCadenceDraft {
+  source: AutomationSource;
+  notificationCadence: NotificationCadence;
+  traceDebounceMs: number;
+  graphAlert: AutomationGraphAlertDraft;
+  report: AutomationReportDraft;
+}
+
+const OPERATOR_LABELS: Record<GraphAlertOperator, string> = {
+  gt: "greater than",
+  lt: "less than",
+  gte: "greater than or equal",
+  lte: "less than or equal",
+  eq: "equal to",
+};
+
+const TIME_PERIOD_LABELS: Record<GraphAlertTimePeriod, string> = {
+  1: "1 minute",
+  5: "5 minutes",
+  15: "15 minutes",
+  30: "30 minutes",
+  60: "1 hour",
+  1440: "1 day",
+};
+
+const CADENCE_HELP: Record<AutomationSource, string> = {
+  trace:
+    "Whether each matching trace sends its own message or matches are batched into one, plus how long a trace must be quiet before it counts as settled and can send.",
+  customGraph:
+    "What makes it fire: the watched metric crosses this threshold over the chosen window.",
+  report: "When it's sent, as a recurring schedule in the timezone you pick.",
+};
+
+function cadenceIsSet(draft: AutomationCadenceDraft): boolean {
+  if (draft.source === "customGraph") return Number.isFinite(draft.graphAlert.threshold);
+  if (draft.source === "report") {
+    return isValidCron({ cron: draft.report.cron, timezone: draft.report.timezone });
+  }
+  return true;
+}
+
+function cadenceSummary({
+  draft,
+  isNotify,
+}: {
+  draft: AutomationCadenceDraft;
+  isNotify: boolean;
+}): string {
+  if (draft.source === "customGraph") {
+    const { operator, threshold, timePeriod } = draft.graphAlert;
+    if (!Number.isFinite(threshold)) return "Set a threshold";
+    return `${OPERATOR_LABELS[operator]} ${threshold} over ${TIME_PERIOD_LABELS[timePeriod]}`;
+  }
+  if (draft.source === "report") {
+    return cadenceIsSet(draft)
+      ? describeCron(draft.report.cron, draft.report.timezone)
+      : "Set a schedule";
+  }
+  const settle = Math.round(draft.traceDebounceMs / 1000);
+  // A persist action writes per match (the router coerces its cadence to
+  // immediate), so the summary must not echo a digest the server discards.
+  if (!isNotify) return `Per matching trace, ${settle}s settle window`;
+  return `${CADENCE_CHOICE_LABELS[draft.notificationCadence]}, ${settle}s settle window`;
+}
+
+function cadenceContent({
+  draft,
+  isEdit,
+  showReceiveChooser,
+  onCadenceChange,
+  onTraceDebounceChange,
+  onGraphAlertChange,
+  onReportChange,
+}: {
+  draft: AutomationCadenceDraft;
+  isEdit: boolean;
+  showReceiveChooser: boolean;
+  onCadenceChange: (value: NotificationCadence) => void;
+  onTraceDebounceChange: (value: number) => void;
+  onGraphAlertChange: (value: AutomationGraphAlertDraft) => void;
+  onReportChange: (value: AutomationReportDraft) => void;
+}) {
+  if (draft.source === "customGraph") {
+    return <GraphCadence value={draft.graphAlert} onChange={onGraphAlertChange} />;
+  }
+  if (draft.source === "report") {
+    return <ReportCadence value={draft.report} isEdit={isEdit} onChange={onReportChange} />;
+  }
+  return (
+    <VStack align="stretch" gap={4}>
+      {showReceiveChooser ? (
+        <ReceiveCadenceField value={draft.notificationCadence} onChange={onCadenceChange} />
+      ) : null}
+      <AutomationTraceDebounceField
+        value={draft.traceDebounceMs}
+        onChange={onTraceDebounceChange}
+      />
+    </VStack>
+  );
+}
+
+/** Controlled cadence facet; state and transport remain in the app host. */
+export function AutomationCadenceSection({
+  draft,
+  isEdit = false,
+  accordion,
+  title = "Cadence",
+  isNotify,
+  chooserHostedByChannel,
+  onCadenceChange,
+  onTraceDebounceChange,
+  onGraphAlertChange,
+  onReportChange,
+}: {
+  draft: AutomationCadenceDraft;
+  isEdit?: boolean;
+  accordion?: FacetAccordionProps;
+  /** The wizard names the facet after what it decides on that step (ADR-093 §4). */
+  title?: string;
+  /** A persist action always writes per match, so it is offered no batch window. */
+  isNotify: boolean;
+  /** The channel hosts the receive choice beside the templates it filters. */
+  chooserHostedByChannel: boolean;
+  onCadenceChange: (value: NotificationCadence) => void;
+  onTraceDebounceChange: (value: number) => void;
+  onGraphAlertChange: (value: AutomationGraphAlertDraft) => void;
+  onReportChange: (value: AutomationReportDraft) => void;
+}) {
+  return (
+    <FacetSection
+      title={title}
+      help={CADENCE_HELP[draft.source]}
+      accordion={accordion}
+      complete={cadenceIsSet(draft)}
+      summary={cadenceSummary({ draft, isNotify })}
+    >
+      {cadenceContent({
+        draft,
+        isEdit,
+        showReceiveChooser: isNotify && !chooserHostedByChannel,
+        onCadenceChange,
+        onTraceDebounceChange,
+        onGraphAlertChange,
+        onReportChange,
+      })}
+    </FacetSection>
+  );
+}
+
+function GraphCadence({
+  value,
+  onChange,
+}: {
+  value: AutomationGraphAlertDraft;
+  onChange: (value: AutomationGraphAlertDraft) => void;
+}) {
+  const { operator, threshold, timePeriod } = value;
+  const [thresholdText, setThresholdText] = useState(() =>
+    Number.isFinite(threshold) ? String(threshold) : "",
+  );
+
+  const [thresholdFrom, setThresholdFrom] = useState(threshold);
+  if (!Object.is(thresholdFrom, threshold)) {
+    setThresholdFrom(threshold);
+    setThresholdText(Number.isFinite(threshold) ? String(threshold) : "");
+  }
+
+  const parsed = thresholdText.trim() === "" ? NaN : Number(thresholdText);
+  const thresholdInvalid = !Number.isFinite(parsed);
+
+  const updateThreshold = (raw: string) => {
+    setThresholdText(raw);
+    onChange({ ...value, threshold: raw.trim() === "" ? NaN : Number(raw) });
+  };
+
+  return (
+    <VStack align="stretch" gap={4}>
+      <HStack gap={3}>
+        <Field.Root flex="1">
+          <Field.Label>Operator</Field.Label>
+          <NativeSelect.Root>
+            <NativeSelect.Field
+              value={operator}
+              onChange={(event) =>
+                onChange({
+                  ...value,
+                  operator: event.target.value as GraphAlertOperator,
+                })
+              }
+            >
+              <option value="gt">Greater than</option>
+              <option value="lt">Less than</option>
+              <option value="gte">Greater than or equal</option>
+              <option value="lte">Less than or equal</option>
+              <option value="eq">Equal to</option>
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+        </Field.Root>
+        <Field.Root flex="1" invalid={thresholdInvalid}>
+          <Field.Label>Threshold</Field.Label>
+          <Input
+            type="number"
+            step="any"
+            value={thresholdText}
+            onChange={(event) => updateThreshold(event.target.value)}
+          />
+          <Field.ErrorText>Enter a number to compare against.</Field.ErrorText>
+        </Field.Root>
+      </HStack>
+
+      <Field.Root>
+        <Field.Label>Time window</Field.Label>
+        <NativeSelect.Root>
+          <NativeSelect.Field
+            value={timePeriod}
+            onChange={(event) =>
+              onChange({
+                ...value,
+                timePeriod: Number(event.target.value) as GraphAlertTimePeriod,
+              })
+            }
+          >
+            {GRAPH_ALERT_TIME_PERIODS.map((minutes) => (
+              <option key={minutes} value={minutes}>
+                {TIME_PERIOD_LABELS[minutes]}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </Field.Root>
+
+      <Text textStyle="xs" color="fg.muted">
+        Fires when the watched metric is {OPERATOR_LABELS[operator]}{" "}
+        {Number.isFinite(parsed) ? parsed : "…"} over {TIME_PERIOD_LABELS[timePeriod]}.
+      </Text>
+    </VStack>
+  );
+}
+
+function ReportCadence({
+  value,
+  isEdit,
+  onChange,
+}: {
+  value: AutomationReportDraft;
+  isEdit: boolean;
+  onChange: (value: AutomationReportDraft) => void;
+}) {
+  return (
+    <ReportScheduleField
+      cron={value.cron}
+      timezone={value.timezone}
+      isEdit={isEdit}
+      onChange={(next) => onChange({ ...value, ...next })}
+    />
+  );
+}

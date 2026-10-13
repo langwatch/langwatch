@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/langwatch/langwatch/pkg/health"
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -341,6 +342,32 @@ func TestPlaygroundProxy_DispatcherErrorReturns502(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode < 500 || resp.StatusCode >= 600 {
 		t.Errorf("status = %d, want 5xx for dispatcher error", resp.StatusCode)
+	}
+}
+
+// A refusal the dispatcher made of the caller keeps its own status, so a
+// scenario judge that hits a rate limit reads the limit, not "Bad Gateway".
+func TestPlaygroundProxy_DispatcherRefusalKeepsItsStatus(t *testing.T) {
+	refusal := herr.New(context.Background(), domain.ErrRateLimited, herr.M{"message": "rpm 1 exceeded"})
+	fake := &fakeProxy{syncErr: refusal}
+	srv := newProxyTestServer(t, fake)
+
+	body := `{"model":"openai/gpt-5-mini","messages":[]}`
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/go/proxy/v1/chat/completions", strings.NewReader(body))
+	req.Header.Set("x-litellm-model", "openai/gpt-5-mini")
+	req.Header.Set("x-litellm-api_key", "sk-test")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429; body %s", resp.StatusCode, raw)
+	}
+	if !strings.Contains(string(raw), "rate_limited") {
+		t.Errorf("body does not name the rate limit: %s", raw)
 	}
 }
 

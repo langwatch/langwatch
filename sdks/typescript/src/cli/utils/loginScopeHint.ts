@@ -1,38 +1,37 @@
 /**
- * What a refusal does not say on its own: which permissions the login on this
- * machine actually carries.
- *
- * `langwatch api-keys create` answers 403 to an organization admin, because a
- * CLI login key is minted without `organization:manage` on purpose. The
- * refusal read as though the person lacked the role, so the way out looked
- * like an escalation rather than a re-login, and an agent holding a device
- * login had no way to tell the two apart at all.
- *
- * The login records the slugs it was minted with, so on an authorization
- * failure they are listed back. That turns "you cannot do this" into "this
- * login was not given that", which names a different and reachable fix.
- *
- * Spec: specs/typescript-sdk/cli-projects-api-keys.feature
+ * Lists the permissions this machine's login carries on an authorization failure: a CLI login key
+ * leaves the management permissions out on purpose, and the fix is a re-login, not an escalation. A
+ * refusal for any of them names the one re-login that grants it, whichever command was refused.
+ * @see specs/typescript-sdk/cli-projects-api-keys.feature
+ * @see specs/ai-gateway/per-team-budget-reorganization.feature
  */
 
 import { scopedApiKey } from "@/internal/credentialContext";
+
 import { loadConfig } from "./governance/config";
 
 /**
- * The extra line for an authorization failure, or nothing when there is
- * nothing to add: another code, no login on this machine, a login made before
- * the permissions were recorded, or a request that authenticated with some
- * other key. Silence beats a guess here, since a wrong list would send the
- * reader after the wrong fix.
- *
- * The permissions belong to the LOGIN key, so the line is only true when the
- * request used it. `--api-key` and `LANGWATCH_API_KEY` win over the login
- * (utils/apiKey.ts) and carry permissions this machine never recorded, so a
- * refusal there is described by listing what some other credential holds.
+ * The permissions a CLI login key leaves out unless the login asked for management access. Mirrors
+ * `CLI_KEY_MANAGEMENT_PERMISSIONS` in @langwatch/api-key-contract, which the SDK cannot import.
  */
-export const loginPermissionsHint = (code: string): string | undefined => {
-  if (code !== "unauthorized") return undefined;
+export const LOGIN_MANAGEMENT_PERMISSIONS: readonly string[] = [
+  "organization:manage",
+  "team:manage",
+];
 
+export const MANAGEMENT_RELOGIN_COMMAND = "langwatch login --device --management";
+
+/** The codes a missing permission comes back as, depending on which door refused it. */
+const PERMISSION_REFUSAL_CODES = new Set([
+  "unauthorized",
+  "forbidden",
+  "insufficient_permissions",
+  "permission_denied",
+  "api_key_permission_denied",
+]);
+
+/** The login recorded on this machine, when the refused request authenticated with it. */
+const loginUsedByThisRequest = (): { permissions: string[] | undefined } | undefined => {
   let permissions: string[] | undefined;
   let loginKey: string | undefined;
   try {
@@ -43,8 +42,41 @@ export const loginPermissionsHint = (code: string): string | undefined => {
     // An unreadable config is not worth a second failure on the error path.
     return undefined;
   }
-  if (!permissions?.length) return undefined;
   if (!loginKey || scopedApiKey() !== loginKey) return undefined;
+  return { permissions };
+};
 
-  return `Your login carries ${[...permissions].sort().join(", ")}. A command needing a permission that is not listed there is refused whatever your role is: run \`langwatch login\` again to approve more, or use an API key that already has it.`;
+/**
+ * The extra line for an authorization failure, or nothing when there is nothing true to add. Only
+ * when the request used the LOGIN key: `--api-key`/`LANGWATCH_API_KEY` carry permissions never
+ * recorded.
+ */
+export const loginPermissionsHint = (
+  code: string,
+  meta: Readonly<Record<string, unknown>> = {},
+): string | undefined => {
+  const refusedPermission = typeof meta.permission === "string" ? meta.permission : undefined;
+  const refusedManagement =
+    refusedPermission !== undefined &&
+    LOGIN_MANAGEMENT_PERMISSIONS.includes(refusedPermission) &&
+    PERMISSION_REFUSAL_CODES.has(code);
+  if (code !== "unauthorized" && !refusedManagement) return undefined;
+
+  const login = loginUsedByThisRequest();
+  if (!login) return undefined;
+
+  // A CLI login leaves the management permissions out unless it was asked
+  // for them, so a login without the refused one is the reason, whatever role
+  // its owner holds.
+  if (refusedManagement) {
+    // A login that carries it was refused by its owner's role, which no
+    // re-login changes.
+    if (login.permissions?.includes(refusedPermission)) return undefined;
+    return `Your CLI login does not include management access (${refusedPermission}). Run \`${MANAGEMENT_RELOGIN_COMMAND}\` to add the management access you hold, or use an API key that has ${refusedPermission}.`;
+  }
+
+  const { permissions } = login;
+  if (!permissions?.length) return undefined;
+
+  return `Your login carries ${[...permissions].toSorted().join(", ")}. A command needing a permission that is not listed there is refused whatever your role is: run \`langwatch login\` again to approve more, or use an API key that already has it.`;
 };

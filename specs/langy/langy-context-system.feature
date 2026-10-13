@@ -21,17 +21,17 @@ Feature: Langy captures what I am viewing as turn context
   Scenario: Viewing an experiment surfaces it as context
     Given I am viewing an experiment
     When I open the Langy panel
-    Then the composer shows a context chip for that experiment
+    Then the add-context control offers a chip for that experiment
 
   @integration
   Scenario: Viewing a trace surfaces it as context
     Given I am viewing a trace
-    Then the composer shows a context chip for that trace
+    Then the add-context control offers a chip for that trace
 
   @integration
   Scenario: Viewing a prompt, dataset, or dashboard surfaces it as context
     Given I am viewing a dataset
-    Then the composer shows a context chip for that dataset
+    Then the add-context control offers a chip for that dataset
 
   @integration
   Scenario: A context chip can be removed
@@ -60,10 +60,11 @@ Feature: Langy captures what I am viewing as turn context
     Then the composer shows a context chip for the new trace
 
   @integration
-  Scenario: Starting a new chat restores dismissed context
-    Given I have removed a context chip
+  Scenario: Starting a new chat starts with no context chosen
+    Given I have chosen context chips for the current chat
     When I start a new chat
-    Then the dismissed context chips return for the fresh turn
+    Then no context chip is chosen for the fresh turn
+    And the context I assembled for the last question does not follow me into the next
 
   @unit
   Scenario: The dataset page offers its dataset by name

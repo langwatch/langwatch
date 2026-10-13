@@ -6,6 +6,7 @@ Feature: Personal usage REST API
   Background:
     Given I authenticate with an API key from my personal workspace
 
+  @integration
   Scenario: Reading personal usage for the current month
     When I GET /api/me/usage
     Then the response status is 200
@@ -13,11 +14,13 @@ Feature: Personal usage REST API
     And the body has a "dailyBuckets" array of per-day spend and request counts
     And the body has a "breakdownByModel" array of per-model spend and request counts
 
+  @integration
   Scenario: Reading personal usage for an explicit window
     When I GET /api/me/usage with a start and end time
     Then the response status is 200
     And the rollups cover only usage that falls inside the requested window
 
+  @unit
   Scenario: Ingestion-source spend is included and scoped to this organization
     Given my account has ingestion-source spend (e.g. Claude Code) in this organization
     And my account also has ingestion-source spend in another organization
@@ -26,16 +29,19 @@ Feature: Personal usage REST API
     And the rollups include this organization's ingestion-source spend
     And the rollups exclude ingestion-source spend from other organizations
 
+  @integration
   Scenario: A half-specified window is rejected
     When I GET /api/me/usage with only a start time (or only an end time)
-    Then the response status is 400
+    Then the response status is 422
     And the error explains both bounds must be provided together
 
+  @integration
   Scenario: An inverted window is rejected
     When I GET /api/me/usage with a start time at or after the end time
-    Then the response status is 400
+    Then the response status is 422
     And the error explains the start must be before the end
 
+  @integration
   Scenario: Empty state is safe
     Given my personal workspace has no usage in the window
     When I GET /api/me/usage
@@ -43,6 +49,7 @@ Feature: Personal usage REST API
     And the spend is 0 and there is no most-used model
     And every daily bucket shows zero spend and the per-model breakdown is empty
 
+  @integration
   Scenario: A key cannot read another user's personal usage
     Given I authenticate with a user-bound key that can view another user's personal workspace
     When I GET /api/me/usage for that other workspace
@@ -50,6 +57,25 @@ Feature: Personal usage REST API
     And the refusal carries a named code saying the key is for a different workspace
     And nothing in the refusal says whose workspace it is
 
+  # A legacy project key and a modern service key both arrive carrying no user.
+  # They are not the same credential: the first IS the workspace's key, the
+  # second belongs to a job and stands for nobody.
+
+  @unit
+  Scenario: A legacy project key still answers for its workspace's owner
+    Given I authenticate with a legacy project key for my personal workspace
+    When I GET /api/me/usage
+    Then the read answers for the workspace's owner
+
+  @unit
+  Scenario: An ownerless service key is refused rather than answered as the owner
+    Given I authenticate with a service API key that belongs to no person
+    When I GET /api/me/usage
+    Then the response status is 403
+    And the refusal carries a named code saying a service key cannot answer for a person
+    And no usage is answered for the workspace's owner
+
+  @integration
   Scenario: A shared-workspace API key is rejected
     Given I authenticate with an API key from a shared (non-personal) workspace
     When I GET /api/me/usage
@@ -57,6 +83,7 @@ Feature: Personal usage REST API
     And the refusal carries a named code saying a personal-workspace API key is required
     And the refusal names no internal detail of how the check is made
 
+  @integration
   Scenario: Unauthenticated requests are rejected
     Given I provide no API key
     When I GET /api/me/usage

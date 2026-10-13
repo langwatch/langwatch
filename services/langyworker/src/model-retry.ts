@@ -1,19 +1,7 @@
 /**
- * The retry for a model call that failed for a transient reason: an overloaded
- * provider, a dropped stream, a network error, a timeout, a 5xx or a 429.
- *
- * It runs inside pi's own retry loop, which is the right place for it: pi drops
- * the failed assistant message and makes the same call again against the
- * conversation as it stands, so every tool call that already ran keeps its
- * result and nothing the turn did runs twice. pi decides what to retry and how
- * long to wait with two methods of its session; this module replaces both with
- * the policy below (which errors, how many times, the backoff with jitter and a
- * wait the provider names) and leaves the loop, the abort and the events to pi.
- *
- * The relay (services/langyagent/adapters/otelrelay/llmretry.go) still re-sends
- * a rejected 429 by its Retry-After header before the worker sees it; this
- * retry covers what the relay cannot, a failure inside a stream already
- * answered 200.
+ * The retry for a model call that failed transiently (overload, dropped stream, network,
+ * timeout, 5xx, 429). It runs inside pi's own retry loop, so tool calls that already ran keep
+ * their result; the relay (services/langyagent/adapters/otelrelay/llmretry.go) covers 429s.
  */
 
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
@@ -90,10 +78,9 @@ export function leadingStatus(errorMessage: string): number | undefined {
 }
 
 /**
- * Whether a failed model call is worth another try. A status the message
- * opens with decides first: 408, 429 and 5xx are transient, every other 4xx
- * is a refusal (validation, permission, a request the provider will refuse the
- * same way). With no status, the wording decides. A plan limit never retries.
+ * Whether a failed model call is worth another try. A leading status decides first: 408, 429
+ * and 5xx are transient, every other 4xx a refusal. Otherwise the wording decides. A plan
+ * limit never retries.
  */
 export function isTransientModelFailure(call: FailedModelCall): boolean {
   if (call.stopReason !== "error") return false;
@@ -105,28 +92,62 @@ export function isTransientModelFailure(call: FailedModelCall): boolean {
   return TRANSIENT_PATTERN.test(message);
 }
 
+/** Milliseconds per unit a provider writes after "try again in". */
+function unitMs(unit: string): number {
+  const lower = unit.toLowerCase();
+  if (lower === "ms" || lower.startsWith("milli")) return 1;
+  if (lower === "m" || lower.startsWith("min")) return 60_000;
+  return 1_000;
+}
+
+const DURATION_PART =
+  /(\d+(?:\.\d+)?)\s*(ms|milliseconds?|minutes?|mins?|m|seconds?|secs?|s)(?![a-z])/iy;
+
+/** "2m", "1m30s", "820ms", "20 seconds": the parts written back to back, summed. */
+function durationMs(text: string): number | undefined {
+  let total = 0;
+  let matched = false;
+  DURATION_PART.lastIndex = 0;
+  for (;;) {
+    const part = DURATION_PART.exec(text);
+    if (!part?.[1] || !part[2]) break;
+    total += Number(part[1]) * unitMs(part[2]);
+    matched = true;
+    while (DURATION_PART.lastIndex < text.length && text[DURATION_PART.lastIndex] === " ") {
+      DURATION_PART.lastIndex++;
+    }
+  }
+  return matched ? total : undefined;
+}
+
+/** A Retry-After value: seconds, or an HTTP date read as the time left until it. */
+function retryAfterMs(value: string, now: number): number | undefined {
+  const seconds = /^\s*(\d+(?:\.\d+)?)(?![\d:/-]|\.\d)/.exec(value);
+  if (seconds?.[1]) return Number(seconds[1]) * 1_000;
+  const at = Date.parse(value);
+  if (Number.isNaN(at) || at <= now) return undefined;
+  return at - now;
+}
+
 /**
  * The wait a provider names in its message ("Please try again in 20s",
- * "try again in 820ms", "Retry-After: 3"), in milliseconds.
+ * "try again in 1m30s", "Retry-After: 3", a Retry-After date), in milliseconds.
  */
-export function namedWaitMs(errorMessage: string): number | undefined {
-  const inPhrase = /try again in\s+(\d+(?:\.\d+)?)\s*(ms|milliseconds?|s|sec|seconds?)\b/i.exec(
-    errorMessage,
-  );
-  if (inPhrase?.[1] && inPhrase[2]) {
-    const value = Number(inPhrase[1]);
-    return inPhrase[2].toLowerCase().startsWith("m") ? value : value * 1_000;
+export function namedWaitMs(errorMessage: string, now: number = Date.now()): number | undefined {
+  const inPhrase = /try again in\s+/i.exec(errorMessage);
+  if (inPhrase) {
+    const named = durationMs(errorMessage.slice(inPhrase.index + inPhrase[0].length));
+    if (named !== undefined) return named;
   }
-  const header = /retry[- ]after[":\s]+(\d+(?:\.\d+)?)/i.exec(errorMessage);
-  if (header?.[1]) return Number(header[1]) * 1_000;
+  const header = /retry[- ]after[":\s]+([^\n"]+)/i.exec(errorMessage);
+  if (header?.[1]) return retryAfterMs(header[1], now);
   return undefined;
 }
 
 /**
- * The wait before retry number `attempt` (from 1), or null when the provider
- * named a wait too long to take. A named wait is taken as named; otherwise the
- * backoff doubles from MODEL_RETRY_BASE_DELAY_MS, shifted by up to
- * MODEL_RETRY_JITTER either way so retries from many turns do not line up.
+ * The wait before retry number `attempt` (from 1), or null when the provider named one too
+ * long to take. A named wait is taken as named; otherwise the backoff doubles from
+ * MODEL_RETRY_BASE_DELAY_MS with MODEL_RETRY_JITTER either way.
  */
 export function retryDelayMs({
   attempt,

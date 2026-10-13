@@ -124,6 +124,12 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       And an approve request carrying zero bindings is refused with a handled
         error naming the bindings field
 
+    @integration
+    Scenario: approval is blocked when the user's own access cannot be read
+      Given the user's role bindings fail to load on the authorize screen
+      Then the approve action is unavailable
+      And the screen says the access could not be read and asks the user to reload
+
   # ─────────────────────────────────────────────────────────────────────
   # Minting mechanics
   # ─────────────────────────────────────────────────────────────────────
@@ -137,8 +143,8 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       Then the response carries a `cli_api_key` in the `sk-lw-{lookupId}_{secret}` format
       And the ApiKey row records the approving user as owner
       And its permissionMode is "restricted" with the selected permission list
-      And the response still carries the personal project and its API key,
-        so older CLI versions keep working unchanged
+      And the response still carries the personal project's id, slug and name,
+        never its project API key
 
     @integration
     Scenario: the exchange reports the permissions the key was minted with
@@ -203,11 +209,36 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       Then each mint revokes only the keys created before its own
       And the key the last exchange handed to the CLI is still active
 
+    @unit
+    Scenario: a previous key a racing login already revoked does not fail the re-login
+      Given two logins from the same device label are exchanged at the same time
+      And the other login revokes the previous key first
+      When this login's mint reaches the same previous key
+      Then the exchange still answers with its new key
+
     @integration
     Scenario: logout revokes the CLI key
       Given the user holds an active CLI key from this login
       When the CLI calls the logout endpoint
       Then that CLI key is revoked along with the device session tokens
+
+  # The key lives as long as the session that minted it: its expiry is set
+  # from the session start and the organization's session ceiling, and slides
+  # with every refresh, so a CLI that stops refreshing leaves no live key.
+  Rule: the CLI key expires with its session
+
+    @integration
+    Scenario: the CLI key is minted with the session's expiry
+      Given the organization caps sessions at thirty days
+      When the CLI exchanges an approved device code
+      Then the key is minted anchored at the moment the session started
+      And under the organization's ceiling and the refresh window
+
+    @integration
+    Scenario: refreshing the session extends the CLI key's expiry
+      Given the CLI holds a session and its CLI key
+      When the CLI refreshes the session
+      Then the key's expiry is extended from the same session start
 
   # ─────────────────────────────────────────────────────────────────────
   # Project listing honours the key's reach

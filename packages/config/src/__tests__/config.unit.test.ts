@@ -1,0 +1,270 @@
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
+
+import { ConfigCollisionError, ConfigParseError } from "../config.errors.ts";
+import { Config, parseProcessConfig } from "../config.ts";
+import {
+  langevalsStagingTtlSeconds,
+  nlpServiceUrl,
+  publicBaseUrl,
+  slackApiBase,
+  slackWebhookBase,
+} from "../deployment-facts.ts";
+
+const github = {
+  name: "github",
+  config: Config.define((c) => ({
+    appId: c.env("GITHUB_APP_ID", z.string().optional()),
+    apiUrl: c.env("GITHUB_API_URL", z.string().url().default("https://api.github.com")),
+  })),
+} as const;
+
+describe("parseProcessConfig", () => {
+  it("parses each owner's slice from the environment, keyed by owner name", () => {
+    const config = parseProcessConfig({
+      owners: [github],
+      environment: { GITHUB_APP_ID: "1207" },
+    });
+
+    expect(config.github.appId).toBe("1207");
+    expect(config.github.apiUrl).toBe("https://api.github.com");
+  });
+
+  /** @scenario "The process and every installed module become one parsed object" */
+  it("gives the process one root key and each declaring module its own, holding only its values", () => {
+    const process = {
+      name: "process",
+      config: Config.define((c) => ({ port: c.env("PORT", z.string().default("5560")) })),
+    } as const;
+    const billing = {
+      name: "billing",
+      config: Config.define((c) => ({ plan: c.env("BILLING_PLAN", z.string().default("free")) })),
+    } as const;
+
+    const config = parseProcessConfig({
+      owners: [process, github, billing],
+      environment: { PORT: "7000", GITHUB_APP_ID: "1207", BILLING_PLAN: "pro" },
+    });
+
+    expect(Object.keys(config).toSorted()).toEqual(["billing", "github", "process"]);
+    expect(config.process).toEqual({ port: "7000" });
+    expect(config.billing).toEqual({ plan: "pro" });
+    expect(config.github).toEqual({ appId: "1207", apiUrl: "https://api.github.com" });
+  });
+
+  /** @scenario "A missing required value refuses naming its root, its field and its variable" */
+  it("refuses naming owner.path and the env var, every miss at once", () => {
+    const strict = {
+      name: "strict",
+      config: Config.define((c) => ({
+        one: c.env("STRICT_ONE", z.string()),
+        nested: { two: c.env("STRICT_TWO", z.string()) },
+      })),
+    } as const;
+
+    const refusalsOf = (run: () => unknown): readonly string[] => {
+      try {
+        run();
+        return [];
+      } catch (error) {
+        return error instanceof ConfigParseError ? error.refusals : [];
+      }
+    };
+
+    const refusals = refusalsOf(() => parseProcessConfig({ owners: [strict], environment: {} }));
+    expect(refusals.some((line) => line.startsWith("strict.one ← STRICT_ONE"))).toBe(true);
+    expect(refusals.some((line) => line.startsWith("strict.nested.two ← STRICT_TWO"))).toBe(true);
+  });
+
+  /** @scenario "Two meanings for one variable still refuse" */
+  it("refuses two owners claiming one variable, however they spell it", () => {
+    const a = {
+      name: "a",
+      config: Config.define((c) => ({ host: c.env("BASE_HOST", z.string().optional()) })),
+    } as const;
+    const b = {
+      name: "b",
+      config: Config.define((c) => ({ host: c.env("BASE_HOST", z.string().optional()) })),
+    } as const;
+
+    // One variable carries one meaning. The owner that declares it passes the
+    // parsed value down; a second declaration is a second meaning, not sharing.
+    expect(() => parseProcessConfig({ owners: [a, b], environment: {} })).toThrowError(
+      ConfigCollisionError,
+    );
+  });
+
+  describe("given two owners holding the one exported deployment-fact leaf", () => {
+    /** @scenario "Owners sharing one deployment-fact leaf both parse it" */
+    /** @scenario "One shared deployment fact may be claimed by several modules" */
+    it("admits both claims and hands each owner the same parsed value", () => {
+      const evaluation = {
+        name: "evaluation",
+        config: { ttl: langevalsStagingTtlSeconds },
+      } as const;
+      const workflow = { name: "workflow", config: { ttl: langevalsStagingTtlSeconds } } as const;
+
+      const config = parseProcessConfig({
+        owners: [evaluation, workflow],
+        environment: { LANGEVALS_STAGING_TTL_SECONDS: "120" },
+      });
+
+      expect(config.evaluation.ttl).toBe(120);
+      expect(config.workflow.ttl).toBe(120);
+    });
+
+    /** @scenario "A second leaf for a shared deployment fact still refuses" */
+    it("refuses an owner declaring its own leaf for the same variable", () => {
+      const evaluation = { name: "evaluation", config: { ttl: langevalsStagingTtlSeconds } };
+      const rogue = {
+        name: "rogue",
+        config: Config.define((c) => ({ ttl: c.env("LANGEVALS_STAGING_TTL_SECONDS", z.string()) })),
+      };
+
+      expect(() => parseProcessConfig({ owners: [evaluation, rogue], environment: {} })).toThrow(
+        expect.objectContaining({ code: "config_collision" }),
+      );
+    });
+  });
+
+  describe("given an owner holding the public origin leaf", () => {
+    const automation = { name: "automation", config: { publicBaseUrl } } as const;
+    const read = (environment: Record<string, string | undefined>) =>
+      parseProcessConfig({ owners: [automation], environment }).automation.publicBaseUrl;
+
+    /** @scenario "A blank public origin reads as absent" */
+    it("reads a blank or unset BASE_HOST as no public origin", () => {
+      expect(read({ BASE_HOST: "   " })).toBeUndefined();
+      expect(read({ BASE_HOST: "" })).toBeUndefined();
+      expect(read({})).toBeUndefined();
+      expect(read({ BASE_HOST: " https://app.langwatch.test " })).toBe(
+        "https://app.langwatch.test",
+      );
+    });
+  });
+
+  describe("given an owner holding the engine address leaf", () => {
+    const evaluation = { name: "evaluation", config: { nlpServiceUrl } } as const;
+    const read = (environment: Record<string, string | undefined>) =>
+      parseProcessConfig({ owners: [evaluation], environment }).evaluation.nlpServiceUrl;
+
+    /** @scenario "A blank engine address reads as absent" */
+    it("reads a blank or unset LANGWATCH_NLP_SERVICE as no engine address", () => {
+      expect(read({ LANGWATCH_NLP_SERVICE: "   " })).toBeUndefined();
+      expect(read({ LANGWATCH_NLP_SERVICE: "" })).toBeUndefined();
+      expect(read({})).toBeUndefined();
+      expect(read({ LANGWATCH_NLP_SERVICE: " http://nlp.langwatch.test " })).toBe(
+        "http://nlp.langwatch.test",
+      );
+    });
+  });
+
+  describe("given slack and automation holding the Slack address leaves", () => {
+    const owners = [
+      { name: "slack", config: { slackApiBase } },
+      { name: "automation", config: { slackApiBase, slackWebhookBase } },
+    ] as const;
+
+    /** @scenario "Slack's addresses default to Slack itself" */
+    it("reads unset addresses as Slack's own", () => {
+      const config = parseProcessConfig({ owners, environment: {} });
+      expect(config.slack.slackApiBase).toBe("https://slack.com/api");
+      expect(config.automation.slackApiBase).toBe("https://slack.com/api");
+      expect(config.automation.slackWebhookBase).toBe("https://hooks.slack.com");
+    });
+
+    /** @scenario "A dev stack points Slack's addresses at a stand-in" */
+    it("hands both owners the stand-in's addresses", () => {
+      const sim = "https://outbound.x.langwatch.localhost";
+      const config = parseProcessConfig({
+        owners,
+        environment: { SLACK_API_BASE: `${sim}/api`, SLACK_WEBHOOK_BASE: sim },
+      });
+      expect(config.slack.slackApiBase).toBe(`${sim}/api`);
+      expect(config.automation.slackApiBase).toBe(`${sim}/api`);
+      expect(config.automation.slackWebhookBase).toBe(sim);
+    });
+  });
+
+  /** @scenario "The parsed configuration cannot be mutated" */
+  it("returns frozen slices — the parse's answer is what the process holds", () => {
+    const config = parseProcessConfig({ owners: [github], environment: {} });
+    expect(Object.isFrozen(config)).toBe(true);
+    expect(Object.isFrozen(config.github)).toBe(true);
+  });
+
+  /** @scenario "A module that declares no config schema contributes nothing" */
+  it("owns no slice for an owner that declares none", () => {
+    const config = parseProcessConfig({ owners: [{ name: "bare" }], environment: {} });
+    expect("bare" in config).toBe(false);
+  });
+});
+
+describe("config and secrets stay separate", () => {
+  /** @scenario "A module config schema may not declare a credential" */
+  it("refuses a config leaf claiming an env name any owner declared as a secret", () => {
+    const security = {
+      name: "security",
+      secrets: { key: { id: "SIGNING_KEY" } },
+    } as const;
+    const sneaky = {
+      name: "sneaky",
+      config: Config.define((c) => ({ key: c.env("SIGNING_KEY", z.string().optional()) })),
+    } as const;
+
+    expect(() => parseProcessConfig({ owners: [security, sneaky], environment: {} })).toThrowError(
+      /"sneaky" declares "SIGNING_KEY" as config, but "security" declares it as a secret/,
+    );
+  });
+
+  /** @scenario "A module config schema may not declare a connection string" */
+  it("refuses a module binding a connection string another owner declares as a secret", () => {
+    const stores = {
+      name: "stores",
+      secrets: { databaseUrl: { id: "DATABASE_URL" } },
+    } as const;
+    const sneaky = {
+      name: "sneaky",
+      config: Config.define((c) => ({ url: c.env("DATABASE_URL", z.string().optional()) })),
+    } as const;
+
+    expect(() => parseProcessConfig({ owners: [stores, sneaky], environment: {} })).toThrow(
+      expect.objectContaining({ code: "config_claims_secret" }),
+    );
+  });
+
+  /** @scenario "The process root may declare a secret that is read through the secrets chain" */
+  it("accepts a process owner that declares a secret and carries no value for it", () => {
+    const processRoot = {
+      name: "process",
+      config: Config.define((c) => ({ port: c.env("PORT", z.string().default("5560")) })),
+      secrets: { signingKey: { id: "SIGNING_KEY" } },
+    } as const;
+
+    const config = parseProcessConfig({
+      owners: [processRoot],
+      environment: { SIGNING_KEY: "never-on-config" },
+    });
+
+    expect(config.process.port).toBe("5560");
+    expect(JSON.stringify(config)).not.toContain("never-on-config");
+  });
+
+  /** @scenario "A config leaf under a declared family prefix refuses naming both owners" */
+  it("refuses a config leaf read from a name under a declared secret family's prefix", () => {
+    const stores = {
+      name: "stores",
+      secrets: { clickhouseRoutes: { id: "CLICKHOUSE_URL__", family: true } },
+    } as const;
+    const sneaky = {
+      name: "sneaky",
+      config: Config.define((c) => ({
+        route: c.env("CLICKHOUSE_URL__acme__org_1", z.string().optional()),
+      })),
+    } as const;
+
+    expect(() => parseProcessConfig({ owners: [stores, sneaky], environment: {} })).toThrow(
+      expect.objectContaining({ code: "config_claims_secret" }),
+    );
+  });
+});

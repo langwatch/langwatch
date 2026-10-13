@@ -1,11 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
+import { printEvaluators } from "../test-suites/renderSuiteDetails";
 import { createCliRunPlansService } from "./cli-run-plans-service";
 import { describeScope } from "./scopeFlags";
-import { printEvaluators } from "../test-suites/renderSuiteDetails";
 
 /**
  * Returns the plan rather than printing it: the output port renders it in
@@ -13,9 +14,7 @@ import { printEvaluators } from "../test-suites/renderSuiteDetails";
  *
  * @see specs/features/run-plan-cli.feature
  */
-export const getRunPlanCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const getRunPlanCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = createCliRunPlansService();
@@ -42,9 +41,7 @@ export const getRunPlanCommand = async (
         console.log(
           `    ${chalk.gray("Judge:")}     ${plan.judgeModel ?? chalk.gray("project default")}`,
         );
-        console.log(
-          `    ${chalk.gray("Archived:")}  ${plan.archivedAt ?? chalk.gray("no")}`,
-        );
+        console.log(`    ${chalk.gray("Archived:")}  ${plan.archivedAt ?? chalk.gray("no")}`);
 
         console.log();
         console.log(chalk.bold("  Targets:"));

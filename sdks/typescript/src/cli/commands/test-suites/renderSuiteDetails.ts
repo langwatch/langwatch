@@ -1,4 +1,5 @@
 import chalk from "chalk";
+
 import type {
   EvaluatorAttachment,
   ScenarioMapping,
@@ -21,9 +22,7 @@ export function printSuiteFields(fields: SuiteFieldDefinition[] | undefined): vo
   console.log();
   console.log(chalk.bold("  Fields:"));
   for (const field of fields) {
-    console.log(
-      `    ${chalk.gray("•")} ${field.identifier} ${chalk.gray(`(${field.type})`)}`,
-    );
+    console.log(`    ${chalk.gray("•")} ${field.identifier} ${chalk.gray(`(${field.type})`)}`);
   }
 }
 
@@ -39,14 +38,10 @@ export function printEvaluators(
     const label = name
       ? `${name} ${chalk.gray(`(${attachment.evaluatorId})`)}`
       : attachment.evaluatorId;
-    const gate = attachment.required
-      ? chalk.red("required")
-      : chalk.gray("reports only");
+    const gate = attachment.required ? chalk.red("required") : chalk.gray("reports only");
     console.log(`    ${chalk.gray("•")} ${label} ${chalk.gray("·")} ${gate}`);
     for (const [input, mapping] of Object.entries(attachment.mappings)) {
-      console.log(
-        `        ${chalk.gray(`${input}:`)} ${chalk.cyan(describeMapping(mapping))}`,
-      );
+      console.log(`        ${chalk.gray(`${input}:`)} ${chalk.cyan(describeMapping(mapping))}`);
     }
   }
 }

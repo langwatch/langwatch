@@ -1,18 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { QueryApiError, QueryApiService } from "../query-api.service";
-import { isLangWatchHandledError } from "@/internal/api/errors";
+
 import type { LangwatchApiClient } from "@/internal/api/client";
+import { isLangWatchHandledError } from "@/internal/api/errors";
+
+import { QueryApiError, QueryApiService } from "../query-api.service";
 
 /**
- * The canonical REST envelope a domain refusal answers with
- * (`app/api/shared/schemas.ts`), as it arrives from `/api/v1/query`: at the
- * top level of the body, the same place every other REST family puts it.
- *
- * `query_scan_limit_exceeded` is the real ceiling code, mapped from
- * ClickHouse TOO_MANY_ROWS (158) / TOO_MANY_BYTES (307)
- * (`server/analytics/lwql/errors.ts:15`, `provisioning.ts:181-182`), and it
- * answers 422 — a well-formed query refused on a deliberate ceiling, not a
- * malformed or unauthorized one.
+ * The canonical REST envelope `/api/v1/query` answers a domain refusal
+ * with. `query_scan_limit_exceeded` maps from ClickHouse
+ * TOO_MANY_ROWS(158)/TOO_MANY_BYTES(307) and answers 422, not 400/401.
  */
 const scanCeilingBody = {
   error: {
@@ -50,8 +46,7 @@ const serviceWith = (result: {
   data?: unknown;
   error?: unknown;
   response?: Response;
-}): QueryApiService =>
-  new QueryApiService({ langwatchApiClient: clientWith(result) });
+}): QueryApiService => new QueryApiService({ langwatchApiClient: clientWith(result) });
 
 describe("given a QueryApiService", () => {
   describe("when query() runs a LangWatchQL statement", () => {
@@ -93,8 +88,10 @@ describe("given a QueryApiService", () => {
         sql: "SELECT 1",
       });
 
-      const [, options] = (client.POST as ReturnType<typeof vi.fn>).mock
-        .calls[0] as [string, { body: Record<string, unknown> }];
+      const [, options] = (client.POST as ReturnType<typeof vi.fn>).mock.calls[0] as [
+        string,
+        { body: Record<string, unknown> },
+      ];
       expect(options.body).not.toHaveProperty("jsonrpc");
       expect(options.body).not.toHaveProperty("method");
       expect(options.body).not.toHaveProperty("params");
@@ -201,9 +198,7 @@ describe("given a QueryApiService", () => {
         httpStatus: 401,
         traceId: "1234567890abcdef1234567890abcdef",
       });
-      expect((thrown as Error).message).toContain(
-        "The provided API key is invalid.",
-      );
+      expect((thrown as Error).message).toContain("The provided API key is invalid.");
     });
   });
 });

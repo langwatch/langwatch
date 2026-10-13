@@ -1,4 +1,4 @@
-import { makeRequest } from "./langwatch-api.js";
+import { makeRequest } from "./langwatch-api.ts";
 
 export interface AnnotationResponse {
   id?: string;
@@ -33,14 +33,14 @@ function unwrapData<T>(response: unknown, operation: string): T {
 
 export async function listAnnotations(): Promise<AnnotationResponse[]> {
   return unwrapData<AnnotationResponse[]>(
-    await makeRequest("GET", "/api/annotations"),
+    await makeRequest("GET", "/api/v1/annotations"),
     "listAnnotations",
   );
 }
 
 export async function getAnnotation(id: string): Promise<AnnotationResponse> {
   return unwrapData<AnnotationResponse>(
-    await makeRequest("GET", `/api/annotations/${encodeURIComponent(id)}`),
+    await makeRequest("GET", `/api/v1/annotations/${encodeURIComponent(id)}`),
     "getAnnotation",
   );
 }
@@ -49,7 +49,7 @@ export async function getAnnotationsByTrace(traceId: string): Promise<Annotation
   return unwrapData<AnnotationResponse[]>(
     await makeRequest(
       "GET",
-      `/api/annotations/trace/${encodeURIComponent(traceId)}`,
+      `/api/v1/annotations/trace/${encodeURIComponent(traceId)}`,
     ),
     "getAnnotationsByTrace",
   );
@@ -62,7 +62,7 @@ export async function createAnnotation(
   return unwrapData<AnnotationResponse>(
     await makeRequest(
       "POST",
-      `/api/annotations/trace/${encodeURIComponent(traceId)}`,
+      `/api/v1/annotations/trace/${encodeURIComponent(traceId)}`,
       data,
     ),
     "createAnnotation",
@@ -70,8 +70,8 @@ export async function createAnnotation(
 }
 
 export async function deleteAnnotation(id: string): Promise<{ status?: string; message?: string }> {
-  return makeRequest(
-    "DELETE",
-    `/api/annotations/${encodeURIComponent(id)}`,
-  ) as Promise<{ status?: string; message?: string }>;
+  return makeRequest("DELETE", `/api/v1/annotations/${encodeURIComponent(id)}`) as Promise<{
+    status?: string;
+    message?: string;
+  }>;
 }
