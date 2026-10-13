@@ -601,7 +601,7 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "db",
-		summary: "this stack's data: reset [preset] (drop + migrate + seed) | seed [preset] (drops nothing) | url | prune (stray test/apidiff databases; dry run unless --yes)",
+		summary: "this stack's data: reset [preset] (drop + migrate + seed) | seed [preset] (drops nothing) | url | prune (stray test databases; dry run unless --yes)",
 		args:    "<reset|seed|url|prune> [preset|engine]",
 		maxArgs: 2,
 		flags: []flagSpec{

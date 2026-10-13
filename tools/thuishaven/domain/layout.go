@@ -3,8 +3,8 @@ package domain
 // Layout is the source shape of a checkout: which packages it has, and so
 // which processes a stack of it is made of. This branch is modular (apps/ui +
 // apps/api, two Node lanes); origin/main is the monolith (platform/app, one
-// Node process for both). apidiff and visualdiff boot a base ref as its own
-// haven stack, so haven starts what the checkout defines, not this worktree.
+// Node process for both). A stack may be booted from an older ref, so haven
+// starts what the checkout defines, not this worktree.
 type Layout string
 
 const (

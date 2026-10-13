@@ -55,10 +55,10 @@ func reclaimOrch(now time.Time, f reclaimFixture) *Orchestrator {
 	return o
 }
 
-// @scenario "A temporary worktree left by a diff tool is reclaimed after a day"
+// @scenario "A temporary worktree left by an agent lane is reclaimed after a day"
 // @scenario "A worktree on an agent-minted branch is reclaimed after a day"
 // @scenario "A temporary worktree touched this morning is left alone"
-// @scenario "A diff drive is judged by its directory, not by the ref it checked out"
+// @scenario "A temporary worktree is judged by its directory, not by the ref it checked out"
 // @scenario "A worktree whose branch is already on main is reclaimed"
 // @scenario "A worktree with uncommitted changes is never reclaimed, whatever its age"
 // @scenario "A worktree with a stack running from it is never reclaimed"
@@ -74,38 +74,23 @@ func TestClassifyingWorktreesForReclaim(t *testing.T) {
 		want    domain.WorktreeClass
 	}{
 		{
-			name:    "given a detached worktree the apidiff tool left behind",
-			fixture: reclaimFixture{dir: reclaimRepoRoot + "/.apidiff/base", lastSeen: yesterday},
-			want:    domain.ClassTemporary,
-		},
-		{
 			name:    "given a detached worktree under .claude/worktrees",
 			fixture: reclaimFixture{dir: reclaimRepoRoot + "/.claude/worktrees/lane-a", lastSeen: yesterday},
 			want:    domain.ClassTemporary,
 		},
 		{
-			name:    "given a visual-diff drive beside the checkout",
-			fixture: reclaimFixture{dir: "/repos/worktrees/visual-7601", lastSeen: yesterday},
-			want:    domain.ClassTemporary,
-		},
-		{
-			name:    "given an apidiff drive the tool put in the system temp dir",
-			fixture: reclaimFixture{dir: "/private/tmp/apidiff-4c41001475-candidate", lastSeen: yesterday},
-			want:    domain.ClassTemporary,
-		},
-		{
-			name:    "given a visual-diff pair checked out inside a job's own scratch",
-			fixture: reclaimFixture{dir: "/Users/dev/.claude/jobs/ab12/tmp/visual/vd3/base", lastSeen: yesterday},
+			name:    "given a worktree checked out inside a job's own scratch",
+			fixture: reclaimFixture{dir: "/Users/dev/.claude/jobs/ab12/tmp/lane/base", lastSeen: yesterday},
 			want:    domain.ClassTemporary,
 		},
 		{
 			// The regression this guards: LastActivity reads HEAD's committer date,
-			// and a diff drive checks out whatever ref it is comparing — so a
-			// minutes-old comparison of a year-old tag reads as a year idle. The
-			// temporary clock is the directory's own mtime for exactly this reason.
-			name: "given a diff drive created minutes ago at a year-old ref",
+			// and a scratch worktree may check out any ref — so a minutes-old
+			// checkout of a year-old tag reads as a year idle. The temporary
+			// clock is the directory's own mtime for exactly this reason.
+			name: "given a temporary worktree created minutes ago at a year-old ref",
 			fixture: reclaimFixture{
-				dir:      "/private/tmp/apidiff-99-base",
+				dir:      reclaimRepoRoot + "/.claude/worktrees/old-tag",
 				lastSeen: now.Add(-365 * 24 * time.Hour),
 				touched:  now.Add(-5 * time.Minute),
 			},
@@ -138,7 +123,7 @@ func TestClassifyingWorktreesForReclaim(t *testing.T) {
 		},
 		{
 			name:    "given a month-old temporary worktree holding uncommitted changes",
-			fixture: reclaimFixture{dir: reclaimRepoRoot + "/.apidiff/head", dirty: true, lastSeen: old},
+			fixture: reclaimFixture{dir: reclaimRepoRoot + "/.claude/worktrees/head", dirty: true, lastSeen: old},
 			want:    domain.ClassNone,
 		},
 		{

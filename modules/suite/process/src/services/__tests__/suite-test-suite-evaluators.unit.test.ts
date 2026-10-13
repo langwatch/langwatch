@@ -120,12 +120,12 @@ describe("a test suite's evaluators", () => {
           testSuiteId: "suite-1",
           projectId,
           name: "Checkout",
-          fields: [{ identifier: "apidiff", type: "text" }],
-          evaluators: [attachment("apidiff")],
+          fields: [{ identifier: "accuracy", type: "text" }],
+          evaluators: [attachment("accuracy")],
         }),
       ).rejects.toMatchObject({
         code: "suite_evaluator_not_found",
-        meta: { evaluatorId: "apidiff" },
+        meta: { evaluatorId: "accuracy" },
       });
       expect(writes).toEqual([]);
     });

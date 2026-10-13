@@ -197,4 +197,4 @@ they're docs assets under `docs/images/ai-governance/`.
 
 - Parameterize `dogfood-claude-code-install.ts (deleted 2026-09-17, one-off script)` by slug → single walker for all 3 templates
 - Add fresh-user walker (currently manual)
-- Add automated assertion runner that consumes ClickHouse query gates (currently visual diff only)
+- Add automated assertion runner that consumes ClickHouse query gates (currently checked by eye)

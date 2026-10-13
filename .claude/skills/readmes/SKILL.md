@@ -24,7 +24,7 @@ The extractor runs under `node` from `packages/architecture-enforcer`, so it nee
 and prepared workspace (`pnpm install`, `pnpm start:prepare:files`, `pnpm ensure:built`). It mounts
 the api describe-only for the REST cross-check; when that mount fails the check is skipped with
 "REST cross-check skipped". It also imports the installed REST declarations and every
-`defineTrpcContract` file to convert their zod schemas, as `tools/apidiff` does; when one of those
+`defineTrpcContract` file to convert their zod schemas; when one of those
 imports fails the run stops with "the zod schemas could not be read", so a page never loses its
 contracts because the checkout was unprepared.
 

@@ -11,7 +11,6 @@ Feature: The project.* browser namespace is served by the application the compos
   # over its module's application, so a member the door names and the
   # application does not serve is not caught at the seam — it is a TypeError on
   # the first access, which the boundary degrades to a generic "unknown".
-  # apidiff never saw this family, because apidiff probes REST only.
   #
   # These scenarios are bound to tests that build the REAL ProjectModule over its
   # own repository interface and reach it through that same proxy.

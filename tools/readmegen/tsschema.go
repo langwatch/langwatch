@@ -10,7 +10,7 @@ import (
 // maxPrintedLines is the longest declaration printed inline; a longer one links to its source.
 const maxPrintedLines = 12
 
-// Schemas is every JSON Schema the extractor converted from zod, as apidiff converts them.
+// Schemas is every JSON Schema the extractor converted from zod.
 type Schemas struct {
 	Rest   []RestSchemas `json:"rest"`
 	Trpc   []TrpcSchemas `json:"trpc"`

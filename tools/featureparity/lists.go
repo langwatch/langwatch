@@ -61,7 +61,6 @@ var (
 		"tools/linkcheck",
 		"cmd/linkcheck",
 		"cmd/service",
-		"tools/apidiff",
 		"tools/upgradelab",
 		"services/sims/telemetrysim",
 		"infra/clickhouse-serverless",

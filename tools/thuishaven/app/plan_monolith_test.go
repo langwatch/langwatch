@@ -14,7 +14,7 @@ import (
 // processes sit behind them.
 func monolithStack() domain.Stack {
 	return domain.Stack{
-		Slug: "apidiff-run-base", Layout: domain.LayoutMonolith, APIPort: 46001,
+		Slug: "run-base", Layout: domain.LayoutMonolith, APIPort: 46001,
 		Services: []domain.Service{
 			{Name: "app", Port: 46000},
 			{Name: "gateway", Port: 46003},

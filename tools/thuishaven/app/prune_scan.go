@@ -212,7 +212,7 @@ func (o *Orchestrator) scanMeta(row PruneRow, chDBs, pgDBs []string, now time.Ti
 		}
 	}
 	// The temporary rule reads the directory's own mtime, never LastActivity's
-	// committer date: a diff drive checked out at an old ref would otherwise read
+	// committer date: a scratch worktree checked out at an old ref would otherwise read
 	// as months idle the moment it was created.
 	var untouched time.Duration
 	touchedAt, untouchedKnown := o.hyg.LastTouched(row.Dir)

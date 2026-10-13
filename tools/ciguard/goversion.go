@@ -304,7 +304,7 @@ func goDockerfileImages(repoRoot, want string) ([]string, error) {
 // isSkippedDir also skips scratch trees and linked worktrees (a .git file).
 func isSkippedDir(path, name string) bool {
 	switch name {
-	case "node_modules", ".git", "dist", ".apidiff", ".visualdiff", ".fuzz", ".worktrees", ".claude", ".bin":
+	case "node_modules", ".git", "dist", ".fuzz", ".worktrees", ".claude", ".bin":
 		return true
 	}
 	info, err := os.Lstat(filepath.Join(path, ".git"))

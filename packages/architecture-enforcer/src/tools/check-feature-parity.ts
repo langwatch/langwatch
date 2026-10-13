@@ -230,7 +230,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // satisfied by Go tests and by nothing else.
   "services/sims/mailsim",
   // The other simulators haven runs (LLM, storage, analytics, voice, outbound,
-  // telemetry) and the diff and fuzz suites: their specs/setup scenarios bind
+  // telemetry) and the fuzz and worker suites: their specs/setup scenarios bind
   // only from Go tests.
   "services/sims/llmsim",
   "services/sims/storagesim",
@@ -271,11 +271,6 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // identity each keeps and which address variable each binds are asserted
   // here and nowhere else.
   "cmd/service",
-  // apidiff: how it boots its two instances - one haven stack per instance
-  // under its own run-scoped slug, and a teardown that can only reach the
-  // slugs it started (specs/tooling/apidiff-on-haven.feature) - is asserted by
-  // these Go tests and by nothing else.
-  "tools/apidiff",
   // upgradelab: snapshot format, restore guards, scrub and generation (specs/upgrade/*.feature)
   // are asserted by these Go tests only.
   "tools/upgradelab",

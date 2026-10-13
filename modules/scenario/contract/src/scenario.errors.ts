@@ -91,7 +91,7 @@ export class ScenarioVersionNotFoundError extends NotFoundError {
 /**
  * Reserved-set runs are refused to protect plan aggregates; see
  * specs/scenarios/reserved-set-write-guard.feature. This error preserves the
- * known 404 instead of a generic 500 (apidiff run 20260916-r6).
+ * known 404 instead of a generic 500.
  */
 export class SimulationRunNotFoundError extends NotFoundError {
   declare readonly code: "simulation_run_not_found";

@@ -1,5 +1,4 @@
-// Request and response JSON Schemas for the readmegen extractor, converted the
-// way tools/apidiff/inventory/branch-trpc.mjs converts them: REST from the
+// Request and response JSON Schemas for the readmegen extractor: REST from the
 // installed declarations, tRPC from every contract that calls defineTrpcContract.
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";

@@ -116,7 +116,8 @@ hold a few GiB. `haven up +langevals` (sticky) runs `services/langevals` with
 `LANGEVALS_ENDPOINT` at it for every lane. Without it, `.env`'s
 `LANGEVALS_ENDPOINT` stands, and nothing listens there unless you run
 `make -C services/langevals start` yourself. The first start syncs the Python
-dependencies, which takes a few minutes. 
+dependencies, which takes a few minutes.
+
 The six simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`) each serve a
 console at `<name>.<slug>.langwatch.localhost`, appear as rows in the hub and the stack
 home, and log through `haven logs <name>`. `mail`, `idp` and `storage` run by default

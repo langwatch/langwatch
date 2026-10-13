@@ -1,7 +1,6 @@
 Feature: Reclaiming disk — temporary and merged worktrees, and agent job scratch
-  A machine running several agents fills up in two places nobody looks at. Diff
-  tools and agent lanes leave detached worktrees behind under .apidiff/,
-  .claude/worktrees/ and worktrees/visual-*; branches get merged into main and
+  A machine running several agents fills up in two places nobody looks at. Agent
+  lanes leave detached worktrees behind under .claude/worktrees/; branches get merged into main and
   their worktrees stay on disk for weeks. Meanwhile every agent job keeps a
   directory under ~/.claude/jobs holding its record and the scratch it produced
   getting there — a single finished run can hold thirteen gigabytes of tmp/.
@@ -35,8 +34,8 @@ Feature: Reclaiming disk — temporary and merged worktrees, and agent job scrat
     Given a machine with several worktrees and a directory of agent jobs
 
   @unit
-  Scenario: A temporary worktree left by a diff tool is reclaimed after a day
-    Given a detached worktree under the repository's .apidiff directory
+  Scenario: A temporary worktree left by an agent lane is reclaimed after a day
+    Given a detached worktree under the repository's .claude/worktrees directory
     And it has no uncommitted changes and no stack running from it
     And nothing has touched it for more than a day
     When haven classifies the worktrees
@@ -50,8 +49,8 @@ Feature: Reclaiming disk — temporary and merged worktrees, and agent job scrat
     Then it is classified temporary
 
   @unit
-  Scenario: A diff drive is judged by its directory, not by the ref it checked out
-    Given a diff worktree created minutes ago at a year-old ref
+  Scenario: A temporary worktree is judged by its directory, not by the ref it checked out
+    Given a temporary worktree created minutes ago at a year-old ref
     When haven classifies the worktrees
     Then it is not offered for reclaim, because nothing has been written in it since
 
