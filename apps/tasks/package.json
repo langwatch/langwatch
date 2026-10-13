@@ -56,7 +56,6 @@
     "@langwatch/entitlement-process": "workspace:*",
     "@langwatch/evaluation-process": "workspace:*",
     "@langwatch/evaluator-process": "workspace:*",
-    "@langwatch/eventing": "workspace:*",
     "@langwatch/experiment-process": "workspace:*",
     "@langwatch/feature-flag-process": "workspace:*",
     "@langwatch/gateway-process": "workspace:*",
@@ -109,6 +108,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
