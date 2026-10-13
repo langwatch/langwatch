@@ -134,7 +134,7 @@ catalog:
   nanoid: ^6.0.0
   next-themes: ^0.4.6
   node-pty: ^1.0.0
-  nodemailer: ^9.0.3
+  nodemailer: ^10.0.14
   nprogress: ^0.2.0
   numeral: ^2.0.6
   openapi-types: ^12.1.3
