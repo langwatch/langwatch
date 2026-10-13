@@ -1,0 +1,21 @@
+-- Backs every case-insensitive address lookup on "User" (lower("email") = lower($1)).
+-- Prisma's insensitive `equals` compiled to ILIKE, which no index serves, so each lookup
+-- read the whole table; the identity identifier backfill made one per user.
+-- Not declarable in schema.prisma (no expression indexes), noted on User.email instead.
+--
+-- ops pre-build: on any install with real traffic, run this ahead of the release, outside
+-- a transaction, so the build never blocks writes to "User":
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS "User_email_lower_idx" ON "User" (lower("email"));
+-- The statement below then finds it built and does nothing. A failed concurrent build
+-- leaves an invalid index under this name that IF NOT EXISTS skips; check
+--   SELECT indisvalid FROM pg_index WHERE indexrelid = '"User_email_lower_idx"'::regclass;
+-- and DROP INDEX CONCURRENTLY IF EXISTS "User_email_lower_idx" before retrying.
+--
+-- Left to this statement, the build holds a SHARE lock on "User" while it runs: reads go on,
+-- writes (sign-up, last-login stamps) wait. That is milliseconds on a fresh install and
+-- seconds on a million rows, which is why the pre-build above is the production path.
+CREATE INDEX IF NOT EXISTS "User_email_lower_idx" ON "User" (lower("email"));
+
+-- Down (manual rollback; uncomment and run). The index holds no data; lookups fall back
+-- to a full read of "User". Outside a transaction, the concurrent drop does not block:
+-- DROP INDEX CONCURRENTLY IF EXISTS "User_email_lower_idx";

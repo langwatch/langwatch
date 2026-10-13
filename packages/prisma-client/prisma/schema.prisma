@@ -180,6 +180,7 @@ model Session {
 model User {
   id                            String                   @id @default(nanoid())
   name                          String?
+  /// Case-insensitive reads use the lower("email") index in 20261013120000_user_email_lower_index.
   email                         String?                  @unique
   emailVerified                 Boolean                  @default(false)
   signupConfirmationPending     Boolean                  @default(false)
@@ -300,6 +301,7 @@ model Identifier {
   id                String    @id
   userId            String
   provider          String
+  /// Case-insensitive reads use the lower("value") index in 20261013120100_identifier_value_lower_index.
   value             String?
   domain            String?
   identifierHash    String?

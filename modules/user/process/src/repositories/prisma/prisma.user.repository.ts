@@ -229,8 +229,17 @@ export class PrismaUserRepository
   }
 
   async findByEmail(email: string): Promise<UserProfile[]> {
+    // Raw so the lower("email") index serves it; Prisma's insensitive `equals` is unindexed ILIKE.
+    const matches = await this.#database.$queryRaw<{ id: string }[]>`
+      ${skipTenantCheck({
+        // An address names one account install-wide; users belong to no single tenant.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT "id" FROM "User" WHERE lower("email") = lower(${email})
+    `;
+    if (matches.length === 0) return [];
     const rows = await this.prisma.user.findMany({
-      where: { email: { equals: email, mode: "insensitive" } },
+      where: { id: { in: matches.map((match) => match.id) } },
       select: userProfileSelect,
       orderBy: { createdAt: "asc" },
     });

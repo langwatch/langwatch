@@ -1,4 +1,5 @@
 import type { BackfillIdentifierRow } from "@langwatch/identity-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { UserNotFoundError } from "@langwatch/user-contract";
 
@@ -64,8 +65,17 @@ export class PrismaIdentityBackfillRepository implements IdentityBackfillReposit
   }: {
     normalizedValue: string;
   }): Promise<BackfillUserRow[]> {
+    // Raw so the lower("email") index serves it; Prisma's insensitive `equals` is unindexed ILIKE.
+    const matches = await this.prisma.$queryRaw<{ id: string }[]>`
+      ${skipTenantCheck({
+        // An address names one account fleet-wide or it names nobody.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT "id" FROM "User" WHERE lower("email") = lower(${normalizedValue}) ORDER BY "id" ASC
+    `;
+    if (matches.length === 0) return [];
     const users = await this.prisma.user.findMany({
-      where: { email: { equals: normalizedValue, mode: "insensitive" } },
+      where: { id: { in: matches.map((match) => match.id) } },
       select: BACKFILL_USER_COLUMNS,
       orderBy: { id: "asc" },
     });

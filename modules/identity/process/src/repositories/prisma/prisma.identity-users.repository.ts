@@ -84,10 +84,13 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
    * users still count as holders, since the unique index still enforces it.
    */
   async findUserIdsByEmail({ normalizedValue }: { normalizedValue: string }): Promise<string[]> {
-    const users = await this.database.user.findMany({
-      where: { email: { equals: normalizedValue, mode: "insensitive" } },
-      select: { id: true },
-    });
+    const users = await this.database.$queryRaw<{ id: string }[]>`
+      ${skipTenantCheck({
+        // An address names one account fleet-wide or it names nobody.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT "id" FROM "User" WHERE lower("email") = lower(${normalizedValue})
+    `;
     return users.map((user) => user.id);
   }
 }
