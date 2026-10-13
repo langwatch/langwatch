@@ -87,7 +87,7 @@ jobs:
           # Scoped: see the note in langevals-ci.yml. These two were the only
           # unscoped buildx caches left, which meant they shared one.
           cache-from: type=gha,scope=langwatch-nlp
-          cache-to: type=gha,mode=max,scope=langwatch-nlp
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,mode=max,scope=langwatch-nlp' || '' }}
 
   langwatch-nlp-complete:
     needs: [changes, docker-build]
