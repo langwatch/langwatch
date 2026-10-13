@@ -38,7 +38,7 @@ export class InstantEvalAccessService {
   private readonly optIns: InstantEvalOptInReader;
   private readonly isJudgeConfigured: () => boolean;
   private readonly judge: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
-  private readonly hostedPlans: InstantEvalPlanReader | undefined;
+  private readonly hostedPlans: InstantEvalPlanReader | null;
 
   private constructor(options: {
     flags: InstantEvalFlagReader;
@@ -47,7 +47,7 @@ export class InstantEvalAccessService {
     optIns: InstantEvalOptInReader;
     isJudgeConfigured: () => boolean;
     judge: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
-    hostedPlans: InstantEvalPlanReader | undefined;
+    hostedPlans: InstantEvalPlanReader | null;
   }) {
     this.flags = options.flags;
     this.projects = options.projects;
@@ -81,10 +81,10 @@ export class InstantEvalAccessService {
     /** The judge, where it judges for some organizations and not others. */
     judge?: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
     /**
-     * Given on the hosted service only: an enterprise organization is released by the flag, a
-     * self-serve one by its own switch, so neither answers for the other.
+     * The plan on the hosted service, null on a self-hosted install: required, so a forgotten
+     * wiring fails to compile instead of falling back to the self-hosted rule.
      */
-    hostedPlans?: InstantEvalPlanReader;
+    hostedPlans: InstantEvalPlanReader | null;
   }): InstantEvalAccessService {
     return new InstantEvalAccessService({
       flags,

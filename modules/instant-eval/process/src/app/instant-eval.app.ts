@@ -215,9 +215,9 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       },
       isJudgeConfigured: () => setup.config.classifier !== "null",
       judge,
-      ...(setup.config.isSaas
-        ? { hostedPlans: { isEnterprisePlan: InstantEvalModule.isEnterprisePlanOf(setup) } }
-        : {}),
+      hostedPlans: setup.config.isSaas
+        ? { isEnterprisePlan: InstantEvalModule.isEnterprisePlanOf(setup) }
+        : null,
     });
     const optIns = InstantEvalModule.optInsOf({ setup, access });
     const reads = InstantEvalReadsService.create({

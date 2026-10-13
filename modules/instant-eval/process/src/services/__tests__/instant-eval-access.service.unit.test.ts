@@ -36,13 +36,13 @@ function gate({
   flags = LOUD_FLAGS,
   projects = LOUD_PROJECTS,
   optIns = NEVER_OPTED_IN,
-  hostedPlans,
+  hostedPlans = null,
 }: {
   isJudgeConfigured: () => boolean;
   flags?: InstantEvalFlagReader;
   projects?: InstantEvalProjectReader;
   optIns?: InstantEvalOptInReader;
-  hostedPlans?: InstantEvalPlanReader;
+  hostedPlans?: InstantEvalPlanReader | null;
 }) {
   return InstantEvalAccessService.create({
     flags,
@@ -138,6 +138,7 @@ describe("given a judge that judges for some organizations and not others", () =
         projects,
         optIns: NEVER_OPTED_IN,
         isJudgeConfigured: () => true,
+        hostedPlans: null,
         judge: {
           isAvailableForOrganization: async (organizationId) => {
             asked.push(organizationId);
@@ -159,6 +160,7 @@ describe("given a judge that judges for some organizations and not others", () =
         projects,
         optIns: NEVER_OPTED_IN,
         isJudgeConfigured: () => true,
+        hostedPlans: null,
         judge: { isAvailableForOrganization: async () => true },
       });
 
@@ -305,6 +307,7 @@ describe("given a self-hosted install that judges through LangWatch, with the re
         judgesThroughConnect: true,
         optIns: LOUD_OPT_INS,
         isJudgeConfigured: () => true,
+        hostedPlans: null,
         judge: { isAvailableForOrganization: async () => true },
       });
 
@@ -322,6 +325,7 @@ describe("given a self-hosted install that judges through LangWatch, with the re
         judgesThroughConnect: true,
         optIns: NEVER_OPTED_IN,
         isJudgeConfigured: () => true,
+        hostedPlans: null,
         judge: { isAvailableForOrganization: async () => false },
       });
 
@@ -341,6 +345,7 @@ describe("given a self-hosted install with judging turned off, with the release 
         judgesThroughConnect: false,
         optIns: NEVER_OPTED_IN,
         isJudgeConfigured: () => true,
+        hostedPlans: null,
         judge: {
           isAvailableForOrganization: () => {
             throw new Error("the gate read the license");

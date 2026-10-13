@@ -8,7 +8,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const accessQueryMock = vi.fn();
 
-// The browser's flag read says on for every test, so only the server's answer can release.
+// A guard: the hook no longer reads the flag, so a returning browser flag read meets "on" here
+// and only the server's answer can still release.
 vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
