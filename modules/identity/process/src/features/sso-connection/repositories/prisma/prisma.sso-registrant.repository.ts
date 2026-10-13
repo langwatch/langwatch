@@ -1,6 +1,5 @@
 import { LIVE_IDENTIFIER_STATES, normalizeIdentifierValue } from "@langwatch/identity-contract";
-import { skipTenantCheck } from "@langwatch/prisma-client";
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
   SsoAccountKey,
@@ -12,7 +11,7 @@ import type {
 /** The models the gate's and the user resolver's person questions are read through. */
 type PrismaSsoRegistrantDatabase = Pick<
   PrismaClient,
-  "user" | "identifier" | "account" | "accountCredential" | "passkey" | "$queryRaw"
+  "user" | "identifier" | "account" | "accountCredential" | "passkey"
 >;
 
 /** An address somebody proved and still holds. `verifiedAt` alone would also
@@ -75,18 +74,11 @@ export class PrismaSsoRegistrantReadRepository implements SsoRegistrantReadRepos
   }
 
   async findUsersByEmail({ email }: { email: string }): Promise<SsoResolutionCandidate[]> {
-    // Raw so the lower("email") index serves it; Prisma's insensitive `equals` is unindexed ILIKE.
-    const rows = await this.database.$queryRaw<
-      { id: string; emailVerified: boolean; deactivatedAt: Date | null }[]
-    >`
-      ${skipTenantCheck({
-        // An address or a subject names one person fleet-wide or it names nobody.
-        SKIP_TENANT_CHECK: true,
-      })}
-      SELECT "id", "emailVerified", "deactivatedAt" FROM "User"
-      WHERE lower("email") = lower(${email})
-      LIMIT 2
-    `;
+    const rows = await this.database.user.findMany({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: { id: true, emailVerified: true, deactivatedAt: true },
+      take: 2,
+    });
     return rows.map((row) => ({
       id: row.id,
       emailVerified: row.emailVerified,
@@ -137,22 +129,18 @@ export class PrismaSsoRegistrantReadRepository implements SsoRegistrantReadRepos
     email: string;
     accountKey: SsoAccountKey;
   }): Promise<boolean> {
-    // Raw so the lower("value") index serves the address half; see findUsersByEmail.
-    const conflicts = await this.database.$queryRaw<{ id: string }[]>`
-      ${skipTenantCheck({
-        // An address or a subject names one person fleet-wide or it names nobody.
-        SKIP_TENANT_CHECK: true,
-      })}
-      SELECT "id" FROM "Identifier"
-      WHERE "userId" <> ${userId}
-        AND "state" IN (${Prisma.join([...LIVE_IDENTIFIER_STATES])})
-        AND (
-          lower("value") = lower(${email})
-          OR ("issuer" = ${accountKey.issuer} AND "providerAccountId" = ${accountKey.accountId})
-        )
-      LIMIT 1
-    `;
-    return conflicts.length > 0;
+    const conflict = await this.database.identifier.findFirst({
+      where: {
+        userId: { not: userId },
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+        OR: [
+          { value: { equals: email, mode: "insensitive" } },
+          { issuer: accountKey.issuer, providerAccountId: accountKey.accountId },
+        ],
+      },
+      select: { id: true },
+    });
+    return conflict !== null;
   }
 
   async hasStoredCredential({ userId }: { userId: string }): Promise<boolean> {
@@ -177,34 +165,29 @@ export class PrismaSsoRegistrantReadRepository implements SsoRegistrantReadRepos
     email: string;
     accountKey: SsoAccountKey;
   }): Promise<boolean> {
-    // Raw for the lower("value") index. The NOT excludes the pending address SCIM's bridge
-    // records for the person themself, which proves no way in.
-    const identifiers = await this.database.$queryRaw<{ id: string }[]>`
-      ${skipTenantCheck({
-        // An address or a subject names one person fleet-wide or it names nobody.
-        SKIP_TENANT_CHECK: true,
-      })}
-      SELECT "id" FROM "Identifier"
-      WHERE "state" IN (${Prisma.join([...LIVE_IDENTIFIER_STATES])})
-        AND NOT (
-          "userId" = ${userId}
-          AND "provider" = 'email'
-          AND "value" IS NOT NULL
-          AND lower("value") = lower(${email})
-          AND "state" = 'ATTACHED'
-          AND "verifiedAt" IS NULL
-          AND "accountId" IS NULL
-          AND "providerId" IS NULL
-          AND "issuer" IS NULL
-          AND "providerAccountId" IS NULL
-        )
-        AND (
-          "userId" = ${userId}
-          OR ("issuer" = ${accountKey.issuer} AND "providerAccountId" = ${accountKey.accountId})
-          OR lower("value") = lower(${email})
-        )
-      LIMIT 1
-    `;
-    return identifiers.length > 0;
+    const identifier = await this.database.identifier.findFirst({
+      where: {
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+        // SCIM's bridge records the pending address without proving a way in.
+        NOT: {
+          userId,
+          provider: "email",
+          value: { not: null, equals: email, mode: "insensitive" },
+          state: "ATTACHED",
+          verifiedAt: null,
+          accountId: null,
+          providerId: null,
+          issuer: null,
+          providerAccountId: null,
+        },
+        OR: [
+          { userId },
+          { issuer: accountKey.issuer, providerAccountId: accountKey.accountId },
+          { value: { equals: email, mode: "insensitive" } },
+        ],
+      },
+      select: { id: true },
+    });
+    return identifier !== null;
   }
 }

@@ -1,4 +1,3 @@
-import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
@@ -6,8 +5,8 @@ import type {
   LegacySignInAccount,
 } from "../identity-signin-accounts.repository.ts";
 
-/** The one model the legacy sign-in answer is read through, and the raw read that finds the row. */
-type PrismaIdentitySignInAccountsDatabase = Pick<PrismaClient, "user" | "$queryRaw">;
+/** The one model the legacy sign-in answer is read through. */
+type PrismaIdentitySignInAccountsDatabase = Pick<PrismaClient, "user">;
 
 /** better-auth's own provider name for an email-and-password sign-in method. */
 const CREDENTIAL_PROVIDER = "credential";
@@ -44,17 +43,8 @@ export class PrismaIdentitySignInAccountsRepository implements IdentitySignInAcc
   }: {
     normalizedValue: string;
   }): Promise<LegacySignInAccount[]> {
-    // Raw so the lower("email") index serves it; Prisma's insensitive `equals` is unindexed ILIKE.
-    const [match] = await this.database.$queryRaw<{ id: string }[]>`
-      ${skipTenantCheck({
-        // An address names one account fleet-wide or it names nobody.
-        SKIP_TENANT_CHECK: true,
-      })}
-      SELECT "id" FROM "User" WHERE lower("email") = lower(${normalizedValue}) LIMIT 1
-    `;
-    if (!match) return [];
-    const user = await this.database.user.findUnique({
-      where: { id: match.id },
+    const user = await this.database.user.findFirst({
+      where: { email: { equals: normalizedValue, mode: "insensitive" } },
       select: {
         id: true,
         // The subject rides along for exactly one reader: the connection
