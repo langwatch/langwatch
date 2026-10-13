@@ -1,4 +1,4 @@
-import { createDashboard as apiCreateDashboard } from "../langwatch-api-dashboards.js";
+import { createDashboard as apiCreateDashboard } from "../langwatch-api-dashboards.ts";
 
 export async function handleCreateDashboard(params: { name: string }): Promise<string> {
   const dashboard = await apiCreateDashboard({ name: params.name });

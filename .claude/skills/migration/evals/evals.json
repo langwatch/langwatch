@@ -1,0 +1,29 @@
+{
+  "skill_name": "migration",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We are renaming the event type lw.experiment.run_finished to lw.experiment.run_completed. Write a migration that updates the stored rows in event_log.",
+      "expected_output": "Refuses to rewrite the log first (record §9, Alex 2026-10-06). Declares .withUpcasts({ events: [{ from: { type: 'lw.experiment.run_finished' }, to: 'lw.experiment.run_completed' }] }) on the owning pipeline after .withEvents, with drain if jobs queued under a former pipeline's keys must reach the new lanes. Says the ledger step upcast:<pipeline>:<stored type> is derived, not written. Notes the rewrite step is not landed (@unimplemented in packages/eventing/specs/event-upcast.feature), so the upcast stays until it is, and any delete of originals is an operator step confirmed in Ops. Routes the details to eventing-and-worker.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "This PR stops reading Project.legacyKey. Add the DROP COLUMN in the same PR so we don't forget it.",
+      "expected_output": "Does not put a DROP COLUMN in any migration file: the drop-table-or-column guard refuses it and a retirement note does not excuse it. Stops reading and writing the column, marks it `/// retired: unread since <release>` in schema.prisma, and leaves the drop as an operator step confirmed in Ops once old writers are gone. No release is a required stop.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I added a Prisma migration. The api now refuses to start saying a blocking step is not done. Can I make the api run pending migrations on boot so dev is easier?",
+      "expected_output": "No: api and worker never migrate (record §7, ADR-173); the serving gate refuses by name until `upgrade` has run. Apply with `pnpm start:prepare:db` (`pnpm task upgrade`), not raw `prisma migrate` or `goose`, which bypass the ledger so the gate keeps refusing (the root `pnpm prisma:migrate` and `pnpm clickhouse:migrate` aliases go through `pnpm task upgrade`). Points to `pnpm task upgrade status` to see what is outstanding.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Backfill the new Organization.billingCountry column from Stripe for existing organizations. Put it in the Prisma migration as an UPDATE.",
+      "expected_output": "Inline SQL is only for rows of a table the same migration creates (an UPDATE or DELETE on an existing table is refused); a backfill that needs an external service or a peer *Api is a defineMigrationStep in the owning module's .withMigrations, kind data, mode background, run on the worker. Writers must set the new column from the release that adds it, because a fresh install plans data steps by mode and a step is never the only way a row becomes correct. Routes the recipe to migration-data-step and the column to postgres-migration (nullable or DEFAULT, ADD COLUMN IF NOT EXISTS).",
+      "files": []
+    }
+  ]
+}

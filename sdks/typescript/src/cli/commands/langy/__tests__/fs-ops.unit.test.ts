@@ -6,7 +6,9 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { LocalCallFailure } from "../errors";
 import {
   editFile,
@@ -41,10 +43,7 @@ describe("given a shared folder with a link that leaves it", () => {
     fs.mkdirSync(path.join(root, "build"));
     fs.writeFileSync(path.join(root, "build", "app.py"), "print('built')\n");
     fs.mkdirSync(path.join(root, "node_modules", "left"), { recursive: true });
-    fs.writeFileSync(
-      path.join(root, "node_modules", "left", "app.py"),
-      "print('vendor')\n",
-    );
+    fs.writeFileSync(path.join(root, "node_modules", "left", "app.py"), "print('vendor')\n");
     fs.symlinkSync(outside, path.join(root, "escape"));
   });
 
@@ -84,9 +83,7 @@ describe("given a shared folder with a link that leaves it", () => {
     });
 
     it("allows a path inside the folder", () => {
-      expect(insideRoot({ target: "src/app.py", root })).toBe(
-        path.join(root, "src", "app.py"),
-      );
+      expect(insideRoot({ target: "src/app.py", root })).toBe(path.join(root, "src", "app.py"));
     });
   });
 
@@ -123,9 +120,7 @@ describe("given a shared folder with a link that leaves it", () => {
         root,
       });
       expect(answer).toContain("src/deep/new.py");
-      expect(fs.readFileSync(path.join(root, "src/deep/new.py"), "utf8")).toBe(
-        "print('x')\n",
-      );
+      expect(fs.readFileSync(path.join(root, "src/deep/new.py"), "utf8")).toBe("print('x')\n");
     });
   });
 
@@ -139,9 +134,7 @@ describe("given a shared folder with a link that leaves it", () => {
         root,
       });
       expect(answer).toContain("1 edit");
-      expect(fs.readFileSync(path.join(root, "README.md"), "utf8")).toContain(
-        "# Acme Shop",
-      );
+      expect(fs.readFileSync(path.join(root, "README.md"), "utf8")).toContain("# Acme Shop");
     });
 
     it("refuses an old text that is not there", () => {
@@ -174,9 +167,7 @@ describe("given a shared folder with a link that leaves it", () => {
         thrown = error;
       }
       expect((thrown as LocalCallFailure).message).toContain("2 times");
-      expect(fs.readFileSync(path.join(root, "src/app.py"), "utf8")).toContain(
-        "print('hello')",
-      );
+      expect(fs.readFileSync(path.join(root, "src/app.py"), "utf8")).toContain("print('hello')");
     });
   });
 
@@ -188,9 +179,7 @@ describe("given a shared folder with a link that leaves it", () => {
         root,
       });
       expect(answer).toContain("1 edit");
-      expect(fs.readFileSync(path.join(root, "README.md"), "utf8")).toBe(
-        "# Acme\nSecond line\n",
-      );
+      expect(fs.readFileSync(path.join(root, "README.md"), "utf8")).toBe("# Acme\nSecond line\n");
     });
 
     it("creates the file when there is none", () => {
@@ -198,9 +187,7 @@ describe("given a shared folder with a link that leaves it", () => {
         params: { path: "notes/todo.txt", edits: [{ append: "one\ntwo" }] },
         root,
       });
-      expect(fs.readFileSync(path.join(root, "notes/todo.txt"), "utf8")).toBe(
-        "one\ntwo\n",
-      );
+      expect(fs.readFileSync(path.join(root, "notes/todo.txt"), "utf8")).toBe("one\ntwo\n");
     });
 
     it("still refuses a replacement in a file that is not there", () => {
@@ -292,12 +279,12 @@ describe("given a shared folder with a link that leaves it", () => {
     });
 
     it("honors the glob and the literal flag", () => {
-      expect(
-        grep({ params: { pattern: "print", glob: "*.md" }, root }),
-      ).toContain("No line matches");
-      expect(
-        grep({ params: { pattern: "print('hello')", literal: true }, root }),
-      ).toContain("src/app.py");
+      expect(grep({ params: { pattern: "print", glob: "*.md" }, root })).toContain(
+        "No line matches",
+      );
+      expect(grep({ params: { pattern: "print('hello')", literal: true }, root })).toContain(
+        "src/app.py",
+      );
     });
   });
 

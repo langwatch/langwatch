@@ -1,0 +1,133 @@
+/**
+ * Procedures this package calls: derived namespaces from contract, borrowed ones
+ * from features not yet split. Segment names are load-bearing for React Query cache.
+ */
+
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type {
+  Currency,
+  currencyTrpc,
+  SubscriptionBillingInterval,
+  subscriptionTrpc,
+} from "@langwatch/enterprise-billing-contract";
+import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
+import type { Plan, SeatLimitInfo } from "@langwatch/entitlement-contract";
+
+import type { OrganizationUserRole, PricingModel, TeamUserRole } from "../model/prisma-types.ts";
+
+/** The organization every billing procedure is scoped to. */
+type OrganizationScope = { organizationId: string };
+
+/** The plan an organization is on. Produced by the entitlement provider, not restated. */
+export type ActivePlan = Plan;
+
+/**
+ * Usage within limits for this period. Counts are read by `mapUsageToLimits`;
+ * `usageUnit` decides label (traces or events).
+ */
+export type UsageRead = {
+  activePlan: ActivePlan;
+  usageUnit?: string;
+  membersCount: number;
+  membersLiteCount: number;
+  currentMonthMessagesCount: number | null;
+  /** Seats used against the plan, counted the way enforcement counts them. */
+  seatLimitInfo?: SeatLimitInfo;
+};
+
+/** A member row, as the seat count and the seat drawer read it. */
+export type OrganizationMemberRead = {
+  userId: string;
+  role: OrganizationUserRole;
+  user: { id: string; name: string | null; email: string | null };
+};
+
+/** An invitation that has not been accepted, which still occupies a seat. */
+export type PendingInviteRead = {
+  id: string;
+  email: string;
+  role: OrganizationUserRole;
+  status: string;
+  displayStatus: string;
+};
+
+/** Procedures from features not yet split: plan, limits, license, organization, invite. */
+type BorrowedProcedures = {
+  plan: {
+    getActivePlan: { query: { input: OrganizationScope; output: ActivePlan } };
+  };
+
+  limits: {
+    getUsage: { query: { input: OrganizationScope; output: UsageRead } };
+  };
+
+  license: {
+    getStatus: { query: { input: OrganizationScope; output: LicenseStatus } };
+  };
+
+  organization: {
+    /**
+     * Organization graph with pricingModel to decide seat pricing display.
+     */
+    getScopeGraph: {
+      query: {
+        input: Record<string, never>;
+        output: {
+          id: string;
+          name: string;
+          pricingModel: PricingModel | null;
+          teams: { id: string; projects: { id: string }[] }[];
+        }[];
+      };
+    };
+
+    getOrganizationWithMembersAndTheirTeams: {
+      query: {
+        input: OrganizationScope & { includeDeactivated: boolean };
+        output: { members: OrganizationMemberRead[] };
+      };
+    };
+  };
+
+  invite: {
+    getOrganizationPendingInvites: {
+      query: { input: OrganizationScope; output: PendingInviteRead[] };
+    };
+    /** A seat checkout and the invitations that motivated it: organization's door (C2 A). */
+    upgradeWithInvites: {
+      mutation: {
+        input: OrganizationScope & {
+          baseUrl: string;
+          currency?: Currency;
+          billingInterval?: SubscriptionBillingInterval;
+          totalSeats: number;
+          invites: { email: string; role: OrganizationUserRole }[];
+        };
+        output: { url: string | null };
+      };
+    };
+    createInvites: {
+      mutation: {
+        input: OrganizationScope & {
+          invites: {
+            email: string;
+            role: OrganizationUserRole;
+            teams?: { teamId: string; role: TeamUserRole }[];
+          }[];
+        };
+        output: unknown;
+      };
+    };
+  };
+};
+
+/** Everything this family calls: the declared namespaces plus the borrowed five. */
+export type BillingApiMap = ContractApiMap<typeof subscriptionTrpc> &
+  ContractApiMap<typeof currencyTrpc> &
+  BorrowedProcedures;
+
+/**
+ * The billing family's typed tRPC hooks. Same machinery, same transport and
+ * same React Query cache as the application's `api` proxy.
+ */
+export const billingApi = createModuleApi<BillingApiMap>();

@@ -23,7 +23,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/prompts/{id}/sync".format(
+        "url": "/api/v1/prompts/{id}/sync".format(
             id=quote(str(id), safe=""),
         ),
     }

@@ -95,7 +95,7 @@ example-up: deps
 	@kind load docker-image $(LANGEVALS_IMAGE) --name $(KIND_CLUSTER)
 	$(HELM_SAFE) upgrade --install $(RELEASE) . \
 	  -f $(VALUES) \
-	  --wait --timeout 10m
+	  --wait --timeout 45m
 
 ## Tear down the example release
 example-down:

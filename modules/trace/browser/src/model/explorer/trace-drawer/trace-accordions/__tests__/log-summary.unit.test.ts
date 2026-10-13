@@ -1,0 +1,163 @@
+import type { TraceLogRecordDto } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+import { logEventTone, summarizeLogEvent } from "../log-summary.ts";
+
+function log(attributes: Record<string, string>): TraceLogRecordDto {
+  return {
+    spanId: "span-1",
+    timeUnixMs: 1_000,
+    body: "",
+    attributes,
+    resourceAttributes: {},
+    scopeName: "com.anthropic.claude_code.events",
+    scopeVersion: null,
+  };
+}
+
+describe("summarizeLogEvent", () => {
+  describe("given a tool the user denied", () => {
+    it("names the tool and the reason", () => {
+      const summary = summarizeLogEvent(
+        log({
+          "event.name": "tool_decision",
+          decision: "reject",
+          tool_name: "Bash",
+          source: "user_reject",
+        }),
+      );
+      expect(summary).toBe("Denied Bash (user_reject)");
+    });
+  });
+
+  describe("given a tool the user approved", () => {
+    it("names the tool", () => {
+      const summary = summarizeLogEvent(
+        log({
+          "event.name": "tool_decision",
+          decision: "accept",
+          tool_name: "Read",
+        }),
+      );
+      expect(summary).toBe("Approved Read");
+    });
+  });
+
+  describe("given a compaction with before/after counts", () => {
+    it("reports the token counts", () => {
+      const summary = summarizeLogEvent(
+        log({
+          "event.name": "compaction",
+          pre_tokens: "142000",
+          post_tokens: "18000",
+        }),
+      );
+      expect(summary).toBe("Context compacted: 142k → 18k tokens");
+    });
+  });
+
+  describe("given a rate limit", () => {
+    it("names it specifically, not as a generic API error", () => {
+      const summary = summarizeLogEvent(log({ "event.name": "api_error", status_code: "429" }));
+      expect(summary).toBe("Rate limited by the provider");
+    });
+
+    // The rollup counts an agent-reported rate limit apart from a 429 inferred
+    // from a failed call, so the same sentence twice in two tones would hide
+    // the distinction the data keeps.
+    it("tells the agent's own report apart from the inferred 429", () => {
+      const reported = summarizeLogEvent(log({ "event.name": "rate_limit" }));
+      const inferred = summarizeLogEvent(log({ "event.name": "api_error", status_code: "429" }));
+
+      expect(reported).toBe("Rate limit reported by the agent");
+      expect(reported).not.toBe(inferred);
+    });
+  });
+
+  describe("given an event name we don't recognise", () => {
+    it("returns null so the caller falls back to a generic view", () => {
+      const summary = summarizeLogEvent(log({ "event.name": "some_future_event" }));
+      expect(summary).toBeNull();
+    });
+  });
+
+  describe("given a log record with no event name at all", () => {
+    it("returns null", () => {
+      expect(summarizeLogEvent(log({}))).toBeNull();
+    });
+  });
+});
+
+describe("logEventTone", () => {
+  it("flags a denied tool call as danger", () => {
+    expect(
+      logEventTone(
+        log({
+          "event.name": "tool_decision",
+          decision: "reject",
+          tool_name: "Bash",
+        }),
+      ),
+    ).toBe("danger");
+  });
+
+  it("leaves an approved tool call neutral", () => {
+    expect(
+      logEventTone(
+        log({
+          "event.name": "tool_decision",
+          decision: "accept",
+          tool_name: "Read",
+        }),
+      ),
+    ).toBe("neutral");
+  });
+
+  it("flags a failed tool result as danger", () => {
+    expect(
+      logEventTone(
+        log({
+          "event.name": "tool_result",
+          tool_name: "Bash",
+          error_type: "timeout",
+        }),
+      ),
+    ).toBe("danger");
+  });
+
+  it("leaves a successful tool result neutral", () => {
+    expect(logEventTone(log({ "event.name": "tool_result", tool_name: "Read" }))).toBe("neutral");
+  });
+
+  it("flags an api_error as danger", () => {
+    expect(logEventTone(log({ "event.name": "api_error" }))).toBe("danger");
+  });
+
+  it("flags a model refusal as warning", () => {
+    expect(logEventTone(log({ "event.name": "api_refusal" }))).toBe("warning");
+  });
+
+  it("is neutral for an event we don't recognise", () => {
+    expect(logEventTone(log({ "event.name": "some_future_event" }))).toBe("neutral");
+  });
+});
+
+describe("summarizeLogEvent across the event families", () => {
+  it.each([
+    [{ "event.name": "user_prompt", prompt: "hello" }, "User sent a prompt (5 chars)"],
+    [{ "event.name": "assistant_response", model: "gpt" }, "Assistant replied (gpt)"],
+    [{ "event.name": "turn_ttft", duration_ms: "40" }, "First token after 40 ms"],
+    [{ "event.name": "turn_ttft" }, "First token timing reported"],
+    [{ "event.name": "tool_decision", decision: "accept" }, "Approved a tool"],
+    [{ "event.name": "permission_mode_changed" }, "Approval mode changed to unknown"],
+    [{ "event.name": "skill_activated", name: "review" }, "Skill activated: review"],
+    [{ "event.name": "mcp_server_connection" }, "Connected to MCP server"],
+    [{ "event.name": "hook_execution_complete", name: "lint" }, "Hook ran: lint"],
+    [{ "event.name": "at_mention" }, "@-mentioned a file"],
+    [{ "event.name": "subtask_invoked", subagent_type: "explore" }, "Sub-agent invoked: explore"],
+    [{ "event.name": "commit" }, "Commit created"],
+    [{ "event.name": "internal_error" }, "The session hit an internal error"],
+  ])("summarises %o", (attributes, expected) => {
+    expect(summarizeLogEvent(log(attributes))).toBe(expected);
+  });
+});

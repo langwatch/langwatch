@@ -1,0 +1,109 @@
+import {
+  PopoverAnchor,
+  PopoverBody,
+  PopoverContent,
+  PopoverRoot,
+} from "@langwatch/design-system/popover";
+import { Badge, HStack } from "@langwatch/design-system/primitives";
+import type { MouseEvent, ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+/**
+ * Flags a feature as legacy with an inline, dismissable explanation, so
+ * we can steer toward the replacement without a hard cutover. A popover,
+ * not a tooltip, so the message can carry links to the new surface.
+ */
+export function LegacyPill({
+  children,
+  message,
+  label = "Legacy",
+}: {
+  children?: ReactNode;
+  message: ReactNode;
+  label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleOpen = useCallback(() => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    setOpen(true);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    closeTimeoutRef.current = setTimeout(() => {
+      setOpen(false);
+    }, 150);
+  }, []);
+
+  const handlePopoverEnter = useCallback(() => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handlePopoverLeave = useCallback(() => {
+    handleClose();
+  }, [handleClose]);
+
+  const pill = (
+    <PopoverRoot
+      open={open}
+      onOpenChange={({ open: isOpen }) => setOpen(isOpen)}
+      positioning={{ placement: "bottom-start" }}
+    >
+      <PopoverAnchor asChild>
+        <Badge
+          variant="subtle"
+          colorPalette={"red"}
+          fontSize="2xs"
+          paddingX={1.5}
+          lineHeight={1.2}
+          cursor="pointer"
+          asChild
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onMouseEnter={handleOpen}
+          onMouseLeave={handleClose}
+          onFocus={handleOpen}
+          onBlur={handleClose}
+          onClick={(e: MouseEvent) => {
+            // Pill renders inside SideMenuLink's <Link href>; preventDefault
+            // keeps the click a popover toggle rather than a navigation.
+            e.stopPropagation();
+            e.preventDefault();
+            setOpen((prev) => !prev);
+          }}
+        >
+          <button type="button">{label}</button>
+        </Badge>
+      </PopoverAnchor>
+      <PopoverContent onMouseEnter={handlePopoverEnter} onMouseLeave={handlePopoverLeave}>
+        <PopoverBody>{message}</PopoverBody>
+      </PopoverContent>
+    </PopoverRoot>
+  );
+
+  if (!children) {
+    return pill;
+  }
+
+  return (
+    <HStack gap={2} align="center">
+      {children}
+      {pill}
+    </HStack>
+  );
+}

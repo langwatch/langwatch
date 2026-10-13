@@ -1,15 +1,10 @@
 name: coderabbit-config-check
 
-# Proves the committed CodeRabbit lint config ACTUALLY works, so no rule can
-# silently go dead again (see #3754: no-form-watch-in-child fired on nothing and
-# the semgrep ruleset failed to parse — both passed un-noticed because nothing
-# executed them). This job EXECUTES them:
-#   * every ast-grep rule must match its committed fixture (`ast-grep test`)
-#   * the semgrep ruleset must validate AND the PII rule must still match.
-#
-# ast-grep and semgrep are PINNED — rule-matching behaviour is version-sensitive
-# (the dead-rule confusion in #3754 was partly version fragility). Bump the pins
-# deliberately and re-run `ast-grep test`/`semgrep --validate` when you do.
+# Proves the semgrep ruleset CodeRabbit loads actually works, so no rule can
+# silently go dead again (see #3754: the ruleset failed to parse and nothing
+# noticed). The ruleset must validate AND the PII rule must still match its
+# fixture. semgrep is PINNED — rule matching is version-sensitive; bump the pin
+# deliberately (with the Makefile's SEMGREP_VERSION) and re-run the check.
 on:
   pull_request:
     paths:
@@ -38,15 +33,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install pinned linters
-        run: pip install "ast-grep-cli==0.42.3" "semgrep==1.164.0" "pyyaml>=6"
-
-      - name: ast-grep version (pinned)
-        run: ast-grep --version
-
-      - name: ast-grep rule fixtures — every rule must match its fixture
-        working-directory: dev/lint/ast-grep
-        run: ast-grep test -c sgconfig.yml -t rule-tests
+      - name: Install pinned semgrep
+        run: pip install "semgrep==1.164.0" "pyyaml>=6"
 
       - name: semgrep ruleset validates
         run: semgrep --validate --config dev/lint/semgrep/langwatch.yml

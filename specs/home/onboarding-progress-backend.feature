@@ -48,13 +48,10 @@ Feature: Onboarding Progress Backend
     Then step "syncFirstMessage" should be complete
 
   # Setup model providers step (scope cascade)
-  # Bound to onboarding-checks.integration.test.ts. A model provider is
-  # visible to a project when it is scoped to the project, the project's
-  # team, or the project's organization — the same PROJECT -> TEAM ->
-  # ORGANIZATION cascade real model-provider reads use. The onboarding
-  # check must mirror that cascade, otherwise a user whose only provider
-  # is configured org-wide sees "Setup your model providers" stuck
-  # incomplete even though every project under that org can use it.
+  # A provider counts when scoped to the project, its team or its
+  # organization (the PROJECT -> TEAM -> ORGANIZATION cascade). Bound to
+  # onboarding-checks.service.unit.test.ts; the enabled filter to the
+  # model-provider repository scope test.
 
   Scenario: Step setupModelProviders is complete for a project-scoped provider
     Given an enabled model provider scoped to the project

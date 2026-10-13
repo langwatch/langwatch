@@ -110,9 +110,8 @@ Feature: Langy recognises its own CLI behind a shell tool call
     @unit
     Scenario: A failure card says what went wrong in the user's terms
       When Langy's tool call fails because the caller's access does not cover the action
-      Then the card says the access does not cover the action
-      And the card names the missing access in plain words as a detail
-      And the card offers the next step the platform recommends
+      Then the card names the missing permission in plain words
+      And it then tells the reader who to ask for it
       And the card never shows an internal permission name as its headline
 
     # The sandbox's `gh` has no login when the GitHub App is not installed, and
