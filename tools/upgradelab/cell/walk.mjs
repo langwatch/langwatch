@@ -20,7 +20,7 @@ const phase = () => {
     return "main";
   }
 };
-// unreadBody marks a failed response whose body was gone (the page navigated); observe.go matches it.
+// unreadBody marks a failed response whose body was gone (the page navigated); observe.go reads it.
 const unreadBody = "body unread";
 const stopped = () => existsSync(join(runDir, "walk.stop"));
 const dismissNudge = (page) =>

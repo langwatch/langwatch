@@ -1,7 +1,7 @@
 // One screenshot for an upgradelab cell: the holding page, or Ops > Upgrades after signing in.
 // Run with cwd = <head>/apps/ui (where @playwright/test resolves); argv[2] is JSON
-// { url, email, password, out, signIn, path?, open?, expect? }: path defaults to /ops/upgrades; open is
-// text to click there (a row), expect the text to wait for after it. Prints { url, text } as JSON.
+// { url, email, password, out, signIn, path?, open?, expect? }: path defaults to /ops/upgrades;
+// open is text to click there (a row), expect the text to wait for after it. Prints { url, text }.
 import { createRequire } from "node:module";
 
 const { chromium } = createRequire(`${process.cwd()}/package.json`)("@playwright/test");

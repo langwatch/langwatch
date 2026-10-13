@@ -1,8 +1,7 @@
 // Plain members signing in through SSO for an upgradelab cell (E6, E7). cwd = <head>/apps/ui;
 // argv[2] = JSON { url, phase, project, stateDir, shots, members: [{ email, inviteCode, door,
-// connectionId, project? }] }. One JSON line per check: { phase, member, door, check, ok, url, detail }.
-// Phase test-login is the go-live checklist's round trip through a connection not yet live;
-// head first replays main's cookie.
+// connectionId, project? }] }. Prints one JSON line per check (phase, member, door, check, ok,
+// url, detail). Phase test-login is the go-live round trip; head first replays main's cookie.
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
