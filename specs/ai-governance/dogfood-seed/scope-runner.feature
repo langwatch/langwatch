@@ -8,17 +8,13 @@ Feature: Demo-seed scope-guard, runner, entry point: single dev-and-prod path
   So that the same code path runs in dev and prod with structurally
   bounded blast radius, no fork to drift, and one source of truth.
 
-  The harness lives at platform/app/scripts/dogfood/governance/. Dev runs
+  The harness was the platform application's governance dogfood seed script, deleted
+  with that package and not yet rehomed. Dev runs
   it directly via `pnpm tsx scripts/dogfood/governance/seed-demo.ts`.
-  Prod runs it via the existing K8s CronJob pattern in
-  langwatch-saas/infrastructure/cronjobs.tf: a scheduled job inside
-  the cluster `curl`s an internal API route on the langwatch app pod
-  (`/api/cron/seed_demo`, mounted via `app.all` so both GET and POST
-  match the existing convention), authenticated with `CRON_API_KEY` in
-  the Authorization header, matching the existing
-  `topic_clustering` and `alert_triggers` cron-route shape. The route
-  handler invokes the same `runSeedActions` orchestrator the CLI
-  invokes; no Lambda, no submodule, one code path.
+  Prod runs it as the demo-data module's daily scheduled process
+  manager on the worker (enterprise/modules/demo-data/specs): there is no
+  cron route and no CRON_API_KEY. The scheduled run invokes the same
+  `runSeedActions` orchestrator the CLI invokes; one code path.
 
   Background:
     Given an allowlist of demo organization ids is configured via the
@@ -286,94 +282,6 @@ Feature: Demo-seed scope-guard, runner, entry point: single dev-and-prod path
     And the report ends with a trailing newline
 
   # ─────────────────────────────────────────────────────────────────────
-  # Prod cron route: /api/cron/seed_demo (K8s CronJob curls into pod)
-  # Mounted via app.all so both GET and POST are accepted, matching the
-  # existing /cron/triggers, /cron/schedule_topic_clustering shape.
-  # ─────────────────────────────────────────────────────────────────────
-
-  @bdd @demo-seed @cron-route @auth
-  Scenario: Missing Authorization header returns 401 with empty body
-    Given `CRON_API_KEY=ck_test` is set in the langwatch app env
-    When a request `/api/cron/seed_demo` arrives with no Authorization header
-    Then the response status is `401`
-    And the response body is empty
-    And `runSeedDemo` was never invoked
-
-  @bdd @demo-seed @cron-route @auth
-  Scenario: Wrong CRON_API_KEY returns 401
-    Given `CRON_API_KEY=ck_test` is set
-    When a request `/api/cron/seed_demo` arrives with `Authorization: Bearer ck_wrong`
-    Then the response status is `401`
-    And `runSeedDemo` was never invoked
-
-  @bdd @demo-seed @cron-route @auth
-  Scenario: Bare CRON_API_KEY without Bearer prefix is accepted
-    Given `CRON_API_KEY=ck_test` is set
-    When a request `/api/cron/seed_demo` arrives with `Authorization: ck_test`
-    Then the route handler proceeds past auth
-    So that the existing cron-route header convention is preserved
-
-  @bdd @demo-seed @cron-route @http-method
-  Scenario Outline: Both GET and POST are accepted on the cron route
-    Given a valid CRON_API_KEY
-    When a `<method>` request to `/api/cron/seed_demo` arrives with the header
-    Then the route handler proceeds past auth
-    And `runSeedDemo` is invoked
-    So that the K8s CronJob curl can use either verb
-
-    Examples:
-      | method |
-      | GET    |
-      | POST   |
-
-  @bdd @demo-seed @cron-route @execute
-  Scenario: Route handler always invokes runSeedDemo with execute=true
-    Given a valid CRON_API_KEY in the Authorization header
-    And `DEMO_ORG_IDS="org_demo_acme"` is configured in the pod env
-    When a request `/api/cron/seed_demo` arrives
-    Then `runSeedDemo` is invoked with `{ execute: true }`
-    And the prod path never runs in dry-run mode
-
-  @bdd @demo-seed @cron-route @scope
-  Scenario: Route handler resolves the target org via DEMO_ORG_IDS default
-    Given a valid CRON_API_KEY
-    And `DEMO_ORG_IDS="org_demo_acme,org_demo_other"` in the pod env
-    When a request `/api/cron/seed_demo` arrives
-    Then `runSeedDemo` is invoked without an explicit `organizationId`
-    And `runSeedDemo` resolves the target via `DemoOrgScope.fromEnv` to the first allowlisted id
-
-  @bdd @demo-seed @cron-route @observability
-  Scenario: Clean run returns 200 with the report in the JSON body
-    Given a valid CRON_API_KEY
-    And every seed action succeeds for the target org
-    When a request `/api/cron/seed_demo` arrives
-    Then the response status is `200`
-    And the response body has shape `{ report: SeedRunReport }`
-    And `report.mode` equals `"execute"`
-    And `report.actions` lists every action with status `"succeeded"` or `"skipped"`
-
-  @bdd @demo-seed @cron-route @observability @cron-alarm
-  Scenario: Any failed action returns HTTP 500 so the cron alarm fires
-    Given a valid CRON_API_KEY
-    And at least one seed action fails during the run
-    When a request `/api/cron/seed_demo` arrives
-    Then the response status is `500`
-    And the response body has shape `{ report: SeedRunReport }`
-    And the report records the failed action with its error message
-    So that the K8s CronJob success-rate metric reflects the failure
-       and operators page on partial-success runs
-
-  @bdd @demo-seed @cron-route @misconfig
-  Scenario: runSeedDemo throws (e.g., DEMO_ORG_IDS unset) returns 500 with error JSON
-    Given a valid CRON_API_KEY
-    And `DEMO_ORG_IDS` is unset in the pod env
-    When a request `/api/cron/seed_demo` arrives
-    Then the response status is `500`
-    And the response body has shape `{ message: string, error: string }`
-    And the response body does NOT contain a `report` field
-    And `runSeedDemo` threw before completing
-
-  # ─────────────────────────────────────────────────────────────────────
   # First action: verifyOrgIdentity proves the wiring
   # ─────────────────────────────────────────────────────────────────────
 
@@ -552,7 +460,7 @@ Feature: Demo-seed scope-guard, runner, entry point: single dev-and-prod path
   @bdd @demo-seed @runner @actions-list
   Scenario: ACTIONS list is the cron-path roster only
     Given the demo-seed entry point at `scripts/dogfood/governance/seed-demo.ts`
-    When the runner is invoked (CLI dev path or `/api/cron/seed_demo`)
+    When the runner is invoked (CLI dev path or the daily scheduled run)
     Then the actions executed in order are
       | name              |
       | verifyOrgIdentity |

@@ -1,15 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import { formatTable } from "../../utils/formatting.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 /**
  * Returns the listing rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts). The `table` closure
@@ -19,22 +20,21 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner("Fetching monitors...").start();
 
-  let monitors: Array<{
+  let monitors: {
     id: string;
     name: string;
     checkType: string;
     enabled: boolean;
     executionMode: string;
     sample: number;
-  }>;
+  }[];
   try {
-    const response = await langwatchFetch(`${endpoint}/api/monitors`, {
-      headers: buildAuthHeaders({ apiKey }),
+    const response = await langwatchFetch(`${endpoint}/api/v1/monitors`, {
+      headers: buildRequestHeaders({ apiKey }),
     });
 
     if (!response.ok) {
@@ -42,18 +42,16 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
       process.exit(1);
     }
 
-    monitors = (await response.json()) as Array<{
+    monitors = (await response.json()) as {
       id: string;
       name: string;
       checkType: string;
       enabled: boolean;
       executionMode: string;
       sample: number;
-    }>;
+    }[];
 
-    spinner.succeed(
-      `Found ${monitors.length} monitor${monitors.length !== 1 ? "s" : ""}`
-    );
+    spinner.succeed(`Found ${monitors.length} monitor${monitors.length !== 1 ? "s" : ""}`);
   } catch (error) {
     // No explicit `format`: see traces/search.ts — the preAction hook covers
     // every spelling; the `-f` commander default must not override it.
@@ -69,9 +67,7 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
         console.log(chalk.gray("No monitors found."));
         console.log(chalk.gray("Create one with:"));
         console.log(
-          chalk.cyan(
-            '  langwatch monitor create "Toxicity Check" --check-type ragas/toxicity'
-          )
+          chalk.cyan('  langwatch monitor create "Toxicity Check" --check-type ragas/toxicity'),
         );
         return;
       }

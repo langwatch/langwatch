@@ -27,6 +27,7 @@ type App struct {
 	traces     AITraceEmitter
 	spend      pipeline.SpendEmitter
 	realtime   RealtimeSessionRegistry
+	voice      VoiceSupervisor
 	hosted     HostedServices
 	metrics    MetricsRecorder
 	breaker    CircuitBreaker
@@ -56,6 +57,12 @@ func WithSpend(e pipeline.SpendEmitter) Option { return func(app *App) { app.spe
 // nobody recorded is unbillable voice.
 func WithRealtimeSessions(r RealtimeSessionRegistry) Option {
 	return func(app *App) { app.realtime = r }
+}
+
+// WithVoiceSupervisor wires the supervisor of brokered voice calls. Without
+// it the broker routes refuse: a call no socket watches cannot be metered.
+func WithVoiceSupervisor(v VoiceSupervisor) Option {
+	return func(app *App) { app.voice = v }
 }
 func WithMetrics(m MetricsRecorder) Option       { return func(app *App) { app.metrics = m } }
 func WithCircuitBreaker(b CircuitBreaker) Option { return func(app *App) { app.breaker = b } }

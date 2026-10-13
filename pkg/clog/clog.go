@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"sync"
+	"time"
 
 	prettyconsole "github.com/thessem/zap-prettyconsole"
 	"go.opentelemetry.io/contrib/bridges/otelzap"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.uber.org/zap"
+	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/langwatch/langwatch/pkg/contexts"
@@ -40,7 +43,12 @@ func Get(ctx context.Context) *zap.Logger {
 		return l
 	}
 	fallbackOnce.Do(func() {
-		fallbackLogger, _ = zap.NewProduction()
+		// The shared format, not zap.NewProduction()'s: a line that reaches a
+		// terminal through a bare context is exactly the line nobody set up,
+		// and it must still render rather than showing up as raw JSON.
+		cfg := zap.NewProductionConfig()
+		cfg.EncoderConfig = jsonEncoderConfig()
+		fallbackLogger, _ = cfg.Build()
 	})
 	return fallbackLogger
 }
@@ -58,20 +66,34 @@ func New(ctx context.Context, cfg Config) *zap.Logger {
 
 	if cfg.Format == "pretty" {
 		logger = zap.New(zapcore.NewCore(
-			prettyconsole.NewEncoder(prettyEncoderConfig()),
+			prettyConsoleEncoder(),
 			zapcore.Lock(os.Stdout),
 			cfg.zapLevel(),
 		))
 	} else {
 		zapCfg := zap.NewProductionConfig()
+		zapCfg.EncoderConfig = jsonEncoderConfig()
 		zapCfg.Level = zap.NewAtomicLevelAt(cfg.zapLevel())
 		logger, _ = zapCfg.Build()
 	}
 
-	if fields := serviceFields(ctx); fields != nil {
+	if fields := consoleServiceFields(ctx, cfg.Format); fields != nil {
 		logger = logger.With(fields...)
 	}
 	return logger
+}
+
+// consoleServiceFields is the constant identity a console core carries, which
+// on the pretty console is nothing at all. `service`, `version` and `env` are
+// the same on every line this process ever writes, and in a `pnpm dev`
+// terminal `concurrently` has already said which lane a line came from — so
+// there they are three repeated columns the message could have used. Nothing
+// prefixes a machine-readable line, so that one keeps them.
+func consoleServiceFields(ctx context.Context, format string) []zap.Field {
+	if format == "pretty" {
+		return nil
+	}
+	return serviceFields(ctx)
 }
 
 // serviceFields stamps service/version/env from the context's ServiceInfo, so
@@ -112,6 +134,12 @@ func WithCollector(ctx context.Context, cfg Config, base *zap.Logger, lp *sdklog
 		otelzap.NewCore(otelScopeName, otelzap.WithLoggerProvider(lp)),
 		cfg.otelZapLevel(),
 	)
+	// The collector keeps the constant identity even when the console drops it
+	// (see consoleServiceFields): nothing prefixes an exported record with the
+	// service it came from, so there it is the only thing saying so.
+	if fields := serviceFields(ctx); fields != nil && cfg.Format == "pretty" {
+		otelCore = otelCore.With(fields)
+	}
 	// zap.New starts from a bare logger, so the caller/stacktrace annotation the
 	// New path gets from zap.NewProductionConfig has to be re-applied here or the
 	// split stream would silently lose it.
@@ -120,7 +148,7 @@ func WithCollector(ctx context.Context, cfg Config, base *zap.Logger, lp *sdklog
 		zap.AddCaller(),
 		zap.AddStacktrace(zapcore.ErrorLevel),
 	)
-	if fields := serviceFields(ctx); fields != nil {
+	if fields := consoleServiceFields(ctx, cfg.Format); fields != nil {
 		logger = logger.With(fields...)
 	}
 	return logger
@@ -131,21 +159,87 @@ func WithCollector(ctx context.Context, cfg Config, base *zap.Logger, lp *sdklog
 func buildConsoleCore(format string, level zapcore.Level) zapcore.Core {
 	out := zapcore.Lock(os.Stdout)
 	if format == "pretty" {
-		return zapcore.NewCore(prettyconsole.NewEncoder(prettyEncoderConfig()), out, level)
+		return zapcore.NewCore(prettyConsoleEncoder(), out, level)
 	}
-	return zapcore.NewCore(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), out, level)
+	return zapcore.NewCore(jsonEncoder(), out, level)
 }
 
-// prettyEncoderConfig aligns the Go pretty console with the TS app's
-// pino-pretty lane, so a terminal interleaving Go and JS services reads as one
-// format: a 24h HH:MM:SS.mmm timestamp (prettyconsole's default is 12h with no
-// seconds) and a full-word capital level (INFO, not INF) — matching
-// pino-pretty's "[12:19:00.616] INFO (name): msg".
+// jsonEncoderConfig is the shared machine format
+// (dev/docs/best_practices/dev-log-format.md): zap's production encoder with
+// its epoch-float `ts` replaced by an RFC 3339 `time` to the millisecond, so a
+// Go record and a Node record carry the same timestamp field, spelled the same
+// way, in every environment. `level` is already the lowercase word and `msg`
+// already the message; only the timestamp differed.
+func jsonEncoderConfig() zapcore.EncoderConfig {
+	cfg := zap.NewProductionEncoderConfig()
+	cfg.TimeKey = "time"
+	cfg.EncodeTime = sharedTimeEncoder
+	return cfg
+}
+
+// sharedTimeLayout is RFC 3339 to the millisecond, the one instant format
+// every LangWatch process writes.
+const sharedTimeLayout = "2006-01-02T15:04:05.000Z07:00"
+
+// sharedTimeEncoder writes the instant in UTC, so a record from a laptop in
+// Amsterdam and one from a pod in eu-west sort and compare without anyone
+// having to notice an offset.
+func sharedTimeEncoder(at time.Time, encoder zapcore.PrimitiveArrayEncoder) {
+	encoder.AppendString(at.UTC().Format(sharedTimeLayout))
+}
+
+// jsonEncoder builds the shared machine encoder.
+func jsonEncoder() zapcore.Encoder { return zapcore.NewJSONEncoder(jsonEncoderConfig()) }
+
+// prettyEncoderConfig aligns the Go pretty console with the TS lanes'
+// pino-pretty console, so a terminal interleaving Go and JS services reads as
+// one format: a bracketed 24h HH:MM:SS.mmm timestamp (prettyconsole's default
+// is a bare 12h clock with no seconds) and a full-word capital level, matching
+// pino-pretty's "[13:10:46.108] INFO (name): msg".
 func prettyEncoderConfig() zapcore.EncoderConfig {
 	cfg := prettyconsole.NewEncoderConfig()
-	cfg.EncodeTime = prettyconsole.DefaultTimeEncoder("15:04:05.000")
+	cfg.EncodeTime = bracketedTimeEncoder
 	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	return cfg
+}
+
+// bracketedTimeEncoder writes [15:04:05.000], the shape the Node lanes' console
+// prints and the one thing about it that is not configurable there.
+func bracketedTimeEncoder(at time.Time, encoder zapcore.PrimitiveArrayEncoder) {
+	encoder.AppendString("[" + at.Format("15:04:05.000") + "]")
+}
+
+// prettyMessageMarker is the "> " prettyconsole writes between the level and
+// the message, with the color codes it wraps it in and the separator ahead of
+// it. Nothing else in a `pnpm dev` terminal writes one, and prettyconsole
+// offers no option to leave it out.
+var prettyMessageMarker = regexp.MustCompile(
+	"(?:\x1b\\[[0-9;]*m)*\\s(?:\x1b\\[[0-9;]*m)*\x1b\\[1m(?:\x1b\\[[0-9;]*m)*>(?:\x1b\\[[0-9;]*m)*",
+)
+
+// prettyConsoleEncoder is prettyconsole's encoder with that marker removed and
+// error chains flattened onto the line (see error_fields.go).
+func prettyConsoleEncoder() zapcore.Encoder {
+	return markerlessEncoder{Encoder: prettyconsole.NewEncoder(prettyEncoderConfig())}
+}
+
+type markerlessEncoder struct {
+	zapcore.Encoder
+}
+
+func (e markerlessEncoder) Clone() zapcore.Encoder {
+	return markerlessEncoder{Encoder: e.Encoder.Clone()}
+}
+
+func (e markerlessEncoder) EncodeEntry(entry zapcore.Entry, fields []zapcore.Field) (*buffer.Buffer, error) {
+	encoded, err := e.Encoder.EncodeEntry(entry, flattenErrorFields(fields))
+	if err != nil || encoded == nil {
+		return encoded, err
+	}
+	line := prettyMessageMarker.ReplaceAllString(encoded.String(), "")
+	encoded.Reset()
+	encoded.AppendString(line)
+	return encoded, nil
 }
 
 // leveledCore gates an inner core to a minimum level. Used to hold the otelzap
@@ -177,7 +271,7 @@ func (c *leveledCore) With(fields []zapcore.Field) zapcore.Core {
 
 // Config controls logging setup. The env keys are shared with the TS app
 // (LOG_LEVEL / LOG_CONSOLE_LEVEL / LOG_OTEL_LEVEL) so one set of variables in
-// platform/app/.env configures logging for both Go and JS.
+// .env configures logging for both Go and JS.
 type Config struct {
 	Level  string `env:"LEVEL"`  // "debug", "info", "warn", "error"
 	Format string `env:"FORMAT"` // "json" (default), "pretty"

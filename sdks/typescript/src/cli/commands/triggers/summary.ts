@@ -6,7 +6,7 @@
 
 type Loose = Record<string, unknown> | null | undefined;
 
-/** An automation as `/api/triggers` answers with it, credentials redacted. */
+/** An automation as `/api/v1/triggers` answers with it, credentials redacted. */
 export interface TriggerRecord {
   id: string;
   name: string;
@@ -48,18 +48,22 @@ export function summariseGraphAlert({
   return `${text({ value: graphAlert.seriesName, fallback: "series" })} ${symbol} ${text({ value: graphAlert.threshold, fallback: "?" })} over ${text({ value: graphAlert.timePeriod, fallback: "?" })}m${graph}`;
 }
 
+function reportTarget({ source }: { source: Record<string, unknown> }): string {
+  if (source.kind === "dashboard") {
+    return `dashboard ${text({ value: source.dashboardId, fallback: "?" })}`;
+  }
+  if (source.kind === "customGraph") {
+    return `graph ${text({ value: source.customGraphId, fallback: "?" })}`;
+  }
+  if (source.kind === "traceQuery") return "trace table";
+  return text({ value: source.kind, fallback: "report" });
+}
+
 export function summariseReport({ report }: { report: Loose }): string | undefined {
   if (!report) return undefined;
   const source = isRecord(report.source) ? report.source : {};
   const schedule = isRecord(report.schedule) ? report.schedule : {};
-  const target =
-    source.kind === "dashboard"
-      ? `dashboard ${text({ value: source.dashboardId, fallback: "?" })}`
-      : source.kind === "customGraph"
-        ? `graph ${text({ value: source.customGraphId, fallback: "?" })}`
-        : source.kind === "traceQuery"
-          ? "trace table"
-          : text({ value: source.kind, fallback: "report" });
+  const target = reportTarget({ source });
   const compare = report.compareToPrevious ? ", vs previous" : "";
   return `${target} at "${text({ value: schedule.cron, fallback: "?" })}" ${text({ value: schedule.timezone, fallback: "" })}${compare}`.trimEnd();
 }
@@ -74,9 +78,7 @@ export function summariseSlackConnection({
     return undefined;
   }
   const channel =
-    typeof actionParams.slackChannelId === "string"
-      ? ` in ${actionParams.slackChannelId}`
-      : "";
+    typeof actionParams.slackChannelId === "string" ? ` in ${actionParams.slackChannelId}` : "";
   return `${actionParams.slackIntegrationId}${channel}`;
 }
 

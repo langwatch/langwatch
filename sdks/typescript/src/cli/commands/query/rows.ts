@@ -1,17 +1,6 @@
 /**
- * Turning a query result into the bytes a caller asked for.
- *
- * Four formats and one rule between them: `table` is for a person, and
- * `json` / `jsonl` / `csv` are for a program or a file. The split matters
- * because the interesting case is not pretty-printing — it is the export. A
- * post-training pull wants one JSON object per line with `messages` as a real
- * array, not as a string holding a JSON array, and getting that right is the
- * difference between a usable `train.jsonl` and one every reader has to parse
- * twice.
- *
- * Kept out of the command so both the single run and the keyset walk write
- * identically, and so the escaping rules are testable without a spinner.
- *
+ * A query result as the bytes a caller asked for: `table` for a person,
+ * `json`/`jsonl`/`csv` for a program, a JSON column a real array.
  * @see specs/analytics/lwql-cli-query.feature
  */
 
@@ -29,13 +18,9 @@ export interface QueryColumn {
 export type QueryRow = Record<string, unknown>;
 
 /**
- * ClickHouse types whose values arrive as a JSON string.
- *
- * The reason this list exists rather than a `JSON.parse` attempt on every
- * string: a value that merely LOOKS like JSON must survive. A captured output
- * of `"[1, 2]"` is the model's own text, and parsing it because it parses would
- * silently change what the export says the model produced. So the column's
- * declared type decides, never the value.
+ * ClickHouse types whose values arrive as a JSON string. The column's declared
+ * type decides, never the value: a captured output of `"[1, 2]"` is the model's
+ * own text, and parsing it because it parses rewrites what it produced.
  */
 const JSON_TYPE_PATTERN = /(^|\()(JSON|Object\('json'\))/i;
 
@@ -44,20 +29,11 @@ function isJsonColumn(column: QueryColumn): boolean {
 }
 
 /**
- * The value to write for one cell, with a JSON-typed column parsed back.
- *
- * A JSON column that does not parse is written through as the string it is:
- * the export's job is to carry what the database returned, and refusing a row
- * because one cell is malformed would lose the other columns of a row that is
- * otherwise fine.
+ * One cell, with a JSON-typed column parsed back. A JSON column that does not
+ * parse is written through as the string it is: refusing the row would lose
+ * the other columns of a row that is otherwise fine.
  */
-function machineValue({
-  column,
-  value,
-}: {
-  column: QueryColumn;
-  value: unknown;
-}): unknown {
+function machineValue({ column, value }: { column: QueryColumn; value: unknown }): unknown {
   if (!isJsonColumn(column) || typeof value !== "string") return value;
   try {
     return JSON.parse(value);
@@ -89,22 +65,17 @@ export function renderJsonl({
   columns: readonly QueryColumn[];
   rows: readonly QueryRow[];
 }): string {
-  return rows
-    .map((row) => JSON.stringify(machineRow({ columns, row })))
-    .join("\n");
+  return rows.map((row) => JSON.stringify(machineRow({ columns, row }))).join("\n");
 }
 
 /**
- * One cell of CSV.
- *
- * Quoted whenever the value carries a comma, a quote, a newline or a carriage
- * return, with embedded quotes doubled — RFC 4180, and the one place a
- * hand-rolled exporter usually gets it wrong is the carriage return, which
- * splits the row for a reader on Windows even though it looks like nothing.
+ * One cell of CSV: quoted whenever the value carries a comma, a quote, a
+ * newline or a carriage return, with embedded quotes doubled (RFC 4180). The
+ * carriage return is the one a hand-rolled exporter forgets.
  */
 export function csvCell(value: unknown): string {
   if (value === null || value === undefined) return "";
-  const text = typeof value === "string" ? value : JSON.stringify(value) ?? "";
+  const text = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
@@ -117,9 +88,7 @@ export function renderCsv({
 }): string {
   const header = columns.map((column) => csvCell(column.name)).join(",");
   const body = rows.map((row) =>
-    columns
-      .map((column) => csvCell(machineValue({ column, value: row[column.name] })))
-      .join(","),
+    columns.map((column) => csvCell(machineValue({ column, value: row[column.name] }))).join(","),
   );
   return [header, ...body].join("\n");
 }

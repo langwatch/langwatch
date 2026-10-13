@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
@@ -7,12 +7,6 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_experiments_runs_by_run_id_results_response_200 import (
     GetApiExperimentsRunsByRunIdResultsResponse200,
-)
-from ...models.get_api_experiments_runs_by_run_id_results_response_401 import (
-    GetApiExperimentsRunsByRunIdResultsResponse401,
-)
-from ...models.get_api_experiments_runs_by_run_id_results_response_404 import (
-    GetApiExperimentsRunsByRunIdResultsResponse404,
 )
 from ...types import UNSET, Response, Unset, safe_http_status
 
@@ -31,7 +25,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/experiments/runs/{run_id}/results".format(
+        "url": "/api/v1/experiments/runs/{run_id}/results".format(
             run_id=quote(str(run_id), safe=""),
         ),
         "params": params,
@@ -42,25 +36,18 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiExperimentsRunsByRunIdResultsResponse200
-    | GetApiExperimentsRunsByRunIdResultsResponse401
-    | GetApiExperimentsRunsByRunIdResultsResponse404
-    | None
-):
+) -> Any | GetApiExperimentsRunsByRunIdResultsResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiExperimentsRunsByRunIdResultsResponse200.from_dict(response.json())
 
         return response_200
 
     if response.status_code == 401:
-        response_401 = GetApiExperimentsRunsByRunIdResultsResponse401.from_dict(response.json())
-
+        response_401 = cast(Any, None)
         return response_401
 
     if response.status_code == 404:
-        response_404 = GetApiExperimentsRunsByRunIdResultsResponse404.from_dict(response.json())
-
+        response_404 = cast(Any, None)
         return response_404
 
     if client.raise_on_unexpected_status:
@@ -71,11 +58,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    GetApiExperimentsRunsByRunIdResultsResponse200
-    | GetApiExperimentsRunsByRunIdResultsResponse401
-    | GetApiExperimentsRunsByRunIdResultsResponse404
-]:
+) -> Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -92,11 +75,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     experiment_slug: str | Unset = UNSET,
-) -> Response[
-    GetApiExperimentsRunsByRunIdResultsResponse200
-    | GetApiExperimentsRunsByRunIdResultsResponse401
-    | GetApiExperimentsRunsByRunIdResultsResponse404
-]:
+) -> Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]:
     """Read run results
 
      Every dataset row of a run with what the target predicted, plus one entry per evaluator per row.
@@ -112,7 +91,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse401 | GetApiExperimentsRunsByRunIdResultsResponse404]
+        Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -132,12 +111,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     experiment_slug: str | Unset = UNSET,
-) -> (
-    GetApiExperimentsRunsByRunIdResultsResponse200
-    | GetApiExperimentsRunsByRunIdResultsResponse401
-    | GetApiExperimentsRunsByRunIdResultsResponse404
-    | None
-):
+) -> Any | GetApiExperimentsRunsByRunIdResultsResponse200 | None:
     """Read run results
 
      Every dataset row of a run with what the target predicted, plus one entry per evaluator per row.
@@ -153,7 +127,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse401 | GetApiExperimentsRunsByRunIdResultsResponse404
+        Any | GetApiExperimentsRunsByRunIdResultsResponse200
     """
 
     return sync_detailed(
@@ -168,11 +142,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     experiment_slug: str | Unset = UNSET,
-) -> Response[
-    GetApiExperimentsRunsByRunIdResultsResponse200
-    | GetApiExperimentsRunsByRunIdResultsResponse401
-    | GetApiExperimentsRunsByRunIdResultsResponse404
-]:
+) -> Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]:
     """Read run results
 
      Every dataset row of a run with what the target predicted, plus one entry per evaluator per row.
@@ -188,7 +158,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse401 | GetApiExperimentsRunsByRunIdResultsResponse404]
+        Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -206,12 +176,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     experiment_slug: str | Unset = UNSET,
-) -> (
-    GetApiExperimentsRunsByRunIdResultsResponse200
-    | GetApiExperimentsRunsByRunIdResultsResponse401
-    | GetApiExperimentsRunsByRunIdResultsResponse404
-    | None
-):
+) -> Any | GetApiExperimentsRunsByRunIdResultsResponse200 | None:
     """Read run results
 
      Every dataset row of a run with what the target predicted, plus one entry per evaluator per row.
@@ -227,7 +192,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse401 | GetApiExperimentsRunsByRunIdResultsResponse404
+        Any | GetApiExperimentsRunsByRunIdResultsResponse200
     """
 
     return (

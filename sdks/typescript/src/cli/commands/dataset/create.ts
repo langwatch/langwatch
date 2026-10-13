@@ -1,10 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import type { DatasetColumnType } from "@/client-sdk/services/datasets/types";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Parses a comma-separated column spec string into DatasetColumnType[].
@@ -16,7 +18,17 @@ import { handleDatasetCommandError } from "./error-handler";
 export const parseColumns = (columnsStr: string): DatasetColumnType[] => {
   return columnsStr.split(",").map((pair) => {
     const parts = pair.trim().split(":");
-    if (parts.length !== 2 || !parts[0]?.trim() || !parts[1]?.trim()) {
+    if (parts.length !== 2) {
+      throw new Error(
+        `Invalid column format: "${pair.trim()}". Expected "name:type" (e.g. "input:string")`,
+      );
+    }
+    if (!parts[0]?.trim()) {
+      throw new Error(
+        `Invalid column format: "${pair.trim()}". Expected "name:type" (e.g. "input:string")`,
+      );
+    }
+    if (!parts[1]?.trim()) {
       throw new Error(
         `Invalid column format: "${pair.trim()}". Expected "name:type" (e.g. "input:string")`,
       );
@@ -39,9 +51,7 @@ export const createCommand = async (
     try {
       columnTypes = parseColumns(options.columns);
     } catch (error) {
-      console.error(
-        chalk.red(error instanceof Error ? error.message : "Invalid columns format"),
-      );
+      console.error(chalk.red(error instanceof Error ? error.message : "Invalid columns format"));
       process.exit(1);
     }
   }
@@ -61,9 +71,7 @@ export const createCommand = async (
         console.log(`  ${chalk.bold("ID:")}    ${dataset.id}`);
         console.log(`  ${chalk.bold("Slug:")}  ${dataset.slug}`);
         if (dataset.columnTypes.length > 0) {
-          const colStr = dataset.columnTypes
-            .map((c) => `${c.name}:${c.type}`)
-            .join(", ");
+          const colStr = dataset.columnTypes.map((c) => `${c.name}:${c.type}`).join(", ");
           console.log(`  ${chalk.bold("Columns:")} ${colStr}`);
         }
         const viewUrl = dataset.platformUrl;

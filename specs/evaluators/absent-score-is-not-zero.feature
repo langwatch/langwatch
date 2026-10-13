@@ -224,9 +224,8 @@ Feature: An absent evaluator score is never presented as zero
 
     Examples:
       | value     | rendered |
-      | absent    | N/A      |
-      | empty     | N/A      |
-      | zero      | 0        |
+      | absent    | -        |
+      | zero      | 0.00     |
 
 # --- AC Coverage Map (D6 slice only) ---
 # AC 0a: prompt reaches the judge, both config shapes

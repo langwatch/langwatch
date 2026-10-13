@@ -1,0 +1,342 @@
+import { createHmac } from "node:crypto";
+
+import { normalizeIdentifierValue } from "@langwatch/identity-contract";
+import { createLogger } from "@langwatch/observability";
+import type { SignUpVerdict } from "@langwatch/organization-contract";
+import type { UserApi } from "@langwatch/user-contract";
+import type { GenericEndpointContext } from "better-auth";
+import { APIError, getSessionFromCtx } from "better-auth/api";
+import { z } from "zod";
+
+import type { BetterAuthAnnouncements } from "../better-auth.channel.ts";
+
+/** Everything the passkey ceremony asks of the user directory. */
+export type PasskeySignUpDirectory = Pick<UserApi, "findByEmail" | "createPasskeyUser">;
+
+/** Whether the installation admits a new account for an address. */
+export type PasskeySignUpPolicy = Readonly<{
+  checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict>;
+}>;
+
+/** The mailbox proof a spent confirmation link minted: checked before the ceremony,
+ *  spent after it. */
+export interface SignUpVerification {
+  validateAddressProof(input: { token: string; email: string }): Promise<boolean>;
+  claimAddressProof(input: { token: string; email: string }): Promise<boolean>;
+}
+
+const logger = createLogger("langwatch:better-auth:passkey-signup");
+
+/**
+ * The code the sign-up screen watches for, so an already-registered address
+ * turns the screen into log-in rather than reporting a failed ceremony —
+ * refused BEFORE the ceremony, so no system prompt ever opens for it.
+ */
+export const PASSKEY_SIGNUP_EMAIL_TAKEN = "EMAIL_ALREADY_REGISTERED";
+
+/** The code for an address the endpoint will not accept at all. */
+export const PASSKEY_SIGNUP_EMAIL_INVALID = "INVALID_EMAIL";
+
+/** The code for a ceremony whose address proof is missing, spent, expired or another address's. */
+export const PASSKEY_SIGNUP_VERIFICATION_REQUIRED = "VERIFICATION_REQUIRED";
+
+/** A signed-in browser ran the sign-up ceremony for some other address. */
+export const PASSKEY_SIGNUP_ALREADY_SIGNED_IN = "ALREADY_SIGNED_IN";
+
+/** The installation restricts who may create an account, and this address is not admitted. */
+export const PASSKEY_SIGNUP_RESTRICTED = "auth_sign_up_restricted";
+
+/** Main's code for an address that must use its organization's sign-in method. */
+export const PASSKEY_SIGNUP_NOT_LOCAL = "REGISTRATION_NOT_ALLOWED";
+
+/** Whether a proven address still enrols a passkey here, rather than at its organization's door. */
+export interface PasskeySignUpEligibility {
+  enrolsLocally(input: { email: string; method: "passkey" }): Promise<boolean>;
+}
+
+/** Who the ceremony's request is signed in as, if anyone. */
+export type PasskeyCeremonyCaller =
+  | { signedIn: true; user: { id: string; email: string } }
+  | { signedIn: false };
+
+type PasskeyCeremonySession = (ctx: GenericEndpointContext) => Promise<PasskeyCeremonyCaller>;
+
+/** What the sign-up screen bakes into the registration challenge. */
+const signUpContextSchema = z.object({
+  email: z.string(),
+  addressProof: z.string().min(1),
+});
+
+/**
+ * Account creation WITH passkey. Requires no session and account created only
+ * on success. Public endpoints (requireSession: false) secured by resolveUser
+ * check, address duplicate prevention, and rate limiting.
+ */
+
+/**
+ * WebAuthn user handle for unauthenticated signup. Keyed hash of address so
+ * it's stable and opaque.
+ */
+function provisionalHandle({
+  email,
+  handleSecret,
+}: {
+  email: string;
+  handleSecret: string;
+}): string {
+  return `signup_${createHmac("sha256", handleSecret)
+    .update(email)
+    .digest("base64url")
+    .slice(0, 32)}`;
+}
+
+function parseContext(context: string | null | undefined): unknown {
+  try {
+    return JSON.parse(context ?? "");
+  } catch {
+    return null;
+  }
+}
+
+/** The address the ceremony was started for and the proof it carries, or a refusal. */
+function resolveSignUpContext(context: string | null | undefined): {
+  email: string;
+  addressProof: string;
+} {
+  const carried = signUpContextSchema.safeParse(parseContext(context));
+  const resolvedEmail = carried.success ? normalizeIdentifierValue(carried.data.email) : "";
+  // Deliberately shallow: whether the address RECEIVES mail was settled by the
+  // link that minted the proof, not by a regex (ADR-117 §6).
+  if (!resolvedEmail.includes("@") || resolvedEmail.length > 320) {
+    throw new APIError("BAD_REQUEST", {
+      code: PASSKEY_SIGNUP_EMAIL_INVALID,
+      message: "Enter an email address to create an account.",
+    });
+  }
+  if (!carried.success) {
+    throw new APIError("BAD_REQUEST", {
+      code: PASSKEY_SIGNUP_EMAIL_INVALID,
+      message: "Restart passkey sign-up from this browser.",
+    });
+  }
+  return { email: resolvedEmail, addressProof: carried.data.addressProof };
+}
+
+function verificationRequired(): APIError {
+  return new APIError("FORBIDDEN", {
+    code: PASSKEY_SIGNUP_VERIFICATION_REQUIRED,
+    message: "Verify this email address before creating a passkey.",
+  });
+}
+
+async function refuseIfRegistered({
+  users,
+  email: candidateEmail,
+}: {
+  users: PasskeySignUpDirectory;
+  email: string;
+}): Promise<void> {
+  // Case-insensitive for the same reason `auth.register` is: rows written
+  // before addresses were stored lowercased may carry capitals, and a
+  // case-twin beside one is two Users answering for one person.
+  const existing = await users.findByEmail({ email: candidateEmail });
+  if (!existing) return;
+
+  throw new APIError("BAD_REQUEST", {
+    code: PASSKEY_SIGNUP_EMAIL_TAKEN,
+    message: "That email already has an account. Log in with it instead.",
+  });
+}
+
+/** Asked before the proof is read, so an address that left local sign-up spends nothing. */
+async function refuseIfNotLocal({
+  eligibility,
+  email,
+}: {
+  eligibility: PasskeySignUpEligibility;
+  email: string;
+}): Promise<void> {
+  if (await eligibility.enrolsLocally({ email, method: "passkey" })) return;
+
+  throw new APIError("FORBIDDEN", {
+    code: PASSKEY_SIGNUP_NOT_LOCAL,
+    message: "This address must use its organization's sign-in method.",
+  });
+}
+
+async function refuseIfPolicyRefuses({
+  policy,
+  email,
+}: {
+  policy: PasskeySignUpPolicy;
+  email: string;
+}): Promise<void> {
+  const verdict = await policy.checkSignUp({ email });
+  if (verdict.allowed) return;
+
+  throw new APIError("FORBIDDEN", {
+    code: PASSKEY_SIGNUP_RESTRICTED,
+    message: "Accounts on this installation are created by invitation.",
+  });
+}
+
+/**
+ * Resolves ceremony user (unauthenticated signup): address without account
+ * and its handle. Name/displayName are credential manager display text.
+ */
+async function resolveUser({
+  handleSecret,
+  users,
+  verification,
+  policy,
+  eligibility,
+  context,
+}: {
+  ctx: GenericEndpointContext;
+  handleSecret: string;
+  users: PasskeySignUpDirectory;
+  verification: SignUpVerification;
+  policy: PasskeySignUpPolicy;
+  eligibility: PasskeySignUpEligibility;
+  context?: string | null | undefined;
+}): Promise<{ id: string; name: string; displayName: string }> {
+  const { email: resolvedEmail, addressProof } = resolveSignUpContext(context);
+  await refuseIfNotLocal({ eligibility, email: resolvedEmail });
+  if (!(await verification.validateAddressProof({ token: addressProof, email: resolvedEmail }))) {
+    throw verificationRequired();
+  }
+  await refuseIfRegistered({ users, email: resolvedEmail });
+  // Before the system prompt opens, so a refused address is never asked to
+  // create a passkey for an account it cannot have.
+  await refuseIfPolicyRefuses({ policy, email: resolvedEmail });
+
+  return {
+    id: provisionalHandle({ email: resolvedEmail, handleSecret }),
+    name: resolvedEmail,
+    displayName: resolvedEmail,
+  };
+}
+
+/**
+ * After ceremony succeeds, create account and return userId. Session opened
+ * by plugin in one atomic transaction (ceremony, write, mint).
+ */
+function createAfterVerification({
+  announcements,
+  users,
+  verification,
+  policy,
+  eligibility,
+  sessionOf,
+}: {
+  announcements: BetterAuthAnnouncements;
+  users: PasskeySignUpDirectory;
+  verification: SignUpVerification;
+  policy: PasskeySignUpPolicy;
+  eligibility: PasskeySignUpEligibility;
+  sessionOf: PasskeyCeremonySession;
+}): (params: {
+  ctx: GenericEndpointContext;
+  context?: string | null | undefined;
+}) => Promise<{ userId: string; name: string }> {
+  return async function afterVerification({
+    ctx,
+    context,
+  }: {
+    ctx: GenericEndpointContext;
+    context?: string | null | undefined;
+  }): Promise<{ userId: string; name: string }> {
+    // The plugin runs this for a signed-in caller too: adding a passkey from settings, the
+    // nudge or the post-reset offer attaches it to the account already signed in, while a
+    // sign-up ceremony from a signed-in browser is refused. specs/identity/passkeys.feature
+    const caller = await sessionOf(ctx);
+    if (caller.signedIn) {
+      if (carriesSignUpContext(context)) throw alreadySignedIn();
+      return { userId: caller.user.id, name: caller.user.email };
+    }
+    const { email: resolvedEmail, addressProof } = resolveSignUpContext(context);
+    await refuseIfNotLocal({ eligibility, email: resolvedEmail });
+    // Again, because the check in `resolveUser` was one network round trip ago
+    // and an account can be created in that window. The unique index on the
+    // address is the real backstop; this is the one that answers in words.
+    await refuseIfRegistered({ users, email: resolvedEmail });
+    // Before the proof is spent: a refused address keeps its link.
+    await refuseIfPolicyRefuses({ policy, email: resolvedEmail });
+
+    // Spent before anything is written: the proof is the authority to enrol.
+    if (!(await verification.claimAddressProof({ token: addressProof, email: resolvedEmail }))) {
+      logger.info("a passkey sign-up finished without a live address proof; nothing was created");
+      throw verificationRequired();
+    }
+
+    const user = await users.createPasskeyUser({ email: resolvedEmail });
+    announcements.signUpNurturing({ userId: user.id });
+
+    return {
+      userId: user.id,
+      // The stored label, where the browser did not supply one. The address is
+      // what somebody scanning a list of passkeys recognises.
+      name: resolvedEmail,
+    };
+  };
+}
+
+/**
+ * The plugin's `registration` block. Exported whole so the flag that mounts
+ * the plugin is the only thing deciding whether any of it exists.
+ */
+export function passkeySignUpRegistration(options: {
+  announcements: BetterAuthAnnouncements;
+  handleSecret: string;
+  users: PasskeySignUpDirectory;
+  verification: SignUpVerification;
+  policy: PasskeySignUpPolicy;
+  eligibility: PasskeySignUpEligibility;
+  sessionOf?: PasskeyCeremonySession;
+}): {
+  requireSession: boolean;
+  resolveUser: (params: {
+    ctx: GenericEndpointContext;
+    context?: string | null;
+  }) => Promise<{ id: string; name: string; displayName: string }>;
+  afterVerification: (params: {
+    ctx: GenericEndpointContext;
+    context?: string | null | undefined;
+  }) => Promise<{ userId: string; name: string }>;
+} {
+  return {
+    requireSession: false,
+    resolveUser: ({ ctx, context }: { ctx: GenericEndpointContext; context?: string | null }) =>
+      resolveUser({
+        ctx,
+        context,
+        users: options.users,
+        verification: options.verification,
+        policy: options.policy,
+        eligibility: options.eligibility,
+        handleSecret: options.handleSecret,
+      }),
+    afterVerification: createAfterVerification({
+      ...options,
+      sessionOf: options.sessionOf ?? identifyCeremonyCaller,
+    }),
+  };
+}
+
+async function identifyCeremonyCaller(ctx: GenericEndpointContext): Promise<PasskeyCeremonyCaller> {
+  const session = await getSessionFromCtx(ctx);
+  return session?.user.id
+    ? { signedIn: true, user: { id: session.user.id, email: session.user.email } }
+    : { signedIn: false };
+}
+
+function carriesSignUpContext(context: string | null | undefined): boolean {
+  return signUpContextSchema.validate(parseContext(context));
+}
+
+function alreadySignedIn(): APIError {
+  return new APIError("FORBIDDEN", {
+    code: PASSKEY_SIGNUP_ALREADY_SIGNED_IN,
+    message: "Sign out before creating a new account with a passkey.",
+  });
+}

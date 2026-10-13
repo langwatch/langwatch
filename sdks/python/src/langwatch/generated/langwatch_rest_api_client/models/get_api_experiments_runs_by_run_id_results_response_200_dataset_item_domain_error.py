@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -27,10 +26,14 @@ class GetApiExperimentsRunsByRunIdResultsResponse200DatasetItemDomainError:
         message (str | Unset):
         meta (GetApiExperimentsRunsByRunIdResultsResponse200DatasetItemDomainErrorMeta | Unset):
         http_status (float | Unset):
-        fault (str | Unset): Who the failure is attributable to: customer, platform, provider
+        fault (str | Unset): Who the failure is attributable to: customer, platform, presumed_platform, provider
         trace_id (str | Unset):
+        span_id (str | Unset):
+        trace_url (str | Unset):
+        retryable (bool | Unset):
         tips (list[str] | Unset):
         docs_url (str | Unset):
+        reasons (list[Any] | Unset):
     """
 
     code: str
@@ -40,9 +43,12 @@ class GetApiExperimentsRunsByRunIdResultsResponse200DatasetItemDomainError:
     http_status: float | Unset = UNSET
     fault: str | Unset = UNSET
     trace_id: str | Unset = UNSET
+    span_id: str | Unset = UNSET
+    trace_url: str | Unset = UNSET
+    retryable: bool | Unset = UNSET
     tips: list[str] | Unset = UNSET
     docs_url: str | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    reasons: list[Any] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         code = self.code
@@ -61,14 +67,24 @@ class GetApiExperimentsRunsByRunIdResultsResponse200DatasetItemDomainError:
 
         trace_id = self.trace_id
 
+        span_id = self.span_id
+
+        trace_url = self.trace_url
+
+        retryable = self.retryable
+
         tips: list[str] | Unset = UNSET
         if not isinstance(self.tips, Unset):
             tips = self.tips
 
         docs_url = self.docs_url
 
+        reasons: list[Any] | Unset = UNSET
+        if not isinstance(self.reasons, Unset):
+            reasons = self.reasons
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "code": code,
@@ -85,10 +101,18 @@ class GetApiExperimentsRunsByRunIdResultsResponse200DatasetItemDomainError:
             field_dict["fault"] = fault
         if trace_id is not UNSET:
             field_dict["traceId"] = trace_id
+        if span_id is not UNSET:
+            field_dict["spanId"] = span_id
+        if trace_url is not UNSET:
+            field_dict["traceUrl"] = trace_url
+        if retryable is not UNSET:
+            field_dict["retryable"] = retryable
         if tips is not UNSET:
             field_dict["tips"] = tips
         if docs_url is not UNSET:
             field_dict["docsUrl"] = docs_url
+        if reasons is not UNSET:
+            field_dict["reasons"] = reasons
 
         return field_dict
 
@@ -118,9 +142,17 @@ class GetApiExperimentsRunsByRunIdResultsResponse200DatasetItemDomainError:
 
         trace_id = d.pop("traceId", UNSET)
 
+        span_id = d.pop("spanId", UNSET)
+
+        trace_url = d.pop("traceUrl", UNSET)
+
+        retryable = d.pop("retryable", UNSET)
+
         tips = cast(list[str], d.pop("tips", UNSET))
 
         docs_url = d.pop("docsUrl", UNSET)
+
+        reasons = cast(list[Any], d.pop("reasons", UNSET))
 
         get_api_experiments_runs_by_run_id_results_response_200_dataset_item_domain_error = cls(
             code=code,
@@ -130,25 +162,12 @@ class GetApiExperimentsRunsByRunIdResultsResponse200DatasetItemDomainError:
             http_status=http_status,
             fault=fault,
             trace_id=trace_id,
+            span_id=span_id,
+            trace_url=trace_url,
+            retryable=retryable,
             tips=tips,
             docs_url=docs_url,
+            reasons=reasons,
         )
 
-        get_api_experiments_runs_by_run_id_results_response_200_dataset_item_domain_error.additional_properties = d
         return get_api_experiments_runs_by_run_id_results_response_200_dataset_item_domain_error
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

@@ -89,6 +89,15 @@ Feature: An organization can bound how long a signed-in session lasts
       # activity is a maximum session length, which is the other setting.
 
     @unit
+    Scenario: A page that polls on its own does not keep the session alive
+      Given "acme" ends idle sessions after one hour
+      When "sam" leaves a page open whose reads poll in the background for two hours
+      Then those polling reads are judged against the window but never count as use
+      And his session ends an hour after he last used LangWatch himself
+      # Diverges from main, which counts every read (Alex's ruling, 2026-10-11): reads a
+      # person caused still count, including refetches a server hint triggers.
+
+    @unit
     Scenario: A maximum length is not extended by activity
       Given "acme" caps a session at eight hours
       When "sam" works continuously for nine

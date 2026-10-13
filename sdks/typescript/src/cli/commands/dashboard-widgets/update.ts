@@ -1,21 +1,18 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { sanitizeTerminalText } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
-import {
-  WidgetInputError,
-  type DefinitionFlags,
-  resolveDefinitionInput,
-} from "./definitionInput";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
+import { WidgetInputError, type DefinitionFlags, resolveDefinitionInput } from "./definitionInput";
 
 /**
- * Returns the updated widget rather than printing it: the output port
- * renders it in whatever format the caller asked for (utils/output.ts). A
- * call touching nothing is refused locally, matching the API's own refusal
- * of an empty update.
+ * Returns the updated widget rather than printing it (output port renders
+ * per-format). A call touching nothing is refused locally, matching the
+ * API's own refusal of an empty update.
  */
 export const updateDashboardWidgetCommand = async (
   id: string,

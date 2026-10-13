@@ -1,9 +1,11 @@
 import chalk from "chalk";
+
 import { PromptsApiService } from "@/client-sdk/services/prompts";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { validateTagName } from "./validation";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
+import { validateTagName } from "./validation";
 
 /**
  * Creates a custom tag for the organization.

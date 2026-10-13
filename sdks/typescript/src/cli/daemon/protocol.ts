@@ -1,18 +1,7 @@
 /**
- * Wire protocol between the thin CLI client and the daemon.
- *
- * Framing: newline-delimited JSON. One JSON object per line, no embedded
- * newlines (JSON.stringify escapes them). Output chunks carry base64 so
- * arbitrary bytes survive the round trip — a command's stdout is not
- * guaranteed to be valid UTF-8, and splitting a multi-byte sequence across
- * two chunks would corrupt it if we shipped strings.
- *
- * One connection carries exactly one request. That keeps cancellation and
- * crash semantics trivial: the connection IS the request's lifetime.
- *
- * This module must stay dependency-free (node builtins only) — it is loaded
- * on the client's hot path, where every millisecond of module load is a
- * millisecond added to every CLI invocation.
+ * Wire protocol between the CLI client and the daemon: newline-delimited
+ * JSON, output chunks base64'd (stdout isn't guaranteed valid UTF-8). One
+ * connection, one request. Dependency-free -- it loads on every invocation.
  */
 import { StringDecoder } from "node:string_decoder";
 
@@ -30,11 +19,9 @@ export interface HelloFrame {
   /** Human-readable CLI version of the *client*, for error messages. */
   cliVersion: string;
   /**
-   * Identity of the CODE the client is running: version + entrypoint size/mtime.
-   * Must equal the daemon's, or the daemon is stale and gets evicted. See
-   * `resolveBuildId` — the semver alone does not move when a bundle is rebuilt
-   * or reinstalled, and a daemon serving yesterday's code is the worst bug this
-   * feature can have.
+   * Identity of the CODE the client is running: version + entrypoint
+   * size/mtime. Must equal the daemon's, or it is stale and gets evicted --
+   * the semver alone does not move when a bundle is rebuilt. See `resolveBuildId`.
    */
   build: string;
   /** sha256 of (endpoint, apiKey, uid). See identity.ts. */
@@ -53,17 +40,9 @@ export interface ExecFrame {
   /** Chalk colour level the caller's process would have resolved (0-3). */
   colorLevel: number;
   /**
-   * The CALLER's `process.argv[1]` — the bin it was actually invoked as.
-   *
-   * The package ships two bin names for one file (`lw` and `langwatch`), and
-   * ONE daemon serves both: `resolveBuildId` stats the same symlink target
-   * either way, so whichever bin happened to spawn the daemon is the one whose
-   * `argv[1]` it holds forever. Without this field, `buildProgram()` titles
-   * usage and every commander error (the root sets `.showHelpAfterError()`)
-   * with the DAEMON's bin, so an `lw` caller is shown `Usage: langwatch …`.
-   *
-   * Optional so a client that predates the field still parses; `buildProgram`
-   * falls back to the serving process's own `argv[1]`, i.e. today's behaviour.
+   * The CALLER's `process.argv[1]` — the bin it was invoked as. Two bin names
+   * (`lw`, `langwatch`) share one daemon, so without this the daemon's own bin
+   * name leaks into usage/error text for the other caller. Optional field.
    */
   bin?: string;
 }
@@ -83,12 +62,7 @@ export interface StatusFrame {
   t: "status";
 }
 
-export type ClientFrame =
-  | HelloFrame
-  | ExecFrame
-  | CancelFrame
-  | StopFrame
-  | StatusFrame;
+export type ClientFrame = HelloFrame | ExecFrame | CancelFrame | StopFrame | StatusFrame;
 
 /** Daemon -> client: handshake accepted. */
 export interface HelloOkFrame {
@@ -129,11 +103,9 @@ export interface ExitFrame {
 }
 
 /**
- * Daemon -> client: "I cannot serve this faithfully, run it yourself."
- *
- * Only ever sent BEFORE any `out`/`err` frame, so the client can fall back
- * with zero risk of duplicated output. Used when the caller's cwd vanished,
- * or when a future daemon wants to decline a command it does not support.
+ * Daemon -> client: "I cannot serve this faithfully, run it yourself." Only
+ * ever sent BEFORE any `out`/`err` frame, so the client falls back with zero
+ * risk of duplicated output.
  */
 export interface FallbackFrame {
   t: "fallback";
@@ -171,21 +143,16 @@ export function encodeFrame(frame: AnyFrame): string {
 }
 
 /**
- * Incremental newline-delimited-JSON reader.
- *
- * Socket reads split anywhere, so a frame can arrive across several chunks
- * and several frames can arrive in one. Feed raw buffers, get whole frames.
+ * Incremental newline-delimited-JSON reader: socket reads split anywhere, so
+ * a frame can span several chunks and several frames can arrive in one.
+ * Feed raw buffers, get whole frames.
  */
 export class FrameDecoder<T extends AnyFrame = AnyFrame> {
   private buffer = "";
   /**
-   * Decodes across chunk boundaries. A socket splits wherever it likes, so a
-   * multi-byte UTF-8 sequence routinely straddles two reads — and
-   * `chunk.toString("utf8")` per chunk resolves each half to U+FFFD, silently
-   * mangling the frame while still producing parseable JSON. StringDecoder
-   * holds the incomplete tail until the rest of the sequence arrives. (The
-   * header above already warned about this for the base64'd output path; the
-   * framing layer itself had the same bug.)
+   * A socket can split a multi-byte UTF-8 sequence across two reads;
+   * `chunk.toString("utf8")` per chunk would resolve each half to U+FFFD,
+   * silently mangling the frame. `StringDecoder` holds the incomplete tail.
    */
   private readonly utf8 = new StringDecoder("utf8");
 
@@ -196,8 +163,7 @@ export class FrameDecoder<T extends AnyFrame = AnyFrame> {
   constructor(private readonly maxLineBytes = 64 * 1024 * 1024) {}
 
   push(chunk: Buffer | string): T[] {
-    this.buffer +=
-      typeof chunk === "string" ? chunk : this.utf8.write(chunk);
+    this.buffer += typeof chunk === "string" ? chunk : this.utf8.write(chunk);
     if (this.buffer.length > this.maxLineBytes) {
       this.buffer = "";
       throw new Error("daemon protocol: frame exceeded maximum size");
