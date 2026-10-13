@@ -310,6 +310,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     timeout-minutes: 12
     env:
       # Flip to 'false' to observe the selection for a few weeks without
@@ -344,9 +348,9 @@ jobs:
 
       # The graph is derived, not source: it is rebuilt whenever the workspace
       # shape changes and is cheap to recompute, so a miss costs seconds.
-      # Only main saves; a pull request restores main's newest entry.
+      # Main and same-repository pull requests save; a pull request keeps one copy.
       - name: Restore the Nx project graph
-        if: github.ref != 'refs/heads/main'
+        if: ${{ !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/workspace-data
@@ -356,7 +360,7 @@ jobs:
             ${{ runner.os }}-nx-graph-
 
       - name: Cache the Nx project graph
-        if: github.ref == 'refs/heads/main'
+        if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/workspace-data
@@ -364,6 +368,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nx-graph-${{ hashFiles('pnpm-lock.yaml', 'nx.json') }}-
             ${{ runner.os }}-nx-graph-
+
+      - uses: ./.github/actions/prune-pr-caches
+        with:
+          prefix: ${{ runner.os }}-nx-graph-
 
       - name: Decide which applications this change reaches
         id: pick
@@ -478,6 +486,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -506,7 +518,7 @@ jobs:
       #
       # The restore key is pinned to the lockfile and the root compiler
       # options: a snapshot built against other dependency types is never
-      # restored. Only main saves, below, so a pull request restores main's.
+      # restored. Saved below, once the typecheck has run; a pull request keeps one copy.
       - name: Restore TypeScript incremental build info
         id: tsbuildinfo
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -522,6 +534,10 @@ jobs:
           key: ${{ runner.os }}-pkg-dist-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.*.json') }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-pkg-dist-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.*.json') }}-
+
+      - uses: ./.github/actions/prune-pr-caches
+        with:
+          prefix: ${{ runner.os }}-pkg-dist-
 
       # A restored dist is trusted only where the package and its workspace
       # dependencies are unchanged since the snapshot: tsc 7 keeps a stale
@@ -570,7 +586,7 @@ jobs:
       # leave every later run cold. Safe: tsbuildinfo keeps the errors, and a
       # fix changes the package's sources, which drops it and its dependants.
       - name: Save TypeScript incremental build info
-        if: ${{ !cancelled() && github.ref == 'refs/heads/main' && (steps.typecheck.outcome == 'success' || steps.typecheck.outcome == 'failure') }}
+        if: ${{ !cancelled() && steps.tsbuildinfo.outputs.cache-hit != 'true' && (steps.typecheck.outcome == 'success' || steps.typecheck.outcome == 'failure') && ((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -1159,6 +1175,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     env:
       # Disable telemetry and optimize build for CI
       NEXT_TELEMETRY_DISABLED: 1

@@ -208,6 +208,8 @@ jobs:
       - uses: ./.github/actions/nx-cache
         with:
           suffix: sdk-python-e2e
+          # Fork code can run here (pull_request_target): no prune permission, so no PR copy.
+          pr-save: "false"
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0

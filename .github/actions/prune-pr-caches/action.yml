@@ -1,0 +1,42 @@
+# Keeps a pull request to one saved copy of a cache. Run it after the restore
+# and before the job's save: the newest copy is already on disk, so the older
+# ones can go and the save leaves exactly one. Entries ending in this run's
+# commit are never touched, so sibling jobs sharing a prefix keep what they
+# saved. Does nothing off a same-repository pull request (forks cannot delete).
+name: prune-pr-caches
+description: Delete this pull request's older entries for one cache key prefix. Never fails the job.
+
+inputs:
+  prefix:
+    description: >-
+      The key up to the part that rotates, ending in a dash, for example
+      `Linux-nx-sdk-`. Entries must continue with hashes and the commit only,
+      so `Linux-nx-sdk-` leaves `Linux-nx-sdk-e2e-` alone.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Delete this pull request's older entries
+      if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        CACHE_REF: ${{ github.ref }}
+        CACHE_PREFIX: ${{ inputs.prefix }}
+        CACHE_SHA: ${{ github.sha }}
+      run: |
+        set +e
+        case "$CACHE_REF" in refs/pull/*/merge) ;; *) exit 0 ;; esac
+        ids=$(gh cache list --ref "$CACHE_REF" --key "$CACHE_PREFIX" --limit 100 --json id,key |
+          jq -r --arg p "$CACHE_PREFIX" --arg sha "$CACHE_SHA" '
+            .[]
+            | select(.key | startswith($p))
+            | select((.key | endswith($sha)) | not)
+            | select(.key | ltrimstr($p) | test("^([0-9a-f]{64}-)*[0-9a-f]{40}$"))
+            | .id')
+        for id in $ids; do
+          gh cache delete "$id" || echo "::warning::Could not delete cache $id; continuing."
+        done
+        exit 0

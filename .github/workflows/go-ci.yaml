@@ -100,6 +100,10 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true' }}
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -142,6 +146,10 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true' }}
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -269,6 +277,10 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.go == 'true' }}
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
