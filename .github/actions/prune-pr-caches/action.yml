@@ -28,8 +28,11 @@ runs:
       run: |
         set +e
         case "$CACHE_REF" in refs/pull/*/merge) ;; *) exit 0 ;; esac
-        ids=$(gh cache list --ref "$CACHE_REF" --key "$CACHE_PREFIX" --limit 1000 --json id,key |
-          jq -r --arg p "$CACHE_PREFIX" --arg sha "$CACHE_SHA" '
+        if ! listed=$(gh cache list --ref "$CACHE_REF" --key "$CACHE_PREFIX" --limit 1000 --json id,key); then
+          echo "::warning::Could not list caches for $CACHE_PREFIX on $CACHE_REF; nothing pruned."
+          exit 0
+        fi
+        ids=$(printf '%s' "$listed" | jq -r --arg p "$CACHE_PREFIX" --arg sha "$CACHE_SHA" '
             .[]
             | select(.key | startswith($p))
             | select((.key | endswith($sha)) | not)

@@ -21,8 +21,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
           CACHE_REF: refs/pull/${{ github.event.pull_request.number }}/merge
         run: |
-          set +e
-          for id in $(gh cache list --ref "$CACHE_REF" --limit 1000 --json id --jq '.[].id'); do
+          # A failed listing fails the job; a single failed delete only warns.
+          ids=$(gh cache list --ref "$CACHE_REF" --limit 1000 --json id --jq '.[].id') || {
+            echo "::error::Could not list caches on $CACHE_REF; nothing deleted."
+            exit 1
+          }
+          for id in $ids; do
             gh cache delete "$id" || echo "::warning::Could not delete cache $id; continuing."
           done
-          exit 0
