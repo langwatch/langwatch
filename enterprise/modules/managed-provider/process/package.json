@@ -21,7 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@aws-sdk/client-sts": "^3.1080.0",
+    "@aws-sdk/client-sts": "^3.1146.0",
     "@langwatch/enterprise-managed-provider-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
