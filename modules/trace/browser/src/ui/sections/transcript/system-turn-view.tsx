@@ -1,0 +1,36 @@
+import { Box, Flex, Text } from "@langwatch/design-system/primitives";
+import { asMarkdownBody, type ContentBlock } from "@langwatch/trace-contract/transcript";
+
+import { RenderedMarkdown } from "../../blocks/markdown/rendered-markdown.tsx";
+import { RoleChip } from "../../blocks/transcript/role-chip.tsx";
+import { TurnCollapseChevron } from "../../elements/transcript/turn-collapse-chevron.tsx";
+
+export function SystemTurnView({
+  role,
+  blocks,
+  onCollapse,
+}: {
+  role: "system" | "developer";
+  blocks: ContentBlock[];
+  onCollapse?: () => void;
+}) {
+  const text = blocks
+    .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
+    .map((b) => b.text)
+    .join("\n");
+  return (
+    <Box marginBottom={3}>
+      <Flex align="center" justify="space-between" gap={2}>
+        <RoleChip role={role} />
+        {onCollapse && <TurnCollapseChevron onClick={onCollapse} />}
+      </Flex>
+      <Box textStyle="xs" color="fg.muted">
+        {text ? (
+          <RenderedMarkdown markdown={asMarkdownBody(text)} paddingX={0} paddingY={0} />
+        ) : (
+          <Text>—</Text>
+        )}
+      </Box>
+    </Box>
+  );
+}

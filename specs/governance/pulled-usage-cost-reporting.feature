@@ -57,6 +57,20 @@ Feature: Pulled provider usage becomes visible, attributed cost
     Then the reported cost reflects the corrected figure
     And the earlier figure is not added on top
 
+  # Governance prices, gateway debits: no gateway row or Api edge in governance (Q208C, Alex 2026-10-06).
+  @unit
+  Scenario: Governance records a priced fact for each pulled observation it can price
+    Given an ingestion source pulled a usage record with a known dollar cost for a team
+    When governance's ledger process handles the observation
+    Then governance records a pulled-usage priced fact in nano-dollars under the team's scope
+
+  @unit
+  Scenario: The gateway budget ledger debits governance's priced pulled-usage fact
+    Given governance recorded a pulled-usage priced fact for a team
+    When the gateway's budget ledger receives the fact
+    Then the ledger holds that pulled cost under the team's scope, in the governance tenant
+    And a redelivered fact adds nothing to the total
+
   @unit
   Scenario: A refused Anthropic collision names the fields the two rows differed in
     Given Anthropic's cost report answers with two rows for the same day,

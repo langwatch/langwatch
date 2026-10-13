@@ -153,7 +153,7 @@ func (r *BifrostRouter) dispatchMessagesTranslated(
 	// dispatch goes through the pinned aws-sdk client instead. OpenAI models
 	// on Bedrock take the same lane over the public runtime host (see
 	// bedrockConverseEndpoint).
-	if endpoint, epErr := resolveBedrockConverseEndpoint(cred, model); epErr != nil {
+	if endpoint, epErr := resolveBedrockConverseEndpoint(cred, model, r.endpointPolicy); epErr != nil {
 		return nil, epErr
 	} else if endpoint != "" {
 		return r.dispatchMessagesTranslatedBedrockVPCE(ctx, bfCtx, bfReq, model, cred, endpoint)
@@ -235,7 +235,7 @@ func (r *BifrostRouter) dispatchMessagesTranslatedStream(
 	}
 
 	// Same endpoint pinning as the non-streaming lane above.
-	if endpoint, epErr := resolveBedrockConverseEndpoint(cred, model); epErr != nil {
+	if endpoint, epErr := resolveBedrockConverseEndpoint(cred, model, r.endpointPolicy); epErr != nil {
 		return nil, epErr
 	} else if endpoint != "" {
 		return r.dispatchMessagesTranslatedBedrockVPCEStream(ctx, bfCtx, bfReq, req, model, cred, endpoint)
@@ -259,8 +259,8 @@ func (r *BifrostRouter) dispatchMessagesTranslatedStream(
 // streaming and non-streaming translated lanes. An invalid endpoint comes back as the Anthropic-shaped 400 both lanes owe
 // their clients; keeping the check in one place means the error contract and
 // any future bypass condition cannot drift between the two.
-func resolveBedrockConverseEndpoint(cred domain.Credential, model string) (string, error) {
-	endpoint, err := bedrockConverseEndpoint(cred, model)
+func resolveBedrockConverseEndpoint(cred domain.Credential, model string, policy customerEndpointPolicy) (string, error) {
+	endpoint, err := bedrockConverseEndpoint(cred, model, policy)
 	if err != nil {
 		return "", anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}

@@ -113,3 +113,58 @@ Feature: CLI evaluation results command
     When I run `langwatch experiment results <experiment>`
     Then the CLI prints a clear message that no runs were found
     And the CLI exits with status 1
+
+  # Results are stored after the run reports them, so a read taken while the
+  # platform is still storing a large run holds part of it. One such read
+  # returned 1,062 of 17,640 verdicts as plain JSON with exit status 0, and a
+  # release gate compared pass rates over that sixteenth of the run.
+
+  @unit
+  Scenario: A JSON answer that is not whole says so
+    Given a run whose results are still being stored
+    When I run `langwatch experiment results <experiment> --format json`
+    Then the answer carries how many rows and verdicts were received and how many the run reported
+    And the answer is marked as not complete
+    And the CLI warns on stderr that the results are partial
+    And the CLI exits with status 0
+
+  @unit
+  Scenario: Requiring complete results fails on a partial answer
+    Given a run whose results are still being stored
+    When I run `langwatch experiment results <experiment> --require-complete`
+    Then the CLI exits with status 2
+    And the error says how many verdicts are still missing
+
+  @unit
+  Scenario: Waiting returns the whole run once it is stored
+    Given a run whose results finish being stored a moment later
+    When I run `langwatch experiment results <experiment> --wait 60`
+    Then the CLI reads the run again until it is complete
+    And the answer carries every row and verdict
+    And the CLI exits with status 0
+
+  @unit
+  Scenario: Waiting gives up when the run stays partial
+    Given a run whose results never finish being stored
+    When I run `langwatch experiment results <experiment> --wait 1`
+    Then the CLI exits with status 2
+
+  @unit
+  Scenario: Waiting holds on while the run is not stored yet
+    Given a run reported a moment ago that the platform does not hold yet
+    When I run `langwatch experiment results <experiment> --run-id <id> --wait 60`
+    Then the CLI reads again instead of failing on the missing run
+    And it answers once the run is stored whole
+
+  @unit
+  Scenario: Waiting reports a run that never appears
+    Given a run id the platform never holds
+    When I run `langwatch experiment results <experiment> --run-id <id> --wait 1`
+    Then the CLI fails saying the run was not found
+
+  @unit
+  Scenario: A whole answer raises no warning
+    Given a finished run whose reported rows and verdicts are all stored
+    When I run `langwatch experiment results <experiment> --require-complete`
+    Then the CLI prints no partial results warning
+    And the CLI exits with status 0

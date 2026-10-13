@@ -20,7 +20,7 @@ import (
 
 // Step is one entry in a job's `steps:` list. Only the fields the guards read
 // are modeled; everything else in a workflow is deliberately ignored.
-type Step struct { //nolint:recvcheck // UnmarshalYAML must take a pointer receiver to populate the value; the read-only accessors stay value receivers.
+type Step struct {
 	Name string            `yaml:"name"`
 	Uses string            `yaml:"uses"`
 	With map[string]any    `yaml:"with"`
@@ -117,7 +117,7 @@ func (o *On) UnmarshalYAML(node *yaml.Node) error {
 
 // Concurrency models the workflow-level `concurrency:` block: the group runs
 // share, and whether a superseded run is canceled.
-type Concurrency struct { //nolint:recvcheck // UnmarshalYAML must take a pointer receiver to populate the value; CancelsInProgress stays a value receiver.
+type Concurrency struct {
 	Group            string `yaml:"group"`
 	CancelInProgress any    `yaml:"cancel-in-progress"`
 }

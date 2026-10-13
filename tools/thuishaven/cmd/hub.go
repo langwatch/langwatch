@@ -6,22 +6,21 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-
-	"github.com/0xdeafcafe/moron/tui"
+	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/hubtui"
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // runHub is bare `haven` in a terminal: the interactive hub. Opening a stack's
-// git view — or handing off to the cleanup picker — quits the hub, runs the
-// other full-screen program, and re-enters the hub when it closes: two
-// full-screen programs take turns rather than nesting. Agents get the plain
-// list; a TUI is useless to them.
+// viewer or the cleanup picker quits the hub, runs the other full-screen
+// program, and re-enters the hub when it closes: two full-screen programs take
+// turns rather than nesting. Agents get the plain list; a TUI is useless to them.
 func runHub(ctx context.Context, d deps) error {
 	if d.isAgent {
-		return d.orch.Status(false, d.worktree)
+		return d.orch.Status(false, d.worktree, false)
 	}
 	// The TUI owns the terminal: a stray zap line would scribble over the
 	// interface, so the orchestrator's logs go to a file for this command.
@@ -32,15 +31,13 @@ func runHub(ctx context.Context, d deps) error {
 			return err
 		}
 		switch {
-		case out.RunCleanup:
-			if err := runInteractiveClean(ctx, d, pruneStaleThreshold(invocation{})); err != nil {
-				fmt.Fprintf(os.Stderr, "haven: cleanup failed: %v\n", err)
+		case out.OpenStack != "":
+			if err := runUpViewer(ctx, viewerTarget{slug: out.OpenStack, logPath: d.orch.LogPath(out.OpenStack), logDir: d.orch.LogDir(out.OpenStack), session: d.sessionActions(out.OpenStack)}, ""); err != nil {
+				fmt.Fprintf(os.Stderr, "haven: viewer for %s failed: %v\n", out.OpenStack, err)
 			}
-		case out.OpenGitDir != "":
-			if err := tui.Run(out.OpenGitDir); err != nil {
-				// A stale row (e.g. the worktree dir was deleted underneath us)
-				// shouldn't end the session — surface the error and re-enter the hub.
-				fmt.Fprintf(os.Stderr, "haven: git view for %s failed: %v\n", out.OpenGitDir, err)
+		case out.RunCleanup:
+			if err := runInteractiveClean(ctx, newCleanRun(d, invocation{})); err != nil {
+				fmt.Fprintf(os.Stderr, "haven: cleanup failed: %v\n", err)
 			}
 		default:
 			return nil
@@ -68,6 +65,7 @@ func (d deps) hubActions() hubtui.Actions {
 		},
 		WebURL:     d.orch.DashboardURL(),
 		HasCleanup: true,
+		HasViewer:  true,
 	}
 }
 
@@ -110,6 +108,7 @@ func hubView(v app.HubView) hubtui.View {
 		out.Worktrees = append(out.Worktrees, hubtui.WorktreeRow{
 			Slug: wt.Slug, Branch: wt.Branch, Dir: wt.Dir,
 			IsPrimary: wt.IsPrimary, IsCurrent: wt.IsCurrent,
+			StaleDays: staleDays(wt.IdleFor),
 		})
 	}
 	for _, ev := range v.Events {
@@ -135,10 +134,12 @@ func dashboardExtras(v app.HubView) dashboard.Extras {
 			OtherRSS:   v.Footprint.OtherRSS,
 			Pressure:   v.Footprint.Pressure.String(),
 		},
-		StackRSS: map[int]uint64{},
+		StackRSS:    map[int]uint64{},
+		StackUptime: map[int]time.Duration{},
 	}
 	for i := range v.Stacks {
 		out.StackRSS[v.Stacks[i].Stack.LauncherPID] = v.Stacks[i].RSS
+		out.StackUptime[v.Stacks[i].Stack.LauncherPID] = v.Stacks[i].Uptime
 	}
 	for _, wt := range v.Worktrees {
 		out.Worktrees = append(out.Worktrees, dashboard.WorktreeView{
@@ -167,4 +168,13 @@ func openInBrowser(url string) error {
 	// the hub stays up.
 	go func() { _ = cmd.Wait() }()
 	return nil
+}
+
+// staleDays is the whole days a worktree has gone without a commit, or 0 while
+// it is younger than domain.StaleWorktreeAge.
+func staleDays(idle time.Duration) int {
+	if idle < domain.StaleWorktreeAge {
+		return 0
+	}
+	return int(idle / (24 * time.Hour))
 }

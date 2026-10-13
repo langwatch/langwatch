@@ -154,6 +154,11 @@ Feature: Directory administration
       Then they are taken to the directory page
 
     @integration
+    Scenario: The old access address forwards onto the page it became
+      When somebody opens the old access address
+      Then they are taken to the directory page
+
+    @integration
     Scenario: The page leads with whether it is working
       When "ana" opens the directory page
       Then the first thing she reads is which sources are connected

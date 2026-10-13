@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { GroupsApiService } from "@/client-sdk/services/groups/groups-api.service";
+
 import { parseBindingFlags } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
 import { printFacts, runManagement, withParsedFlags } from "../management/_shared";

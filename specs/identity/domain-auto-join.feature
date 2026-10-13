@@ -196,6 +196,13 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
     And the administrators receive one automatic-join notice for that membership
     And accepting an invitation does not send an automatic-join notice
 
+  @unit @regression
+  Scenario: An automatic SSO admission's notice reaches the administrators' mail
+    Given the arrival owes the administrators an automatic-join notice
+    When it is sent
+    Then the join-request notifier sends it, keyed by the admission's grant
+    And a Developer seat's notice, which has no grant, is keyed by the organization, person and domain
+
   @unit
   Scenario: A later SSO sign-in completes a failed admission grant
     Given automatic SSO admission persisted a membership with its pending grant identity

@@ -1,0 +1,12 @@
+# Apps
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+| App   | Package   | Installs          | What it is (package.json `description`) |
+| ----- | --------- | ----------------- | --------------------------------------- |
+| `api` | `@lw/api` | 2 process modules | The api process.                        |
+| `ui`  | `@lw/ui`  | 1 browser module  | The browser process.                    |
+
+Installs counts the entries of the app's generated module list (`pnpm generate:modules`).
+
+<!-- readme:generated:end -->
