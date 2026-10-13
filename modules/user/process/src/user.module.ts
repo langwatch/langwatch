@@ -6,7 +6,10 @@ import { UserModule } from "./app/user.app.ts";
 import { userChannels } from "./channels/user-channels.registry.ts";
 import { userLifecycleEventing } from "./eventing/user-lifecycle.pipeline.ts";
 import { userRepositories } from "./repositories/user-repositories.registry.ts";
-import { UserAddressLowerCaseService } from "./services/user-address-lower-case.service.ts";
+import {
+  UserAddressLowerCaseService,
+  userAddressLowerCaseReportSchema,
+} from "./services/user-address-lower-case.service.ts";
 import { createGdprUserDataEraseRunner } from "./tasks/user-data-erase.task.ts";
 import { meRest } from "./transport/me.rest.ts";
 import { userAvatarRest } from "./transport/user-avatar.rest.ts";
@@ -59,15 +62,8 @@ export const userProcessModule: PublishedProcessModule<"user", UserApi, UserServ
           "Lower-cases every stored account address; when another account already holds the lower-cased address, it gets a plus tag instead (name+2@domain, then +3 and so on).",
         needsOldWritersGone: false,
         run: async ({ checkpoint, dryRun, signal }) => {
-          const afterId = checkpoint.resumeFrom?.afterId;
-          const count = (key: "lowerCased" | "plusTagged"): number => {
-            const counted = checkpoint.resumeFrom?.[key];
-            return typeof counted === "number" ? counted : 0;
-          };
-          const resumeFrom =
-            typeof afterId === "string"
-              ? { afterId, lowerCased: count("lowerCased"), plusTagged: count("plusTagged") }
-              : null;
+          const resumed = userAddressLowerCaseReportSchema.safeParse(checkpoint.resumeFrom);
+          const resumeFrom = resumed.success ? resumed.data : null;
           return UserAddressLowerCaseService.create({ users: repositories.users }).lowerCaseStored({
             dryRun,
             signal,

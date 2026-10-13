@@ -39,7 +39,7 @@ describe("the address step", () => {
 
       const { report, saved } = await runStep({ users });
 
-      expect(report).toEqual({ afterId: ada.id, lowerCased: 1, plusTagged: 0 });
+      expect(report).toEqual({ afterId: ada.id, lowerCased: 1, plusTagged: 0, renamed: [] });
       expect(saved).toEqual([report]);
       await expect(users.findByEmail("ada@example.com")).resolves.toMatchObject([{ id: ada.id }]);
       await expect(users.findById(grace.id)).resolves.toMatchObject({
@@ -60,6 +60,9 @@ describe("the address step", () => {
       const { report } = await runStep({ users });
 
       expect(report).toMatchObject({ lowerCased: 0, plusTagged: 2 });
+      expect(
+        report.renamed.map(({ userId }) => userId).toSorted((x, y) => x.localeCompare(y)),
+      ).toEqual([capitals.id, shouting.id].toSorted((x, y) => x.localeCompare(y)));
       await expect(users.findById(lowered.id)).resolves.toMatchObject({
         email: "eve@example.com",
       });
@@ -83,7 +86,7 @@ describe("the address step", () => {
       await runStep({ users });
 
       await expect(runStep({ users })).resolves.toEqual({
-        report: { afterId: null, lowerCased: 0, plusTagged: 0 },
+        report: { afterId: null, lowerCased: 0, plusTagged: 0, renamed: [] },
         saved: [],
       });
     });

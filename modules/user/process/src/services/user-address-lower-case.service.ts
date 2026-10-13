@@ -1,13 +1,20 @@
+import { z } from "zod";
+
 import type { UserAddressRow, UserRepository } from "../repositories/user.repository.ts";
 
 const PAGE_SIZE = 500;
 
-/** Where the step got to, and how many addresses it rewrote; a dry run counts what it would. */
-export type UserAddressLowerCaseReport = {
-  afterId: string | null;
-  lowerCased: number;
-  plusTagged: number;
-};
+/**
+ * Where the step got to and what it rewrote; a dry run counts what it would. `renamed` lists the
+ * accounts that took a plus tag, so an admin sees them on Ops > Upgrades and can fix each one.
+ */
+export const userAddressLowerCaseReportSchema = z.object({
+  afterId: z.string().nullable(),
+  lowerCased: z.number(),
+  plusTagged: z.number(),
+  renamed: z.array(z.object({ userId: z.string(), from: z.string(), to: z.string() })),
+});
+export type UserAddressLowerCaseReport = z.infer<typeof userAddressLowerCaseReportSchema>;
 
 export type UserAddressLowerCaseRun = Readonly<{
   dryRun: boolean;
@@ -37,7 +44,9 @@ export class UserAddressLowerCaseService {
     resumeFrom,
     onPageDone,
   }: UserAddressLowerCaseRun): Promise<UserAddressLowerCaseReport> {
-    const report = { ...(resumeFrom ?? { afterId: null, lowerCased: 0, plusTagged: 0 }) };
+    const report = {
+      ...(resumeFrom ?? { afterId: null, lowerCased: 0, plusTagged: 0, renamed: [] }),
+    };
     while (!signal.aborted) {
       const page = await this.deps.users.findMixedCaseAddressPage({
         afterId: report.afterId,
@@ -50,7 +59,7 @@ export class UserAddressLowerCaseService {
         else await this.#lowerCase({ row, report });
       }
       report.afterId = last.id;
-      if (!dryRun) await onPageDone({ report: { ...report } });
+      if (!dryRun) await onPageDone({ report: { ...report, renamed: [...report.renamed] } });
     }
     return report;
   }
@@ -70,7 +79,10 @@ export class UserAddressLowerCaseService {
       if (outcome === "changed") return;
       if (outcome === "replaced") {
         if (tag === 1) report.lowerCased += 1;
-        else report.plusTagged += 1;
+        else {
+          report.plusTagged += 1;
+          report.renamed.push({ userId: row.id, from: row.email, to });
+        }
         return;
       }
     }

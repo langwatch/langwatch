@@ -54,6 +54,7 @@ Feature: Canonical user lifecycle
     When the address step runs
     Then the address is stored as "local+2@domain", or the next free "+N"
     And nothing is merged or removed
+    And the step report on Ops > Upgrades lists the account with its old and new address, for an admin to fix
 
   @integration
   Scenario: The address step never overwrites a save made during its pass
