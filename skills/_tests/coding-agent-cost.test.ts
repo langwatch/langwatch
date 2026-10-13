@@ -97,6 +97,9 @@ describe("the coding-agent-cost skill", () => {
       expect(oneProject, "the skill says how to read one project").toBeTruthy();
       expect(oneProject).toContain("add `AND TenantId = '<id>'` to every query below");
       expect(oneProject).toContain("`personal_project.id` in `langwatch whoami`");
+      expect(oneProject).toContain(
+        "if that field is missing, ask the user which project id to use",
+      );
       expect(oneProject).not.toContain("--project");
     });
   });
