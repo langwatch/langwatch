@@ -1,0 +1,13 @@
+# Modules
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+| Module                   | Subjects          | Halves                       | Owns tables             | Peers                    |
+| ------------------------ | ----------------- | ---------------------------- | ----------------------- | ------------------------ |
+| [alpha](alpha/README.md) | alpha, alpha-item | contract · process · browser | AlphaItem, alpha_events | gamma, ≈ `...extraPeers` |
+| [gamma](gamma/README.md) | gamma             | process                      | –                       | –                        |
+
+**Who owns a subject?** Search this table, or `modules/catalogue.json`. A subject with no
+row is unowned: add it to the catalogue before writing code for it.
+
+<!-- readme:generated:end -->

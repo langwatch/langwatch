@@ -1,17 +1,18 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatScope, formatStatus } from "./_shared";
-import type { CommandResult } from "../../utils/output";
 
 /**
- * Returns the listing rather than printing it: the output port renders it in
- * whatever format the caller asked for (utils/output.ts). The list model
- * carries no secrets — only `display_prefix`, exactly what the human table
- * shows — so the raw list is safe to hand to a machine caller.
+ * Returns the listing rather than printing it (output port renders
+ * per-format). The list model carries no secrets -- only `display_prefix`,
+ * what the human table shows -- so it's safe for a machine caller.
  */
 export const listVirtualKeysCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();
@@ -45,7 +46,9 @@ export const listVirtualKeysCommand = async (): Promise<CommandResult | void> =>
           Scopes: vk.scopes.map(formatScope).join(", ") || chalk.gray("—"),
           Routing: vk.routing_mode,
           Purpose: vk.purpose === "langy" ? chalk.magenta("langy") : "user",
-          "Last used": vk.last_used_at ? new Date(vk.last_used_at).toLocaleDateString() : chalk.gray("—"),
+          "Last used": vk.last_used_at
+            ? new Date(vk.last_used_at).toLocaleDateString()
+            : chalk.gray("—"),
         }));
 
         formatTable({

@@ -114,10 +114,17 @@ Feature: Connect on a self-hosted install
     And the verdicts come back in the shape every other classifier returns
 
   @unit
-  Scenario: An install with its own judge key keeps using it
-    Given the install has its own judge key configured
-    Then eval functions are judged with that key
-    And nothing is sent to the hosted services host
+  Scenario: A self-hosted install never judges with a judge key it sets
+    Given a self-hosted install that sets a judge key
+    Then eval functions are never judged with that key
+    And they are judged through the hosted service only when "Instant Evals" is switched on
+
+  @unit
+  Scenario: A development checkout judges with LangWatch's key directly
+    Given a development checkout (NODE_ENV "development") that is not LangWatch Cloud
+    And LangWatch's judge key is set
+    Then eval functions and search routing are judged with that key, as on LangWatch Cloud
+    And nothing is judged through Connect
 
   @unit
   Scenario: An install with the service off publishes eval functions as unavailable
@@ -204,6 +211,21 @@ Feature: Connect on a self-hosted install
     When an eval function runs
     Then it fails with code "connect_budget_exhausted"
     And the error names the cap and says an organization admin can raise it in Settings, Connect
+
+  @unit
+  Scenario: A usage read that cannot reach LangWatch shows usage as unavailable
+    Given the hosted usage route is blocked, times out or fails
+    When an admin reads the Connect settings
+    Then the settings report usage as unavailable
+    And reading them does not fail and reports no refusal
+    And the services the license names keep their switches
+
+  @integration
+  Scenario: The page shows usage as unavailable when LangWatch cannot be reached
+    Given the usage read could not reach LangWatch
+    When an admin opens Settings, Connect
+    Then the spend section says usage is unavailable
+    And no error alert or toast is shown
 
   @unit
   Scenario: An unregistered license surfaces as a named error

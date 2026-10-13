@@ -31,7 +31,7 @@ The [Langy API surface flag](/self-hosting/langy/setup#staged-rollout) must be o
 | Status | Body | Meaning |
 | --- | --- | --- |
 | `200` | `{ "status": "ok", "conversationId", "turnId", "durationMs" }` | Langy answered with text. |
-| `503` | `{ "status": "unhealthy", "reason", ... }` | `timeout`: no answer within 55 seconds, which includes a worker that never managed to start. `turn_failed`: the turn failed or stopped. `empty_reply`: the turn completed with no text. |
+| `503` | `{ "status": "unhealthy", "reason", "cause", ... }` | `timeout`: no answer within 55 seconds, which includes a worker that never managed to start. `turn_failed`: the turn failed or stopped. `empty_reply`: the turn completed with no text. `cause` is the underlying error code, such as `insufficient_quota` or `budget_exceeded`, or `turn_stopped` for a stopped turn. It is left out when no code can be read. |
 | `429` | `{ "status": "busy" }` | A check for the same key is still running, or its last one timed out less than 55 seconds ago. Poll less often. |
 | `401` / `403` | `{ "message" }` | The key is missing, unknown, lacks `langy:create`, or its owner has no Langy access. |
 

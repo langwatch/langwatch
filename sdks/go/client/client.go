@@ -64,6 +64,9 @@ type Client struct {
 	// Triggers manages alerting/automation triggers.
 	Triggers *TriggersService
 
+	// SlackConnections lists the Slack connections triggers post through.
+	SlackConnections *SlackConnectionsService
+
 	// Monitors manages evaluation monitors and their on/off state.
 	Monitors *MonitorsService
 
@@ -150,6 +153,7 @@ func New(opts ...Option) (*Client, error) {
 	c.Events = &EventsService{client: c}
 	c.Evaluations = &EvaluationsService{client: c}
 	c.Triggers = &TriggersService{client: c}
+	c.SlackConnections = &SlackConnectionsService{client: c}
 	c.Monitors = &MonitorsService{client: c}
 	c.Scenarios = &ScenariosService{client: c}
 	c.Projects = &ProjectsService{client: c}

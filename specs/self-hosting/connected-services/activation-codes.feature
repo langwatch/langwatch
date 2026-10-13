@@ -40,6 +40,25 @@ Feature: Activating a self-hosted install with a code
     Then every hosted service is included unless the operator unticks it
     And the license the code mints names those services, so the install syncs and refreshes on its own
 
+  @unit
+  Scenario: A code issued with no lite seats mints the plan's lite seats
+    Given an operator issuing an enterprise activation code with no lite seats given
+    When an install redeems it
+    Then the license carries the enterprise plan's lite seats, the same as a license issued directly
+
+  @unit
+  Scenario: A code issued with lite seats mints exactly those
+    Given an operator issuing an activation code with 3 lite seats
+    When an install redeems it
+    Then the license carries 3 lite seats
+
+  @integration
+  Scenario: The activation code form offers lite seats with the plan default
+    Given an operator issuing an activation code in the backoffice
+    When the operator leaves lite seats empty, or types a number
+    Then an empty field sends no lite seats, so the plan default applies
+    And a typed number is sent as the lite seats
+
   @integration
   Scenario: A list of codes that cannot be read says so
     Given an operator on the activation-code list in the backoffice
@@ -89,6 +108,23 @@ Feature: Activating a self-hosted install with a code
     When another attempt arrives
     Then it is refused as rate limited before the registry is read
 
+  @unit
+  Scenario: The connect host's door finds the code and the redemption claims it
+    Given a valid single-use code
+    When an install posts it to the connect host as its bearer
+    Then the licence token door looks the code up without claiming it
+    And the redemption is handed the code and the install the door found, never the bearer
+    And the redemption claims the code and answers with the minted license
+
+  @unit
+  Scenario: A revoked, expired or already redeemed code is refused at the connect host with its own code
+    Given a code that is revoked, past its expiry, or already redeemed
+    When an install posts it to the connect host
+    Then a revoked code is refused at the door as activation_code_not_found with status 401
+    And an expired code is refused at the door as activation_code_expired with status 403
+    And a code claimed first by another install is refused by the claim as activation_code_already_redeemed with status 403
+    And nothing is minted
+
   # ============================================================================
   # Exactly once
   # ============================================================================
@@ -132,7 +168,7 @@ Feature: Activating a self-hosted install with a code
     When LangWatch answers with a signed license
     Then the install validates and stores it the way it stores a pasted one
 
-  @unimplemented @unit
+  @unit
   Scenario: An install with connect switched off refuses to redeem
     Given an install with connect switched off
     When an operator enters a code

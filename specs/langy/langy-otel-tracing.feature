@@ -161,6 +161,13 @@ Feature: Langy agent activity is traced into the user's project
     Then the customer's trace is complete
     And nothing about the turn reaches the prod Langy project
 
+  @unit
+  Scenario: An install with no mirror sends model calls without the mirror's markers
+    Given an install with no mirror project configured
+    When the gateway records a Langy turn's model call
+    Then the customer's project receives the call with its content
+    And the call carries none of the mirror's internal markers
+
   @unimplemented
   Scenario: A turn in the prod Langy project never mirrors into itself
     Given a conversation whose own project is the prod Langy project

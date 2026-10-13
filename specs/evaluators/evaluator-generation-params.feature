@@ -22,11 +22,9 @@ Feature: Evaluator generation parameters reach the judge the same way on every p
   # and specs/evaluators/langevals-gpt5-temperature-compatibility.feature.
   #
   # Bindings:
-  #   platform/app/src/server/evaluations/generationParams.ts
-  #   platform/app/src/server/app-layer/evaluations/evaluation-execution.factories.ts
-  #   platform/app/src/server/routes/evaluations-legacy.ts
-  #   platform/app/src/server/evaluations/__tests__/generationParams.unit.test.ts
-  #   platform/app/src/server/app-layer/evaluations/__tests__/evaluation-execution.factories.unit.test.ts
+  #   services/langevals/langevals_core (the Claude temperature/top_p rule)
+  #   modules/evaluation/process/src/rules/evaluator-settings.rules.ts (the API route parse)
+  #   modules/model-provider/process/src/services/model-provider-evaluator-model-env.service.ts (X_LITELLM_* build)
 
   @unit
   Scenario: Generation parameters survive the settings schema parse on the API route

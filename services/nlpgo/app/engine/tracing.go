@@ -32,6 +32,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -178,10 +179,7 @@ func encodeJSONAttr(v any) (string, bool) {
 // + output JSON.
 func startLLMSpan(ctx context.Context, model, provider string, messages []app.ChatMessage) (context.Context, trace.Span) {
 	tracer := otelapi.Tracer(tracerName)
-	displayModel := model
-	if provider != "" && model != "" {
-		displayModel = provider + "/" + model
-	}
+	displayModel := modelID(model, provider)
 	attrs := []attribute.KeyValue{
 		attribute.String("langwatch.span.type", llmSpanType),
 	}
@@ -189,7 +187,7 @@ func startLLMSpan(ctx context.Context, model, provider string, messages []app.Ch
 		attrs = append(attrs, attribute.String("gen_ai.system", provider))
 	}
 	if model != "" {
-		attrs = append(attrs, attribute.String("gen_ai.request.model", model))
+		attrs = append(attrs, attribute.String("gen_ai.request.model", modelID(model, provider)))
 	}
 	if v, ok := encodeJSONAttr(messages); ok {
 		attrs = append(attrs, attribute.String("langwatch.input", v))
@@ -199,6 +197,20 @@ func startLLMSpan(ctx context.Context, model, provider string, messages []app.Ch
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(attrs...),
 	)
+}
+
+// modelID reports the model under the platform's provider-prefixed spelling
+// ("openai/gpt-5-mini"), the id SDK and gateway spans carry, so a trace's
+// Models column names one model the same way whichever surface ran it. The
+// engine splits the prefix off at the first slash for routing; this puts it
+// back, so a model with slashes of its own ("Qwen/Qwen2.5-32B-Instruct") still
+// gets its provider. A model with no known provider, or one that already
+// starts with it, is kept as is.
+func modelID(model, provider string) string {
+	if model == "" || provider == "" || strings.HasPrefix(model, provider+"/") {
+		return model
+	}
+	return provider + "/" + model
 }
 
 // endLLMSpan stamps the LLM response shape onto the span and closes it.

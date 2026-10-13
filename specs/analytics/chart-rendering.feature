@@ -45,6 +45,18 @@ Feature: Analytics Chart Rendering
     When the chart renders the Y-axis and tooltips
     Then values display as percentages like "85%" not decimals like "0.85"
 
+  # Distinct from the scenario above: this is the per-series "show as
+  # percentage (%)" toggle (`asPercent`), which applies to ANY metric, not
+  # just the one metric (`evaluation_pass_rate`) that already ships its own
+  # percent format. Before this fix `asPercent` flowed all the way to the
+  # query but the render path never consulted it, so a percentage series
+  # plotted its raw value (e.g. "40") on a count-formatted axis with no "%".
+  @unit
+  Scenario: A percentage series formats its values as a percentage
+    Given a chart series configured to show as a percentage
+    When the chart renders the Y-axis and tooltip
+    Then values display as percentages like "40%" not raw numbers like "40"
+
   # ---------------------------------------------------------------------------
   # Semantic color tokens
   # ---------------------------------------------------------------------------
@@ -134,3 +146,10 @@ Feature: Analytics Chart Rendering
     When the query succeeds but returns no data
     Then the chart shows a "No data" message instead of a blank area
     And the empty chart content is not rendered underneath
+
+  @regression @integration
+  Scenario: An empty summary keeps its figure labels inside its own bounds
+    Given a summary figure drawn inside a narrow tab header
+    When the query succeeds but returns no data
+    Then the tab header shows the figure label with "-" and "No data yet"
+    And no chart placeholder text is drawn over the neighbouring figures

@@ -423,10 +423,17 @@ func buildWorkerEnv(in SpawnInput) []string {
 		// belongs to the session key's owning user before doing anything.
 		"LANGY_CONVERSATION_ID="+in.ConversationID,
 	)
-	for _, c := range in.Capabilities {
-		env = append(env, c.Contribute()...)
-	}
 	noProxy := workerenv.NoProxyHosts(in.Creds)
+	for _, c := range in.Capabilities {
+		for _, kv := range c.Contribute() {
+			// A capability's NO_PROXY joins the worker's list rather than replacing it.
+			if hosts, ok := strings.CutPrefix(kv, "NO_PROXY="); ok {
+				noProxy += "," + hosts
+				continue
+			}
+			env = append(env, kv)
+		}
+	}
 	if in.EgressPort > 0 {
 		proxyURL := fmt.Sprintf("http://127.0.0.1:%d", in.EgressPort)
 		env = append(env,

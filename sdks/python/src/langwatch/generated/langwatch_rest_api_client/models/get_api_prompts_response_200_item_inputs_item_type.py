@@ -5,6 +5,7 @@ class GetApiPromptsResponse200ItemInputsItemType(str, Enum):
     BOOL = "bool"
     CHAT_MESSAGES = "chat_messages"
     DICT = "dict"
+    FILE = "file"
     FLOAT = "float"
     IMAGE = "image"
     LIST = "list"

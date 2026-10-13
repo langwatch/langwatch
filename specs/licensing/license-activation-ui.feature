@@ -1,11 +1,10 @@
 Feature: License Activation UI
 
-  # All scenarios in this file describe page-level UX of the License
-  # activation flow (file dropzone, textarea, method-toggle checkboxes,
-  # success/error states). They require either a page-level integration
-  # test against the rendered LicenseActivationForm or Playwright E2E
-  # driving the file-upload/textarea flow. No such harness exists yet —
-  # all aspirational pending the page-test fixture.
+  # Page-level UX of the License activation flow. The @integration scenarios
+  # under "Either form in any field" are bound by
+  # enterprise/modules/licensing/browser/src/ui/sections/__tests__/license-input-forms.integration.test.tsx, which
+  # renders the page with the license API mocked. The @unimplemented ones
+  # still need a page-level harness or a Playwright E2E.
 
   As a self-hosted user
   I want to activate a license by uploading a file or entering a key
@@ -75,6 +74,49 @@ Feature: License Activation UI
     When I try to uncheck "Upload license file" without checking another option
     Then "Upload license file" remains checked
     And a validation ensures at least one method is always selected
+
+  # Either form in any field. Each field takes an activation code
+  # (LW-XXXX-XXXX-XXXX-XXXX, redeemed over HTTPS at connect.langwatch.ai) or a
+  # signed license key (works offline), told apart by shape, the same as
+  # LANGWATCH_LICENSE_KEY.
+  @integration
+  Scenario: an activation code entered in the activation code field is redeemed
+    Given I am on the license settings page
+    And I have selected the "Enter activation code" method
+    When I type "LW-ABCD-EFGH-JKMN-PQRS" and click "Activate License"
+    Then the activation code is redeemed with LangWatch
+
+  @integration
+  Scenario: a signed license key pasted in the activation code field is stored
+    Given I am on the license settings page
+    And I have selected the "Enter activation code" method
+    When I paste a signed license key and click "Activate License"
+    Then the license key is stored
+    And no activation code is redeemed
+
+  @integration
+  Scenario: an activation code pasted in the license key field is redeemed
+    Given I am on the license settings page
+    And I have selected the "Enter license key" method
+    When I paste "LW-ABCD-EFGH-JKMN-PQRS" and click "Activate License"
+    Then the activation code is redeemed with LangWatch
+    And no license key is stored
+
+  @integration
+  Scenario: an uploaded file holding an activation code is redeemed
+    Given I am on the license settings page
+    And I have selected the "Upload license file" method
+    When I drop a ".langwatch-license" file whose content is an activation code
+    And I click "Activate License"
+    Then the activation code is redeemed with LangWatch
+
+  @integration
+  Scenario: an uploaded file holding a signed license key is stored
+    Given I am on the license settings page
+    And I have selected the "Upload license file" method
+    When I drop a ".langwatch-license" file holding a signed license key
+    And I click "Activate License"
+    Then the license key is stored
 
   # File upload flow
   @e2e @unimplemented

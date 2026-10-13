@@ -302,12 +302,24 @@ func classifyPath(urlPath string) (domain.RequestType, string) {
 	}
 }
 
+// dispatchFailure is the herr a failed dispatch answers with. A refusal the
+// dispatcher itself made of the caller (a rate limit, a budget, a model not
+// allowed) keeps its own 4xx so the caller reads the reason; anything else is
+// the gateway being unavailable.
+func dispatchFailure(ctx context.Context, err error, reason string) herr.E {
+	var refusal herr.E
+	if errors.As(err, &refusal) {
+		if status := herr.HTTPStatus(refusal); status >= 400 && status < 500 {
+			return refusal
+		}
+	}
+	return herr.New(ctx, nlpgodomain.ErrGatewayUnavailable, herr.M{"reason": reason}, err)
+}
+
 func handleSync(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProxy, req playgroundProxyRequest) {
 	resp, err := proxy.Dispatch(ctx, req)
 	if err != nil {
-		writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrGatewayUnavailable, herr.M{
-			"reason": "dispatcher_error",
-		}, err))
+		writeHandlerError(ctx, w, dispatchFailure(ctx, err, "dispatcher_error"))
 		return
 	}
 	// Forward the upstream content-type so the playground sees JSON as JSON.
@@ -335,9 +347,7 @@ func handleSync(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProx
 func handleStream(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProxy, req playgroundProxyRequest) {
 	iter, err := proxy.DispatchStream(ctx, req)
 	if err != nil {
-		writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrGatewayUnavailable, herr.M{
-			"reason": "dispatcher_stream_error",
-		}, err))
+		writeHandlerError(ctx, w, dispatchFailure(ctx, err, "dispatcher_stream_error"))
 		return
 	}
 	defer func() { _ = iter.Close() }()
@@ -391,11 +401,7 @@ func jsonEscape(s string) string {
 	return string(bytes.TrimSpace(b))
 }
 
-// guard against unused-imports warnings in the case the dispatcher
-// signature evolves
-var _ = errors.New
-
-// PlaygroundProxyFromDispatcher adapts the in-process aigateway
+// DispatcherShim adapts the in-process aigateway
 // dispatcher to the PlaygroundProxy interface this handler consumes.
 // It exists in this file (not cmd/root.go) so the cmd package doesn't
 // need access to playgroundProxyRequest/Response which we keep unexported
@@ -547,6 +553,11 @@ func (a *shimAdapter) DispatchStream(ctx context.Context, req playgroundProxyReq
 //   - Authorization / X-Auth-Token — never expected from a /v1beta caller
 //     in our deployment shape; if present, it's almost certainly meant
 //     for the LangWatch app surface, not the upstream.
+//   - X-LangWatch-NLP-Secret — the credential the app authenticates this
+//     hop with. It is consumed by RequireInternalSecret before the request
+//     reaches here, and this list is a denylist over everything else, so
+//     leaving it out would hand our own internal secret to whichever
+//     provider or customer-configured endpoint the call fans out to.
 //   - Hop-by-hop headers per RFC 7230 §6.1.
 //   - Host (the upstream provider sets its own).
 //   - Content-Length (the dispatcher recomputes this for the outbound
@@ -574,6 +585,9 @@ func filterPassthroughHeaders(in http.Header) map[string]string {
 			continue
 		}
 		if _, ok := dyn[lk]; ok {
+			continue
+		}
+		if strings.EqualFold(lk, InternalSecretHeader) {
 			continue
 		}
 		switch lk {

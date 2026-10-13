@@ -8,9 +8,11 @@ package nlpgo
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
+	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
 
 // DefaultSandboxPython is the interpreter a code block runs on when nothing
@@ -19,13 +21,30 @@ const DefaultSandboxPython = "python3"
 
 // Config is the top-level service configuration.
 type Config struct {
-	Environment                   string        `env:"ENVIRONMENT"`
-	BlockLocalHTTPCalls           bool          `env:"BLOCK_LOCAL_HTTP_CALLS"`
-	RequireHTTPSCustomerEndpoints bool          `env:"REQUIRE_HTTPS_CUSTOM_ENDPOINTS"`
-	AllowedProxyHosts             string        `env:"ALLOWED_PROXY_HOSTS"`
-	Server                        config.Server `env:"SERVER"`
-	Log                           clog.Config   `env:"LOG"`
-	OTel                          config.OTel   `env:"OTEL"`
+	Environment                   string `env:"ENVIRONMENT"`
+	BlockLocalHTTPCalls           bool   `env:"BLOCK_LOCAL_HTTP_CALLS"`
+	RequireHTTPSCustomerEndpoints bool   `env:"REQUIRE_HTTPS_CUSTOM_ENDPOINTS"`
+	AllowedProxyHosts             string `env:"ALLOWED_PROXY_HOSTS"`
+	// InternalSecret is the secret shared with the LangWatch app. When set,
+	// every /go/* route requires it in the X-LangWatch-NLP-Secret header, so
+	// nothing but the app can reach the engine. When empty those routes stay
+	// open and Serve says so at startup, which is what lets a self-hosted
+	// install upgrade before its configuration carries the value.
+	//
+	// Spelled without the NLPGO_ prefix because the app reads the same
+	// variable, and in docker compose both read one .env file. One name, one
+	// value, no way for the two sides to disagree.
+	InternalSecret string        `env:"LANGWATCH_NLP_INTERNAL_SECRET"`
+	Server         config.Server `env:"SERVER"`
+	Log            clog.Config   `env:"LOG"`
+	OTel           config.OTel   `env:"OTEL"`
+
+	// LangWatchEndpoint is where customer studio traces route (see configureNLPGoOTel).
+	LangWatchEndpoint string `env:"LANGWATCH_ENDPOINT"`
+	// SpanSync swaps the per-tenant batch processor for a synchronous one so
+	// integration tests can assert on persisted spans (nlpgo-eval-trace-id-roundtrip).
+	// Production leaves it off: batching keeps the hot path off collector RTT.
+	SpanSync bool `env:"NLPGO_SPAN_SYNC"`
 
 	// Engine knobs surfaced to operators.
 	Engine EngineConfig `env:"NLPGO_ENGINE"`
@@ -92,9 +111,12 @@ func defaultConfig() Config {
 	return Config{
 		Environment: "local",
 		Server: config.Server{
-			Addr:                ":5562",
-			GracefulSeconds:     10,
-			MaxRequestBodyBytes: config.DefaultMaxRequestBodyBytes,
+			Addr:            ":5562",
+			GracefulSeconds: 10,
+			// One dataset row with every attachment inline; see the
+			// derivation on app.DefaultMaxRequestBodyBytes. An operator
+			// overrides it with SERVER_MAX_REQUEST_BODY_BYTES.
+			MaxRequestBodyBytes: app.DefaultMaxRequestBodyBytes,
 		},
 		Engine: EngineConfig{
 			StreamHeartbeatSeconds: 15,
@@ -145,6 +167,13 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Hydrate(&cfg); err != nil {
 		return Config{}, err
 	}
+	// An operator who has not set the secret usually has the variable present
+	// and blank rather than absent: .env.example ships the key with no value,
+	// and compose passes a blank line through as an empty string. Whitespace
+	// is the same intent typed less carefully. All of it has to mean "not
+	// configured", or the engine starts demanding a secret nothing can
+	// present and refuses every request the app makes.
+	cfg.InternalSecret = strings.TrimSpace(cfg.InternalSecret)
 	cfg.OTel.SampleRatioSet = os.Getenv("OTEL_SAMPLE_RATIO") != ""
 	if err := cfg.OTel.Resolve(); err != nil {
 		return Config{}, err
@@ -152,17 +181,5 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Validate(ctx, cfg); err != nil {
 		return Config{}, err
 	}
-	if err := validateRequired(cfg); err != nil {
-		return Config{}, err
-	}
 	return cfg, nil
-}
-
-func validateRequired(_ Config) error {
-	// Soft requirements — nlpgo boots even when the gateway is
-	// unconfigured because the /go/proxy and LLM-block paths fail
-	// gracefully, and operators may run nlpgo before every project's
-	// model providers are set up. Any non-/go/* request gets a
-	// self-explaining 502 from goOnlyModeFallback (see httpapi).
-	return nil
 }

@@ -54,36 +54,11 @@ Feature: Signing up never strands an account
   # cannot be undone is one that can be repeated.
   @unit
   Scenario: A sign-up that died mid-ceremony leaves the address usable
-    Given a passkey sign-up for my address wrote the account and then failed
+    Given a passkey sign-up for my address started and died before the ceremony finished
+    Then nothing was written for my address, because the account is created only when the ceremony succeeds
     When I sign up with a passkey for that address again
-    Then the ceremony starts rather than telling me the address is taken
-    And finishing it signs me in to the account the first attempt left behind
-    And I am counted as having signed up once, not twice
-
-  @unit
-  Scenario: Only the same browser can continue an unfinished passkey sign-up
-    Given a passkey sign-up left an unconfirmed account and its browser retained the claim
-    When that browser retries with the same normalized address and claim
-    Then it adopts the unfinished account and does not create another
-
-  @unit
-  Scenario: Another browser cannot claim an unfinished passkey sign-up
-    Given a passkey sign-up left an unconfirmed account for another browser
-    When a different browser presents a distinct claim for the same address
-    Then adoption is refused and the unfinished account is unchanged
-
-  @unit
-  Scenario: Legacy unfinished accounts without a claim are not publicly adoptable
-    Given an unfinished passkey account predates browser claims
-    When any browser presents a claim for its address
-    Then adoption is refused and the ordinary recovery path remains available
-
-  @integration
-  Scenario: Concurrent browsers cannot both claim one free address
-    Given two browsers hold distinct claims for the same free address
-    When both complete passkey registration concurrently
-    Then exactly one creates and owns the verified account
-    And the other is refused without adopting it
+    Then the ceremony starts with the same handle, so the retry replaces the credential
+    And finishing it creates the account and counts me as having signed up once
 
   @integration
   Scenario: Client session flags cannot bypass address confirmation
@@ -116,3 +91,32 @@ Feature: Signing up never strands an account
     When I sign up with "Joel.During@example.com"
     Then the account is stored with the lowercased address
     And a later sign-up for any casing of that address says it is already registered
+
+  # The sign-in at the end of a sign-up is refused on any web address other
+  # than the one the installation is set up for (NEXTAUTH_URL). The calls that
+  # start the sign-up and create the account apply the same check first, so a
+  # sign-up on the wrong address stops before anything is written, instead of
+  # leaving an account behind that a later sign-up calls "already registered".
+  @unit @integration
+  Scenario: A sign-up on a web address the installation is not set up for writes no account
+    Given the installation is set up for "http://localhost:5560"
+    And I opened the sign-up screen on "http://localhost:18560"
+    When I choose a password and create the account
+    Then the sign-up is refused with the "auth_invalid_origin" code
+    And no account and no password are written for my address
+    And the screen says LangWatch is set up for a different web address than the one I am using
+
+  @unit @integration
+  Scenario: A sign-up started on a web address the installation is not set up for issues nothing
+    Given the installation is set up for "http://localhost:5560"
+    And I opened the sign-up screen on "http://localhost:18560"
+    When I enter my email to start signing up
+    Then the request is refused with the "auth_invalid_origin" code
+    And no confirmation link is mailed and no address proof is issued
+    And the screen says LangWatch is set up for a different web address than the one I am using
+
+  @unit
+  Scenario: A sign-up request that names no web address is refused
+    When a request to create an account carries neither an Origin nor a Referer header
+    Then it is refused with the "auth_invalid_origin" code
+    And no account is written

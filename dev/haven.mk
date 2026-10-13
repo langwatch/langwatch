@@ -1,4 +1,7 @@
-# =============================================================================
+# With no terminal (an agent, CI) it runs `--yes`: installs what haven needs,
+# asks nothing; a human gets the picker.
+#
+# `|| true` because the check is advice.	@if [ -t 0 ] && [ -t 1 ]; then go run $(HAVEN_PKG) self install; else go run $(HAVEN_PKG) self install --yes; fi || true# =============================================================================
 # THUISHAVEN — hostname-based local dev
 # =============================================================================
 # Included from the repo-root Makefile (`include dev/haven.mk`, last line).
@@ -15,12 +18,12 @@
 # per-command wrapper to keep in sync. See `haven help` for the set. There is
 # no setup step: the first `haven up` bootstraps the machine itself.
 #
-#   make haven install       # go install the binary, then just run `haven ...`
+#   make haven install       # go install the binary + check the machine's prerequisites
 #   make haven up            # start this worktree's stack
 #   make haven status        # every stack + shared-server health, one shot
-#   make haven               # build ./bin/haven (no subcommand)
+#   make haven               # build .bin/haven/haven and its consoles through Nx
 
-.PHONY: haven observability observability-connect observability-logs \
+.PHONY: haven haven-web observability observability-connect observability-logs \
         observability-status observability-down
 
 HAVEN_PKG = ./cmd/haven
@@ -45,17 +48,44 @@ ifeq (haven,$(firstword $(MAKECMDGOALS)))
   endif
 endif
 
-# `make haven`         -> build ./bin/haven
-# `make haven install` -> go install so plain `haven ...` works everywhere after
+# `make haven`         -> build .bin/haven/haven
+# `make haven install` -> go install, fix PATH, then check the machine
 # `make haven <sub>`   -> run the haven CLI with <sub> (up, down, status, logs, …)
+#
+# The install branch is two steps: put the binary somewhere, then check that
+# it can be run and that the machine has what it drives. `haven install` owns
+# the second half entirely — whether the Go bin dir is on PATH (and offering
+# to fix the shell config), then portless, node, pnpm, the brew formulae and a
+# container runtime. It used to be a bash script sandwiched between two Go
+# programs, which is why the output read as three tools taking turns.
+#
+# The check runs through `go run` rather than the binary just installed: a
+# first-ever install is exactly the case where the Go bin dir is NOT on PATH
+# yet, so the freshly installed name does not resolve — and the check would be
+# skipped on the one machine that needed it most.
+#
+# With no terminal (an agent, CI) it runs `--yes`: installs what haven needs
+# (on macOS the native tier too) and asks nothing; a human gets the picker.
+#
+# `|| true` because the check is advice. A declined install, or no terminal to
+# ask in, must not fail a target whose own job — installing the binary — is
+# already done.
 haven:
 ifeq ($(strip $(HAVEN_ARGS)),)
-	@go build -o bin/haven $(HAVEN_PKG) && echo "built bin/haven"
+	@$(NX) run haven:build --outputStyle=static && echo "built .bin/haven/haven"
 else ifeq ($(strip $(HAVEN_ARGS)),install)
-	@go install $(HAVEN_PKG) && bash dev/scripts/haven-install-path.sh
+	@go run $(HAVEN_PKG) self install --build
+	@if [ -t 0 ] && [ -t 1 ]; then go run $(HAVEN_PKG) self install; else go run $(HAVEN_PKG) self install --yes; fi || true
 else
 	@$(HAVEN) $(HAVEN_ARGS)
 endif
+
+# `make haven-web` builds the consoles the haven binary embeds (ADR-160): the
+# hub and stack homes, the mail inbox and the IdP console. `make haven install`
+# runs it first; a console that fails to build (--no-bail keeps the others)
+# serves a page naming this target instead.
+haven-web:
+	@$(NX) run-many -t build --projects tag:haven-console --outputStyle=static
 
 # =============================================================================
 # LOCAL OBSERVABILITY STACK (owned by haven — one capped container on colima)

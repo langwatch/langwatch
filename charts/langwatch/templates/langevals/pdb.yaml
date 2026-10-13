@@ -1,4 +1,4 @@
-{{- if .Values.langevals.enabled }}
+{{- if and .Values.langevals.enabled (include "langwatch.pdbRenders" (dict "name" "langevals" "spec" .Values.langevals.podDisruptionBudget "replicas" .Values.langevals.replicaCount)) }}
 {{- with .Values.langevals.podDisruptionBudget }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget

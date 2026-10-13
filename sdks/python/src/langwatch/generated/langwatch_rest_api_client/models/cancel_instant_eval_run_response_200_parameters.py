@@ -13,13 +13,17 @@ T = TypeVar("T", bound="CancelInstantEvalRunResponse200Parameters")
 class CancelInstantEvalRunResponse200Parameters:
     """The values the statement's parameters were filled with."""
 
-    additional_properties: dict[str, bool | float | None | str] = _attrs_field(init=False, factory=dict)
+    additional_properties: dict[str, bool | float | list[str] | None | str] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
 
         field_dict: dict[str, Any] = {}
         for prop_name, prop in self.additional_properties.items():
-            field_dict[prop_name] = prop
+            if isinstance(prop, list):
+                field_dict[prop_name] = prop
+
+            else:
+                field_dict[prop_name] = prop
 
         return field_dict
 
@@ -31,10 +35,18 @@ class CancelInstantEvalRunResponse200Parameters:
         additional_properties = {}
         for prop_name, prop_dict in d.items():
 
-            def _parse_additional_property(data: object) -> bool | float | None | str:
+            def _parse_additional_property(data: object) -> bool | float | list[str] | None | str:
                 if data is None:
                     return data
-                return cast(bool | float | None | str, data)
+                try:
+                    if not isinstance(data, list):
+                        raise TypeError()
+                    additional_property_type_1 = cast(list[str], data)
+
+                    return additional_property_type_1
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
+                return cast(bool | float | list[str] | None | str, data)
 
             additional_property = _parse_additional_property(prop_dict)
 
@@ -47,10 +59,10 @@ class CancelInstantEvalRunResponse200Parameters:
     def additional_keys(self) -> list[str]:
         return list(self.additional_properties.keys())
 
-    def __getitem__(self, key: str) -> bool | float | None | str:
+    def __getitem__(self, key: str) -> bool | float | list[str] | None | str:
         return self.additional_properties[key]
 
-    def __setitem__(self, key: str, value: bool | float | None | str) -> None:
+    def __setitem__(self, key: str, value: bool | float | list[str] | None | str) -> None:
         self.additional_properties[key] = value
 
     def __delitem__(self, key: str) -> None:

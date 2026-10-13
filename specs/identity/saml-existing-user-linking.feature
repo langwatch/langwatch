@@ -2,6 +2,9 @@ Feature: Signed SAML linking to an existing local account
   A managed connection's signed email assertion can link a locally verified address
   after the connection's domain or registrant checks admit that assertion.
   A SAML assertion does not need an OIDC email verification claim.
+  On a self-hosted installation an unconfirmed local account links too once
+  the connection has proved the address's domain
+  (specs/identity/sso-link-unconfirmed-local-account.feature).
 
   @integration @regression
   Scenario: A signed SAML assertion links a verified local account
@@ -10,6 +13,13 @@ Feature: Signed SAML linking to an existing local account
     Then the session belongs to that same user
     And the local profile and verification remain unchanged
     And repeating sign-in reuses the same SAML account binding
+
+  @unit
+  Scenario: A repeat SAML sign-in of a linked identity continues, never links
+    Given a SAML identity already linked to a local account
+    When the same identity signs in through the connection again
+    Then the sign-in continues on that account
+    And it is not asked to link again
 
   @integration @regression
   Scenario: The first SAML session stays revocable before projection catches up
@@ -51,7 +61,7 @@ Feature: Signed SAML linking to an existing local account
 
   @integration @regression
   Scenario: SAML linking refuses unsuitable local identity evidence
-    Given an unverified, inactive, ambiguous, or conflicting local identity
+    Given an inactive, ambiguous, or conflicting local identity
     And an assertion may instead be outside the proved domain or have an invalid signature
     When the SAML provider attempts to sign the user in
     Then no new account binding or session is created

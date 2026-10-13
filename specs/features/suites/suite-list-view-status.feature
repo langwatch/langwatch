@@ -26,28 +26,28 @@ Feature: Suite list view status with criteria count
     Given a scenario run with status "success"
     And the run has 5 met criteria and 0 unmet criteria
     When the status label is computed
-    Then the label reads "passed (5/5)"
+    Then the label reads "Passed (5/5)"
 
   @unit
   Scenario: Failed run shows "failed" with criteria count
     Given a scenario run with status "failed"
     And the run has 3 met criteria and 2 unmet criteria
     When the status label is computed
-    Then the label reads "failed (3/5)"
+    Then the label reads "Failed (3/5)"
 
   @unit
   Scenario: Run with no criteria results shows status without count
     Given a scenario run with status "success"
     And the run has no evaluation results
     When the status label is computed
-    Then the label reads "passed"
+    Then the label reads "Passed"
 
   @unit
   Scenario: Run with zero criteria shows status without count
     Given a scenario run with status "failed"
     And the run has 0 met criteria and 0 unmet criteria
     When the status label is computed
-    Then the label reads "failed"
+    Then the label reads "Failed"
 
   # --- Non-terminal statuses remain unchanged ---
 
@@ -55,13 +55,13 @@ Feature: Suite list view status with criteria count
   Scenario: In-progress run shows "running" without criteria count
     Given a scenario run with status "in_progress"
     When the status label is computed
-    Then the label reads "running"
+    Then the label reads "Running"
 
   @unit
   Scenario: Pending run shows "pending" without criteria count
     Given a scenario run with status "pending"
     When the status label is computed
-    Then the label reads "pending"
+    Then the label reads "Pending"
 
   # --- List view rendering ---
 
@@ -69,14 +69,14 @@ Feature: Suite list view status with criteria count
   Scenario: List view row displays passed status with criteria count
     Given a suite run contains a scenario that passed with 4/5 criteria met
     When I view the run in list view
-    Then the scenario row shows "passed (4/5)"
+    Then the scenario row shows "Passed (4/5)"
     And does not show "100%"
 
   @integration
   Scenario: List view row displays failed status with criteria count
     Given a suite run contains a scenario that failed with 2/5 criteria met
     When I view the run in list view
-    Then the scenario row shows "failed (2/5)"
+    Then the scenario row shows "Failed (2/5)"
 
   # --- Iteration display ---
 

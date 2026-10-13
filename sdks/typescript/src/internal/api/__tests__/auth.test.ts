@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { buildAuthHeaders, isPersonalAccessToken, isUserScopedApiKey } from "../auth";
+
+import { buildAuthHeaders, isUserScopedApiKey } from "../auth";
 
 describe("isUserScopedApiKey", () => {
   describe("when given an old pat-lw- token", () => {
@@ -24,14 +25,6 @@ describe("isUserScopedApiKey", () => {
     it("returns false without throwing", () => {
       expect(isUserScopedApiKey("")).toBe(false);
     });
-  });
-});
-
-describe("isPersonalAccessToken (deprecated alias)", () => {
-  it("delegates to isUserScopedApiKey", () => {
-    expect(isPersonalAccessToken("pat-lw-abc_def")).toBe(true);
-    expect(isPersonalAccessToken("sk-lw-abc_def")).toBe(true);
-    expect(isPersonalAccessToken("sk-lw-legacykey123")).toBe(false);
   });
 });
 
@@ -68,10 +61,7 @@ describe("buildAuthHeaders", () => {
         apiKey: "pat-lw-abc_secret",
         projectId: "project_123",
       });
-      const expected = Buffer.from(
-        "project_123:pat-lw-abc_secret",
-        "utf-8",
-      ).toString("base64");
+      const expected = Buffer.from("project_123:pat-lw-abc_secret", "utf-8").toString("base64");
       expect(headers).toEqual({ authorization: `Basic ${expected}` });
     });
   });
@@ -94,10 +84,7 @@ describe("buildAuthHeaders", () => {
     it("falls back to LANGWATCH_PROJECT_ID", () => {
       process.env.LANGWATCH_PROJECT_ID = "env_project";
       const headers = buildAuthHeaders({ apiKey: "pat-lw-envtok_secret" });
-      const expected = Buffer.from(
-        "env_project:pat-lw-envtok_secret",
-        "utf-8",
-      ).toString("base64");
+      const expected = Buffer.from("env_project:pat-lw-envtok_secret", "utf-8").toString("base64");
       expect(headers).toEqual({ authorization: `Basic ${expected}` });
     });
   });

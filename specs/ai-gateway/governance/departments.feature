@@ -30,10 +30,10 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
     - specs/ai-gateway/governance/ingestion-attribution.feature (principal attribution)
 
   Implementation lives under:
-    - platform/app/ee/governance/services/department/                  (attribution + service)
-    - platform/app/ee/governance/routers/departments.ts                (tRPC)
-    - platform/app/ee/governance/services/activity-monitor/            (bird-eye rollup)
-    - platform/app/ee/scim/scim.service.ts                     (SCIM auto-assignment)
+    - enterprise/modules/governance/process/src/ (department)                  (attribution + service)
+    - enterprise/modules/governance/contract/src/department.ts                (tRPC)
+    - enterprise/modules/governance/process/src/ (activity-monitor)            (bird-eye rollup)
+    - enterprise/modules/scim/process/src/services/scim.service.ts                     (SCIM auto-assignment)
 
   Background:
     Given the user is signed in as an org admin of "acme-corp"
@@ -181,6 +181,15 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
     When the admin creates the first department
     Then the department column appears on the members and teams pages
 
+  # The control also sits on settings pages every member can open, while the
+  # department lists need `governance:view`.
+  @bdd @departments @ui
+  Scenario: The department lists are not requested without the grant to read them
+    Given a member of acme-corp who does not hold `governance:view`
+    When they open a settings page that carries the department control
+    Then neither the departments nor their assignments are requested
+    And the page shows no department column
+
   # ---------------------------------------------------------------------------
   # SCIM auto-assignment (enterprise standard)
   # ---------------------------------------------------------------------------
@@ -237,6 +246,13 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
     When acme-corp's admin loads the dashboard
     Then the department rollup contains zero spend from the other org
     And every underlying ClickHouse query filters by TenantId first
+
+  @bdd @departments @birds-eye @unit
+  Scenario: Spend by department reads the organization's projects as one declared tenant set
+    Given an organization with two projects
+    When the dashboard asks for spend by department
+    Then the read binds one tenant parameter per project and declares exactly that set
+    And the tenant guard accepts it rather than failing the card
 
   @bdd @departments @birds-eye @integration
   Scenario: Marketing-versus-engineering comparison reads from departments

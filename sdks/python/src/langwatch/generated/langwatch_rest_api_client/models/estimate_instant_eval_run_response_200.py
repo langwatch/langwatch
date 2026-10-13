@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -20,7 +19,6 @@ class EstimateInstantEvalRunResponse200:
         avg_tokens (int): Input tokens one judged row sends, measured from a sample.
         total_tokens (int): Input tokens the whole run would send.
         requests (int): Classifications the run would make, one per judged row.
-        cost_usd (float): What the run would cost us, in United States dollars.
         price_usd (float): What the run would cost you, in United States dollars.
         free_budget_remaining_usd (float | Unset): What is left of the free Instant Evals budget, in United States
             dollars. Only present for an organization without a paid plan.
@@ -31,10 +29,8 @@ class EstimateInstantEvalRunResponse200:
     avg_tokens: int
     total_tokens: int
     requests: int
-    cost_usd: float
     price_usd: float
     free_budget_remaining_usd: float | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         rows = self.rows
@@ -47,14 +43,12 @@ class EstimateInstantEvalRunResponse200:
 
         requests = self.requests
 
-        cost_usd = self.cost_usd
-
         price_usd = self.price_usd
 
         free_budget_remaining_usd = self.free_budget_remaining_usd
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "rows": rows,
@@ -62,7 +56,6 @@ class EstimateInstantEvalRunResponse200:
                 "avgTokens": avg_tokens,
                 "totalTokens": total_tokens,
                 "requests": requests,
-                "costUsd": cost_usd,
                 "priceUsd": price_usd,
             }
         )
@@ -84,8 +77,6 @@ class EstimateInstantEvalRunResponse200:
 
         requests = d.pop("requests")
 
-        cost_usd = d.pop("costUsd")
-
         price_usd = d.pop("priceUsd")
 
         free_budget_remaining_usd = d.pop("freeBudgetRemainingUsd", UNSET)
@@ -96,26 +87,8 @@ class EstimateInstantEvalRunResponse200:
             avg_tokens=avg_tokens,
             total_tokens=total_tokens,
             requests=requests,
-            cost_usd=cost_usd,
             price_usd=price_usd,
             free_budget_remaining_usd=free_budget_remaining_usd,
         )
 
-        estimate_instant_eval_run_response_200.additional_properties = d
         return estimate_instant_eval_run_response_200
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

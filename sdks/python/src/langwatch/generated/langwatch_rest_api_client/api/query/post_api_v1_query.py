@@ -9,6 +9,7 @@ from ...models.post_api_v1_query_response_200 import PostApiV1QueryResponse200
 from ...models.post_api_v1_query_response_400 import PostApiV1QueryResponse400
 from ...models.post_api_v1_query_response_401 import PostApiV1QueryResponse401
 from ...models.post_api_v1_query_response_403 import PostApiV1QueryResponse403
+from ...models.post_api_v1_query_response_404 import PostApiV1QueryResponse404
 from ...models.post_api_v1_query_response_422 import PostApiV1QueryResponse422
 from ...models.post_api_v1_query_response_500 import PostApiV1QueryResponse500
 from ...types import Response, safe_http_status
@@ -40,6 +41,7 @@ def _parse_response(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
     | None
@@ -64,6 +66,11 @@ def _parse_response(
 
         return response_403
 
+    if response.status_code == 404:
+        response_404 = PostApiV1QueryResponse404.from_dict(response.json())
+
+        return response_404
+
     if response.status_code == 422:
         response_422 = PostApiV1QueryResponse422.from_dict(response.json())
 
@@ -87,6 +94,7 @@ def _build_response(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
 ]:
@@ -110,14 +118,15 @@ def sync_detailed(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
 ]:
     """Run a LangWatchQL query
 
-     Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns,
-    rows, execution statistics, truncation state and diagnostics. The query runs as a restricted
-    database identity scoped to the authenticated project.
+     Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows,
+    execution statistics and diagnostics. The query runs as a restricted database identity scoped to the
+    projects this key can read.
 
     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue
     was detected. It is not proof that the answer is the one you meant.
@@ -132,8 +141,23 @@ def sync_detailed(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    The project is taken from the credential — no project id appears anywhere in the path or the body,
-    and none can be sent to select another one.
+    Any LangWatch API key — project, organization or personal — reaches every project it can read
+    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
+    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
+    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+
+    To run over one project only, send its id as `projectId` in the body: the run then reads that
+    project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read
+    `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same
+    answer as a project that does not exist. Without `projectId` the run spans every project the key can
+    read.
+
+    A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
+    query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
+    and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level
+    branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with
+    `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright
+    with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.
 
     Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's
     canonical error envelope — the same `code` and `meta` every other REST family publishes.
@@ -146,7 +170,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500]
+        Response[PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse404 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -169,15 +193,16 @@ def sync(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
     | None
 ):
     """Run a LangWatchQL query
 
-     Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns,
-    rows, execution statistics, truncation state and diagnostics. The query runs as a restricted
-    database identity scoped to the authenticated project.
+     Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows,
+    execution statistics and diagnostics. The query runs as a restricted database identity scoped to the
+    projects this key can read.
 
     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue
     was detected. It is not proof that the answer is the one you meant.
@@ -192,8 +217,23 @@ def sync(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    The project is taken from the credential — no project id appears anywhere in the path or the body,
-    and none can be sent to select another one.
+    Any LangWatch API key — project, organization or personal — reaches every project it can read
+    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
+    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
+    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+
+    To run over one project only, send its id as `projectId` in the body: the run then reads that
+    project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read
+    `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same
+    answer as a project that does not exist. Without `projectId` the run spans every project the key can
+    read.
+
+    A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
+    query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
+    and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level
+    branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with
+    `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright
+    with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.
 
     Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's
     canonical error envelope — the same `code` and `meta` every other REST family publishes.
@@ -206,7 +246,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500
+        PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse404 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500
     """
 
     return sync_detailed(
@@ -224,14 +264,15 @@ async def asyncio_detailed(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
 ]:
     """Run a LangWatchQL query
 
-     Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns,
-    rows, execution statistics, truncation state and diagnostics. The query runs as a restricted
-    database identity scoped to the authenticated project.
+     Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows,
+    execution statistics and diagnostics. The query runs as a restricted database identity scoped to the
+    projects this key can read.
 
     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue
     was detected. It is not proof that the answer is the one you meant.
@@ -246,8 +287,23 @@ async def asyncio_detailed(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    The project is taken from the credential — no project id appears anywhere in the path or the body,
-    and none can be sent to select another one.
+    Any LangWatch API key — project, organization or personal — reaches every project it can read
+    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
+    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
+    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+
+    To run over one project only, send its id as `projectId` in the body: the run then reads that
+    project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read
+    `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same
+    answer as a project that does not exist. Without `projectId` the run spans every project the key can
+    read.
+
+    A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
+    query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
+    and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level
+    branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with
+    `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright
+    with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.
 
     Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's
     canonical error envelope — the same `code` and `meta` every other REST family publishes.
@@ -260,7 +316,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500]
+        Response[PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse404 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -281,15 +337,16 @@ async def asyncio(
     | PostApiV1QueryResponse400
     | PostApiV1QueryResponse401
     | PostApiV1QueryResponse403
+    | PostApiV1QueryResponse404
     | PostApiV1QueryResponse422
     | PostApiV1QueryResponse500
     | None
 ):
     """Run a LangWatchQL query
 
-     Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns,
-    rows, execution statistics, truncation state and diagnostics. The query runs as a restricted
-    database identity scoped to the authenticated project.
+     Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows,
+    execution statistics and diagnostics. The query runs as a restricted database identity scoped to the
+    projects this key can read.
 
     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue
     was detected. It is not proof that the answer is the one you meant.
@@ -304,8 +361,23 @@ async def asyncio(
     answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
     budget answers 422 before anything is sent.
 
-    The project is taken from the credential — no project id appears anywhere in the path or the body,
-    and none can be sent to select another one.
+    Any LangWatch API key — project, organization or personal — reaches every project it can read
+    `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows
+    from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a
+    single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
+
+    To run over one project only, send its id as `projectId` in the body: the run then reads that
+    project's rows alone, redacted by that project's own protections. A `projectId` the key cannot read
+    `analytics:view` on, in its own organization, is refused with `project_not_found` (404), the same
+    answer as a project that does not exist. Without `projectId` the run spans every project the key can
+    read.
+
+    A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
+    query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
+    and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level
+    branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with
+    `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright
+    with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.
 
     Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's
     canonical error envelope — the same `code` and `meta` every other REST family publishes.
@@ -318,7 +390,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500
+        PostApiV1QueryResponse200 | PostApiV1QueryResponse400 | PostApiV1QueryResponse401 | PostApiV1QueryResponse403 | PostApiV1QueryResponse404 | PostApiV1QueryResponse422 | PostApiV1QueryResponse500
     """
 
     return (

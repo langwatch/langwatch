@@ -61,6 +61,27 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then the addresses and the identity providers are one section
     And adding an address and connecting a provider are offered on one row
 
+  @integration
+  Scenario: Each provider that can still be linked has its own connect button
+    Given the deployment offers GitHub, Google and single sign-on
+    And "sam" already has Google linked
+    When the authentication settings are shown
+    Then "Connect GitHub" and "Connect single sign-on" are offered on the same row as adding an address
+    And "Connect Google" is not offered
+
+  @integration
+  Scenario: A deployment with no federated providers offers no connect buttons
+    Given the deployment offers no federated provider
+    When the authentication settings are shown
+    Then no "Connect" button is offered
+
+  @unit
+  Scenario: The browser is told which providers the deployment offers
+    Given AUTH_PROVIDER is "auth0" and Google and GitHub client ids are set
+    When the page's configuration is read
+    Then the federated providers are "auth0", "google" and "github"
+    And with no provider named the list is empty
+
   # ── One way in, said before it is too late ─────────────────────────────
 
   # The detach guard's own reasoning, read forwards. The guard refuses to
@@ -103,7 +124,40 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     When the sign-in addresses are listed
     Then nothing offers to send a confirmation link
 
+  # Two facts can say an address is confirmed: the account's email identifier
+  # (VERIFIED through the emailed ceremony) and `User.emailVerified`. The fold
+  # writes the column from the identifier, never the other way, and sign-in
+  # linking reads the column. An operator who confirms an address by setting
+  # the column directly, on an installation that cannot send email, moves only
+  # the column. The list follows the column for the account's own address, so
+  # the screen never calls an address unconfirmed that sign-in already trusts.
+  @unit
+  Scenario: The account's own address confirmed outside the app shows as confirmed
+    Given "sam"'s own address identifier was never verified
+    And "sam"'s account says the address is confirmed
+    When the sign-in addresses are listed
+    Then the account's own address is shown as confirmed
+    And nothing offers to send it a confirmation link
+    And another address that was never confirmed still shows as not confirmed yet
+
   # ── Adding another address ─────────────────────────────────────────────
+
+  # Adding an address is sending it a link. Where the installation has no email
+  # provider no link can go out, so the offer stands down and says what is
+  # missing, and the route refuses with a named error whatever the screen drew.
+  @integration
+  Scenario: An installation that cannot send email does not offer to add an address
+    Given the installation has no email provider configured
+    When the authentication settings are shown
+    Then adding an email address is not offered
+    And the reason given says an administrator needs to set up an email provider
+
+  @unit
+  Scenario: Adding or resending an address without a way to send email is refused with a named error
+    Given the installation has no email provider configured
+    When "sam" asks to add an address or to send an address its link again
+    Then it is refused with "auth_email_sending_unavailable"
+    And no identifier is attached and nothing is sent
 
   @integration
   Scenario: Adding a second address starts a confirmation rather than a sign-in method
@@ -156,14 +210,14 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then nothing is confirmed
     And the account's address still reads as not confirmed
 
-  @integration
+  @unit
   Scenario: An own address that is already confirmed is not confirmed again
     Given "sam" has confirmed the account's own address
     When "sam" asks from Settings for another confirmation link
     Then no link is sent
     And "sam" is told the address cannot be confirmed again
 
-  @integration
+  @unit
   Scenario: An own address the account is not known by sends nothing
     Given the account's own address is not one of the addresses "sam" is known by
     When "sam" asks from Settings for the confirmation link
@@ -325,6 +379,20 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then the confirmation names the ways in that stay behind
     And nothing is removed until "sam" confirms
 
+  # ── Connecting a provider ──────────────────────────────────────────────
+
+  # The Connect offers come from the deployment's sign-in policy, carried on
+  # the public settings read. An operator who removes a provider restarts the
+  # app, and a tab that was open across that restart still holds the old list.
+  # The read is kept briefly and asked again on mount and on focus, so a plain
+  # reload, or coming back to the tab, shows the deployment's current set.
+  @unit
+  Scenario: A provider the deployment stopped offering leaves the Connect offers on reload
+    Given the deployment offered "Microsoft" when "sam" opened the page
+    And the operator removed it and restarted the app
+    When "sam" reloads or comes back to the page
+    Then the deployment's settings are asked for again rather than read from a long-lived cache
+
   # ── Unlinking single sign-on ───────────────────────────────────────────
 
   @integration
@@ -354,3 +422,11 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     When "sam" confirms unlinking it
     Then the confirmation said another way in becomes primary first
     And the unlink completes as one action
+
+  @integration
+  Scenario: The page is a narrow column of divided sections with bordered rows
+    Given "sam" holds a linked account
+    When the authentication settings are shown
+    Then the page column is no wider than 820px
+    And each section has a hairline divider above it
+    And each row of a section has its own border

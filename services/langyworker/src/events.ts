@@ -1,10 +1,6 @@
 /**
  * Maps pi's native session events onto the wire protocol, tagged with the
- * turn's id. Payload shapes pass through pi's documented fields verbatim
- * (`toolCallId` -> `id`, `toolName` -> `name`, `args` -> `input`), bounded per
- * PROTOCOL.md. One mapper instance lives per turn; it also replays the
- * recorded `tool_start` input on `tool_end` (pi's end event does not carry
- * args) and mirrors successful `todowrite` calls as `plan` snapshots.
+ * turn's id, bounded per PROTOCOL.md.
  */
 
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
@@ -18,7 +14,17 @@ export type SessionEventLike = {
   [key: string]: unknown;
 };
 
+/** A session event field read as a number, or 0 when it is not one. */
+function numberField(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 type ContentBlock = { type?: string; text?: string };
+
+/** A session event field read as a string, or "" when it is not one. */
+function stringField(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
 
 /** Concatenate the text blocks of a tool result content array. */
 export function contentText(result: unknown): string {
@@ -38,14 +44,20 @@ export function contentText(result: unknown): string {
  */
 const MAX_RECOVERED_OUTPUT_BYTES = 1024 * 1024;
 
+/** A cut at the cap can land inside a code point; step back to a boundary. */
+function codePointBoundaryBefore(buffer: Buffer, offset: number): number {
+  let end = offset;
+  while (end > 0) {
+    const byte = buffer[end];
+    if (byte === undefined || (byte & 0b1100_0000) !== 0b1000_0000) break;
+    end--;
+  }
+  return end;
+}
+
 /**
- * The frame's output for a settled tool: pi's bash tool truncates big output
- * to its TAIL and saves the full text to a file named in the result's
- * details. A tail cut removes the head of a JSON document, which is where its
- * structure lives, so the manager's structural reduction (built to keep ids,
- * counts and pagination under its own budget) would be left reducing a
- * fragment. Recover the saved file for the frame; the model's own context
- * keeps pi's truncated view.
+ * pi's bash tool truncates big output to its TAIL and saves the full text
+ * to a file; recover it so the frame keeps the document's structure.
  */
 export function settledToolOutput(result: unknown): string {
   const text = contentText(result);
@@ -63,15 +75,8 @@ export function settledToolOutput(result: unknown): string {
       if (want <= 0) return text;
       const buffer = Buffer.alloc(want);
       const read = readSync(fd, buffer, 0, want, 0);
-      // A cut at the cap can land inside a code point; step back to a boundary.
-      let end = read;
-      if (read === MAX_RECOVERED_OUTPUT_BYTES && size > MAX_RECOVERED_OUTPUT_BYTES) {
-        while (end > 0) {
-          const byte = buffer[end];
-          if (byte === undefined || (byte & 0b1100_0000) !== 0b1000_0000) break;
-          end--;
-        }
-      }
+      const truncated = read === MAX_RECOVERED_OUTPUT_BYTES && size > MAX_RECOVERED_OUTPUT_BYTES;
+      const end = truncated ? codePointBoundaryBefore(buffer, read) : read;
       return buffer.toString("utf8", 0, end);
     } finally {
       closeSync(fd);
@@ -83,30 +88,44 @@ export function settledToolOutput(result: unknown): string {
 
 export class TurnEventMapper {
   private readonly toolInputs = new Map<string, unknown>();
+  // A text block ended and no tool has started since. The next text delta
+  // opens a new block of the same paragraph run (GPT-5 on the Responses API
+  // sends a commentary message and a final one), so it gets a paragraph
+  // break instead of running into the previous sentence.
+  private textBlockEnded = false;
+  private textInBlock = false;
 
   constructor(private readonly turnId: string) {}
 
+  private mapMessageUpdate(delta: { type?: string; delta?: string } | undefined): WorkerEvent[] {
+    if (delta?.type === "text_delta" && typeof delta.delta === "string" && delta.delta !== "") {
+      const text = this.textBlockEnded ? `\n\n${delta.delta}` : delta.delta;
+      this.textBlockEnded = false;
+      this.textInBlock = true;
+      return [{ type: "delta", turnId: this.turnId, text: boundText({ text }) }];
+    }
+    if (delta?.type === "text_end") {
+      if (this.textInBlock) this.textBlockEnded = true;
+      this.textInBlock = false;
+      return [];
+    }
+    if (delta?.type === "thinking_delta" && typeof delta.delta === "string" && delta.delta !== "") {
+      return [{ type: "reasoning", turnId: this.turnId, text: boundText({ text: delta.delta }) }];
+    }
+    return [];
+  }
+
   map(event: SessionEventLike): WorkerEvent[] {
     switch (event.type) {
-      case "message_update": {
-        const delta = event.assistantMessageEvent as
-          | { type?: string; delta?: string }
-          | undefined;
-        if (delta?.type === "text_delta" && typeof delta.delta === "string" && delta.delta !== "") {
-          return [{ type: "delta", turnId: this.turnId, text: boundText({ text: delta.delta }) }];
-        }
-        if (
-          delta?.type === "thinking_delta" &&
-          typeof delta.delta === "string" &&
-          delta.delta !== ""
-        ) {
-          return [{ type: "reasoning", turnId: this.turnId, text: boundText({ text: delta.delta }) }];
-        }
-        return [];
-      }
+      case "message_update":
+        return this.mapMessageUpdate(
+          event.assistantMessageEvent as { type?: string; delta?: string } | undefined,
+        );
       case "tool_execution_start": {
-        const id = String(event.toolCallId ?? "");
-        const name = String(event.toolName ?? "");
+        this.textBlockEnded = false;
+        this.textInBlock = false;
+        const id = stringField(event.toolCallId);
+        const name = stringField(event.toolName);
         this.toolInputs.set(id, event.args);
         return [
           {
@@ -124,40 +143,58 @@ export class TurnEventMapper {
           {
             type: "tool_update",
             turnId: this.turnId,
-            id: String(event.toolCallId ?? ""),
-            name: String(event.toolName ?? ""),
+            id: stringField(event.toolCallId),
+            name: stringField(event.toolName),
             ...(output !== "" ? { output: boundText({ text: output }) } : {}),
           },
         ];
       }
-      case "tool_execution_end": {
-        const id = String(event.toolCallId ?? "");
-        const name = String(event.toolName ?? "");
-        const input = this.toolInputs.get(id);
-        this.toolInputs.delete(id);
-        const isError = event.isError === true;
-        const events: WorkerEvent[] = [
+      case "tool_execution_end":
+        return this.mapToolExecutionEnd(event);
+      case "auto_retry_start":
+        return [
           {
-            type: "tool_end",
+            type: "retrying",
             turnId: this.turnId,
-            id,
-            name,
-            input: boundJsonValue({ value: input }),
-            isError,
-            output: boundText({ text: settledToolOutput(event.result) }),
-            ...(ranInFolder(event.result) ? { local: true } : {}),
+            attempt: numberField(event.attempt),
+            maxAttempts: numberField(event.maxAttempts),
+            delayMs: numberField(event.delayMs),
           },
         ];
-        if (!isError && name.toLowerCase() === TODOWRITE_TOOL_NAME) {
-          const items = normalizeTodos(input);
-          if (items.length > 0) {
-            events.push({ type: "plan", turnId: this.turnId, items });
-          }
-        }
-        return events;
-      }
+      case "auto_retry_end":
+        // Every end clears the retry line: an answered call, the last retry
+        // failing or a stop during the wait. The error terminal that follows a
+        // failed end does not clear the status on its own.
+        return [{ type: "retry_settled", turnId: this.turnId }];
       default:
         return [];
     }
+  }
+
+  private mapToolExecutionEnd(event: SessionEventLike): WorkerEvent[] {
+    const id = stringField(event.toolCallId);
+    const name = stringField(event.toolName);
+    const input = this.toolInputs.get(id);
+    this.toolInputs.delete(id);
+    const isError = event.isError === true;
+    const events: WorkerEvent[] = [
+      {
+        type: "tool_end",
+        turnId: this.turnId,
+        id,
+        name,
+        input: boundJsonValue({ value: input }),
+        isError,
+        output: boundText({ text: settledToolOutput(event.result) }),
+        ...(ranInFolder(event.result) ? { local: true } : {}),
+      },
+    ];
+    if (!isError && name.toLowerCase() === TODOWRITE_TOOL_NAME) {
+      const items = normalizeTodos(input);
+      if (items.length > 0) {
+        events.push({ type: "plan", turnId: this.turnId, items });
+      }
+    }
+    return events;
   }
 }

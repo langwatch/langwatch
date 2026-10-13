@@ -26,10 +26,6 @@ gateway:
   replicaCount: 1
   autoscaling:
     enabled: false
-  # Kind cluster has no ingress controller; chart-default Ingress would
-  # reference a non-existent IngressClass.
-  ingress:
-    enabled: false
 
 # ── services that require private images — set to 0 replicas ─────────────────
 app:
@@ -44,8 +40,8 @@ app:
     skipEnvValidation: true
 
 workers:
-  # e2e.sh asserts the workers Deployment is absent when enabled=false
-  # (validates the gate added in c74fb13a3).
+  # The workers run the upgrade. enabled: false runs the worker as a sidecar
+  # in each app pod, so the app pod can finish the upgrade it waits on.
   enabled: false
 
 langwatch_nlp:

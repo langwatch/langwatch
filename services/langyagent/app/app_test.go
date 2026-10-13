@@ -9,7 +9,11 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
@@ -279,6 +283,38 @@ func TestApp_StartTurn_AtCapacityReturnsMaxWorkers(t *testing.T) {
 	_, err := newTestApp(pool, &fakeRelay{}).StartTurn(context.Background(), req())
 	if err == nil || !herr.IsCode(err, domain.ErrMaxWorkers) {
 		t.Fatalf("at capacity must return herr(ErrMaxWorkers) (transport → 503), got %v", err)
+	}
+}
+
+// @scenario "A keyless dispatch that needs a spawn is logged as the fallback, not an error"
+func TestApp_StartTurn_KeylessSpawnLogsTheFallbackNotAnError(t *testing.T) {
+	core, logs := observer.New(zapcore.DebugLevel)
+	ctx := clog.Set(context.Background(), zap.New(core))
+	pool := &fakePool{acquireErr: herr.New(ctx, domain.ErrCredentialsRequired, nil,
+		errors.New("a worker must be spawned for this conversation, but no session key was supplied"))}
+
+	_, err := newTestApp(pool, &fakeRelay{}).StartTurn(ctx, req())
+
+	if err == nil || !herr.IsCode(err, domain.ErrCredentialsRequired) {
+		t.Fatalf("a keyless spawn must still return herr(ErrCredentialsRequired) (transport → 428), got %v", err)
+	}
+	if n := logs.FilterLevelExact(zapcore.ErrorLevel).Len(); n != 0 {
+		t.Errorf("the mint-and-retry fallback must not log at error level, got %d error lines", n)
+	}
+	if n := logs.FilterLevelExact(zapcore.InfoLevel).Len(); n != 1 {
+		t.Errorf("the fallback must be logged once at info, got %d info lines", n)
+	}
+}
+
+func TestApp_StartTurn_OtherAcquireFailuresLogAtError(t *testing.T) {
+	core, logs := observer.New(zapcore.DebugLevel)
+	ctx := clog.Set(context.Background(), zap.New(core))
+	pool := &fakePool{acquireErr: herr.New(ctx, domain.ErrWorkerSpawn, nil)}
+
+	_, _ = newTestApp(pool, &fakeRelay{}).StartTurn(ctx, req())
+
+	if n := logs.FilterMessage("acquire worker failed").FilterLevelExact(zapcore.ErrorLevel).Len(); n != 1 {
+		t.Errorf("a failed spawn must log at error level, got %d error lines", n)
 	}
 }
 
@@ -588,8 +624,39 @@ func statusOf(fs []frames.Frame) string {
 	return ""
 }
 
+// statusesOf returns every status frame's text, in the order emitted.
+func statusesOf(fs []frames.Frame) []string {
+	var out []string
+	for _, f := range fs {
+		var s struct {
+			Type   string `json:"type"`
+			Status string `json:"status"`
+		}
+		_ = json.Unmarshal([]byte(f.JSON()), &s)
+		if s.Type == "status" {
+			out = append(out, s.Status)
+		}
+	}
+	return out
+}
+
+// requireThinkingNeverStartingUp asserts the turn opened with the thinking
+// line and that no status frame, first or later, named a startup.
+func requireThinkingNeverStartingUp(t *testing.T, emitted []frames.Frame) {
+	t.Helper()
+	if got := statusOf(emitted); got != statusThinking {
+		t.Errorf("readiness status = %q, want %q", got, statusThinking)
+	}
+	for _, status := range statusesOf(emitted) {
+		if status == statusStartingUp {
+			t.Errorf("a turn on a worker that is already up must never say %q, got statuses %v", statusStartingUp, statusesOf(emitted))
+		}
+	}
+}
+
 // A worker that has never answered says it is starting up — never the
 // connecting line, which would hide that a boot is happening.
+// @scenario "A worker that has not served a turn yet says it is starting up"
 func TestApp_Turn_NeverServedWorkerEmitsStartingUpStatus(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true}
 	relay := &fakeRelay{}
@@ -598,37 +665,39 @@ func TestApp_Turn_NeverServedWorkerEmitsStartingUpStatus(t *testing.T) {
 	if got := statusOf(relay.stream.emitted); got != statusStartingUp {
 		t.Errorf("cold readiness status = %q, want %q", got, statusStartingUp)
 	}
+	if got := frameTypes(relay.stream.emitted); len(got) == 0 || got[0] != "status" {
+		t.Errorf("the status must come before the first agent frame, got order %v", got)
+	}
 }
 
 // A warm worker gets the thinking line — never the starting-up line, which
 // would claim a boot that isn't happening. Its dispatch is a millisecond
 // round-trip, so the window this status fills is the model working.
+// @scenario "A warm worker goes straight to thinking"
 func TestApp_Turn_WarmWorkerEmitsThinkingStatus(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true, servedTurn: true}
 	relay := &fakeRelay{}
 	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
 
-	if got := statusOf(relay.stream.emitted); got != statusThinking {
-		t.Errorf("warm readiness status = %q, want %q", got, statusThinking)
-	}
+	requireThinkingNeverStartingUp(t, relay.stream.emitted)
 }
 
 // A pre-warmed worker's first turn thinks: its boot happened while the panel
 // sat open, so "Starting Langy…" would name a startup the user never waited
 // on.
+// @scenario "A pre-warmed worker's first turn goes straight to thinking"
 func TestApp_Turn_PrewarmedWorkerEmitsThinkingStatus(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true, prewarmed: true}
 	relay := &fakeRelay{}
 	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
 
-	if got := statusOf(relay.stream.emitted); got != statusThinking {
-		t.Errorf("prewarmed readiness status = %q, want %q", got, statusThinking)
-	}
+	requireThinkingNeverStartingUp(t, relay.stream.emitted)
 }
 
 // A follow-up whose worker was reaped respawns on the persisted session — the
 // conversation already has replies (the dispatch carries a history seed), and
 // "Starting Langy…" there reads as the workspace having vanished mid-chat.
+// @scenario "A follow-up on a respawned worker goes straight to thinking"
 func TestApp_Turn_FollowUpRespawnEmitsThinkingStatus(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true}
 	relay := &fakeRelay{}
@@ -636,13 +705,12 @@ func TestApp_Turn_FollowUpRespawnEmitsThinkingStatus(t *testing.T) {
 	r.HistorySeed = "THE CONVERSATION SO FAR: earlier exchange"
 	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), r)
 
-	if got := statusOf(relay.stream.emitted); got != statusThinking {
-		t.Errorf("follow-up respawn readiness status = %q, want %q", got, statusThinking)
-	}
+	requireThinkingNeverStartingUp(t, relay.stream.emitted)
 }
 
 // A turn resuming from a shutdown handoff (ADR-048) says it is picking the
 // checkpointed turn back up, not cold-starting.
+// @scenario "A resumed turn says it is picking up where it left off"
 func TestApp_Turn_ResumeFromHandoffEmitsPickingUpStatus(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true}
 	relay := &fakeRelay{}
