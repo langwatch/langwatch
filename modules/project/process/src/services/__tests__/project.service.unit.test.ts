@@ -126,8 +126,8 @@ class StubRepository implements ProjectRepository {
   assignProjectDepartment = vi.fn(async () => false);
   existing: InternalProject | null = null;
   findInternalByOrganization = vi.fn(async () => this.existing);
-  findInternalBySlug = vi.fn(async () => null);
-  findLiveInternalIds = vi.fn(async () => []);
+  findInternalBySlug = vi.fn(async (_slug: string): Promise<InternalProject | null> => null);
+  findLiveInternalIds = vi.fn(async (_input: { kind: string }): Promise<string[]> => []);
   createInternalOrFindWinner = vi.fn(async () => project);
   isPresenceEnabled = vi.fn(async () => true);
   findBySlugInTeam = vi.fn(async () => null);
@@ -654,6 +654,85 @@ describe("ProjectService", () => {
         framework: "checkup",
       }),
     );
+  });
+
+  describe("given the organization has no internal project of the kind but its slug is held", () => {
+    /** @scenario "A feature ensures an internal project" */
+    it("reuses the project holding the slug when it is of the same kind", async () => {
+      const repository = new StubRepository();
+      repository.findInternalBySlug.mockResolvedValue(project);
+
+      await expect(
+        createService(repository).ensureInternal({
+          organizationId: "org",
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        }),
+      ).resolves.toBe(project);
+      expect(repository.findInternalBySlug).toHaveBeenCalledWith("governance-org");
+      expect(repository.createInternalOrFindWinner).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A feature ensures an internal project" */
+    it("hands a slug held by a different kind to the repository's create-or-find-winner", async () => {
+      const repository = new StubRepository();
+      repository.findInternalBySlug.mockResolvedValue({
+        ...project,
+        kind: PROJECT_KIND.INTERNAL_CHECKUP,
+      });
+
+      await expect(
+        createService(repository).ensureInternal({
+          organizationId: "org",
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        }),
+      ).resolves.toEqual(project);
+      expect(repository.createInternalOrFindWinner).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slug: "governance-org",
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        }),
+      );
+    });
+  });
+
+  describe("when a feature reads internal projects", () => {
+    /** @scenario "A feature reads an internal project" */
+    it("finds the organization's internal project of the kind", async () => {
+      const repository = new StubRepository();
+      repository.existing = project;
+
+      await expect(
+        createService(repository).findInternal({
+          organizationId: "org",
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        }),
+      ).resolves.toBe(project);
+      expect(repository.findInternalByOrganization).toHaveBeenCalledWith({
+        organizationId: "org",
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+      });
+    });
+
+    it("answers null when the organization has none", async () => {
+      await expect(
+        createService(new StubRepository()).findInternal({
+          organizationId: "org",
+          kind: PROJECT_KIND.INTERNAL_CHECKUP,
+        }),
+      ).resolves.toBeNull();
+    });
+
+    it("lists the live internal project ids of a kind", async () => {
+      const repository = new StubRepository();
+      repository.findLiveInternalIds.mockResolvedValue(["p1", "p2"]);
+
+      await expect(
+        createService(repository).findInternalIds({ kind: PROJECT_KIND.INTERNAL_CHECKUP }),
+      ).resolves.toEqual(["p1", "p2"]);
+      expect(repository.findLiveInternalIds).toHaveBeenCalledWith({
+        kind: PROJECT_KIND.INTERNAL_CHECKUP,
+      });
+    });
   });
 
   /** @scenario "A feature ensures an internal project" */
