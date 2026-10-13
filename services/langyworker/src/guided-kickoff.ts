@@ -1,17 +1,7 @@
 /**
- * The guided onboarding kickoff, as the worker recognises it.
- *
- * The kickoff is the user message the app sends when the sign-up tour ends.
- * Its brief opens with a fixed line and then names what the tour collected.
- * The turn that carries it needs the guided-onboarding skill in context from
- * the start: left to the routing row and the `skill` tool, the model acted on
- * the onboarding CLI tools it could see and never read the script. So the
- * runner recognises the brief by its opener and places the skill's body ahead
- * of the message, the way a slash skill expands, and the brief stays the
- * script's input.
- *
- * The opener is app-owned copy (`GUIDED_KICKOFF_BRIEF_OPENER` in the app's
- * guided-onboarding kickoff module); the two sides pin the same literal.
+ * The guided onboarding kickoff: the user message the app sends when the
+ * sign-up tour ends. The runner recognises it by its opener and places the
+ * skill's body ahead of it, the way a slash skill expands.
  */
 
 export const GUIDED_ONBOARDING_SKILL_NAME = "guided-onboarding";
@@ -34,8 +24,7 @@ const USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";
 
 export function isGuidedKickoffPrompt(prompt: string): boolean {
   const labelAt = prompt.lastIndexOf(USER_MESSAGE_LABEL);
-  const message =
-    labelAt === -1 ? prompt : prompt.slice(labelAt + USER_MESSAGE_LABEL.length);
+  const message = labelAt === -1 ? prompt : prompt.slice(labelAt + USER_MESSAGE_LABEL.length);
   const lines = message.trim().split("\n");
   const first = lines[0]?.trim() ?? "";
   if (first.startsWith(GUIDED_KICKOFF_OPENER)) return true;
@@ -62,15 +51,8 @@ export function historyHasGuidedKickoff(messages: readonly unknown[]): boolean {
 }
 
 /**
- * Whether the turn is on the guided path, read once per turn, before the
- * prompt goes out, from the prompt the worker composed and the history at
- * that moment. The skill tool and the turn end guard read that one value.
- *
- * The prompt is read whole, not from the last user-message label: a
- * conversation resumed on a fresh worker arrives as a folded seed ahead of
- * the message, and the seed carries the kickoff while the worker's own
- * history is still empty. Read from the history alone at that moment, the
- * kickoff conversation itself was refused its skill.
+ * Whether the turn is on the guided path, from the composed prompt (read
+ * whole, not from the last user-message label) and the history.
  */
 export function isGuidedTurn({
   prompt,
@@ -103,12 +85,8 @@ export function prependSkillBody({
 
 /**
  * What the `skill` tool answers when the model loads the guided onboarding
- * skill in a conversation that is not on the guided path. The skill's own
- * rule is that nothing but the kickoff brief triggers it; left to the model,
- * a bare first message in a fresh conversation loaded it and ran the path's
- * first step, opener and code access card included. The turn's holder says
- * whether the conversation is guided; anywhere else the load is refused with
- * the rule and none of the script is returned.
+ * skill outside the guided path: left unguarded, a bare first message in a
+ * fresh conversation loaded it and ran the path's first step anyway.
  */
 export const GUIDED_SKILL_REFUSAL =
   "The guided-onboarding skill is the script for the kickoff brief the app sends when the sign-up tour ends, and this conversation has no kickoff. Do not set up a path: answer the message as it is.";

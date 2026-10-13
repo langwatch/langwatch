@@ -1,24 +1,11 @@
-Feature: Simulation Runner Service
-  As the SimulationRunnerService
+Feature: Scenario execution worker
+  As the Scenario execution worker
   I need to orchestrate scenario execution
   So that scenarios can be run against various targets
 
-  # NOTE: the SimulationRunnerService class this feature was written against no
-  # longer exists — it was superseded and deleted once nothing imported it. The
-  # behaviour it describes is still required and now lives in
-  # src/server/scenarios/execution/: data-prefetcher.ts loads the scenario and
-  # passes situation/criteria through, serialized-adapters/ resolves the HTTP
-  # and prompt-config targets, and execution-pool.ts + scenario-child-process.ts
-  # run it. Steps below still name SimulationRunnerService; rewording them
-  # against the surviving modules is tracked as follow-up, not done here.
-  #
-  # Per AUDIT_MANIFEST.md: 25 scenarios → 16 DUPLICATE (now bound or already
-  # covered elsewhere via @scenario JSDoc against simulation-runner.router,
-  # orchestrator, http-agent.adapter, prompt-config.adapter, scenario.processor.*,
-  # scenario-event.service tests) + 2 UPDATE + 7 KEEP. The 8 remaining
-  # @unimplemented scenarios are mostly load-scenario flow + return-immediate
-  # error variants pending tests in PR #3458. "Pass labels to SDK for tracing"
-  # is covered via OTEL_RESOURCE_ATTRIBUTES env (otel-isolation test:153).
+  # Scenario server owns prefetch, target adapters and isolated child execution.
+  # Simulation's durable process manager submits work through its execution
+  # service; transport handlers only validate and dispatch.
 
   # ============================================================================
   # Initialization
@@ -28,7 +15,7 @@ Feature: Simulation Runner Service
   Scenario: Load scenario and prompt for execution
     Given scenario "Test" exists
     And prompt "Test Prompt" exists
-    When SimulationRunnerService.run is called
+    When Scenario execution is requested
     Then the scenario is loaded from ScenarioService
     And the prompt is loaded from PromptService
     And the SDK scenario.run is invoked
@@ -37,7 +24,7 @@ Feature: Simulation Runner Service
   Scenario: Load scenario and HTTP agent for execution
     Given scenario "Test" exists
     And HTTP agent "Test Agent" exists with URL "https://api.example.com"
-    When SimulationRunnerService.run is called
+    When Scenario execution is requested
     Then the scenario is loaded from ScenarioService
     And the HTTP adapter is configured with the agent URL
 
@@ -48,19 +35,19 @@ Feature: Simulation Runner Service
   @unit @unimplemented
   Scenario: Pass situation to SDK
     Given scenario with situation "User is angry about billing"
-    When SimulationRunnerService executes
+    When Scenario execution starts
     Then the SDK receives the situation in the description
 
   @unit @unimplemented
   Scenario: Pass criteria to SDK for judgment
     Given scenario with criteria ["Must apologize", "Must offer refund"]
-    When SimulationRunnerService executes
+    When Scenario execution starts
     Then the SDK receives the criteria for judge evaluation
 
   @unit
   Scenario: Pass labels to SDK for tracing
     Given scenario with labels ["support", "billing"]
-    When SimulationRunnerService executes
+    When Scenario execution starts
     Then the SDK receives the labels as metadata
 
   # ============================================================================
@@ -111,7 +98,7 @@ Feature: Simulation Runner Service
   Scenario: Return error when HTTP agent not found
     Given scenario "Test" exists
     And HTTP agent "nonexistent" does not exist
-    When SimulationRunnerService.execute is called with HTTP target
+    When Scenario execution starts with an HTTP target
     Then it returns an error result
     And the error message contains "HTTP agent" and "not found"
 
@@ -119,6 +106,6 @@ Feature: Simulation Runner Service
   Scenario: Return error when model provider disabled
     Given scenario "Test" exists
     And the project's model provider is disabled
-    When SimulationRunnerService.execute is called
+    When Scenario execution starts
     Then it returns an error result
     And the error message contains "not configured or disabled"

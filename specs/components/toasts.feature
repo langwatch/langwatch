@@ -41,12 +41,7 @@ Feature: Toast notifications
     Then the toast region is placed at the bottom center of the viewport
 
   @unit
-  Scenario: A filled toast drops the accent its panel would use
-    Given a status toast, which light mode fills with a solid colour
-    Then its action and its icon inherit the colour the fill sets
-    And on the dark panel they keep the status accent
-
-  @unit
-  Scenario: A toast that is a card in both modes keeps its accent
-    Given an info or loading toast, which no mode fills
-    Then its action keeps the accent, having no fill to sit on
+  Scenario: A toast's secondary action uses the toast's own foreground
+    Given a toast of any status carrying an action
+    Then its action takes the toast's foreground colour at reduced opacity, in light and dark
+    And the lifetime line under it does the same

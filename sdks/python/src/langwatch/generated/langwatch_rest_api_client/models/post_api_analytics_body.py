@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
+from attrs import field as _attrs_field
 
-from ..models.post_api_analytics_body_group_by import PostApiAnalyticsBodyGroupBy
-from ..models.post_api_analytics_body_time_scale_type_0 import PostApiAnalyticsBodyTimeScaleType0
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -21,8 +20,8 @@ T = TypeVar("T", bound="PostApiAnalyticsBody")
 class PostApiAnalyticsBody:
     """
     Attributes:
-        start_date (float):
-        end_date (float):
+        start_date (float | str):
+        end_date (float | str):
         series (list[PostApiAnalyticsBodySeriesItem]):
         time_zone (str):
         query (str | Unset):
@@ -30,13 +29,14 @@ class PostApiAnalyticsBody:
         trace_ids (list[str] | Unset):
         negate_filters (bool | Unset):
         exclude_origins (list[str] | Unset):
-        group_by (PostApiAnalyticsBodyGroupBy | Unset):
+        group_by (str | Unset):
         group_by_key (str | Unset):
-        time_scale (int | PostApiAnalyticsBodyTimeScaleType0 | Unset):
+        time_scale (int | Literal['full'] | Unset):
+        should_skip_previous_period (bool | Unset):
     """
 
-    start_date: float
-    end_date: float
+    start_date: float | str
+    end_date: float | str
     series: list[PostApiAnalyticsBodySeriesItem]
     time_zone: str
     query: str | Unset = UNSET
@@ -44,13 +44,17 @@ class PostApiAnalyticsBody:
     trace_ids: list[str] | Unset = UNSET
     negate_filters: bool | Unset = UNSET
     exclude_origins: list[str] | Unset = UNSET
-    group_by: PostApiAnalyticsBodyGroupBy | Unset = UNSET
+    group_by: str | Unset = UNSET
     group_by_key: str | Unset = UNSET
-    time_scale: int | PostApiAnalyticsBodyTimeScaleType0 | Unset = UNSET
+    time_scale: int | Literal["full"] | Unset = UNSET
+    should_skip_previous_period: bool | Unset = UNSET
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        start_date: float | str
         start_date = self.start_date
 
+        end_date: float | str
         end_date = self.end_date
 
         series = []
@@ -76,22 +80,20 @@ class PostApiAnalyticsBody:
         if not isinstance(self.exclude_origins, Unset):
             exclude_origins = self.exclude_origins
 
-        group_by: str | Unset = UNSET
-        if not isinstance(self.group_by, Unset):
-            group_by = self.group_by.value
+        group_by = self.group_by
 
         group_by_key = self.group_by_key
 
-        time_scale: int | str | Unset
+        time_scale: int | Literal["full"] | Unset
         if isinstance(self.time_scale, Unset):
             time_scale = UNSET
-        elif isinstance(self.time_scale, PostApiAnalyticsBodyTimeScaleType0):
-            time_scale = self.time_scale.value
         else:
             time_scale = self.time_scale
 
-        field_dict: dict[str, Any] = {}
+        should_skip_previous_period = self.should_skip_previous_period
 
+        field_dict: dict[str, Any] = {}
+        field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "startDate": start_date,
@@ -116,6 +118,8 @@ class PostApiAnalyticsBody:
             field_dict["groupByKey"] = group_by_key
         if time_scale is not UNSET:
             field_dict["timeScale"] = time_scale
+        if should_skip_previous_period is not UNSET:
+            field_dict["shouldSkipPreviousPeriod"] = should_skip_previous_period
 
         return field_dict
 
@@ -125,9 +129,16 @@ class PostApiAnalyticsBody:
         from ..models.post_api_analytics_body_series_item import PostApiAnalyticsBodySeriesItem
 
         d = dict(src_dict)
-        start_date = d.pop("startDate")
 
-        end_date = d.pop("endDate")
+        def _parse_start_date(data: object) -> float | str:
+            return cast(float | str, data)
+
+        start_date = _parse_start_date(d.pop("startDate"))
+
+        def _parse_end_date(data: object) -> float | str:
+            return cast(float | str, data)
+
+        end_date = _parse_end_date(d.pop("endDate"))
 
         series = []
         _series = d.pop("series")
@@ -153,29 +164,22 @@ class PostApiAnalyticsBody:
 
         exclude_origins = cast(list[str], d.pop("excludeOrigins", UNSET))
 
-        _group_by = d.pop("groupBy", UNSET)
-        group_by: PostApiAnalyticsBodyGroupBy | Unset
-        if isinstance(_group_by, Unset):
-            group_by = UNSET
-        else:
-            group_by = PostApiAnalyticsBodyGroupBy(_group_by)
+        group_by = d.pop("groupBy", UNSET)
 
         group_by_key = d.pop("groupByKey", UNSET)
 
-        def _parse_time_scale(data: object) -> int | PostApiAnalyticsBodyTimeScaleType0 | Unset:
+        def _parse_time_scale(data: object) -> int | Literal["full"] | Unset:
             if isinstance(data, Unset):
                 return data
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                time_scale_type_0 = PostApiAnalyticsBodyTimeScaleType0(data)
-
-                return time_scale_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(int | PostApiAnalyticsBodyTimeScaleType0 | Unset, data)
+            time_scale_type_0 = cast(Literal["full"], data)
+            if time_scale_type_0 != "full":
+                raise ValueError(f"timeScale_type_0 must match const 'full', got '{time_scale_type_0}'")
+            return time_scale_type_0
+            return cast(int | Literal["full"] | Unset, data)
 
         time_scale = _parse_time_scale(d.pop("timeScale", UNSET))
+
+        should_skip_previous_period = d.pop("shouldSkipPreviousPeriod", UNSET)
 
         post_api_analytics_body = cls(
             start_date=start_date,
@@ -190,6 +194,24 @@ class PostApiAnalyticsBody:
             group_by=group_by,
             group_by_key=group_by_key,
             time_scale=time_scale,
+            should_skip_previous_period=should_skip_previous_period,
         )
 
+        post_api_analytics_body.additional_properties = d
         return post_api_analytics_body
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

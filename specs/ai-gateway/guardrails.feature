@@ -3,7 +3,9 @@ Feature: Guardrails wrap every gateway dispatch
   # All scenarios in this file describe gateway data-plane guardrail
   # invocation (pre-request block/modify, post-response block/modify,
   # per-chunk streaming guardrails, fail-open/closed config). Implemented
-  # in Go (services/aigateway/) — out of scope for the TS parity check.
+  # in Go (services/aigateway/) — out of scope for the TS parity check,
+  # except the control-plane scenarios tagged @unit, bound in the gateway and
+  # evaluation modules.
 
   The gateway calls LangWatch's guardrail service before dispatch (`request`),
   after response (`response`), and optionally per-chunk on streams
@@ -106,6 +108,39 @@ Feature: Guardrails wrap every gateway dispatch
       And the log records `langwatch.guardrail.timeout=pre`
       And the request does NOT silently bypass the guardrail (fail-closed)
 
+    @unit
+    Scenario: the control plane stops a request-direction check at its 800ms deadline
+      Given a request-direction guardrail whose evaluator is still running after 800ms
+      When the guardrail check is asked for a verdict
+      Then it answers by the deadline that the check has no verdict, which the data plane receives as a retryable 503
+      And the evaluator's run is told to stop
+      And the check never answers allow
+
+    @unit
+    Scenario: a fail-open guardrail allows when the deadline passes
+      Given a fail-open request-direction guardrail whose evaluator never answers
+      When the deadline passes
+      Then the check answers allow
+
+    @unit
+    Scenario: the caller's cancellation reaches the evaluator
+      Given the data plane abandons a guardrail check while its evaluator runs
+      Then the evaluator's run is told to stop
+      And the guardrail fails by its failure mode
+
+    @unit
+    Scenario: a guardrail check answers by its deadline even when the evaluator ignores the abort
+      Given a guardrail's evaluator that never answers and ignores its abort signal
+      When the evaluation module's guardrail check reaches its deadline
+      Then it answers that the run stopped at the deadline
+      And the evaluator's run is told to stop
+
+    @unit
+    Scenario: a cancelled guardrail check aborts the evaluator's call to the analysis service
+      Given an evaluator is waiting on the analysis service
+      When its caller cancels
+      Then the call is aborted and is not retried
+
   Rule: Multiple guardrails run in parallel
 
     @integration @unimplemented
@@ -115,6 +150,17 @@ Feature: Guardrails wrap every gateway dispatch
       Then all three are called in parallel
       And the first to return `block` short-circuits the rest
       And the other in-flight guardrail calls are cancelled (ctx cancel)
+
+    @unit
+    Scenario: a guardrail that blocks cancels the evaluators still running
+      Given two guardrails run for one check and one blocks while the other is judging
+      Then the check blocks naming only the blocking guardrail
+      And the other evaluator's run is told to stop
+
+    @unit
+    Scenario: a guardrail's cost is recorded after the verdict and survives the cancellation
+      Given one guardrail blocked and cancelled another
+      Then the blocking evaluator's cost is recorded as a GUARDRAIL cost after the verdict
 
   Rule: Guardrail results appear in gateway logs and Observability
 
@@ -200,3 +246,22 @@ Feature: Guardrails wrap every gateway dispatch
       And the edited_text is NOT written to the stream
       # Provider-shape-specific chunk rewriting is deferred to a future iter.
       # "redact on stream" in v1 = block + client-retry.
+
+  Rule: The guardrail form checks on submit
+
+    @integration
+    Scenario: Saving an incomplete guardrail names the missing name and evaluator
+      Given the new-guardrail form is open and nothing is filled in
+      Then the save action is enabled and no error is shown
+      When the save action is pressed
+      Then "Enter a name." and "Choose an evaluator." are shown
+      And the name field is focused
+      And nothing is sent
+      And once a name is entered the evaluator field is the one focused
+
+    @integration
+    Scenario: An edit whose guardrail is no longer available offers no save
+      Given the form is opened for a guardrail that is not in the project
+      Then it says the guardrail is no longer available
+      And no save action is offered
+      And Cancel is still offered

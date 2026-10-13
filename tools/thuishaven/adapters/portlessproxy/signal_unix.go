@@ -2,6 +2,7 @@ package portlessproxy
 
 import (
 	"errors"
+	"os/exec"
 	"syscall"
 )
 
@@ -15,4 +16,10 @@ var sig0 = syscall.Signal(0)
 // (ESRCH, "process already finished") means it is gone.
 func aliveFromSignalErr(err error) bool {
 	return err == nil || errors.Is(err, syscall.EPERM)
+}
+
+// detach puts cmd in a new session so a signal to the caller's process group
+// never reaches it.
+func detach(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 }

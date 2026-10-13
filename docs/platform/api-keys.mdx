@@ -9,25 +9,25 @@ keywords: api keys, authentication, personal keys, service keys, langwatch, secu
 
 LangWatch has two kinds of credentials. An ingestion key starts with `ik-lw-` and can only write traces. An API key starts with `sk-lw-` and can read and change whatever its scope and permissions allow. Both are managed at **Settings > API Keys**.
 
-| | Ingestion key | API key |
-|---|---|---|
-| **What it does** | Writes traces. It cannot read, update or delete | Reads and manages everything its permissions allow |
-| **Permissions** | `traces:create` only | The permission categories you pick, capped by the owner's permissions on a personal key |
-| **Scope** | Exactly one project | One or more projects, teams, or the whole organization |
-| **Use it for** | Agent environments, CLIs and OTLP exporters that only push telemetry | SDK setup, MCP, CI/CD, dashboards and automation |
-| **If it leaks** | The holder can create traces in one project, and cannot read or delete anything | The holder gets whatever the key grants. Treat it like a password |
+|                  | Ingestion key                                                                   | API key                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **What it does** | Writes traces. It cannot read, update or delete                                 | Reads and manages everything its permissions allow                                      |
+| **Permissions**  | `traces:create` only                                                            | The permission categories you pick, capped by the owner's permissions on a personal key |
+| **Scope**        | Exactly one project                                                             | One or more projects, teams, or the whole organization                                  |
+| **Use it for**   | Agent environments, CLIs and OTLP exporters that only push telemetry            | SDK setup, MCP, CI/CD, dashboards and automation                                        |
+| **If it leaks**  | The holder can create traces in one project, and cannot read or delete anything | The holder gets whatever the key grants. Treat it like a password                       |
 
 An [ingestion template](/ai-governance/ingestion-templates) mints an ingestion key and writes it into the tool's `OTEL_EXPORTER_OTLP_HEADERS`; the `langwatch <tool>` CLI does the same. An ingestion key can reference the template so the receiver shapes the trace into the `gen_ai.*` attributes. The rest of this page covers API keys.
 
 ## Key types
 
-| | Personal key | Service key |
-|---|---|---|
-| **Owner** | One user | None; it belongs to the organization |
-| **Use it for** | Local development, AI assistants over MCP, personal scripts | CI/CD pipelines, automation, service-to-service calls |
-| **Permissions** | Never more than the owner holds at the time of the request | The scope and the permission mode you set |
-| **Who can create it** | Any member | Organization admins |
-| **When the owner leaves** | Removing the owner from the organization revokes their bindings, so the key can no longer do anything. A deactivated owner's key is rejected | Keeps working |
+|                           | Personal key                                                                                                                                 | Service key                                           |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| **Owner**                 | One user                                                                                                                                     | None; it belongs to the organization                  |
+| **Use it for**            | Local development, AI assistants over MCP, personal scripts                                                                                  | CI/CD pipelines, automation, service-to-service calls |
+| **Permissions**           | Never more than the owner holds at the time of the request                                                                                   | The scope and the permission mode you set             |
+| **Who can create it**     | Any member                                                                                                                                   | Organization admins                                   |
+| **When the owner leaves** | Removing the owner from the organization revokes their bindings, so the key can no longer do anything. A deactivated owner's key is rejected | Keeps working                                         |
 
 <Info>
   The **Project API Key** shown on the project setup page, and in the **Legacy** row of **Settings > API Keys**, still works and is not going away. It carries its project, so it does not need `LANGWATCH_PROJECT_ID`. Rotate it from that row. Create keys from **Settings > API Keys** when you need scoped permissions.
@@ -40,14 +40,14 @@ An [ingestion template](/ai-governance/ingestion-templates) mints an ingestion k
     Go to [Settings > API Keys](https://app.langwatch.ai/settings/api-keys) and click **Create new secret key**.
   </Step>
 
-  <Step title="Fill in the drawer">
-    - **Key type**: shown to organization admins only. Pick **Personal**. Other members always create a personal key.
-    - **Name**: for example `Local dev` or `MCP key`
-    - **Description**: optional
-    - **Scope**: the projects, teams or the organization the key can access
-    - **Permissions**: **All** gives the key your own permissions on each scope. **Restricted** lets you pick read or write per [permission category](#permission-categories)
-    - **Expiration**: **No expiration**, 7, 30, 60 or 90 days, or **Custom**
-  </Step>
+<Step title="Fill in the drawer">
+  - **Key type**: shown to organization admins only. Pick **Personal**. Other members always create
+  a personal key. - **Name**: for example `Local dev` or `MCP key` - **Description**: optional -
+  **Scope**: the projects, teams or the organization the key can access - **Permissions**: **All**
+  gives the key your own permissions on each scope. **Restricted** lets you pick read or write per
+  [permission category](#permission-categories) - **Expiration**: **No expiration**, 7, 30, 60 or 90
+  days, or **Custom**
+</Step>
 
   <Step title="Copy the key">
     Click **Create secret key**. The key is shown once, as `sk-lw-<id>_<secret>`, with ready-made `.env`, HTTP header, terminal and MCP snippets whose copy buttons carry the real key. Copy it now; the table never shows it again.
@@ -71,9 +71,7 @@ Organization admins can also create a personal key for another member: the drawe
 
 Service keys are for automated systems: CI/CD pipelines, production services and scripts that span projects. They have no owner, so they keep working when people leave.
 
-<Note>
-  Only organization admins create service keys.
-</Note>
+<Note>Only organization admins create service keys.</Note>
 
 <Steps>
   <Step title="Open Settings > API Keys">
@@ -90,6 +88,7 @@ Service keys are for automated systems: CI/CD pipelines, production services and
     <Warning>
       A service key scoped to the organization with **All** permissions is an organization-wide Admin. Scope service keys to the projects they serve.
     </Warning>
+
   </Step>
 
   <Step title="Copy the key">
@@ -113,8 +112,10 @@ LANGWATCH_PROJECT_ID="your-project-id"
 import langwatch
 
 # LANGWATCH_PROJECT_ID comes from the environment
+
 langwatch.setup(api_key="sk-lw-...")
-```
+
+````
 </Tab>
 <Tab title="TypeScript">
 ```typescript
@@ -122,7 +123,8 @@ import { LangWatch } from 'langwatch';
 
 // LANGWATCH_PROJECT_ID comes from the environment
 const langwatch = new LangWatch({ apiKey: 'sk-lw-...' });
-```
+````
+
 </Tab>
 </Tabs>
 
@@ -130,29 +132,29 @@ const langwatch = new LangWatch({ apiKey: 'sk-lw-...' });
 
 A **Restricted** key holds read or write access per category. Read grants the `view` action on the resources in the category. Write grants every action on them.
 
-| Category | Read | Write |
-|---|---|---|
-| **Traces** | View traces and spans | Create, update and share traces |
-| **Cost** | View cost analytics | Read only |
-| **Scenarios** | View scenarios and runs | Create and manage scenarios |
-| **Annotations** | View annotations | Create and manage annotations |
-| **Analytics** | View analytics dashboards | Create and manage dashboards |
-| **Evaluations** | View evaluations | Create and manage evaluations |
-| **Langy** | View Langy conversations | Start and manage Langy conversations |
-| **Datasets** | View datasets | Create and manage datasets |
-| **Triggers** | View triggers | Create and manage triggers |
-| **Workflows** | View workflows | Create and manage workflows |
-| **Experiments** | View experiments | Create and manage experiments |
-| **Prompts** | View prompts | Create and manage prompts |
-| **Playground** | View the playground | Run the playground |
-| **Secrets** | List secrets | Create and manage secrets |
-| **Agent Cache** | View the agent cache | Manage the agent cache |
-| **Audit Log** | View the audit log | Read only |
-| **Team** | View team members | Manage team membership |
-| **Project** | View project settings | Create, update and delete projects |
-| **Organization** | View the organization | Manage the organization |
-| **Gateway** | View virtual keys, budgets, providers, routing policies, guardrails, usage, cache rules, spend and webhook endpoints | Manage all of them |
-| **Governance** | View governance, ingestion sources, anomaly rules, compliance exports, the activity monitor and AI tools | Manage all of them |
+| Category         | Read                                                                                                                 | Write                                |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| **Traces**       | View traces and spans                                                                                                | Create, update and share traces      |
+| **Cost**         | View cost analytics                                                                                                  | Read only                            |
+| **Scenarios**    | View scenarios and runs                                                                                              | Create and manage scenarios          |
+| **Annotations**  | View annotations                                                                                                     | Create and manage annotations        |
+| **Analytics**    | View analytics dashboards                                                                                            | Create and manage dashboards         |
+| **Evaluations**  | View evaluations                                                                                                     | Create and manage evaluations        |
+| **Langy**        | View Langy conversations                                                                                             | Start and manage Langy conversations |
+| **Datasets**     | View datasets                                                                                                        | Create and manage datasets           |
+| **Triggers**     | View triggers                                                                                                        | Create and manage triggers           |
+| **Workflows**    | View workflows                                                                                                       | Create and manage workflows          |
+| **Experiments**  | View experiments                                                                                                     | Create and manage experiments        |
+| **Prompts**      | View prompts                                                                                                         | Create and manage prompts            |
+| **Playground**   | View the playground                                                                                                  | Run the playground                   |
+| **Secrets**      | List secrets                                                                                                         | Create and manage secrets            |
+| **Agent Cache**  | View the agent cache                                                                                                 | Manage the agent cache               |
+| **Audit Log**    | View the audit log                                                                                                   | Read only                            |
+| **Team**         | View team members                                                                                                    | Manage team membership               |
+| **Project**      | View project settings                                                                                                | Create, update and delete projects   |
+| **Organization** | View the organization                                                                                                | Manage the organization              |
+| **Gateway**      | View virtual keys, budgets, providers, routing policies, guardrails, usage, cache rules, spend and webhook endpoints | Manage all of them                   |
+| **Governance**   | View governance, ingestion sources, anomaly rules, compliance exports, the activity monitor and AI tools             | Manage all of them                   |
 
 **Also check:** [Access Control (RBAC)](/platform/rbac) for the actions each resource accepts.
 
@@ -210,5 +212,6 @@ The key's owner and organization admins can:
 The **Ingestion keys** table on the same page lists ingestion keys; organization admins revoke them.
 
 <Tip>
-  Set an expiration on keys made for a short task, and revoke keys that show no **Last Used** date for a while.
+  Set an expiration on keys made for a short task, and revoke keys that show no **Last Used** date
+  for a while.
 </Tip>

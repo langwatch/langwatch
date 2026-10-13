@@ -4,11 +4,13 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.get_api_experiments_runs_by_run_id_results_response_200_completeness import (
+        GetApiExperimentsRunsByRunIdResultsResponse200Completeness,
+    )
     from ..models.get_api_experiments_runs_by_run_id_results_response_200_dataset_item import (
         GetApiExperimentsRunsByRunIdResultsResponse200DatasetItem,
     )
@@ -38,6 +40,10 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
         evaluations (list[GetApiExperimentsRunsByRunIdResultsResponse200EvaluationsItem]): One row per evaluator per
             dataset entry
         timestamps (GetApiExperimentsRunsByRunIdResultsResponse200Timestamps):
+        completeness (GetApiExperimentsRunsByRunIdResultsResponse200Completeness): What is stored against what the run
+            reported. Results are stored after they are reported, so a read can hold part of a run: `complete` is false
+            until the run has ended and every reported row and evaluation is stored. `expected` is null when the run
+            reported no counts
         workflow_version_id (None | str | Unset):
         progress (float | None | Unset):
         total (float | None | Unset):
@@ -51,11 +57,11 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
     dataset: list[GetApiExperimentsRunsByRunIdResultsResponse200DatasetItem]
     evaluations: list[GetApiExperimentsRunsByRunIdResultsResponse200EvaluationsItem]
     timestamps: GetApiExperimentsRunsByRunIdResultsResponse200Timestamps
+    completeness: GetApiExperimentsRunsByRunIdResultsResponse200Completeness
     workflow_version_id: None | str | Unset = UNSET
     progress: float | None | Unset = UNSET
     total: float | None | Unset = UNSET
     targets: list[GetApiExperimentsRunsByRunIdResultsResponse200TargetsType0Item] | None | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         experiment_id = self.experiment_id
@@ -75,6 +81,8 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
             evaluations.append(evaluations_item)
 
         timestamps = self.timestamps.to_dict()
+
+        completeness = self.completeness.to_dict()
 
         workflow_version_id: None | str | Unset
         if isinstance(self.workflow_version_id, Unset):
@@ -107,7 +115,7 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
             targets = self.targets
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "experimentId": experiment_id,
@@ -116,6 +124,7 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
                 "dataset": dataset,
                 "evaluations": evaluations,
                 "timestamps": timestamps,
+                "completeness": completeness,
             }
         )
         if workflow_version_id is not UNSET:
@@ -131,6 +140,9 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.get_api_experiments_runs_by_run_id_results_response_200_completeness import (
+            GetApiExperimentsRunsByRunIdResultsResponse200Completeness,
+        )
         from ..models.get_api_experiments_runs_by_run_id_results_response_200_dataset_item import (
             GetApiExperimentsRunsByRunIdResultsResponse200DatasetItem,
         )
@@ -168,6 +180,8 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
             evaluations.append(evaluations_item)
 
         timestamps = GetApiExperimentsRunsByRunIdResultsResponse200Timestamps.from_dict(d.pop("timestamps"))
+
+        completeness = GetApiExperimentsRunsByRunIdResultsResponse200Completeness.from_dict(d.pop("completeness"))
 
         def _parse_workflow_version_id(data: object) -> None | str | Unset:
             if data is None:
@@ -229,27 +243,11 @@ class GetApiExperimentsRunsByRunIdResultsResponse200:
             dataset=dataset,
             evaluations=evaluations,
             timestamps=timestamps,
+            completeness=completeness,
             workflow_version_id=workflow_version_id,
             progress=progress,
             total=total,
             targets=targets,
         )
 
-        get_api_experiments_runs_by_run_id_results_response_200.additional_properties = d
         return get_api_experiments_runs_by_run_id_results_response_200
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

@@ -1,21 +1,17 @@
+import {
+  InMemoryLogRecordExporter,
+  LoggerProvider,
+  SimpleLogRecordProcessor,
+} from "@opentelemetry/sdk-logs";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { InMemoryLogRecordExporter, LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
+
 import { getLangWatchLogger, getLangWatchLoggerFromProvider } from "../..";
 import { NoOpLogger } from "../../../../logger";
+import { resetObservabilitySdkConfig } from "../../../config";
 import { setupObservability } from "../../../setup/node";
 import { type LangWatchLogRecord } from "../../types";
-import { resetObservabilitySdkConfig } from "../../../config";
 
-/**
- * Integration tests for LangWatch logger with real OpenTelemetry setup.
- *
- * These tests verify:
- * - Real OpenTelemetry SDK initialization
- * - Actual log record creation and data flow
- * - Integration between logger and setup components
- * - Logger functionality and API
- * - Log records are actually sent to processors and exported
- */
+/** Integration tests for LangWatch logger with a real OpenTelemetry SDK. */
 
 // Test data constants for consistency
 const TEST_LOG_MESSAGE = "This is a test log message";
@@ -44,26 +40,24 @@ const TEST_GEN_AI_ATTRIBUTES = {
 
 type SetupObservabilityOptions = NonNullable<Parameters<typeof setupObservability>[0]>;
 
+type ExportedLogRecord = ReturnType<InMemoryLogRecordExporter["getFinishedLogRecords"]>[number];
+
+/** The first exported record, failing the test when none was exported. */
+function firstExportedRecord(records: ExportedLogRecord[]): ExportedLogRecord {
+  const record = records[0];
+  if (!record) throw new Error("Expected log record to be exported");
+  return record;
+}
+
 describe("given logger observability wired to a real OpenTelemetry SDK", () => {
   let logRecordExporter: InMemoryLogRecordExporter;
   let logRecordProcessor: SimpleLogRecordProcessor;
   let observabilityHandle: ReturnType<typeof setupObservability>;
 
   /**
-   * Starts observability against a fresh in-memory exporter.
-   *
-   * `langwatch: "disabled"` keeps the real LangWatch exporter out of the test:
-   * otherwise setup attaches a BatchLogRecordProcessor to the live endpoint
-   * alongside the in-memory one, which times out and drops records in CI.
-   *
-   * Each start also gets its own exporter and processor, because shutting a
-   * handle down shuts down its processors too. A processor shared across tests
-   * would stop recording for every test after the first shutdown.
-   *
-   * `disableAutoShutdown` keeps setup from registering beforeExit/SIGINT/SIGTERM
-   * handlers on every start. Those are never removed, not even by shutdown, so
-   * without this each start leaks three process listeners and the suite trips
-   * Node's MaxListeners warning. `afterEach` owns teardown here.
+   * Starts observability against a fresh in-memory exporter/processor per
+   * test, so one test's shutdown can't silence another's. `disableAutoShutdown`
+   * skips process-exit handlers that would otherwise leak listeners across the suite.
    */
   function startObservability({
     dataCapture,
@@ -82,7 +76,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       ...(dataCapture ? { dataCapture } : {}),
       attributes: {
         "test.suite": "logger-integration",
-        "test.environment": "vitest"
+        "test.environment": "vitest",
       },
     });
   }
@@ -127,7 +121,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("log record creation and data flow", () => {
+  describe("when creating log records and data flows", () => {
     it("creates log records with proper LangWatch attributes through real OpenTelemetry", async () => {
       const logger = getLangWatchLogger("integration-test-logger-1");
 
@@ -147,10 +141,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
 
       expect(exportedLogRecords).toHaveLength(1);
 
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       expect(exportedLogRecord.body).toBe(TEST_LOG_MESSAGE);
       expect(exportedLogRecord.severityText).toBe("INFO");
@@ -174,30 +165,30 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
           severityText: "DEBUG",
           severityNumber: 5,
           body: "Debug message",
-          attributes: { "level": "debug" },
+          attributes: { level: "debug" },
         },
         {
           severityText: "INFO",
           severityNumber: 9,
           body: "Info message",
-          attributes: { "level": "info" },
+          attributes: { level: "info" },
         },
         {
           severityText: "WARN",
           severityNumber: 13,
           body: "Warning message",
-          attributes: { "level": "warn" },
+          attributes: { level: "warn" },
         },
         {
           severityText: "ERROR",
           severityNumber: 17,
           body: "Error message",
-          attributes: { "level": "error" },
+          attributes: { level: "error" },
         },
       ];
 
       // Emit all log records
-      logRecords.forEach(record => logger.emit(record));
+      logRecords.forEach((record) => logger.emit(record));
 
       await logRecordProcessor.forceFlush();
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
@@ -205,8 +196,8 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       expect(exportedLogRecords).toHaveLength(4);
 
       // Verify severity levels
-      const severityTexts = exportedLogRecords.map(r => r.severityText);
-      const severityNumbers = exportedLogRecords.map(r => r.severityNumber);
+      const severityTexts = exportedLogRecords.map((r) => r.severityText);
+      const severityNumbers = exportedLogRecords.map((r) => r.severityNumber);
 
       expect(severityTexts).toEqual(["DEBUG", "INFO", "WARN", "ERROR"]);
       expect(severityNumbers).toEqual([5, 9, 13, 17]);
@@ -233,10 +224,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
 
       expect(exportedLogRecords).toHaveLength(1);
 
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       expect(exportedLogRecord.body).toBe("Simple log message without attributes");
       expect(exportedLogRecord.severityText).toBe("INFO");
@@ -245,7 +233,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("data capture integration", () => {
+  describe("when integrating data capture", () => {
     it("preserves log record body when output capture is enabled by default", async () => {
       const logger = getLangWatchLogger("data-capture-test-logger-4");
 
@@ -253,7 +241,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: "Test log message with body",
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -262,10 +250,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       // By default, output capture should be enabled, so body should be preserved
       expect(exportedLogRecord.body).toBe("Test log message with body");
@@ -283,7 +268,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: "Test log message with body",
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -292,10 +277,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       // With 'all' data capture, body should be preserved
       expect(exportedLogRecord.body).toBe("Test log message with body");
@@ -313,7 +295,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: "Test log message with body",
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -322,10 +304,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       // With 'output' data capture, body should be preserved
       expect(exportedLogRecord.body).toBe("Test log message with body");
@@ -343,7 +322,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: "Test log message with body",
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -352,10 +331,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       // With 'input' data capture, body should be removed (set to undefined)
       expect(exportedLogRecord.body).toBeUndefined();
@@ -373,7 +349,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: "Test log message with body",
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -382,10 +358,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       // With 'none' data capture, body should be removed
       expect(exportedLogRecord.body).toBeUndefined();
@@ -403,7 +376,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "ERROR",
         severityNumber: 17,
         body: "Test log message with body",
-        attributes: { "test": "value", "custom": "attribute" },
+        attributes: { test: "value", custom: "attribute" },
         timestamp: timestamp,
       };
 
@@ -413,16 +386,16 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       // Verify other properties are preserved while body is removed
       expect(exportedLogRecord.severityText).toBe("ERROR");
       expect(exportedLogRecord.severityNumber).toBe(17);
       expect(exportedLogRecord.body).toBeUndefined(); // Only body should be modified
-      expect(exportedLogRecord.attributes).toEqual({ "test": "value", "custom": "attribute" });
+      expect(exportedLogRecord.attributes).toEqual({
+        test: "value",
+        custom: "attribute",
+      });
       // Note: timestamp is not available on ReadableLogRecord, so we don't assert it
     });
 
@@ -437,7 +410,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         severityText: "INFO",
         severityNumber: 9,
         // No body property
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -446,17 +419,14 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       // Verify the log record is emitted without body
       expect(exportedLogRecord.body).toBeUndefined();
     });
   });
 
-  describe("logger naming and versioning", () => {
+  describe("when naming and versioning the logger", () => {
     it("handles different logger names correctly", async () => {
       const loggers = [
         getLangWatchLogger("app-logger-11"),
@@ -516,7 +486,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("GenAI-specific logging", () => {
+  describe("when logging GenAI-specific data", () => {
     it("handles GenAI-specific attributes correctly", async () => {
       const logger = getLangWatchLogger("genai-test-logger-17");
 
@@ -537,10 +507,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
 
       expect(exportedLogRecords).toHaveLength(1);
 
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       // Verify GenAI-specific attributes
       expect(exportedLogRecord.attributes?.["gen_ai.request.model"]).toBe("gpt-4");
@@ -576,10 +543,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
 
       expect(exportedLogRecords).toHaveLength(1);
 
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       expect(exportedLogRecord.severityText).toBe("ERROR");
       expect(exportedLogRecord.severityNumber).toBe(17);
@@ -590,7 +554,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("performance and concurrency", () => {
+  describe("when checking performance and concurrency", () => {
     it("handles concurrent log record creation efficiently", async () => {
       const logger = getLangWatchLogger("concurrent-test-logger-19");
 
@@ -608,7 +572,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
 
           logger.emit(logRecord);
           return i;
-        })
+        }),
       );
 
       expect(concurrentOperations).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
@@ -668,8 +632,8 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         data: "x".repeat(50_000), // 50KB string
         numbers: Array.from({ length: 1000 }, (_, i) => i),
         nested: {
-          level1: { level2: { level3: "deeply nested data" } }
-        }
+          level1: { level2: { level3: "deeply nested data" } },
+        },
       };
 
       const largeDataLogRecord: LangWatchLogRecord = {
@@ -688,10 +652,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       // Verify large data was handled correctly
       expect(exportedLogRecord.body).toBe("Large data log message");
@@ -699,7 +660,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("attribute and metadata validation", () => {
+  describe("when validating attributes and metadata", () => {
     it("validates and sanitize attribute values", async () => {
       const logger = getLangWatchLogger("attribute-validation-test-logger-22");
 
@@ -722,10 +683,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       // Verify valid attributes are present
       expect(exportedLogRecord.attributes?.["string.attr"]).toBe("valid string");
@@ -760,10 +718,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       // Verify valid attributes are present
       expect(exportedLogRecord.attributes?.["valid.string"]).toBe("normal string");
@@ -774,7 +729,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("error boundary and recovery", () => {
+  describe("when errors occur and recovery is needed", () => {
     it("handles log record operation failures gracefully", async () => {
       const logger = getLangWatchLogger("log-failure-test-logger-24");
 
@@ -795,10 +750,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       // Log record should have been created successfully
       expect(exportedLogRecord.body).toBe("Valid log message");
@@ -827,17 +779,14 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       expect(exportedLogRecord.body).toBe("Log during shutdown test");
       expect(exportedLogRecord.attributes?.["shutdown.test"]).toBe(true);
     });
   });
 
-  describe("current logger provider integration", () => {
+  describe("when integrating with the current logger provider", () => {
     it("uses the currently configured logger provider", () => {
       // Get loggers using current provider
       const logger1 = getLangWatchLogger("current-test-26");
@@ -864,7 +813,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("custom logger provider integration", () => {
+  describe("when integrating with a custom logger provider", () => {
     it("works with custom logger providers", async () => {
       // A provider owned by the caller, not the one setupObservability registers
       const customExporter = new InMemoryLogRecordExporter();
@@ -875,7 +824,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const logger = getLangWatchLoggerFromProvider(
         customProvider,
         "custom-provider-test-logger-28",
-        "1.0.0"
+        "1.0.0",
       );
 
       const customProviderLogRecord: LangWatchLogRecord = {
@@ -894,10 +843,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       const exportedLogRecords = customExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
-      const exportedLogRecord = exportedLogRecords[0];
-      if (!exportedLogRecord) {
-        throw new Error("Expected log record to be exported");
-      }
+      const exportedLogRecord = firstExportedRecord(exportedLogRecords);
 
       expect(exportedLogRecord.body).toBe("Custom provider test message");
       expect(exportedLogRecord.attributes?.["custom.provider"]).toBe(true);

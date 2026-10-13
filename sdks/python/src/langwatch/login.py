@@ -1,5 +1,7 @@
 import langwatch
 from langwatch.http_client import create_client
+from langwatch.__version__ import __version__
+from langwatch.utils.sdk_identity import build_sdk_identity_headers
 from langwatch.utils.exceptions import better_raise_for_status
 from .state import get_api_key, get_endpoint
 from getpass import getpass
@@ -21,7 +23,10 @@ def login(relogin=False):
     with create_client() as client:
         response = client.post(
             f"{get_endpoint()}/api/auth/validate",
-            headers={"X-Auth-Token": api_key or ""},
+            headers={
+                **build_sdk_identity_headers(str(__version__)),
+                "X-Auth-Token": api_key or "",
+            },
             json={},
         )
     if response.status_code == 401:

@@ -15,6 +15,14 @@ if TYPE_CHECKING:
     from ..models.metrics import Metrics
     from ..models.output import Output
     from ..models.timestamps import Timestamps
+    from ..models.trace_contexts_item import TraceContextsItem
+    from ..models.trace_error_type_0 import TraceErrorType0
+    from ..models.trace_events_item import TraceEventsItem
+    from ..models.trace_expected_output import TraceExpectedOutput
+    from ..models.trace_privacy import TracePrivacy
+    from ..models.trace_spans_item_type_0 import TraceSpansItemType0
+    from ..models.trace_spans_item_type_1 import TraceSpansItemType1
+    from ..models.trace_spans_item_type_2 import TraceSpansItemType2
 
 
 T = TypeVar("T", bound="Trace")
@@ -24,40 +32,70 @@ T = TypeVar("T", bound="Trace")
 class Trace:
     """
     Attributes:
-        trace_id (str | Unset):
-        project_id (str | Unset):
-        timestamps (Timestamps | Unset):
+        trace_id (str):
+        project_id (str):
+        metadata (Metadata):
+        timestamps (Timestamps):
+        spans (list[TraceSpansItemType0 | TraceSpansItemType1 | TraceSpansItemType2]):
+        privacy (TracePrivacy | Unset):
         input_ (Input | Unset):
         output (Output | Unset):
-        metadata (Metadata | Unset):
+        contexts (list[TraceContextsItem] | Unset):
+        expected_output (TraceExpectedOutput | Unset):
         metrics (Metrics | Unset):
+        error (None | TraceErrorType0 | Unset):
         indexing_md5s (list[str] | Unset):
-        error (None | str | Unset):
+        events (list[TraceEventsItem] | Unset):
         evaluations (list[Evaluation] | Unset):
-        contexts (list[Any] | Unset):
+        redacted_by_visibility_window (bool | Unset):
     """
 
-    trace_id: str | Unset = UNSET
-    project_id: str | Unset = UNSET
-    timestamps: Timestamps | Unset = UNSET
+    trace_id: str
+    project_id: str
+    metadata: Metadata
+    timestamps: Timestamps
+    spans: list[TraceSpansItemType0 | TraceSpansItemType1 | TraceSpansItemType2]
+    privacy: TracePrivacy | Unset = UNSET
     input_: Input | Unset = UNSET
     output: Output | Unset = UNSET
-    metadata: Metadata | Unset = UNSET
+    contexts: list[TraceContextsItem] | Unset = UNSET
+    expected_output: TraceExpectedOutput | Unset = UNSET
     metrics: Metrics | Unset = UNSET
+    error: None | TraceErrorType0 | Unset = UNSET
     indexing_md5s: list[str] | Unset = UNSET
-    error: None | str | Unset = UNSET
+    events: list[TraceEventsItem] | Unset = UNSET
     evaluations: list[Evaluation] | Unset = UNSET
-    contexts: list[Any] | Unset = UNSET
+    redacted_by_visibility_window: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.trace_error_type_0 import TraceErrorType0
+        from ..models.trace_spans_item_type_0 import TraceSpansItemType0
+        from ..models.trace_spans_item_type_1 import TraceSpansItemType1
+
         trace_id = self.trace_id
 
         project_id = self.project_id
 
-        timestamps: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.timestamps, Unset):
-            timestamps = self.timestamps.to_dict()
+        metadata = self.metadata.to_dict()
+
+        timestamps = self.timestamps.to_dict()
+
+        spans = []
+        for spans_item_data in self.spans:
+            spans_item: dict[str, Any]
+            if isinstance(spans_item_data, TraceSpansItemType0):
+                spans_item = spans_item_data.to_dict()
+            elif isinstance(spans_item_data, TraceSpansItemType1):
+                spans_item = spans_item_data.to_dict()
+            else:
+                spans_item = spans_item_data.to_dict()
+
+            spans.append(spans_item)
+
+        privacy: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.privacy, Unset):
+            privacy = self.privacy.to_dict()
 
         input_: dict[str, Any] | Unset = UNSET
         if not isinstance(self.input_, Unset):
@@ -67,23 +105,39 @@ class Trace:
         if not isinstance(self.output, Unset):
             output = self.output.to_dict()
 
-        metadata: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.metadata, Unset):
-            metadata = self.metadata.to_dict()
+        contexts: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.contexts, Unset):
+            contexts = []
+            for contexts_item_data in self.contexts:
+                contexts_item = contexts_item_data.to_dict()
+                contexts.append(contexts_item)
+
+        expected_output: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.expected_output, Unset):
+            expected_output = self.expected_output.to_dict()
 
         metrics: dict[str, Any] | Unset = UNSET
         if not isinstance(self.metrics, Unset):
             metrics = self.metrics.to_dict()
 
+        error: dict[str, Any] | None | Unset
+        if isinstance(self.error, Unset):
+            error = UNSET
+        elif isinstance(self.error, TraceErrorType0):
+            error = self.error.to_dict()
+        else:
+            error = self.error
+
         indexing_md5s: list[str] | Unset = UNSET
         if not isinstance(self.indexing_md5s, Unset):
             indexing_md5s = self.indexing_md5s
 
-        error: None | str | Unset
-        if isinstance(self.error, Unset):
-            error = UNSET
-        else:
-            error = self.error
+        events: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.events, Unset):
+            events = []
+            for events_item_data in self.events:
+                events_item = events_item_data.to_dict()
+                events.append(events_item)
 
         evaluations: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.evaluations, Unset):
@@ -92,35 +146,41 @@ class Trace:
                 evaluations_item = evaluations_item_data.to_dict()
                 evaluations.append(evaluations_item)
 
-        contexts: list[Any] | Unset = UNSET
-        if not isinstance(self.contexts, Unset):
-            contexts = self.contexts
+        redacted_by_visibility_window = self.redacted_by_visibility_window
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if trace_id is not UNSET:
-            field_dict["trace_id"] = trace_id
-        if project_id is not UNSET:
-            field_dict["project_id"] = project_id
-        if timestamps is not UNSET:
-            field_dict["timestamps"] = timestamps
+        field_dict.update(
+            {
+                "trace_id": trace_id,
+                "project_id": project_id,
+                "metadata": metadata,
+                "timestamps": timestamps,
+                "spans": spans,
+            }
+        )
+        if privacy is not UNSET:
+            field_dict["privacy"] = privacy
         if input_ is not UNSET:
             field_dict["input"] = input_
         if output is not UNSET:
             field_dict["output"] = output
-        if metadata is not UNSET:
-            field_dict["metadata"] = metadata
-        if metrics is not UNSET:
-            field_dict["metrics"] = metrics
-        if indexing_md5s is not UNSET:
-            field_dict["indexing_md5s"] = indexing_md5s
-        if error is not UNSET:
-            field_dict["error"] = error
-        if evaluations is not UNSET:
-            field_dict["evaluations"] = evaluations
         if contexts is not UNSET:
             field_dict["contexts"] = contexts
+        if expected_output is not UNSET:
+            field_dict["expected_output"] = expected_output
+        if metrics is not UNSET:
+            field_dict["metrics"] = metrics
+        if error is not UNSET:
+            field_dict["error"] = error
+        if indexing_md5s is not UNSET:
+            field_dict["indexing_md5s"] = indexing_md5s
+        if events is not UNSET:
+            field_dict["events"] = events
+        if evaluations is not UNSET:
+            field_dict["evaluations"] = evaluations
+        if redacted_by_visibility_window is not UNSET:
+            field_dict["redacted_by_visibility_window"] = redacted_by_visibility_window
 
         return field_dict
 
@@ -132,18 +192,61 @@ class Trace:
         from ..models.metrics import Metrics
         from ..models.output import Output
         from ..models.timestamps import Timestamps
+        from ..models.trace_contexts_item import TraceContextsItem
+        from ..models.trace_error_type_0 import TraceErrorType0
+        from ..models.trace_events_item import TraceEventsItem
+        from ..models.trace_expected_output import TraceExpectedOutput
+        from ..models.trace_privacy import TracePrivacy
+        from ..models.trace_spans_item_type_0 import TraceSpansItemType0
+        from ..models.trace_spans_item_type_1 import TraceSpansItemType1
+        from ..models.trace_spans_item_type_2 import TraceSpansItemType2
 
         d = dict(src_dict)
-        trace_id = d.pop("trace_id", UNSET)
+        trace_id = d.pop("trace_id")
 
-        project_id = d.pop("project_id", UNSET)
+        project_id = d.pop("project_id")
 
-        _timestamps = d.pop("timestamps", UNSET)
-        timestamps: Timestamps | Unset
-        if isinstance(_timestamps, Unset):
-            timestamps = UNSET
+        metadata = Metadata.from_dict(d.pop("metadata"))
+
+        timestamps = Timestamps.from_dict(d.pop("timestamps"))
+
+        spans = []
+        _spans = d.pop("spans")
+        for spans_item_data in _spans:
+
+            def _parse_spans_item(data: object) -> TraceSpansItemType0 | TraceSpansItemType1 | TraceSpansItemType2:
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    spans_item_type_0 = TraceSpansItemType0.from_dict(data)
+
+                    return spans_item_type_0
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    spans_item_type_1 = TraceSpansItemType1.from_dict(data)
+
+                    return spans_item_type_1
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
+                if not isinstance(data, dict):
+                    raise TypeError()
+                spans_item_type_2 = TraceSpansItemType2.from_dict(data)
+
+                return spans_item_type_2
+
+            spans_item = _parse_spans_item(spans_item_data)
+
+            spans.append(spans_item)
+
+        _privacy = d.pop("privacy", UNSET)
+        privacy: TracePrivacy | Unset
+        if isinstance(_privacy, Unset):
+            privacy = UNSET
         else:
-            timestamps = Timestamps.from_dict(_timestamps)
+            privacy = TracePrivacy.from_dict(_privacy)
 
         _input_ = d.pop("input", UNSET)
         input_: Input | Unset
@@ -159,12 +262,21 @@ class Trace:
         else:
             output = Output.from_dict(_output)
 
-        _metadata = d.pop("metadata", UNSET)
-        metadata: Metadata | Unset
-        if isinstance(_metadata, Unset):
-            metadata = UNSET
+        _contexts = d.pop("contexts", UNSET)
+        contexts: list[TraceContextsItem] | Unset = UNSET
+        if _contexts is not UNSET:
+            contexts = []
+            for contexts_item_data in _contexts:
+                contexts_item = TraceContextsItem.from_dict(contexts_item_data)
+
+                contexts.append(contexts_item)
+
+        _expected_output = d.pop("expected_output", UNSET)
+        expected_output: TraceExpectedOutput | Unset
+        if isinstance(_expected_output, Unset):
+            expected_output = UNSET
         else:
-            metadata = Metadata.from_dict(_metadata)
+            expected_output = TraceExpectedOutput.from_dict(_expected_output)
 
         _metrics = d.pop("metrics", UNSET)
         metrics: Metrics | Unset
@@ -173,16 +285,33 @@ class Trace:
         else:
             metrics = Metrics.from_dict(_metrics)
 
-        indexing_md5s = cast(list[str], d.pop("indexing_md5s", UNSET))
-
-        def _parse_error(data: object) -> None | str | Unset:
+        def _parse_error(data: object) -> None | TraceErrorType0 | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                error_type_0 = TraceErrorType0.from_dict(data)
+
+                return error_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | TraceErrorType0 | Unset, data)
 
         error = _parse_error(d.pop("error", UNSET))
+
+        indexing_md5s = cast(list[str], d.pop("indexing_md5s", UNSET))
+
+        _events = d.pop("events", UNSET)
+        events: list[TraceEventsItem] | Unset = UNSET
+        if _events is not UNSET:
+            events = []
+            for events_item_data in _events:
+                events_item = TraceEventsItem.from_dict(events_item_data)
+
+                events.append(events_item)
 
         _evaluations = d.pop("evaluations", UNSET)
         evaluations: list[Evaluation] | Unset = UNSET
@@ -193,20 +322,25 @@ class Trace:
 
                 evaluations.append(evaluations_item)
 
-        contexts = cast(list[Any], d.pop("contexts", UNSET))
+        redacted_by_visibility_window = d.pop("redacted_by_visibility_window", UNSET)
 
         trace = cls(
             trace_id=trace_id,
             project_id=project_id,
+            metadata=metadata,
             timestamps=timestamps,
+            spans=spans,
+            privacy=privacy,
             input_=input_,
             output=output,
-            metadata=metadata,
-            metrics=metrics,
-            indexing_md5s=indexing_md5s,
-            error=error,
-            evaluations=evaluations,
             contexts=contexts,
+            expected_output=expected_output,
+            metrics=metrics,
+            error=error,
+            indexing_md5s=indexing_md5s,
+            events=events,
+            evaluations=evaluations,
+            redacted_by_visibility_window=redacted_by_visibility_window,
         )
 
         trace.additional_properties = d

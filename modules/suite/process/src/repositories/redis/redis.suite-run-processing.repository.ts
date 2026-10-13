@@ -1,0 +1,77 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  RedisCachedFoldStore,
+  RepositoryFoldStore,
+  type FoldProjectionStore,
+} from "@langwatch/eventing";
+import { SUITE_RUN_PROJECTION_VERSIONS, type SuiteRunStateData } from "@langwatch/suite-contract";
+import type { Cluster, Redis } from "ioredis";
+
+import { ClickhouseSuiteEventingRepository } from "../clickhouse/clickhouse.suite-eventing.repository.ts";
+import { ClickHouseSuiteRunRepository } from "../clickhouse/clickhouse.suite-run.repository.ts";
+import type { SuiteRunProcessingRepository } from "../suite-run-processing.repository.ts";
+
+/**
+ * The Redis keyspace the suite-run fold's read-through cache occupies. A
+ * prefix drift would leave each side reading a cache the other never writes,
+ * and the fold cache is the read-your-write consistency layer (ADR-066).
+ */
+const SUITE_RUN_FOLD_CACHE_KEY_PREFIX = "suite_runs";
+
+type ClickHouseSuiteRunProcessingAdapterOptions = {
+  /** The process's one ClickHouse client, which routes each statement itself. */
+  clickhouse: ClickHouseQueryClient;
+  /**
+   * The process's own Redis, required rather than optional.
+   */
+  redis: Redis | Cluster;
+  /**
+   * The cache's consistency TTL, as the process resolved it.
+   */
+  foldCacheTtlSeconds?: number;
+};
+
+/**
+ * Durable suite-run processing, composed from the process's own ClickHouse
+ * client and its own Redis.
+ */
+export class RedisSuiteRunProcessingRepository implements SuiteRunProcessingRepository {
+  static create(
+    options: ClickHouseSuiteRunProcessingAdapterOptions,
+  ): RedisSuiteRunProcessingRepository {
+    return new RedisSuiteRunProcessingRepository(options);
+  }
+
+  private constructor(private readonly options: ClickHouseSuiteRunProcessingAdapterOptions) {}
+
+  openRunStateFoldStore({
+    defaultRetentionDays,
+  }: {
+    defaultRetentionDays: () => number;
+  }): FoldProjectionStore<SuiteRunStateData> {
+    return new RedisCachedFoldStore<SuiteRunStateData>(
+      new RepositoryFoldStore<SuiteRunStateData>(
+        ClickhouseSuiteEventingRepository.create({
+          clickhouse: this.options.clickhouse,
+          defaultRetentionDays,
+        }).build().suiteRunState,
+        SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
+      ),
+      this.options.redis,
+      {
+        keyPrefix: SUITE_RUN_FOLD_CACHE_KEY_PREFIX,
+        ...(this.options.foldCacheTtlSeconds === undefined
+          ? {}
+          : { ttlSeconds: this.options.foldCacheTtlSeconds }),
+      },
+    );
+  }
+
+  /** Reads ClickHouse directly: an open run's latest row is the one the fold last stored. */
+  findOpenRuns(input: { tenantId: string }): Promise<SuiteRunStateData[]> {
+    return ClickHouseSuiteRunRepository.create({
+      clickhouse: this.options.clickhouse,
+      defaultRetentionDays: () => 0,
+    }).findOpenRuns(input);
+  }
+}

@@ -1,15 +1,24 @@
+import {
+  type LangWatchHandledErrorShape,
+  readCliErrorDocument,
+} from "@langwatch/handled-error/langwatch-handled-error";
+
+/** The CLI error document stdout carried; these cases all expect one. */
+function cliErrorDocument(output: unknown): LangWatchHandledErrorShape {
+  const read = readCliErrorDocument(output);
+  if (read.kind !== "error") throw new Error("stdout held no CLI error document");
+  return read.error;
+}
+
 /**
- * Credential resolution is the first thing every API-calling command does, so
- * its priority order, its session-liveness gate, its daemon discipline (never
- * write the resolved key to the shared env), and both renderings of its
- * failure are pinned here.
- *
+ * Credential resolution is the first thing every API-calling command does:
+ * priority order, session-liveness gate, daemon discipline, both failures.
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
-import type * as ProjectScopeNs from "../projectScope";
+
 import type * as SessionApiNs from "../governance/session-api";
+import type * as ProjectScopeNs from "../projectScope";
 
 // A developer's local .env must not decide whether these tests see a key; the
 // scoped loader's `parse` results are stubbed per test below.
@@ -25,17 +34,13 @@ vi.mock("../identityNotice", () => ({
 vi.mock("../governance/config", () => ({
   loadConfig: vi.fn(() => ({ control_plane_url: "https://app.langwatch.ai" })),
   saveConfig: vi.fn(),
-  isLoggedIn: vi.fn(
-    (cfg: { access_token?: string } | undefined) => !!cfg?.access_token,
-  ),
+  isLoggedIn: vi.fn((cfg: { access_token?: string } | undefined) => !!cfg?.access_token),
 }));
 
 // Keep SessionApiError real (the resolver branches on `err.status`), mock only
 // the network call.
 vi.mock("../governance/session-api", async () => {
-  const actual = await vi.importActual<typeof SessionApiNs>(
-    "../governance/session-api",
-  );
+  const actual = await vi.importActual<typeof SessionApiNs>("../governance/session-api");
   return { SessionApiError: actual.SessionApiError, fetchPersonalProject: vi.fn() };
 });
 
@@ -54,17 +59,12 @@ vi.mock("../projectScope", async () => {
 });
 
 import { config } from "dotenv";
-import { loadConfig, saveConfig } from "../governance/config";
+
 import {
-  ProjectScopeError,
-  resolveProjectSelector,
-} from "../projectScope";
-import { scopedProjectId } from "../../../internal/credentialContext";
-import {
-  fetchPersonalProject,
-  SessionApiError,
-} from "../governance/session-api";
-import { maybePrintIdentityNotice } from "../identityNotice";
+  runWithCredentialHolder,
+  scopedProjectId,
+  setRunsOutsideProject,
+} from "../../../internal/credentialContext";
 import {
   loginElsewhereMessage,
   loginMadeElsewhere,
@@ -72,6 +72,10 @@ import {
   SESSION_REVALIDATE_WINDOW_MS,
 } from "../apiKey";
 import { setOutputFormat } from "../errorOutput";
+import { loadConfig, saveConfig } from "../governance/config";
+import { fetchPersonalProject, SessionApiError } from "../governance/session-api";
+import { maybePrintIdentityNotice } from "../identityNotice";
+import { ProjectScopeError, resolveProjectSelector } from "../projectScope";
 
 const mockedDotenvConfig = vi.mocked(config);
 const mockedLoadConfig = vi.mocked(loadConfig);
@@ -110,9 +114,7 @@ const stalePersonal = (apiKey = "pkey_personal") => ({
     slug: "personal-x",
     name: "Personal Workspace",
     api_key: apiKey,
-    validated_at: Math.floor(
-      (Date.now() - SESSION_REVALIDATE_WINDOW_MS - 60_000) / 1000,
-    ),
+    validated_at: Math.floor((Date.now() - SESSION_REVALIDATE_WINDOW_MS - 60_000) / 1000),
   },
 });
 
@@ -138,11 +140,9 @@ describe("resolveCredentials()", () => {
     mockedResolveProjectSelector.mockReset();
     logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation((() => {
-        throw new Error("process.exit called");
-      }) as never);
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called");
+    }) as never);
   });
 
   afterEach(() => {
@@ -154,7 +154,7 @@ describe("resolveCredentials()", () => {
     vi.restoreAllMocks();
   });
 
-  describe("resolution order", () => {
+  describe("when resolving the API key", () => {
     /** @scenario an explicit --api-key value beats the environment */
     it("prefers an explicit key argument over the environment", async () => {
       process.env.LANGWATCH_API_KEY = "sk-from-env";
@@ -195,9 +195,7 @@ describe("resolveCredentials()", () => {
 
       expect(resolved.source).toBe("session");
       expect(resolved.apiKey).toBe("pkey_personal");
-      expect(mockedNotice).toHaveBeenCalledWith(
-        expect.objectContaining({ mode: "device" }),
-      );
+      expect(mockedNotice).toHaveBeenCalledWith(expect.objectContaining({ mode: "device" }));
     });
 
     it("lazily exchanges the personal key once and persists it for old sessions", async () => {
@@ -238,6 +236,36 @@ describe("resolveCredentials()", () => {
       // The key reaches further, but the request still names the project the
       // command pointed at before this feature.
       expect(resolved.projectId).toBe("proj_1");
+    });
+
+    it("tells which project a project command reads", async () => {
+      mockedLoadConfig.mockReturnValue(
+        loggedInConfig({ ...freshPersonal(), cli_api_key: "sk-lw-lookup01_secret01" }) as never,
+      );
+
+      await runWithCredentialHolder(async () => {
+        setRunsOutsideProject(false);
+        await resolveCredentials();
+      });
+
+      expect(mockedNotice).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: "device-login-key" }),
+      );
+    });
+
+    describe("when the command answers for the organization, not a project", () => {
+      it("says nothing about which project it reads", async () => {
+        mockedLoadConfig.mockReturnValue(
+          loggedInConfig({ ...freshPersonal(), cli_api_key: "sk-lw-lookup01_secret01" }) as never,
+        );
+
+        await runWithCredentialHolder(async () => {
+          setRunsOutsideProject(true);
+          await resolveCredentials();
+        });
+
+        expect(mockedNotice).not.toHaveBeenCalled();
+      });
     });
 
     it("keeps LANGWATCH_API_KEY ahead of the login key", async () => {
@@ -312,15 +340,13 @@ describe("resolveCredentials()", () => {
         ),
       );
 
-      await expect(
-        resolveCredentials({ project: "ghost" }),
-      ).rejects.toThrow("process.exit called");
+      await expect(resolveCredentials({ project: "ghost" })).rejects.toThrow("process.exit called");
       // No silent fallback: the personal project must not become the target.
       expect(scopedProjectId()).not.toBe("proj_1");
     });
   });
 
-  describe("session-liveness gate (revocation cannot be bypassed by the cached key)", () => {
+  describe("when the session-liveness gate blocks a cached key", () => {
     /** @scenario a device session uses the cached key without a network call while validation is fresh */
     it("uses the cached key without revalidating inside the window", async () => {
       mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
@@ -358,9 +384,7 @@ describe("resolveCredentials()", () => {
       await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
       // The cached key was deleted and the wipe persisted.
-      expect(
-        (cfg as { personal_project?: unknown }).personal_project,
-      ).toBeUndefined();
+      expect((cfg as { personal_project?: unknown }).personal_project).toBeUndefined();
       expect(mockedSaveConfig).toHaveBeenCalled();
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
@@ -395,7 +419,7 @@ describe("resolveCredentials()", () => {
     });
   });
 
-  describe("daemon discipline (no resolved key in the shared env)", () => {
+  describe("when the daemon keeps the resolved key out of the shared env", () => {
     /** @scenario the resolved session key never touches the shared process env */
     it("does not materialize the session key into process.env", async () => {
       mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
@@ -436,40 +460,30 @@ describe("resolveCredentials()", () => {
 
   describe("given no credential anywhere", () => {
     describe("when the command runs with --format json", () => {
+      beforeEach(() => {
+        setOutputFormat("json");
+      });
+
       /** @scenario machine callers get the structured missing_api_key document with the same message */
       it("prints a structured error document on stdout and exits nonzero", async () => {
-        setOutputFormat("json");
+        await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
-        await expect(resolveCredentials()).rejects.toThrow(
-          "process.exit called",
-        );
-
-        const stdout = logSpy.mock.calls
-          .map((c: unknown[]) => String(c[0]))
-          .join("\n");
-        const domain = readCliErrorDocument(stdout);
+        const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+        const domain = cliErrorDocument(stdout);
 
         expect(domain).not.toBeNull();
         expect(domain?.kind).toBe("missing_api_key");
         expect(domain?.isHandled).toBe(true);
         expect(domain?.message).toContain("Not logged in");
         expect(domain?.message).toContain("langwatch login");
-        expect(domain?.meta?.authUrl).toBe(
-          "https://app.langwatch.ai/authorize",
-        );
+        expect(domain?.meta?.authUrl).toBe("https://app.langwatch.ai/authorize");
         expect(exitSpy).toHaveBeenCalledWith(1);
       });
 
       it("keeps stdout free of prose — the document is the whole stream", async () => {
-        setOutputFormat("json");
+        await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
-        await expect(resolveCredentials()).rejects.toThrow(
-          "process.exit called",
-        );
-
-        const stdout = logSpy.mock.calls
-          .map((c: unknown[]) => String(c[0]))
-          .join("\n");
+        const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(() => JSON.parse(stdout)).not.toThrow();
       });
     });
@@ -479,9 +493,7 @@ describe("resolveCredentials()", () => {
       it("prints the not-logged-in guidance on stderr, nothing on stdout, exits 1", async () => {
         setOutputFormat(undefined);
 
-        await expect(resolveCredentials()).rejects.toThrow(
-          "process.exit called",
-        );
+        await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
         expect(logSpy).not.toHaveBeenCalled();
         // Full-block equality: pins the copy, the ordering, and the blank
@@ -489,7 +501,7 @@ describe("resolveCredentials()", () => {
         // codes are stripped so a color-forcing environment cannot skew it.
         const stderr = errorSpy.mock.calls
           .map((c: unknown[]) =>
-            // eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output
+            // eslint-disable-next-line no-control-regex -- strips ANSI codes from chalk output
             String(c[0]).replace(/\u001b\[[0-9;]*m/g, ""),
           )
           .join("\n");
@@ -516,16 +528,10 @@ describe("resolveCredentials()", () => {
         process.env.LANGWATCH_ENDPOINT = "https://langwatch.acme.internal";
         setOutputFormat(undefined);
 
-        await expect(resolveCredentials()).rejects.toThrow(
-          "process.exit called",
-        );
+        await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
-        const stderr = errorSpy.mock.calls
-          .map((c: unknown[]) => String(c[0]))
-          .join("\n");
-        expect(stderr).toContain(
-          "Create an API key at https://langwatch.acme.internal/authorize",
-        );
+        const stderr = errorSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+        expect(stderr).toContain("Create an API key at https://langwatch.acme.internal/authorize");
         expect(stderr).not.toContain("<endpoint>");
       });
     });
@@ -535,14 +541,10 @@ describe("resolveCredentials()", () => {
         process.env.LANGWATCH_API_KEY = "   ";
         setOutputFormat("json");
 
-        await expect(resolveCredentials()).rejects.toThrow(
-          "process.exit called",
-        );
+        await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
-        const stdout = logSpy.mock.calls
-          .map((c: unknown[]) => String(c[0]))
-          .join("\n");
-        expect(readCliErrorDocument(stdout)?.kind).toBe("missing_api_key");
+        const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+        expect(cliErrorDocument(stdout)?.kind).toBe("missing_api_key");
       });
     });
   });
@@ -551,7 +553,7 @@ describe("resolveCredentials()", () => {
     const LOGIN_ADDRESS = "https://app.langwatch.ai";
     const OTHER = "https://langwatch.other.test";
     const stripAnsi = (text: string): string =>
-      // eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output
+      // eslint-disable-next-line no-control-regex -- strips ANSI escape codes from chalk output
       text.replace(/\u001b\[[0-9;]*m/g, "");
     const loginWithBothKeys = () =>
       loggedInConfig({ ...freshPersonal(), cli_api_key: "sk-lw-login-key" });
@@ -564,9 +566,7 @@ describe("resolveCredentials()", () => {
 
       await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
-      const stderr = stripAnsi(
-        errorSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n"),
-      );
+      const stderr = stripAnsi(errorSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n"));
       expect(stderr).toBe(
         `Error: ${loginElsewhereMessage({ loginEndpoint: LOGIN_ADDRESS, endpoint: OTHER })}`,
       );
@@ -603,10 +603,8 @@ describe("resolveCredentials()", () => {
 
       await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
-      const stdout = logSpy.mock.calls
-        .map((c: unknown[]) => String(c[0]))
-        .join("\n");
-      const domain = readCliErrorDocument(stdout);
+      const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+      const domain = cliErrorDocument(stdout);
       expect(domain?.kind).toBe("login_endpoint_mismatch");
       expect(domain?.isHandled).toBe(true);
       expect(domain?.meta).toMatchObject({

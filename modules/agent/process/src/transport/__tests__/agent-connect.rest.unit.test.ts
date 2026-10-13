@@ -1,0 +1,318 @@
+import {
+  AgentRegisterRefusedError,
+  AgentSessionUnknownError,
+  type AgentApi,
+  type AgentConnectRegisterOutput,
+} from "@langwatch/agent-contract";
+import {
+  KeyKindRefusedError,
+  ProjectMissingCredentialsError,
+  ProjectRequiredError,
+} from "@langwatch/api";
+import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
+import { createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
+import { Hono } from "hono";
+/**
+ * @vitest-environment node
+ * @see specs/agents/connected-agents.feature
+ */
+import { describe, expect, it, vi } from "vitest";
+
+import { createAgentConnectRest } from "../agent-connect.rest.ts";
+import { connectCredentialsContext, connectDoor } from "./agent-connect-door.fixture.ts";
+
+function buildApi({
+  relayMaxPayloadMb,
+  application,
+  refusal,
+}: { relayMaxPayloadMb?: number; application?: AgentApi; refusal?: Error } = {}) {
+  const framesSpy = vi.fn(async () => ({ accepted: 1 }));
+  const app = application ?? createApiFixture<AgentApi>({ connectFrames: framesSpy });
+  const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
+    identity: connectDoor(refusal ? { refusal } : {}),
+  } as never);
+  const hono = new Hono();
+  hono.route(
+    "/",
+    runtime.mount(createAgentConnectRest(relayMaxPayloadMb).router(), {
+      app: () => app,
+      onError: canonicalErrorResponse,
+      middlewareContext: [connectCredentialsContext],
+    }),
+  );
+  return {
+    hono: {
+      request: (path: string, init?: RequestInit) => hono.request(`http://api.test${path}`, init),
+    },
+    framesSpy,
+  };
+}
+
+const REACHABLE = [
+  { id: "project_a", name: "Project A" },
+  { id: "project_b", name: "Project B" },
+];
+
+const headers = {
+  "content-type": "application/json",
+  authorization: "Bearer sk-lw-anything",
+  "x-agent-instance-token": "ait_test",
+};
+
+const registerBody = {
+  type: "register",
+  protocol: 1,
+  sdk: { name: "test", version: "1", language: "typescript" },
+  instance: {
+    id: "instance_one",
+    hostname: "host",
+    username: "user",
+    pid: 1,
+    startedAt: "2026-09-17T00:00:00.000Z",
+  },
+  agents: [{ name: "agent", environment: "test" }],
+};
+
+describe("the connect routes' door", () => {
+  /** @scenario "A register refusal answers at the HTTP status of its reason" */
+  /** @scenario "The HTTP transport refuses the same credentials as the socket" */
+  it.each([
+    ["no bearer token", new ProjectMissingCredentialsError(), "api_key_invalid", 401],
+    [
+      "a key that names several projects",
+      new ProjectRequiredError({ projects: REACHABLE }),
+      "project_required",
+      400,
+    ],
+    ["an ingestion key", new KeyKindRefusedError("ingestion_key"), "key_type_not_allowed", 403],
+    [
+      "a key without scenarios:manage",
+      new ApiKeyPermissionDeniedError("scenarios:manage"),
+      "permission_denied",
+      403,
+    ],
+  ] as const)("answers %s as the %s frame at its status", async (_name, refusal, code, status) => {
+    const { hono } = buildApi({ refusal });
+
+    const response = await hono.request("/api/v1/agents/connect/register", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(registerBody),
+    });
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({ frame: { type: "refused", code } });
+  });
+
+  /** @scenario "A key that reaches several projects must name one" */
+  it("lists the projects the key reaches on its project_required frame", async () => {
+    const { hono } = buildApi({ refusal: new ProjectRequiredError({ projects: REACHABLE }) });
+
+    const response = await hono.request("/api/v1/agents/connect/poll", { headers });
+
+    expect(await response.json()).toMatchObject({
+      frame: { code: "project_required", meta: { projects: REACHABLE } },
+    });
+  });
+});
+
+describe("registerConnectedAgentInstance", () => {
+  /** @scenario "A register refusal answers at the HTTP status of its reason" */
+  it.each([
+    ["api_key_invalid", 401],
+    ["project_required", 400],
+    ["permission_denied", 403],
+    ["key_type_not_allowed", 403],
+    ["replica_count_unsupported", 503],
+    ["parameters_invalid", 422],
+    ["environment_invalid", 422],
+    ["protocol_invalid", 422],
+  ] as const)("maps the %s refusal to HTTP %i", async (code, status) => {
+    const refusedFrame = {
+      type: "refused" as const,
+      protocol: 1 as const,
+      code,
+      message: "Refused",
+    };
+    const app = createApiFixture<AgentApi>({
+      registerConnectedAgentInstance: async () => {
+        throw new AgentRegisterRefusedError({ reason: code, message: "Refused" });
+      },
+    });
+    const { hono } = buildApi({ application: app });
+
+    const response = await hono.request("/api/v1/agents/connect/register", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(registerBody),
+    });
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({ frame: refusedFrame });
+  });
+
+  it("answers a body that is no register frame with main's protocol_invalid frame at 422", async () => {
+    const registerConnectedAgentInstance = vi.fn();
+    const { hono } = buildApi({
+      application: createApiFixture<AgentApi>({ registerConnectedAgentInstance }),
+    });
+
+    const response = await hono.request("/api/v1/agents/connect/register", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ type: "hello" }),
+    });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({
+      frame: {
+        type: "refused",
+        protocol: 1,
+        code: "protocol_invalid",
+        message: "The body must be a register frame with protocol 1.",
+      },
+    });
+    expect(registerConnectedAgentInstance).not.toHaveBeenCalled();
+  });
+
+  it("answers a poll's credential refusal as the refused frame at the body's root", async () => {
+    const { hono } = buildApi({
+      application: createApiFixture<AgentApi>({
+        connectPoll: async () => {
+          throw new AgentRegisterRefusedError({ reason: "api_key_invalid", message: "Refused" });
+        },
+      }),
+    });
+
+    const response = await hono.request("/api/v1/agents/connect/poll", { headers });
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      frame: { type: "refused", protocol: 1, code: "api_key_invalid", message: "Refused" },
+    });
+  });
+
+  it("leaves an unknown instance token to the boundary, as main never framed it", async () => {
+    const { hono } = buildApi({
+      application: createApiFixture<AgentApi>({
+        connectPoll: async () => {
+          throw new AgentSessionUnknownError();
+        },
+      }),
+    });
+
+    const response = await hono.request("/api/v1/agents/connect/poll", { headers });
+
+    expect(response.status).toBe(410);
+    expect(await response.json()).toMatchObject({ code: "agent_session_unknown" });
+  });
+
+  it("answers a registered frame and instance token with HTTP 200", async () => {
+    const answer: AgentConnectRegisterOutput = {
+      frame: {
+        type: "registered" as const,
+        protocol: 1 as const,
+        agents: [],
+        heartbeatIntervalMs: 1000,
+        instanceId: "instance_one",
+      },
+      instanceToken: "token_one",
+    };
+    const { hono } = buildApi({
+      application: createApiFixture<AgentApi>({
+        registerConnectedAgentInstance: async () => answer,
+      }),
+    });
+
+    const response = await hono.request("/api/v1/agents/connect/register", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(registerBody),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(answer);
+  });
+
+  /** @scenario "A connected protocol forwards only its declared middleware context" */
+  it("passes only parsed protocol input and declared middleware context", async () => {
+    const connectFrames = vi.fn(async () => ({ accepted: 1 }));
+    const { hono } = buildApi({ application: createApiFixture<AgentApi>({ connectFrames }) });
+    const frame = { type: "ack", protocol: 1, callId: "call_one" };
+
+    const response = await hono.request("/api/v1/agents/connect/frames", {
+      method: "POST",
+      headers: { ...headers, "x-unrelated-secret": "do-not-forward" },
+      body: JSON.stringify({ frames: [frame], extra: "discard" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(connectFrames).toHaveBeenCalledExactlyOnceWith(
+      { frames: [frame] },
+      {
+        caller: {
+          principalId: "user:user_test",
+          project: { id: "project_test", slug: "test-project" },
+          userId: "user_test",
+        },
+        instanceToken: "ait_test",
+      },
+    );
+    expect(JSON.stringify(connectFrames.mock.calls)).not.toContain("do-not-forward");
+  });
+
+  describe("given an instance registered over HTTP", () => {
+    describe("when it posts a body that carries no ack, result or deregister frame", () => {
+      /** @scenario "A frames body the endpoint does not take is refused as a protocol frame" */
+      it("answers main's protocol_invalid frame at 422", async () => {
+        const { hono, framesSpy } = buildApi();
+
+        const response = await hono.request("/api/v1/agents/connect/frames", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ frames: [{ type: "ping" }] }),
+        });
+
+        expect(response.status).toBe(422);
+        expect(await response.json()).toEqual({
+          frame: {
+            type: "refused",
+            protocol: 1,
+            code: "protocol_invalid",
+            message: "The body must carry ack, result and deregister frames under frames.",
+          },
+        });
+        expect(framesSpy).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when it posts a body above the frame cap", () => {
+      /** @scenario "A frames body above the cap names the limit alone" */
+      it("is refused with agent_payload_too_large, naming the limit and no measured size", async () => {
+        const { hono, framesSpy } = buildApi({ relayMaxPayloadMb: 0.001 });
+        const oversized = "x".repeat(64 * 1024);
+
+        const response = await hono.request("/api/v1/agents/connect/frames", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            frames: [{ type: "result", protocol: 1, callId: "call_1", output: oversized }],
+          }),
+        });
+        const body = (await response.json()) as {
+          code?: string;
+          message?: string;
+        };
+
+        expect(body.code).toBe("agent_payload_too_large");
+        expect(body.message).toMatch(/limit of 2096 bytes/);
+        expect(body.message).not.toContain(String(oversized.length));
+        expect(framesSpy).not.toHaveBeenCalled();
+      });
+    });
+  });
+});

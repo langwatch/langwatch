@@ -54,7 +54,7 @@ class CacheStub:
                 },
             )
 
-        name = path.removeprefix("/api/agent-cache/").removesuffix("/claim")
+        name = path.removeprefix("/api/v1/agent-cache/").removesuffix("/claim")
         body: Dict[str, Any] = json.loads(request.content) if request.content else {}
 
         if request.method == "POST" and path.endswith("/claim"):
@@ -115,7 +115,7 @@ class TestGet:
         stub = CacheStub(stored={"ACME_SESSION": "session-1"})
 
         assert facade_over(stub).get("ACME_SESSION") == "session-1"
-        assert ("GET", "/api/agent-cache/ACME_SESSION") in stub.calls
+        assert ("GET", "/api/v1/agent-cache/ACME_SESSION") in stub.calls
 
     # @scenario "The SDK raises on a refusal that is not a miss"
     def test_raises_on_a_refusal_that_is_not_a_miss(self):
@@ -157,7 +157,7 @@ class TestClaim:
 
         assert facade_over(stub).claim("ACME_SESSION", "session-1") is True
         assert stub.stored == {"ACME_SESSION": "session-1"}
-        assert ("POST", "/api/agent-cache/ACME_SESSION/claim") in stub.calls
+        assert ("POST", "/api/v1/agent-cache/ACME_SESSION/claim") in stub.calls
 
     # @scenario "The SDK answers a lost claim with false"
     def test_answers_false_when_the_name_is_already_held(self):
@@ -181,7 +181,7 @@ class TestDelete:
         facade_over(stub).delete("ACME_SESSION")
 
         assert stub.stored == {}
-        assert ("DELETE", "/api/agent-cache/ACME_SESSION") in stub.calls
+        assert ("DELETE", "/api/v1/agent-cache/ACME_SESSION") in stub.calls
 
 
 class TestValuesThatAreNotText:
