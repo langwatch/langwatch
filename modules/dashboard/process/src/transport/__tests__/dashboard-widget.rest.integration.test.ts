@@ -31,6 +31,7 @@ function mountKey() {
   const runtime = createRestRuntime({
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: { authenticate: () => caller, identify: () => caller },
   });
   const hono = runtime.mount(dashboardWidgetRest.router(), {

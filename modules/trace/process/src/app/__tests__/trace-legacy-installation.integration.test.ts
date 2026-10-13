@@ -87,6 +87,7 @@ function bootTraceApp(options: {
   };
 
   const app = TraceModule.fromDependencies({
+    authorizeRead: async ({ projectId }) => ownProof({ projectId }),
     storedObjects: createApiFixture<StoredObjectApi>(),
     spanCostSuggestions: createApiFixture<TraceSpanCostSuggestion>(),
     traces: {

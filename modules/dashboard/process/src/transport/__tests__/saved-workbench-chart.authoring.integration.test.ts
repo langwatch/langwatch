@@ -65,6 +65,7 @@ function bothDoors({
   const hono = createRestRuntime({
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: { authenticate: () => caller, identify: () => caller },
   }).mount(savedWorkbenchChartRest.router(), {
     app: () => app,

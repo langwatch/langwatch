@@ -8,6 +8,16 @@ import { PipelineParticipation } from "../pipeline-selection.ts";
 /** Never dialled: destinations are asked for PLATFORM_TENANT_ID, answered with no read. */
 const UNREACHED_DATABASE = "postgresql://nobody:nothing@127.0.0.1:9/unreached";
 
+/**
+ * The database a placement asks which organization a project is in. Every project is in one
+ * organization with no private account, so placement never dials the unreachable database.
+ */
+export const organizationOfEveryProject = {
+  project: { findUnique: () => Promise.resolve({ team: { organizationId: "organization-1" } }) },
+  organization: { findUnique: () => Promise.resolve(null) },
+  user: { findUnique: () => Promise.resolve(null) },
+} as unknown as NonNullable<Parameters<typeof openStores>[0]["members"]>["prisma"];
+
 export type ObjectStorageSettings = StoresConfig["objectStorage"];
 
 export const noObjectStorage: ObjectStorageSettings = {
@@ -37,6 +47,8 @@ export async function openObjectStorage(options: {
   settings: Partial<ObjectStorageSettings>;
   accountKey?: string;
   environment?: Record<string, string>;
+  /** Members the caller supplies; a caller naming its own DATABASE_URL places through that one. */
+  members?: Parameters<typeof openStores>[0]["members"];
 }) {
   const config: StoresConfig = {
     defaultRetentionDays: 30,
@@ -62,16 +74,20 @@ export async function openObjectStorage(options: {
     ...(options.accountKey ? { AZURE_BLOB_ACCOUNT_KEY: options.accountKey } : {}),
   };
   const resolver = SecretsResolver.over(SecretsChain.start({ environment }).withEnv());
-  const { members } = await openStores({
+  const members =
+    options.members ??
+    (options.environment?.DATABASE_URL ? undefined : { prisma: organizationOfEveryProject });
+  const { members: opened } = await openStores({
     name: "object-storage-test",
     config,
     secrets: resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets)),
     pipelines: PipelineParticipation.producer(),
     production: true,
+    ...(members ? { members } : {}),
   });
   return {
-    storage: members.read("objectStorage"),
-    close: () => members.close(),
+    storage: opened.read("objectStorage"),
+    close: () => opened.close(),
   };
 }
 

@@ -13,6 +13,7 @@ import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   type GatewayApi,
 } from "@langwatch/gateway-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -74,6 +75,9 @@ function worker(eventStore: EventStoreMemory) {
         requestBound: async () => 10,
       }),
       gateway: createApiFixture<GatewayApi>({}),
+      "data-retention": createApiFixture<DataRetentionApi>({
+        getPlatformDefaultRetentionDays: () => 30,
+      }),
       project: createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] }),
     });
 }

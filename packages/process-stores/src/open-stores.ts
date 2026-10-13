@@ -174,8 +174,10 @@ export function openStores(options: {
   secrets: ScopedSecrets;
   pipelines: PipelineParticipation;
   production: boolean;
+  /** Members the caller built itself, used as they stand (see {@link buildProcessStores}). */
+  members?: Parameters<typeof buildProcessStores>[0]["members"];
 }): Promise<ProcessStores> {
-  const { name, config, secrets, pipelines, production } = options;
+  const { name, config, secrets, pipelines, production, members } = options;
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
       secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>
@@ -196,6 +198,7 @@ export function openStores(options: {
                       storage,
                       production,
                     }),
+                    ...(members ? { members } : {}),
                   }),
                 ),
               ),

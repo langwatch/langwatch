@@ -5,12 +5,37 @@
  */
 import { describe, expect, it } from "vitest";
 
+import type { OrganizationLifecycleSenders } from "../../services/organization-lifecycle-notice.service.ts";
 import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import { TestAuthzApi } from "../../transport/__tests__/support/test-authz-api.ts";
 import { OrganizationModule } from "../organization.app.ts";
 import { organizationModuleSetup } from "./support/organization-module-setup.ts";
 
 const ORGANIZATION_ID = "org-1";
+
+/** Deleting an organization records each member's removal; every sender here just accepts it. */
+function acceptingSenders(): OrganizationLifecycleSenders {
+  const accepts = { send: async () => undefined };
+
+  return {
+    recordCreated: accepts,
+    recordSignedUp: accepts,
+    recordMembersInvited: accepts,
+    recordInviteAccepted: accepts,
+    recordIntegrationMethodChosen: accepts,
+    recordPersonalWorkspaceProvisioned: accepts,
+    recordPersonalTeamCreated: accepts,
+    recordPersonalWorkspaceArchived: accepts,
+    recordPersonalWorkspaceRevived: accepts,
+    recordPersonalWorkspaceFeaturesChanged: accepts,
+    recordPresenceSettingChanged: { ...accepts, sendBatch: async () => undefined },
+    recordTraceSharingDisabled: accepts,
+    recordMemberDisabled: accepts,
+    recordMemberEnabled: accepts,
+    recordMemberRemoved: accepts,
+    recordMemberDepartmentChanged: accepts,
+  };
+}
 
 describe("given an organization that was deleted", () => {
   describe("when its administrators are read", () => {
