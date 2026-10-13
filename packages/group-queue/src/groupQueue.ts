@@ -157,6 +157,14 @@ function scopeKeyOf(metadata: GroupQueueContextMetadata | undefined): string | u
   return typeof value === "string" ? value : undefined;
 }
 
+/** The listed run's candidates a job was sent under, where COMPLETE puts a group with work back. */
+function listedCandidatesOf(metadata: GroupQueueContextMetadata | undefined): {
+  candidatesKey?: string;
+} {
+  const scopeKey = scopeKeyOf(metadata);
+  return scopeKey ? { candidatesKey: `${scopeKey}:candidates` } : {};
+}
+
 async function withActiveSpan<T>(
   name: string,
   options: Parameters<ReturnType<typeof trace.getTracer>["startActiveSpan"]>[1],
@@ -1517,7 +1525,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // Success — complete the group slot. Drained siblings were
     // removed from staging during the drain, so completing the
     // dispatched job is enough to free the group.
-    const scopeKey = scopeKeyOf(job.contextMetadata);
     const completed = await this.scripts.complete({
       groupId,
       stagedJobId,
@@ -1525,7 +1532,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       claimToken,
       // A success ends the group's retry chain: no stale streak or attempt outlives it.
       endsRetryChain: true,
-      ...(scopeKey ? { candidatesKey: `${scopeKey}:candidates` } : {}),
+      ...listedCandidatesOf(job.contextMetadata),
     });
     if (!completed) {
       // Another worker recovered this claim after our active key lapsed and runs the job
@@ -1786,6 +1793,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         jobName,
         dropped: true,
         claimToken,
+        ...listedCandidatesOf(contextMetadata),
       });
       // A recovering worker's job carries this value and its lease; only the owner releases it.
       if (completed) await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
@@ -1914,6 +1922,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         jobName,
         dropped: true,
         claimToken,
+        ...listedCandidatesOf(contextMetadata),
       });
       if (completed) await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
       return;
@@ -2104,6 +2113,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       claimToken: job.claimToken,
       // The chain is over for this group: the next job starts with a fresh budget and streak.
       endsRetryChain: true,
+      ...listedCandidatesOf(contextMetadata),
     });
     if (!completed) {
       // The recovering worker now owns the group's chain, its failures and its attempt count.
@@ -2237,18 +2247,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
    * not thrown, so it never masks the original processing error.
    */
 
-  /**
-   * Per-group retry-chain counter: a re-staged sibling carries no `__attempt`
-   * of its own, so without this it would read as a fresh delivery and the fold
-   * would think nothing in the chain had applied yet.
-   */
-  private groupAttemptKey(groupId: string): string {
-    return `${this.queueName}:gq:group:${groupId}:attempt`;
-  }
-
   private async readGroupAttempt(groupId: string): Promise<number> {
     try {
-      const raw = await this.redisConnection.get(this.groupAttemptKey(groupId));
+      const raw = await this.redisConnection.get(this.scripts.groupAttemptKey(groupId));
       const parsed = raw === null ? 0 : Number.parseInt(raw, 10);
       return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
     } catch (err) {

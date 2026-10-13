@@ -5,7 +5,10 @@ import { ConfigCollisionError, ConfigParseError } from "../config.errors.ts";
 import { Config, parseProcessConfig } from "../config.ts";
 import {
   langevalsStagingTtlSeconds,
+  localPasswords,
+  mfaEnrollmentOpen,
   nlpServiceUrl,
+  passkeysEnabled,
   publicBaseUrl,
   slackApiBase,
   slackWebhookBase,
@@ -187,6 +190,30 @@ describe("parseProcessConfig", () => {
       expect(read({ LANGWATCH_NLP_SERVICE: " http://nlp.langwatch.test " })).toBe(
         "http://nlp.langwatch.test",
       );
+    });
+  });
+
+  describe("given an owner holding the sign-in capability switches", () => {
+    const auth = {
+      name: "auth",
+      config: Config.define(() => ({ passkeysEnabled, mfaEnrollmentOpen, localPasswords })),
+    } as const;
+    const read = (environment: Record<string, string | undefined>) =>
+      parseProcessConfig({ owners: [auth], environment }).auth;
+
+    /** @scenario "A switch the previous release compared to one word reads any other value as it did" */
+    it("reads only on as on for the opt-in switches and only off as off for passkeys", () => {
+      expect(read({})).toEqual({
+        passkeysEnabled: true,
+        mfaEnrollmentOpen: false,
+        localPasswords: false,
+      });
+      expect(
+        read({ PASSKEYS_ENABLED: "off", MFA_ENROLLMENT_OPEN: "on", LOCAL_PASSWORDS_ENABLED: "on" }),
+      ).toEqual({ passkeysEnabled: false, mfaEnrollmentOpen: true, localPasswords: true });
+      expect(
+        read({ PASSKEYS_ENABLED: "no", MFA_ENROLLMENT_OPEN: "1", LOCAL_PASSWORDS_ENABLED: "true" }),
+      ).toEqual({ passkeysEnabled: true, mfaEnrollmentOpen: false, localPasswords: false });
     });
   });
 

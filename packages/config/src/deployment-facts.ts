@@ -8,8 +8,9 @@ import { z } from "zod";
 import { Config } from "./config.ts";
 import {
   environmentExactOneSchema,
+  environmentExactOnSchema,
+  environmentNotExactOffSchema,
   environmentOneOrTrueSchema,
-  environmentOnOffSchema,
 } from "./env-schemas.ts";
 
 const positiveInteger = z.coerce.number().int().positive();
@@ -338,12 +339,12 @@ export const { signUpMode, signUpAllowedDomains } = Config.define((c) => ({
 /**
  * The sign-in capability switches (round 48, A1-a): auth builds the surfaces, identity and user
  * read the same leaves. Passkeys are offered unless "off"; two-step enrolment opens only on "on";
- * own passwords beside a federated provider (D09) only on "on". Any other value refuses the boot.
+ * own passwords beside a federated provider (D09) only on "on", as the previous release read them.
  */
 export const { passkeysEnabled, mfaEnrollmentOpen, localPasswords } = Config.define((c) => ({
-  passkeysEnabled: c.env("PASSKEYS_ENABLED", environmentOnOffSchema.default(true)),
-  mfaEnrollmentOpen: c.env("MFA_ENROLLMENT_OPEN", environmentOnOffSchema.default(false)),
-  localPasswords: c.env("LOCAL_PASSWORDS_ENABLED", environmentOnOffSchema.default(false)),
+  passkeysEnabled: c.env("PASSKEYS_ENABLED", environmentNotExactOffSchema),
+  mfaEnrollmentOpen: c.env("MFA_ENROLLMENT_OPEN", environmentExactOnSchema),
+  localPasswords: c.env("LOCAL_PASSWORDS_ENABLED", environmentExactOnSchema),
 }));
 
 /**

@@ -28,12 +28,14 @@ export class GroupQueueDispatcher {
   private slotFreed = false;
   /** The open list that claims first next time, so each list leads in turn. */
   private nextList = 0;
+  /** The candidates the last listed claim scanned; the poll wakes when the soonest comes due. */
+  private scannedCandidates: readonly string[] = [];
 
   constructor(
     private readonly params: {
       scripts: Pick<
         GroupStagingScripts,
-        "getSignalKey" | "getEarliestReadyScore" | "dispatchBatch"
+        "getSignalKey" | "getEarliestReadyScore" | "getEarliestCandidateScore" | "dispatchBatch"
       >;
       processingQueue: fastq.queueAsPromised<DispatchResult, void>;
       blockingConnection: BlockingConnection;
@@ -177,10 +179,11 @@ export class GroupQueueDispatcher {
    * A listed-group dispatcher beside the queue's own polls instead: the signal list
    * is the whole queue's, and taking from it leaves the other dispatcher asleep.
    */
-  private pollListedGroups(): Promise<void> {
-    if (this.slotFreed) return Promise.resolve();
+  private async pollListedGroups(): Promise<void> {
+    const waitMs = await this.nextListedPollMs();
+    if (this.slotFreed || this.shutdownRequested || this.paused) return;
     return new Promise((resolve) => {
-      const timer = setTimeout(() => this.wake?.(), this.params.signalTimeoutSec * 1000);
+      const timer = setTimeout(() => this.wake?.(), waitMs);
       this.wake = () => {
         clearTimeout(timer);
         this.wake = null;
@@ -189,15 +192,37 @@ export class GroupQueueDispatcher {
     });
   }
 
+  /** A group passed over while running, or due soon, is claimed at its candidate score. */
+  private async nextListedPollMs(): Promise<number> {
+    const idleMs = this.params.signalTimeoutSec * 1000;
+    if (this.saturated() || this.scannedCandidates.length === 0) return idleMs;
+    const nowMs = nowInstant().epochMilliseconds;
+    try {
+      const earliest = await this.params.scripts.getEarliestCandidateScore({
+        candidatesKeys: this.scannedCandidates,
+        afterMs: nowMs,
+      });
+      if (earliest === null) return idleMs;
+      return Math.min(idleMs, Math.max(earliest - nowMs, 50));
+    } catch {
+      // Peek is best-effort; fall back to the fixed interval.
+      return idleMs;
+    }
+  }
+
+  private saturated(): boolean {
+    return (
+      this.params.processingQueue.length() + this.params.processingQueue.running() >=
+      this.params.globalConcurrency
+    );
+  }
+
   /**
    * Clamps BRPOP timeout to the earliest due group, handling delayed jobs
    * and signal-loss edge cases; falls back to fixed interval when saturated.
    */
   private async nextWakeTimeoutSec(): Promise<number> {
-    const saturated =
-      this.params.processingQueue.length() + this.params.processingQueue.running() >=
-      this.params.globalConcurrency;
-    if (saturated) return this.params.signalTimeoutSec;
+    if (this.saturated()) return this.params.signalTimeoutSec;
     try {
       const earliest = await this.params.scripts.getEarliestReadyScore();
       if (earliest === null) return this.params.signalTimeoutSec;
@@ -228,10 +253,13 @@ export class GroupQueueDispatcher {
         ...(listKey ? { listKey } : {}),
       });
     if (!this.params.listedGroupsKeys) {
-      return claimFrom({ allowedGroupsKey: this.params.dispatchGroupAllowListKey, jobs: maxJobs });
+      const allowList = this.params.dispatchGroupAllowListKey;
+      this.scannedCandidates = allowList ? [allowList] : [];
+      return claimFrom({ allowedGroupsKey: allowList, jobs: maxJobs });
     }
     const results: DispatchResult[] = [];
     const lists = await this.params.listedGroupsKeys();
+    this.scannedCandidates = lists.map((listKey) => `${listKey}:candidates`);
     const first = this.nextList++ % Math.max(lists.length, 1);
     for (const listKey of [...lists.slice(first), ...lists.slice(0, first)]) {
       if (results.length >= maxJobs) break;

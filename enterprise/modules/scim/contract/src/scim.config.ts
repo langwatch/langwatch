@@ -2,13 +2,13 @@
 import {
   Config,
   environmentBooleanSchema,
-  environmentOnOffSchema,
+  environmentExactOnSchema,
   type ConfigOf,
 } from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
 
-/** The previous release spelled this switch `on`/`off`; both spellings stay readable. */
-const scimGrantsSwitchSchema = environmentOnOffSchema.or(environmentBooleanSchema);
+/** true/false/1/0 read as booleans; otherwise only `on` is on, as the previous release read it. */
+const scimGrantsSwitchSchema = environmentBooleanSchema.or(environmentExactOnSchema);
 
 /** `provenOffboarding` selects one process-wide offboarding path at boot. */
 export const scimConfig = Config.define((c) => ({

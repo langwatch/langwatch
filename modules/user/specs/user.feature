@@ -340,10 +340,11 @@ Feature: Canonical user lifecycle
       And no switch is claimed twice
 
     @unit
-    Scenario: A capability switch written a way nothing reads refuses the boot
+    Scenario: A capability switch written another way reads as the previous release read it
       Given a deployment that sets one of the switches to a value outside "on" and "off"
       When user's configuration is parsed
-      Then the boot is refused rather than the surface left quietly off
+      Then the boot goes ahead
+      And two-step enrolment and own passwords read it as off, and passkeys read it as on
 
   # Round 54 (O1-P2): a first visit can act before its personal project arrives; the server
   # answers the retryable "personal_workspace_pending" and the screen waits instead of failing.

@@ -33,3 +33,17 @@ Feature: A listed run's dispatch costs Redis little however many groups wait
     When a claim with one free slot runs
     Then it dispatches nothing
     And it looks at each of the 100 groups once, not the same groups again until its scan budget
+
+  @integration
+  Scenario: A listed run's group gets its next job about a second after a job sent outside the run
+    Given a listed run's group holding a job sent outside the run, then a job sent under the run
+    And the listed consumer runs the outside job, whose completion knows no listed run
+    When the outside job completes
+    Then the listed consumer claims the run's job within about a second and a half
+    And does not wait out its full idle poll
+
+  @integration
+  Scenario: A job that succeeds clears its group's failure streak and retry attempt
+    Given a group with a recorded failure streak and retry attempt
+    When the group's next job is dispatched and completes successfully
+    Then the group's failure streak and retry attempt are both gone

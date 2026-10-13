@@ -33,7 +33,6 @@ function loadHostProvider(mount: UiModuleHostMount): Promise<{ default: UiHostPr
   );
 }
 
-/** With nothing mounted, the children draw at once, unframed. */
 function UiNoHostMounts({ children }: { children?: ReactNode }) {
   return <>{children}</>;
 }

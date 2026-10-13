@@ -91,6 +91,28 @@ describe("given a listed run's candidates", () => {
     expect(second?.stagedJobId).toBe("j2");
   });
 
+  /** @scenario "A job that succeeds clears its group's failure streak and retry attempt" */
+  it("clears the failure streak and retry attempt when a job completes successfully", async () => {
+    const nowMs = Date.now();
+    const groupKey = `${QUEUE_NAME}:gq:group:tenant/g1`;
+    await redis.set(`${groupKey}:failstreak`, "3");
+    await redis.set(`${groupKey}:attempt`, "2");
+    await stage({ groupId: "tenant/g1", jobId: "j1", dueMs: nowMs - 1_000 });
+    await scripts.registerPreflightTargets({ targetKey: LIST_KEY, groupIds: ["tenant/g1"] });
+
+    const [first] = await claim({ nowMs, maxJobs: 1 });
+    const completed = await scripts.complete({
+      groupId: "tenant/g1",
+      stagedJobId: "j1",
+      claimToken: first!.claimToken,
+      endsRetryChain: true,
+      candidatesKey: CANDIDATES_KEY,
+    });
+
+    expect(completed).toBe(true);
+    expect(await redis.exists(`${groupKey}:failstreak`, `${groupKey}:attempt`)).toBe(0);
+  });
+
   /** @scenario "A claim with fewer due groups than free slots looks at each waiting group once" */
   it("looks at each of a hundred waiting groups once in one claim", async () => {
     const nowMs = Date.now();

@@ -886,8 +886,10 @@ const DISPATCH_BATCH_LUA =
   `
 local function gqCandidateScore(keyPrefix, groupId, readyScore, nowMs)
   local groupPrefix = keyPrefix .. "group:" .. groupId
-  if redis.call("EXISTS", groupPrefix .. ":active", groupPrefix .. ":claimed") > 0 then
-    return nowMs + ${IN_FLIGHT_CANDIDATE_DELAY_MS}
+  if redis.call("EXISTS", groupPrefix .. ":claimed") > 0 then return nowMs + ${IN_FLIGHT_CANDIDATE_DELAY_MS} end
+  -- A retry backoff drops the claim, keeps :active and moves the ready score to its due time.
+  if redis.call("EXISTS", groupPrefix .. ":active") > 0 then
+    return math.max(nowMs + ${IN_FLIGHT_CANDIDATE_DELAY_MS}, tonumber(readyScore) or 0)
   end
   if redis.call("ZCARD", groupPrefix .. ":jobs") == 0 then return nowMs + ${SETTLED_CANDIDATE_DELAY_MS} end
   if readyScore and tonumber(readyScore) > nowMs then return tonumber(readyScore) end
@@ -1292,8 +1294,10 @@ local signalKey       = KEYS[4]
 local statsKey        = KEYS[5]
 local errorKey        = KEYS[6]
 local claimedKey      = KEYS[7]
+local failStreakKey   = KEYS[8]
+local attemptKey      = KEYS[9]
 -- The listed run's candidates the job was sent under, if any: a group left with work rejoins its scan.
-local candidatesKey   = KEYS[8]
+local candidatesKey   = KEYS[10]
 
 local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
@@ -1328,8 +1332,7 @@ end
 redis.call("DEL", claimedKey)
 redis.call("DEL", activeKey)
 if endsRetryChain then
-  local groupBase = string.sub(jobsKey, 1, #jobsKey - 5)
-  redis.call("DEL", groupBase .. ":failstreak", groupBase .. ":attempt")
+  redis.call("DEL", failStreakKey, attemptKey)
 end
 
 -- Free the tenant in-flight slot when the soft-cap is enabled.
@@ -2388,7 +2391,7 @@ export class GroupStagingScripts {
     const listedKeys = candidatesKey?.startsWith(this.keyPrefix) ? [candidatesKey] : [];
     const result = await completeScript.run(
       this.redis,
-      7 + listedKeys.length,
+      9 + listedKeys.length,
       activeKey,
       jobsKey,
       readyKey,
@@ -2396,6 +2399,8 @@ export class GroupStagingScripts {
       statsKey,
       errorKey,
       this.claimedKey(groupId),
+      this.failStreakKey(groupId),
+      this.groupAttemptKey(groupId),
       ...listedKeys,
       groupId,
       stagedJobId,
@@ -2590,7 +2595,7 @@ export class GroupStagingScripts {
   }): Promise<boolean> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
-    const attemptKey = `${this.keyPrefix}group:${groupId}:attempt`;
+    const attemptKey = this.groupAttemptKey(groupId);
     // TTL = backoff + 2s buffer so the key expires just after the job becomes eligible
     const retryTtlSec = Math.ceil(backoffMs / 1000) + 2;
 
@@ -2740,6 +2745,14 @@ export class GroupStagingScripts {
 
   private failStreakKey(groupId: string): string {
     return `${this.keyPrefix}group:${groupId}:failstreak`;
+  }
+
+  /**
+   * Per-group retry-chain counter: a re-staged sibling carries no `__attempt`
+   * of its own, so without this it would read as a fresh delivery.
+   */
+  groupAttemptKey(groupId: string): string {
+    return `${this.keyPrefix}group:${groupId}:attempt`;
   }
 
   /**
@@ -2956,6 +2969,32 @@ export class GroupStagingScripts {
     if (result.length < 2) return null;
     const score = Number(result[1]);
     return Number.isFinite(score) ? score : null;
+  }
+
+  /** The soonest candidate score after `afterMs` across listed runs' candidates, if any. */
+  async getEarliestCandidateScore({
+    candidatesKeys,
+    afterMs,
+  }: {
+    candidatesKeys: readonly string[];
+    afterMs: number;
+  }): Promise<number | null> {
+    const scores = await Promise.all(
+      candidatesKeys.map(async (key) => {
+        const result = await this.redis.zrangebyscore(
+          key,
+          `(${afterMs}`,
+          "+inf",
+          "WITHSCORES",
+          "LIMIT",
+          0,
+          1,
+        );
+        return result.length < 2 ? Number.NaN : Number(result[1]);
+      }),
+    );
+    const finite = scores.filter((score) => Number.isFinite(score));
+    return finite.length === 0 ? null : Math.min(...finite);
   }
 
   /**

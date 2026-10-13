@@ -21,6 +21,7 @@ describe("GroupQueueDispatcher with an allow-list", () => {
         scripts: {
           getSignalKey: () => "{test}:gq:signal",
           getEarliestReadyScore: async () => null,
+          getEarliestCandidateScore: async () => null,
           dispatchBatch,
         },
         processingQueue: fastq.promise(async () => {}, 10),
@@ -73,6 +74,7 @@ describe("GroupQueueDispatcher with an allow-list", () => {
         scripts: {
           getSignalKey: () => "{test}:gq:signal",
           getEarliestReadyScore: async () => null,
+          getEarliestCandidateScore: async () => null,
           dispatchBatch,
         },
         processingQueue: fastq.promise(async (job: DispatchResult) => {
