@@ -1,5 +1,5 @@
-import { listSimulationRuns as apiListSimulationRuns } from "../langwatch-api-simulation-runs.js";
-import { formatRunStatus } from "./format-suite-details.js";
+import { listSimulationRuns as apiListSimulationRuns } from "../langwatch-api-simulation-runs.ts";
+import { formatRunStatus } from "./format-suite-details.ts";
 
 /**
  * Handles the platform_list_simulation_runs MCP tool invocation.
@@ -27,7 +27,9 @@ export async function handleListSimulationRuns(params: {
   }
 
   const lines: string[] = [];
-  lines.push(`# Simulation Runs (${runs.length} results${result.hasMore ? ", more available" : ""})\n`);
+  lines.push(
+    `# Simulation Runs (${runs.length} results${result.hasMore ? ", more available" : ""})\n`,
+  );
 
   for (const run of runs) {
     const statusIcon = formatRunStatus(run.status);
@@ -47,7 +49,9 @@ export async function handleListSimulationRuns(params: {
     lines.push("");
   }
 
-  lines.push("> Use `platform_get_simulation_run` with a run ID to see full details (messages, results).");
+  lines.push(
+    "> Use `platform_get_simulation_run` with a run ID to see full details (messages, results).",
+  );
 
   return lines.join("\n");
 }

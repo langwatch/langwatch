@@ -7,13 +7,14 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.rerun_run_plan_body import RerunRunPlanBody
 from ...models.rerun_run_plan_response_200 import RerunRunPlanResponse200
-from ...types import Response, safe_http_status
+from ...models.rerun_run_plan_response_404 import RerunRunPlanResponse404
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: RerunRunPlanBody,
+    body: RerunRunPlanBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +25,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -34,11 +36,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> RerunRunPlanResponse200 | None:
+) -> RerunRunPlanResponse200 | RerunRunPlanResponse404 | None:
     if response.status_code == 200:
         response_200 = RerunRunPlanResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 404:
+        response_404 = RerunRunPlanResponse404.from_dict(response.json())
+
+        return response_404
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -48,7 +55,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[RerunRunPlanResponse200]:
+) -> Response[RerunRunPlanResponse200 | RerunRunPlanResponse404]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -64,8 +71,8 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: RerunRunPlanBody,
-) -> Response[RerunRunPlanResponse200]:
+    body: RerunRunPlanBody | Unset = UNSET,
+) -> Response[RerunRunPlanResponse200 | RerunRunPlanResponse404]:
     """Run a plan again
 
      Run a run plan again, with the configuration it already holds. To run a different configuration,
@@ -73,14 +80,14 @@ def sync_detailed(
 
     Args:
         id (str):
-        body (RerunRunPlanBody):
+        body (RerunRunPlanBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[RerunRunPlanResponse200]
+        Response[RerunRunPlanResponse200 | RerunRunPlanResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -99,8 +106,8 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: RerunRunPlanBody,
-) -> RerunRunPlanResponse200 | None:
+    body: RerunRunPlanBody | Unset = UNSET,
+) -> RerunRunPlanResponse200 | RerunRunPlanResponse404 | None:
     """Run a plan again
 
      Run a run plan again, with the configuration it already holds. To run a different configuration,
@@ -108,14 +115,14 @@ def sync(
 
     Args:
         id (str):
-        body (RerunRunPlanBody):
+        body (RerunRunPlanBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        RerunRunPlanResponse200
+        RerunRunPlanResponse200 | RerunRunPlanResponse404
     """
 
     return sync_detailed(
@@ -129,8 +136,8 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: RerunRunPlanBody,
-) -> Response[RerunRunPlanResponse200]:
+    body: RerunRunPlanBody | Unset = UNSET,
+) -> Response[RerunRunPlanResponse200 | RerunRunPlanResponse404]:
     """Run a plan again
 
      Run a run plan again, with the configuration it already holds. To run a different configuration,
@@ -138,14 +145,14 @@ async def asyncio_detailed(
 
     Args:
         id (str):
-        body (RerunRunPlanBody):
+        body (RerunRunPlanBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[RerunRunPlanResponse200]
+        Response[RerunRunPlanResponse200 | RerunRunPlanResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -162,8 +169,8 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: RerunRunPlanBody,
-) -> RerunRunPlanResponse200 | None:
+    body: RerunRunPlanBody | Unset = UNSET,
+) -> RerunRunPlanResponse200 | RerunRunPlanResponse404 | None:
     """Run a plan again
 
      Run a run plan again, with the configuration it already holds. To run a different configuration,
@@ -171,14 +178,14 @@ async def asyncio(
 
     Args:
         id (str):
-        body (RerunRunPlanBody):
+        body (RerunRunPlanBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        RerunRunPlanResponse200
+        RerunRunPlanResponse200 | RerunRunPlanResponse404
     """
 
     return (

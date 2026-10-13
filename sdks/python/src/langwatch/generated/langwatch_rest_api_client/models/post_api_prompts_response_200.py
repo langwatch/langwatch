@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..models.post_api_prompts_response_200_scope import PostApiPromptsResponse200Scope
 from ..types import UNSET, Unset
@@ -51,6 +50,7 @@ class PostApiPromptsResponse200:
         demonstrations (PostApiPromptsResponse200Demonstrations | Unset):
         prompting_technique (PostApiPromptsResponse200PromptingTechnique | Unset):
         response_format (PostApiPromptsResponse200ResponseFormat | Unset):
+        platform_url (str | Unset):
     """
 
     id: str
@@ -77,7 +77,7 @@ class PostApiPromptsResponse200:
     demonstrations: PostApiPromptsResponse200Demonstrations | Unset = UNSET
     prompting_technique: PostApiPromptsResponse200PromptingTechnique | Unset = UNSET
     response_format: PostApiPromptsResponse200ResponseFormat | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    platform_url: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
@@ -155,8 +155,10 @@ class PostApiPromptsResponse200:
         if not isinstance(self.response_format, Unset):
             response_format = self.response_format.to_dict()
 
+        platform_url = self.platform_url
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -192,6 +194,8 @@ class PostApiPromptsResponse200:
             field_dict["promptingTechnique"] = prompting_technique
         if response_format is not UNSET:
             field_dict["responseFormat"] = response_format
+        if platform_url is not UNSET:
+            field_dict["platformUrl"] = platform_url
 
         return field_dict
 
@@ -311,6 +315,8 @@ class PostApiPromptsResponse200:
         else:
             response_format = PostApiPromptsResponse200ResponseFormat.from_dict(_response_format)
 
+        platform_url = d.pop("platformUrl", UNSET)
+
         post_api_prompts_response_200 = cls(
             id=id,
             handle=handle,
@@ -336,23 +342,7 @@ class PostApiPromptsResponse200:
             demonstrations=demonstrations,
             prompting_technique=prompting_technique,
             response_format=response_format,
+            platform_url=platform_url,
         )
 
-        post_api_prompts_response_200.additional_properties = d
         return post_api_prompts_response_200
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

@@ -68,6 +68,96 @@ Feature: Join before create - the choice happens before an organization is minte
     Then nothing is looked up and nothing is offered
     And no organization name has been sent to the browser
 
+  # ── An invitation that was already waiting ─────────────────────────────
+  #
+  # An administrator who invited somebody has already decided the seat and
+  # the teams. Until now that decision only reached the person through the
+  # link in the mail: somebody who signed up from the sign-in screen, or from
+  # `langwatch login`, never saw it, asked to join instead, and the admin
+  # answered a question they had already answered. The welcome screen now
+  # looks for a pending invitation on the account's VERIFIED addresses and
+  # leads with it. Accepting runs the invitation's own acceptance, so the
+  # seat is the one the invitation names and the open request, if any, is
+  # withdrawn the way it always was.
+  #
+  # Only on the welcome screen, which has no organization in view. The same
+  # takeover sits on every dashboard, and an invitation offer or an automatic
+  # admission there would cover a page somebody is working on, or quietly add
+  # a member of one organization to another. Only VERIFIED addresses count,
+  # with no fall-back to an unproven session address: the invitation code is
+  # the secret from the mail, and it is handed over only to somebody who has
+  # proved they hold the address it was sent to. An account not yet on
+  # identifiers is read from the legacy column, and only where it is marked
+  # verified, which is exactly the answer the join door reads for the same
+  # person: the two lookups must agree, or the door admits somebody whose
+  # invitation the screen could not see. On an installation where accounts
+  # are created by invitation only, the invitation screen already runs before
+  # the welcome screen (specs/auth/sign-up-restriction.feature), and nothing
+  # here is reached.
+
+  @integration
+  Scenario: A pending invitation is offered before asking to join
+    Given "ana" invited "sam@acme.com" to "acme" as a Developer
+    And "acme" is also open to requests from "acme.com"
+    When "sam" completes verification and reaches the welcome screen
+    Then accepting the invitation to "acme" is the leading action, naming the seat
+    And asking to join is not offered beside it
+
+  @integration
+  Scenario: A pending invitation leads even while a request to join is open
+    Given "sam" already asked to join "acme" and is waiting for an administrator
+    And "ana" invited "sam@acme.com" to "acme" as a Developer
+    When "sam" reaches the welcome screen
+    Then accepting the invitation to "acme" is the leading action
+    And the waiting screen does not stand in front of it
+
+  @integration
+  Scenario: Accepting the invitation from the welcome screen lands the invited seat
+    Given "ana" invited "sam@acme.com" to "acme" as a Developer
+    When "sam" accepts it from the welcome screen
+    Then the invitation's own acceptance runs, so "sam" is a Developer in "acme"
+    And the screen stays where it is and lets the welcome redirect carry on, the terminal's continuation included
+
+  @integration
+  Scenario: The invitation can be set aside without accepting it
+    Given "ana" invited "sam@acme.com" to "acme"
+    And "acme" admits verified colleagues on "acme.com" automatically
+    When "sam" reaches the welcome screen and chooses to create a new organization instead
+    Then the invitation screen steps aside and the welcome screen beneath is reachable
+    And "sam" is not admitted to "acme" behind the invitation, which still stands
+
+  @integration
+  Scenario: A failed invitation lookup neither asks nor admits
+    Given "acme" is open to "acme.com" by request or automatically
+    And the lookup for "sam"'s pending invitations fails
+    When "sam" reaches the welcome screen
+    Then "sam" is neither offered to ask to join nor admitted to "acme"
+    And the welcome screen beneath is reachable
+
+  @integration
+  Scenario: An invitation is only offered to somebody who proved the address
+    Given "ana" invited "sam@acme.com" to "acme"
+    And "sam" signed in with an account whose "sam@acme.com" address is not verified
+    When "sam" reaches the welcome screen
+    Then no invitation is offered
+
+  @integration
+  Scenario: An account not yet on identifiers is matched on its verified legacy address
+    Given "ana" invited "sam@acme.com" to "acme"
+    And "acme" admits verified colleagues on "acme.com" automatically
+    And "sam"'s account is not on identifiers yet, with "sam@acme.com" verified on the legacy column
+    When "sam" reaches the welcome screen
+    Then accepting the invitation to "acme" is the leading action
+    And "sam" is not admitted to "acme" through the automatic door behind it
+
+  @integration
+  Scenario: The welcome screen honours an automatic door
+    Given "acme" admits verified colleagues on "acme.com" automatically
+    When "sam" signs up from "langwatch login" and reaches the welcome screen
+    Then "sam" is admitted to "acme" without being offered anything
+    And the request records that it was made from the terminal
+    And a dashboard that already has an organization in view admits nobody
+
   # ── The invariant ──────────────────────────────────────────────────────
 
   @integration
@@ -109,6 +199,14 @@ Feature: Join before create - the choice happens before an organization is minte
     Then the application starts the normal sign-out flow
 
   @integration
+  Scenario: Checking again after an approval re-reads the organizations as well as the request
+    Given "sam" is on the waiting screen and an administrator has approved the request
+    When "sam" chooses to check again
+    Then both the request and the organizations "sam" belongs to are read again
+    # Re-reading only the request left a stale empty organization list behind it,
+    # so the welcome screen asked an approved member to create an organization.
+
+  @integration
   Scenario: A pending request for another organization does not block the current organization
     Given "sam" can access "acme" and has a pending request to join "ana"
     When "sam" opens "acme"
@@ -117,9 +215,48 @@ Feature: Join before create - the choice happens before an organization is minte
   @integration
   Scenario: Creating an organization on a matching domain is nudged, never blocked
     Given "sam" is an existing user whose domain matches "acme"
+    And "sam" already declined the offer for that domain
     When "sam" opens the create-organization screen
-    Then a soft notice says "acme" is already here and offers joining instead
+    Then a quiet action below the form offers joining "acme" instead
     And creating the organization is still available and still completes
+
+  # ── Declining once is an answer ────────────────────────────────────────
+  #
+  # The sign-up step asks first. Declining it is recorded as the same "no
+  # thanks" the onboarding offer records, so the welcome screen does not cover
+  # the organization form with a second takeover asking the same question.
+  # The way back stays on that form as one quiet action below it, and taking
+  # it runs the same request (or automatic admission) the offer runs.
+
+  @integration
+  Scenario: Declining the team at sign-up is not asked again during onboarding
+    Given an organization "acme" open to requests from "acme.com"
+    When "sam" completes verification and chooses to create a new organization
+    Then the decline is recorded for "acme.com" before "sam" moves on
+    And the welcome screen shows no join takeover over the organization form
+
+  @integration
+  Scenario: After declining, one colleague organization is offered as a quiet action
+    Given "sam" declined the offer for "acme.com"
+    And only "acme" is open to "acme.com"
+    When "sam" reaches the organization step of the welcome screen
+    Then a secondary action below the form reads "Join acme instead"
+    And creating the organization stays the leading action
+
+  @integration
+  Scenario: After declining, several colleague organizations are offered through a chooser
+    Given "sam" declined the offer for "acme.com"
+    And both "acme" and "acme-labs" are open to "acme.com"
+    When "sam" chooses "Join an existing organization" on the organization step
+    Then each organization open to "acme.com" is listed to choose from
+
+  @integration
+  Scenario: Joining from the organization step runs the same request as the offer
+    Given "sam" declined the offer for "acme.com"
+    When "sam" chooses to join "acme" from the organization step
+    Then a request to join "acme" is made, recording where it was made from
+    And "sam" sees the waiting screen naming "acme"
+    And an organization that admits "acme.com" automatically admits "sam" instead
 
   @integration
   Scenario: The step waits for its own answer before sending anybody anywhere
@@ -148,3 +285,29 @@ Feature: Join before create - the choice happens before an organization is minte
     When the sign-up health reporting is read
     Then those organizations are reported as the rate this step exists to reduce
     And the rate is readable for the period before this step existed
+
+  @integration
+  Scenario: A person's organizations are read across tenants through the guarded client
+    Given a person who is a member of two organizations, one membership disabled
+    When creating an organization asks which organizations they already belong to
+    Then the answer comes back through the org-tenancy guard instead of a refusal
+    And only the active membership counts unless disabled ones are asked for
+
+  @integration
+  Scenario: A domain's candidate organizations are read across tenants through the guarded client
+    Given verified colleagues on one domain in two organizations
+    When the join screen looks up where that domain could join
+    Then both organizations come back through the org-tenancy guard
+
+  @unit
+  Scenario: A person's own pending join requests are read across organizations
+    Given a signed-in person with requests to several organizations
+    When the join screen asks what they are waiting on
+    Then a read bounded by that one user passes the org-tenancy guard
+    And a read naming neither an organization nor a user is still refused
+
+  @unit
+  Scenario: With no join offer to make, a password account is offered a passkey
+    Given "sam" signed in with a password and has no organization to join
+    When any app page opens
+    Then the account-security offer is drawn where the join offer would be

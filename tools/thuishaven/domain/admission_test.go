@@ -356,3 +356,49 @@ func TestNarrowedWorkersDivideByRunsInFlight(t *testing.T) {
 		})
 	})
 }
+
+// @scenario "The unit test worker cap is one machine-wide setting"
+func TestUnitTestFullWidthIsOneMachineWideSetting(t *testing.T) {
+	t.Run("given HAVEN_TEST_WORKERS is set, the way HAVEN_TYPECHECK_SLOTS is", func(t *testing.T) {
+		t.Run("when the full width is resolved", func(t *testing.T) {
+			t.Run("that setting wins outright, named by its own source", func(t *testing.T) {
+				width, source := UnitTestFullWidth(4<<30, 64, "3")
+				if width != 3 || source != "HAVEN_TEST_WORKERS" {
+					t.Fatalf("expected 3 from HAVEN_TEST_WORKERS, got %d from %q", width, source)
+				}
+			})
+
+			t.Run("a value that will not parse is treated as unset, not fatal", func(t *testing.T) {
+				width, source := UnitTestFullWidth(4<<30, 8, "not-a-number")
+				if source != "machine" || width != 4 {
+					t.Fatalf("expected the machine default (4), got %d from %q", width, source)
+				}
+			})
+		})
+	})
+
+	t.Run("given HAVEN_TEST_WORKERS is unset", func(t *testing.T) {
+		t.Run("when the full width is resolved", func(t *testing.T) {
+			t.Run("it is derived from the machine's cores", func(t *testing.T) {
+				width, source := UnitTestFullWidth(64<<30, 8, "")
+				if width != 4 || source != "machine" {
+					t.Fatalf("expected half the 8 cores (4), got %d from %q", width, source)
+				}
+			})
+
+			t.Run("and bounded by the machine's memory, the way a typecheck slot is", func(t *testing.T) {
+				width, source := UnitTestFullWidth(2<<30, 64, "")
+				if width != 2 || source != "machine" {
+					t.Fatalf("expected 2 workers from 2 GiB at 1 GiB/worker, got %d from %q", width, source)
+				}
+			})
+
+			t.Run("and never falls below one, because a run with no workers never finishes", func(t *testing.T) {
+				width, _ := UnitTestFullWidth(0, 1, "")
+				if width != 1 {
+					t.Fatalf("expected 1, got %d", width)
+				}
+			})
+		})
+	})
+}

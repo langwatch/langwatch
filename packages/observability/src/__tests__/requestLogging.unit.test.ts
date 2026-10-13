@@ -1,14 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { REQUEST_CAUSE_FIELD } from "../constants";
+
+import { REQUEST_CAUSE_FIELD } from "../constants.ts";
 import {
+  getLogLevelForRequest,
   getLogLevelFromStatusCode,
   getStatusCodeFromError,
+  handledFaultOf,
   hasAuthorizationToken,
   logHttpRequest,
-} from "../request/requestLogging";
+} from "../request/requestLogging.ts";
 
 describe("requestLogging", () => {
-  describe("getStatusCodeFromError", () => {
+  describe("getStatusCodeFromError()", () => {
     describe("when no error is provided", () => {
       it("returns 200", () => {
         expect(getStatusCodeFromError(null)).toBe(200);
@@ -59,7 +62,7 @@ describe("requestLogging", () => {
     });
   });
 
-  describe("getLogLevelFromStatusCode", () => {
+  describe("getLogLevelFromStatusCode()", () => {
     describe("when status is 5xx", () => {
       it("returns error", () => {
         expect(getLogLevelFromStatusCode(500)).toBe("error");
@@ -88,7 +91,23 @@ describe("requestLogging", () => {
     });
   });
 
-  describe("logHttpRequest", () => {
+  describe("when a handled error presumes the platform's fault", () => {
+    const presumed = { code: "upstream_unavailable", httpStatus: 503, fault: "presumed_platform" };
+
+    it("reports the presumed_platform fault", () => {
+      expect(handledFaultOf(presumed)).toBe("presumed_platform");
+    });
+
+    it("logs at error level", () => {
+      expect(getLogLevelForRequest(presumed, 503)).toBe("error");
+    });
+
+    it("still warns for a declared customer fault at 5xx", () => {
+      expect(getLogLevelForRequest({ ...presumed, fault: "customer" }, 503)).toBe("warn");
+    });
+  });
+
+  describe("logHttpRequest()", () => {
     describe("when request succeeds", () => {
       it("logs at info level", () => {
         const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
@@ -124,6 +143,36 @@ describe("requestLogging", () => {
         expect(logData.statusCode).toBe(200);
         expect(logData.url).toBe("/real-url");
         expect(logData.customField).toBe("kept");
+      });
+    });
+
+    describe("when the request carries traffic attribution", () => {
+      /** @scenario The request log line carries the attribution fields */
+      it("flattens the endpoint class and client fields onto the log line", () => {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+
+        logHttpRequest(logger, {
+          method: "POST",
+          url: "/api/collector",
+          statusCode: 200,
+          duration: 42,
+          userAgent: "langwatch-sdk-node/3.1.0",
+          attribution: {
+            endpointClass: "collector",
+            clientSource: "sdk",
+            clientSdkName: "langwatch-observability-sdk",
+            clientSdkLanguage: "typescript",
+            clientSdkVersion: "3.1.0",
+          },
+        });
+
+        expect(logger.info.mock.calls[0][0]).toMatchObject({
+          endpointClass: "collector",
+          clientSource: "sdk",
+          clientSdkName: "langwatch-observability-sdk",
+          clientSdkLanguage: "typescript",
+          clientSdkVersion: "3.1.0",
+        });
       });
     });
 
@@ -182,7 +231,6 @@ describe("requestLogging", () => {
           statusCode: 500,
         });
       });
-
     });
 
     describe("when the response succeeds", () => {
@@ -284,8 +332,10 @@ describe("requestLogging", () => {
         expect(warnData()).not.toHaveProperty("error");
       });
 
-      it("still carries the cause for diagnosis", () => {
-        expect(warnData()[REQUEST_CAUSE_FIELD]).toBe(handledCustomer);
+      it("still carries a bounded summary of the cause for diagnosis", () => {
+        const cause = warnData()[REQUEST_CAUSE_FIELD];
+        expect(cause).toMatchObject({ type: "PlanLimitExceededError", message: "over quota" });
+        expect(cause).not.toBe(handledCustomer);
       });
 
       /** @scenario The error type stays groupable after the cause is re-keyed */
@@ -317,7 +367,7 @@ describe("requestLogging", () => {
 
     describe("when the record is logged at error level", () => {
       /** @scenario A record at error level keeps its cause on the error field */
-      it("keeps the cause under error so 5xx dashboards are unchanged", () => {
+      it("keeps a bounded cause summary under error so 5xx dashboards are unchanged", () => {
         const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
         const boom = new Error("boom");
 
@@ -331,13 +381,14 @@ describe("requestLogging", () => {
         });
 
         const logData = logger.error.mock.calls[0][0];
-        expect(logData.error).toBe(boom);
+        expect(logData.error).toMatchObject({ type: "Error", message: "boom" });
+        expect(logData.error).not.toBe(boom);
         expect(logData).not.toHaveProperty(REQUEST_CAUSE_FIELD);
       });
     });
   });
 
-  describe("hasAuthorizationToken", () => {
+  describe("hasAuthorizationToken()", () => {
     describe("when x-auth-token is present", () => {
       it("returns true", () => {
         expect(hasAuthorizationToken({ "x-auth-token": "tok" })).toBe(true);
@@ -346,9 +397,7 @@ describe("requestLogging", () => {
 
     describe("when bearer authorization is present", () => {
       it("returns true", () => {
-        expect(hasAuthorizationToken({ authorization: "Bearer abc123" })).toBe(
-          true,
-        );
+        expect(hasAuthorizationToken({ authorization: "Bearer abc123" })).toBe(true);
       });
     });
 
@@ -378,18 +427,14 @@ describe("requestLogging", () => {
 
     describe("when authorization uses Basic scheme", () => {
       it("returns true", () => {
-        expect(hasAuthorizationToken({ authorization: "Basic xyz" })).toBe(
-          true,
-        );
+        expect(hasAuthorizationToken({ authorization: "Basic xyz" })).toBe(true);
       });
     });
 
     describe("when authorization header uses lowercase key", () => {
       it("returns true", () => {
         // The function signature accepts `authorization` (lowercase) by definition
-        expect(
-          hasAuthorizationToken({ authorization: "Bearer token123" }),
-        ).toBe(true);
+        expect(hasAuthorizationToken({ authorization: "Bearer token123" })).toBe(true);
       });
     });
 

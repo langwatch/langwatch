@@ -103,6 +103,14 @@ export const goErrorCodes = {
    */
   config_invalid: { service: "config" },
   /**
+   * ErrConnectCredentialPending — means the license authenticated but its
+   * managed key is still being provisioned. It is not a refusal: a retry a few
+   * seconds later succeeds, so the gateway never remembers it.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_credential_pending: { service: "aigateway", httpStatus: 503 },
+  /**
    * ErrConnectInstanceRequired — means a license token arrived without the
    * X-LangWatch-Instance header. A license is bound to one install, so the
    * token alone identifies nothing.
@@ -378,6 +386,11 @@ export const goErrorCodes = {
    * operation. Terminal, and the remediation is in the customer's model
    * provider settings rather than in the request.
    *
+   * The answer carries a "problem" in its meta, one of the ConfigProblem*
+   * values below, naming which of those it was. The copy the customer reads is
+   * chosen from it, because "add your API key" and "add a deployment mapping"
+   * are different instructions.
+   *
    * @source services/aigateway/domain/errors.go
    */
   provider_config_invalid: { service: "aigateway", httpStatus: 400 },
@@ -559,6 +572,15 @@ export const goErrorCodes = {
    * @source services/aigateway/domain/errors.go
    */
   virtual_key_revoked: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrVoiceBrokerUnavailable — means this gateway cannot take another
+   * brokered call right now: it is draining, or it already supervises as many
+   * calls as it is configured to hold. Nothing was booked and nothing was
+   * created.
+   *
+   * @source services/aigateway/domain/voice_broker.go
+   */
+  voice_broker_unavailable: { service: "aigateway", httpStatus: 503 },
   /**
    * ErrWorkerNotReady — signals a freshly spawned worker did not become ready
    * within LANGY_READINESS_TIMEOUT_MS.

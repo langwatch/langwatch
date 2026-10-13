@@ -38,6 +38,43 @@ Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
     When a chat completion is dispatched through it
     Then the upstream request is sent to the proxy endpoint instead of api.openai.com
 
+  # The Responses lane forwards the caller's body as it arrived. Bifrost's
+  # chat-completions adapter, which serves the base-URL override for chat, has
+  # no Responses route and posted that body to /v1/chat/completions, which every
+  # OpenAI-compatible server refuses for having no "messages". That held for
+  # OPENAI_BASE_URL set to the default https://api.openai.com/v1 as much as for
+  # a proxy, so an OpenAI provider with any base URL could not serve Langy,
+  # which calls OpenAI models on the Responses API.
+  #
+  # Bindings: services/aigateway/adapters/providers/openai_base_url_responses_test.go
+  @unit
+  Scenario Outline: OpenAI provider with a base URL serves the Responses API at that URL
+    Given an "openai" model provider with OPENAI_BASE_URL set to "<base URL>"
+    When a /v1/responses request is dispatched through it
+    Then the upstream request is sent to "/v1/responses" under that endpoint
+    And the request body is forwarded in Responses shape unchanged
+    And no request is sent to "/v1/chat/completions"
+
+    Examples:
+      | base URL                |
+      | https://host.test/v1    |
+      | https://host.test/v1/   |
+      | https://host.test       |
+      | https://host.test/      |
+
+  @unit
+  Scenario: An unauthenticated OpenAI-compatible endpoint serves the Responses API without a key
+    Given an "openai" model provider with a base URL and no API key
+    When a /v1/responses request is dispatched through it
+    Then the dispatch does not fail credential validation
+    And the upstream request carries no bearer token
+
+  @unit
+  Scenario: Two OpenAI providers with different base URLs stay isolated on the Responses API
+    Given two "openai" model providers configured with different base URLs
+    When a /v1/responses request is dispatched through each
+    Then each upstream request reaches its own configured endpoint
+
   Scenario: OpenAI provider without a base URL keeps default routing
     Given an "openai" model provider with only OPENAI_API_KEY set
     When a chat completion is dispatched through it
@@ -83,6 +120,20 @@ Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
     When a /v1/messages request is dispatched through it
     Then the dispatch does not fail credential validation
     And the upstream request carries no x-api-key header
+
+  @unit
+  Scenario: A Gemini or Vertex provider with a base URL reaches that host instead of Google's
+    Given a Gemini credential, or a Vertex credential with a project and location, whose base_url names another host
+    When a chat completion is dispatched through the gateway
+    Then the generateContent call reaches that host, on the Gemini models path or the Vertex publishers path
+    And a credential without a base_url keeps Google's endpoints
+
+  @unit
+  Scenario: A Bedrock provider whose runtime host is on the customer-endpoint allowlist reaches that host
+    Given a Bedrock credential whose runtime endpoint or base_url names a host on ALLOWED_PROXY_HOSTS
+    When a chat completion is dispatched through the gateway
+    Then the Converse call is signed for and sent to that host
+    But a runtime host that is neither amazonaws.com nor on the allowlist is still refused
 
   Scenario: An endpoint that fell out of recent use still works when dispatched to again
     Given an "anthropic" model provider with a base URL that has not been used recently

@@ -105,6 +105,11 @@ const (
 	// deployment map is missing, or the provider does not implement the
 	// operation. Terminal, and the remediation is in the customer's model
 	// provider settings rather than in the request.
+	//
+	// The answer carries a "problem" in its meta, one of the ConfigProblem*
+	// values below, naming which of those it was. The copy the customer reads
+	// is chosen from it, because "add your API key" and "add a deployment
+	// mapping" are different instructions.
 	ErrProviderConfigInvalid = herr.Code("provider_config_invalid")
 	// ErrProviderConnectionFailed means the request never got to the provider:
 	// DNS failure, connection refused, transport error. Retryable and the
@@ -165,6 +170,10 @@ const (
 	// Either the token leaked, or the install was rebuilt and an operator has
 	// to reset the binding.
 	ErrConnectWrongInstance = herr.Code("connect_wrong_instance")
+	// ErrConnectCredentialPending means the license authenticated but its
+	// managed key is still being provisioned. It is not a refusal: a retry a
+	// few seconds later succeeds, so the gateway never remembers it.
+	ErrConnectCredentialPending = herr.Code("connect_credential_pending")
 	// ErrConnectServiceNotEntitled means the license authenticated but does
 	// not include the hosted service the call needs. Distinct from every
 	// refusal above: the license is live and its other services keep working,
@@ -233,3 +242,28 @@ func IsNoFallback(err error) bool {
 	var nf noFallbackError
 	return errors.As(err, &nf)
 }
+
+// ConfigProblem names what a provider slot is missing when a request fails
+// with ErrProviderConfigInvalid. It travels as meta["problem"] and is a closed
+// vocabulary: clients match on it to pick their sentence, so a value is added
+// here and in features/errors/logic/presentation.ts together.
+type ConfigProblem string
+
+const (
+	// ConfigProblemAPIKeyMissing means the provider authenticates with an API
+	// key and the slot holds none.
+	ConfigProblemAPIKeyMissing ConfigProblem = "api_key_missing"
+	// ConfigProblemEndpointMissing means the provider is reached at a URL the
+	// customer supplies (an Azure resource, a self-hosted server) and the slot
+	// holds none.
+	ConfigProblemEndpointMissing ConfigProblem = "endpoint_missing"
+	// ConfigProblemDeploymentMissing means the provider serves models through
+	// named deployments and the slot maps none for the requested model.
+	ConfigProblemDeploymentMissing ConfigProblem = "deployment_missing"
+	// ConfigProblemOperationUnsupported means the provider has no API for the
+	// kind of request that was sent.
+	ConfigProblemOperationUnsupported ConfigProblem = "operation_unsupported"
+	// ConfigProblemModelNotServed is the remainder: the slot is complete and
+	// still holds nothing that can serve the requested model.
+	ConfigProblemModelNotServed ConfigProblem = "model_not_served"
+)

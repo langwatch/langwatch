@@ -21,6 +21,11 @@ The gateway has no retention setting of its own. Each record it produces lives i
 
 Set the policy under **Settings > Data Retention**. A policy applies to an organization, a team or a project, and the most specific one wins. Periods are whole weeks. You can apply a new policy to data that is already stored.
 
+<Note>
+  Retention is scoped per organization, team, and project, never per ingestion source. Compliance
+  notes that describe a per-source retention class map onto these scoped policies instead.
+</Note>
+
 Trace retention and spend retention are independent. When a trace ages out before its spend record, the spend record still reconciles, and only the link from the record to the trace is gone.
 
 **Also check:** [Data retention](/platform/data-retention) for the plan limits, the presets and how deletion works.

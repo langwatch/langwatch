@@ -1,9 +1,7 @@
 /**
  * Constants shared by the browser tracer and the ingest route that accepts its
- * telemetry. They have to agree on all of these, and they live on opposite
- * sides of the network, so they are stated once here rather than twice.
- *
- * See ADR-058.
+ * telemetry. They have to agree on all of these, so they are stated once here
+ * rather than twice. See ADR-058.
  */
 
 /**
@@ -59,9 +57,8 @@ export const RUM_SESSION_HEADER = "x-langwatch-rum-session";
 export const RUM_MAX_BODY_BYTES = 1_000_000;
 
 /**
- * Largest number of spans accepted in one export. The byte cap alone is not a
- * bound on work: minimal spans are small, so a body under the size limit can
- * still carry thousands of them. A browser exporting more than this in a single
- * batch is malfunctioning or malicious either way.
+ * Largest number of spans accepted in one export. The byte cap alone doesn't
+ * bound work — minimal spans are small, so a body under the size limit can
+ * still carry thousands. More than this in one batch is malfunctioning or malicious.
  */
 export const RUM_MAX_SPANS = 2_000;

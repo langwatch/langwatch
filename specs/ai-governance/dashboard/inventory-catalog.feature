@@ -373,3 +373,9 @@ Feature: The Inventory catalog is the tools the organization runs
     # Counts are stored as numbers and formatted at render; anything already
     # shaped for reading is stored as its string. The type is the rule, so no
     # formatter has to guess whether a figure is tokens or dollars.
+
+  @integration
+  Scenario: The Sources tab says what a source is
+    Given an admin on the Inventory page
+    When the admin opens the Sources tab
+    Then the pane's first line says sources are connections that send usage data
