@@ -18,9 +18,7 @@ go get google.golang.org/genai
 
 ## Usage
 
-<Info>
-Set `LANGWATCH_API_KEY` and `GEMINI_API_KEY` environment variables before running.
-</Info>
+<Info>Set `LANGWATCH_API_KEY` and `GEMINI_API_KEY` environment variables before running.</Info>
 
 `WrapClientConfig` sets the client's HTTP transport to a traced one in place, preserving any transport you already configured. Register your LangWatch tracer provider first, then wrap the `genai.ClientConfig`:
 
@@ -76,7 +74,8 @@ For the **Vertex AI** backend set `Backend: genai.BackendVertexAI`. If you build
 </Note>
 
 <Warning>
-The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
+  The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost
+  when your application exits.
 </Warning>
 
 ## Related

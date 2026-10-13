@@ -24,7 +24,8 @@ class PostApiSuitesByIdRunBody:
         name (str | Unset): The run plan this run joins or creates. Used only when the id names a test suite; derived
             from the suite name and the targets when absent.
         targets (list[PostApiSuitesByIdRunBodyTargetsItem] | Unset): The prompts, agents or workflows the run goes
-            against. Used only when the id names a test suite, which stores no target of its own.
+            against. Read only when the id names a test suite, which stores no target of its own; a run plan already holds
+            its own and refuses these.
         repeat_count (int | Unset): How many times each scenario and target pairing runs, between 1 and 5. Used only
             when the id names a test suite.
         simulator_model (None | str | Unset): The model that plays the user for every scenario in the run. Used only

@@ -6,13 +6,13 @@ sidebarTitle: Streaming
 
 ## Which endpoints stream
 
-| Endpoint | How you ask for a stream |
-|---|---|
-| `POST /v1/chat/completions` | `"stream": true` in the body |
-| `POST /v1/messages` | `"stream": true` in the body |
-| `POST /v1/responses` | `"stream": true` in the body |
+| Endpoint                                            | How you ask for a stream                         |
+| --------------------------------------------------- | ------------------------------------------------ |
+| `POST /v1/chat/completions`                         | `"stream": true` in the body                     |
+| `POST /v1/messages`                                 | `"stream": true` in the body                     |
+| `POST /v1/responses`                                | `"stream": true` in the body                     |
 | `POST /v1beta/models/{model}:streamGenerateContent` | The method name. The Gemini SDKs call it for you |
-| `POST /v1beta/models/{model}:streamGenerateAnswer` | The method name |
+| `POST /v1beta/models/{model}:streamGenerateAnswer`  | The method name                                  |
 
 `/v1/embeddings`, `/v1/audio/*`, `/v1/images/*` and `/v1/models` return one response and never stream. On the image routes a `stream` of `true`, or a `partial_images` above zero, answers `400` before any provider is contacted.
 
@@ -28,12 +28,13 @@ from openai import OpenAI
 client = OpenAI(base_url="https://gateway.langwatch.ai/v1", api_key="vk-lw-...")
 
 for chunk in client.chat.completions.create(
-    model="openai/gpt-5-mini",
-    messages=[{"role": "user", "content": "count to 5"}],
-    stream=True,
+model="openai/gpt-5-mini",
+messages=[{"role": "user", "content": "count to 5"}],
+stream=True,
 ):
-    print(chunk.choices[0].delta.content or "", end="")
-```
+print(chunk.choices[0].delta.content or "", end="")
+
+````
   </Tab>
   <Tab title="Anthropic">
 ```python
@@ -48,7 +49,8 @@ with client.messages.stream(
 ) as stream:
     for text in stream.text_stream:
         print(text, end="")
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -109,11 +111,11 @@ A failure after the first frame ends the stream with the error frame above. Send
 
 Providers report usage at the end of a stream, in their own shape.
 
-| Endpoint and provider | Where the usage arrives |
-|---|---|
-| `/v1/chat/completions` on OpenAI, Azure OpenAI, an OpenAI-compatible custom endpoint | The final data-only chunk, and only when the body carries `stream_options: {"include_usage": true}` |
-| `/v1/messages`, any provider | `message_start` carries the input and cache counters, `message_delta` carries the running `output_tokens` |
-| `/v1beta` on Gemini or Vertex | `usageMetadata` on the chunks that carry it |
+| Endpoint and provider                                                                | Where the usage arrives                                                                                   |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `/v1/chat/completions` on OpenAI, Azure OpenAI, an OpenAI-compatible custom endpoint | The final data-only chunk, and only when the body carries `stream_options: {"include_usage": true}`       |
+| `/v1/messages`, any provider                                                         | `message_start` carries the input and cache counters, `message_delta` carries the running `output_tokens` |
+| `/v1beta` on Gemini or Vertex                                                        | `usageMetadata` on the chunks that carry it                                                               |
 
 The gateway keeps the last non-zero counter it sees for each bucket, so an empty usage block late in the stream does not overwrite a real number.
 
@@ -145,7 +147,10 @@ That stream debits zero tokens, so it passes budget enforcement without being co
 A request without `stream: true` returns one JSON body. The gateway runs the response guardrails on the full body, and the fallback chain stays open for the whole call because the caller sees only the response that succeeded.
 
 <Warning>
-A proxy in front of a self-hosted gateway must not buffer responses. With buffering on, every frame is held until the provider finishes and the caller gets the whole stream at once. On an nginx ingress set `nginx.ingress.kubernetes.io/proxy-buffering: "off"`, and raise the read timeout above the longest stream you allow. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls).
+  A proxy in front of a self-hosted gateway must not buffer responses. With buffering on, every
+  frame is held until the provider finishes and the caller gets the whole stream at once. On an
+  nginx ingress set `nginx.ingress.kubernetes.io/proxy-buffering: "off"`, and raise the read timeout
+  above the longest stream you allow. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls).
 </Warning>
 
 **Also check:** [Parameter mapping](/ai-gateway/parameter-mapping) for what happens to a parameter the target provider has no field for, [Observability](/ai-gateway/observability) for the span attributes and the metrics.

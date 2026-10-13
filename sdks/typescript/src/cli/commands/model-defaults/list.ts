@@ -1,18 +1,17 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 
 import { ModelDefaultsApiService } from "@/client-sdk/services/model-defaults/model-defaults-api.service";
 
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
- * Returns the snapshot rather than printing it: the output port renders it in
- * whatever format the caller asked for (utils/output.ts). `data` is the whole
- * snapshot — effective resolution, configs AND the scope block the human view
- * only shows in its spinner line.
+ * Returns the snapshot rather than printing it (output port renders
+ * per-format). `data` is the whole snapshot -- resolution, configs and the
+ * scope block the human view only shows in its spinner line.
  */
 export const listModelDefaultsCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();
@@ -23,18 +22,14 @@ export const listModelDefaultsCommand = async (): Promise<CommandResult | void> 
   try {
     const snapshot = await service.getSnapshot();
 
-    spinner.succeed(
-      `Default-model snapshot for project ${chalk.cyan(snapshot.scope.projectId)}`,
-    );
+    spinner.succeed(`Default-model snapshot for project ${chalk.cyan(snapshot.scope.projectId)}`);
 
     return {
       data: snapshot,
       table: () => {
         console.log();
         console.log(chalk.bold("Effective resolution"));
-        const effectiveRows = (
-          ["DEFAULT", "FAST", "EMBEDDINGS"] as const
-        ).map((role) => {
+        const effectiveRows = (["DEFAULT", "FAST", "EMBEDDINGS"] as const).map((role) => {
           const hit = snapshot.effective[role];
           return {
             Role: role,
@@ -51,22 +46,14 @@ export const listModelDefaultsCommand = async (): Promise<CommandResult | void> 
         console.log();
         console.log(chalk.bold(`Configs (${snapshot.configs.length})`));
         if (snapshot.configs.length === 0) {
-          console.log(
-            chalk.gray(
-              "  No configs at any readable scope. Set one with:",
-            ),
-          );
-          console.log(
-            chalk.cyan("    langwatch model-default set DEFAULT openai/gpt-5"),
-          );
+          console.log(chalk.gray("  No configs at any readable scope. Set one with:"));
+          console.log(chalk.cyan("    langwatch model-default set DEFAULT openai/gpt-5"));
           console.log();
           return;
         }
 
         for (const c of snapshot.configs) {
-          const scopesStr = c.scopes
-            .map((s) => `${s.type.toLowerCase()}:${s.name}`)
-            .join(", ");
+          const scopesStr = c.scopes.map((s) => `${s.type.toLowerCase()}:${s.name}`).join(", ");
           console.log();
           console.log(`  ${chalk.gray("ID:")}     ${chalk.green(c.id)}`);
           console.log(`  ${chalk.gray("Scopes:")} ${scopesStr}`);

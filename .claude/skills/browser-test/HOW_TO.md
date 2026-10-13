@@ -1,102 +1,56 @@
-# Browser Test — How To Guide
+# Browser test: how to
 
-Lessons learned from running `/browser-test` against the LangWatch app.
+Gotchas for walking a feature with `haven browser` (see `haven-browser`, `haven-auth`). Dated
+run notes live in `history/`; they describe the setup of their day, not today's.
 
-## Before Starting
+## Before starting
 
-1. **Check the port is reachable** — try `browser_navigate` first. If it fails with `ERR_CONNECTION_REFUSED` or `ERR_CONNECTION_RESET`, the app isn't ready. Docker containers can take 1-2 minutes for migrations + compilation.
+1. **Stack and origin.** `haven status` names the stack and its URL. Use that origin throughout:
+   the trusted origin comes from the auth config, so `127.0.0.1` or a bare `localhost:<port>`
+   403s the sign-in while anonymous pages still load. `haven browser ... --as admin` handles
+   sign-in and re-signs a lane that lands on the sign-in page.
+2. **First load is slow under Vite** (`pnpm dev:hmr`): chunks compile on first visit, tens of
+   seconds. The default stack serves the built UI and loads fast. Wait with
+   `--wait-for 'text=...'`, not sleeps.
 
-2. **Dev mode is slow** — First visit to any page triggers Turbopack compilation. Expect **60-120 second waits** per new page. The orange bar at the top of the screen is the compilation indicator. Don't panic — just wait. Use `browser_wait_for` with `time: 120` for first page loads.
+## Authentication and accounts
 
-3. **Port mismatch kills auth** — `NEXTAUTH_URL` in `.env` must match the port the app is actually running on. If using `make quickstart` / `dev.sh`, the port auto-detects starting from 5560. The `compose.dev.yml` overrides `NEXTAUTH_URL` with `${APP_PORT:-5560}` so Docker should be fine. If running `pnpm dev` directly and the port increments (e.g. to 5561), auth callbacks will break.
+- Use `--as admin` or a seeded login (`haven db seed --json` lists them). Never type, read or
+  print a password.
+- A new account hits onboarding (org name, terms, product flavour). Prefer a seeded login so
+  the walk starts past it.
 
-## Authentication
+## Data seeding
 
-- Local dev uses **NextAuth credentials** (not Auth0). Navigating to the app URL redirects to `/auth/signin` — a simple Email + Password form with a "Sign in" button.
-- For fresh accounts, click **"Register new account"** on the sign-in page, fill in the credentials, then sign in.
-- After successful login, the app redirects to the dashboard. Dev mode may show a loading splash while Turbopack compiles — wait up to 120s.
-- **New accounts hit onboarding** — you'll need to fill in an org name (`Browser Test Org`), accept ToS, and pick a product flavour before reaching the main app.
-- After auth, you should see the dashboard with "Hello, Browser" and "Browser Test Org" in the header.
+Create the minimum through the UI: a suite (Suites, Create, name, save, confirm it is listed),
+a run (open the suite, Run, wait for Completed, up to 120 s when a worker is involved), a trace
+(send it with the SDK using a personal scoped key, or use `haven db seed`). Wait on text such as
+"Completed", not a fixed delay.
 
-### Standard Test Credentials
+## Chakra gotchas
 
-See SKILL.md sub-agent template for current credentials. They're shared across `/browser-test`, `dev/scripts/verify-browser-test.js`, `tests/agentic-e2e/tests/auth.setup.ts`, and interactive runs.
+- A checkbox click can be intercepted by Chakra's overlay element ("intercepts pointer
+  events"): click its label text instead.
+- Overlays are one routed drawer or dialog at a time. Assert that, that back returns to the
+  caller and that a draft is restored. A second copy of the same overlay is a defect: report it.
 
-## Data Seeding
+## Interaction tips
 
-Many features require existing data to be testable. The sub-agent should create this data before verification begins.
+- Actions answer with a diff (what changed, requests made, console errors): read it before taking
+  a `snapshot`. Use `snapshot --grep <text>` on big pages.
+- `haven browser network --failed` and `console --level error` show whether data loaded.
+- Screenshots: one per step that checks how something looks, and one per failure. A snapshot
+  cannot show width, padding, colour or dark-mode paint.
 
-### Common Seeding Patterns
+## Known issues
 
-**Creating a suite:**
-1. Navigate to the Suites page from the sidebar
-2. Click the "Create Suite" (or "New Suite") button
-3. Fill in the suite name (e.g., "Test Suite") and any required fields
-4. Save/submit the form
-5. Verify the suite appears in the list before proceeding
+| Issue                                 | Workaround                                                 |
+| ------------------------------------- | ---------------------------------------------------------- |
+| First route stalls under Vite         | `haven browser goto` the same URL again                    |
+| Sign-in 403s                          | Browse the stack's configured hostname from `haven status` |
+| Checkbox click intercepted by overlay | Click the label text                                       |
+| Splash shows but queries resolved     | Wait with `--wait-for`; the chunks are still building      |
 
-**Triggering test runs / batch runs:**
-1. Open an existing suite
-2. Click "Run" or "Run All" to trigger execution
-3. Wait for the run status to change from "Running" to "Completed" — use `browser_wait_for` with a generous timeout (60-120s)
-4. Refresh or re-navigate if the status does not update automatically
+## After finishing
 
-**Waiting for results to appear:**
-- After triggering runs or sending traces, data may take a few seconds to propagate
-- Use `browser_wait_for` with `text` matching (e.g., wait for "Completed" or a result count) rather than fixed sleeps
-- If results depend on background workers, allow up to 120s
-
-**Creating traces via the SDK or API:**
-- Use a quick Bash command to send traces when UI seeding is impractical. The payload below is illustrative — replace placeholders with valid values:
-  ```bash
-  curl -X POST http://localhost:<port>/api/collector \
-    -H "X-Auth-Token: <project-api-key>" \
-    -H "Content-Type: application/json" \
-    -d '<valid trace payload JSON>'
-  ```
-- Find the project API key on the project settings page in the UI
-
-**Creating evaluations:**
-- Evaluations typically require traces to already exist
-- Navigate to the Evaluations section, configure an evaluator, and run it against existing traces
-
-## Chakra UI Gotchas
-
-- **Checkbox clicks get intercepted** by Chakra's overlay `<div>`. If clicking a checkbox times out with "intercepts pointer events", click the **label text** or the **adjacent img element** instead.
-- **Dialogs sometimes stack** — the "New Scenario" flow can open multiple drawers. Press `Escape` multiple times to close them all.
-
-## Interaction Tips
-
-- **Use `browser_snapshot`** for all interactions — it returns the accessibility tree with element refs. Only use `browser_take_screenshot` for evidence of failures.
-- **Wait generously** — use `browser_wait_for` with 60-120 seconds for first page loads, 10-30 seconds for subsequent transitions. Dev mode compilation is the bottleneck.
-- **Check console logs** in snapshot events — tRPC query/mutation logs show what API calls are happening (`>> query` = request, `<< query` = response). This tells you if data is loading or if something failed.
-- **Escape closes dialogs** — prefer `browser_press_key Escape` over clicking Close buttons to avoid intercepted-click issues.
-
-## Screenshots
-
-Save screenshots to the local artifact directory: `browser-tests/<feature-name>/<YYYY-MM-DD>/screenshots/`.
-
-```text
-browser_take_screenshot → filename: "browser-tests/plans-comparison/2026-03-11/screenshots/01-sign-in.png"
-```
-
-Screenshots are uploaded to img402.dev (not committed to git). See SKILL.md Step 5 for upload instructions. **Never commit `browser-tests/`** — it is gitignored.
-
-## After Finishing
-
-1. **Save report** to `browser-tests/<feature-name>/<YYYY-MM-DD>/report.md` (see SKILL.md for format).
-2. **Report results** to the caller using the summary table format from `SKILL.md`.
-
-## Example Run
-
-See `browser-tests/proof-of-concept/` for a complete proof-of-concept run with screenshots, raw logs, and a report. This was the first successful AI-driven browser verification against a local dev instance.
-
-## Known Issues
-
-| Issue | Workaround |
-|-------|-----------|
-| Orange compile bar stuck for >60s | Hard refresh: `browser_navigate` to the same URL |
-| Auth callback goes to wrong port | Ensure `NEXTAUTH_URL` matches actual port, or use Docker which overrides it |
-| "New Scenario" opens duplicate dialogs | Press Escape twice to close both |
-| Checkbox click intercepted by overlay | Click the label or img element next to the checkbox |
-| Page shows splash but queries all resolved | Wait longer — Turbopack is still compiling the page JS |
+Write the report (SKILL.md section 4), close the lane, and return the table.

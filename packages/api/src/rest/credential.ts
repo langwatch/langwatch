@@ -1,0 +1,518 @@
+/**
+ * Who a REST request arrived as: the project and credential a door resolves, the principal
+ * a second permission question is asked with, the scope a handler reads back, and the person
+ * a personal-workspace key stands for.
+ */
+import type {
+  PrincipalRef,
+  RestCredentialPrincipal,
+  RestKeyCredentialPrincipal,
+  RestKeyDoorPrincipal,
+  RestOrganizationCredentialPrincipal,
+  RestProjectCredentialPrincipal,
+  RestProjectIdentity,
+  RestResolvedOrganizationCredential,
+  RestResolvedProjectCredential,
+} from "@langwatch/authorization";
+import { HandledError, remediation } from "@langwatch/handled-error";
+import type { Context } from "hono";
+
+import { ProjectInvalidCredentialsError } from "../errors.ts";
+import type { EndpointVariables, ServiceContext } from "./response.ts";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The request context a scoped family sees, written by the process's own
+// authentication.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * `project` is the project identity — the same value the resolved credential
+ * carries, so the credential a request arrives with and the project a handler
+ * reads agree by construction.
+ */
+export type AppRestProjectVariables = {
+  project: RestProjectIdentity;
+  apiKeyId?: string;
+  apiKeyUserId?: string;
+  apiKeyOrganizationId?: string;
+  /**
+   * The full resolved credential. Always set by the unified authentication middleware;
+   * optional here only because other middleware sharing this shape don't set it. Handlers
+   * needing WHICH kind of credential called (scoped key vs legacy project key) read this.
+   */
+  resolvedToken?: RestResolvedProjectCredential;
+};
+
+/**
+ * `organization` carries only an id because that is all an organization credential resolves
+ * to: the resolved token is `{ type, apiKeyId, userId, organizationId }`, and the
+ * organization feature publishes no scalar organization value.
+ */
+export type AppRestOrganizationVariables = {
+  organization: { id: RestResolvedOrganizationCredential["organizationId"] };
+  apiKeyId: string;
+  apiKeyUserId: string | null;
+  apiKeyOrganizationId: string;
+  orgResolvedToken: RestResolvedOrganizationCredential;
+};
+
+/** The principal a resolved token stands for. */
+export function credentialPrincipalOfToken(
+  resolved: RestResolvedProjectCredential,
+): RestProjectCredentialPrincipal {
+  if (resolved.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
+  if (resolved.type === "cliAccessToken") {
+    return {
+      kind: "cliAccessToken",
+      userId: resolved.userId,
+      organizationId: resolved.organizationId,
+      projectId: resolved.project.id,
+      teamId: resolved.project.teamId,
+    };
+  }
+
+  return {
+    kind: "apiKey",
+    apiKeyId: resolved.apiKeyId,
+    userId: resolved.userId,
+    organizationId: resolved.organizationId,
+    projectId: resolved.project.id,
+    teamId: resolved.project.teamId,
+    ...(resolved.isLangySessionKey === undefined
+      ? {}
+      : { isLangySessionKey: resolved.isLangySessionKey }),
+  };
+}
+
+/**
+ * Who authz checks a project credential as: a project-bound access token is its user, a project
+ * key or legacy access token its own key row. None for a legacy API key, which predates RBAC
+ * and carries full project access by its class alone.
+ */
+export function principalOfCredential(
+  credential: RestResolvedProjectCredential,
+): PrincipalRef | null {
+  if (credential.type === "legacyProjectKey") return null;
+  if (credential.type === "cliAccessToken") return { type: "user", id: credential.userId };
+
+  return { type: "apiKey", id: credential.apiKeyId };
+}
+
+/** The principal a resolved organization token stands for. */
+export function organizationCredentialPrincipalOfToken(
+  resolved: RestResolvedOrganizationCredential,
+): RestOrganizationCredentialPrincipal {
+  return {
+    kind: "organizationApiKey",
+    apiKeyId: resolved.apiKeyId,
+    userId: resolved.userId,
+    organizationId: resolved.organizationId,
+  };
+}
+
+/**
+ * The principal behind a framework-authenticated project request. Raises rather than
+ * guessing: a handler asking this on an unauthenticated request is a mis-wired route. Throws
+ * plain `Error` (degrades to generic unknown per ADR-045) so it logs loudly.
+ */
+export function credentialPrincipalOf(c: Context): RestProjectCredentialPrincipal {
+  const resolved = c.get("resolvedToken") as RestResolvedProjectCredential | undefined;
+
+  if (!resolved) {
+    throw new Error(
+      "A handler asked for the request's credential principal with no resolved credential — mount the project authentication middleware before it",
+    );
+  }
+
+  return credentialPrincipalOfToken(resolved);
+}
+
+/**
+ * The principal behind a framework-authenticated organization request. Raises
+ * for the reason its project sibling does: a door that resolved no credential
+ * is mis-wired, and a blank principal widens the question instead of failing.
+ */
+export function organizationCredentialPrincipalOf(c: Context): RestOrganizationCredentialPrincipal {
+  const resolved = c.get("orgResolvedToken") as RestResolvedOrganizationCredential | undefined;
+
+  if (!resolved) {
+    throw new Error(
+      "A handler asked for the request's organization credential principal with no resolved credential — mount the organization authentication middleware before it",
+    );
+  }
+
+  return organizationCredentialPrincipalOfToken(resolved);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// What the process's doors resolved for one request, as a module reads it back when binding
+// middleware context. Keyed by request (not context) so a door remains unable to touch handler
+// variables.
+// The answer is the door's: resolving twice would ask the key store a second time per request.
+
+/** Who a browser cookie was verified as, for a family that binds it as middleware context. */
+export type RestBrowserCaller = Readonly<{ userId: string | null; sessionId?: string | null }>;
+
+/**
+ * What the SCIM door resolved: the token's own id (the actor), the
+ * organization it was minted for (the scope), and the directory connection
+ * it belongs to, when it belongs to one.
+ */
+export type RestResolvedScimCredential = Readonly<{
+  id: string;
+  organizationId: string;
+  connectionId: string | null;
+}>;
+
+const projectCredentials = new WeakMap<Request, RestResolvedProjectCredential>();
+const organizationCredentials = new WeakMap<Request, RestResolvedOrganizationCredential>();
+const scimCredentials = new WeakMap<Request, RestResolvedScimCredential>();
+const keyCredentials = new WeakMap<Request, RestKeyDoorPrincipal>();
+const browserCallers = new WeakMap<Request, RestBrowserCaller>();
+
+/** The project door states what it resolved, once per request. */
+export function recordProjectCredential(
+  request: Request,
+  credential: RestResolvedProjectCredential,
+): void {
+  projectCredentials.set(request, credential);
+}
+
+/** The organization door states what it resolved, once per request. */
+export function recordOrganizationCredential(
+  request: Request,
+  credential: RestResolvedOrganizationCredential,
+): void {
+  organizationCredentials.set(request, credential);
+}
+
+/** The SCIM door states what it resolved, once per request. */
+export function recordScimCredential(
+  request: Request,
+  credential: RestResolvedScimCredential,
+): void {
+  scimCredentials.set(request, credential);
+}
+
+/** The key door states what it resolved, once per request. */
+export function recordKeyCredential(request: Request, credential: RestKeyDoorPrincipal): void {
+  keyCredentials.set(request, credential);
+}
+
+/** The byte door states who it verified, once per request. */
+export function recordBrowserCaller(request: Request, caller: RestBrowserCaller): void {
+  browserCallers.set(request, caller);
+}
+
+/**
+ * What the project door resolved for this request. Raises rather than guessing: no resolved
+ * credential is a wiring bug. Throws plain `Error` (degrades to generic unknown per ADR-045).
+ */
+export function projectCredentialOfRequest(request: Request): RestResolvedProjectCredential {
+  const credential = projectCredentials.get(request);
+
+  if (!credential) {
+    throw new Error(
+      "A module read its middleware context off the project credential, and this request's door resolved none",
+    );
+  }
+
+  return credential;
+}
+
+/** The value of `projectRequestContext`, which each module whose routes name it provides. */
+export function projectRequestContextOf(request: Request): {
+  projectSlug: string;
+  viewerUserId: string | null;
+  actorId: string;
+} {
+  const credential = projectCredentialOfRequest(request);
+
+  return {
+    projectSlug: credential.project.slug,
+    viewerUserId: credential.type === "legacyProjectKey" ? null : credential.userId,
+    actorId: actorIdOf(credential),
+  };
+}
+
+/** The value of `browserSessionContext`: the session the browser door already resolved. */
+export function browserSessionOfRequest(request: Request): { id: string } | null {
+  const sessionId = browserCallers.get(request)?.sessionId;
+
+  return sessionId ? { id: sessionId } : null;
+}
+
+function actorIdOf(credential: RestResolvedProjectCredential): string {
+  if (credential.type === "legacyProjectKey") return credential.project.id;
+  if (credential.type === "cliAccessToken") return credential.userId;
+
+  return credential.userId ?? credential.apiKeyId;
+}
+
+/** The code path a project key that stands for nobody proves its own project's trace read under. */
+export const OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH = "api.rest.ownerless-project-key";
+
+/**
+ * Whether the project door admitted, for `projectId`, a key that stands for nobody: a legacy
+ * project key, or an API key with no owner. A run key minted for an unattended run acts as the
+ * system instead, so it is not one.
+ */
+export function admittedOwnerlessProjectKeyFor({
+  request,
+  projectId,
+}: {
+  request: Request;
+  projectId: string;
+}): boolean {
+  const credential = projectCredentials.get(request);
+  if (!credential || credential.project.id !== projectId) return false;
+  if (credential.type === "legacyProjectKey") return true;
+
+  return (
+    credential.type === "apiKey" && credential.userId === null && !credential.isUnattendedRunKey
+  );
+}
+
+/** The same, for the organization door. */
+export function organizationCredentialOfRequest(
+  request: Request,
+): RestResolvedOrganizationCredential {
+  const credential = organizationCredentials.get(request);
+
+  if (!credential) {
+    throw new Error(
+      "A module bound middleware context from the organization credential, and this request's door resolved none",
+    );
+  }
+
+  return credential;
+}
+
+/** What a key-bearing door recorded for this request, or nothing where it recorded none. */
+export function recordedKeyCredentialOf({
+  door,
+  request,
+}: {
+  door: "project" | "organization" | "api_key";
+  request: Request;
+}):
+  | RestResolvedProjectCredential
+  | RestResolvedOrganizationCredential
+  | RestKeyDoorPrincipal
+  | undefined {
+  if (door === "project") return projectCredentials.get(request);
+  if (door === "organization") return organizationCredentials.get(request);
+
+  return keyCredentials.get(request);
+}
+
+/** The same, for the key door, with a project-bound access token let through as its person. */
+export function keyDoorPrincipalOfRequest(request: Request): RestKeyDoorPrincipal {
+  const credential = keyCredentials.get(request);
+
+  if (!credential) {
+    throw new Error(
+      "A module bound middleware context from the key credential, and this request's door resolved none",
+    );
+  }
+
+  return credential;
+}
+
+/** The API key the key door resolved. An access token is no API key, so it is refused here. */
+export function keyCredentialOfRequest(request: Request): RestKeyCredentialPrincipal {
+  const credential = keyDoorPrincipalOfRequest(request);
+  if (credential.kind === "cliAccessToken") throw new ProjectInvalidCredentialsError();
+
+  return credential;
+}
+
+/** The same, for the SCIM door. */
+export function scimCredentialOfRequest(request: Request): RestResolvedScimCredential {
+  const credential = scimCredentials.get(request);
+
+  if (!credential) {
+    throw new Error(
+      "A module bound middleware context from the SCIM credential, and this request's door resolved none",
+    );
+  }
+
+  return credential;
+}
+
+/**
+ * Who the byte door verified, or nobody. Answers `null` rather than raising:
+ * every family that binds this one declares its own 401, and an optional door
+ * that admitted an anonymous caller is not a wiring bug.
+ */
+export function browserCallerOfRequest(request: Request): RestBrowserCaller | null {
+  return browserCallers.get(request) ?? null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The scope a request arrived on, read off a handler's own context — typed
+// once, instead of `c.get("project") as ProjectIdentity` in every family.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A context that can answer for one variable. Structural rather than a whole
+ * `ServiceContext`: Hono's context is INVARIANT in its variables map, so a
+ * parameter naming one map would refuse every family with its own provider.
+ */
+type ScopeReader<TKey extends string, TValue> = {
+  get(key: TKey): TValue | undefined;
+};
+
+/** A handler context on a family whose door resolved a project. */
+export type ProjectScopedContext<
+  TVariables extends Record<string, unknown> = EndpointVariables,
+  TApp = unknown,
+> = ServiceContext<TVariables & Partial<AppRestProjectVariables>, TApp>;
+
+/** A handler context on a family whose door resolved an organization. */
+export type OrganizationScopedContext<
+  TVariables extends Record<string, unknown> = EndpointVariables,
+  TApp = unknown,
+> = ServiceContext<TVariables & Partial<AppRestOrganizationVariables>, TApp>;
+
+/**
+ * The project this request is scoped to. It throws rather than answering
+ * `undefined` when the door did not run: a handler reading a missing project
+ * would query with a blank id, which widens the read rather than refusing.
+ */
+export function projectOf(
+  context: ScopeReader<"project", AppRestProjectVariables["project"]>,
+): AppRestProjectVariables["project"] {
+  const project = context.get("project");
+
+  if (!project) {
+    throw new Error(
+      "No project on the request context: this route is not on a project-scoped family, " +
+        "or its own door did not run",
+    );
+  }
+
+  return project;
+}
+
+/** The organization this request is scoped to. @see projectOf */
+export function organizationOf(
+  context: ScopeReader<"organization", AppRestOrganizationVariables["organization"]>,
+): AppRestOrganizationVariables["organization"] {
+  const organization = context.get("organization");
+
+  if (!organization) {
+    throw new Error(
+      "No organization on the request context: this route is not on an organization-scoped " +
+        "family, or its own door did not run",
+    );
+  }
+
+  return organization;
+}
+
+// Personal-workspace API key checks: `/api/me/usage` and PR usage both need the same
+// two guards. A legacy key carries no user (IS the workspace key), while a modern key with
+// no user is a service key (minted for a job), so the guard takes the whole credential.
+
+/**
+ * The calling key belongs to a workspace that is not one person's. Handled rather than a
+ * plain `Error`: we know exactly what is wrong, and the caller has one step to take — use
+ * the key from their own personal workspace.
+ */
+export class PersonalProjectKeyRequiredError extends HandledError {
+  declare readonly code: "personal_project_key_required";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "personal_project_key_required",
+      "This endpoint requires a personal-workspace API key. Use the API key from your own personal workspace.",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        ...remediation("personal_project_key_required"),
+        ...options,
+      },
+    );
+
+    this.name = "PersonalProjectKeyRequiredError";
+  }
+}
+
+/**
+ * The calling key belongs to a user who does not own the personal workspace it is pointed
+ * at. Nothing identifies the owner, on the error or in `meta`: whose workspace this is
+ * answers the very question the refusal exists to withhold.
+ */
+export class PersonalUsageKeyMismatchError extends HandledError {
+  declare readonly code: "personal_usage_key_mismatch";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "personal_usage_key_mismatch",
+      "This API key cannot read another user's personal workspace. Use a key scoped to your own personal workspace.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("personal_usage_key_mismatch"),
+        ...options,
+      },
+    );
+
+    this.name = "PersonalUsageKeyMismatchError";
+  }
+}
+
+/**
+ * The calling credential is a service key, which stands for no person. A personal read has
+ * to name whose data it answers for; answering with the workspace's owner would hand the
+ * key its creator's identity rather than its own.
+ */
+export class PersonalUsageServiceKeyUnsupportedError extends HandledError {
+  declare readonly code: "personal_usage_service_key_unsupported";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "personal_usage_service_key_unsupported",
+      "This endpoint answers for one person, so a service API key cannot read it. Use an API key issued to you.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("personal_usage_service_key_unsupported"),
+        ...options,
+      },
+    );
+
+    this.name = "PersonalUsageServiceKeyUnsupportedError";
+  }
+}
+
+/**
+ * The user whose data a personal-workspace read answers for. Takes the resolved credential
+ * (not just loose ids from context) because the credential's CLASS is half the decision.
+ */
+export function resolvePersonalCaller({
+  project,
+  credential,
+}: {
+  project: { isPersonal: boolean | null; ownerUserId: string | null };
+  credential: RestCredentialPrincipal;
+}): string {
+  if (!project.isPersonal || !project.ownerUserId) {
+    throw new PersonalProjectKeyRequiredError();
+  }
+
+  if (credential.kind === "legacyProjectKey") {
+    return project.ownerUserId;
+  }
+
+  if (credential.userId === null) {
+    throw new PersonalUsageServiceKeyUnsupportedError();
+  }
+
+  if (credential.userId !== project.ownerUserId) {
+    throw new PersonalUsageKeyMismatchError();
+  }
+
+  return project.ownerUserId;
+}

@@ -1,0 +1,90 @@
+/**
+ * The boot cross-check: no route reaches the router unclassified, and the router's own 405 answer
+ * for a declared path is not mistaken for one. Spec:
+ * packages/api/specs/transport-declaration-split.feature.
+ */
+
+import { moduleApi } from "@langwatch/module";
+import type { Hono } from "hono";
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
+
+import { authorizationPort } from "../../__tests__/api-double.ts";
+import { createErrorHandler } from "../../errors.ts";
+import { allRegisteredRoutes } from "../../route-registry.ts";
+import { defineRestRouter } from "../declaration.ts";
+import { createRestRuntime } from "../runtime.ts";
+import { assertEveryRouteDeclared, undeclaredRoutes } from "../security.ts";
+
+const SecretApi = moduleApi<{ getById(input: { id: string }): Promise<{ id: string }> }>("secret");
+
+const secrets = defineRestRouter(SecretApi)
+  .withNamespace("secrets")
+  .withVersion("2026-09-08")
+  .get("/:id", "getDeclaredSecret")
+  .withParams(z.object({ id: z.string() }))
+  .withPermission("secrets:view")
+  .withOutput(z.object({ id: z.string() }))
+  .handle(async ({ app, input }) => app.getById({ id: input.id }))
+  .build();
+
+function mounted(): Hono {
+  const runtime = createRestRuntime({
+    authorization: authorizationPort,
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
+    },
+  });
+
+  return runtime.mount(secrets.router(), {
+    app: () => ({ getById: async ({ id }: { id: string }) => ({ id }) }),
+    onError: createErrorHandler(),
+  });
+}
+
+describe("the cross-check a process boots behind", () => {
+  describe("given a family the runtime mounted", () => {
+    /** @scenario "A process mounts a declaration on the runtime it built" */
+    it("finds every address declared, the router's own 405 guards among them", () => {
+      const app = mounted();
+
+      expect(undeclaredRoutes({ app, registry: allRegisteredRoutes() })).toEqual([]);
+
+      expect(() =>
+        assertEveryRouteDeclared({ app, registry: allRegisteredRoutes() }),
+      ).not.toThrow();
+    });
+  });
+
+  describe("given a route mounted outside the runtime", () => {
+    /** @scenario "A process mounts a declaration on the runtime it built" */
+    it("refuses to finish booting, naming the address nothing declared", () => {
+      const app = mounted();
+
+      app.get("/api/secrets/smuggled", (context) => context.json({}));
+
+      expect(undeclaredRoutes({ app, registry: allRegisteredRoutes() })).toEqual([
+        "GET /api/secrets/smuggled",
+      ]);
+
+      expect(() => assertEveryRouteDeclared({ app, registry: allRegisteredRoutes() })).toThrow(
+        /no declared access policy: GET \/api\/secrets\/smuggled/,
+      );
+    });
+  });
+
+  describe("given a dated mount over a shared family's route", () => {
+    /** @scenario "The dated middleware scopes of a shared family are not undeclared endpoints" */
+    it("reports a dated any-method mount only when no registered path stands behind it", () => {
+      const app = mounted();
+      const dated = "/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
+
+      app.all(`/api/secrets${dated}/:id`, (context) => context.json({}));
+      app.all(`/api/secrets${dated}/smuggled`, (context) => context.json({}));
+
+      expect(undeclaredRoutes({ app, registry: allRegisteredRoutes() })).toEqual([
+        `ALL /api/secrets${dated}/smuggled`,
+      ]);
+    });
+  });
+});

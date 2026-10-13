@@ -1,0 +1,274 @@
+Feature: LangWatchQL queries on the dashboard
+
+  As an authorized LangWatch project member
+  I want to query the live analytics schema, inspect native results, and chart
+  them with a controlled Vega-Lite specification
+  So that analytical questions stay tenant-scoped and secure
+
+  Background:
+    Given a project whose LangWatchQL analytics SQL API is available to the signed-in member
+
+  Rule: Availability, authorization, and ownership are enforced at the server boundary
+
+    @unit
+    Scenario: The workbench has no unsolicited work or hidden client persistence
+      Given the workbench source
+      When it is inspected for polling, timers, browser storage, export, sharing, agent, or connector surfaces
+      Then none is present and the edited specification stays in memory only
+
+  Rule: The live schema drives editor assistance and the backend owns SQL validation
+
+    @unit
+    Scenario: Schema documentation and completion use the live response
+      Given a schema response containing datasets, columns, types, descriptions and units
+      When the member asks the dashboard widget's editor for completion or hover details
+      Then every offered dataset comes from that response in its returned order
+      And hover reproduces the response's own type, unit and description
+
+    @unit
+    Scenario: The browser submits exact SQL and does not validate a second language
+      Given a draft statement the backend would reject
+      When the member runs it
+      Then the statement is sent unmodified and the backend's coded refusal is what the member sees
+
+  Rule: Request state distinguishes draft, submitted, and visible result
+
+    @unit
+    Scenario: Run and Reload preserve the intended snapshot
+      Given a draft SQL statement and named scalar parameters
+      When the member runs it successfully and later edits the draft
+      Then the successful outcome owns an immutable submitted snapshot, editing marks it stale, and the action returns to Run query
+      And Reload reruns the submitted snapshot rather than the edited draft
+
+    @unit
+    Scenario: Named scalar parameters accompany the SQL without rewriting it
+      Given a widget draft using parameter placeholders and named scalar values
+      When the member runs the query
+      Then the request carries the SQL unmodified and the parameters as named scalars
+
+    @unit
+    Scenario: Requests are manual, single-flight, and cancellation-safe
+      Given a query is in flight or a previous result is visible
+      When the member runs again, leaves the page, or cancels the newer request
+      Then no duplicate or background request is issued
+      And an aborted or late response cannot replace the visible previous result
+
+    @integration
+    Scenario: Reserved period parameters are filled only when declared
+      Given SQL declares dashboard_context_period_start and/or dashboard_context_period_end as ClickHouse date-time parameters
+      When the member runs it with the page's UTC window
+      Then only declared parameters are bound with the half-open page window and the SQL remains unchanged
+
+    @unit
+    Scenario: Reserved parameter misuse is refused before execution
+      Given SQL declares a reserved parameter as a non-date-time or the request supplies one itself
+      When the statement is run or saved
+      Then it is refused with the corresponding named validation error and does not reach the database
+
+    @unit
+    Scenario: A statement without a period reports that fact
+      Given SQL declares neither reserved period parameter
+      When the member runs it with a selected or one-off window
+      Then it executes unchanged and reports that it does not follow the page period
+
+    @unit
+    Scenario: A period-aware statement run with no window names what is unset
+      Given SQL declaring the reserved period parameters and no window at all
+      When the declaration is resolved
+      Then the statement still reports that it follows the period
+      And the declared reserved names are reported as awaited rather than refused
+
+    @unit
+    Scenario: A period-aware statement run with no window is refused naming the unset parameters
+      Given SQL declaring the reserved period parameters
+      When it is run with no time window at all
+      Then it is refused with error code lwql_parameter_missing naming them
+      And validating that same statement is not refused, because the window is the surface's to supply
+
+    @integration
+    Scenario: Choosing a step sends it beside the query rather than among its parameters
+      Given a LangWatchQL query draft
+      When the member chooses a step and runs the query
+      Then the request carries that step in its own field
+      And no reserved name appears among the parameters sent
+
+    @unit
+    Scenario: Changing the granularity step marks the result stale and restores Run query
+      Given a successful result for a submitted snapshot at one granularity step
+      When the member picks a different granularity step
+      Then the visible result is marked stale
+      And the action reads Run query again
+
+    @unit
+    Scenario: Clearing the chosen step sends no step at all, not an empty one
+      Given a submission that had chosen a granularity step
+      When the member clears the step and runs the query
+      Then the request carries no granularity field at all
+      And it is not sent as a present field holding no value
+
+  Rule: The declared granularity step is resolved, never invented
+
+    The workbench-facing half of this contract is above. These are the
+    resolver's own decisions, which every surface that runs a declared
+    statement inherits.
+
+    @unit
+    Scenario: A statement declaring the granularity parameter runs at the step the workbench supplies
+      Given SQL declaring dashboard_context_granularity_seconds as UInt32 alongside both period bounds
+      And the surface supplies an offered step
+      When the declaration is resolved
+      Then the statement is bound with that step
+      And the resolution says it follows the granularity
+
+    @unit
+    Scenario: The resolver reports an unfilled declared granularity rather than inventing a step
+      Given SQL declaring dashboard_context_granularity_seconds as UInt32 and no step supplied
+      When the declaration is resolved on its own
+      Then the resolution still says the statement follows the granularity
+      And it carries no granularity value, since inventing one would change what a
+        member's chart shows without them asking
+
+    @unit
+    Scenario: The granularity parameter declared as anything but UInt32 is refused
+      Given SQL declaring dashboard_context_granularity_seconds as any other ClickHouse type
+      When the statement is resolved, at save or at run
+      Then it is refused as a wrong granularity declaration
+      And the refusal blames the declared type rather than the step
+
+    @unit
+    Scenario: A zero or fractional step is refused as a wrong declaration
+      Given SQL declaring dashboard_context_granularity_seconds as UInt32
+      When the surface supplies a step that is zero, negative, fractional, or not an offered step
+      Then the run is refused as a wrong granularity declaration
+      And the refusal describes the step rather than claiming the declaration is mistyped
+      And the refusal says the step must be one of the offered steps
+
+    @unit
+    Scenario: A granularity declared alongside a mistyped period bound is refused at save
+      Given SQL declaring dashboard_context_granularity_seconds and a period bound declared as a non-date-time
+      When the statement is validated
+      Then it is refused because granularity requires well-typed period parameters
+      And the refusal distinguishes the mistyped bound from an absent one
+
+    @unit
+    Scenario: A window too wide for even the coarsest offered step is refused everywhere
+      Given a statement declaring granularity over a period no offered step can bucket
+      When the run is resolved on a surface that would otherwise coarsen
+      Then it is refused as too fine for the period rather than coarsened
+      And the refusal names the requested step and the bucket ceiling
+
+  Rule: Chart mode is a controlled reading of the same result
+
+    @integration
+    Scenario: Chart mode preserves data and offers an accessible table fallback
+      Given categorical or time-bucketed multi-series result data
+      When a valid specification renders and the member changes data, size, or colour mode
+      Then the registered result dataset is updated, the chart remains responsive and themed, tooltips and accessible naming remain available, and Table remains the non-visual fallback
+
+    @integration
+    Scenario: Starter specifications follow new data until the member edits them
+      Given a dashboard widget whose chart was saved without a specification
+      When its run returns different result columns
+      Then the starter it draws reshapes to those columns
+      And a widget saved with its own specification keeps drawing that specification
+
+    @integration
+    Scenario: Chart failures are explicit and do not discard the table
+      Given invalid JSON, schema or policy failures, unknown fields or datasets, excessive data, empty or non-finite values, or Vega runtime failures
+      When Chart mode handles them
+      Then it names the intentional failure or warning, never renders a blank chart, and leaves every returned row available in Table mode
+
+    @unit
+    Scenario: Vega dependencies and browser runtime stay behind the lazy boundary
+      Given the application dependency manifest and source graph
+      When entry and unrelated route chunks are inspected
+      Then Vega, Vega-Lite, vega-embed, and the generated validator are exact compatible dependencies loaded only through Lazy Chart mode
+      And policy modules import without React, DOM, or browser runtime side effects
+
+    @e2e
+    Scenario: The chart renders under CSP without eval
+      Given a hardened Content Security Policy without unsafe-eval
+      When a valid specification renders
+      Then Vega's interpreter renders it and disabling the interpreter causes the observed policy failure
+
+  Rule: Vega validation fails closed and never loads caller resources
+
+    @unit
+    Scenario: Only supported parsed specifications are admitted
+      Given a candidate specification
+      When it is a URL, non-object, unsupported schema version, or invalid against the bundled Vega-Lite v6 schema
+      Then validation refuses it with a stable code, JSON path, and repairable message
+
+    @unit
+    Scenario: Data and runtime escape hatches are rejected
+      Given a specification containing inline values, caller datasets, URL data/spec/config/patches, image marks, URL encodings, or embed usermeta options at any depth
+      When it is validated
+      Then it is refused before reaching Vega
+
+    @unit
+    Scenario: Policy validates names, fields, transforms, and complexity
+      Given registered named datasets and the centralized size, depth, unit-view, layer, transform, expression, parameter, lookup, and row limits
+      When a specification uses unknown names or fields, unsupported transforms or expressions, invalid lookup sources, or crosses a limit
+      Then it is refused with the relevant dataset, field, rule, or limit named
+      And values at each ceiling remain admissible
+
+    @unit
+    Scenario: The adversarial corpus and multi-dataset renderer contract stay covered
+      Given the reviewed corpus of deep composition, long expressions, nested resource paths, lookup bypasses, and runtime options
+      When each fixture is validated and a renderer is supplied multiple registered datasets
+      Then every adversarial fixture is refused and valid branches resolve each named dataset without weakening the first workbench's query_result injection
+
+    @integration
+    Scenario: No renderer path performs network or file loading
+      Given a specification that could request a resource
+      When validation and rendering are attempted while browser network activity is recorded
+      Then static policy and the repository-owned loader reject it, no credential or authenticated URL reaches Vega, and no request is made
+
+    @integration
+    Scenario: Chart controls expose no unsafe embed actions
+      When a chart renders
+      Then source, compiled-spec, export, and open-in-editor actions are not exposed
+
+  Rule: The protections a query runs under are resolved from the caller, never defaulted open
+
+    @unit
+    Scenario: A member permitted every declared check sees costs and captured content
+      Given a member whose project grants every check the workbench declares
+      When the workbench resolves what that member may see
+      Then costs and the default policy's captured content are both visible
+
+    @unit
+    Scenario: A member denied every declared check sees neither costs nor captured content
+      Given a member whose project grants none of the checks the workbench declares
+      When the workbench resolves what that member may see
+      Then costs and captured content are both hidden
+
+    @unit
+    Scenario: A thrown data-privacy read hides captured content rather than defaulting it open
+      Given a member whose data-privacy policy read fails
+      When the workbench resolves what that member may see
+      Then captured content is hidden rather than shown by default
+
+    @unit
+    Scenario: A run-caller resolution for a missing project refuses rather than running as no one
+      Given a project that no longer exists
+      When the workbench resolves who a query runs as
+      Then it refuses with the project-not-found code
+
+    @unit
+    Scenario: A run-caller resolution for a live project returns its restricted identity and protections
+      Given a project that exists
+      When the workbench resolves who a query runs as
+      Then it returns the project's own restricted identity with the caller's protections
+
+    @unit
+    Scenario: A thrown data-privacy read hides captured content from an api key rather than defaulting it open
+      Given an api key whose project's data-privacy policy read fails
+      When the query surface resolves what that key may see
+      Then captured content is hidden rather than shown by default
+
+    @unit
+    Scenario: A restrict policy visible to members answers false for an api key, which is never a member
+      Given a project whose policy shows captured content to members only
+      When the query surface resolves what an api key may see
+      Then captured content is hidden, because an api key reads the public cut

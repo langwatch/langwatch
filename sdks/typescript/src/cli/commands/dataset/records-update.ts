@@ -1,13 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Updates a single record in a dataset.
@@ -28,9 +26,7 @@ export const recordsUpdateCommand = async (
     entry = parsed as Record<string, unknown>;
   } catch (error) {
     reportCommandError({
-      error: commandValidationError(
-        error instanceof Error ? error.message : "Invalid JSON input",
-      ),
+      error: commandValidationError(error instanceof Error ? error.message : "Invalid JSON input"),
     });
     process.exit(1);
   }

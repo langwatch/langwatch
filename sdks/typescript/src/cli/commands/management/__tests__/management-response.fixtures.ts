@@ -1,8 +1,7 @@
 /**
- * One representative API response per management family, each carrying fields
- * the human table never prints. They live here rather than inline so the test
- * that walks them stays about the assertion, and so a family added later has
- * an obvious place to land.
+ * One representative API response per management family, carrying fields
+ * the human table never prints. Kept here (not inline) so the walking test
+ * stays about the assertion, and a family added later has a place to land.
  */
 
 export const ORGANIZATION_SETTINGS_RESPONSE = {

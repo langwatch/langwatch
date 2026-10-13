@@ -3,8 +3,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const cliDistPath = path.resolve(
-	path.dirname(fileURLToPath(import.meta.url)),
-	"../../../sdks/typescript/dist/cli/index.js",
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../../sdks/typescript/dist/cli/index.js",
 );
 
 /**
@@ -13,20 +13,20 @@ const cliDistPath = path.resolve(
  * from `workingDirectory`, whose .env carries the project key.
  */
 export function archiveTestSuite({
-	workingDirectory,
-	name,
+  workingDirectory,
+  name,
 }: {
-	workingDirectory: string;
-	name: string;
+  workingDirectory: string;
+  name: string;
 }): void {
-	try {
-		execFileSync(
-			"node",
-			[cliDistPath, "test-suite", "archive", name, "--format", "json"],
-			{ cwd: workingDirectory, encoding: "utf8", stdio: ["ignore", "ignore", "ignore"] },
-		);
-	} catch {
-		// The suite was never created, or the archive failed; it stays in the
-		// project and the next run gets a fresh name anyway.
-	}
+  try {
+    execFileSync("node", [cliDistPath, "test-suite", "archive", name, "--format", "json"], {
+      cwd: workingDirectory,
+      encoding: "utf8",
+      stdio: ["ignore", "ignore", "ignore"],
+    });
+  } catch {
+    // The suite was never created, or the archive failed; it stays in the
+    // project and the next run gets a fresh name anyway.
+  }
 }
