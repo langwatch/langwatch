@@ -108,7 +108,12 @@ shape() { docker run --rm --entrypoint bash "$image" -c "$1"; }
 check "UI bundle shipped" shape 'test -f /app/apps/ui/dist/client/index.html'
 check "no UI source or packages" shape '! test -e /app/apps/ui/src && ! test -e /app/apps/ui/node_modules'
 check "no source maps in the bundle" shape '! find /app/apps/ui/dist/client -name "*.map" | grep -q .'
-check "no dev toolchain in node_modules" shape '! ls /app/node_modules/.pnpm | grep -Eq "^(vite|vitest|playwright)@"'
+check "no dev toolchain in node_modules" \
+  shape '! ls /app/node_modules/.pnpm | grep -Eq "^(vite|vitest|playwright|rolldown|esbuild|lightningcss|sass|msw|jsdom|typescript|monaco-editor|react-icons|lucide-react|recharts)@"'
+check "no browser halves, tests or declarations in the first-party trees" \
+  shape '! ls -d /app/modules/*/browser /app/modules/*/client /app/packages/design-system 2>/dev/null | grep -q . && ! find /app/modules /app/packages /app/apps -name node_modules -prune -o \( -name "*.test.*" -o -name "*.d.ts" -o -name "*.map" \) -print | grep -q .'
+check "no dangling symlinks under /app" \
+  docker run --rm -v "${repo}/infra/docker/check-links.mjs:/check-links.mjs:ro" --entrypoint node "$image" /check-links.mjs /app
 check "backend app present" shape 'test -f /app/apps/backend/src/main.ts'
 check "forwarding folder present" shape 'test -f /app/platform/app/package.json && test -x /app/start.sh'
 check "old task with no equivalent exits 2" \
@@ -163,6 +168,26 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' "$extra")" = "healthy" ]
   sleep 5
 done
 [ "$waited" -lt 180 ] && echo "ok    HEALTHCHECK follows PORT (${waited}s)"
+
+# The PORT container still runs; a one-shot task needs only the databases.
+docker rm -f "$extra" >/dev/null 2>&1 || true
+extra=""
+
+echo "== pnpm task upgrade on a fresh database, inside the image"
+compose exec -T postgres psql -U prisma -d mydb -c 'CREATE DATABASE freshdb' >/dev/null
+compose exec -T clickhouse clickhouse-client --password langwatch -q 'CREATE DATABASE IF NOT EXISTS langwatch_fresh' >/dev/null
+fresh_log="${work}/fresh-upgrade.log"
+fresh_upgrade() {
+  compose run --rm --no-deps -T \
+    -e DATABASE_URL='postgresql://prisma:prisma@postgres:5432/freshdb?schema=public' \
+    -e CLICKHOUSE_URL='http://default:langwatch@clickhouse:8123/langwatch_fresh' \
+    app bash -c 'cd /app/apps/tasks && pnpm --silent task upgrade' >"$fresh_log" 2>&1
+}
+check "task upgrade finishes on empty Postgres and ClickHouse databases" fresh_upgrade
+check "that upgrade logged no missing module" bash -c \
+  "! grep -Eq 'ERR_MODULE_NOT_FOUND|Cannot find module|ERR_PNPM' '${fresh_log}'"
+check "that upgrade applied the Prisma migrations" grep -Eq 'prisma migrate deploy|migrations? (found|applied)|have been successfully applied|No pending migrations' "$fresh_log"
+echo "--- fresh upgrade log, tail"; tail -15 "$fresh_log"
 
 echo "== ${failures} failure(s)"
 [ "$failures" -eq 0 ]

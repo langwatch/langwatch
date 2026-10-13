@@ -63,7 +63,7 @@ RUN find . ! -type d ! -name package.json -delete && find . -depth -type d -empt
 # ── Stage 2: build ──────────────────────────────────────────────────
 FROM node:24-alpine AS builder
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
-RUN npm install -g pnpm@12.6.0
+RUN npm install -g pnpm@12.6.0 && npm cache clean --force
 
 # Install Goose migration tool (copied to runtime stage later)
 ARG GOOSE_SHA256_ARM64=dfafe0254b0058cabf016234a500df5ada1623ed034e9473cee9fe4ed07ca090
@@ -196,16 +196,60 @@ RUN pnpm run ensure:ai-gateway-secrets && pnpm run generate:modules \
 # left the devDependencies in the virtual store. @langwatch/ui is not installed here at all; its
 # bundle is already built, and nothing that runs imports it. The pnpm store mount holds every
 # package from the first install, so this one downloads nothing.
+# --filter-prod, not --filter: with --prod alone a filtered member's devDependencies are still
+# followed, which linked the test harness and the design system's tooling in.
 # CI=true: pnpm refuses to purge a modules directory without a TTY unless told it is non-interactive.
 RUN find . -name node_modules -type d -prune -exec rm -rf {} + \
  && find apps/ui/dist/client -name '*.map' -delete
+# The image's own pnpmfile drops the peer dependencies that resolve to dev tools (see its header).
+# A hook only runs when pnpm resolves, so the lockfile is re-resolved first, keeping every locked
+# version, and then installed frozen: the install itself still takes only what that lockfile names.
+# pnpm_config_pnpmfile is how pnpm 12 takes a hook file; only these two commands set it.
+COPY infra/docker/image.pnpmfile.cjs /tmp/image.pnpmfile.cjs
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    CI=true pnpm install --frozen-lockfile --prod --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/tasks..." --filter "@langwatch/backend..."
+    export pnpm_config_pnpmfile=/tmp/image.pnpmfile.cjs CI=true \
+ && pnpm install --lockfile-only \
+ && pnpm install --frozen-lockfile --prod --filter-prod "@langwatch/platform-api..." --filter-prod "@langwatch/worker..." --filter-prod "@langwatch/tasks..." --filter-prod "@langwatch/backend..."
+
+# What no process runs, removed before the runtime stage copies the trees: the module halves the
+# browser loads (the api serves the built bundle), tests, specs, ADRs, declarations, source maps
+# and the SDKs' sources and examples. Workspace packages nothing links to go too; the link check
+# fails the build if any link in the tree now points at nothing.
+COPY infra/docker/check-links.mjs /tmp/check-links.mjs
+RUN rm -rf modules/*/browser modules/*/client enterprise/modules/*/browser enterprise/modules/*/client \
+      packages/architecture-enforcer packages/oxlint-rules packages/design-system packages/design-system-internal \
+      packages/browser packages/browser-host packages/browser-types packages/sim-console packages/test-harness \
+      packages/vitest-config packages/webhook-verify packages/ksuid-python \
+ && find sdks/typescript mcp/typescript -mindepth 1 -maxdepth 1 ! -name dist ! -name node_modules ! -name package.json -exec rm -rf {} + \
+ && find apps packages modules enterprise -name node_modules -prune -o \
+      \( -type d \( -name __tests__ -o -name tests -o -name e2e -o -name specs -o -name adrs -o -name docs -o -name examples \) -o \
+         -type f \( -name '*.test.*' -o -name '*.spec.*' -o -name '*.feature' -o -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.tsbuildinfo' -o -name '*.md' \) \) \
+      -prune -exec rm -rf {} + \
+ && node /tmp/check-links.mjs /app
+
+# The installed packages' own weight: source maps, declarations, tests, docs and examples, and the
+# query compiler Prisma ships for every database it supports (this image talks to PostgreSQL only).
+RUN find node_modules/.pnpm -type d \( -name test -o -name tests -o -name __tests__ -o -name docs -o -name example -o -name examples \) -prune -exec rm -rf {} + \
+ && find node_modules/.pnpm -type f \( -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.md' \) -delete \
+ && find node_modules/.pnpm -type f -name 'query_compiler_*' ! -name '*postgresql*' -delete \
+ && node /tmp/check-links.mjs /app
+
+# The Prisma CLI is here for `prisma migrate deploy` (the upgrade runs it) and nothing else. Its
+# entry file requires Studio's data modules and the dev server's state module at load, so those two
+# packages stay; Studio's browser UI, the dev server's bundled database, the query-plan executor
+# and Studio's graph layout are only reached by the commands that use them. The links that
+# pointed at removed packages go with them, and the link check proves nothing else did.
+RUN rm -rf node_modules/.pnpm/@prisma+studio-core@*/node_modules/@prisma/studio-core/dist/ui \
+      node_modules/.pnpm/@prisma+studio-core@*/node_modules/@prisma/studio-core/dist/metafile-*.json \
+      node_modules/.pnpm/@prisma+dev@*/node_modules/@prisma/dev/dist/runtime-assets \
+      node_modules/.pnpm/@prisma+query-plan-executor@* node_modules/.pnpm/@electric-sql+pglite* node_modules/.pnpm/elkjs@* \
+ && find node_modules/.pnpm -type l \( -path '*/@prisma/query-plan-executor' -o -path '*/@electric-sql/pglite*' -o -path '*/node_modules/elkjs' \) -delete \
+ && node /tmp/check-links.mjs /app
 
 # ── Stage 3: runtime ───────────────────────────────────────────────
 FROM node:24-alpine
 RUN apk --no-cache add curl openssl bash
-RUN npm install -g pnpm@12.6.0
+RUN npm install -g pnpm@12.6.0 && npm cache clean --force
 
 COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
 # The scenario SDK opens a voice worker's quick tunnel with a bare `cloudflared` spawn, so the
