@@ -15,6 +15,23 @@ vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 
+// SearchBar reads the project and the model providers for its AI shortcut; neither needs a
+// trace host or tRPC to exercise the editor wiring.
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: undefined,
+    organization: undefined,
+    team: undefined,
+    isFetching: false,
+  }),
+}));
+vi.mock("../../../use-model-providers-settings.ts", () => ({
+  useModelProvidersSettings: () => ({
+    modelProviders: [],
+    customDefaultModel: null,
+    isLoading: false,
+  }),
+}));
 vi.mock("../../../../../features/facet/behavior/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
@@ -28,6 +45,22 @@ vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-access.t
 // provider, so stub the hook out — server search has its own dedicated suite.
 // These tests type `field:value` queries only, which never reach the router,
 // so the submit hook is stubbed rather than mounting a tRPC provider.
+// The instant-eval route runs tRPC mutations; the editor wiring needs none of them.
+vi.mock("../use-instant-eval-route.ts", () => ({
+  useInstantEvalRoute: () => ({
+    onInstantEvalRoute: vi.fn(),
+    abandonPendingRun: vi.fn(),
+    confirmation: null,
+    confirmRun: vi.fn(),
+    searchWordsInstead: vi.fn(),
+    refusal: null,
+    dismissRefusal: vi.fn(),
+    enableInstantEvals: vi.fn(),
+    isEnabling: false,
+    isEstimating: false,
+    isStarting: false,
+  }),
+}));
 vi.mock("../use-submit-search.ts", () => ({
   useSubmitSearch: () => ({
     submitSearch: (text: string) => useFilterStore.getState().applyQueryText(text.trim()),

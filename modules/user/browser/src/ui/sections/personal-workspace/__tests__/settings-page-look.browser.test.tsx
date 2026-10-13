@@ -37,6 +37,7 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
     routingPolicy: { personalContext: { useQuery: () => ({ error: null, isFetching: false }) } },
     identity: {
       myIdentifiers: { useQuery: () => ({ data: [], isPending: false, error: null }) },
+      mySignInGovernance: { useQuery: () => ({ data: void 0 }) },
       myMethodsLastUsed: { useQuery: () => ({ data: void 0 }) },
       mySignInGovernance: { useQuery: () => ({ data: { governedBySso: false } }) },
       addEmailIdentifier: mutation(),
@@ -49,6 +50,7 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
       setPassword: mutation(),
       unlinkAccount: mutation(),
       endBrowserSession: mutation(),
+      unlinkAccount: mutation(),
       sendMyAddressConfirmation: mutation(),
       browserSessions: { useQuery: () => ({ data: [session], isLoading: false }) },
       myAddressConfirmation: {
@@ -61,6 +63,7 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
     license: { getSsoGateStatus: { useQuery: () => ({ data: void 0, isLoading: false }) } },
     plan: { getActivePlan: { useQuery: () => ({ data: { type: "LAUNCH" }, isLoading: false }) } },
     user: {
+      secureAccountNudge: { useQuery: () => ({ data: void 0, dataUpdatedAt: 0 }) },
       getLinkedAccounts: {
         useQuery: () => ({
           data: [{ id: "acc-1", provider: "auth0", providerAccountId: "auth0|user-123" }],
@@ -180,10 +183,10 @@ describe("given a wide window", () => {
     it("is a column of divided bands whose rows are bordered", async () => {
       const container = mount("profile");
       await waitFor(() => expect(screen.getByText("My CLI key")).toBeVisible());
-      const { column, bands, rows } = look(container, [
-        "browser-session-row",
-        "personal-api-key-row",
-      ]);
+      // Sessions are rows divided inside one card (only the last has no rule), so the
+      // fully bordered rows are the API keys'.
+      expect(container.querySelectorAll('[data-testid="browser-session-row"]')).toHaveLength(1);
+      const { column, bands, rows } = look(container, ["personal-api-key-row"]);
 
       expect(column.getBoundingClientRect().width).toBeGreaterThan(600);
       expect(bands.length).toBeGreaterThanOrEqual(4);

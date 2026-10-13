@@ -120,6 +120,10 @@ async function mountedCreate(
         findOrganizationId: async () => ORGANIZATION_ID,
         findIdentity: async (id) => identity(id),
         listIdsByOrganization: async () => [...PROJECT_TEAMS.keys()],
+        findTraceDestination: async (id) => {
+          const teamId = PROJECT_TEAMS.get(id);
+          return teamId ? { id, teamId, archivedAt: null, kind: "application" } : null;
+        },
         listTraceDestinations: async (projectIds) =>
           projectIds.map((id) => ({
             id,
