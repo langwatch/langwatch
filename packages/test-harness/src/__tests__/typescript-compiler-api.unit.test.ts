@@ -132,7 +132,11 @@ describe("given TypeScript 7 is the compiler", () => {
         .filter(([, script]) => script !== undefined);
 
       expect(scripts.length).toBeGreaterThan(0);
-      const local = scripts.filter(([, script]) => !script.startsWith("pnpm -w exec tsc "));
+      // Environment assignments (`GOMAXPROCS=2 …`) only bound the compiler's resources.
+      const command = (script: string) => script.replace(/^(?:[A-Z_][A-Z0-9_]*=\S+\s+)*/, "");
+      const local = scripts.filter(
+        ([, script]) => !command(script).startsWith("pnpm -w exec tsc "),
+      );
       expect(local).toEqual([]);
     });
 

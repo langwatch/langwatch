@@ -16,7 +16,7 @@ import {
   RESERVED_SYSTEM_KEY_NAMES,
   isSystemApiKey,
 } from "@langwatch/api-key-contract";
-import type { AuthzGrantCaller, AuthzPrincipalRef } from "@langwatch/authz-contract";
+import type { AuthzGrantCaller } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import { fromDate } from "@langwatch/time";
 import type { z } from "zod";
@@ -26,6 +26,7 @@ import type {
   ApiKeyRepository,
   StoredApiKey,
 } from "../repositories/api-key.repository.ts";
+import { ApiKeyBindingValidationService } from "./api-key-binding-validation.service.ts";
 import type { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import type { ApiKeyTokenResolutionService } from "./api-key-token-resolution.service.ts";
@@ -48,20 +49,6 @@ function grantCaller({ userId, apiKeyId }: Requester): AuthzGrantCaller {
   if (apiKeyId) return { type: "apiKey", id: apiKeyId };
 
   return userId ? { type: "user", id: userId } : { type: "system" };
-}
-
-/** Whose holdings bound a key's bindings: its owner, else the person; and any requesting key. */
-function ceilingPrincipals({
-  ownerUserId,
-  userId,
-  apiKeyId,
-}: Requester & { ownerUserId: string | null }): AuthzPrincipalRef[] {
-  const person = ownerUserId ?? (apiKeyId ? null : userId);
-
-  return [
-    ...(person ? [{ type: "user" as const, id: person }] : []),
-    ...(apiKeyId ? [{ type: "apiKey" as const, id: apiKeyId }] : []),
-  ];
 }
 
 function actor(userId: string | null | undefined): {
@@ -128,6 +115,7 @@ export class ApiKeyLifecycleService {
   }
 
   private readonly bindings: ApiKeyGrantsService;
+  private readonly validation: ApiKeyBindingValidationService;
 
   private readonly repository: ApiKeyRepository;
   private readonly options: ApiKeyDependencies;
@@ -150,6 +138,7 @@ export class ApiKeyLifecycleService {
     this.grants = grants;
     this.answers = answers;
     this.bindings = ApiKeyGrantsService.create({ authz: options.authz });
+    this.validation = ApiKeyBindingValidationService.create({ grants });
   }
 
   async create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
@@ -213,7 +202,7 @@ export class ApiKeyLifecycleService {
       permissionMode: parsed.permissionMode ?? "all",
       permissions: parsed.permissions,
     });
-    await this.validateCreateBindings({
+    await this.validation.validateCreate({
       isSystemManaged: parsed.isSystemManaged ?? false,
       userId: parsed.userId ?? null,
       createdByUserId: parsed.createdByUserId ?? null,
@@ -287,7 +276,7 @@ export class ApiKeyLifecycleService {
         })
       : void 0;
     if (input.bindings) {
-      await this.validateUpdateBindings({
+      await this.validation.validateUpdate({
         input,
         bindings: input.bindings,
         ownerUserId: existing.userId,
@@ -318,43 +307,6 @@ export class ApiKeyLifecycleService {
     await this.answers.forget({ lookupId: existing.lookupId, revoked: false });
 
     return publicApiKey(await this.bindings.attachOne(updated));
-  }
-
-  /** The new bindings' scopes, personal-scope ownership and every caller's ceiling, in order. */
-  private async validateUpdateBindings({
-    input,
-    bindings,
-    ownerUserId,
-    permissions,
-  }: {
-    input: UpdateApiKeyInput;
-    bindings: ApiKeyScope[];
-    ownerUserId: string | null;
-    permissions: string[] | undefined;
-  }): Promise<void> {
-    for (const binding of bindings) {
-      await this.grants.validateScope(binding, input.organizationId);
-    }
-
-    await this.grants.assertPersonalScopesOwnedBy({
-      scopes: bindings,
-      organizationId: input.organizationId,
-      ownerUserId,
-      isSystemManaged: false,
-    });
-    const principals = ceilingPrincipals({
-      ownerUserId,
-      userId: input.callerUserId,
-      apiKeyId: input.callerApiKeyId,
-    });
-    for (const principal of principals) {
-      await this.grants.assertCeiling({
-        principal,
-        organizationId: input.organizationId,
-        bindings,
-        permissions: permissions ?? [],
-      });
-    }
   }
 
   /** Sets revokedAt, then a refusal as the key's shared answer: dead on every pod at once. */
@@ -492,54 +444,6 @@ export class ApiKeyLifecycleService {
     }
 
     return this.bindings.attachOne(row);
-  }
-
-  private async validateCreateBindings(input: {
-    isSystemManaged: boolean;
-    userId: string | null;
-    createdByUserId: string | null;
-    callerApiKeyId: string | null;
-    organizationId: string;
-    bindings: ApiKeyScope[];
-    permissions: string[] | undefined;
-  }): Promise<void> {
-    if (input.userId) {
-      await this.grants.ensureCallerIsOrgMember({
-        userId: input.userId,
-        organizationId: input.organizationId,
-      });
-    }
-
-    for (const binding of input.bindings) {
-      await this.grants.validateScope(binding, input.organizationId);
-    }
-
-    await this.grants.assertPersonalScopesOwnedBy({
-      scopes: input.bindings,
-      organizationId: input.organizationId,
-      ownerUserId: input.userId,
-      isSystemManaged: input.isSystemManaged,
-    });
-    const principals = ceilingPrincipals({
-      ownerUserId: input.userId,
-      userId: input.createdByUserId,
-      apiKeyId: input.callerApiKeyId,
-    });
-    // A key's own role is bounded only here: no one to bound it by is a platform mint.
-    if (input.permissions?.length && principals.length === 0 && !input.isSystemManaged) {
-      throw new ApiKeyScopeViolationError(
-        "A restricted key needs an owner, a creator or a requesting key to bound its permissions",
-      );
-    }
-
-    for (const principal of principals) {
-      await this.grants.assertCeiling({
-        principal,
-        organizationId: input.organizationId,
-        bindings: input.bindings,
-        permissions: input.permissions ?? [],
-      });
-    }
   }
 }
 
