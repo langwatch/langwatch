@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "tsBuildInfoFile": "dist/tsconfig.type-tests.tsbuildinfo",
+    "composite": false,
+    "noEmit": true
+  },
+  "include": ["type-tests/**/*"],
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    }
+  ]
+}

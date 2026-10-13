@@ -1,0 +1,124 @@
+/* The shell's layout glue only; every value is a kit token (packages/design-system-internal/README.md). */
+
+.sim-console {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.sim-console[data-sim="mail"] {
+  --sim-accent: var(--brand);
+}
+
+.sim-console[data-sim="idp"] {
+  --sim-accent: var(--moss);
+}
+
+.sim-console[data-sim="storage"] {
+  --sim-accent: var(--amber);
+}
+
+.sim-console[data-sim="llm"] {
+  --sim-accent: var(--brand-deep);
+}
+
+.sim-console[data-sim="voice"] {
+  --sim-accent: var(--rust);
+}
+
+.sim-console[data-sim="analytics"] {
+  --sim-accent: var(--moss);
+}
+
+.sim-console[data-sim="outbound"] {
+  --sim-accent: var(--amber);
+}
+
+.sim-console[data-sim="payment"] {
+  --sim-accent: var(--brand-deep);
+}
+
+.sim-console[data-sim="telemetry"] {
+  --sim-accent: var(--rust);
+}
+
+.sim-console[data-sim="lambda"] {
+  --sim-accent: var(--amber);
+}
+
+.sim-console .ds-topbar-mark {
+  background: var(--sim-accent);
+}
+
+.sim-console > .ds-topbar,
+.sim-console-tabs {
+  flex: none;
+}
+
+.sim-console-tabs {
+  width: 100%;
+  max-width: calc(var(--page-max) + 2 * var(--space-8));
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-8) 0;
+}
+
+.sim-console-main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.sim-split {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+/* The list pane keeps its width; the detail takes what is left. */
+.sim-split-list {
+  flex: none;
+  width: 40%;
+  min-width: 16rem;
+}
+
+.sim-split-detail {
+  flex: 1;
+  min-width: 0;
+}
+
+.sim-json > summary {
+  cursor: pointer;
+  color: var(--ink-500);
+  font-size: var(--text-sm);
+}
+
+.sim-json[open] > summary {
+  padding-bottom: var(--space-2);
+}
+
+@media (max-width: 719px) {
+  .sim-console-tabs {
+    padding: var(--space-2) var(--space-4) 0;
+  }
+
+  .sim-split {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sim-split-list {
+    width: auto;
+    min-width: 0;
+  }
+}
+
+/* A titled list sits flush in its panel, as a bare kit list does. */
+.ds-panel-body:has(> .sim-list:only-child) {
+  padding: 0;
+}
+
+.ds-panel-body > .sim-list:only-child > .ds-list {
+  border: 0;
+  border-radius: 0;
+}

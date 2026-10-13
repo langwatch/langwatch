@@ -1,16 +1,5 @@
 /**
- * Activating capture wires each tool's session context seam, the same run that
- * mints the ingest key: hook entries for Claude Code and Codex, a plugin file
- * for opencode.
- *
- * The mint is the only thing faked: the config is a real file behind
- * LANGWATCH_CLI_CONFIG, and the files the command merges into or writes are
- * real files in a temp directory.
- *
- * `claude` here is one without plugin support, so claude_code lands on the hook
- * entries rather than the LangWatch plugin. What the plugin path reports lives
- * in install-claude-plugin.unit.test.ts.
- *
+ * Wire session hooks for each tool; only mint is faked, config is real.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
@@ -36,9 +25,7 @@ const { mintIngestionKeyMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/cli/utils/governance/cli-api", async () => {
-  const actual = await vi.importActual<typeof CliApiModule>(
-    "@/cli/utils/governance/cli-api",
-  );
+  const actual = await vi.importActual<typeof CliApiModule>("@/cli/utils/governance/cli-api");
   return { ...actual, mintIngestionKey: mintIngestionKeyMock };
 });
 
@@ -49,15 +36,12 @@ const { spawnSyncMock } = vi.hoisted(() => ({
   spawnSyncMock: vi.fn(() => ({ status: 1, stdout: "", stderr: "unknown" })),
 }));
 vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  const actual = await vi.importActual<typeof ChildProcessModule>("node:child_process");
   return { ...actual, spawnSync: spawnSyncMock };
 });
 
 const entryFor = (tool: "claude_code" | "codex") => ({
-  hooks: [
-    { type: "command", command: sessionContextHookCommand(tool), timeout: 10 },
-  ],
+  hooks: [{ type: "command", command: sessionContextHookCommand(tool), timeout: 10 }],
 });
 
 // Claude's SessionStart entry carries the guidance hook as a second command:
@@ -173,9 +157,7 @@ describe("the claude_code ingestion install", () => {
 
       stdoutSpy.mockClear();
       await runInstall();
-      expect(stdout()).toContain(
-        `${settingsPath} session hooks already up to date`,
-      );
+      expect(stdout()).toContain(`${settingsPath} session hooks already up to date`);
     });
 
     it("carries the action in the json report", async () => {
@@ -209,11 +191,7 @@ describe("the claude_code ingestion install", () => {
       fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
       fs.writeFileSync(
         settingsPath,
-        JSON.stringify(
-          { model: "claude-sonnet-5", hooks: { SessionStart: [userEntry] } },
-          null,
-          2,
-        ),
+        JSON.stringify({ model: "claude-sonnet-5", hooks: { SessionStart: [userEntry] } }, null, 2),
       );
     });
 
@@ -223,10 +201,7 @@ describe("the claude_code ingestion install", () => {
       await runInstall();
 
       const settings = readJson();
-      expect(settings.hooks.SessionStart).toEqual([
-        userEntry,
-        ourSessionStartEntry,
-      ]);
+      expect(settings.hooks.SessionStart).toEqual([userEntry, ourSessionStartEntry]);
       expect(settings.model).toBe("claude-sonnet-5");
     });
   });
@@ -243,9 +218,7 @@ describe("the codex ingestion install", () => {
         SessionStart: [entryFor("codex")],
         Stop: [entryFor("codex")],
       });
-      expect(sessionContextHookCommand("codex")).toBe(
-        "langwatch ingest hook codex",
-      );
+      expect(sessionContextHookCommand("codex")).toBe("langwatch ingest hook codex");
     });
 
     /** @scenario "The codex install tells the user Codex asks for review once" */
@@ -284,14 +257,9 @@ describe("the opencode ingestion install", () => {
       await runOpencodeInstall();
       await runOpencodeInstall();
 
-      expect(fs.readdirSync(opencodePluginDir)).toEqual([
-        OPENCODE_PLUGIN_FILE_NAME,
-      ]);
+      expect(fs.readdirSync(opencodePluginDir)).toEqual([OPENCODE_PLUGIN_FILE_NAME]);
       expect(
-        fs.readFileSync(
-          path.join(opencodePluginDir, OPENCODE_PLUGIN_FILE_NAME),
-          "utf8",
-        ),
+        fs.readFileSync(path.join(opencodePluginDir, OPENCODE_PLUGIN_FILE_NAME), "utf8"),
       ).toContain(JSON.stringify(OPENCODE_HOOK_COMMAND.split(" ")));
     });
 

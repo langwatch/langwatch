@@ -187,6 +187,13 @@ Feature: Bulk dataset upload
     Then that file stops and leaves nothing half-created behind
     And the other two continue preparing
 
+  @unit
+  Scenario: A file's row leaves Preparing when its dataset settles, without polling
+    Given a file whose dataset the server is preparing
+    When the server finishes normalising it, ready or failed
+    Then it states that the dataset's normalisation settled, with where it came to rest
+    And the dataset reads refresh on that fact, so the row shows ready or failed in place
+
   @integration @unimplemented
   Scenario: Closing the drawer mid-upload keeps the files preparing
     Given I have started an upload of several files

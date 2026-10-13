@@ -1,0 +1,589 @@
+/**
+ * What a screen may ask of the process it is mounted in — ADR-004 seals
+ * off `document`, the router, the toaster and the session client, so a
+ * screen asks ports instead. Missing ports refuse loudly, never silently.
+ */
+
+import type { ModuleApiClient, ModuleApiMap } from "@langwatch/api/web";
+import { createContext, useContext } from "react";
+
+import { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget } from "./copy-targets.ts";
+import { type HostService, NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
+import { UiScope, type UiActiveScope } from "./scope.ts";
+import type { UiSessionSnapshot } from "./session.ts";
+import type { UiAnalytics } from "./telemetry/analytics.ts";
+
+/** Scope is a host service of its own; this file stays the one ports barrel. */
+export { UiScope, type UiActiveScope };
+export { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget };
+
+/** The filters a trace list read narrows by, without the project it reads in. */
+export type UiTraceFilterReading = {
+  startDate: number;
+  endDate: number;
+  filters: Record<string, unknown>;
+  query?: string;
+  negateFilters?: boolean;
+};
+
+/** The reader's applied trace filters; a capability travels by declaration (§10.1). */
+export abstract class UiTraceFilters {
+  /** Undefined while no filter narrows anything: a free-text query alone stays unfiltered. */
+  abstract applied(): UiTraceFilterReading | undefined;
+}
+
+/** The composition never filled this port, and something asked it to work. */
+export class UiHostServiceUnavailableError extends Error {
+  constructor(readonly hostService: string) {
+    super(
+      `The ${JSON.stringify(hostService)} UI host service has no implementation in this composition. ` +
+        "Supply it through createUiApplication({ features: { capabilities } }).",
+    );
+    this.name = "UiHostServiceUnavailableError";
+  }
+}
+
+/** The hosted support chat; absent where the deployment ships none. */
+export abstract class UiSupportChat {
+  /** Re-asserts the closed bubble; leaves a conversation the reader opened alone. */
+  abstract hide(): void;
+}
+
+/** Sets the browser tab's title, and hands back the way to put it back. */
+export abstract class UiDocumentTitle {
+  abstract set(title: string): () => void;
+}
+
+/**
+ * The one way out a failure offers, when there is one — a fix in a click
+ * (open the plan with nothing runnable, configure the model provider).
+ * `run`, not `onClick`: a port describes what happens, not the input device.
+ */
+export type UiFailureAction = {
+  label: string;
+  run: () => void;
+};
+
+/** A short confirmation of something the user just did. */
+export type UiSuccessNotice = {
+  title: string;
+  description?: string;
+  /** Dedupes repeats of the same action. */
+  id?: string;
+  action?: { label: string; run: () => void };
+};
+
+/**
+ * A failure, as the screen knows it — the raw `error` travels, never a
+ * message the screen composed: words are resolved from `error.code` by
+ * the host's registry. `fallbackTitle` names the action, for when there's no code.
+ */
+export type UiFailureNotice = {
+  error: unknown;
+  fallbackTitle: string;
+  /**
+   * A hard override of the headline, registry entry or not — rare, and
+   * usually a smell: where the registry's copy is wrong, fix the registry
+   * rather than one call site.
+   */
+  title?: string;
+  /**
+   * A sentence for a refusal the SCREEN made, not the server — ignored the
+   * moment the error carries a code the registry can say something better
+   * about. For failures with no code: a browser-side form guard, say.
+   */
+  description?: string;
+  /**
+   * The single fix this failure offers, as a button — belongs HERE rather
+   * than a hand-rolled toast, so the failure keeps the registry's words
+   * as well as the button. Stays rare: a re-run-what-just-failed button is noise.
+   */
+  action?: UiFailureAction;
+  id?: string;
+};
+
+/** Tells the user how something they did turned out. */
+export abstract class UiFeedback {
+  abstract succeeded(notice: UiSuccessNotice): void;
+  /** A caution, not a failure: a refusal to go on or a partial result. */
+  abstract warned(notice: UiSuccessNotice): void;
+  /** A plain fact about what happened, neither a success nor a caution. */
+  abstract informed(notice: UiSuccessNotice): void;
+  abstract failed(failure: UiFailureNotice): void;
+}
+
+/** What a live procedure hands its subscriber, one entry at a time. */
+export type UiRpcSubscriptionHandlers = {
+  onData?: (value: unknown) => void;
+  onError?: (error: unknown) => void;
+  onStarted?: () => void;
+  onStopped?: () => void;
+};
+
+/** A live procedure, while somebody is listening to it. */
+export type UiRpcSubscription = { unsubscribe: () => void };
+
+/**
+ * A procedure call addressed by path rather than by a typed hook, for a
+ * surface covering many procedures behind one path string. A typed hook off
+ * the module's derived client is normal; this is the shell-composed escape.
+ */
+export abstract class UiRpc {
+  abstract query(path: string, input: unknown): Promise<unknown>;
+
+  abstract mutate(path: string, input: unknown): Promise<unknown>;
+
+  /** A LIVE procedure, opened from outside React. Nothing is cached. */
+  abstract subscribe(
+    path: string,
+    input: unknown,
+    handlers: UiRpcSubscriptionHandlers,
+  ): UiRpcSubscription;
+}
+
+/** Moves the address bar. */
+export abstract class UiNavigation {
+  abstract navigate(to: string): void;
+  abstract replace(to: string): void;
+  abstract back(): void;
+}
+
+/** The path parameters and query string a screen was opened with. */
+export type UiRouteReadingValues = {
+  /** The `:id` style segments the matched route captured. */
+  params: Readonly<Record<string, string | undefined>>;
+  /** The query string, single-valued — the last write of a repeated key wins. */
+  query: Readonly<Record<string, string | undefined>>;
+  /**
+   * The path the reader is on, without query or fragment. Optional because a
+   * test that hands over a reading rarely has one; `useRouter` reads it as the
+   * empty string when it is absent.
+   */
+  pathname?: string;
+};
+
+/**
+ * The address a screen is rendering, as data — `useSearchParams` reaches
+ * the router, sealed off by ADR-004. `setQuery` takes the WHOLE next
+ * query, not a patch, so a screen can remove a key as well as set one.
+ */
+export abstract class UiRoute {
+  abstract reading(): UiRouteReadingValues;
+  abstract setQuery(
+    next: Readonly<Record<string, string | undefined>>,
+    options?: { replace?: boolean },
+  ): void;
+}
+
+/** Who is signed in, as a screen needs to know them. */
+export type UiActor = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+  impersonator?: { id: string; email: string | null } | null;
+};
+
+/**
+ * Who is here and what they may do — `hasPermission` and `hasOrganizationPermission`
+ * answer synchronously and fail closed, so a loading screen
+ * renders the same as a "no" screen. Where they are is `UiScope`, a host service of its own.
+ */
+export abstract class UiSession {
+  abstract currentUser(): UiActor | null;
+  abstract hasPermission(permission: string): boolean;
+
+  /**
+   * Whether the reader holds a permission in the active organization: the active
+   * scope's grant answers, as on main (scope knot Q2). Ports that cannot answer it fail by name.
+   */
+  hasOrganizationPermission(_permission: string): boolean {
+    throw new UiHostServiceUnavailableError("session organization permission");
+  }
+
+  /**
+   * Whether the answers above have arrived — a guard needs the
+   * difference `hasPermission` hides: "no" and "not asked yet" are the
+   * same `false` to a screen, but must not be to a guard.
+   */
+  abstract isSettled(): boolean;
+
+  /**
+   * The shell's single session, scope and grant reading. Legacy ports that do
+   * not publish it fail by name instead of fabricating an auth state.
+   */
+  snapshot(): UiSessionSnapshot {
+    throw new UiHostServiceUnavailableError("session snapshot");
+  }
+
+  /** Reads the signed-in reader again, e.g. after their name or photo changed. */
+  refresh(): Promise<void> {
+    return Promise.reject(new UiHostServiceUnavailableError("session refresh"));
+  }
+}
+
+class UnavailableUiFeedback extends UiFeedback {
+  succeeded(): never {
+    throw new UiHostServiceUnavailableError("feedback");
+  }
+
+  warned(): never {
+    throw new UiHostServiceUnavailableError("feedback");
+  }
+
+  informed(): never {
+    throw new UiHostServiceUnavailableError("feedback");
+  }
+
+  failed(): never {
+    throw new UiHostServiceUnavailableError("feedback");
+  }
+}
+
+class UnavailableUiSession extends UiSession {
+  currentUser(): never {
+    throw new UiHostServiceUnavailableError("session");
+  }
+
+  hasPermission(): never {
+    throw new UiHostServiceUnavailableError("session");
+  }
+
+  override hasOrganizationPermission(): never {
+    throw new UiHostServiceUnavailableError("session");
+  }
+
+  isSettled(): never {
+    throw new UiHostServiceUnavailableError("session");
+  }
+}
+
+class UnavailableUiRpc extends UiRpc {
+  query(): never {
+    throw new UiHostServiceUnavailableError("rpc");
+  }
+
+  mutate(): never {
+    throw new UiHostServiceUnavailableError("rpc");
+  }
+
+  subscribe(): never {
+    throw new UiHostServiceUnavailableError("rpc");
+  }
+}
+
+/** The default for a port with no implementation this package can write. */
+export const UNAVAILABLE_UI_FEEDBACK: UiFeedback = new UnavailableUiFeedback();
+export const UNAVAILABLE_UI_RPC: UiRpc = new UnavailableUiRpc();
+export const UNAVAILABLE_UI_SESSION: UiSession = new UnavailableUiSession();
+
+/** The title of the document this application is rendered into. */
+export class BrowserUiDocumentTitle extends UiDocumentTitle {
+  static create(target: Pick<Document, "title"> = document): BrowserUiDocumentTitle {
+    return new BrowserUiDocumentTitle(target);
+  }
+
+  private constructor(private readonly target: Pick<Document, "title">) {
+    super();
+  }
+
+  set(title: string): () => void {
+    const previous = this.target.title;
+    this.target.title = title;
+    return () => {
+      this.target.title = previous;
+    };
+  }
+}
+
+/**
+ * Which build a screen is running in, as the composing application knows it.
+ * Only `apps/ui` can read that; a screen asks for the reading instead.
+ */
+export type UiDeployment = {
+  /** A local development build: dev-only affordances and raw error text. */
+  isDevelopment: boolean;
+  /** The hosted product rather than a self-hosted one. */
+  isSaaS: boolean;
+  /**
+   * This deployment's own address. Required, not optional: a host that must
+   * answer one has no honest absence, and `""` renders a link that looks real.
+   */
+  appBaseUrl: string;
+  /** The shared demo project, when this deployment configures one. */
+  demoProjectSlug?: string;
+  /** Where a licence is bought, when this deployment sells one. */
+  licensePaymentUrl?: string;
+  hasNlpService: boolean;
+  hasLangevals: boolean;
+  /**
+   * Whether this deployment can actually send mail. Required, not optional: a
+   * host answering `false` where mail works tells an administrator their invite
+   * was not sent when it was.
+   */
+  hasEmailProvider: boolean;
+  /** `"email"`, or the federated provider id this deployment mounted; absent means email. */
+  authProvider?: string;
+  /** Whether this deployment mounted passkeys; absent reads as no. */
+  passkeysEnabled?: boolean;
+  /** Whether this deployment mounted email/password sign-in; absent reads as no. */
+  emailPasswordEnabled?: boolean;
+  /** Federated provider ids offered to connect; absent reads as the one `authProvider`. */
+  federatedProviders?: readonly string[];
+  /** `invite_only` when accounts here are created by invitation; absent reads as open. */
+  signUpMode?: "open" | "invite_only";
+  /** Whether ops offers the Cloud admin capability; off unless this is LangWatch's own cloud. */
+  hasCloudOps: boolean;
+  /** Where a customer's SDK reaches the gateway, without `/v1`; absent when unconfigured. */
+  gatewayBaseUrl?: string;
+};
+
+/** What a composition that declared no deployment is read as. */
+const PRODUCTION_UI_DEPLOYMENT: UiDeployment = {
+  isDevelopment: false,
+  isSaaS: false,
+  // The composition that declared no deployment declared no address either;
+  // the document's own origin is the one answer that is never a guess.
+  appBaseUrl: typeof window === "undefined" ? "" : window.location.origin,
+  hasNlpService: true,
+  hasLangevals: true,
+  hasEmailProvider: false,
+  hasCloudOps: false,
+};
+
+/** Every host service a screen can ask for, all of them answered. */
+export type UiHostServices = {
+  /**
+   * Where every module's named events go. Absent and "installed no
+   * destination" are the same reading — `useUiAnalytics` degrades to the
+   * inert destination either way.
+   */
+  analytics?: UiAnalytics;
+  /** Where the reader could replicate a thing to. Absent reads as no answer. */
+  copyTargets?: UiCopyTargets;
+  /**
+   * What installed modules declared through `withCapabilities`. Optional:
+   * absent reads as nothing declared.
+   */
+  declarations?: UiDeclarations;
+  /**
+   * Optional so a hand-built host service set stays valid without one;
+   * {@link resolveUiHostServices} always fills it, production when absent.
+   */
+  deployment?: UiDeployment;
+  documentTitle: UiDocumentTitle;
+  feedback: UiFeedback;
+  navigation: UiNavigation;
+  route: UiRoute;
+  /**
+   * The by-path dispatcher, for the few surfaces too wide for a procedure
+   * map. Optional so a hand-built host service set stays valid without one;
+   * absent reads as the refusing dispatcher, exactly as `session` does.
+   */
+  rpc?: UiRpc;
+  /**
+   * Where the reader is standing. Optional so a hand-built host service set
+   * stays valid without one; absent reads as the refusing port, exactly as
+   * `rpc` does.
+   */
+  scope?: UiScope;
+  session: UiSession;
+  /** The support chat the composition installed. Absent reads as no chat. */
+  supportChat?: UiSupportChat;
+  /** The trace filters the reader applied. Absent reads as unfiltered. */
+  traceFilters?: UiTraceFilters;
+};
+
+/** What the composing application chose to answer itself. */
+export type UiHostServiceInstall = Partial<UiHostServices>;
+
+export type UiHostServiceResolution = {
+  install: UiHostServiceInstall;
+  /** The default only the browser can build. */
+  documentTitle: UiDocumentTitle;
+  /** The defaults only router context can build. */
+  navigation: UiNavigation;
+  route: UiRoute;
+  /**
+   * The default only the composition can build: the dispatcher needs both the
+   * transport and the one QueryClient, neither of which a screen may reach.
+   */
+  rpc?: UiRpc;
+  /** The scope that same live host resolved, beside the session it came with. */
+  scope?: UiScope;
+  /** The copy targets that same live host read, over the same organization graph. */
+  copyTargets?: UiCopyTargets;
+  /** The trace filters that same live host read off the address. */
+  traceFilters?: UiTraceFilters;
+  /**
+   * The default only a live host can build — absent for a composition
+   * that declared no session source, when the refusal below is the honest answer.
+   */
+  session?: UiSession;
+};
+
+/**
+ * The install, completed. An installed port always wins over a default, so a
+ * host that has a real toaster or a real session never gets the refusing one.
+ */
+export function resolveUiHostServices({
+  install,
+  documentTitle,
+  navigation,
+  route,
+  rpc,
+  scope,
+  copyTargets,
+  traceFilters,
+  session,
+}: UiHostServiceResolution): UiHostServices {
+  return {
+    analytics: install.analytics,
+    copyTargets: install.copyTargets ?? copyTargets,
+    declarations: install.declarations,
+    deployment: install.deployment ?? PRODUCTION_UI_DEPLOYMENT,
+    documentTitle: install.documentTitle ?? documentTitle,
+    feedback: install.feedback ?? UNAVAILABLE_UI_FEEDBACK,
+    navigation: install.navigation ?? navigation,
+    route: install.route ?? route,
+    rpc: install.rpc ?? rpc ?? UNAVAILABLE_UI_RPC,
+    scope: install.scope ?? scope ?? UNAVAILABLE_UI_SCOPE,
+    session: install.session ?? session ?? UNAVAILABLE_UI_SESSION,
+    supportChat: install.supportChat,
+    traceFilters: install.traceFilters ?? traceFilters,
+  };
+}
+
+const UiHostServicesContext = createContext<UiHostServices | undefined>(void 0);
+
+/** Publishes the resolved host services to everything a screen renders. */
+export const UiHostServicesContextProvider = UiHostServicesContext.Provider;
+
+/**
+ * The host services above this screen, or undefined where none are mounted.
+ * The hooks this package publishes over the ports read this one rather than
+ * {@link useUiHostServices}, degrading to an inert reading instead of a crash.
+ */
+export function useOptionalUiHostServices(): UiHostServices | undefined {
+  return useContext(UiHostServicesContext);
+}
+
+/**
+ * The build this screen is running in. A screen mounted with no shell above
+ * it reads production, the same fail-closed reading every other port gives.
+ */
+export function useUiDeployment(): UiDeployment {
+  return useOptionalUiHostServices()?.deployment ?? PRODUCTION_UI_DEPLOYMENT;
+}
+
+/** What installed modules declared, degrading to none outside a shell. */
+export function useUiDeclarations(): UiDeclarations {
+  return useOptionalUiHostServices()?.declarations ?? NO_UI_DECLARATIONS;
+}
+
+/**
+ * The by-path dispatcher of the process this screen is running in. Read off
+ * the host services rather than a context of its own: record 10.1 rules out
+ * ambient React context as a cross-module transport.
+ */
+export function useUiRpc(): UiRpc {
+  return useOptionalUiHostServices()?.rpc ?? UNAVAILABLE_UI_RPC;
+}
+
+/**
+ * Missing means the screen was mounted outside the application shell — a
+ * composition fault, not something the screen can degrade around.
+ */
+export function useUiHostServices(): UiHostServices {
+  const hostServices = useContext(UiHostServicesContext);
+  if (!hostServices) {
+    throw new Error(
+      "No UI host services are mounted above this screen; render it inside the application shell.",
+    );
+  }
+  return hostServices;
+}
+
+/** What a composition's session read yields; copy targets only where organization lent them. */
+export type UiSessionHostServices = {
+  session: UiSession;
+  scope: UiScope;
+  copyTargets?: UiCopyTargets;
+  traceFilters?: UiTraceFilters;
+};
+
+/**
+ * A composition's live session, built where the transport is — declared as a
+ * source (a hook, called once) rather than a port, since the answer changes as
+ * the reader navigates and the reads land.
+ */
+export type UiSessionSource = (input: {
+  transport: ModuleApiClient<ModuleApiMap>;
+  /** Where a refused session read is told, since nobody else sees it. */
+  feedback: UiFeedback;
+}) => UiSessionHostServices;
+
+/** What every host service's source is called with, on each render (ARCHITECTURE.md §10.1). */
+export type UiHostServiceInput = Readonly<{
+  transport: ModuleApiClient<ModuleApiMap>;
+  feedback: UiFeedback;
+  session: UiSession;
+  scope: UiScope;
+}>;
+
+/** A host service's source: a hook the runtime calls on every render, in the runtime's order. */
+export type UiHostServiceSource<Value> = (input: UiHostServiceInput) => Value;
+
+/** This render's value of each host service, keyed by the service's name. */
+export type UiHostServiceValues = ReadonlyMap<string, unknown>;
+
+const UiHostServiceContext = createContext<UiHostServiceValues>(new Map());
+
+/** Publishes the host services' values to everything a screen renders. */
+export const UiHostServiceProvider = UiHostServiceContext.Provider;
+
+/** One service's value this render, or undefined outside a shell; a service's own hook reads it. */
+export function useHostService<Source extends UiHostServiceSource<unknown>>(
+  service: HostService<Source>,
+): ReturnType<Source> | undefined {
+  const value = useContext(UiHostServiceContext).get(service.name);
+  return isSourceValue<Source>(value) ? value : undefined;
+}
+
+function isSourceValue<Source extends UiHostServiceSource<unknown>>(
+  value: unknown,
+): value is ReturnType<Source> {
+  return value !== undefined;
+}
+
+class UnavailableUiScope extends UiScope {
+  activeScope(): never {
+    throw new UiHostServiceUnavailableError("scope");
+  }
+}
+
+/** The default for a composition that named no scope source. Refuses by name. */
+export const UNAVAILABLE_UI_SCOPE: UiScope = new UnavailableUiScope();
+
+/**
+ * Where this screen is standing. Mounted outside a shell it reads the refusing
+ * port, which names the missing host service rather than inventing a scope.
+ */
+export function useUiScope(): UiScope {
+  return useOptionalUiHostServices()?.scope ?? UNAVAILABLE_UI_SCOPE;
+}
+
+/** Where this reader could replicate a thing to; absent where no lender is installed. */
+export function useUiCopyTargets(): UiCopyTargets {
+  return useOptionalUiHostServices()?.copyTargets ?? ABSENT_UI_COPY_TARGETS;
+}
+
+/** The support chat, or undefined where this deployment installed none. */
+export function useUiSupportChat(): UiSupportChat | undefined {
+  return useOptionalUiHostServices()?.supportChat;
+}
+
+/** The trace filters this reader applied; undefined where no lender is installed. */
+export function useUiTraceFilters(): UiTraceFilters | undefined {
+  return useOptionalUiHostServices()?.traceFilters;
+}

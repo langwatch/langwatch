@@ -45,6 +45,14 @@ Feature: Test agent with one scripted run
       And no scenario row is read
 
     @unit
+    Scenario: The worker prefetches a queued test run without a scenario row
+      Given a queued run with the agent test scenario id of an HTTP agent
+      When the worker prepares it
+      Then it reads the project and the agent, never a scenario row
+      And the child starts with the run's key
+      And an agent that is gone fails the run on the agent, not on a missing scenario
+
+    @unit
     Scenario: A child job with a script parses without model params
       Given a child job payload that carries a script and no model params
       When the child parses it
@@ -106,6 +114,12 @@ Feature: Test agent with one scripted run
     Scenario: The REST route schedules the same run
       When "POST /api/v1/agents/:id/test" is called with a project key
       Then the answer carries the scenario run id and the batch run id
+
+    @integration
+    Scenario: The REST route starts the run as the caller's person and the key they called with
+      When "POST /api/v1/agents/:id/test" is called with a member's personal access token
+      Then the run is started as that member, naming the token's key, so the run's key holds no more
+      And a key that acts as nobody starts the run with no person
 
   Rule: A connected agent no process is holding cannot be tested
 
@@ -201,6 +215,12 @@ Feature: Test agent with one scripted run
       Given the agents page with an agent that cannot be tested
       When "Test agent" is chosen from the card menu
       Then the refusal is shown with the registry's title and no raw message
+
+    @integration
+    Scenario: Voice and prompt agent cards do not offer Test agent
+      Given the agents page with a voice agent and a prompt agent
+      When either card's menu is opened
+      Then no "Test agent" item is offered
 
   Rule: The drawer test panel sends "ping" by default
 

@@ -1,0 +1,65 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`QueueRedisRepository.getBlockedSummary > clusters blocked groups by pipeline and normalised error across queues, sampling five ids 1`] = `
+[
+  {
+    "count": 7,
+    "normalizedMessage": "Timeout after 100ms",
+    "pipelineName": "trace",
+    "queueName": "qa",
+    "sampleGroupIds": [
+      "t0",
+      "t1",
+      "t2",
+      "t3",
+      "t4",
+    ],
+    "sampleMessage": "Timeout after 100ms",
+    "sampleStack": "s",
+  },
+  {
+    "count": 1,
+    "normalizedMessage": "Timeout after 5ms",
+    "pipelineName": "eval",
+    "queueName": "qa",
+    "sampleGroupIds": [
+      "e1",
+    ],
+    "sampleMessage": "Timeout after 5ms",
+    "sampleStack": null,
+  },
+  {
+    "count": 1,
+    "normalizedMessage": "Unknown error",
+    "pipelineName": null,
+    "queueName": "qa",
+    "sampleGroupIds": [
+      "u1",
+    ],
+    "sampleMessage": "Unknown error",
+    "sampleStack": null,
+  },
+  {
+    "count": 1,
+    "normalizedMessage": "HTTP 500",
+    "pipelineName": "trace",
+    "queueName": "qb",
+    "sampleGroupIds": [
+      "b1",
+    ],
+    "sampleMessage": "HTTP 500",
+    "sampleStack": null,
+  },
+  {
+    "count": 1,
+    "normalizedMessage": "HTTP 500",
+    "pipelineName": null,
+    "queueName": "qb",
+    "sampleGroupIds": [
+      "b2",
+    ],
+    "sampleMessage": "HTTP 500",
+    "sampleStack": null,
+  },
+]
+`;

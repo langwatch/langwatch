@@ -2,16 +2,21 @@
   "name": "metadata-example",
   "version": "1.0.0",
   "description": "LangWatch metadata and labels example",
-  "main": "dist/index.js",
+  "keywords": [
+    "labels",
+    "langwatch",
+    "metadata",
+    "opentelemetry"
+  ],
+  "license": "MIT",
+  "author": "LangWatch",
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "tsc && dotenv -- node dist/index.js",
     "start:rest-api": "tsc && dotenv -- node dist/rest-api.js"
   },
-  "keywords": ["langwatch", "metadata", "labels", "opentelemetry"],
-  "author": "LangWatch",
-  "license": "MIT",
   "dependencies": {
     "@ai-sdk/openai": "^2.0.6",
     "@opentelemetry/context-async-hooks": "^2.0.1",

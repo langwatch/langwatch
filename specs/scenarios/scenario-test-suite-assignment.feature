@@ -28,6 +28,12 @@ Feature: Filing a scenario into a test suite
     And it appears under the "Refunds" group in the scenario list
 
   @integration
+  Scenario: A scenario created right after its suite is filed into that new suite
+    Given a test suite was just created from the rail
+    When New scenario is chosen and the scenario is saved
+    Then the scenario is filed in the new suite
+
+  @integration
   Scenario: A scenario created without naming a test suite is filed into Default
     Given a project whose scenarios are created without naming a test suite
     When New scenario is chosen and the scenario is saved

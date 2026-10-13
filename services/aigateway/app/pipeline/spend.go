@@ -307,6 +307,10 @@ func (w *spendStreamWrapper) Chunk() []byte       { return w.inner.Chunk() }
 func (w *spendStreamWrapper) Usage() domain.Usage { return w.inner.Usage() }
 func (w *spendStreamWrapper) Err() error          { return w.inner.Err() }
 
+// Unwrap exposes the wrapped iterator so its optional extensions stay
+// reachable (domain.StreamHeadersOf).
+func (w *spendStreamWrapper) Unwrap() domain.StreamIterator { return w.inner }
+
 func (w *spendStreamWrapper) RawFraming() bool {
 	if rf, ok := w.inner.(domain.RawFramer); ok {
 		return rf.RawFraming()

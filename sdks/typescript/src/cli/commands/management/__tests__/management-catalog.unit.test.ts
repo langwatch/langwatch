@@ -1,19 +1,14 @@
 /**
  * The shape of the management command tree, read off the live commander
- * program rather than off a list kept next to it: `buildProgram()` is the
- * ground truth for what the CLI actually registers, so a verb that was never
- * wired up fails here instead of at a customer's terminal.
- *
+ * program -- `buildProgram()` is ground truth, so a verb never wired up
+ * fails here instead of at a customer's terminal.
  * @see specs/typescript-sdk/cli-management-apis.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { FEATURE_MAP } from "../../../../internal/generated/cli/feature-map.generated";
 import { buildProgram } from "../../../program";
-import {
-  buildCatalog,
-  flattenCatalog,
-  type CatalogEntry,
-} from "../../../utils/commandCatalog";
+import { buildCatalog, flattenCatalog, type CatalogEntry } from "../../../utils/commandCatalog";
 
 // program.ts reads the tsup-injected __CLI_VERSION__ build constant; under
 // vitest there is no bundler define, so stub it before buildProgram() runs.
@@ -28,6 +23,7 @@ const MANAGEMENT_GROUPS = [
   "groups",
   "roles",
   "role-bindings",
+  "grants",
   "scim-tokens",
   "organizations",
 ] as const;
@@ -45,9 +41,7 @@ const verbsOf = (group: string): string[] => {
 /** The leaf verbs registered under a nested group, e.g. `teams members`. */
 const nestedVerbsOf = (group: string, nested: string): string[] => {
   const entry = catalog().find((candidate) => candidate.path === group);
-  const child = entry?.children.find(
-    (candidate) => candidate.path === `${group} ${nested}`,
-  );
+  const child = entry?.children.find((candidate) => candidate.path === `${group} ${nested}`);
   return (child?.children ?? []).map((leaf) => leaf.path.split(" ").pop()!);
 };
 
@@ -84,19 +78,8 @@ describe("the management command tree", () => {
 
     /** @scenario Team commands cover the team lifecycle and membership */
     it("gives the teams family its lifecycle plus nested member commands, and add accepts the role", () => {
-      expect(verbsOf("teams")).toEqual([
-        "list",
-        "get",
-        "create",
-        "update",
-        "archive",
-        "members",
-      ]);
-      expect(nestedVerbsOf("teams", "members")).toEqual([
-        "list",
-        "add",
-        "remove",
-      ]);
+      expect(verbsOf("teams")).toEqual(["list", "get", "create", "update", "archive", "members"]);
+      expect(nestedVerbsOf("teams", "members")).toEqual(["list", "add", "remove"]);
       expect(carriesFlag("teams members add", "--role <role>")).toBe(true);
     });
 
@@ -111,16 +94,8 @@ describe("the management command tree", () => {
         "members",
         "bindings",
       ]);
-      expect(nestedVerbsOf("groups", "members")).toEqual([
-        "list",
-        "add",
-        "remove",
-      ]);
-      expect(nestedVerbsOf("groups", "bindings")).toEqual([
-        "list",
-        "add",
-        "remove",
-      ]);
+      expect(nestedVerbsOf("groups", "members")).toEqual(["list", "add", "remove"]);
+      expect(nestedVerbsOf("groups", "bindings")).toEqual(["list", "add", "remove"]);
 
       // A binding is a role at a scope, and may defer to a custom role.
       const addBinding = flagsOf("groups bindings add").join(" ");
@@ -128,6 +103,14 @@ describe("the management command tree", () => {
       expect(addBinding).toContain("--custom-role-id <id>");
       expect(addBinding).toContain("--scope-type <type>");
       expect(addBinding).toContain("--scope-id <id>");
+    });
+
+    /** @scenario The grants commands cover the grant lifecycle */
+    it("gives the grants family its lifecycle, and create accepts an expiry and an idempotency key", () => {
+      expect(verbsOf("grants")).toEqual(["list", "get", "create", "change-role", "revoke"]);
+      expect(carriesFlag("grants create", "--expires-at <iso>")).toBe(true);
+      expect(carriesFlag("grants create", "--idempotency-key <key>")).toBe(true);
+      expect(carriesFlag("roles list", "--built-in")).toBe(true);
     });
 
     /** @scenario Every management command is covered by the feature map */
@@ -145,18 +128,14 @@ describe("the management command tree", () => {
         .filter(
           (entry) =>
             entry.children.length === 0 &&
-            (MANAGEMENT_GROUPS as readonly string[]).includes(
-              entry.path.split(" ")[0]!,
-            ),
+            (MANAGEMENT_GROUPS as readonly string[]).includes(entry.path.split(" ")[0]!),
         )
         .map((entry) => entry.path);
 
       // Canary: an empty list would make the check below pass vacuously.
       expect(managementLeaves.length).toBeGreaterThanOrEqual(40);
 
-      const undeclared = managementLeaves.filter(
-        (path) => !declared.has(path),
-      );
+      const undeclared = managementLeaves.filter((path) => !declared.has(path));
       expect(
         undeclared,
         [

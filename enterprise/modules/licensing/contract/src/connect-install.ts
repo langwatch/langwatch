@@ -1,0 +1,301 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * The install side of Connect as everything outside the feature reads it
+ * (ADR-156, sections 5 and 6): the credential an install presents, the answers
+ * the two hosts give it, and what the Settings screens render from.
+ */
+
+import type { Named } from "@langwatch/module";
+import { z } from "zod";
+
+import { CONNECT_SERVICES } from "./issued-license.ts";
+import type { LicenseError } from "./license-constants.ts";
+
+/** What an install presents on every call to LangWatch. */
+export interface ConnectCredential {
+  readonly token: string;
+  readonly instanceId: string;
+}
+
+/** Where an install's own gateway reaches LangWatch-hosted models, with the credential it presents. */
+export interface ConnectUpstream extends ConnectCredential {
+  /** The Connect gateway endpoint; the slot calls its `/v1`. */
+  readonly baseUrl: string;
+}
+
+/** The seats in use, as the install counts them. */
+export interface LicenseSeatCounts {
+  readonly members: number;
+  readonly liteMembers: number;
+}
+
+const connectSyncAnswerSchemaDefinition = z.object({
+  services: z.array(z.string()),
+  /** A reissued license waiting for this install, sent until it is presented. */
+  license: z.string().optional(),
+});
+export interface ConnectSyncAnswerSchema extends Named<typeof connectSyncAnswerSchemaDefinition> {}
+export const connectSyncAnswerSchema: ConnectSyncAnswerSchema = connectSyncAnswerSchemaDefinition;
+
+/** The hosted services the registry has the license entitled to, and any reissued license. */
+export type LicenseSyncAnswer = z.infer<typeof connectSyncAnswerSchema>;
+
+const connectActivationAnswerSchemaDefinition = z.object({
+  license: z.string().min(1),
+  planType: z.string(),
+  maxMembers: z.number(),
+  expiresAt: z.string(),
+  services: z.array(z.string()),
+});
+export interface ConnectActivationAnswerSchema extends Named<
+  typeof connectActivationAnswerSchemaDefinition
+> {}
+export const connectActivationAnswerSchema: ConnectActivationAnswerSchema =
+  connectActivationAnswerSchemaDefinition;
+
+/** The license an activation code minted, as it comes back. */
+export type ActivationAnswer = z.infer<typeof connectActivationAnswerSchema>;
+
+const connectBudgetSchemaDefinition = z.object({
+  id: z.string(),
+  scope: z.string(),
+  window: z.string(),
+  cap_usd: z.number(),
+  spent_usd: z.number().nullable(),
+  remaining_usd: z.number().nullable(),
+  on_breach: z.string(),
+  period_started_at: z.string(),
+  is_contract: z.boolean(),
+});
+export interface ConnectBudgetSchema extends Named<typeof connectBudgetSchemaDefinition> {}
+export const connectBudgetSchema: ConnectBudgetSchema = connectBudgetSchemaDefinition;
+
+const connectContractSchemaDefinition = z.object({
+  ...connectBudgetSchema.shape,
+  commit_usd: z.number(),
+  maximum_cap_usd: z.number(),
+  overage_enabled: z.boolean(),
+  term_ends_at: z.string().nullable(),
+});
+export interface ConnectContractSchema extends Named<typeof connectContractSchemaDefinition> {}
+export const connectContractSchema: ConnectContractSchema = connectContractSchemaDefinition;
+
+/**
+ * The published shape of the usage answer. Both halves parse against it, which
+ * is what keeps the hosted route and the install from drifting apart.
+ */
+const connectUsageAnswerSchemaDefinition = z.object({
+  services: z.array(z.string()),
+  spend_available: z.boolean(),
+  read_at: z.string(),
+  contract: connectContractSchema.nullable(),
+  budgets: z.array(connectBudgetSchema),
+});
+export interface ConnectUsageAnswerSchema extends Named<
+  typeof connectUsageAnswerSchemaDefinition
+> {}
+export const connectUsageAnswerSchema: ConnectUsageAnswerSchema =
+  connectUsageAnswerSchemaDefinition;
+
+const connectSetBudgetAnswerSchemaDefinition = z.object({
+  cap_usd: z.number(),
+  maximum_cap_usd: z.number(),
+});
+export interface ConnectSetBudgetAnswerSchema extends Named<
+  typeof connectSetBudgetAnswerSchemaDefinition
+> {}
+export const connectSetBudgetAnswerSchema: ConnectSetBudgetAnswerSchema =
+  connectSetBudgetAnswerSchemaDefinition;
+
+const connectVerdictSchemaDefinition = z.object({
+  questionId: z.string(),
+  probability: z.number().optional(),
+  score: z.number().optional(),
+  label: z.string().optional(),
+  probabilities: z.record(z.string(), z.number()).optional(),
+});
+export interface ConnectVerdictSchema extends Named<typeof connectVerdictSchemaDefinition> {}
+export const connectVerdictSchema: ConnectVerdictSchema = connectVerdictSchemaDefinition;
+
+const connectClassifyAnswerSchemaDefinition = z.object({
+  verdicts: z.array(connectVerdictSchema),
+  skipped_reason: z.string().optional(),
+  input_tokens: z.number(),
+  is_text_truncated: z.boolean(),
+  charged_usd: z.number(),
+});
+export interface ConnectClassifyAnswerSchema extends Named<
+  typeof connectClassifyAnswerSchemaDefinition
+> {}
+export const connectClassifyAnswerSchema: ConnectClassifyAnswerSchema =
+  connectClassifyAnswerSchemaDefinition;
+
+/** One judged text, as the host answers it. */
+export interface ConnectClassifyAnswer {
+  readonly verdicts: z.infer<typeof connectVerdictSchema>[];
+  readonly skippedReason?: string;
+  readonly inputTokens: number;
+  readonly isTextTruncated: boolean;
+  readonly chargedUsd: number;
+}
+
+export type ConnectBudgetView = z.infer<typeof connectBudgetViewSchema>;
+
+export type ConnectContractView = z.infer<typeof connectContractViewSchema>;
+
+export type ConnectUsageView = z.infer<typeof connectUsageViewSchema>;
+
+/** What a refused read came back as, for the page to render its own copy. */
+export type ConnectRefusal = z.infer<typeof connectRefusalSchema>;
+
+/** Where the daily license sync stands (ADR-156, section 6). */
+export type ConnectSyncView = z.infer<typeof connectSyncViewSchema>;
+
+/**
+ * What Settings, Connect renders. `deployment: "off"` is the escape hatch an
+ * auditor asks for: this install builds no client and makes no outbound call.
+ */
+export type ConnectStatus = z.infer<typeof connectStatusSchema>;
+
+/** What one sync of one organization did with the answer it got back. */
+export type LicenseSyncOutcome =
+  | { readonly outcome: "unchanged" }
+  | { readonly outcome: "updated"; readonly maxMembers: number; readonly expiresAt: string }
+  | { readonly outcome: "delivered_invalid"; readonly error: LicenseError };
+
+/**
+ * What an administrator pressing "Refresh license" is told. A license the host
+ * delivered that does not verify is not applied, and is thrown rather than
+ * answered, so the page shows the same refusal the daily pass recorded.
+ */
+export type LicenseRefreshOutcome = Exclude<
+  LicenseSyncOutcome,
+  { readonly outcome: "delivered_invalid" }
+>;
+
+/** The views above, as the wire carries them. */
+const connectBudgetViewSchemaDefinition = z.object({
+  id: z.string(),
+  scope: z.string(),
+  window: z.string(),
+  capUsd: z.number(),
+  spentUsd: z.number().nullable(),
+  remainingUsd: z.number().nullable(),
+  onBreach: z.string(),
+  periodStartedAt: z.string(),
+  isContract: z.boolean(),
+});
+export interface ConnectBudgetViewSchema extends Named<typeof connectBudgetViewSchemaDefinition> {}
+export const connectBudgetViewSchema: ConnectBudgetViewSchema = connectBudgetViewSchemaDefinition;
+
+const connectContractViewSchemaDefinition = z.object({
+  ...connectBudgetViewSchema.shape,
+  commitUsd: z.number(),
+  maximumCapUsd: z.number(),
+  overageEnabled: z.boolean(),
+  termEndsAt: z.string().nullable(),
+});
+export interface ConnectContractViewSchema extends Named<
+  typeof connectContractViewSchemaDefinition
+> {}
+export const connectContractViewSchema: ConnectContractViewSchema =
+  connectContractViewSchemaDefinition;
+
+const connectUsageViewSchemaDefinition = z.object({
+  services: z.array(z.string()),
+  spendAvailable: z.boolean(),
+  readAt: z.string(),
+  contract: connectContractViewSchema.nullable(),
+  budgets: z.array(connectBudgetViewSchema),
+});
+export interface ConnectUsageViewSchema extends Named<typeof connectUsageViewSchemaDefinition> {}
+export const connectUsageViewSchema: ConnectUsageViewSchema = connectUsageViewSchemaDefinition;
+
+const connectRefusalSchema = z.object({ code: z.string(), meta: z.unknown().optional() });
+
+const connectSyncViewSchema = z.object({
+  lastSyncAt: z.string().nullable(),
+  lastError: z.object({ code: z.string() }).nullable(),
+});
+
+const connectStatusSchemaDefinition = z.union([
+  z.object({ deployment: z.literal("off") }),
+  z.object({
+    deployment: z.literal("on"),
+    gatewayHost: z.string(),
+    licensed: z.boolean(),
+    enabledServices: z.array(z.enum(CONNECT_SERVICES)),
+    entitledServices: z.array(z.string()).nullable(),
+    usage: connectUsageViewSchema.nullable(),
+    refusal: connectRefusalSchema.nullable(),
+    isUsageUnavailable: z.boolean(),
+    sync: connectSyncViewSchema,
+  }),
+]);
+export interface ConnectStatusSchema extends Named<typeof connectStatusSchemaDefinition> {}
+export const connectStatusSchema: ConnectStatusSchema = connectStatusSchemaDefinition;
+
+const connectServicesSetSchemaDefinition = z.object({
+  enabledServices: z.array(z.enum(CONNECT_SERVICES)),
+});
+export interface ConnectServicesSetSchema extends Named<
+  typeof connectServicesSetSchemaDefinition
+> {}
+export const connectServicesSetSchema: ConnectServicesSetSchema =
+  connectServicesSetSchemaDefinition;
+
+const connectCapSetSchemaDefinition = z.object({
+  capUsd: z.number(),
+  maximumCapUsd: z.number(),
+});
+export interface ConnectCapSetSchema extends Named<typeof connectCapSetSchemaDefinition> {}
+export const connectCapSetSchema: ConnectCapSetSchema = connectCapSetSchemaDefinition;
+
+const licenseRefreshOutcomeSchemaDefinition = z.union([
+  z.object({ outcome: z.literal("unchanged") }),
+  z.object({ outcome: z.literal("updated"), maxMembers: z.number(), expiresAt: z.string() }),
+]);
+export interface LicenseRefreshOutcomeSchema extends Named<
+  typeof licenseRefreshOutcomeSchemaDefinition
+> {}
+export const licenseRefreshOutcomeSchema: LicenseRefreshOutcomeSchema =
+  licenseRefreshOutcomeSchemaDefinition;
+
+/**
+ * The install's identity row, for the usage report and the checkup (ADR-156,
+ * section 9). Times are ISO 8601; an absent report field means none was sent.
+ */
+export interface InstanceIdentityView {
+  readonly instanceId: string;
+  readonly createdAt: string;
+  readonly lastReportAt?: string;
+  readonly lastReportError?: string;
+  readonly optionalMetricsOptOut: boolean;
+  readonly hostnameOptOut: boolean;
+}
+
+/** One hosted service's answer in its two halves, since each refusal has its own remedy. */
+export interface ConnectServiceState {
+  /** The license names the service. */
+  readonly isEntitled: boolean;
+  /** Named, and no organization admin switched it off. */
+  readonly isSwitchedOn: boolean;
+}
+
+/** What the deployment decided about Connect, and whether any license here names a hosted service. */
+export interface ConnectDeploymentView {
+  /** False where LANGWATCH_CONNECT_DISABLED is set: the install opens no connection to LangWatch. */
+  readonly permitted: boolean;
+  /** Some organization's license on this install names a hosted service. */
+  readonly connected: boolean;
+  readonly licenseEndpoint: string;
+  readonly gatewayEndpoint: string;
+  /** `override` where LANGWATCH_LICENSE_PUBLIC_KEY replaces the key compiled in. */
+  readonly licenseKeySource: "embedded" | "override";
+  /** The first 16 hex characters of the SHA-256 of the verifying key; never the key. */
+  readonly licenseKeyFingerprint: string;
+  /** The instance license, else the first organization's; null where the install holds none. */
+  readonly licenseId: string | null;
+  /** Whether that license's signature verified; null where the install holds none. */
+  readonly licenseVerified: boolean | null;
+}

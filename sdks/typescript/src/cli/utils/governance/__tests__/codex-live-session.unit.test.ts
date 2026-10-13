@@ -1,8 +1,6 @@
 /**
- * Which codex session is live: the one hot rollout inside the window, because
- * codex exports nothing about itself into the processes a session spawns.
- * Two hot rollouts mean two sessions asking at once and resolve to nothing.
- *
+ * Which codex session is live: the one hot rollout inside the window --
+ * codex exports nothing about itself into spawned processes.
  * Feature: specs/ai-governance/cli-wrappers/session-context-declare.feature
  */
 
@@ -12,10 +10,7 @@ import * as path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  type CodexSessionResolution,
-  resolveLiveCodexSession,
-} from "../codex-live-session";
+import { type CodexSessionResolution, resolveLiveCodexSession } from "../codex-live-session";
 
 /** The resolved session, or a readable failure naming what came back instead. */
 function sessionOf(resolution: CodexSessionResolution) {
@@ -55,10 +50,7 @@ function writeRollout({
 }): string {
   const dir = path.join(sessionsRoot, "2026", "08", day);
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(
-    dir,
-    filename ?? `rollout-2026-08-22T10-00-00-${sessionId}.jsonl`,
-  );
+  const file = path.join(dir, filename ?? `rollout-2026-08-22T10-00-00-${sessionId}.jsonl`);
   fs.writeFileSync(
     file,
     (
@@ -108,7 +100,7 @@ describe("resolving the live codex session", () => {
 
       expect(live.kind).toBe("ambiguous");
       expect(live.kind === "ambiguous" && live.sessionIds).toEqual(
-        [SESSION_A, SESSION_B].sort(),
+        [SESSION_A, SESSION_B].toSorted(),
       );
     });
   });
