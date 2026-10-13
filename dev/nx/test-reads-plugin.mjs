@@ -184,9 +184,8 @@ export const reads = {
   ],
   "@langwatch/onboarding-browser": ["apps/ui/src/shell/route-patterns.generated.json"],
   "@langwatch/analytics-browser": [
-    "apps/ui/public/images/dashboards/templates/*",
+    "apps/ui/public/images/dashboards/templates/**/*",
     "pnpm-workspace.yaml",
-    "apps/ui/**/*",
   ],
   "@langwatch/webhook-verify": ["specs/webhooks/signature-vectors.json"],
   "@langwatch/oxlint-rules": [
