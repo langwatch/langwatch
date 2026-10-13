@@ -75,7 +75,7 @@ type AggregateReconcilerDependencies = {
 /**
  * ADR-177 decision 3 (main's AggregateReconciler): one live shared trace read per member the
  * aggregate's rule selects, and a revoke for each that stopped matching. Each run holds the
- * aggregate's lock, so a trigger and the sweep never both attach one member. Logs ids and counts.
+ * aggregate's lock, so two triggers never both attach one member. Logs ids and counts.
  */
 export class AggregateReconcilerService {
   static create(deps: AggregateReconcilerDependencies): AggregateReconcilerService {
@@ -113,7 +113,7 @@ export class AggregateReconcilerService {
     return [...live, ...retiring];
   }
 
-  /** Every live aggregate of every organisation, for the daily sweep. */
+  /** Every live aggregate of every organisation, for the one-off full-history backfill. */
   liveAggregates(): Promise<LiveAggregate[]> {
     return this.deps.projects.findAllLiveAggregates();
   }

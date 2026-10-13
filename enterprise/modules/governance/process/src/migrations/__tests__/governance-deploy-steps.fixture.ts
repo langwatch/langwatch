@@ -15,6 +15,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   createTenantId,
   EventSourcing,
+  type ProcessStore,
   type ReplayEventSource,
   ReplayService,
 } from "@langwatch/eventing";
@@ -82,10 +83,14 @@ function replayEngineOver(eventSource: ReplayEventSource) {
 /** A governance worker over memory twins whose billed facts land in a readable event store. */
 export async function bootGovernanceWorker({
   organization = createApiFixture<OrganizationApi>(),
+  project = createApiFixture<ProjectApi>(),
   replaySource,
+  processStore,
 }: {
   organization?: OrganizationApi;
+  project?: ProjectApi;
   replaySource?: ReplayEventSource;
+  processStore?: ProcessStore;
 } = {}) {
   const eventStore = EventStoreMemory.createForTesting();
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }).withEnv());
@@ -105,12 +110,13 @@ export async function bootGovernanceWorker({
         // A worker's participation, so the charge map and the cost rollup are registered.
         participation: "consume",
         ...(replaySource === undefined ? {} : { replayEngine: replayEngineOver(replaySource) }),
+        ...(processStore === undefined ? {} : { processStore }),
       }),
     )
     .provide({
       "data-retention": createApiFixture<DataRetentionApi>({}),
       agent: createApiFixture<AgentApi>(),
-      project: createApiFixture<ProjectApi>(),
+      project,
       auth: createApiFixture<AuthApi>(),
       entitlement: createApiFixture<EntitlementApi>(),
       organization,

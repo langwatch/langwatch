@@ -192,7 +192,6 @@ import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.c
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
 import { OutboxAggregateReconcile } from "../eventing/aggregate-reconcile.intent.ts";
-import { enqueueMemberAggregates } from "../eventing/aggregate-reconcile.subscriber.ts";
 import {
   OutboxAnomalyAlertDelivery,
   requestAnomalyAlertDelivery,
@@ -241,10 +240,7 @@ import { GovernanceCostBreakdownService } from "../features/cost/services/govern
 import { GovernanceCostNoticesService } from "../features/cost/services/governance-cost-notices.service.ts";
 import { GovernanceCostSummaryService } from "../features/cost/services/governance-cost-summary.service.ts";
 import { DatabricksGeniePullerService } from "../features/databricks-genie/services/databricks-genie-puller.service.ts";
-import {
-  DepartmentService,
-  type MemberDepartmentAssigned,
-} from "../features/identity/services/department.service.ts";
+import { DepartmentService } from "../features/identity/services/department.service.ts";
 import { DirectoryDepartmentSyncService } from "../features/identity/services/directory-department-sync.service.ts";
 import { ErasureSuppressionService } from "../features/identity/services/erasure-suppression.service.ts";
 import { GovernancePeopleScreenService } from "../features/identity/services/governance-people-screen.service.ts";
@@ -299,6 +295,7 @@ import { governanceOperatorReads } from "../repositories/prisma/prisma.suppressi
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
 import { exemptOriginsOf, vendorBasesOf, type VendorBases } from "../rules/vendor-bases.rules.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
+import { AggregateReconcileBackfillService } from "../services/aggregate-reconcile-backfill.service.ts";
 import { AggregateReconcilerService } from "../services/aggregate-reconciler.service.ts";
 import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catalog.service.ts";
 import { ModelProviderAiToolCatalogService } from "../services/ai-tool-provider-catalog.service.ts";
@@ -619,6 +616,10 @@ export class GovernanceModule implements GovernanceRestApi {
       grants: dependencies.permissions,
       now: nowInstant,
     });
+    this.aggregateReconcileBackfill = AggregateReconcileBackfillService.create({
+      reconciler: this.aggregateReconciler,
+      outbox: () => this.#aggregateReconcileOutbox,
+    });
     this.anomalyWebhookMigration = AnomalyWebhookDestinationMigrationService.create({
       rules: repositories.anomalyRules,
       organizationIds: (input) => dependencies.organizations.listAllIds(input),
@@ -662,9 +663,6 @@ export class GovernanceModule implements GovernanceRestApi {
       repository: repositories.departments,
       organizations: dependencies.organizations,
       projects: dependencies.projects,
-      // ponytail: no outbox in this process -> organization's member_department_changed fact and the sweep reconcile.
-      onMemberDepartmentAssigned: (fact) =>
-        this.#memberAggregateReconcile?.(fact) ?? Promise.resolve(),
     });
     this.erasureSuppression = erasureSuppression;
     // One instance: the erasure refreshes the very snapshot the cost fold reads (ADR-128 §9 step 5).
@@ -984,6 +982,8 @@ export class GovernanceModule implements GovernanceRestApi {
   readonly codingAssistantBilling: CodingAssistantBillingFactService;
   /** ADR-177 decision 3: aggregate members as shared reads; the reconcile process manager runs it. */
   readonly aggregateReconciler: AggregateReconcilerService;
+  /** ADR-177 v4.11: the deploy step queueing one reconcile per live aggregate, once. */
+  readonly aggregateReconcileBackfill: AggregateReconcileBackfillService;
   /** W-11: the deploy step moving inline anomaly webhooks onto endpoints. */
   readonly anomalyWebhookMigration: AnomalyWebhookDestinationMigrationService;
   private readonly people: GovernancePeopleScreenService;
@@ -1085,19 +1085,15 @@ export class GovernanceModule implements GovernanceRestApi {
     return this.spendSpikes.evaluateAll();
   }
 
-  #memberAggregateReconcile: MemberDepartmentAssigned | undefined;
+  #aggregateReconcileOutbox: OutboxAggregateReconcile | undefined;
 
-  /** A built pipeline means an outbox: this module's own department writes enqueue reconciles. */
+  /** A built pipeline means an outbox: the one-off backfill queues its reconciles in it. */
   connectAggregateReconcileOutbox({
     processStore,
   }: {
     processStore: Pick<ProcessStore, "appendIntents">;
   }): void {
-    this.#memberAggregateReconcile = enqueueMemberAggregates({
-      reconciler: this.aggregateReconciler,
-      outbox: OutboxAggregateReconcile.create(processStore),
-      trigger: "department-write",
-    });
+    this.#aggregateReconcileOutbox = OutboxAggregateReconcile.create(processStore);
   }
 
   #anomalyAlertOutbox: OutboxAnomalyAlertDelivery | undefined;
