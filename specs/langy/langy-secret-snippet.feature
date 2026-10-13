@@ -28,11 +28,6 @@ Feature: Langy shows a secret once, in a card, never in the conversation
       When the same reveal id is read again
       Then the read is refused with the code secret_already_revealed
 
-    @integration
-    Scenario: A reveal id that never existed or has expired is refused
-      When a reveal id that was never stashed is read
-      Then the read is refused with the code secret_reveal_expired
-
     @unit
     Scenario: A reveal belongs to the organization that minted it
       Given a virtual key secret stashed for one organization

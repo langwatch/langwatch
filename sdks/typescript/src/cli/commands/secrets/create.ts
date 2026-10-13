@@ -1,31 +1,28 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+
 /**
- * Returns the created secret's metadata rather than printing it: the output
- * port renders it in whatever format the caller asked for (utils/output.ts).
- *
- * `data` is `{ id, name }` — the whole create response. The VALUE the caller
- * passed in `--value` is never echoed back by the server and is never put in
- * the payload here: unlike an API key or virtual key, the caller already holds
- * this secret, so there is nothing a machine caller gains from re-emitting it
- * and a great deal it risks.
+ * Return secret metadata { id, name }; never echo --value back.
  */
 export const createSecretCommand = async (
   name: string,
-  options: { value: string }
+  options: { value: string },
 ): Promise<CommandResult | void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
+  if (!credentials.projectId) {
+    throw new Error("A project must be selected for secret operations");
+  }
 
   if (!/^[A-Z][A-Z0-9_]*$/.test(name)) {
     reportCommandError({
@@ -37,19 +34,22 @@ export const createSecretCommand = async (
   }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Creating secret "${name}"...`).start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/secrets`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/secrets`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+        ...buildRequestHeaders({ apiKey }),
       },
-      body: JSON.stringify({ name, value: options.value }),
+      body: JSON.stringify({
+        projectId: credentials.projectId,
+        name,
+        value: options.value,
+      }),
     });
 
     if (!response.ok) {

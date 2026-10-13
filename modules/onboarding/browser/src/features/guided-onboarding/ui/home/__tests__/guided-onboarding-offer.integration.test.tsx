@@ -1,0 +1,280 @@
+/**
+ * @vitest-environment jsdom
+ * @see specs/home/guided-onboarding-offer.feature
+ */
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
+
+const emitMock = vi.fn();
+const beginPathMutate = vi.fn();
+const recordTourMutate = vi.fn();
+const dock = vi.fn();
+const queueKickoff = vi.fn();
+const failed = vi.fn();
+
+vi.mock("react-contextual-analytics", () => ({
+  AnalyticsBoundary: ({ children }: { children: unknown }) => children,
+  useAnalytics: () => ({ emit: emitMock }),
+}));
+
+vi.mock("../../../../../behavior/onboarding-api.ts", () => ({
+  onboardingApi: {
+    useUtils: () => ({ onboarding: { getGuidedState: { invalidate: vi.fn() } } }),
+    onboarding: {
+      beginPath: { useMutation: () => ({ mutateAsync: beginPathMutate }) },
+      recordTour: { useMutation: () => ({ mutate: recordTourMutate }) },
+      attachConversation: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+  },
+}));
+
+let guided: {
+  enabled: boolean;
+  state: Record<string, unknown> | null;
+};
+vi.mock("../../../behavior/use-guided-onboarding.ts", () => ({
+  useGuidedOnboardingFlag: () => ({ enabled: guided.enabled, organizationId: "org_1" }),
+  useGuidedOnboarding: () => ({ state: guided.state }),
+}));
+
+let ambientProject: { id: string; name: string; slug: string } | undefined;
+vi.mock("../../../../../model/onboarding-host.ts", () => ({
+  useOnboardingHost: () => ({
+    scope: () => ({ organization: { id: "org_1", name: "Acme" }, project: ambientProject }),
+    currentUser: () => ({ id: "u1", name: "Ada Lovelace" }),
+    failed,
+    langy: () => ({
+      dock,
+      queueKickoff,
+      onScopeAnnounced: (_id: string, callback: () => void) => {
+        callback();
+        return () => undefined;
+      },
+    }),
+  }),
+}));
+
+import { useGuidedTourStore } from "../../../behavior/guided-tour-store.ts";
+import GuidedOnboardingOffer from "../guided-onboarding-offer.tsx";
+
+const guidedState = (over: Record<string, unknown> = {}) => ({
+  variant: "guided",
+  paths: ["llmops", "gateway"],
+  currentPath: null,
+  donePaths: [],
+  conversationId: null,
+  ...over,
+});
+
+function renderOffer(props: {
+  space: "project" | "me" | "gateway" | "governance";
+  spaceInUse?: boolean | null;
+}) {
+  return render(
+    <DesignSystemProvider forcedTheme="light">
+      <GuidedOnboardingOffer {...props} />
+    </DesignSystemProvider>,
+  );
+}
+
+const pill = () => screen.queryByTestId("guided-onboarding-offer");
+
+describe("GuidedOnboardingOffer", () => {
+  beforeEach(() => {
+    guided = { enabled: true, state: guidedState() };
+    beginPathMutate.mockResolvedValue(guidedState({ currentPath: "gateway" }));
+    useGuidedTourStore.setState({ running: false });
+  });
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  describe("given a space that reads as empty", () => {
+    /** @scenario the offer shows on the project home under the search bar */
+    /** @scenario the offer shows on the gateway, governance and personal homes */
+    it("shows the pill in every space", () => {
+      for (const space of ["project", "gateway", "governance", "me"] as const) {
+        const { unmount } = renderOffer({ space, spaceInUse: false });
+        expect(pill()).toHaveTextContent("Start guided onboarding");
+        unmount();
+      }
+    });
+
+    /** @scenario a space the user never picked is offered too */
+    it("offers a space whose path was not among the picked ones", () => {
+      guided.state = guidedState({ paths: ["llmops"] });
+      renderOffer({ space: "governance", spaceInUse: false });
+      expect(pill()).not.toBeNull();
+    });
+
+    /** @scenario the offer is hidden while Langy is guiding that same space */
+    it("hides while Langy guides that space", () => {
+      guided.state = guidedState({ currentPath: "llmops" });
+      renderOffer({ space: "project", spaceInUse: false });
+      expect(pill()).toBeNull();
+    });
+
+    /** @scenario the offer is hidden once the space is done */
+    it("hides once the space is done", () => {
+      guided.state = guidedState({ donePaths: ["gateway"] });
+      renderOffer({ space: "gateway", spaceInUse: false });
+      expect(pill()).toBeNull();
+    });
+
+    /** @scenario the offer is hidden while a tour is on screen */
+    it("hides while a tour runs", () => {
+      useGuidedTourStore.setState({ running: true });
+      renderOffer({ space: "gateway", spaceInUse: false });
+      expect(pill()).toBeNull();
+    });
+
+    /** @scenario a path picked on the value screen but not started yet is offered in its space */
+    it("offers a picked path that has not started", () => {
+      guided.state = guidedState({ paths: ["llmops", "gateway"], currentPath: "llmops" });
+      renderOffer({ space: "gateway", spaceInUse: false });
+      expect(pill()).not.toBeNull();
+    });
+
+    /** @scenario the classic variant never shows the offer */
+    it("never shows for the classic variant", () => {
+      guided.state = guidedState({ variant: "classic" });
+      renderOffer({ space: "project", spaceInUse: false });
+      expect(pill()).toBeNull();
+    });
+  });
+
+  describe("given the space is in use or not yet known", () => {
+    /** @scenario the offer waits until it knows whether the space is in use */
+    it("stays hidden while unknown", () => {
+      renderOffer({ space: "gateway", spaceInUse: null });
+      expect(pill()).toBeNull();
+    });
+
+    /** @scenario a gateway with virtual keys is not offered the guided onboarding */
+    it("stays hidden once the space is in use", () => {
+      renderOffer({ space: "gateway", spaceInUse: true });
+      expect(pill()).toBeNull();
+    });
+  });
+
+  describe("given a space already in use", () => {
+    /** @scenario the offer is hidden on a project that already has traces */
+    it("stays hidden on a project that has traces", () => {
+      renderOffer({ space: "project", spaceInUse: true });
+      expect(pill()).toBeNull();
+    });
+
+    /** @scenario a governance home with an ingestion source is not offered the guided onboarding */
+    it("stays hidden on a governance home that is in use", () => {
+      renderOffer({ space: "governance", spaceInUse: true });
+      expect(pill()).toBeNull();
+    });
+
+    /** @scenario a personal home with a personal key or usage is not offered the guided onboarding */
+    it("stays hidden on a personal home that is in use", () => {
+      renderOffer({ space: "me", spaceInUse: true });
+      expect(pill()).toBeNull();
+    });
+  });
+
+  describe("given the governance home renders with some project ambient", () => {
+    beforeEach(() => {
+      ambientProject = { id: "proj_1", name: "Checkout bot", slug: "checkout-bot" };
+    });
+    afterEach(() => {
+      ambientProject = undefined;
+    });
+
+    /** @scenario the gateway, governance and personal homes read the organization's guided state */
+    it("follows the organization's guided state and the space's own use, never the project's", () => {
+      const { unmount } = renderOffer({ space: "governance", spaceInUse: false });
+      expect(pill()).toHaveTextContent("Start guided onboarding");
+      unmount();
+
+      guided.state = guidedState({ donePaths: ["governance"] });
+      renderOffer({ space: "governance", spaceInUse: false });
+      expect(pill()).toBeNull();
+    });
+  });
+
+  describe("given an organization outside the guided variant", () => {
+    /** @scenario an organization outside the guided variant is never offered it on the gateway, governance or personal pages */
+    it("shows no pill on the gateway, governance or personal homes", () => {
+      guided.state = guidedState({ variant: "classic" });
+      for (const space of ["gateway", "governance", "me"] as const) {
+        const { unmount } = renderOffer({ space, spaceInUse: false });
+        expect(pill()).toBeNull();
+        unmount();
+      }
+    });
+  });
+
+  describe("when the pill is clicked", () => {
+    /** @scenario the offer is disabled while the path is being begun */
+    it("disables the pill until the path has begun", async () => {
+      beginPathMutate.mockReturnValue(new Promise(() => undefined));
+      renderOffer({ space: "gateway", spaceInUse: false });
+      fireEvent.click(pill() as HTMLElement);
+      await waitFor(() => expect(pill()).toBeDisabled());
+    });
+
+    /** @scenario clicking the offer begins the path and runs its tour */
+    it("begins the path, docks Langy and starts the tour", async () => {
+      renderOffer({ space: "gateway", spaceInUse: false });
+      fireEvent.click(pill() as HTMLElement);
+      await waitFor(() => expect(useGuidedTourStore.getState().running).toBe(true));
+      expect(beginPathMutate).toHaveBeenCalledWith({ organizationId: "org_1", path: "gateway" });
+      expect(dock).toHaveBeenCalledTimes(1);
+      expect(emitMock).toHaveBeenCalledWith("clicked", "home_offer", { path: "gateway" });
+    });
+
+    /** @scenario the kickoff continues the attached conversation when the tour ends */
+    it("queues one kickoff that continues the attached conversation once the tour ends", async () => {
+      guided.state = guidedState({ conversationId: "conv_1" });
+      beginPathMutate.mockResolvedValue(
+        guidedState({ currentPath: "gateway", conversationId: "conv_1" }),
+      );
+      renderOffer({ space: "gateway", spaceInUse: false });
+      fireEvent.click(pill() as HTMLElement);
+      await waitFor(() => expect(useGuidedTourStore.getState().running).toBe(true));
+      expect(queueKickoff).not.toHaveBeenCalled();
+
+      act(() => useGuidedTourStore.getState().end("completed"));
+
+      expect(queueKickoff).toHaveBeenCalledTimes(1);
+      expect(queueKickoff).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: "conv_1",
+          brief: expect.stringMatching(/^Let's set up Gateway then\./),
+          onConversationNamed: undefined,
+          parts: [
+            expect.objectContaining({ type: "guided-onboarding-kickoff", path: "gateway" }),
+            expect.objectContaining({ type: "text" }),
+          ],
+        }),
+      );
+    });
+
+    /** @scenario the coding offer queues the kickoff with no tour */
+    it("queues the coding kickoff straight away", async () => {
+      beginPathMutate.mockResolvedValue(guidedState({ currentPath: "coding" }));
+      renderOffer({ space: "me", spaceInUse: false });
+      fireEvent.click(pill() as HTMLElement);
+      await waitFor(() => expect(queueKickoff).toHaveBeenCalledTimes(1));
+      expect(useGuidedTourStore.getState().running).toBe(false);
+    });
+
+    /** @scenario a failed begin keeps the offer and shows the error */
+    it("keeps the pill and reports the failure", async () => {
+      const error = new Error("refused");
+      beginPathMutate.mockRejectedValue(error);
+      renderOffer({ space: "gateway", spaceInUse: false });
+      fireEvent.click(pill() as HTMLElement);
+      await waitFor(() => expect(failed).toHaveBeenCalledWith(expect.objectContaining({ error })));
+      expect(pill()).not.toBeNull();
+    });
+  });
+});

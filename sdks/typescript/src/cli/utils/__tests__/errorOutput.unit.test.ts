@@ -1,15 +1,24 @@
+import {
+  type LangWatchHandledErrorShape,
+  readCliErrorDocument,
+} from "@langwatch/handled-error/langwatch-handled-error";
+import chalk from "chalk";
+
+/** The CLI error document stdout carried; these cases all expect one. */
+function cliErrorDocument(output: unknown): LangWatchHandledErrorShape {
+  const read = readCliErrorDocument(output);
+  if (read.kind !== "error") throw new Error("stdout held no CLI error document");
+  return read.error;
+}
+
 /**
  * How a failure is rendered, in each of the two shapes a caller can ask for.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import chalk from "chalk";
-import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
 
 import { LangWatchHandledError } from "@/internal/api/errors";
-import {
-  ExecutionContext,
-  withExecutionContext,
-} from "../../daemon/execution";
+
+import { ExecutionContext, withExecutionContext } from "../../daemon/execution";
 import {
   commandValidationError,
   currentOutputScope,
@@ -31,10 +40,11 @@ const handledError = ({
   traceId = "4bf92f3577b34da6a3ce929d0e0e4736" as string | undefined,
   traceUrl = undefined as string | undefined,
   reasons = undefined as
-    | { kind: string; meta?: Record<string, unknown> }[]
+    | { kind: string; retryable?: boolean; meta?: Record<string, unknown> }[]
     | undefined,
   suggestions = undefined as string[] | undefined,
   docUrl = undefined as string | undefined,
+  retryable = false,
 } = {}) =>
   new LangWatchHandledError({
     handled: {
@@ -44,14 +54,18 @@ const handledError = ({
       httpStatus,
       meta,
       isHandled: true,
+      retryable,
       traceId,
       traceUrl,
-      reasons,
+      reasons: reasons?.map((reason) => ({
+        ...reason,
+        retryable: reason.retryable ?? false,
+      })),
       suggestions,
       docUrl,
     },
     body: { error: code, message, ...meta },
-    operation: "GET /api/dataset/sales-q3",
+    operation: "GET /api/v1/dataset/sales-q3",
     message,
   });
 
@@ -102,7 +116,7 @@ describe("given a failure the platform named", () => {
   describe("when rendering it for a machine", () => {
     it("emits a document a parser can read the code, meta and trace id out of", () => {
       const json = renderErrorAsJson(readCommandError(handledError()));
-      const parsed = readCliErrorDocument(json);
+      const parsed = cliErrorDocument(json);
 
       expect(parsed).toMatchObject({
         code: "dataset_not_found",
@@ -115,9 +129,7 @@ describe("given a failure the platform named", () => {
     });
 
     it("marks the document as a failure so it cannot be mistaken for a result", () => {
-      const parsed: unknown = JSON.parse(
-        renderErrorAsJson(readCommandError(handledError())),
-      );
+      const parsed: unknown = JSON.parse(renderErrorAsJson(readCommandError(handledError())));
 
       expect(parsed).toMatchObject({ ok: false });
     });
@@ -142,9 +154,7 @@ describe("given a failure the platform named", () => {
 describe("given an infrastructure failure the platform did NOT name", () => {
   describe("when rendering it for a person", () => {
     it("prints the sentence alone, inventing no kind the platform never gave", () => {
-      const rendered = renderErrorForHumans(
-        readCommandError(new Error("fetch failed")),
-      );
+      const rendered = renderErrorForHumans(readCommandError(new Error("fetch failed")));
 
       expect(rendered).toBe("fetch failed");
       expect(rendered).not.toContain("kind");
@@ -153,7 +163,7 @@ describe("given an infrastructure failure the platform did NOT name", () => {
 
   describe("when rendering it for a machine", () => {
     it("says plainly that this was not the caller's fault", () => {
-      const parsed = readCliErrorDocument(
+      const parsed = cliErrorDocument(
         renderErrorAsJson(readCommandError(new Error("fetch failed"))),
       );
 
@@ -200,12 +210,6 @@ describe("given a server echoes a credential back in its message", () => {
 
 /**
  * The other half of the redaction contract, and the one it is easy to get wrong.
- *
- * `meta` is a payload the platform CURATES for a user to act on — it never holds
- * a secret by construction. Scrubbing it anyway would be worse than useless: the
- * credential patterns match legitimate identifiers, so an over-eager scrub turns
- * the id the user needed into `[redacted]` and hides the answer inside the error
- * that was supposed to give it.
  */
 describe("given a domain error whose meta holds an actionable identifier", () => {
   const withKeyLikeIds = () =>
@@ -227,9 +231,7 @@ describe("given a domain error whose meta holds an actionable identifier", () =>
 
   describe("when rendering it for a machine", () => {
     it("hands the identifier through so the agent can act on it", () => {
-      const parsed = readCliErrorDocument(
-        renderErrorAsJson(readCommandError(withKeyLikeIds())),
-      );
+      const parsed = cliErrorDocument(renderErrorAsJson(readCommandError(withKeyLikeIds())));
 
       expect(parsed?.meta).toEqual({
         virtualKeyId: "vk-abc123def456",
@@ -285,7 +287,7 @@ describe("given a failure on a command path that has no spinner", () => {
       reportCommandError({ error: handledError(), format: "json" });
 
       const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
-      const parsed = readCliErrorDocument(stdout);
+      const parsed = cliErrorDocument(stdout);
 
       expect(parsed?.kind).toBe("dataset_not_found");
       expect(errorSpy).toHaveBeenCalled();
@@ -311,7 +313,7 @@ describe("given a failure on a command path that has no spinner", () => {
       });
 
       const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
-      const parsed = readCliErrorDocument(stdout);
+      const parsed = cliErrorDocument(stdout);
 
       expect(parsed?.kind).toBe("validation_error");
       expect(parsed?.isHandled).toBe(true);
@@ -337,17 +339,13 @@ describe("given a failure the platform sent advice with", () => {
 
       expect(rendered).toContain("Suggestions:");
       expect(rendered).toContain("  - Raise the budget in the gateway settings");
-      expect(rendered).toContain(
-        "Docs: https://langwatch.ai/docs/ai-gateway/budgets",
-      );
+      expect(rendered).toContain("Docs: https://langwatch.ai/docs/ai-gateway/budgets");
     });
   });
 
   describe("when rendering it for a machine", () => {
     it("carries the advice in the document", () => {
-      const parsed = readCliErrorDocument(
-        renderErrorAsJson(readCommandError(advised())),
-      );
+      const parsed = cliErrorDocument(renderErrorAsJson(readCommandError(advised())));
 
       expect(parsed).toMatchObject({
         code: "budget_exceeded",
@@ -371,7 +369,7 @@ describe("given a failure the platform sent NO advice with", () => {
     });
 
     it("fills the JSON document from the same table", () => {
-      const parsed = readCliErrorDocument(
+      const parsed = cliErrorDocument(
         renderErrorAsJson(readCommandError(handledError({ code: "missing_api_key" }))),
       );
 
@@ -407,22 +405,15 @@ describe("given a failure the platform sent NO advice with", () => {
 });
 
 /**
- * The daemon runs requests that share an execution window CONCURRENTLY, and
- * they can disagree about `--format`/`--agent`. The output context is scoped
- * per request (AsyncLocalStorage, entered by withExecutionContext) precisely
- * so the second writer cannot clobber the first request's error rendering.
+ * The daemon runs requests that share an execution window CONCURRENTLY, and they can
+ * disagree about `--format`/`--agent`.
  */
 describe("given two concurrent daemon requests in one window", () => {
-  const contextFor = (id: string) =>
-    new ExecutionContext(id, () => undefined);
+  const contextFor = (id: string) => new ExecutionContext(id, () => undefined);
 
   describe("when they were invoked with different formats", () => {
     it("renders each request's errors in its OWN format", async () => {
-      const render = (
-        id: string,
-        format: string | undefined,
-        delayMs: number,
-      ): Promise<string> =>
+      const render = (id: string, format: string | undefined, delayMs: number): Promise<string> =>
         withExecutionContext(contextFor(id), async () => {
           setOutputFormat(format);
           // Interleave: yield so the other request records ITS format before
@@ -450,17 +441,14 @@ describe("given two concurrent daemon requests in one window", () => {
       try {
         chalk.level = 1;
 
-        const observed = await withExecutionContext(
-          contextFor("agent"),
-          async () => {
-            disableOutputColor();
-            await new Promise((resolve) => setTimeout(resolve, 1));
-            return {
-              scopeColor: currentOutputScope()?.hasColor,
-              level: chalk.level,
-            };
-          },
-        );
+        const observed = await withExecutionContext(contextFor("agent"), async () => {
+          disableOutputColor();
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          return {
+            scopeColor: currentOutputScope()?.hasColor,
+            level: chalk.level,
+          };
+        });
 
         expect(observed.scopeColor).toBe(false);
         // The whole point: a concurrent request's colour is untouched, because
@@ -514,6 +502,29 @@ describe("given a validation failure with one reason per rejected field", () => 
       expect(rendered).toContain("caused by");
       expect(rendered).toContain("name");
       expect(rendered).toContain("String must contain at least 1 character(s)");
+    });
+  });
+});
+
+describe("given an escalation refusal", () => {
+  const refusal = () =>
+    handledError({
+      code: "grant_exceeds_caller_permissions",
+      message: "You cannot grant a role with permissions you do not hold yourself",
+      httpStatus: 403,
+      meta: { missingPermissions: ["secrets:manage", "project:delete"] },
+      traceId: undefined,
+    });
+
+  describe("when rendering it for a person", () => {
+    /** @scenario An escalation refusal lists the missing permissions */
+    it("lists the missing permissions as words and says what to do instead", () => {
+      const rendered = renderErrorForHumans(readCommandError(refusal()));
+
+      expect(rendered).toContain("secrets:manage, project:delete");
+      expect(rendered).not.toContain('["secrets:manage"');
+      expect(rendered).toContain("only permissions you hold yourself");
+      expect(rendered).toContain("ask someone who holds those permissions");
     });
   });
 });

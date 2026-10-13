@@ -36,3 +36,21 @@ Feature: Unmapped model cost suggestion in span details
     Given I open the span details of a span that has a model but no token counts
     Then I do not see the cost mapping suggestion
     # without tokens there is nothing a cost rule could price
+
+  @integration
+  Scenario: Span without a model shows no suggestion
+    Given I open the span details of a span that has token counts but no model
+    And no cost was computed for that span
+    Then I do not see the cost mapping suggestion
+
+  @integration
+  Scenario: Span whose model a custom cost rule already matches shows no suggestion
+    Given I open the span details of a span that has a model, token counts and no computed cost
+    And the project has a custom cost rule that matches that model
+    Then I do not see the cost mapping suggestion
+
+  @integration
+  Scenario: Span whose model the catalogue already prices shows no suggestion
+    Given I open the span details of a span that has a model, token counts and no computed cost
+    And the static model catalogue prices that model
+    Then I do not see the cost mapping suggestion

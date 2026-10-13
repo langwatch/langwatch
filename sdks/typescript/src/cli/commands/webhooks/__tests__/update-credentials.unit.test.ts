@@ -17,6 +17,7 @@ vi.mock("ora", () => ({
 }));
 
 import { WebhooksApiService } from "@/client-sdk/services/webhooks/webhooks-api.service";
+
 import { updateWebhookCommand } from "../update";
 
 class ProcessExitError extends Error {
@@ -58,8 +59,11 @@ describe("Feature: a queue endpoint's credential mode is switched from the CLI",
     vi.stubEnv("LANGWATCH_SQS_SECRET_ACCESS_KEY", "an-example-secret");
   });
 
-  const sentSqs = (): Record<string, unknown> =>
-    (mockUpdate.mock.calls[0]?.[1] as { sqs: Record<string, unknown> }).sqs;
+  const sentSqs = (): Record<string, unknown> => {
+    const sent = mockUpdate.mock.calls[0]?.[1] as { sqs: Record<string, unknown> } | undefined;
+    if (!sent) throw new Error("expected an update call");
+    return sent.sqs;
+  };
 
   describe("given the endpoint currently uses a static key pair", () => {
     /**
@@ -105,14 +109,12 @@ describe("Feature: a queue endpoint's credential mode is switched from the CLI",
     };
 
     const saidOnStderr = (phrase: string) =>
-      stderr.mock.calls
-        .flat()
-        .some((line: unknown) => String(line).includes(phrase));
+      stderr.mock.calls.flat().some((line: unknown) => String(line).includes(phrase));
 
     it("refuses before sending anything, and says why", async () => {
-      await expect(
-        updateWebhookCommand("wh_1", bothFlags),
-      ).rejects.toBeInstanceOf(ProcessExitError);
+      await expect(updateWebhookCommand("wh_1", bothFlags)).rejects.toBeInstanceOf(
+        ProcessExitError,
+      );
 
       expect(mockUpdate).not.toHaveBeenCalled();
       expect(saidOnStderr("different credential modes")).toBe(true);
@@ -126,9 +128,9 @@ describe("Feature: a queue endpoint's credential mode is switched from the CLI",
     it("names the mode conflict, not the missing secret, when neither is set", async () => {
       vi.stubEnv("LANGWATCH_SQS_SECRET_ACCESS_KEY", "");
 
-      await expect(
-        updateWebhookCommand("wh_1", bothFlags),
-      ).rejects.toBeInstanceOf(ProcessExitError);
+      await expect(updateWebhookCommand("wh_1", bothFlags)).rejects.toBeInstanceOf(
+        ProcessExitError,
+      );
 
       expect(saidOnStderr("different credential modes")).toBe(true);
       expect(saidOnStderr("LANGWATCH_SQS_SECRET_ACCESS_KEY")).toBe(false);

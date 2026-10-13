@@ -1,0 +1,31 @@
+# beta
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+## At a glance
+
+|                |                                       |
+| -------------- | ------------------------------------- |
+| Classification | enterprise (`modules/catalogue.json`) |
+| Subjects       | beta                                  |
+| Halves         | [process](process/README.md)          |
+| Api token      | none                                  |
+| Installed by   | –                                     |
+
+## What beta owns
+
+No table, store, secret or config: beta declares none.
+
+Anything else beta needs belongs to another module and is reached through its `*Api`.
+
+## Peers (static dependencies)
+
+| Name     | Token      | Module                                    |
+| -------- | ---------- | ----------------------------------------- |
+| `alphas` | `AlphaApi` | [alpha](../../../modules/alpha/README.md) |
+
+## Who depends on beta
+
+No module names beta as a peer.
+
+<!-- readme:generated:end -->

@@ -1,21 +1,11 @@
 /**
- * The `say` tool: a line said to the user now, where the call happens.
- *
- * A model that writes its reply once its calls are done puts every line at the
- * end of the turn, under the cards, whatever the skill asked for. This tool
- * gives a line a place of its own: the call is a tool part like any other, so
- * it is streamed, recorded and replayed in the order it happened, and the
- * panel draws its text as ordinary reply prose instead of an activity row.
- *
- * A rule handed in at creation can refuse a line: the tool then throws the
- * rule's own words, pi records the call as errored, and the panel draws
- * nothing for a say that errored. Two rules apply: the guided path's closing
- * line before the complete-path command (guided-turn-end.ts), and a line
- * already said in the turn (below).
+ * The `say` tool: a line said to the user now, streamed and replayed in
+ * place. A rule handed in at creation can refuse it, thrown as an error.
  */
 
-import { Type } from "typebox";
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+
 import type { SettledCall } from "./turn-context.js";
 
 export const SAY_TOOL_NAME = "say";
@@ -43,17 +33,15 @@ export function renderSaid(text: unknown): string {
   return SAID_RESULT;
 }
 
-/** A line as it is compared for repeats: the ends trimmed, runs of whitespace folded to one space. */
+/** A line as compared for repeats: trimmed, runs of whitespace folded to one space. */
 function foldWhitespace(text: string): string {
   return text.trim().replace(/\s+/g, " ");
 }
 
 /**
  * The repeat rule: a line already said in this turn, whitespace aside, is
- * refused and draws nothing. Only the turn's own settled says count, so a
- * later turn may say the line again, and only the ones that were drawn: a
- * say the rules refused was never said. The skill's rule is never to say a
- * line twice; a step 2 block said twice in a row drew twice on film.
+ * refused and draws nothing. Only the turn's own settled, drawn says
+ * count, so a later turn may say the line again.
  */
 export function repeatedLineRefusal({
   text,
@@ -71,7 +59,7 @@ export function repeatedLineRefusal({
   return said ? REPEATED_LINE_PUSHBACK : undefined;
 }
 
-/** A rule over a line about to be said: the words of the refusal, or undefined to let it through. */
+/** A rule over a line about to be said: the refusal's words, or undefined to let it through. */
 export type SayRefusal = (text: string) => string | undefined;
 
 export function createSayExtension({ refuse }: { refuse?: SayRefusal } = {}): InlineExtension {

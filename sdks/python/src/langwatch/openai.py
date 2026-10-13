@@ -46,6 +46,39 @@ from openai.types.chat import ChatCompletion, ChatCompletionChunk
 from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 
 
+
+class OpenAIErrorEnvelope(Exception):
+    """An error body the endpoint returned under a 2xx status.
+
+    Recorded on the span only; it is never raised to the caller.
+    """
+
+    def __init__(self, message: str, error_type: Optional[str] = None):
+        super().__init__(message)
+        self.error_type = error_type
+
+
+def _error_envelope(response: Any) -> Optional[OpenAIErrorEnvelope]:
+    """Read the heartbeat error envelope off a completion without choices."""
+    if getattr(response, "choices", None):
+        return None
+    extra = getattr(response, "model_extra", None)
+    error = extra.get("error") if isinstance(extra, dict) else None
+    if not isinstance(error, dict):
+        return None
+    message = error.get("message")
+    error_type = error.get("type")
+    return OpenAIErrorEnvelope(
+        message if isinstance(message, str) else "completion returned an error body",
+        error_type if isinstance(error_type, str) else None,
+    )
+
+
+def _record_envelope_type(span: Any, envelope: Optional[OpenAIErrorEnvelope]) -> None:
+    if envelope is not None and envelope.error_type is not None:
+        span.set_attributes({"error.type": envelope.error_type})
+
+
 class OpenAITracer:
     """
     Tracing for both Completion and ChatCompletion endpoints
@@ -262,7 +295,7 @@ class OpenAICompletionTracer:
     ):
         text_outputs: Dict[int, str] = {}
         for delta in deltas:
-            for choice in delta.choices:
+            for choice in delta.choices or []:
                 index = choice.index or 0
                 text_outputs[index] = text_outputs.get(index, "") + (choice.text or "")
 
@@ -287,12 +320,15 @@ class OpenAICompletionTracer:
         timestamps: SpanTimestamps,
         **kwargs,
     ):
+        envelope = _error_envelope(response)
+        _record_envelope_type(span, envelope)
         OpenAICompletionTracer.end_span(
             client=client,
             span=span,
+            error=envelope,
             outputs=[
                 TypedValueText(type="text", value=output.text)
-                for output in response.choices
+                for output in response.choices or []
             ],
             metrics=SpanMetrics(
                 prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
@@ -618,7 +654,7 @@ class OpenAIChatCompletionTracer:
         for delta in deltas:
             if hasattr(delta, "usage") and delta.usage is not None:
                 usage = delta.usage
-            for choice in delta.choices:
+            for choice in delta.choices or []:
                 index = choice.index
                 delta = choice.delta
                 if delta.role and index in synthesized_roles:
@@ -722,9 +758,12 @@ class OpenAIChatCompletionTracer:
         timestamps: SpanTimestamps,
         **kwargs,
     ):
+        envelope = _error_envelope(response)
+        _record_envelope_type(span, envelope)
         OpenAIChatCompletionTracer.end_span(
             client=client,
             span=span,
+            error=envelope,
             outputs=[
                 TypedValueChatMessages(
                     type="chat_messages",
@@ -732,7 +771,7 @@ class OpenAIChatCompletionTracer:
                         cast(ChatMessage, output.message.model_dump(exclude_unset=True))
                     ],
                 )
-                for output in response.choices
+                for output in response.choices or []
             ],
             metrics=SpanMetrics(
                 prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
