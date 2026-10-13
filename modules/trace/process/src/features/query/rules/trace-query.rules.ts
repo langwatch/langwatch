@@ -19,7 +19,7 @@ import {
   buildAndChain,
   type EvaluationScope,
 } from "./trace-query-evaluation-scope.rules.ts";
-import { boundedSubquery } from "./trace-query-subquery.rules.ts";
+import { boundedSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
@@ -319,7 +319,7 @@ function translateEventAttribute({
   const pVal = nextParam(ctx, "eventAttrValue");
   ctx.params[pKey] = attrKey;
   ctx.params[pVal] = value;
-  return wrap(
+  return wrapMembership(
     boundedSubquery(
       "stored_spans",
       "StartTime",
@@ -353,7 +353,7 @@ function translateSpanAttribute({
   const pVal = nextParam(ctx, "spanAttrValue");
   ctx.params[pKey] = attrKey;
   ctx.params[pVal] = value;
-  return wrap(
+  return wrapMembership(
     boundedSubquery(
       "stored_spans",
       "StartTime",
@@ -386,12 +386,10 @@ function translateFreeText({
   // stored_spans.SpanName. Both branches evaluate to a definite true/false,
   // never NULL (parity suite pins this), keeping three-valued logic unchanged.
   const content = searchContent ? `ComputedInput ILIKE ${p} OR ComputedOutput ILIKE ${p} OR ` : "";
-  const clause = `(${content}ifNull(TraceName, '') ILIKE ${p} OR ${boundedSubquery(
-    "stored_spans",
-    "StartTime",
-    `SpanName ILIKE ${p}`,
-  )})`;
-  return negated ? `NOT ${clause}` : clause;
+  const own = `${content}ifNull(TraceName, '') ILIKE ${p}`;
+  const spans = boundedSubquery("stored_spans", "StartTime", `SpanName ILIKE ${p}`);
+  // Negated by De Morgan, so the span membership is a `NOT IN` the tenant guard admits.
+  return negated ? `(NOT (${own}) AND ${wrapMembership(spans, true)})` : `(${own} OR ${spans})`;
 }
 
 /**

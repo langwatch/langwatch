@@ -44,12 +44,12 @@ a run (open the suite, Run, wait for Completed, up to 120 s when a worker is inv
 
 ## Known issues
 
-| Issue                                 | Workaround                                              |
-| ------------------------------------- | ------------------------------------------------------- |
-| First route stalls under Vite         | `haven browser goto` the same URL again                 |
+| Issue                                 | Workaround                                                 |
+| ------------------------------------- | ---------------------------------------------------------- |
+| First route stalls under Vite         | `haven browser goto` the same URL again                    |
 | Sign-in 403s                          | Browse the stack's configured hostname from `haven status` |
-| Checkbox click intercepted by overlay | Click the label text                                    |
-| Splash shows but queries resolved     | Wait with `--wait-for`; the chunks are still building   |
+| Checkbox click intercepted by overlay | Click the label text                                       |
+| Splash shows but queries resolved     | Wait with `--wait-for`; the chunks are still building      |
 
 ## After finishing
 

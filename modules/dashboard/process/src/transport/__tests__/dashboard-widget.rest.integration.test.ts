@@ -33,6 +33,7 @@ function mountKey() {
     scope: { tier: "project" as const, id: "project-1" },
   };
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: { authenticate: () => caller, identify: () => caller },
   });

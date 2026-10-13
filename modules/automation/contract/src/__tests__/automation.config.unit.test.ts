@@ -19,6 +19,10 @@ describe("automation server configuration", () => {
         persistDailyCapFree: 50,
         persistDailyCapPaid: 500,
         persistDailyCapEnterprise: 5_000,
+        publicBaseUrl: undefined,
+        slackApiBase: "https://slack.com/api",
+        slackWebhookBase: "https://hooks.slack.com",
+        allowInsecureLocalUrls: false,
       });
     });
   });

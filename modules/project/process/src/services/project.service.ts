@@ -45,9 +45,9 @@ import type { Instant } from "@langwatch/time";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.rules.ts";
 import { isLegacyKeyRevoked } from "../rules/legacy-project-key.rules.ts";
-import { InternalProjectService } from "./internal-project.service.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 import type { ProjectCredentials } from "./project-credentials.service.ts";
+import { ProjectInternalService } from "./project-internal.service.ts";
 import { ProjectMetadataService } from "./project-metadata.service.ts";
 import { ProjectWriteService } from "./project-write.service.ts";
 
@@ -89,7 +89,7 @@ export class ProjectService {
 
   private readonly metadata: ProjectMetadataService;
   private readonly writes: ProjectWriteService;
-  private readonly internal: InternalProjectService;
+  private readonly internal: ProjectInternalService;
   private readonly repository: ProjectRepository;
   private readonly organizations: OrganizationApi;
   private readonly authorization: Pick<AuthzApi, "listUserBindings">;
@@ -106,7 +106,7 @@ export class ProjectService {
   }: {
     metadata: ProjectMetadataService;
     writes: ProjectWriteService;
-    internal: InternalProjectService;
+    internal: ProjectInternalService;
     repository: ProjectRepository;
     organizations: OrganizationApi;
     authorization: Pick<AuthzApi, "listUserBindings">;
@@ -136,7 +136,7 @@ export class ProjectService {
         ...(options.diagnostics ? { diagnostics: options.diagnostics } : {}),
       }),
       writes: ProjectWriteService.create(options),
-      internal: InternalProjectService.create(options),
+      internal: ProjectInternalService.create(options),
       repository: options.repository,
       organizations: options.organizations,
       authorization: options.authorization,
@@ -145,11 +145,11 @@ export class ProjectService {
   }
 
   findInternal(input: InternalProjectQuery): Promise<InternalProject | null> {
-    return this.internal.find(input);
+    return this.internal.findInternal(input);
   }
 
   findInternalIds(input: { kind: InternalProjectKind }): Promise<string[]> {
-    return this.internal.findIds(input);
+    return this.internal.findInternalIds(input);
   }
 
   async resolveTraceDestination(input: TraceDestinationInput): Promise<TraceDestinationDecision> {
@@ -198,7 +198,7 @@ export class ProjectService {
   }
 
   ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {
-    return this.internal.ensure(input);
+    return this.internal.ensureInternal(input);
   }
 
   isPresenceEnabled(input: { projectId: string }): Promise<boolean> {

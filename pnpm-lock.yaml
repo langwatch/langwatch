@@ -1552,9 +1552,6 @@ importers:
       '@langwatch/evaluator-process':
         specifier: workspace:*
         version: link:../../modules/evaluator/process
-      '@langwatch/eventing':
-        specifier: workspace:*
-        version: link:../../packages/eventing
       '@langwatch/experiment-process':
         specifier: workspace:*
         version: link:../../modules/experiment/process
@@ -1712,6 +1709,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../packages/eventing
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../modules/prompt/contract
@@ -4686,9 +4686,6 @@ importers:
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../packages/process
-      '@langwatch/process-stores':
-        specifier: workspace:*
-        version: link:../../../packages/process-stores
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -4723,6 +4720,9 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../../api-key/contract
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -5358,9 +5358,6 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
-      '@langwatch/task':
-        specifier: workspace:*
-        version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -6128,9 +6125,6 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
-      '@langwatch/system-migrations':
-        specifier: workspace:*
-        version: link:../../../packages/system-migrations
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -7668,9 +7662,6 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
-      '@langwatch/upgrade':
-        specifier: workspace:*
-        version: link:../../../packages/upgrade
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e))
@@ -9481,9 +9472,6 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
-      '@langwatch/system-migrations':
-        specifier: workspace:*
-        version: link:../../../packages/system-migrations
       better-auth:
         specifier: 'catalog:'
         version: 1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)))(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.1)
@@ -12524,9 +12512,6 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
-      '@langwatch/task':
-        specifier: workspace:*
-        version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -13079,9 +13064,6 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/task':
-        specifier: workspace:*
-        version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -16238,9 +16220,6 @@ importers:
       '@langwatch/prompt-client':
         specifier: workspace:*
         version: link:../../prompt/client
-      '@langwatch/prompt-contract':
-        specifier: workspace:*
-        version: link:../../prompt/contract
       '@langwatch/scenario-client':
         specifier: workspace:*
         version: link:../../scenario/client

@@ -114,16 +114,16 @@ None: this module declares no REST family.
 
 Contract `../contract/src/insight.trpc.ts:28`, router `src/transport/insight.trpc.ts:10`.
 
-| Procedure                         | Kind     | Gate                        | Input                                 | Output                         |
-| --------------------------------- | -------- | --------------------------- | ------------------------------------- | ------------------------------ |
-| `insights.getAll`                 | query    | Permission `analytics:view` | `insightProjectScopeSchema`           | inline                         |
-| `insights.file`                   | mutation | Permission `analytics:view` | `fileInsightInputSchema`              | `insightEntrySchema`           |
-| `insights.markSeen`               | mutation | Permission `analytics:view` | `markInsightsSeenInputSchema`         | inline                         |
-| `insights.archive`                | mutation | Permission `analytics:view` | `insightScopeSchema`                  | inline                         |
-| `insights.keep`                   | mutation | Permission `analytics:view` | `insightScopeSchema`                  | inline                         |
-| `insights.getBoardDailyRun`       | query    | Permission `analytics:view` | `insightBoardDailyRunScopeSchema`     | `insightDailyRunSettingSchema` |
-| `insights.configureBoardDailyRun` | mutation | Permission `analytics:view` | `configureInsightDailyRunInputSchema` | inline                         |
-| `insights.turnOffBoardDailyRun`   | mutation | Permission `analytics:view` | `turnOffInsightDailyRunInputSchema`   | inline                         |
+| Procedure                         | Kind     | Gate                                        | Input                                 | Output                         |
+| --------------------------------- | -------- | ------------------------------------------- | ------------------------------------- | ------------------------------ |
+| `insights.getAll`                 | query    | Permission `analytics:view`                 | `insightProjectScopeSchema`           | inline                         |
+| `insights.file`                   | mutation | Permission `analytics:view`                 | `fileInsightInputSchema`              | `insightEntrySchema`           |
+| `insights.markSeen`               | mutation | Permission `analytics:view`                 | `markInsightsSeenInputSchema`         | inline                         |
+| `insights.archive`                | mutation | Permission `analytics:view`                 | `insightScopeSchema`                  | inline                         |
+| `insights.keep`                   | mutation | Permission `analytics:view`                 | `insightScopeSchema`                  | inline                         |
+| `insights.getBoardDailyRun`       | query    | Permission `analytics:view`                 | `insightBoardDailyRunScopeSchema`     | `insightDailyRunSettingSchema` |
+| `insights.configureBoardDailyRun` | mutation | Permission `analytics:view or langy:create` | `configureInsightDailyRunInputSchema` | inline                         |
+| `insights.turnOffBoardDailyRun`   | mutation | Permission `analytics:view`                 | `turnOffInsightDailyRunInputSchema`   | inline                         |
 
 ```typescript
 // insights.getAll

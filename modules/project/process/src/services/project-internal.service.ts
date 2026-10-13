@@ -27,47 +27,39 @@ const INTERNAL_PROJECT_NAMING: Record<
   },
 };
 
-/** The organisation's internal projects (governance, checkup canary): found, or made once. */
-export class InternalProjectService {
-  private readonly repository: ProjectRepository;
-  private readonly credentials: ProjectCredentials;
-  private readonly organizations: OrganizationApi;
+/** The organization's internal projects (governance, checkup): found, or made once. */
+export class ProjectInternalService {
+  private constructor(
+    private readonly repository: ProjectRepository,
+    private readonly credentials: ProjectCredentials,
+    private readonly organizations: OrganizationApi,
+  ) {}
 
-  private constructor(options: {
-    repository: ProjectRepository;
-    credentials: ProjectCredentials;
-    organizations: OrganizationApi;
-  }) {
-    this.repository = options.repository;
-    this.credentials = options.credentials;
-    this.organizations = options.organizations;
-  }
-
-  /** Builds the service over the project store, key minting and the organisation's teams. */
   static create(options: {
     repository: ProjectRepository;
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
-  }): InternalProjectService {
-    return new InternalProjectService(options);
+  }): ProjectInternalService {
+    return new ProjectInternalService(
+      options.repository,
+      options.credentials,
+      options.organizations,
+    );
   }
 
-  /** The organisation's internal project of this kind, or null when none exists yet. */
-  find(input: InternalProjectQuery): Promise<InternalProject | null> {
+  findInternal(input: InternalProjectQuery): Promise<InternalProject | null> {
     const parsed = internalProjectQuerySchema.parse(input);
 
     return this.repository.findInternalByOrganization(parsed);
   }
 
-  /** The ids of every live internal project of this kind, across organisations. */
-  findIds(input: { kind: InternalProjectKind }): Promise<string[]> {
+  findInternalIds(input: { kind: InternalProjectKind }): Promise<string[]> {
     return this.repository.findLiveInternalIds({
       kind: internalProjectKindSchema.parse(input.kind),
     });
   }
 
-  /** The organisation's internal project of this kind, created in its oldest team if absent. */
-  async ensure(input: InternalProjectQuery): Promise<InternalProject> {
+  async ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {
     const parsed = internalProjectQuerySchema.parse(input);
     const existing = await this.repository.findInternalByOrganization(parsed);
     if (existing) {

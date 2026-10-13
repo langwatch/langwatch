@@ -81,7 +81,7 @@ Every console action has a verb (`--json` on reads, non-zero exit on failure, `-
 | --------- | ------------------------------------------------------------------------------------------------------------------------- |
 | mail      | `haven sim mail address\|status\|list\|get <id>\|links <id>\|wait\|delete <id>\|clear`                                    |
 | llm       | `haven sim llm status\|list [--model <text>] [--failed]\|get <id>\|clear\|fault <status>\|config --seed`                  |
-| analytics | `haven sim analytics status\|list\|record <id>\|clear\|wait --event`                                                         |
+| analytics | `haven sim analytics status\|list\|record <id>\|clear\|wait --event`                                                      |
 | storage   | `haven sim storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|presign\|delete\|clear [bucket]\|seed\|list` |
 | voice     | `haven sim voice status\|list\|get <id>\|clear`                                                                           |
 | telemetry | `haven sim telemetry send\|load\|fuzz\|status\|stop`                                                                      |

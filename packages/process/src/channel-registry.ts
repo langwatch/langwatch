@@ -2,13 +2,16 @@
  * Channel tiers: "live" (reaches the vendor, bus or peer) vs "memory" (records in-process).
  * The container builds the tier the stores state, as it does repositories (record §3.2, §5).
  */
-import { ModuleApiToken, type TokenIdentity } from "@langwatch/module";
+import { ModuleApiToken, type DependencyIdentity, type TokenIdentity } from "@langwatch/module";
 import type { ScopedSecrets } from "@langwatch/secrets";
 
 import type { Tier } from "./tiers.ts";
 
-/** The `*Api` tokens a tier binds, by key: never `static dependencies`, so never an edge. */
-type ChannelBindings = Readonly<Record<string, ModuleApiToken<unknown>>>;
+/**
+ * The `*Api` tokens a tier binds, by key: never `static dependencies`, so never an edge.
+ * Held by identity, as `TokenMap` is: a token is invariant in its `*Api`.
+ */
+type ChannelBindings = Readonly<Record<string, DependencyIdentity>>;
 
 type ChannelProvider = Readonly<{
   readonly requires: readonly string[];
@@ -133,7 +136,7 @@ function freezeProvider(provider: ChannelProvider): ChannelProvider {
 export function channelsBind(
   registry: AnyChannelRegistry,
   tier: Tier,
-): readonly (readonly [string, ModuleApiToken<unknown>])[] {
+): readonly (readonly [string, DependencyIdentity])[] {
   return Object.entries(registry.definitions[tier].binds ?? {});
 }
 

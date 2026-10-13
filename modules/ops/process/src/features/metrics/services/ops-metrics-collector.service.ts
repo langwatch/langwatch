@@ -22,10 +22,8 @@ import type { AnomalyRateTrackerRepository } from "../../../repositories/anomaly
 import type { OpsMetricsRepository } from "../../../repositories/ops-metrics.repository.ts";
 import type { OpsQueueMetricsSourceRepository } from "../../../repositories/ops-queue-metrics-source.repository.ts";
 import type { OpsSnapshotRead } from "../../../repositories/ops-snapshot.repository.ts";
-import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../../rules/anomaly-constants.rules.ts";
 import { totalInFlight as computeTotalInFlight } from "../../../rules/ops-in-flight.rules.ts";
 import { computeEngineCpuPercent } from "../../../rules/ops-redis-engine-cpu.rules.ts";
-import { countWaitingJobsByTenant } from "../../../rules/ops-tenant-backlog.rules.ts";
 import { OpsDashboardViewService } from "../../../services/ops-dashboard-view.service.ts";
 import { OpsMetricsPublicationService } from "./ops-metrics-publication.service.ts";
 import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
@@ -34,6 +32,7 @@ import {
   OpsMetricsWindowService,
   THROUGHPUT_BUFFER_SIZE,
 } from "./ops-metrics-window.service.ts";
+import { OpsTenantBacklogService } from "./ops-tenant-backlog.service.ts";
 
 const logger = createLogger("langwatch:ops:metrics-collector");
 
@@ -65,8 +64,7 @@ export class OpsMetricsCollectorService {
   private readonly inFlight = new Set<Promise<void>>();
 
   private readonly ops: OpsQueueMetricsSourceRepository;
-  private readonly rateTracker: AnomalyRateTrackerRepository;
-  private readonly featureFlags: Pick<FeatureFlagApi, "isEnabled"> | undefined;
+  private readonly tenantBacklogs: OpsTenantBacklogService;
   private snapshots: OpsSnapshotService | null;
   /** Identity of this writer in the lease and in every artifact it stamps. */
   private readonly writerId: string;
@@ -139,8 +137,10 @@ export class OpsMetricsCollectorService {
   }) {
     this.metrics = params.metrics;
     this.ops = params.ops;
-    this.rateTracker = params.rateTracker;
-    this.featureFlags = params.featureFlags;
+    this.tenantBacklogs = OpsTenantBacklogService.create({
+      rateTracker: params.rateTracker,
+      featureFlags: params.featureFlags,
+    });
     this.snapshots = params.snapshots ?? null;
     this.writerId = params.writerId ?? `${os.hostname()}:${process.pid}`;
     this.sampling = OpsMetricsSamplingService.create({ metrics: this.metrics });
@@ -315,7 +315,7 @@ export class OpsMetricsCollectorService {
       });
       await this.recordKnownPipelinePaths(queues);
       await this.recordCycleRates(queues);
-      await this.recordTenantBacklogs(queues);
+      await this.tenantBacklogs.record(queues);
       this.recordProcessCpu();
       this.window.pruneStaleCounters(this.groupQueueNames);
       this.window.persist(this.metrics).catch((err) => {
@@ -463,34 +463,6 @@ export class OpsMetricsCollectorService {
     });
     if (this.window.throughputBuffer.length > THROUGHPUT_BUFFER_SIZE) {
       this.window.throughputBuffer.shift();
-    }
-  }
-
-  /**
-   * What anomaly detection reads: each tenant's waiting jobs as this cycle saw them, recorded once
-   * across the fleet because only the lease holder scans. Main counted at enqueue instead; the
-   * difference is in specs/event-queue-anomaly-detection.feature.
-   */
-  private async recordTenantBacklogs(queues: QueueInfo[]): Promise<void> {
-    const backlogs = countWaitingJobsByTenant({ queues });
-    await Promise.all(
-      [...backlogs].map(async ([tenantId, count]) => {
-        if (await this.isKilledForTenant(tenantId)) return;
-        await this.rateTracker.record(tenantId, count);
-      }),
-    );
-  }
-
-  /** The detector's per-tenant kill switch; a failed lookup counts the tenant. */
-  private async isKilledForTenant(tenantId: string): Promise<boolean> {
-    if (!this.featureFlags || !tenantId) return false;
-    try {
-      return await this.featureFlags.isEnabled(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
-        kind: "project",
-        projectId: tenantId,
-      });
-    } catch {
-      return false;
     }
   }
 

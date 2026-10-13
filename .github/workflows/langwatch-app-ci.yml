@@ -904,10 +904,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: pnpm --filter @langwatch/architecture-enforcer docs:check
 
-      - name: Image code step list is current (blocking)
-        if: ${{ !cancelled() }}
-        run: node --disable-warning=ExperimentalWarning --experimental-transform-types packages/upgrade/scripts/image-code-steps.ts --check
-
       # Every tsconfig's project references match the Nx project graph, as `nx sync`
       # (@nx/js:typescript-sync) writes them. ADR-150's 2026-10-10 amendment.
       - name: TypeScript project references are in sync (blocking)
@@ -969,6 +965,11 @@ jobs:
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
+
+      # After the generated files: listing the steps boots the tasks app, which imports the built SDK.
+      - name: Image code step list is current (blocking)
+        if: ${{ !cancelled() }}
+        run: node --disable-warning=ExperimentalWarning --experimental-transform-types packages/upgrade/scripts/image-code-steps.ts --check
 
       - name: Generated READMEs are current (blocking)
         if: ${{ !cancelled() }}

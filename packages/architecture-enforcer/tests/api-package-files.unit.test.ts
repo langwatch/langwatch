@@ -77,6 +77,7 @@ const TARGET_FILES = new Set([
   "trpc/client-outdated.ts",
   "trpc/compose.ts",
   "trpc/host.ts",
+  "trpc/infinite-input.ts",
   "trpc/policy.ts",
   "trpc/runtime.ts",
   "trpc/sse.ts",

@@ -6,7 +6,7 @@ The server half of [project](../README.md). Projects: finding them, their summar
 
 ## Installation
 
-`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).provideMiddlewareContext(…).withEventing(projectLifecycleEventing).withMigrations(…).withTasks(…)`, `src/project.module.ts:17`.
+`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).provideMiddlewareContext(…).withEventing(projectLifecycleEventing).withMigrations(…)`, `src/project.module.ts:13`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -627,16 +627,6 @@ Declared at `src/eventing/project-lifecycle.pipeline.ts:51`. Events: `projectCre
 | command | `recordProjectTraceSharingDisabled` | –       | `src/eventing/project-lifecycle.pipeline.ts:72` |
 | command | `recordProjectAggregateRuleChanged` | –       | `src/eventing/project-lifecycle.pipeline.ts:73` |
 | command | `recordProjectRevived`              | –       | `src/eventing/project-lifecycle.pipeline.ts:74` |
-
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                                   | Class                                   | Declared at                                                 |
-| -------------------------------------- | --------------------------------------- | ----------------------------------------------------------- |
-| `backfill-project-created`             | `ProjectCreatedBackfillTask`            | `src/tasks/project-created-backfill.task.ts:20`             |
-| `backfill-project-presence-setting`    | `ProjectPresenceSettingBackfillTask`    | `src/tasks/project-presence-setting-backfill.task.ts:16`    |
-| `backfill-project-department-assigned` | `ProjectDepartmentAssignedBackfillTask` | `src/tasks/project-department-assigned-backfill.task.ts:16` |
 
 ## Configuration
 

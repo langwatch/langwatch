@@ -39,7 +39,6 @@
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/upgrade": "workspace:*",
     "@trpc/server": "catalog:",
     "zod": "catalog:"
   },
