@@ -179,7 +179,6 @@ export const APP_ERROR_CODES = [
   "credential_class_mismatch",
   "cross_origin_refused",
   "custom_chart_playground_not_enabled",
-  "custom_graph_writes_disabled_for_playground",
   "custom_role_id_required",
   "custom_role_in_use",
   "custom_role_name_reserved",

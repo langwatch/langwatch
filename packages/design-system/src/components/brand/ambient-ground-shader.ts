@@ -3,7 +3,6 @@
  * the settings AmbientGround renders at rest. The boot splash mounts it before the app loads,
  * so the loading screen looks the same from first paint to the app.
  */
-import { nowInstant } from "@langwatch/time";
 import {
   defaultObjectSizing,
   defaultPatternSizing,
@@ -64,10 +63,11 @@ function sizing(base: typeof defaultObjectSizing, rest: typeof MESH_AT_REST | ty
 
 /**
  * The shader's clock for this moment, from the wall clock rather than page load: a page that
- * reloads (Vite's bundling page into the app) picks the animation up where it was.
+ * reloads (Vite's bundling page into the app) picks the animation up where it was. A plain
+ * clock, not @langwatch/time: the boot splash inlines this, and Temporal would add ~100 KB.
  */
 export function wallClockFrame({ speed }: { speed: number }): number {
-  return (nowInstant().epochMilliseconds % 3_600_000) * speed;
+  return ((performance.timeOrigin + performance.now()) % 3_600_000) * speed;
 }
 
 /**

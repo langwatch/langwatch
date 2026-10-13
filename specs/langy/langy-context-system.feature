@@ -101,3 +101,11 @@ Feature: Langy captures what I am viewing as turn context
     When the page has loaded the dataset
     Then the dataset chip Langy offers carries the dataset's name and its id
     And it replaces the route's chip, which only knows the id
+
+  @unit
+  Scenario: The board chip carries the period the user is viewing
+    Given the user is on a dashboard over the last 30 days at one bucket per day
+    When the board tells Langy what is on screen
+    Then the dashboard chip reads the board's name and "30d · 1d"
+    And what Langy is handed names the board's id, its period and its grain
+    And it replaces the route's chip, which only knows the id

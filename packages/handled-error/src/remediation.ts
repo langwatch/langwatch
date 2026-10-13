@@ -179,12 +179,6 @@ const registry = {
       "Use the lwql-charts skill / `langwatch chart` commands for a saved dashboard chart instead",
     ],
   },
-  custom_graph_writes_disabled_for_playground: {
-    tips: [
-      "The custom-chart-playground is enabled for this project, which turns off creating or editing dashboard graphs; retrying will not help",
-      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
-    ],
-  },
   saved_workbench_chart_already_exists: {
     tips: [
       "A saved chart with this id already exists in this project",

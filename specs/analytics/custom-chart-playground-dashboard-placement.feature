@@ -11,8 +11,7 @@ Feature: Dashboard widgets placed on a dashboard
 
   Dashboard widgets open with exactly two flags, everywhere: `release_dashboards`
   and `release_lwql_workbench`. That covers boards, the REST/CLI surface and the
-  legacy Analytics reports page's widget drawer. The custom chart playground
-  flag (`release_custom_chart_playground`) opens none of them.
+  legacy Analytics reports page's widget drawer.
 
   Placement is not mutually exclusive: a project can carry `workbench_sql`
   rows placed before widgets shipped and `dashboard_srcdoc` rows side by
@@ -96,20 +95,12 @@ Feature: Dashboard widgets placed on a dashboard
   @unit
   Scenario: Dashboard widgets open with the Dashboards and LangWatchQL flags alone
     Given a project with `release_dashboards` and `release_lwql_workbench` on
-    And `release_custom_chart_playground` off
     When the widget surface asks whether the project may use it
     Then the project is admitted
 
   @unit
   Scenario: Dashboard widgets stay closed while the Dashboards or the LangWatchQL flag is off
-    Given a project with `release_custom_chart_playground` off
-    And `release_dashboards` or `release_lwql_workbench` off
-    When the widget surface asks whether the project may use it
-    Then it is refused with the widget surface's own error code
-
-  @unit
-  Scenario: The custom chart playground alone does not open dashboard widgets
-    Given a project with only `release_custom_chart_playground` on
+    Given a project with `release_dashboards` or `release_lwql_workbench` off
     When the widget surface asks whether the project may use it
     Then it is refused with the widget surface's own error code
 
@@ -118,4 +109,4 @@ Feature: Dashboard widgets placed on a dashboard
     Given the legacy Analytics reports page
     When `release_dashboards` and `release_lwql_workbench` are both on
     Then "Add chart" opens the widget drawer
-    And with either flag off, or with only `release_custom_chart_playground` on, "Add chart" links to the chart builder instead
+    And with either flag off, "Add chart" links to the chart builder instead

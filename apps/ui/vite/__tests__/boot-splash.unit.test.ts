@@ -7,7 +7,7 @@ import { runInNewContext } from "node:vm";
 
 import { describe, expect, it } from "vitest";
 
-import { BOOT_SPLASH_BODY, bootSplash, brandFallbackPage } from "../boot-splash";
+import { BOOT_SPLASH_BODY, bootSplash, brandFallbackPage, bundleBootGround } from "../boot-splash";
 
 const VITE_FALLBACK = `<!DOCTYPE html>
 <html lang="en">
@@ -191,6 +191,17 @@ describe("the boot splash", () => {
       expect(html).toContain(GROUND_WITH_PATTERNS);
       expect(html.match(/<body/g)).toHaveLength(1);
     });
+  });
+
+  describe("given the live ground script built for the page", () => {
+    /** @scenario "The boot screen's live ground carries no date and time polyfill" */
+    it("carries no Temporal polyfill", async () => {
+      const script = await bundleBootGround({ minify: true });
+
+      // Booleans, so a failure does not print the whole bundle.
+      expect(script.includes("u_colors")).toBe(true);
+      expect(/Temporal|PlainDateTime/.test(script)).toBe(false);
+    }, 60_000);
   });
 
   describe("given any other page", () => {

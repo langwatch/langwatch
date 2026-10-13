@@ -1744,11 +1744,6 @@ const presentations = {
     describe: () =>
       "This project needs both Dashboards and LangWatchQL switched on for dashboard widgets. Ask your administrator to switch them on.",
   },
-  custom_graph_writes_disabled_for_playground: {
-    title: "Dashboard graph editing is off while the playground is on",
-    describe: () =>
-      "This project has the custom chart playground enabled, which turns off creating or editing dashboard graphs. Use the playground to build a chart instead.",
-  },
   custom_role_not_found: {
     title: "Custom role not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
