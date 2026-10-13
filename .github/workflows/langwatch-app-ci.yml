@@ -478,9 +478,11 @@ jobs:
             !/docs/images/
           sparse-checkout-cone-mode: false
 
+      # The one job that saves the pnpm store (not on the critical path).
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: all
+          save-store: "true"
 
       - uses: ./.github/actions/prepare-generated-files
 
@@ -846,6 +848,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
+    env:
+      # 0 turns off oxlint's local slot queue (patches/oxlint@1.85.0.patch). On a
+      # runner only this job uses, it parks the third process of `lint:types`.
+      LANGWATCH_LINT_SLOTS: "0"
     # Read-only. This job used to carry `pull-requests: write` so that a
     # reviewdog pass could post inline lint annotations through the Review
     # API. The Oxlint gate reports through the job's exit code and writes
