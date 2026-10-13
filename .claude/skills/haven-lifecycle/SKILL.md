@@ -83,7 +83,7 @@ Old chunks stay loadable for 24 h after a swap. Outside haven, `pnpm dev` builds
 
 - The app's own process sheds the UI's Vite server too.
 - The orb is there on any haven stack, built or Vite (`haven orb feedback`, see `haven-orb`); a built page has no HMR and runs its production code paths.
-- Old assets pile up in `apps/ui/dist/client/assets`; `rm -rf apps/ui/dist` clears them.
+- Old assets pile up in the UI build folder; `rm -rf apps/ui/dist` clears them.
 - A build peaks at about 4.8 GB.
 
 ## focus
