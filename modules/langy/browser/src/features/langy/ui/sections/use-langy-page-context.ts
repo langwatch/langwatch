@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { useInRouterContext, useLocation } from "react-router";
 
 import {
@@ -6,6 +6,7 @@ import {
   selectAddableChips,
   selectVisibleChips,
   useLangyStore,
+  withAutoAttachedChips,
 } from "../../../../behavior/langy.store.ts";
 import { useLangyDrawerContext } from "../../../../behavior/use-langy-drawer-context.ts";
 import {
@@ -39,6 +40,7 @@ export function useLangyPageContext(): {
   const pathname = location?.pathname ?? "";
   const search = location?.search ?? "";
   const chosen = useLangyStore((s) => s.chosenChipIds);
+  const dismissed = useLangyStore((s) => s.dismissedChipIds);
 
   // Sub-hooks subscribe to their own sources (the drawer URL param, the Trace
   // Explorer selection/filter stores). They're always called (rules of hooks);
@@ -57,45 +59,39 @@ export function useLangyPageContext(): {
   // their chips while the user is actually on that surface.
   const onTraceExplorer = surfaceOf(pathname) === "traces";
 
-  const candidates = useMemo<LangyContextChip[]>(
-    () =>
-      // Most-specific first; `mergeContextChips` keeps the first claim on an id.
-      // Deliberately NO project chip.
-      mergeContextChips([
-        // Open drawer first — the most specific "what am I looking at" signal.
-        ...drawerChips,
-        // A page that knows its resource's name outranks the route's bare id.
-        ...namedPageChips(pageContext),
-        ...routeChips(pathname),
-        onTraceExplorer ? selectionChip : null,
-        // Always include the whole view. This carries the time range as well as
-        // the search, so "these traces" is meaningful even before any row is
-        // opened or selected.
-        onTraceExplorer ? traceViewChip : null,
-        experimentSlug
-          ? {
-              id: `experiment:${experimentSlug}`,
-              kind: "experiment",
-              label: `experiment: ${experimentSlug}`,
-              ref: experimentSlug,
-            }
-          : null,
-        ...pageContext,
-        ...pickedChips,
-      ]),
-    [
-      drawerChips,
-      pathname,
-      onTraceExplorer,
-      selectionChip,
-      traceViewChip,
-      experimentSlug,
-      pageContext,
-      pickedChips,
-    ],
-  );
+  const routed = routeChips(pathname);
+  // Most-specific first; `mergeContextChips` keeps the first claim on an id.
+  // Deliberately NO project chip.
+  const candidates = mergeContextChips([
+    // Open drawer first — the most specific "what am I looking at" signal.
+    ...drawerChips,
+    // A page that knows its resource's name outranks the route's bare id.
+    ...namedPageChips(pageContext),
+    ...routed,
+    onTraceExplorer ? selectionChip : null,
+    // Always include the whole view. This carries the time range as well as
+    // the search, so "these traces" is meaningful even before any row is
+    // opened or selected.
+    onTraceExplorer ? traceViewChip : null,
+    experimentSlug
+      ? {
+          id: `experiment:${experimentSlug}`,
+          kind: "experiment",
+          label: `experiment: ${experimentSlug}`,
+          ref: experimentSlug,
+        }
+      : null,
+    ...pageContext,
+    ...pickedChips,
+  ]);
 
-  const chips = useMemo(() => selectVisibleChips(candidates, chosen), [candidates, chosen]);
+  // The board on screen rides every turn unasked; every other chip waits to be chosen.
+  const attached = withAutoAttachedChips({
+    chosen,
+    autoAttachedIds: routed.filter((chip) => chip.kind === "dashboard").map((chip) => chip.id),
+    dismissed,
+  });
+  const chips = selectVisibleChips(candidates, attached);
 
   // Tell the page which chips are live, so a registered target can render as
   // "already in context". `setActiveChipIds` no-ops when the membership is
@@ -106,7 +102,7 @@ export function useLangyPageContext(): {
 
   return {
     chips,
-    addableChips: selectAddableChips(candidates, chosen),
+    addableChips: selectAddableChips(candidates, attached),
   };
 }
 

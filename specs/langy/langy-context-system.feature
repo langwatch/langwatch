@@ -7,6 +7,8 @@ Feature: Langy captures what I am viewing as turn context
   # composer, and the same context rides along with the turn I send. Context is
   # captured from the page I am viewing; a chip I dismiss stays gone until the
   # underlying page context changes, and a "+ context" control lets me add more.
+  # Page context is offered, not chosen, except the dashboard I am viewing,
+  # which is attached for me.
 
   Background:
     Given I am signed in to LangWatch on a project
@@ -34,15 +36,31 @@ Feature: Langy captures what I am viewing as turn context
     Then the add-context control offers a chip for that dataset
 
   @integration
-  Scenario: Viewing a dashboard surfaces that board as context
+  Scenario: Viewing a dashboard attaches that board as context without a click
     Given I am viewing a dashboard
-    Then the add-context control offers a chip for that dashboard
+    Then the composer already shows a context chip for that dashboard
     And the chip carries the dashboard's id, so a chart Langy places lands on that board
+    And every message I send carries that dashboard as turn context
+
+  @integration
+  Scenario: A removed dashboard chip stays removed and can be added back
+    Given the composer shows the chip of the dashboard I am viewing
+    When I remove the dashboard chip
+    Then the dashboard chip is no longer shown
+    And the add-context control offers it back
+    When I add the dashboard back
+    Then the composer shows the dashboard chip again
+
+  @integration
+  Scenario: Only a dashboard attaches itself; other pages still only offer their context
+    Given I am viewing a trace, an experiment or a dataset
+    Then the composer shows no context chip until I choose one
 
   @integration
   Scenario: Dashboard pages that show no one board offer no board as context
     Given I am on the dashboards list, the templates library or a From LangWatch board
-    Then the add-context control offers no dashboard chip
+    Then the composer shows no dashboard chip
+    And the add-context control offers no dashboard chip
 
   @integration
   Scenario: A context chip can be removed
