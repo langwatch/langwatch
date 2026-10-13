@@ -50,6 +50,14 @@ Feature: Feature configuration is one schema, validated at boot
     Then every default equals the value that deployment ran on before
 
   @unit
+  Scenario: A setting written the way the previous release read it keeps that meaning
+    Given a deployment upgrading from the previous release
+    And a setting written in a spelling, casing or blank that release accepted
+    When the process resolves its configuration
+    Then the setting reads as it did before the upgrade
+    And the process does not refuse to start over it
+
+  @unit
   Scenario: One variable has one owner across every process
     Given a variable two processes both read
     When each process resolves its configuration

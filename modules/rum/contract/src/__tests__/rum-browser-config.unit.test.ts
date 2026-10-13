@@ -29,6 +29,23 @@ describe("rum's browser config", () => {
     });
   });
 
+  describe("given the switch written off the previous release's way", () => {
+    /** @scenario "A setting written the way the previous release read it keeps that meaning" */
+    it("keeps browser tracing off for 0, a capitalised false or any other non-on word", async () => {
+      for (const value of ["0", "FALSE", "off", "no"]) {
+        const off = await projected({ RUM_ENABLED: value, RUM_COLLECTOR_ENDPOINT: COLLECTOR });
+        expect(off.enabled).toBe(false);
+      }
+    });
+
+    it("reads 1 and a capitalised true as on, and a blank as unset", async () => {
+      for (const value of ["1", "TRUE", ""]) {
+        const on = await projected({ RUM_ENABLED: value, RUM_COLLECTOR_ENDPOINT: COLLECTOR });
+        expect(on.enabled).toBe(true);
+      }
+    });
+  });
+
   describe("given the switch is on and a collector is configured", () => {
     /** @scenario "Browser tracing is on with the sample ratio when switched on and a collector is configured" */
     it("enables browser tracing with rum's own collector", async () => {

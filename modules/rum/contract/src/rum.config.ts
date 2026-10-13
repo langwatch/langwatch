@@ -7,8 +7,11 @@ import { z } from "zod";
 
 const blankIsUnset = (value: unknown) => (value === "" ? undefined : value);
 
+/** A written switch reads as the previous release read it: only `1` or `true`, any case, is on. */
+const ON_SPELLING = /^(1|true)$/i;
+
 /**
- * Browser tracing (ADR-058) is on unless `RUM_ENABLED=false`. It exports to rum's collector, else
+ * Browser tracing (ADR-058) is on unless switched off. It exports to rum's collector, else
  * the deprecated `OTEL_EXPORTER_OTLP_*` (warned at boot); with neither the door refuses.
  */
 export const rumConfig = Config.define((c) => ({
@@ -17,7 +20,7 @@ export const rumConfig = Config.define((c) => ({
     z
       .string()
       .optional()
-      .transform((value) => value !== "false"),
+      .transform((value) => !value || ON_SPELLING.test(value)),
   ),
   sampleRatio: c.env(
     "RUM_SAMPLE_RATIO",
