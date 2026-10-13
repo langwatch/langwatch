@@ -11,6 +11,10 @@ const tips: Record<string, readonly string[]> = {
   langy_conversation_id_unadoptable: [
     "Retry with a different conversation id, or omit `conversationId` to let the server generate one",
   ],
+  langy_agent_not_configured: [
+    "Self-hosted: enable the Langy agent in your deployment, then reload",
+    "Local development: run `haven up +langy` and reload the api",
+  ],
   langy_model_not_configured: ["Pick a model in the project's model settings, then retry"],
   langy_model_not_allowed: ["Choose one of the models configured for this project and retry"],
   langy_egress_misconfigured: [

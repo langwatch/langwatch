@@ -52,6 +52,23 @@ describe("FieldEditor geometry", () => {
     for (const index of [0, 1, 4]) expect(left(variables, index)).toBe(left(outputs, index));
   });
 
+  /** @scenario "A field row reads inline, the value taking the rest of the width" */
+  it("puts the separator right after the name and stretches the value to remove", () => {
+    renderWithDesignSystem(<Pair width={640} />);
+    const row = screen.getByTestId("variables-row");
+    const box = (index: number) => (row.children[index] as HTMLElement).getBoundingClientRect();
+    const nameText = screen.getByText("input").getBoundingClientRect();
+
+    expect(box(2).left - nameText.right).toBeLessThanOrEqual(12);
+    expect(box(4).left - box(3).right).toBeLessThanOrEqual(8);
+    expect(box(3).width).toBeGreaterThan(320);
+
+    const heading = getComputedStyle(screen.getByText("Variables"));
+    expect(heading.fontWeight).toBe("700");
+    expect(heading.textTransform).toBe("uppercase");
+    expect(heading.letterSpacing).toBe("normal");
+  });
+
   /** @scenario "Field editor rows fit a narrow drawer" */
   it("moves the value under the name and does not scroll sideways", () => {
     renderWithDesignSystem(<Pair width={272} />);

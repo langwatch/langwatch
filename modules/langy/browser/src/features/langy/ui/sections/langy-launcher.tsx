@@ -8,6 +8,8 @@ import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { useLangyOrbProximity } from "../../../../behavior/use-langy-orb-proximity.ts";
 import { useLingeringDodge } from "../../../../behavior/use-lingering-dodge.ts";
 import { LANGY_DODGE_STAGGER_MS } from "../../../../model/langy-panel-layout.ts";
+import { langyLauncherRightOffset } from "../../behavior/logic/langy-launcher-position.ts";
+import { readSidebarRight, useOpenDrawerEdge } from "../../behavior/panel/use-open-drawer-edge.ts";
 
 /**
  * The FLAG-OFF closed-state opener — a single circular launcher in the bottom-right
@@ -24,6 +26,12 @@ export function LangyLauncher({ isOpen, onOpen }: { isOpen: boolean; onOpen: () 
     active: !!currentDrawer,
     releaseDelayMs: LANGY_DODGE_STAGGER_MS,
     immediate: reduceMotion,
+  });
+  const measuredEdge = useOpenDrawerEdge({ active: dodgeLeft });
+  const launcherRight = langyLauncherRightOffset({
+    drawerEdge: dodgeLeft ? measuredEdge : null,
+    sidebarRight: measuredEdge === null ? 0 : readSidebarRight(),
+    viewportWidth: window.innerWidth,
   });
   // The orb leans + glows toward the cursor as it approaches (the one place a Langy
   // surface reacts to the pointer — a hover affordance on the target itself, not
@@ -61,11 +69,9 @@ export function LangyLauncher({ isOpen, onOpen }: { isOpen: boolean; onOpen: () 
         aria-keyshortcuts="Meta+I Control+I"
         position="fixed"
         bottom="20px"
-        // Bottom-right by default; hops to bottom-left while a drawer holds the
-        // right edge so it never sits on the drawer or the table pager. (The
-        // proximity hook owns `transform`, and left/right can't cross-fade, so
-        // this repositions rather than slides.)
-        {...(dodgeLeft ? { left: "20px" } : { right: "20px" })}
+        // Bottom-right by default; while a drawer holds the right edge it sits just
+        // left of the drawer, over the page, never on the drawer or the sidebar.
+        right={`${launcherRight}px`}
         // Keep modal/dialog layers above Langy. Chakra's modal stack starts at
         // the modal layer, while Langy remains a persistent app companion.
         zIndex={1200}

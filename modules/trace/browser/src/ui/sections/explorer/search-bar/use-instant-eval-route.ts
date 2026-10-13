@@ -1,7 +1,7 @@
 /**
  * The Explorer's handler for the `instant_eval` route: a known run is reused,
  * else an estimate decides between an auto-start and the dialog, a started run
- * becomes an `eval` chip, and a refusal is a popover or ends in the phrase search.
+ * becomes an `eval` chip, and a refusal is a popover over the chip; only Skip searches another way.
  * @see specs/traces-v2/instant-eval-search.feature
  */
 
@@ -59,12 +59,14 @@ interface InstantEvalRouteState {
   /** The dialog's content while the cost rule asks, or null. */
   confirmation: InstantEvalConfirmation | null;
   confirmRun: () => void;
-  /** The phrase search, from the dialog or the popover. */
+  /** The phrase search, from the dialog. */
   searchWordsInstead: () => void;
   /** The popover's content while a refusal is shown, or null. */
   refusal: InstantEvalRefusal | null;
-  /** Closes the popover; an unreleased project has no phrase to fall back to. */
+  /** Closes the popover and leaves the eval chip in the bar. */
   dismissRefusal: () => void;
+  /** Closes the popover and hands back the refused payload, for the caller to route again. */
+  skipRefusal: () => InstantEvalRoutePayload | null;
   /** Throws the organization's switch, then routes the held submit. */
   enableInstantEvals: () => void;
   isEnabling: boolean;
@@ -116,6 +118,18 @@ function routeRunKey({
   });
 }
 
+/** The bar's query with the route's eval chip in it: what a refusal leaves for the reader. */
+function pendingChipQuery(payload: InstantEvalRoutePayload): string {
+  return combineQueries({
+    base: payload.otherQuery,
+    addition: instantEvalChipText({
+      question: payload.question.instructions,
+      target: payload.target,
+      lensId: useViewStore.getState().activeLensId,
+    }),
+  });
+}
+
 /** What the dialog shows when the estimate is at or over the auto-run line. */
 function confirmationOf({
   payload,
@@ -148,6 +162,8 @@ function useInstantEvalOutcome(): {
   refusal: InstantEvalRefusal | null;
   setRefusal: (value: InstantEvalRefusal | null) => void;
   pendingRef: RefObject<PendingRoute | null>;
+  refusedRef: RefObject<InstantEvalRoutePayload | null>;
+  holdRefused: (payload: InstantEvalRoutePayload) => void;
   searchWordsInstead: () => void;
   refuse: (args: { error: unknown }) => void;
 } {
@@ -156,6 +172,17 @@ function useInstantEvalOutcome(): {
   const [refusal, setRefusal] = useState<InstantEvalRefusal | null>(null);
   // A later Enter supersedes the open dialog or popover rather than racing it.
   const pendingRef = useRef<PendingRoute | null>(null);
+  // The payload the open popover refused, kept for Skip to route again.
+  const refusedRef = useRef<InstantEvalRoutePayload | null>(null);
+
+  // The chip stays in the bar under the popover; nothing is searched until Skip.
+  const holdRefused = useCallback(
+    (payload: InstantEvalRoutePayload) => {
+      refusedRef.current = payload;
+      applyQueryText(pendingChipQuery(payload));
+    },
+    [applyQueryText],
+  );
 
   const searchWordsInstead = useCallback(() => {
     const pending = pendingRef.current;
@@ -170,6 +197,9 @@ function useInstantEvalOutcome(): {
       setConfirmation(null);
       const popover = refusalOf({ error });
       if (popover) {
+        const pending = pendingRef.current;
+        pendingRef.current = null;
+        if (pending) holdRefused(pending.payload);
         setRefusal(popover);
         return;
       }
@@ -182,7 +212,7 @@ function useInstantEvalOutcome(): {
       });
       searchWordsInstead();
     },
-    [searchWordsInstead],
+    [holdRefused, searchWordsInstead],
   );
 
   return {
@@ -191,6 +221,8 @@ function useInstantEvalOutcome(): {
     refusal,
     setRefusal,
     pendingRef,
+    refusedRef,
+    holdRefused,
     searchWordsInstead,
     refuse,
   };
@@ -276,11 +308,19 @@ function useInstantEvalSwitch({
   heldRef: RefObject<InstantEvalRoutePayload | null>;
   seqRef: RefObject<number>;
   route: (args: { payload: InstantEvalRoutePayload; seq: number }) => void;
-  outcome: Pick<ReturnType<typeof useInstantEvalOutcome>, "setRefusal" | "searchWordsInstead">;
-}): { enableInstantEvals: () => void; dismissRefusal: () => void; isEnabling: boolean } {
+  outcome: Pick<
+    ReturnType<typeof useInstantEvalOutcome>,
+    "setRefusal" | "pendingRef" | "refusedRef"
+  >;
+}): {
+  enableInstantEvals: () => void;
+  dismissRefusal: () => void;
+  skipRefusal: () => InstantEvalRoutePayload | null;
+  isEnabling: boolean;
+} {
   const enable = api.instantEval.enable.useMutation();
   const utils = api.useUtils();
-  const { setRefusal, searchWordsInstead } = outcome;
+  const { setRefusal, pendingRef, refusedRef } = outcome;
 
   const enableInstantEvals = useCallback(() => {
     const held = heldRef.current;
@@ -306,13 +346,21 @@ function useInstantEvalSwitch({
     );
   }, [enable, heldRef, route, seqRef, setRefusal, utils]);
 
-  const dismissRefusal = useCallback(() => {
+  const skipRefusal = useCallback(() => {
     seqRef.current += 1;
     heldRef.current = null;
-    searchWordsInstead();
-  }, [heldRef, searchWordsInstead, seqRef]);
+    pendingRef.current = null;
+    setRefusal(null);
+    const refused = refusedRef.current;
+    refusedRef.current = null;
+    return refused;
+  }, [heldRef, pendingRef, refusedRef, seqRef, setRefusal]);
 
-  return { enableInstantEvals, dismissRefusal, isEnabling: enable.isPending };
+  const dismissRefusal = useCallback(() => {
+    skipRefusal();
+  }, [skipRefusal]);
+
+  return { enableInstantEvals, dismissRefusal, skipRefusal, isEnabling: enable.isPending };
 }
 
 /** The refusal an organization without Instant Evals meets; a self-hosted install, its reason. */
@@ -340,13 +388,14 @@ function refuseUnreleased({
   heldRef: RefObject<InstantEvalRoutePayload | null>;
   outcome: Pick<
     ReturnType<typeof useInstantEvalOutcome>,
-    "pendingRef" | "setConfirmation" | "setRefusal"
+    "pendingRef" | "setConfirmation" | "setRefusal" | "holdRefused"
   >;
 }): void {
   outcome.pendingRef.current = null;
   outcome.setConfirmation(null);
   const refusal = unreleasedRefusalOf(optInOffer);
   heldRef.current = refusal.kind === "opt_in" ? payload : null;
+  outcome.holdRefused(payload);
   outcome.setRefusal(refusal);
 }
 
@@ -360,7 +409,7 @@ export function useInstantEvalRoute({
 }): InstantEvalRouteState {
   const estimate = api.instantEval.estimate.useMutation();
   const outcome = useInstantEvalOutcome();
-  const { pendingRef, setConfirmation, setRefusal, refuse } = outcome;
+  const { pendingRef, setConfirmation, setRefusal, refuse, holdRefused } = outcome;
   const seqRef = useRef(0);
   const { isStarting, applyChip, startRun } = useInstantEvalStarter({ outcome, seqRef });
 
@@ -370,12 +419,14 @@ export function useInstantEvalRoute({
     startRun({ ...pending, seq: seqRef.current });
   }, [pendingRef, startRun]);
 
+  const { refusedRef } = outcome;
   const abandonPendingRun = useCallback(() => {
     seqRef.current += 1;
     pendingRef.current = null;
+    refusedRef.current = null;
     setConfirmation(null);
     setRefusal(null);
-  }, [pendingRef, setConfirmation, setRefusal]);
+  }, [pendingRef, refusedRef, setConfirmation, setRefusal]);
 
   // Under the auto-run line the run starts; at or over it the dialog asks.
   const answerEstimate = useCallback(
@@ -435,14 +486,22 @@ export function useInstantEvalRoute({
       const seq = ++seqRef.current;
       if (isInstantEvalAvailable) route({ payload, seq });
       else {
-        const stable = { pendingRef, setConfirmation, setRefusal };
+        const stable = { pendingRef, setConfirmation, setRefusal, holdRefused };
         refuseUnreleased({ payload, optInOffer, heldRef, outcome: stable });
       }
     },
-    [isInstantEvalAvailable, optInOffer, pendingRef, route, setConfirmation, setRefusal],
+    [
+      holdRefused,
+      isInstantEvalAvailable,
+      optInOffer,
+      pendingRef,
+      route,
+      setConfirmation,
+      setRefusal,
+    ],
   );
 
-  const { enableInstantEvals, dismissRefusal, isEnabling } = useInstantEvalSwitch({
+  const { enableInstantEvals, dismissRefusal, skipRefusal, isEnabling } = useInstantEvalSwitch({
     heldRef,
     seqRef,
     route,
@@ -457,6 +516,7 @@ export function useInstantEvalRoute({
     searchWordsInstead: outcome.searchWordsInstead,
     refusal: outcome.refusal,
     dismissRefusal,
+    skipRefusal,
     enableInstantEvals,
     isEnabling,
     isEstimating: estimate.isPending,

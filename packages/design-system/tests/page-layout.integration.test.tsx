@@ -158,11 +158,13 @@ describe("area-owned header geometry", () => {
       expect(style.minHeight).toBe("var(--chakra-sizes-page-header-lg)");
       expect(style.height).toBe("auto");
       expect(style.paddingInline).toBe("var(--page-inset, var(--chakra-spacing-6))");
-      expect(style.paddingTop).toBe("1px");
+      expect(style.paddingTop).toBe("0px");
+      expect(style.borderBottomColor).toBe("var(--chakra-colors-border)");
       // jsdom shows the phone layout, which wraps; from `md` up the row stays single-line.
       expect(style.flexWrap).toBe("wrap");
       const title = getComputedStyle(screen.getByRole("heading", { name: `Title ${count}` }));
-      expect(title.fontSize).toBe("20px");
+      expect(title.fontSize).toBe("16px");
+      expect(title.fontWeight).toBe("500");
       expect(title.height).toBe("28px");
       expect(title.lineHeight).toBe("28px");
     }

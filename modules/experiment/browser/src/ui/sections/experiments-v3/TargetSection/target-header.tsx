@@ -226,22 +226,10 @@ const useShowsOlderVersion = (target: TargetConfig): boolean => {
   );
 };
 
-/** Agent palettes follow the studio node kinds in workflow-icons.tsx. */
-const AGENT_TYPE_PALETTES: Record<AgentTypeEnum, StudioPalette> = {
-  code: "purple",
-  signature: "blue",
-  http: "cyan",
-  workflow: "pink",
-  connected: "pink",
-};
-
-/** The header's accent: the studio node kind's palette; a comparison stays purple. */
 const targetPaletteOf = (target: TargetConfig): StudioPalette => {
   if (target.type === "evaluator") return isComparisonEvaluator(target) ? "purple" : "green";
-  if (target.type === "prompt") return "blue";
-  if (target.type === "workflow") return "pink";
-  if (target.type === "agent" && target.agentType) return AGENT_TYPE_PALETTES[target.agentType];
-  return "purple";
+  if (target.type === "prompt") return "green";
+  return "cyan";
 };
 
 /**

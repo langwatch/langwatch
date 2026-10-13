@@ -81,17 +81,17 @@ describe("primary actions inside product scopes", () => {
   });
 
   describe("given a page header", () => {
-    /** @scenario "A page header's primary button follows the product" */
+    /** @scenario "A page header's buttons stay outlined in every product" */
     it.each(PRIMARY_SOLID)(
-      "paints the primary header button for %s and leaves the plain one outlined",
-      (_label, product, solid) => {
+      "leaves the primary and the plain header button outlined for %s",
+      (_label, product) => {
         renderWithDesignSystem(
           <ProductScope product={product}>
             <PageLayout.HeaderButton primary>New</PageLayout.HeaderButton>
             <PageLayout.HeaderButton>Export</PageLayout.HeaderButton>
           </ProductScope>,
         );
-        expect(paletteSolidOf(screen.getByRole("button", { name: "New" }))).toBe(solid);
+        expect(paletteSolidOf(screen.getByRole("button", { name: "New" }))).toBeUndefined();
         expect(paletteSolidOf(screen.getByRole("button", { name: "Export" }))).toBeUndefined();
       },
     );

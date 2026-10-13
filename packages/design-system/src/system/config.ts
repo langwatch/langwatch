@@ -12,7 +12,7 @@ import { optionItemRecipe, optionListContent, optionListSizes } from "./option-l
 import { PRODUCT_COLOURS, productColourTokens } from "./product-colours.ts";
 import { sectionNavigationRailRecipe } from "./section-navigation.recipe.ts";
 import { segmentGroupSlotRecipe } from "./segment-group.recipe.ts";
-import { productTextStyles } from "./text-styles.ts";
+import { productTextStyles, takeoverTextStyles } from "./text-styles.ts";
 
 // Inter and JetBrains Mono are loaded by the CSS @import in the application's
 // globals.scss. This file names the families, it does not fetch them.
@@ -92,7 +92,7 @@ export const designSystemConfig = defineConfig({
     },
   },
   theme: {
-    textStyles: productTextStyles,
+    textStyles: { ...productTextStyles, ...takeoverTextStyles },
     keyframes: {
       // A toast rises a few pixels into place and fades out where it is: no blur, no scale.
       "toast-in": {
@@ -634,8 +634,51 @@ export const designSystemConfig = defineConfig({
           scrim: {
             value: { _light: "{colors.blackAlpha.500}", _dark: "{colors.blackAlpha.700}" },
           },
+          // The development badge: a dark pill over the top bar's glow, in both modes.
+          devBadge: { value: "{colors.blackAlpha.600}" },
+        },
+        // Guided onboarding takeover: the warm glow it stands on, its card shadows and the white-on
+        // pick-order badge (4.5:1). Fixed brand values; the two wide glows deepen on a dark ground.
+        takeover: {
+          glowPeach: {
+            value: { _light: "rgba(255, 232, 204, 0.9)", _dark: "rgba(101, 43, 25, 0.9)" },
+          },
+          glowApricot: {
+            value: { _light: "rgba(253, 214, 166, 0.75)", _dark: "rgba(123, 52, 30, 0.75)" },
+          },
+          glowOrange: { value: "rgba(237, 137, 38, 0.10)" },
+          glowSoft: { value: "rgba(237, 137, 38, 0.06)" },
+          glowFaint: { value: "rgba(237, 137, 38, 0.02)" },
+          lift: { value: "rgba(26, 26, 46, 0.10)" },
+          liftSoft: { value: "rgba(26, 26, 46, 0.08)" },
+          badge: { value: "#c2510a" },
+          // The guided tour's dim around its spotlight, deeper while a finished step stays lit.
+          tourDim: { value: "rgba(15, 15, 30, 0.35)" },
+          tourDimLit: { value: "rgba(15, 15, 30, 0.5)" },
+        },
+        // Avatar fills under `fg.onColor` initials: each step keeps white at 3:1 or more.
+        avatar: {
+          orange: { value: { _light: "{colors.orange.600}", _dark: "{colors.orange.700}" } },
+          blue: { value: { _light: "{colors.blue.400}", _dark: "{colors.blue.600}" } },
+          green: { value: { _light: "{colors.green.500}", _dark: "{colors.green.700}" } },
+          yellow: { value: { _light: "{colors.yellow.600}", _dark: "{colors.yellow.700}" } },
+          purple: { value: { _light: "{colors.purple.400}", _dark: "{colors.purple.700}" } },
+          teal: { value: { _light: "{colors.teal.500}", _dark: "{colors.teal.700}" } },
+          cyan: { value: { _light: "{colors.cyan.700}", _dark: "{colors.cyan.700}" } },
+          pink: { value: { _light: "{colors.pink.500}", _dark: "{colors.pink.700}" } },
         },
 
+        // Evaluation status dots, accents and fills: one colour per status, the same in
+        // both modes. An error is one step deeper than a failed verdict.
+        evaluation: {
+          pending: { value: "{colors.gray.400}" },
+          running: { value: "{colors.blue.400}" },
+          passed: { value: "{colors.green.500}" },
+          failed: { value: "{colors.red.500}" },
+          processed: { value: "{colors.blue.500}" },
+          error: { value: "{colors.red.600}" },
+          skipped: { value: "{colors.gray.300}" },
+        },
         // Foreground semantic tokens - proper contrast in dark mode
         fg: {
           DEFAULT: {
@@ -648,6 +691,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
           },
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
+          // Text on a saturated fill in both modes: avatar initials, the development badge.
+          onColor: { value: "white" },
           // Status text, one per meaning.
           error: { value: { _light: "{colors.red.500}", _dark: "{colors.red.400}" } },
           success: { value: { _light: "{colors.green.600}", _dark: "{colors.green.300}" } },
@@ -897,9 +942,9 @@ export const designSystemConfig = defineConfig({
             outline: {
               item: {
                 _checked: {
-                  bg: "bg.selected",
-                  borderColor: "colorPalette.fg",
-                  boxShadowColor: "colorPalette.fg",
+                  bg: "colorPalette.muted/20",
+                  borderColor: "colorPalette.solid",
+                  boxShadowColor: "colorPalette.solid",
                 },
               },
             },

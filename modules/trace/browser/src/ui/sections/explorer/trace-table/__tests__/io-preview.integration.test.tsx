@@ -22,12 +22,17 @@ beforeEach(() => {
   }));
 });
 
-// Compact vs comfortable is gated by the density store; force compact so
-// the row path under test is the one in the screenshot.
+// Compact vs comfortable is gated by the density store; compact unless a suite says otherwise.
+const densityState = vi.hoisted(() => ({ density: "compact" }));
+
+beforeEach(() => {
+  densityState.density = "compact";
+});
+
 vi.mock("../../../../../features/explorer/behavior/density.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useDensityStore: (selector: (state: { density: string }) => unknown) =>
-    selector({ density: "compact" }),
+    selector({ density: densityState.density }),
 }));
 
 vi.mock("../../hooks/use-density-tokens.ts", () => ({
@@ -283,6 +288,27 @@ describe("IOPreview missing-side placeholders", () => {
 
         expect(queryByTestId("io-preview-missing-input")).toBeNull();
         expect(queryByTestId("io-preview-missing-output")).toBeNull();
+      });
+    });
+  });
+});
+
+describe("IOPreview comfortable labels", () => {
+  describe("given comfortable density and a row with both sides", () => {
+    describe("when the preview renders", () => {
+      /** @scenario "Comfortable preview labels read as bold coloured words in a fixed column" */
+      it("labels each side with a bare word and no arrow icon", () => {
+        densityState.density = "comfortable";
+        const { getByTestId } = renderPreview("hi there", "hello back");
+
+        for (const [direction, word] of [
+          ["input", "Input"],
+          ["output", "Output"],
+        ] as const) {
+          const label = getByTestId(`io-preview-label-${direction}`);
+          expect(label.textContent).toBe(word);
+          expect(label.querySelector("svg")).toBeNull();
+        }
       });
     });
   });

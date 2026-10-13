@@ -1,4 +1,4 @@
-/** Top bar: org/product scope (left), account controls (right). Impersonation banner from host. */
+/** Top bar: org/product scope (left); dev badge, search and account controls (right). */
 
 import { AppTopBar } from "@langwatch/design-system/app-shell";
 import { LogoIcon } from "@langwatch/design-system/logo-icon";
@@ -34,6 +34,7 @@ export function ShellTopBar({ state, shouldShowProductCluster }: ShellTopBarProp
   const { user, activeProductId, showDevelopmentIndicator } = state;
   const host = useNavigationHost();
   const accountMenu = host.accountMenu();
+  const commandBar = host.commandBar();
   // The product cluster spans the sidebar column, so the organization and
   // the scope start at the left edge of the content column and stay there
   // whatever the product label is. A compact sidebar is narrower than the
@@ -61,6 +62,8 @@ export function ShellTopBar({ state, shouldShowProductCluster }: ShellTopBarProp
           {showDevelopmentIndicator && <DevBadge label={host.deployment().devIndicatorLabel} />}
           {accountMenu?.headerBanner}
           <InsightsBell />
+          {/* Home already has its own search and the sidebar's Quick Search. */}
+          {state.project && state.currentRoute?.title !== "Home" && commandBar?.trigger}
           <AppHeaderUserMenu />
         </>
       }

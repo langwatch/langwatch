@@ -60,6 +60,42 @@ Feature: A run carries a snapshot of the board
     When I run one column
     Then the run carries no cells from the board
 
+  # An evaluator rerun reuses the cell's output instead of producing it, so the
+  # run carries that output and drops only the verdict it is about to replace.
+
+  @unit
+  Scenario: Rerunning one cell's evaluator carries that cell's output
+    Given a board with two columns that both have results
+    When I rerun one evaluator on the first row of one column
+    Then the run carries that cell's output, cost and trace
+    And it carries no verdict of the evaluator being rerun for that cell
+
+  @unit
+  Scenario: Rerunning an evaluator without a saved output leaves that cell to the run
+    Given a board with two columns that both have results
+    When I rerun one evaluator on a cell whose output is not reused
+    Then the run does not carry that cell, because the target answers it again
+    And it still carries the other rows of that column
+
+  @unit
+  Scenario: Running an evaluator on all rows carries every row's output
+    Given a board with two columns that both have results
+    When I run one evaluator on all rows of one column
+    Then the run carries every row's output of that column
+    And it carries no verdict of that evaluator for that column
+
+  @unit
+  Scenario: A verdict of an evaluator no longer on the workbench is not carried
+    Given a board holding a verdict of an evaluator that was removed from the workbench
+    When I run one column
+    Then the removed evaluator's verdict is not carried
+
+  @unit
+  Scenario: A carried cell keeps its carried mark when it is recorded
+    Given a run that carries a board cell with a verdict
+    When the carried target result and verdict are recorded
+    Then both are recorded as carried over, so neither is streamed to the page
+
   # ==========================================================================
   # A carried cell cost nothing and took no time in this run
   # ==========================================================================

@@ -179,11 +179,11 @@ const seedOneDependency = ({
 };
 
 /**
- * The cells a run covers itself, as `${rowIndex}:${targetId}` keys.
- * `computeExecutionCells` covers scopes naming rows/columns; the single-cell
- * `evaluator` scope names neither, so its cell is added here to avoid a stale verdict.
+ * What a run produces itself, so the carry leaves it behind. An evaluator-only
+ * scope reuses its cells' outputs, so it covers only the scoped evaluator's
+ * verdicts on them; every other scope covers whole cells.
  */
-const cellsCoveredByRun = ({
+const coveredByRun = ({
   scope,
   targetIds,
   datasetRows,
@@ -193,28 +193,36 @@ const cellsCoveredByRun = ({
   targetIds: string[];
   datasetRows: Record<string, unknown>[];
   extraCells: CellId[];
-}): Set<string> => {
-  const covered = new Set(
-    [...computeExecutionCells({ scope, targetIds, datasetRows }), ...extraCells].map(
-      (cell) => `${cell.rowIndex}:${cell.targetId}`,
-    ),
-  );
-  if (scope.type === "evaluator") {
-    covered.add(`${scope.rowIndex}:${scope.targetId}`);
+}): { cells: Set<string>; verdicts: Set<string> } => {
+  const scoped = computeExecutionCells({ scope, targetIds, datasetRows });
+  const keyOf = (cell: CellId) => `${cell.rowIndex}:${cell.targetId}`;
+  if (scope.type === "evaluator" || scope.type === "evaluator-all-rows") {
+    const rerun =
+      scope.type === "evaluator"
+        ? [{ rowIndex: scope.rowIndex, targetId: scope.targetId }]
+        : scoped;
+    // With no saved output to reuse, the target answers the cell again.
+    const retargeted = scope.type === "evaluator" && scope.targetOutput === undefined ? rerun : [];
+    return {
+      cells: new Set([...extraCells, ...retargeted].map(keyOf)),
+      verdicts: new Set(rerun.map((cell) => `${keyOf(cell)}:${scope.evaluatorId}`)),
+    };
   }
-  return covered;
+  return { cells: new Set([...scoped, ...extraCells].map(keyOf)), verdicts: new Set() };
 };
 
 // Cells a run carries rather than produces. Every cell the run doesn't cover
 // is copied from the board as it stood, so opening shows the whole board.
 export const planBoardCarryOver = ({
   targets,
+  evaluators,
   scope,
   datasetRows,
   results,
   extraCells = [],
 }: {
   targets: Pick<TargetConfig, "id">[];
+  evaluators: Pick<EvaluatorConfig, "id">[];
   scope: ExecutionScope;
   datasetRows: Record<string, unknown>[];
   results?: Partial<BoardResults>;
@@ -222,6 +230,12 @@ export const planBoardCarryOver = ({
 }): CarriedOverCell[] => {
   if (!results) return [];
 
+  const covered = coveredByRun({
+    scope,
+    targetIds: targets.map((target) => target.id),
+    datasetRows,
+    extraCells,
+  });
   return carriedOverCells({
     results: {
       targetOutputs: results.targetOutputs ?? {},
@@ -229,12 +243,9 @@ export const planBoardCarryOver = ({
       evaluatorResults: results.evaluatorResults ?? {},
       errors: results.errors ?? {},
     },
-    coveredCells: cellsCoveredByRun({
-      scope,
-      targetIds: targets.map((target) => target.id),
-      datasetRows,
-      extraCells,
-    }),
+    coveredCells: covered.cells,
+    coveredVerdicts: covered.verdicts,
+    evaluatorIds: new Set(evaluators.map((evaluator) => evaluator.id)),
   });
 };
 
@@ -324,6 +335,7 @@ export const buildExecutionRequest = ({
   // person is actually looking at.
   const carried = planBoardCarryOver({
     targets: state.targets,
+    evaluators: state.evaluators,
     scope,
     datasetRows,
     results: state.results,

@@ -320,6 +320,24 @@ describe("given the share-control command", () => {
         );
       });
 
+      /** @scenario "A sign-in refused for an untrusted certificate names the certificate fix" */
+      it("names the certificate and its fix when the device login hits an untrusted certificate", async () => {
+        const cause = Object.assign(new Error("self-signed certificate in certificate chain"), {
+          code: "SELF_SIGNED_CERT_IN_CHAIN",
+        });
+        const login = vi.fn(async () => {
+          throw Object.assign(new TypeError("fetch failed"), { cause });
+        });
+
+        const failure = await ensureSignedIn({ login }).catch((e) => e);
+
+        expect(failure).toBeInstanceOf(ShareControlError);
+        const message = (failure as Error).message;
+        expect(message).toContain("SELF_SIGNED_CERT_IN_CHAIN");
+        expect(message).toContain("NODE_EXTRA_CA_CERTS=~/.portless/ca.pem");
+        expect(message).not.toContain("then run `langwatch langy --share-control` again");
+      });
+
       /** @scenario "A sign-in that leaves no usable login ends with what to run" */
       it("ends with what to run when the login leaves no login key", async () => {
         const login = vi.fn(async () => {

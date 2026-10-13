@@ -113,13 +113,10 @@ export const drawerSlotRecipe = defineSlotRecipe({
       paddingInlineEnd: 14,
       gap: 1,
       flexShrink: 0,
-      borderBottomWidth: "1px",
-      borderColor: "border.card",
     },
     title: {
       textStyle: "md",
-      fontWeight: "semibold",
-      letterSpacing: "-0.01em",
+      fontWeight: "medium",
       color: "fg",
     },
     description: {

@@ -1,4 +1,4 @@
-import { Config, type ConfigOf, isSaas } from "@langwatch/config";
+import { Config, type ConfigOf, isSaas, nodeEnvironment } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -26,8 +26,10 @@ export const instantEvalJudgeConfig = Config.define((c) => ({
     "INSTANT_EVAL_TENANT_TOKENS_PER_SECOND",
     z.coerce.number().positive().default(150_000),
   ),
-  /** LangWatch cloud: the only install a judge call is answered on (ADR-174 decision 14). */
+  /** LangWatch cloud: an install a judge call is answered on (ADR-174 decision 14). */
   isSaas,
+  /** "development" marks a repository checkout, which judges with LangWatch's key too. */
+  nodeEnvironment,
 }));
 
 export type InstantEvalJudgeServerConfig = ConfigOf<typeof instantEvalJudgeConfig>;

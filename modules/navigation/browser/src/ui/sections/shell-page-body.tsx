@@ -85,11 +85,11 @@ const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items
 
 /** Every page's header and body share this one edge; the design system reads it. */
 const PAGE_INSET = "var(--chakra-spacing-6)";
-/** Settings-style pages read at one width, left-aligned under the title. */
-const SETTINGS_MEASURE = "960px";
+/** Settings-style page bodies read in one centred column this wide, under a full-width header. */
+const SETTINGS_MEASURE = "1248px";
 
 /**
- * Settings, gateway, instance and Cloud admin pages read at the settings measure, under the title.
+ * Settings, gateway, instance and Cloud admin pages read in the centred settings column.
  * Ops tools other than instance and Cloud admin draw their own frame and get none here.
  */
 function PageMeasure({ pathname, children }: { pathname: string; children: ReactNode }) {
@@ -104,14 +104,14 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
       flex={1}
       minHeight={0}
       overflowY="auto"
-      paddingBottom={16}
-      // The body starts at the header's inset and stops at the measure.
-      // Buttons are skipped: the assistant's floating launcher is a fixed sibling.
+      // Clears the floating assistant launcher, so the last action (Save) is never under it.
+      paddingBottom={28}
+      // The header spans the full width like every page; the body below it reads in one
+      // centred column. The assistant's floating launcher is a fixed button, so it is skipped.
       css={{
         "& [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)": {
           width: `min(${SETTINGS_MEASURE}, calc(100% - 2 * var(--page-inset)))`,
-          marginInlineStart: "var(--page-inset)",
-          marginInlineEnd: "auto",
+          marginInline: "auto",
         },
         "& [data-page-container]": { paddingInline: 0 },
       }}

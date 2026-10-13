@@ -50,15 +50,15 @@ export type {
 export type { ListTableRowActionProps } from "./list-table-parts/row-action.tsx";
 export type { ListTableSortHeaderProps, SortDirection } from "./list-table-parts/sort-header.tsx";
 
-/** One header look at every density: 12px medium, muted, sentence case, no tracking. */
+/** One header look at every density: 12px semibold, muted, uppercase, widely tracked. */
 const HEADER = {
   paddingY: "0",
   bg: "transparent",
-  textTransform: "none",
-  letterSpacing: "normal",
+  textTransform: "uppercase",
+  letterSpacing: "wider",
   fontSize: "xs",
   lineHeight: "16px",
-  fontWeight: "medium",
+  fontWeight: "semibold",
   color: "fg.muted",
   whiteSpace: "nowrap",
 } as const;

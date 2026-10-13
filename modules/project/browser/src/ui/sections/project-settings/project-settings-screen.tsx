@@ -371,7 +371,7 @@ function SettingsForm({
             icon={<Building2 size={18} />}
             title="Organization"
             hint="Identity, defaults and collaboration across your projects."
-            actions={
+            footer={
               isLiteMember ? undefined : (
                 <Button
                   size="sm"
@@ -680,7 +680,7 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
         <SettingsSection
           icon={<FolderCog size={18} />}
           title="Project configuration"
-          actions={
+          footer={
             <Button
               size="sm"
               type="submit"

@@ -267,7 +267,7 @@ Feature: Product switcher navigation
     Then the primary action is red
 
   @integration
-  Scenario: A page header's primary button follows the product
+  Scenario: A page header's buttons stay outlined in every product
     Given a page header with a primary button and a plain button
     When it renders inside each product scope or none
-    Then only the primary button takes the product's accent
+    Then both buttons are outlined and neither takes the product's accent

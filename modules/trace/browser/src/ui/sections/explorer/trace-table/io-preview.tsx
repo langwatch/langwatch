@@ -454,15 +454,16 @@ interface CompactRowProps {
   direction: "input" | "output";
 }
 
+// Input reads blue, output green, in both densities. Light mode takes the saturated
+// `*.solid` step the sidebar origin dots use; dark mode keeps `*.fg`, which reads on dark.
+const IO_ACCENT = {
+  input: { base: "blue.solid", _dark: "blue.fg" },
+  output: { base: "green.solid", _dark: "green.fg" },
+} as const;
+
 const CompactRow: React.FC<CompactRowProps> = ({ row, fontSize, direction }) => {
   const isInput = direction === "input";
-  // Vivid palette in light mode — `*.solid` matches the saturated tone
-  // the filter sidebar uses for the origin dots, so the table accents
-  // and the sidebar legend feel like the same palette. Dark mode keeps
-  // `*.fg` because against the dark canvas the solid step over-pops.
-  const accent = isInput
-    ? { base: "blue.fg", _dark: "blue.fg" }
-    : { base: "green.solid", _dark: "green.fg" };
+  const accent = IO_ACCENT[direction];
   const textColor = isInput ? "fg.muted" : "fg.subtle";
 
   return (
@@ -572,26 +573,24 @@ const ComfortableIOPreview: React.FC<
 };
 
 /**
- * "Input" / "Output" as a neutral label with the same up / down arrow the compact rows use,
- * so the two sides tell apart by word and shape in both themes, never by a palette colour.
+ * "Input" / "Output" as a bold monospace word in its accent colour, in a fixed-width column
+ * so the preview values line up. A missing side stays muted.
  */
 const ComfortableLabel: React.FC<{ direction: "input" | "output"; muted?: boolean }> = ({
   direction,
   muted = false,
 }) => (
-  <HStack
-    gap={1}
+  <Text
+    textStyle="sm"
+    fontFamily="mono"
+    fontWeight="semibold"
     flexShrink={0}
     width={COMFORTABLE_LABEL_WIDTH}
-    height="20px"
-    color={muted ? "fg.subtle" : "fg"}
+    color={muted ? "fg.subtle" : IO_ACCENT[direction]}
     data-testid={`io-preview-label-${direction}`}
   >
-    <Icon boxSize="12px" color={muted ? "fg.subtle" : "fg.muted"}>
-      {direction === "input" ? <ArrowUp /> : <ArrowDown />}
-    </Icon>
-    <Text textStyle="groupLabel">{direction === "input" ? "Input" : "Output"}</Text>
-  </HStack>
+    {direction === "input" ? "Input" : "Output"}
+  </Text>
 );
 
 const ComfortableMissingRow: React.FC<{ direction: "input" | "output" }> = ({ direction }) => (

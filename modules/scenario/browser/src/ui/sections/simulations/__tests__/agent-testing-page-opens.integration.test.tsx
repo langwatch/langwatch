@@ -5,7 +5,6 @@
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/feature-flag-client", () => ({
@@ -48,9 +47,7 @@ vi.mock("../../agent-testing/use-agent-testing-page-flows.ts", () => ({
   useHydrateViewFromUrl: () => {},
 }));
 vi.mock("../../agent-testing/cases/test-cases-tab.tsx", () => ({
-  TestCasesTab: ({ header }: { header: () => ReactNode }) => (
-    <div data-testid="cases-tab">{header()}</div>
-  ),
+  TestCasesTab: () => <div data-testid="cases-tab" />,
 }));
 vi.mock("../../agent-testing/results/results-tab.tsx", () => ({
   ResultsTab: () => <div data-testid="results-tab" />,

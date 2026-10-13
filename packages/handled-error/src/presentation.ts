@@ -4729,6 +4729,11 @@ const presentations = {
     describe: () =>
       "Too many conversations are running at once. Give it a few seconds and try again.",
   },
+  langy_agent_not_configured: {
+    title: "Langy isn't set up on this deployment",
+    describe: () =>
+      "This LangWatch install runs no Langy agent, so messages can't be answered. On a self-hosted install, enable the Langy agent and reload. In local development, run `haven up +langy` and reload the api.",
+  },
   langy_agent_unavailable: {
     title: "Langy is unavailable",
     describe: () =>

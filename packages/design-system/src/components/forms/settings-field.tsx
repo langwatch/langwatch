@@ -1,7 +1,7 @@
 /**
- * One labelled setting. Inline (label left, control right) on a settings page; stacked
- * (label above) inside a Drawer or Dialog, which provide the layout. Spacing is its own:
- * never pad, border or re-inset it. Save sits in the SettingsSection's `actions`.
+ * One labelled setting. Inline on a settings page: label and hint left, control right, a rule
+ * between rows. Stacked (label above) inside a Drawer or Dialog. Spacing is its own: never
+ * pad, border or re-inset it. Save sits in the section's `footer`.
  */
 import { Box, Field, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
@@ -80,13 +80,16 @@ export function SettingsField({
       required={required}
       disabled={disabled}
       readOnly={readOnly}
-      paddingY={3}
+      paddingY={5}
+      borderBottomWidth="1px"
+      borderColor="border"
+      _last={{ borderBottomWidth: 0 }}
       data-testid={testId}
       data-layout="inline"
     >
       <Grid
         width="full"
-        templateColumns={{ base: "minmax(0, 1fr)", md: "minmax(0, 240px) minmax(0, 480px)" }}
+        templateColumns={{ base: "minmax(0, 1fr)", md: "minmax(0, 1fr) minmax(0, 1fr)" }}
         columnGap={8}
         rowGap={1.5}
         alignItems="start"

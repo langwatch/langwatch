@@ -32,7 +32,7 @@ type LooseWidths = {
 };
 
 /**
- * A sortable column header. The label stays sentence case; the arrow shows the order,
+ * A sortable column header. The label reads as the other headers; the arrow shows the order,
  * `aria-sort` on the header cell tells assistive tech. The page owns the order.
  */
 export function SortHeader(props: ListTableSortHeaderProps): ReactNode;

@@ -17,6 +17,7 @@ import * as React from "react";
 import { DrawerFooterBand, DrawerHeaderBand } from "../../../overlays/drawer-chrome.tsx";
 import { useDrawerFocusRestore } from "../../../overlays/drawer-focus.ts";
 import { DrawerOffsetContext, useDrawerEndInset } from "../../../overlays/drawer-inset.ts";
+import { lastInputWasPointer, useInputModality } from "../../../overlays/input-modality.ts";
 import { useHasOpenModal } from "../../../overlays/modal-stack.ts";
 import { BOUNDED_BODY, OverlayBodyState } from "../../../overlays/overlay-body.tsx";
 import { OverlayPortalTargetProvider } from "../../../overlays/portal-target.ts";
@@ -134,9 +135,18 @@ export const DrawerCloseTrigger = React.forwardRef<
   HTMLButtonElement,
   ChakraDrawer.CloseTriggerProps
 >(function DrawerCloseTrigger(props, ref) {
+  useInputModality();
+  const [pointerFocus, setPointerFocus] = React.useState(false);
   return (
     <ChakraDrawer.CloseTrigger position="absolute" top="3" insetEnd="3" {...props} asChild>
-      <CloseButton ref={ref} size="sm" />
+      <CloseButton
+        ref={ref}
+        size="sm"
+        data-pointer-focus={pointerFocus || undefined}
+        onFocus={() => setPointerFocus(lastInputWasPointer())}
+        onBlur={() => setPointerFocus(false)}
+        css={{ "&[data-pointer-focus]:focus-visible": { outline: "none" } }}
+      />
     </ChakraDrawer.CloseTrigger>
   );
 });
@@ -578,7 +588,7 @@ function DrawerFrame({
     <>
       <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
         <DrawerHeaderBand glass={glass} edge={chrome.edges.top} bandRef={chrome.headerRef}>
-          <ChakraDrawer.Header borderBottomWidth={glass ? 0 : void 0}>
+          <ChakraDrawer.Header>
             <DrawerHeaderRow
               onBack={onBack}
               title={title}

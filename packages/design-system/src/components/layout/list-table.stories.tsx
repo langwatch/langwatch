@@ -17,9 +17,9 @@ const meta = {
   title: "Data display/List table",
   parameters: {
     usage: {
-      use: 'Every list of rows: the rounded card and sentence-case header are the one list look. Inside a Card or SettingsCard pass variant="embedded". Sortable columns: ListTable.SortHeader. Ids: ListTable.IdCell. Row menus: ListTable.ActionHeader + ListTable.ActionCell, pinned right. Loading: ListTable.LoadingRows. An opened row, an empty line or a note under the rows: ListTable.SpanRow. A wide table: scroll="x" with a scrollLabel (a focusable region); inside a virtual scroller: scroll="external".',
+      use: 'Every list of rows: the rounded card and uppercase header are the one list look. Inside a Card or SettingsCard pass variant="embedded". Sortable columns: ListTable.SortHeader. Ids: ListTable.IdCell. Row menus: ListTable.ActionHeader + ListTable.ActionCell, pinned right. Loading: ListTable.LoadingRows. An opened row, an empty line or a note under the rows: ListTable.SpanRow. A wide table: scroll="x" with a scrollLabel (a focusable region); inside a virtual scroller: scroll="external".',
       avoid:
-        "Never a bare Table.Root with its own borders (list-table.md), uppercase headers, a Spinner row while loading, or a second border around an embedded table. Facts about one thing: use Settings card rows.",
+        "Never a bare Table.Root with its own borders (list-table.md), a header styled by hand, a Spinner row while loading, or a second border around an embedded table. Facts about one thing: use Settings card rows.",
     },
   },
   component: ListTable,

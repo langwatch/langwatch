@@ -471,7 +471,7 @@ describe("TourLayer", () => {
       expect(spot.dataset.handoff).toBe("lit");
       expect(spot.style.left).toBe("876px");
       expect(spot.style.width).toBe("400px");
-      expect(spot.style.boxShadow).toContain("0.5");
+      expect(spot.style.boxShadow).toContain("takeover-tour-dim-lit");
       expect(spot.style.opacity).toBe("1");
       act(() => {
         vi.advanceTimersByTime(4600);

@@ -174,7 +174,7 @@ export const PageKeyboardShortcuts: React.FC = () => {
       open={open}
       onClose={() => setOpen(false)}
       groups={groups}
-      fallbackFocusSelector='[data-testid="trace-toolbar-more"]'
+      fallbackFocusSelector='[data-testid="trace-toolbar-shortcuts"]'
     />
   );
 };

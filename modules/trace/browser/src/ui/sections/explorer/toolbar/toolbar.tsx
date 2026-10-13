@@ -20,24 +20,26 @@ import { useTourEntryPoints } from "../onboarding/index.ts";
 import { writeSpotlightFragment } from "../onboarding/spotlights/spotlight-overlay.tsx";
 import { PAGE_SHORTCUTS } from "../traces-page/page-keyboard-shortcuts.tsx";
 import { ColumnsDropdown } from "./columns-dropdown.tsx";
-import { DensityToggle } from "./density-toggle.tsx";
+import { DensitySelect } from "./density-select.tsx";
 import { GroupingSelect } from "./grouping-select.tsx";
 import { LensTabs } from "./lens-tabs.tsx";
 import { LiveIndicator } from "./live-indicator.tsx";
 import { TimeRangePicker } from "./time-range-picker.tsx";
-import { ToolbarMoreMenu } from "./toolbar-more-menu.tsx";
+import { AutomateButton, KeyboardShortcutsButton } from "./toolbar-actions.tsx";
 
-// Toolbar widths (the bar's own measured width, not the viewport) below which the right
-// clusters shed labels, then chevrons, so the lens tabs keep the room. Lenses that still do
-// not fit move whole into the lens overflow menu. Grouping and density keep their labels
-// longest: they are how people learn what the controls do.
-const TOOLBAR_LABELS_MIN_WIDTH = 960;
-const TOOLBAR_CHEVRONS_MIN_WIDTH = 720;
-// Room the optional controls take, so the thresholds hold when they are on the bar.
+// Toolbar widths (the bar's own measured width, not the viewport) at which each level of
+// the right clusters still leaves LENS_STRIP_ROOM for the lens tabs (All to Cost in the
+// default set): the clusters' measured width at that level plus the lens room. Lens tabs
+// matter more than labels, so labels go first, then chevrons; only then do lenses overflow.
+const LENS_STRIP_ROOM = 560;
+const TOOLBAR_WIDE_MIN_WIDTH = 900 + LENS_STRIP_ROOM;
+const TOOLBAR_LABELS_MIN_WIDTH = 850 + LENS_STRIP_ROOM;
+const TOOLBAR_CHEVRONS_MIN_WIDTH = 580 + LENS_STRIP_ROOM;
+// Extra room the optional controls take while they show their labels.
 const SAMPLE_TOGGLE_WIDTH = 120;
 const TOUR_LABEL_WIDTH = 100;
 
-function toolbarCompactness({
+export function toolbarCompactness({
   width,
   hasSampleToggle,
   hasTourLabel,
@@ -45,13 +47,14 @@ function toolbarCompactness({
   width: number;
   hasSampleToggle: boolean;
   hasTourLabel: boolean;
-}): { labelsCompact: boolean; chevronsCompact: boolean } {
-  if (width <= 0) return { labelsCompact: false, chevronsCompact: false };
+}): { wide: boolean; labelsCompact: boolean; chevronsCompact: boolean } {
+  if (width <= 0) return { wide: false, labelsCompact: false, chevronsCompact: false };
   const optional =
     (hasSampleToggle ? SAMPLE_TOGGLE_WIDTH : 0) + (hasTourLabel ? TOUR_LABEL_WIDTH : 0);
   return {
+    wide: width >= TOOLBAR_WIDE_MIN_WIDTH + optional,
     labelsCompact: width < TOOLBAR_LABELS_MIN_WIDTH + optional,
-    chevronsCompact: width < TOOLBAR_CHEVRONS_MIN_WIDTH + optional,
+    chevronsCompact: width < TOOLBAR_CHEVRONS_MIN_WIDTH,
   };
 }
 
@@ -204,7 +207,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const { labelsCompact, chevronsCompact } = toolbarCompactness({
+  const { wide, labelsCompact, chevronsCompact } = toolbarCompactness({
     width: toolbarWidth,
     hasSampleToggle: !hideSampleDataAction && showSampleDataToggle,
     hasTourLabel: isNewAccount,
@@ -244,33 +247,34 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
           </Button>
         </Tooltip>
       )}
-      {/* Cluster 1: the lenses, which take every pixel the other two clusters leave. */}
+      {/* Cluster 1: the Filters button (only while the sidebar is closed) leads the lenses at
+          a fixed spot before "All"; the lenses take every pixel the other clusters leave. */}
+      {sidebarCollapsed && (
+        <Tooltip
+          content="Show filters sidebar"
+          shortcut={PAGE_SHORTCUTS.sidebar}
+          positioning={{ placement: "bottom" }}
+        >
+          <Button
+            aria-label="Show filters sidebar"
+            aria-keyshortcuts={shortcutAriaKeys(PAGE_SHORTCUTS.sidebar)}
+            variant="outline"
+            size="xs"
+            fontWeight="medium"
+            gap={1.5}
+            color="fg.subtle"
+            onClick={toggleSidebar}
+            flexShrink={0}
+          >
+            <PanelLeftOpen size={14} />
+            Filters
+          </Button>
+        </Tooltip>
+      )}
       <LensTabs />
-      {/* Cluster 2: what the table holds and how its rows read: filters, saving them, the time
+      {/* Cluster 2: what the table holds and how its rows read: saving the view, the time
           window, freshness, grouping and density. */}
       <HStack gap={1} flexShrink={0}>
-        {sidebarCollapsed && (
-          <Tooltip
-            content="Show filters sidebar"
-            shortcut={PAGE_SHORTCUTS.sidebar}
-            positioning={{ placement: "bottom" }}
-          >
-            <Button
-              aria-label="Show filters sidebar"
-              aria-keyshortcuts={shortcutAriaKeys(PAGE_SHORTCUTS.sidebar)}
-              variant="outline"
-              size="xs"
-              fontWeight="medium"
-              gap={1.5}
-              color="fg.subtle"
-              onClick={toggleSidebar}
-              flexShrink={0}
-            >
-              <PanelLeftOpen size={14} />
-              Filters
-            </Button>
-          </Tooltip>
-        )}
         {canSaveLenses && activeLensIsDraft && !hasParseError && (
           <LensNamePopover
             defaultName={`${activeLensName} (copy)`}
@@ -316,12 +320,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
         <TimeRangePicker compact={labelsCompact} />
         <LiveIndicator />
         <GroupingSelect compact={chevronsCompact} />
-        <DensityToggle compact={chevronsCompact} />
+        <DensitySelect compact={labelsCompact} />
       </HStack>
       <ToolbarDivider />
-      {/* Cluster 3: which columns show, getting data out, and help. */}
+      {/* Cluster 3: which columns show, getting data out, automating it, and help. */}
       <HStack gap={1} flexShrink={0}>
-        <ColumnsDropdown compact={chevronsCompact} />
+        <ColumnsDropdown compact={chevronsCompact} showLabel={wide} />
         {onExportAll && (
           <Tooltip
             content="Export the current view to CSV or JSON"
@@ -340,6 +344,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
             </IconButton>
           </Tooltip>
         )}
+        <AutomateButton compact={labelsCompact} />
+        <ToolbarDivider />
         <Tooltip
           content={spotlightsActive ? "End the guided tour" : "Start the guided tour of this page"}
           positioning={{ placement: "bottom" }}
@@ -353,7 +359,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
             onClick={handleShowMeAround}
           />
         </Tooltip>
-        <ToolbarMoreMenu />
+        <KeyboardShortcutsButton />
       </HStack>
     </Flex>
   );
