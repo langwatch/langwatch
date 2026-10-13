@@ -9,7 +9,7 @@ import {
   type OpsPlatformOperator,
 } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { type UserApi, UserEmailAmbiguousError, type UserProfile } from "@langwatch/user-contract";
+import type { UserApi, UserProfile } from "@langwatch/user-contract";
 
 const logger = createLogger("langwatch:ops:platform-operators");
 
@@ -277,21 +277,10 @@ export class PlatformOperatorsService {
   async #verifiedUsersNamed(adminEmails: readonly string[]): Promise<string[]> {
     const ids = new Set<string>();
     for (const email of adminEmails) {
-      const user = await this.#namedUser(email);
+      const user = await this.options.users.findByEmail({ email });
       if (user && user.emailVerified && user.deactivatedAt === null) ids.add(user.id);
     }
     return [...ids];
-  }
-
-  /** An address several case-variant accounts share names nobody: the seed never guesses. */
-  async #namedUser(email: string): Promise<UserProfile | null> {
-    try {
-      return await this.options.users.findByEmail({ email });
-    } catch (error) {
-      if (!(error instanceof UserEmailAmbiguousError)) throw error;
-      logger.warn("ADMIN_EMAILS names an address several accounts share; skipped");
-      return null;
-    }
   }
 
   async #oldestActiveAdministrator({

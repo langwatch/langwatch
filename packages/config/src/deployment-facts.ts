@@ -6,7 +6,11 @@
 import { z } from "zod";
 
 import { Config } from "./config.ts";
-import { environmentExactOneSchema, environmentOneOrTrueSchema } from "./env-schemas.ts";
+import {
+  environmentExactOneSchema,
+  environmentOneOrTrueSchema,
+  environmentOnOffSchema,
+} from "./env-schemas.ts";
 
 const positiveInteger = z.coerce.number().int().positive();
 
@@ -337,27 +341,9 @@ export const { signUpMode, signUpAllowedDomains } = Config.define((c) => ({
  * own passwords beside a federated provider (D09) only on "on". Any other value refuses the boot.
  */
 export const { passkeysEnabled, mfaEnrollmentOpen, localPasswords } = Config.define((c) => ({
-  passkeysEnabled: c.env(
-    "PASSKEYS_ENABLED",
-    z
-      .enum(["off", "on"])
-      .optional()
-      .transform((value) => value !== "off"),
-  ),
-  mfaEnrollmentOpen: c.env(
-    "MFA_ENROLLMENT_OPEN",
-    z
-      .enum(["off", "on"])
-      .optional()
-      .transform((value) => value === "on"),
-  ),
-  localPasswords: c.env(
-    "LOCAL_PASSWORDS_ENABLED",
-    z
-      .enum(["off", "on"])
-      .optional()
-      .transform((value) => value === "on"),
-  ),
+  passkeysEnabled: c.env("PASSKEYS_ENABLED", environmentOnOffSchema.default(true)),
+  mfaEnrollmentOpen: c.env("MFA_ENROLLMENT_OPEN", environmentOnOffSchema.default(false)),
+  localPasswords: c.env("LOCAL_PASSWORDS_ENABLED", environmentOnOffSchema.default(false)),
 }));
 
 /**

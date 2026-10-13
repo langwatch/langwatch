@@ -11,6 +11,11 @@ export const environmentBooleanSchema = z
   .union([z.boolean(), z.literal("true"), z.literal("false"), z.literal("1"), z.literal("0")])
   .transform((value) => value === true || value === "true" || value === "1");
 
+/** The previous release's spelling of a switch: exactly `on` or `off`. */
+export const environmentOnOffSchema = z
+  .union([z.literal("on"), z.literal("off")])
+  .transform((value) => value === "on");
+
 /** A switch that accepts the literal `1` or `true`, in any casing. */
 export const environmentOneOrTrueSchema = z
   .union([z.string(), z.boolean()])

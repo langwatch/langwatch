@@ -323,7 +323,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
   });
 
   describe("when two accounts hold one address in different case", () => {
-    /** @scenario "A case-only duplicate gets a plus tag" */
+    /** @scenario "A case-only duplicate is left as it is and reported" */
     it("answers the lower-cased holder only, and refuses to give its address to the other", async () => {
       const { users } = create();
       const capitals = await users.create({ name: "Ada", email: "Ada@Example.com" });

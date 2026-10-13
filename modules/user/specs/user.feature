@@ -49,12 +49,12 @@ Feature: Canonical user lifecycle
     Then each such address is stored lower-cased, and a mixed-case lookup finds the account
 
   @unit @integration
-  Scenario: A case-only duplicate gets a plus tag
+  Scenario: A case-only duplicate is left as it is and reported
     Given another account already holds an address's lower-cased form
     When the address step runs
-    Then the address is stored as "local+2@domain", or the next free "+N"
+    Then the account keeps its address as it is, and the step logs it without the address
     And nothing is merged or removed
-    And the step report on Ops > Upgrades lists the account with its old and new address, for an admin to fix
+    And the step report on Ops > Upgrades lists the account with its address, for an admin to fix by hand
 
   @integration
   Scenario: The address step never overwrites a save made during its pass

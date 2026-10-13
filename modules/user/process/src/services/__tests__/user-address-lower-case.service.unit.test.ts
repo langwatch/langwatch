@@ -1,7 +1,8 @@
 /**
  * @vitest-environment node
  * The `user:lower-case-stored-addresses` step over user's memory twin: lower-cases every stored
- * address, gives a case-only duplicate a plus tag, and finds nothing to do on a second run.
+ * address, leaves a case-only duplicate as it is and reports it, and finds nothing on a second
+ * run.
  * @see modules/user/specs/user.feature
  */
 import { InMemoryProcessStore } from "@langwatch/eventing";
@@ -39,7 +40,7 @@ describe("the address step", () => {
 
       const { report, saved } = await runStep({ users });
 
-      expect(report).toEqual({ afterId: ada.id, lowerCased: 1, plusTagged: 0, renamed: [] });
+      expect(report).toEqual({ afterId: ada.id, lowerCased: 1, clashed: 0, clashes: [] });
       expect(saved).toEqual([report]);
       await expect(users.findByEmail("ada@example.com")).resolves.toMatchObject([{ id: ada.id }]);
       await expect(users.findById(grace.id)).resolves.toMatchObject({
@@ -49,31 +50,31 @@ describe("the address step", () => {
   });
 
   describe("given accounts whose addresses differ only in case", () => {
-    /** @scenario "A case-only duplicate gets a plus tag" */
-    it("gives each one the next free plus tag, leaving the lower-cased holder as it is", async () => {
+    /** @scenario "A case-only duplicate is left as it is and reported" */
+    it("leaves each one as it is and lists it in the report, the lower-cased holder untouched", async () => {
       const users = storedAccounts();
       const lowered = await users.create({ name: "Eve", email: "eve@example.com" });
-      const taken = await users.create({ name: "Eve", email: "eve+2@example.com" });
       const capitals = await users.create({ name: "Eve", email: "Eve@Example.com" });
       const shouting = await users.create({ name: "Eve", email: "EVE@example.com" });
 
       const { report } = await runStep({ users });
 
-      expect(report).toMatchObject({ lowerCased: 0, plusTagged: 2 });
-      expect(
-        report.renamed.map(({ userId }) => userId).toSorted((x, y) => x.localeCompare(y)),
-      ).toEqual([capitals.id, shouting.id].toSorted((x, y) => x.localeCompare(y)));
+      expect(report).toMatchObject({ lowerCased: 0, clashed: 2 });
+      expect(report.clashes.toSorted((x, y) => x.userId.localeCompare(y.userId))).toEqual(
+        [
+          { userId: capitals.id, address: "Eve@Example.com" },
+          { userId: shouting.id, address: "EVE@example.com" },
+        ].toSorted((x, y) => x.userId.localeCompare(y.userId)),
+      );
       await expect(users.findById(lowered.id)).resolves.toMatchObject({
         email: "eve@example.com",
       });
-      await expect(users.findById(taken.id)).resolves.toMatchObject({
-        email: "eve+2@example.com",
+      await expect(users.findById(capitals.id)).resolves.toMatchObject({
+        email: "Eve@Example.com",
       });
-      const tagged = await users.findProfiles([capitals.id, shouting.id]);
-      expect(tagged.map(({ email }) => email).toSorted((a, b) => a.localeCompare(b))).toEqual([
-        "eve+3@example.com",
-        "eve+4@example.com",
-      ]);
+      await expect(users.findById(shouting.id)).resolves.toMatchObject({
+        email: "EVE@example.com",
+      });
     });
   });
 
@@ -82,11 +83,11 @@ describe("the address step", () => {
     it("finds nothing to do", async () => {
       const users = storedAccounts();
       await users.create({ name: "Ada", email: "Ada@Example.com" });
-      await users.create({ name: "Ada", email: "ada@example.com" });
+      await users.create({ name: "Grace", email: "grace@example.com" });
       await runStep({ users });
 
       await expect(runStep({ users })).resolves.toEqual({
-        report: { afterId: null, lowerCased: 0, plusTagged: 0, renamed: [] },
+        report: { afterId: null, lowerCased: 0, clashed: 0, clashes: [] },
         saved: [],
       });
     });

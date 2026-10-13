@@ -10,10 +10,7 @@ const LIVE_FOR_MS = 4_000;
 /** The shader's fade out in the boot-splash styles, with room to finish before it stops. */
 const FADE_OUT_MS = 900;
 
-async function start(): Promise<void> {
-  const found = document.getElementById("lw-boot-shader");
-  if (!found || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const element: HTMLElement = found;
+async function runOn(element: HTMLElement): Promise<void> {
   const mode = document.documentElement.classList.contains("dark") ? "dark" : "light";
   let stop: () => void;
   try {
@@ -45,4 +42,9 @@ async function start(): Promise<void> {
   onHidden();
 }
 
-void start();
+function start(): void {
+  const element = document.getElementById("lw-boot-shader");
+  if (element && !matchMedia("(prefers-reduced-motion: reduce)").matches) void runOn(element);
+}
+
+start();

@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { Config, environmentBooleanSchema, type ConfigOf } from "@langwatch/config";
+import {
+  Config,
+  environmentBooleanSchema,
+  environmentOnOffSchema,
+  type ConfigOf,
+} from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
-import { z } from "zod";
 
 /** The previous release spelled this switch `on`/`off`; both spellings stay readable. */
-const scimGrantsSwitchSchema = z
-  .union([z.literal("on"), z.literal("off")])
-  .transform((value) => value === "on")
-  .or(environmentBooleanSchema);
+const scimGrantsSwitchSchema = environmentOnOffSchema.or(environmentBooleanSchema);
 
 /** `provenOffboarding` selects one process-wide offboarding path at boot. */
 export const scimConfig = Config.define((c) => ({

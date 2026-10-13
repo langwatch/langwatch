@@ -63,7 +63,7 @@ describe.skipIf(!databaseUrl)("given an account stored with capitals in its addr
       await expect(users.findById(userId)).resolves.toMatchObject({ email: STORED });
     });
 
-    /** @scenario "A case-only duplicate gets a plus tag" */
+    /** @scenario "A case-only duplicate is left as it is and reported" */
     it("answers taken, changing neither row, when another account holds the lower-cased form", async () => {
       const twin = await connection.client.user.create({ data: { name: "Twin", email: LOWERED } });
 

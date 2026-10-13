@@ -1,18 +1,22 @@
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import type { UserAddressRow, UserRepository } from "../repositories/user.repository.ts";
 
+const logger = createLogger("langwatch:user:address-lower-case");
+
 const PAGE_SIZE = 500;
 
 /**
- * Where the step got to and what it rewrote; a dry run counts what it would. `renamed` lists the
- * accounts that took a plus tag, so an admin sees them on Ops > Upgrades and can fix each one.
+ * Where the step got to and what it rewrote; a dry run counts what it would. `clashes` lists the
+ * accounts left as they were because another holds their lower-cased address, so an admin sees
+ * them on Ops > Upgrades and fixes each by hand.
  */
 export const userAddressLowerCaseReportSchema = z.object({
   afterId: z.string().nullable(),
   lowerCased: z.number(),
-  plusTagged: z.number(),
-  renamed: z.array(z.object({ userId: z.string(), from: z.string(), to: z.string() })),
+  clashed: z.number(),
+  clashes: z.array(z.object({ userId: z.string(), address: z.string() })),
 });
 export type UserAddressLowerCaseReport = z.infer<typeof userAddressLowerCaseReportSchema>;
 
@@ -29,7 +33,7 @@ type Dependencies = Readonly<{
 
 /**
  * Writes every stored address that is not lower-case back lower-cased. When another account
- * already holds that address, it takes the first free plus tag instead (`local+2@domain`).
+ * already holds that address, the account is skipped, logged and listed in the report.
  */
 export class UserAddressLowerCaseService {
   private constructor(private readonly deps: Dependencies) {}
@@ -45,7 +49,7 @@ export class UserAddressLowerCaseService {
     onPageDone,
   }: UserAddressLowerCaseRun): Promise<UserAddressLowerCaseReport> {
     const report = {
-      ...(resumeFrom ?? { afterId: null, lowerCased: 0, plusTagged: 0, renamed: [] }),
+      ...(resumeFrom ?? { afterId: null, lowerCased: 0, clashed: 0, clashes: [] }),
     };
     while (!signal.aborted) {
       const page = await this.deps.users.findMixedCaseAddressPage({
@@ -59,7 +63,7 @@ export class UserAddressLowerCaseService {
         else await this.#lowerCase({ row, report });
       }
       report.afterId = last.id;
-      if (!dryRun) await onPageDone({ report: { ...report, renamed: [...report.renamed] } });
+      if (!dryRun) await onPageDone({ report: { ...report, clashes: [...report.clashes] } });
     }
     return report;
   }
@@ -72,30 +76,19 @@ export class UserAddressLowerCaseService {
     row: UserAddressRow;
     report: UserAddressLowerCaseReport;
   }): Promise<void> {
-    const lowered = row.email.toLowerCase();
-    for (let tag = 1; tag <= MAX_PLUS_TAG; tag += 1) {
-      const to = tag === 1 ? lowered : plusTagged({ address: lowered, tag });
-      const outcome = await this.deps.users.replaceAddress({ id: row.id, from: row.email, to });
-      if (outcome === "changed") return;
-      if (outcome === "replaced") {
-        if (tag === 1) report.lowerCased += 1;
-        else {
-          report.plusTagged += 1;
-          report.renamed.push({ userId: row.id, from: row.email, to });
-        }
-        return;
-      }
+    const outcome = await this.deps.users.replaceAddress({
+      id: row.id,
+      from: row.email,
+      to: row.email.toLowerCase(),
+    });
+    if (outcome === "replaced") report.lowerCased += 1;
+    if (outcome === "taken") {
+      report.clashed += 1;
+      report.clashes.push({ userId: row.id, address: row.email });
+      logger.warn(
+        { userId: row.id },
+        "address left as it is: another account holds its lower-cased form",
+      );
     }
-    throw new Error(`no free plus tag for user ${row.id} below ${MAX_PLUS_TAG}`);
   }
-}
-
-/** Far beyond any real clash: a run that reaches it is a bug, not a crowded address. */
-const MAX_PLUS_TAG = 1_000;
-
-/** `local+N@domain`; an address with no `@` takes the tag at its end. */
-function plusTagged({ address, tag }: { address: string; tag: number }): string {
-  const at = address.lastIndexOf("@");
-  if (at === -1) return `${address}+${tag}`;
-  return `${address.slice(0, at)}+${tag}${address.slice(at)}`;
 }

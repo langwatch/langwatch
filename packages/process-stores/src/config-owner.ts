@@ -44,7 +44,7 @@ const unsetWhenBlank = z.preprocess(
 export const storesOwner = {
   name: "stores",
   config: Config.define((c) => ({
-    /** Days an event-log row with no tenant policy keeps: main's platform default (ADR-022). */
+    /** Days an event-log row with no tenant policy keeps: the previous default (ADR-022). */
     defaultRetentionDays: c.env(
       "DEFAULT_RETENTION_DAYS",
       z.coerce.number().int().positive().default(49),
@@ -120,7 +120,7 @@ export const storesOwner = {
     /** Main's `CLICKHOUSE_URL__<label>__<orgId>` family: each organization's own server. */
     clickhouseRoutes: Secret.family(PRIVATE_ROUTE_ENV_PREFIX),
     redis: Secret.load("REDIS_URL", { optional: true }),
-    /** Main's cluster Redis: comma-separated endpoints, read instead of REDIS_URL when set. */
+    /** The previous release's cluster Redis: endpoints read instead of REDIS_URL when set. */
     redisClusterEndpoints: Secret.load("REDIS_CLUSTER_ENDPOINTS", { optional: true }),
     encryption: credentialsSecret,
     encryptionFallback: sessionSecret,

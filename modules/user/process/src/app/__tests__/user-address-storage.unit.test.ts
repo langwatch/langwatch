@@ -28,12 +28,9 @@ describe("an account's stored address", () => {
       const stored = await app.getProfiles({
         userIds: [directory.id, credential.id, passkey.id, changed.id],
       });
-      expect(stored.map(({ email }) => email).toSorted((a, b) => a.localeCompare(b))).toEqual([
-        "cred@example.com",
-        "dir@example.com",
-        "key@example.com",
-        "moved@elsewhere.com",
-      ]);
+      expect(stored.map(({ email }) => email ?? "").toSorted((a, b) => a.localeCompare(b))).toEqual(
+        ["cred@example.com", "dir@example.com", "key@example.com", "moved@elsewhere.com"],
+      );
     });
   });
 

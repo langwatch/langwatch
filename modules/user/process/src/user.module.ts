@@ -59,7 +59,7 @@ export const userProcessModule: PublishedProcessModule<"user", UserApi, UserServ
         kind: "data",
         mode: "background",
         description:
-          "Lower-cases every stored account address; when another account already holds the lower-cased address, it gets a plus tag instead (name+2@domain, then +3 and so on).",
+          "Lower-cases every stored account address; when another account already holds the lower-cased address, the account is left as it is and listed in the step report for an admin to fix by hand.",
         needsOldWritersGone: false,
         run: async ({ checkpoint, dryRun, signal }) => {
           const resumed = userAddressLowerCaseReportSchema.safeParse(checkpoint.resumeFrom);

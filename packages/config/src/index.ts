@@ -65,6 +65,7 @@ export {
   environmentExactOneSchema,
   environmentLegacyTruthySchema,
   environmentNotExactOneSchema,
+  environmentOnOffSchema,
   environmentOneOrTrueSchema,
   environmentPresenceSchema,
   nodeEnvironmentSchema,
