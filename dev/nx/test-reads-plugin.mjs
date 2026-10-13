@@ -81,6 +81,7 @@ export const reads = {
     "modules/github/**/*",
     "modules/hosted-mcp/**/*",
     "modules/identity/**/*",
+    "modules/insight/**/*",
     "modules/instant-eval-judge/**/*",
     "modules/instant-eval/**/*",
     "modules/integration/**/*",
@@ -143,6 +144,7 @@ export const reads = {
   "@langwatch/langy-contract": ["services/langyagent/**/*", "pnpm-workspace.yaml"],
   "@langwatch/insight-process": [
     "services/langyagent/internal/assets/skills/daily-insights/SKILL.md",
+    "pnpm-workspace.yaml",
   ],
   "@langwatch/enterprise-billing-process": ["docs/pricing/**/*", "docs/pricing.mdx"],
   "@langwatch/trace-process": [
@@ -184,6 +186,7 @@ export const reads = {
   "@langwatch/analytics-browser": [
     "apps/ui/public/images/dashboards/templates/*",
     "pnpm-workspace.yaml",
+    "apps/ui/**/*",
   ],
   "@langwatch/webhook-verify": ["specs/webhooks/signature-vectors.json"],
   "@langwatch/oxlint-rules": [
