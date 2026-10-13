@@ -1,8 +1,9 @@
-import { scopedApiKey } from "@/internal/credentialContext";
-import { resolveEndpoint } from "@/internal/endpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { mergeHeaders } from "@/client-sdk/services/_shared/merge-headers";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey, scopedProjectId } from "@/internal/credentialContext";
+import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export interface SecretResponse {
@@ -32,20 +33,33 @@ export class SecretsApiError extends Error {
 export class SecretsApiService {
   private readonly apiKey: string;
   private readonly endpoint: string;
+  private readonly configuredProjectId: string | undefined;
 
-  constructor(config?: { apiKey?: string; endpoint?: string }) {
+  constructor(config?: { apiKey?: string; endpoint?: string; projectId?: string }) {
     this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     this.endpoint = resolveEndpoint(config?.endpoint);
+    this.configuredProjectId = config?.projectId;
+  }
+
+  private projectId(): string {
+    const projectId =
+      this.configuredProjectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
+    if (!projectId) {
+      throw new SecretsApiError("A projectId is required for secret operations", "configuration");
+    }
+    return projectId;
   }
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
     const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...options,
-      headers: {
-        ...buildAuthHeaders({ apiKey: this.apiKey }),
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
+      headers: mergeHeaders(
+        {
+          ...buildRequestHeaders({ apiKey: this.apiKey, projectId: this.projectId() }),
+          "Content-Type": "application/json",
+        },
+        options?.headers,
+      ),
     });
 
     if (!response.ok) {
@@ -55,8 +69,12 @@ export class SecretsApiService {
         parsed = JSON.parse(errorText);
       } catch {
         // leave as raw text
+        void 0;
       }
-      const message = formatApiErrorMessage({ error: parsed, options: { status: response.status } });
+      const message = formatApiErrorMessage({
+        error: parsed,
+        options: { status: response.status },
+      });
       throwIfHandledError({
         operation: options?.method ?? "GET",
         error: parsed,
@@ -74,30 +92,37 @@ export class SecretsApiService {
   }
 
   async getAll(): Promise<SecretResponse[]> {
-    return this.request<SecretResponse[]>("/api/secrets");
+    const projectId = this.projectId();
+    return this.request<SecretResponse[]>(
+      `/api/v1/secrets?projectId=${encodeURIComponent(projectId)}`,
+    );
   }
 
   async get(id: string): Promise<SecretResponse> {
-    return this.request<SecretResponse>(`/api/secrets/${encodeURIComponent(id)}`);
+    const projectId = this.projectId();
+    return this.request<SecretResponse>(
+      `/api/v1/secrets/${encodeURIComponent(id)}?projectId=${encodeURIComponent(projectId)}`,
+    );
   }
 
   async create(body: { name: string; value: string }): Promise<SecretResponse> {
-    return this.request<SecretResponse>("/api/secrets", {
+    return this.request<SecretResponse>("/api/v1/secrets", {
       method: "POST",
-      body: JSON.stringify(body),
+      body: JSON.stringify({ projectId: this.projectId(), ...body }),
     });
   }
 
   async update(id: string, body: { value: string }): Promise<SecretResponse> {
-    return this.request<SecretResponse>(`/api/secrets/${encodeURIComponent(id)}`, {
+    return this.request<SecretResponse>(`/api/v1/secrets/${encodeURIComponent(id)}`, {
       method: "PUT",
-      body: JSON.stringify(body),
+      body: JSON.stringify({ projectId: this.projectId(), ...body }),
     });
   }
 
   async delete(id: string): Promise<SecretDeleteResponse> {
-    return this.request<SecretDeleteResponse>(`/api/secrets/${encodeURIComponent(id)}`, {
+    return this.request<SecretDeleteResponse>(`/api/v1/secrets/${encodeURIComponent(id)}`, {
       method: "DELETE",
+      body: JSON.stringify({ projectId: this.projectId() }),
     });
   }
 }

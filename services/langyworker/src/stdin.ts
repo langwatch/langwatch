@@ -1,8 +1,7 @@
 /**
- * Strict JSONL framing for stdin. LF is the only record delimiter; a trailing
- * CR is stripped. Node's readline is deliberately not used: it also splits on
- * U+2028/U+2029, which are valid inside JSON strings (pi documents the same
- * rule for its RPC mode).
+ * Strict JSONL framing for stdin: LF the only delimiter, trailing CR
+ * stripped. Node's readline is not used - it also splits on U+2028/U+2029,
+ * valid inside JSON strings (pi documents the same rule for its RPC mode).
  */
 
 import { StringDecoder } from "node:string_decoder";

@@ -176,3 +176,13 @@ Feature: Running a test suite reuses the run plan path
     Given a project with test suites and run plans
     When suites are listed without naming a kind
     Then only run plans come back
+
+  # The plan-name lock is a raw advisory-lock statement whose project id sits
+  # in a bound parameter, so the tenancy guard sees no predicate and refused
+  # every run until the statement declared what it is.
+  @unit
+  Scenario: Starting a run holds the plan-name lock past the tenancy guard
+    Given a run plan resolved by name inside a transaction
+    When the advisory lock is taken
+    Then the statement declares itself an advisory lock the tenancy guard lets through
+    And the lock key is bounded by the project

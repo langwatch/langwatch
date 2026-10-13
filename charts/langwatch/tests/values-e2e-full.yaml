@@ -42,7 +42,7 @@ app:
     publicUrl: "http://localhost:30560"
   resources:
     requests: { cpu: 100m, memory: 1Gi }
-    limits:   { cpu: 1000m, memory: 2Gi }
+    limits: { cpu: 1000m, memory: 2Gi }
 
 # ── Workers (2 replicas) ────────────────────────────────────────────────────
 workers:
@@ -50,21 +50,21 @@ workers:
   replicaCount: 2
   resources:
     requests: { cpu: 100m, memory: 1Gi }
-    limits:   { cpu: 1000m, memory: 2Gi }
+    limits: { cpu: 1000m, memory: 2Gi }
 
 # ── NLP ──────────────────────────────────────────────────────────────────────
 langwatch_nlp:
   replicaCount: 1
   resources:
     requests: { cpu: 100m, memory: 256Mi }
-    limits:   { cpu: 1, memory: 1Gi }
+    limits: { cpu: 1, memory: 1Gi }
 
 # ── Langevals ────────────────────────────────────────────────────────────────
 langevals:
   replicaCount: 1
   resources:
     requests: { cpu: 100m, memory: 512Mi }
-    limits:   { cpu: 1000m, memory: 4Gi }
+    limits: { cpu: 1000m, memory: 4Gi }
 
 # ── ClickHouse (3-node replicated cluster with Keeper) ──────────────────────
 clickhouse:
@@ -90,7 +90,7 @@ postgresql:
       size: 1Gi
     resources:
       requests: { cpu: 50m, memory: 128Mi }
-      limits:   { cpu: 500m, memory: 512Mi }
+      limits: { cpu: 500m, memory: 512Mi }
 
 # ── Redis (no auth — simpler for testing) ────────────────────────────────────
 redis:
@@ -102,7 +102,7 @@ redis:
       size: 1Gi
     resources:
       requests: { cpu: 25m, memory: 64Mi }
-      limits:   { cpu: 250m, memory: 256Mi }
+      limits: { cpu: 250m, memory: 256Mi }
 
 # ── Disabled services ────────────────────────────────────────────────────────
 prometheus:

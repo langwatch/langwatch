@@ -1,0 +1,188 @@
+/**
+ * The local folder's long-poll fallback, `/api/v1/langy/control/connect` (ADR-129). Register
+ * authenticates the minted session key at its own door; poll and frames are addressed by the
+ * instance token alone, as on main. Every refusal answers in the relay's frame wire.
+ */
+
+import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
+import { ProjectMissingCredentialsError } from "@langwatch/api";
+import { anyAuthenticated } from "@langwatch/api/access";
+import {
+  defineRestDoor,
+  defineRestRouter,
+  documentedResponses,
+  MANAGEMENT_API_VERSION,
+  type RestProtocolRefusal,
+} from "@langwatch/api/rest";
+import {
+  LangyApi,
+  registerFrameSchema,
+  langyControlFramesAnswerSchema,
+  langyControlFramesBodySchema,
+  langyControlPollAnswerSchema,
+  langyControlPollQuerySchema,
+  langyControlRegisterAnswerSchema,
+  localControlCredentialSchema,
+} from "@langwatch/langy-contract";
+import { z } from "zod";
+
+import {
+  type ConnectRefusalDocument,
+  framesRefusalDocument,
+  pollRefusalDocument,
+  registerRefusalDocument,
+} from "../rules/langy-local-control-connect.rules.ts";
+import {
+  LANGY_CONTROL_DATED_MOUNTS,
+  type LangyControlMount,
+  langyControlDocs,
+} from "./langy-local-control.rest.ts";
+
+const JSON_MEDIA_TYPE = "application/json";
+
+/** Register's door: the framework parsed the minted key, the session core says who holds it. */
+export const localControlSessionKeyDoor = defineRestDoor("session_key", {
+  needs: LangyApi,
+  identify: async ({ sessionKey, request }, langy) => {
+    if (sessionKey === null) throw new ProjectMissingCredentialsError();
+    const holder = await langy.verifyLocalControlSessionKey({
+      ...sessionKey,
+      instanceToken: request.headers.get(INSTANCE_TOKEN_HEADER),
+    });
+
+    return {
+      actor: holder.actor,
+      scope: { tier: "project", id: holder.projectId },
+      session: holder,
+    };
+  },
+});
+
+const BECAUSE = "The local folder reads its answers and refusals as relay frames.";
+
+const ADDRESSED_BY_INSTANCE_TOKEN =
+  "addressed by the pod-local instance token register handed out, as on main; the session key " +
+  "is checked once, at register";
+
+function frameRefusal(document: (failure: Error) => ConnectRefusalDocument): RestProtocolRefusal {
+  return ({ failure, response }) => {
+    const { status, body } = document(failure);
+    return response.write({ status, mediaType: JSON_MEDIA_TYPE, body: JSON.stringify(body) });
+  };
+}
+
+const instanceTokenHeaders = z.object({ [INSTANCE_TOKEN_HEADER]: z.string().default("") });
+
+function localControlConnectRest(mount: LangyControlMount) {
+  return defineRestRouter(LangyApi)
+    .withNamespace("langy")
+    .withVersion(MANAGEMENT_API_VERSION)
+    .withCredential("project")
+    .withAddressing("literal", { v1Twin: true })
+
+    .post(`/api/langy/control${mount}/connect/register`, "langyControlConnectRegister")
+    .withAudit("langy.registerLocalControl")
+    .withCredential("session_key", { session: localControlCredentialSchema })
+    .withAccess(
+      anyAuthenticated({
+        reason:
+          "a Langy session key is minted for one conversation and holds no RBAC permission; the key is the whole grant",
+      }),
+    )
+    .withInput(registerFrameSchema)
+    .withResponse("protocol", {
+      produces: JSON_MEDIA_TYPE,
+      because: BECAUSE,
+      refusal: frameRefusal(registerRefusalDocument),
+    })
+    .withDocs(
+      langyControlDocs(mount, {
+        operationId: "registerLangyControlSession",
+        description:
+          "The registered frame with its instance token, or the refused frame with its reason.",
+        responses: documentedResponses({ 200: langyControlRegisterAnswerSchema }),
+      }),
+    )
+    .handle(async ({ app, input, actor, scope, session, response }) =>
+      response.write({
+        status: 200,
+        mediaType: JSON_MEDIA_TYPE,
+        body: JSON.stringify(
+          await app.registerLocalControlSession({
+            actor,
+            projectId: scope.id,
+            credential: session,
+            frame: input,
+          }),
+        ),
+      }),
+    )
+
+    .get(`/api/langy/control${mount}/connect/poll`, "langyControlConnectPoll")
+    .withAccess({ kind: "public", reason: ADDRESSED_BY_INSTANCE_TOKEN })
+    .withQuery(langyControlPollQuerySchema)
+    .withHeaders(instanceTokenHeaders)
+    .withResponse("protocol", {
+      produces: JSON_MEDIA_TYPE,
+      because: BECAUSE,
+      refusal: frameRefusal(pollRefusalDocument),
+    })
+    .withDocs(
+      langyControlDocs(mount, {
+        operationId: "pollLangyControlSession",
+        description:
+          "The frames waiting for the folder, or 410 when the instance token is not known.",
+        responses: documentedResponses({ 200: langyControlPollAnswerSchema }),
+      }),
+    )
+    .handle(async ({ app, input, signal, response }, headers) =>
+      response.write({
+        status: 200,
+        mediaType: JSON_MEDIA_TYPE,
+        body: JSON.stringify(
+          await app.pollLocalControlSession({
+            instanceToken: headers[INSTANCE_TOKEN_HEADER],
+            inFlightCallIds: (input.inFlight ?? "").split(",").filter(Boolean),
+            signal,
+          }),
+        ),
+      }),
+    )
+
+    .post(`/api/langy/control${mount}/connect/frames`, "langyControlConnectFrames")
+    .withoutAudit("ingestion")
+    .withAccess({ kind: "public", reason: ADDRESSED_BY_INSTANCE_TOKEN })
+    .withInput(langyControlFramesBodySchema)
+    .withHeaders(instanceTokenHeaders)
+    .withResponse("protocol", {
+      produces: JSON_MEDIA_TYPE,
+      because: BECAUSE,
+      refusal: frameRefusal(framesRefusalDocument),
+    })
+    .withDocs(
+      langyControlDocs(mount, {
+        operationId: "postLangyControlFrames",
+        description: "How many frames were taken, or 410 when the instance token is not known.",
+        responses: documentedResponses({ 200: langyControlFramesAnswerSchema }),
+      }),
+    )
+    .handle(async ({ app, input, response }, headers) =>
+      response.write({
+        status: 200,
+        mediaType: JSON_MEDIA_TYPE,
+        body: JSON.stringify(
+          await app.postLocalControlFrames({
+            instanceToken: headers[INSTANCE_TOKEN_HEADER],
+            frames: input.frames,
+          }),
+        ),
+      }),
+    )
+
+    .build();
+}
+
+export const langyLocalControlConnectRest = localControlConnectRest("");
+
+export const langyLocalControlConnectDatedRests =
+  LANGY_CONTROL_DATED_MOUNTS.map(localControlConnectRest);

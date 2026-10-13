@@ -204,15 +204,4 @@ func (o *Orchestrator) pruneDatabases(ctx context.Context, worktreeDir string, s
 	return dropped
 }
 
-// liveWorktreeDirs is the set of worktree dirs with a running stack.
-func (o *Orchestrator) liveWorktreeDirs() map[string]bool {
-	live := map[string]bool{}
-	for _, s := range o.store.Stacks() {
-		if o.sys.ProcessAlive(s.LauncherPID) {
-			live[s.WorktreeDir] = true
-		}
-	}
-	return live
-}
-
 func zapErr(err error) zap.Field { return zap.Error(err) }

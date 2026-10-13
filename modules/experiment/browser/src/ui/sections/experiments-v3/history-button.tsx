@@ -1,0 +1,70 @@
+import { Link } from "@langwatch/browser-host/link";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+/**
+ * HistoryButton - Navigate to evaluation results
+ */
+import { Button } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { BarChart2 } from "react-feather";
+
+import { experimentApi } from "../../../behavior/experiment-api.ts";
+import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+
+type HistoryButtonProps = {
+  disabled?: boolean;
+};
+
+export function HistoryButton({ disabled = false }: HistoryButtonProps) {
+  const { project } = useOrganizationTeamProject();
+
+  // Get experiment info and whether we've run this session
+  const { experimentId, experimentSlug, hasRunThisSession } = useEvaluationsV3Store((state) => ({
+    experimentId: state.experimentId,
+    experimentSlug: state.experimentSlug,
+    hasRunThisSession: state.ui.hasRunThisSession,
+  }));
+
+  // Check if there are any runs from previous sessions (only on page load)
+  const runsQuery = experimentApi.experiments.getExperimentBatchEvaluationRuns.useQuery(
+    {
+      projectId: project?.id ?? "",
+      experimentId: experimentId ?? "",
+    },
+    {
+      enabled: !!project && !!experimentId && !hasRunThisSession,
+    },
+  );
+
+  const hasExistingRuns = (runsQuery.data?.runs.length ?? 0) > 0;
+  const isLoading = runsQuery.isLoading && !hasRunThisSession;
+
+  // Enable if we've run this session OR there are existing runs
+  const hasRuns = hasRunThisSession || hasExistingRuns;
+
+  // Don't show if no project or experimentId
+  if (!project || !experimentId) return null;
+
+  return (
+    <Tooltip
+      content={hasRuns ? "View results" : "No runs yet"}
+      showArrow
+      positioning={{ placement: "bottom" }}
+      openDelay={100}
+    >
+      <Button
+        size="sm"
+        variant="ghost"
+        color="fg.muted"
+        _hover={{ color: "fg", bg: "bg.subtle" }}
+        disabled={disabled || !hasRuns || isLoading}
+        aria-label="View results"
+        asChild
+      >
+        <Link href={`/${project.slug}/experiments/${experimentSlug}`}>
+          <BarChart2 size={18} />
+          Results
+        </Link>
+      </Button>
+    </Tooltip>
+  );
+}

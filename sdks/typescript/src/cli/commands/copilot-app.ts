@@ -1,9 +1,14 @@
-import chalk from "chalk";
 import * as fs from "node:fs";
 import * as os from "node:os";
 
-import { saveConfig } from "@/cli/utils/governance/config";
-import { resolveLiveIngestionKey } from "@/cli/utils/governance/telemetry-refresh";
+import chalk from "chalk";
+
+import {
+  saveConfig,
+  isLoggedIn,
+  loadConfig,
+  type GovernanceConfig,
+} from "@/cli/utils/governance/config";
 import {
   buildCopilotAppEnv,
   findCopilotApp,
@@ -11,21 +16,12 @@ import {
   type LaunchAgentSpec,
 } from "@/cli/utils/governance/copilot-app";
 import { installCopilotAppAgent } from "@/cli/utils/governance/copilot-app-agent";
-import {
-  isLoggedIn,
-  loadConfig,
-  type GovernanceConfig,
-} from "@/cli/utils/governance/config";
+import { resolveLiveIngestionKey } from "@/cli/utils/governance/telemetry-refresh";
 
 /**
- * `langwatch copilot-app connect` — provisions capture for the standalone
- * GitHub Copilot app (ADR-039 §Extension). The app is a long-running GUI,
- * not a per-invocation CLI, so it is connected once rather than wrapped:
- * resolve a personal ingest key of sourceType "copilot_app" (reusing the
- * cached one while the platform confirms it is live, minting otherwise),
- * then install a login agent that owns the app's launch and injects the
- * direct-OTLP env. Re-running re-points the agent; `langwatch logout`
- * tears it down.
+ * Connect the GitHub Copilot app for telemetry capture. Resolves or mints an
+ * ingest key and installs a login agent.
+ * @see dev/docs/adr/039-extension.md
  */
 
 const SOURCE_TYPE = "copilot_app";
@@ -52,10 +48,7 @@ export interface ConnectCopilotAppDeps {
   env: Record<string, string | undefined>;
   exists: (p: string) => boolean;
   loadConfig: () => GovernanceConfig;
-  mint: (
-    cfg: GovernanceConfig,
-    sourceType: string,
-  ) => Promise<{ token: string; endpoint: string }>;
+  mint: (cfg: GovernanceConfig, sourceType: string) => Promise<{ token: string; endpoint: string }>;
   install: (spec: LaunchAgentSpec) => string;
   captureContent: boolean;
   info: (msg: string) => void;
@@ -70,11 +63,9 @@ export interface ConnectCopilotAppResult {
 }
 
 /**
- * Orchestrates the connect flow with injected collaborators so the
- * behaviour (guards, ordering, notices) is unit-testable without touching
- * the machine, the network, or the OS service manager. Ordering matters:
- * the app-installed guard fires BEFORE the mint, so a missing app never
- * mints a stray key.
+ * Orchestrates the connect flow with injected collaborators, unit-testable
+ * without touching the machine, network or OS service manager. Ordering
+ * matters: the app-installed guard fires BEFORE the mint.
  */
 export async function connectCopilotApp(
   deps: ConnectCopilotAppDeps,
@@ -87,12 +78,7 @@ export async function connectCopilotApp(
     );
   }
 
-  const execPath = findCopilotApp(
-    deps.platform,
-    deps.home,
-    deps.exists,
-    deps.env,
-  );
+  const execPath = findCopilotApp(deps.platform, deps.home, deps.exists, deps.env);
   if (!execPath) {
     throw new CopilotAppConnectError(
       "not-installed",
@@ -134,14 +120,10 @@ export async function connectCopilotApp(
       "[langwatch] content capture is off for the Copilot app; traces will carry tokens only.",
     );
   }
-  const project =
-    cfg.organization?.slug ?? cfg.organization?.name ?? "your personal project";
-  // Honest lifecycle: the agent starts Copilot with tracking now (darwin
-  // bootstrap runs RunAtLoad, linux is an explicit restart, win32 an
-  // explicit /Run) and on every login. Two sessions the agent cannot
-  // capture: an app window already open before connecting (it keeps the
-  // pre-rotation env), and a manual Dock/Start-menu relaunch before the
-  // next login (inherits no environment). ADR-039 §Extension.
+  const project = cfg.organization?.slug ?? cfg.organization?.name ?? "your personal project";
+  // Honest lifecycle: the agent starts Copilot with tracking now and on
+  // every login. Two sessions it cannot capture: a window already open
+  // before connecting, and a manual relaunch before next login. ADR-039 Extension.
   deps.info(
     `GitHub Copilot app connected. Usage will be tracked into ${project}. Capture starts now and on every login. If a Copilot app window was already open, quit and reopen it — that session is not tracked; the same goes for a manual Dock/Start-menu relaunch before your next login.`,
   );
@@ -164,11 +146,9 @@ function currentPlatform(): AppPlatform {
 }
 
 /**
- * Resolve the copilot_app ingest key with the same reuse-first rules the
- * wrappers follow: a cached key that the platform confirms live is used
- * as-is, so re-running `connect` does not rotate a working key out from
- * under an agent on another machine. A fresh mint is cached for the next
- * run.
+ * Resolves the copilot_app ingest key with the same reuse-first rules the
+ * wrappers follow: a cached, live-confirmed key is reused, so re-running
+ * `connect` never rotates a working key out from under another machine.
  */
 async function resolveCopilotAppKey(
   cfg: GovernanceConfig,
@@ -180,12 +160,13 @@ async function resolveCopilotAppKey(
       saveConfig({
         ...cfg,
         default_personal_ingest_keys: {
-          ...(cfg.default_personal_ingest_keys ?? {}),
+          ...cfg.default_personal_ingest_keys,
           [sourceType]: { secret: resolved.token },
         },
       });
     } catch {
       // The agent env below still carries the key; only the cache write failed.
+      void 0;
     }
   }
   return { token: resolved.token, endpoint: resolved.endpoint };

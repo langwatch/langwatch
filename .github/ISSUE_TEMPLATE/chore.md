@@ -31,6 +31,7 @@ See `specs/README.md` for feature file binding.
 
 **Scope**
 What components or areas does this affect?
+
 - [ ] Dependencies
 - [ ] Build/CI
 - [ ] Documentation

@@ -1,0 +1,231 @@
+import { explainSerializedError } from "@langwatch/handled-error/presentation";
+import { createLogger } from "@langwatch/observability/browser";
+import { fetchEventSource } from "@microsoft/fetch-event-source";
+
+import { toError } from "../errors.ts";
+
+const logger = createLogger("sseClient");
+const EVENT_STREAM_CONTENT_TYPE = "text/event-stream";
+
+export interface FetchSSEOptions<T> {
+  /** Endpoint to connect to */
+  endpoint: string;
+
+  /** Payload to send with the request */
+  payload: unknown;
+
+  /** Function to handle each event */
+  onEvent: (event: T) => void;
+
+  /** Function to determine if processing should stop */
+  shouldStopProcessing?: (event: T) => boolean;
+
+  /** Timeout in milliseconds (default: 10_000) */
+  timeout?: number;
+
+  /** Timeout in milliseconds (default: 240_000) */
+  chunkTimeout?: number;
+
+  /** Custom headers */
+  headers?: Record<string, string>;
+
+  /** Error handler */
+  onError?: (error: Error) => void;
+
+  /**
+   * Cancels the stream from the outside — a Stop button, or a component
+   * unmounting mid-run. The server treats the disconnect as the cancel signal.
+   */
+  signal?: AbortSignal;
+}
+
+/**
+ * The failure a refused request rejects with. A coded body rides under `error`
+ * with the status stamped beside it, the shape `readHandledError` already reads,
+ * so `explainAnyError` and `showErrorToast` give the registry's words.
+ */
+async function refusalOf(response: Response): Promise<FetchSSERefusedError> {
+  const body = (await response
+    .clone()
+    .json()
+    .catch(() => null)) as { code?: unknown; error?: unknown } | null;
+
+  if (typeof body?.code === "string") {
+    const explained = explainSerializedError(body as Parameters<typeof explainSerializedError>[0]);
+    return new FetchSSERefusedError({
+      message: explained.description || explained.title,
+      httpStatus: response.status,
+      body,
+    });
+  }
+
+  const message = typeof body?.error === "string" ? body.error : uncodedRefusalText(response);
+  return new FetchSSERefusedError({ message, httpStatus: response.status });
+}
+
+/** The sentence for a refusal whose body carries no code and no text. */
+function uncodedRefusalText(response: Response): string {
+  return response.status >= 500
+    ? `Server error: ${response.status} ${response.statusText}`
+    : response.statusText;
+}
+
+/** One SSE request's lifetime: it settles once, on the first of finish, failure or timeout. */
+class SseRequest {
+  readonly controller = new AbortController();
+  private timeoutId: ReturnType<typeof setTimeout> | undefined;
+  private settled = false;
+  private readonly abortFromSignal = () => this.controller.abort();
+
+  static create(input: {
+    signal?: AbortSignal;
+    resolve: () => void;
+    reject: (error: Error) => void;
+    onError?: (error: Error) => void;
+  }): SseRequest {
+    const request = new SseRequest(input);
+    input.signal?.addEventListener("abort", request.abortFromSignal, { once: true });
+    return request;
+  }
+
+  private constructor(
+    private readonly input: {
+      signal?: AbortSignal;
+      resolve: () => void;
+      reject: (error: Error) => void;
+      onError?: (error: Error) => void;
+    },
+  ) {}
+
+  finish(): void {
+    if (this.settled) return;
+    this.settled = true;
+    this.cleanup();
+    this.input.resolve();
+  }
+
+  fail(error: Error): void {
+    if (this.settled) return;
+    this.settled = true;
+    this.cleanup();
+    if (this.input.onError) {
+      this.input.onError(error);
+      this.input.resolve();
+    } else {
+      this.input.reject(error);
+    }
+  }
+
+  waitForNextEvent(timeoutMs: number): void {
+    if (this.timeoutId) clearTimeout(this.timeoutId);
+    this.timeoutId = setTimeout(() => {
+      const error = new FetchSSETimeoutError(
+        `Connection timed out with timeout ${timeoutMs}ms waiting for the next event`,
+      );
+      logger.error(error);
+      this.fail(error);
+    }, timeoutMs);
+  }
+
+  /** The caller owns `signal` and outlives this request, so its listener is removed here. */
+  private cleanup(): void {
+    this.input.signal?.removeEventListener("abort", this.abortFromSignal);
+    this.controller.abort();
+    if (this.timeoutId) clearTimeout(this.timeoutId);
+  }
+}
+
+/**
+ * Fetches data from an endpoint using SSE (Server-Sent Events)
+ * and processes events through callbacks
+ */
+export async function fetchSSE<T>({
+  endpoint,
+  payload,
+  onEvent,
+  shouldStopProcessing,
+  timeout = 10_000,
+  chunkTimeout = 480_000,
+  headers = {},
+  onError,
+  signal,
+}: FetchSSEOptions<T>): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      resolve();
+      return;
+    }
+    const request = SseRequest.create({ signal, resolve, reject, onError });
+
+    fetchEventSource(endpoint, {
+      openWhenHidden: true,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        ...headers,
+      },
+      body: JSON.stringify(payload),
+      signal: request.controller.signal,
+
+      async onopen(response) {
+        request.waitForNextEvent(timeout);
+
+        if (
+          response.ok &&
+          response.headers.get("content-type")?.includes(EVENT_STREAM_CONTENT_TYPE)
+        ) {
+          return;
+        }
+
+        request.fail(await refusalOf(response));
+      },
+
+      onmessage(ev) {
+        request.waitForNextEvent(chunkTimeout);
+        const event = JSON.parse(ev.data) as T;
+        onEvent(event);
+
+        if (shouldStopProcessing?.(event)) request.finish();
+      },
+
+      onclose() {
+        request.finish();
+      },
+
+      onerror(error) {
+        request.fail(toError(error));
+      },
+    })
+      .then(() => request.finish())
+      .catch((error) => request.fail(toError(error)));
+  });
+}
+
+export class FetchSSETimeoutError extends Error {
+  constructor(message = "Timeout occurred") {
+    super(message);
+    this.name = "Timeout";
+  }
+}
+
+/** The server answered the request with a refusal instead of opening the stream. */
+export class FetchSSERefusedError extends Error {
+  readonly httpStatus: number;
+  declare readonly error?: Record<string, unknown>;
+
+  constructor({
+    message,
+    httpStatus,
+    body,
+  }: {
+    message: string;
+    httpStatus: number;
+    body?: Record<string, unknown>;
+  }) {
+    super(message);
+    this.name = "FetchSSERefusedError";
+    this.httpStatus = httpStatus;
+    if (body) this.error = body;
+  }
+}

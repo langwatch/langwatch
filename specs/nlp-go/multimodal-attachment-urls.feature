@@ -81,6 +81,76 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
     Then the run fails with a clear error explaining the attachment was too large
     And nothing is sent to the model
 
+  # ============================================================================
+  # The size limit follows the organization that owns the run
+  # ============================================================================
+  #
+  # The per-file limit is 20 MB unless the organization holds a raised one. The
+  # application resolves the organization's limit and names it on each request
+  # (`max_attachment_bytes` in the payload, or the
+  # X-LangWatch-Max-Attachment-Bytes header), so the engine applies it to that
+  # run only.
+
+  @integration
+  Scenario: An attachment over the default size is fetched when the request raises the limit
+    Given a run whose request names a per-file limit above the default
+    And a prompt referencing an attachment URL larger than the default limit but within the named one
+    When I run the workflow
+    Then the attachment is delivered to the model
+
+  @integration
+  Scenario: A request that lowers the limit refuses an attachment the default would accept
+    Given a run whose request names a per-file limit below the default
+    And a prompt referencing an attachment URL larger than the named limit
+    When I run the workflow
+    Then the run fails with a clear error explaining the attachment was too large
+
+  @integration
+  Scenario: A request that names no limit runs under the default limit
+    Given a run whose request names no per-file limit
+    And another run on the same engine that named a lower limit
+    When I run the workflow with an attachment the default limit accepts
+    Then the attachment is delivered to the model
+
+  @unit
+  Scenario: A requested limit above what an organization can hold is clamped
+    Given a request naming a per-file limit above 1 GB
+    When the engine resolves the limit for the run
+    Then the run fetches attachments under a 1 GB limit
+
+  @integration
+  Scenario: The too-large error names the limit the run was under
+    Given a run whose request names a per-file limit of 1 MB
+    And a prompt referencing an attachment URL whose body exceeds 1 MB
+    When I run the workflow
+    Then the error says the attachment is larger than the 1 MB attachment limit
+
+  @unit
+  Scenario: The limit is read from the request payload
+    Given a run request whose payload carries a per-file limit
+    When the engine decodes the request
+    Then the run uses the limit from the payload
+
+  @unit
+  Scenario: The limit falls back to the request header when the payload names none
+    Given a run request whose payload carries no per-file limit
+    And the request carries the limit in its header
+    When the engine decodes the request
+    Then the run uses the limit from the header
+    And a header value that is not a positive whole number is ignored
+
+  @integration
+  Scenario: A nested workflow run keeps the limit of the run that started it
+    Given a run whose request names a per-file limit
+    When a node in that run calls another workflow or an evaluator through the application
+    Then the call carries the same limit for the nested run
+
+  @unit
+  Scenario: The request body limit fits a dataset row with ten inline images
+    Given a dataset row carrying ten inline images at the default per-file limit
+    When the row is sent to the engine as one request
+    Then the engine reads the whole request body
+
   @integration
   Scenario: An attachment URL that redirects to a private address is refused
     Given a prompt referencing an attachment URL that redirects to a private address

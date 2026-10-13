@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { callsInHistory } from "./history-calls.js";
 
 // Backs "The continuation names what the history shows done and the step to
@@ -14,16 +15,43 @@ describe("callsInHistory", () => {
         role: "assistant",
         content: [
           { type: "text", text: "On it." },
-          { type: "toolCall", id: "c1", name: "Say", arguments: { text: "I found a LangGraph agent in app/graph.py." } },
+          {
+            type: "toolCall",
+            id: "c1",
+            name: "Say",
+            arguments: { text: "I found a LangGraph agent in app/graph.py." },
+          },
           { type: "toolCall", id: "c2", name: "local_bash", arguments: { command: "uv sync" } },
         ],
       },
-      { role: "toolResult", toolCallId: "c1", toolName: "Say", content: [{ type: "text", text: "Said." }], isError: false },
-      { role: "toolResult", toolCallId: "c2", toolName: "local_bash", content: [{ type: "text", text: "exit code: 1\n\nstderr:\nno uv" }], isError: true },
+      {
+        role: "toolResult",
+        toolCallId: "c1",
+        toolName: "Say",
+        content: [{ type: "text", text: "Said." }],
+        isError: false,
+      },
+      {
+        role: "toolResult",
+        toolCallId: "c2",
+        toolName: "local_bash",
+        content: [{ type: "text", text: "exit code: 1\n\nstderr:\nno uv" }],
+        isError: true,
+      },
     ]);
     expect(calls).toEqual([
-      { name: "say", input: { text: "I found a LangGraph agent in app/graph.py." }, isError: false, output: "Said." },
-      { name: "local_bash", input: { command: "uv sync" }, isError: true, output: "exit code: 1\n\nstderr:\nno uv" },
+      {
+        name: "say",
+        input: { text: "I found a LangGraph agent in app/graph.py." },
+        isError: false,
+        output: "Said.",
+      },
+      {
+        name: "local_bash",
+        input: { command: "uv sync" },
+        isError: true,
+        output: "exit code: 1\n\nstderr:\nno uv",
+      },
     ]);
   });
 
@@ -45,13 +73,24 @@ describe("callsInHistory", () => {
       "Go ahead, keep going.",
     ].join("\n");
     expect(callsInHistory([{ role: "user", content: [{ type: "text", text: seed }] }])).toEqual([
-      { name: "say", input: { text: "I found a LangGraph agent in app/graph.py." }, isError: false, output: "Said." },
-      { name: "local_bash", input: { command: "uv sync" }, isError: true, output: "exit code: 1\n\nstderr:\nno uv" },
+      {
+        name: "say",
+        input: { text: "I found a LangGraph agent in app/graph.py." },
+        isError: false,
+        output: "Said.",
+      },
+      {
+        name: "local_bash",
+        input: { command: "uv sync" },
+        isError: true,
+        output: "exit code: 1\n\nstderr:\nno uv",
+      },
       {
         name: "question",
         input: { questions: [{ header: "Propose the first scenario" }] },
         isError: false,
-        output: "Q: The proposal\nA: Create it\n\nThe user has answered. Continue with the work that follows this answer in this turn.",
+        output:
+          "Q: The proposal\nA: Create it\n\nThe user has answered. Continue with the work that follows this answer in this turn.",
       },
     ]);
   });
@@ -59,13 +98,16 @@ describe("callsInHistory", () => {
   it("keeps a call whose line the digest cut, with no input, and reads nothing off plain messages", () => {
     expect(
       callsInHistory([
-        { role: "user", content: 'assistant: [tool call: say {"text":"I found a LangGr\n[message truncated]' },
+        {
+          role: "user",
+          content: 'assistant: [tool call: say {"text":"I found a LangGr\n[message truncated]',
+        },
         { role: "assistant", content: [{ type: "text", text: "Here is what I found." }] },
         { role: "user", content: "How do I add a trace?" },
       ]),
     ).toEqual([]);
-    expect(callsInHistory([{ role: "user", content: 'assistant: [tool call: say {"text":"cut}]' }])).toEqual([
-      { name: "say", input: undefined, isError: false, output: "" },
-    ]);
+    expect(
+      callsInHistory([{ role: "user", content: 'assistant: [tool call: say {"text":"cut}]' }]),
+    ).toEqual([{ name: "say", input: undefined, isError: false, output: "" }]);
   });
 });

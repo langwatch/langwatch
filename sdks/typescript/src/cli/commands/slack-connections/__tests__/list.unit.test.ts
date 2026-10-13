@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -44,7 +48,7 @@ describe("listSlackConnectionsCommand()", () => {
     const result = await listSlackConnectionsCommand();
 
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/slack-connections"),
+      expect.stringContaining("/api/v1/slack-connections"),
       expect.objectContaining({
         headers: expect.objectContaining({ authorization: "Bearer test-key" }),
       }),

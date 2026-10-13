@@ -1,0 +1,333 @@
+import { beforeEach, describe, expect, it } from "vitest";
+
+import {
+  buildDesiredTTLExpression,
+  hasLegacyRetentionTTL,
+  parseTTLDaysFromEngineMetadata,
+  reconcileTTL,
+  resolveHotDays,
+  shouldRewriteTTL,
+  TABLE_TTL_CONFIG,
+  type TableTTLEntry,
+  TIERED_STORAGE_POLICY,
+} from "../ttl.reconciler.ts";
+
+const legacyRetentionEngineFull =
+  "ReplicatedMergeTree() TTL toDateTime(EndTime) + toIntervalDay(30) TO VOLUME 'cold', " +
+  "toDateTime(EndTime) + toIntervalDay(30) DELETE WHERE RetentionClass = 'thirty_days', " +
+  "toDateTime(EndTime) + toIntervalDay(365) DELETE WHERE RetentionClass = 'one_year' " +
+  "SETTINGS index_granularity = 8192";
+
+const sampleEntry: TableTTLEntry = {
+  table: "stored_spans",
+  ttlColumn: "EndTime",
+  envVar: "CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS",
+  hardcodedDefault: 30,
+};
+
+describe("ttlReconciler", () => {
+  describe("resolveHotDays()", () => {
+    let overrides: Record<string, string | undefined>;
+
+    beforeEach(() => {
+      overrides = {};
+    });
+
+    describe("when per-table env var is set", () => {
+      it("returns the per-table value", () => {
+        overrides[sampleEntry.envVar] = "7";
+        expect(resolveHotDays(sampleEntry, overrides)).toBe(7);
+      });
+
+      it("takes precedence over global default", () => {
+        overrides[sampleEntry.envVar] = "5";
+        overrides.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS = "14";
+        expect(resolveHotDays(sampleEntry, overrides)).toBe(5);
+      });
+
+      it("accepts zero", () => {
+        overrides[sampleEntry.envVar] = "0";
+        expect(resolveHotDays(sampleEntry, overrides)).toBe(0);
+      });
+
+      it("throws on negative value", () => {
+        overrides[sampleEntry.envVar] = "-1";
+        expect(() => resolveHotDays(sampleEntry, overrides)).toThrow(
+          /must be a non-negative integer/,
+        );
+      });
+
+      it("throws on non-numeric value", () => {
+        overrides[sampleEntry.envVar] = "abc";
+        expect(() => resolveHotDays(sampleEntry, overrides)).toThrow(
+          /must be a non-negative integer/,
+        );
+      });
+
+      it("throws on fractional value", () => {
+        overrides[sampleEntry.envVar] = "3.5";
+        expect(() => resolveHotDays(sampleEntry, overrides)).toThrow(
+          /must be a non-negative integer/,
+        );
+      });
+    });
+
+    describe("when only global default is set", () => {
+      it("returns the global default", () => {
+        overrides.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS = "14";
+        expect(resolveHotDays(sampleEntry, overrides)).toBe(14);
+      });
+
+      it("throws on invalid global default", () => {
+        overrides.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS = "not-a-number";
+        expect(() => resolveHotDays(sampleEntry, overrides)).toThrow(
+          /CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS must be a non-negative integer/,
+        );
+      });
+    });
+
+    describe("when no env vars are set", () => {
+      it("returns the hardcoded default", () => {
+        expect(resolveHotDays(sampleEntry, overrides)).toBe(30);
+      });
+    });
+
+    describe("when env var is empty string", () => {
+      it("treats empty per-table var as unset", () => {
+        overrides[sampleEntry.envVar] = "";
+        expect(resolveHotDays(sampleEntry, overrides)).toBe(30);
+      });
+
+      it("treats empty global var as unset", () => {
+        overrides.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS = "";
+        expect(resolveHotDays(sampleEntry, overrides)).toBe(30);
+      });
+    });
+  });
+
+  describe("parseTTLDaysFromEngineMetadata()", () => {
+    describe("when engine_full contains TTL with toIntervalDay", () => {
+      it("extracts the day count", () => {
+        const engineFull =
+          "MergeTree ORDER BY (TenantId) TTL toDateTime(EndTime) + toIntervalDay(30) TO VOLUME 'cold'";
+        expect(parseTTLDaysFromEngineMetadata(engineFull)).toBe(30);
+      });
+
+      it("extracts single-digit day count", () => {
+        const engineFull =
+          "ReplicatedMergeTree() TTL toDateTime(CreatedAt) + toIntervalDay(7) TO VOLUME 'cold' SETTINGS index_granularity = 8192";
+        expect(parseTTLDaysFromEngineMetadata(engineFull)).toBe(7);
+      });
+    });
+
+    describe("when engine_full has no TTL clause", () => {
+      it("returns null", () => {
+        const engineFull = "MergeTree ORDER BY (TenantId) SETTINGS index_granularity = 8192";
+        expect(parseTTLDaysFromEngineMetadata(engineFull)).toBeNull();
+      });
+    });
+
+    describe("when engine_full is empty", () => {
+      it("returns null", () => {
+        expect(parseTTLDaysFromEngineMetadata("")).toBeNull();
+      });
+    });
+  });
+
+  describe("hasLegacyRetentionTTL()", () => {
+    describe("when engine_full carries a RetentionClass DELETE clause", () => {
+      it("detects the legacy clause", () => {
+        expect(hasLegacyRetentionTTL(legacyRetentionEngineFull)).toBe(true);
+      });
+    });
+
+    describe("when engine_full has a clean MOVE-only TTL", () => {
+      it("returns false", () => {
+        const engineFull =
+          "ReplicatedMergeTree() TTL toDateTime(EndTime) + toIntervalDay(30) TO VOLUME 'cold'";
+        expect(hasLegacyRetentionTTL(engineFull)).toBe(false);
+      });
+    });
+
+    describe("when engine_full has no TTL", () => {
+      it("returns false", () => {
+        expect(hasLegacyRetentionTTL("MergeTree ORDER BY (TenantId)")).toBe(false);
+      });
+    });
+  });
+
+  describe("shouldRewriteTTL()", () => {
+    describe("when the cold-storage day count differs from desired", () => {
+      it("requires a rewrite", () => {
+        expect(
+          shouldRewriteTTL({
+            currentDays: 30,
+            desiredDays: 49,
+            engineFull: "TTL toDateTime(EndTime) + toIntervalDay(30) TO VOLUME 'cold'",
+          }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when the day count matches and the TTL is clean", () => {
+      it("skips the rewrite", () => {
+        expect(
+          shouldRewriteTTL({
+            currentDays: 49,
+            desiredDays: 49,
+            engineFull: "TTL toDateTime(EndTime) + toIntervalDay(49) TO VOLUME 'cold'",
+          }),
+        ).toBe(false);
+      });
+    });
+
+    describe("when the day count matches but a legacy retention DELETE clause lingers", () => {
+      it("still requires a rewrite to strip the legacy clause", () => {
+        expect(
+          shouldRewriteTTL({
+            currentDays: 30,
+            desiredDays: 30,
+            engineFull: legacyRetentionEngineFull,
+          }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when no TTL is set on a fresh install", () => {
+      it("requires a rewrite to apply the desired TTL", () => {
+        expect(
+          shouldRewriteTTL({
+            currentDays: null,
+            desiredDays: 49,
+            engineFull: "MergeTree ORDER BY (TenantId)",
+          }),
+        ).toBe(true);
+      });
+    });
+  });
+
+  describe("buildDesiredTTLExpression()", () => {
+    it("builds correct TTL expression", () => {
+      const result = buildDesiredTTLExpression({
+        config: sampleEntry,
+        days: 14,
+      });
+      expect(result).toBe("toDateTime(EndTime) + INTERVAL 14 DAY TO VOLUME 'cold'");
+    });
+
+    it("uses the ttlColumn from the config entry", () => {
+      const entry: TableTTLEntry = {
+        table: "experiment_runs",
+        ttlColumn: "StartedAt",
+        envVar: "CLICKHOUSE_COLD_STORAGE_EXPERIMENT_RUNS_TTL_DAYS",
+        hardcodedDefault: 30,
+      };
+      const result = buildDesiredTTLExpression({ config: entry, days: 7 });
+      expect(result).toBe("toDateTime(StartedAt) + INTERVAL 7 DAY TO VOLUME 'cold'");
+    });
+
+    it("uses ttlColumnExpression override when provided", () => {
+      const entry: TableTTLEntry = {
+        table: "event_log",
+        ttlColumn: "EventOccurredAt",
+        ttlColumnExpression: "toDateTime(EventOccurredAt / 1000)",
+        envVar: "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS",
+        hardcodedDefault: 30,
+      };
+      const result = buildDesiredTTLExpression({ config: entry, days: 7 });
+      expect(result).toBe("toDateTime(EventOccurredAt / 1000) + INTERVAL 7 DAY TO VOLUME 'cold'");
+    });
+  });
+
+  describe("reconcileTTL()", () => {
+    describe("when CLICKHOUSE_URL is not set and no connectionUrl provided", () => {
+      it("skips reconciliation", async () => {
+        await expect(reconcileTTL()).resolves.toBeUndefined();
+      });
+    });
+
+    describe("when CLICKHOUSE_URL is set but CLICKHOUSE_COLD_STORAGE_ENABLED is not set", () => {
+      it("still reconciles retention TTL — only the cold-storage MOVE clause is gated by the flag", async () => {
+        // CLICKHOUSE_URL=valid, no cold-storage flag → must NOT silently skip.
+        // The retention DELETE-by-_retention_days clause is platform-enforced
+        // and has to install on every deployment; only the cold-storage MOVE
+        // clause is operator-managed.
+        await expect(
+          reconcileTTL({ connectionUrl: "http://localhost:1/langwatch" }),
+        ).rejects.toMatchObject({ code: "ECONNREFUSED" });
+      });
+    });
+
+    describe("when CLICKHOUSE_COLD_STORAGE_ENABLED is 'true' but CLICKHOUSE_URL is missing", () => {
+      it("skips reconciliation", async () => {
+        await expect(reconcileTTL({ coldStorageEnabled: true })).resolves.toBeUndefined();
+      });
+    });
+
+    describe("when connectionUrl is provided but has no database path", () => {
+      it("throws a configuration error", async () => {
+        await expect(reconcileTTL({ connectionUrl: "http://localhost:8123" })).rejects.toThrow(
+          /Database name must be specified/,
+        );
+      });
+    });
+
+    describe("when connectionUrl is provided explicitly", () => {
+      it("bypasses the env var gates", async () => {
+        // CLICKHOUSE_URL is not set, but connectionUrl bypasses the gate.
+        // This will fail at the ClickHouse connection level (no server running),
+        // proving it got past the env-var guards.
+        await expect(
+          reconcileTTL({ connectionUrl: "http://localhost:1/testdb" }),
+        ).rejects.toMatchObject({ code: "ECONNREFUSED" });
+      });
+    });
+  });
+
+  describe("given TIERED_STORAGE_POLICY", () => {
+    it("matches the infrastructure-configured policy name", () => {
+      expect(TIERED_STORAGE_POLICY).toBe("local_primary");
+    });
+  });
+
+  describe("given TABLE_TTL_CONFIG", () => {
+    it("covers all expected tables", () => {
+      const tableNames = TABLE_TTL_CONFIG.map((c) => c.table);
+      expect(tableNames).toEqual([
+        "billable_events",
+        "dspy_steps",
+        "evaluation_runs",
+        "event_log",
+        "langy_analytics_events",
+        "experiment_run_items",
+        "experiment_runs",
+        "simulation_runs",
+        "stored_log_records",
+        "log_records",
+        "suite_runs",
+        "metric_data_points",
+        "metric_series",
+        "metric_time_rollups",
+        "stored_spans",
+        "trace_summaries",
+        "trace_analytics",
+        "trace_analytics_rollup",
+        "evaluation_analytics",
+        "evaluation_analytics_rollup",
+        // ADR-128 governance cost tables. In this config but deliberately NOT
+        // in the customer retention cascade: their `_retention_days` defaults
+        // to 0 (keep forever) rather than to a category-resolved day count.
+        "governance_cost_rollup_1d",
+        "governance_cost_rollup_charges",
+        "governance_cost_rollup_restatement_index",
+        "instant_eval_judgments",
+        "instant_eval_runs",
+      ]);
+    });
+
+    it("has unique env vars for each table", () => {
+      const envVars = TABLE_TTL_CONFIG.map((c) => c.envVar);
+      expect(new Set(envVars).size).toBe(envVars.length);
+    });
+  });
+});

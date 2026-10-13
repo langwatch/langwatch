@@ -64,3 +64,44 @@ func TestCapability_SignatureKey(t *testing.T) {
 		t.Errorf("SignatureKey must change when the repo scope changes")
 	}
 }
+
+// A host other than github.com turns the token into gh's enterprise-host set, a
+// git rewrite of github.com URLs to that host, and a NO_PROXY entry for it.
+//
+// @scenario "Langy's worker reaches githubsim when the stack names it as the GitHub host"
+func TestCapability_ContributeWithHost(t *testing.T) {
+	t.Run("when the host is a stand-in", func(t *testing.T) {
+		got := map[string]string{}
+		for _, kv := range New("ghs_sim", "alice", "s").WithHost("github.dev.localhost:1355").Contribute() {
+			k, v, _ := strings.Cut(kv, "=")
+			got[k] = v
+		}
+		want := map[string]string{
+			"GH_HOST": "github.dev.localhost:1355", "GH_ENTERPRISE_TOKEN": "ghs_sim", "GITHUB_LOGIN": "alice",
+			"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "url.https://github.dev.localhost:1355/.insteadOf",
+			"GIT_CONFIG_VALUE_0": "https://github.com/", "NO_PROXY": "github.dev.localhost",
+		}
+		for k, v := range want {
+			if got[k] != v {
+				t.Errorf("env[%s] = %q, want %q", k, got[k], v)
+			}
+		}
+		if _, ok := got["GH_TOKEN"]; ok {
+			t.Errorf("GH_TOKEN must not ride beside GH_ENTERPRISE_TOKEN")
+		}
+	})
+
+	t.Run("when the host is blank or github.com", func(t *testing.T) {
+		for _, host := range []string{"", "github.com"} {
+			if env := New("t", "l", "s").WithHost(host).Contribute(); len(env) != 2 || env[0] != "GH_TOKEN=t" {
+				t.Errorf("host %q: want production GH_TOKEN env, got %v", host, env)
+			}
+		}
+	})
+
+	t.Run("when there is no token", func(t *testing.T) {
+		if env := New("", "l", "s").WithHost("github.dev.localhost").Contribute(); env != nil {
+			t.Errorf("an empty token must contribute nothing, got %v", env)
+		}
+	})
+}

@@ -7,9 +7,9 @@
 
 ## Scenarios Tested
 
-| # | Scenario | Result | Notes |
-|---|----------|--------|-------|
-| 1 | [name]   | PASS/FAIL | [details] |
+| #   | Scenario | Result    | Notes     |
+| --- | -------- | --------- | --------- |
+| 1   | [name]   | PASS/FAIL | [details] |
 
 ## Setup Notes
 

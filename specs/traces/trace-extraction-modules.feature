@@ -42,7 +42,7 @@ Feature: Reading a trace the way the drawer reads it
 
   @unit
   Scenario: A conversation over the budget keeps its head and tail and marks the cut
-    Given a parsed conversation larger than the budget
+    Given a parsed conversation larger than the budget even with every turn shortened
     When it is rendered with that budget
     Then the conversation heading and its real turn count are kept
     And turns are kept from the start and from the end
@@ -55,6 +55,7 @@ Feature: Reading a trace the way the drawer reads it
     Given a parsed conversation whose every turn is larger than the budget
     When it is rendered with that budget
     Then the result is cut to the budget
+    And the final turn keeps its opening and its ending, so the last reply is still read
     And a visible marker says the text was truncated
 
   @unit
@@ -114,6 +115,40 @@ Feature: Reading a trace the way the drawer reads it
     Then no messages are returned
 
   # =========================================================================
+  # Estimating and cutting text for a model
+  # =========================================================================
+
+  @unit
+  Scenario: The token estimate counts bytes, not characters
+    Given text that mixes ASCII with multi-byte characters
+    When its tokens are estimated
+    Then the estimate follows the UTF-8 byte length, not the character count
+    And it agrees with the estimate the judge uses, so a digest that fits one fits the other
+
+  @unit
+  Scenario: A cut never leaves half a character behind
+    Given text whose budget falls inside a multi-byte character
+    When it is cut to the budget
+    Then the cut moves back to the last whole character
+    And a replacement character the text itself carried is kept
+
+  @unit
+  Scenario: A line-oriented digest is cut on a line break
+    Given a digest whose lines each name something
+    When it is cut to a budget that falls mid-line
+    Then the cut moves back to the last whole line
+    And a first line already over the budget is cut where the budget ends
+
+  @unit
+  Scenario: A text cut for a judge keeps its opening and its ending
+    Given a text larger than the budget a judge can read
+    When it is cut keeping both ends
+    Then the result fits the budget
+    And it starts with the text's opening and ends with the text's ending
+    And a marker between them says how many tokens were left out
+    And neither end is cut inside a multi-byte character
+
+  # =========================================================================
   # Bounding the LLM-readable trace digest
   # =========================================================================
 
@@ -130,13 +165,137 @@ Feature: Reading a trace the way the drawer reads it
     When the bounded digest is built
     Then the span tree is returned
     And spans are expanded into it while the budget allows
-    And a span that errored is expanded before a model call
+    And a span that errored is expanded before a tool call
+    And a tool call is expanded before a model call
     And a model call is expanded before a slower span of another kind
     And the result is reported as truncated
+
+  # A tool result is where a judge's evidence sits, and it is small: a
+  # model call repeats the history it read, so it goes after the tools.
+  @unit
+  Scenario: A tool result is kept before a model call when both do not fit
+    Given a trace with a slow model call and a quick tool call
+    When the spans are ranked for expansion
+    Then the tool call is expanded first
 
   @unit
   Scenario: A structure too large for the budget is cut
     Given a trace whose span tree alone is larger than the budget
     When the bounded digest is built
     Then the returned text fits the budget
+    And it keeps the first and the last spans of the tree, on whole lines, with a marker between them
     And it is reported as truncated
+
+  @unit
+  Scenario: A bounded digest spends the caller's budget, not the judge tool's
+    Given a long agent loop whose full digest is larger than an 8,000-token budget
+    When the bounded digest is built for that budget
+    Then spans are expanded past the 4,096-token limit of the scenario judge's expand tool
+    And the text never tells the reader to call grep_trace or expand_trace
+    And a span too large to expand whole is expanded keeping its opening and its ending
+
+  # =========================================================================
+  # What the judge renderings carry
+  # =========================================================================
+
+  @unit
+  Scenario: An LLM span's messages include its system prompt
+    Given an LLM span whose system prompt canonicalisation moved to gen_ai.system_instructions
+    When the span's messages are read
+    Then the input side starts with that system prompt as a system message
+    And a span whose input already carries a system message is not given a second one
+
+  @unit
+  Scenario: An LLM span recorded in the OTel GenAI parts format reads as chat messages
+    Given an LLM span whose messages carry parts instead of content
+    When the span's messages are read
+    Then each text part becomes the message content
+    And tool call parts become tool calls and tool call responses become tool messages
+    And the span can stand for its trace
+
+  @unit
+  Scenario: A judge reading an OTel GenAI agent trace sees the tool call and its result once
+    Given an OTel GenAI agent trace with chat spans and an execute_tool span, sent as OTLP
+    When it is stored and rendered as the digest and as LLM span messages
+    Then the execute_tool span is a tool span whose input is the arguments and whose output is the result
+    And the digest prints the tool's arguments and result once, not again as raw attributes
+    And the LLM span messages carry the tool result as a tool message
+
+  @unit
+  Scenario: Retrieved passages in a later system message reach the LLM span messages
+    Given a LangWatch SDK LLM span whose retrieved passages sit in a system message after the user turn
+    When it is stored and rendered as the digest and as LLM span messages
+    Then both renderings carry the passages
+    And the LLM span messages start with the system prompt, once
+
+  @unit
+  Scenario: A conversation transcript renders the same on every day
+    Given a thread rendered as a conversation transcript
+    When it is rendered at two different times
+    Then both renderings are identical
+    And each turn heading carries the turn's absolute start time
+
+  # =========================================================================
+  # Rendering a thread for a judge
+  # =========================================================================
+  # Measured on the judge-lab long-horizon split (langwatch/tasks#905): a
+  # judge reading a long thread needs every turn once, with its tool calls and
+  # results, and a budget that shortens every turn before it drops one.
+
+  @unit
+  Scenario: The conversation view reads like the chat view with one line naming the tools
+    Given a thread whose first turn called a tool twice and another once
+    When the thread is rendered in the conversation view
+    Then each turn holds its user message and reply
+    And the first turn carries one line naming the tools, a repeat counted
+    And no tool argument, result or model call is printed
+
+  @unit
+  Scenario: A conversation turn lists its tool calls with their results
+    Given a thread whose first turn called a tool that returned a price
+    When the thread is rendered as a conversation
+    Then the first turn lists the tool call with its arguments and its result
+    And the model call that asked for the tool names it, with its token counts
+
+  @unit
+  Scenario: A thread transcript grows with the thread, not with its square
+    Given a thread of many turns whose every model call carries the whole history
+    When the thread is rendered as a conversation
+    Then the first user message appears once
+    And doubling the turns roughly doubles the transcript
+
+  @unit
+  Scenario: A child span that repeats its parent's input and output is folded into the parent
+    Given a tool span with execution and blocked-on-user children that repeat its input and output
+    When the turn's steps are extracted
+    Then the tool call is listed once
+    And a child span whose input or output differs is listed under its tool
+
+  @unit
+  Scenario: A turn whose only step is the model call that wrote the reply does not repeat it
+    Given a chat turn with one model call whose output is the reply
+    When the thread is rendered as a conversation
+    Then the model call is listed with its token counts but not its output
+    And a turn whose model call reported no token counts lists no steps
+
+  @unit
+  Scenario: A conversation over the budget shortens every turn before it drops one
+    Given a long thread whose correction sits in a tool result in the middle
+    When it is rendered with a budget smaller than the whole
+    Then every turn is still present with its tool calls
+    And the correction in the middle is still on the page
+    And the result fits the budget and is reported as truncated
+
+  @unit
+  Scenario: The turn heading names the model that did the work
+    Given a coding agent turn whose first model call is a title call on a small model
+    When the thread is rendered as a conversation
+    Then the turn heading names the model that wrote the most output first
+
+  @unit
+  Scenario: A Vercel AI SDK tool call is listed by its tool name with the result it recorded
+    Given a tool span that records its name and result only as ai.toolCall attributes
+    And a generateText span wrapping the model calls of the turn
+    When the turn's steps are extracted
+    Then the tool call is listed under its tool name with the recorded result
+    And the wrapping span is not listed as a model call

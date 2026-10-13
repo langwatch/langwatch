@@ -2,15 +2,8 @@ import * as readline from "node:readline";
 
 import chalk from "chalk";
 
-import {
-  clearConfig,
-  isLoggedIn,
-  loadConfig,
-} from "@/cli/utils/governance/config";
-import {
-  DeviceFlowError,
-  logout as serverRevokeLogout,
-} from "@/cli/utils/governance/device-flow";
+import { clearConfig, isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
+import { DeviceFlowError, logout as serverRevokeLogout } from "@/cli/utils/governance/device-flow";
 import { scanTelemetryTargets } from "@/cli/utils/governance/telemetry-targets";
 
 export interface LogoutOptions {
@@ -21,14 +14,8 @@ export interface LogoutOptions {
 }
 
 /**
- * Server-revoke the device refresh token AND clear the local
- * ~/.langwatch/config.json. Best-effort: the local clear happens even
- * when the remote revoke fails, so "logout" never leaves a usable token
- * on disk. Idempotent — safe when not logged in.
- *
- * Only the device session is cleared; the project SDK key in `$CWD/.env`
- * (`LANGWATCH_API_KEY`) is a separate, user-managed store and is never
- * touched.
+ * Revoke device token, clear config; best-effort local-first.
+ * Project key in .env/.LANGWATCH_API_KEY untouched.
  */
 const revokeAndClearSession = async (): Promise<void> => {
   const cfg = loadConfig();
@@ -70,24 +57,17 @@ const confirmProceed = async (question: string): Promise<boolean> => {
 };
 
 /**
- * `langwatch logout` — the full un-wire. Revokes + clears the device
- * session (unless --keep-credentials) AND discovers and removes every
- * langwatch-authored telemetry block across the wrapped tools. Scans
- * first, shows exactly what it found, confirms (unless --yes), then
- * removes; only marker-bracketed blocks / known key sets are touched, so
- * surrounding user config is preserved.
+ * `langwatch logout`: revokes/clears the device session (unless
+ * --keep-credentials) and removes every langwatch-authored telemetry block
+ * -- scan, confirm (unless --yes), remove; only marker-bracketed blocks are touched.
  */
-export const logoutCommand = async (
-  options: LogoutOptions = {},
-): Promise<void> => {
+export const logoutCommand = async (options: LogoutOptions = {}): Promise<void> => {
   const present = scanTelemetryTargets().filter((t) => t.present);
   const willRevoke = !options.keepCredentials;
   const loggedIn = isLoggedIn(loadConfig());
 
   if (present.length === 0 && !(willRevoke && loggedIn)) {
-    console.log(
-      "Nothing to clean up — no telemetry wiring or device session found.",
-    );
+    console.log("Nothing to clean up — no telemetry wiring or device session found.");
     return;
   }
 
@@ -108,24 +88,30 @@ export const logoutCommand = async (
     }
   }
 
-  const removed: string[] = [];
-  for (const t of present) {
-    try {
-      if (t.remove()) removed.push(t.label);
-    } catch (err) {
-      console.log(
-        chalk.yellow(
-          `  ! Couldn't remove ${t.label}: ${(err as Error).message}`,
-        ),
-      );
-    }
-  }
+  const removed = removeTargets(present);
 
   if (willRevoke) {
     await revokeAndClearSession();
     if (loggedIn) removed.push("LangWatch device session");
   }
 
+  printRemoved(removed);
+};
+
+/** Removes each present block, returning the labels of those actually removed. */
+function removeTargets(present: ReturnType<typeof scanTelemetryTargets>): string[] {
+  const removed: string[] = [];
+  for (const t of present) {
+    try {
+      if (t.remove()) removed.push(t.label);
+    } catch (err) {
+      console.log(chalk.yellow(`  ! Couldn't remove ${t.label}: ${(err as Error).message}`));
+    }
+  }
+  return removed;
+}
+
+function printRemoved(removed: readonly string[]): void {
   console.log();
   if (removed.length === 0) {
     console.log("Done — nothing needed removing.");
@@ -135,4 +121,4 @@ export const logoutCommand = async (
   for (const label of removed) {
     console.log(chalk.green(`  ✓ ${label}`));
   }
-};
+}
