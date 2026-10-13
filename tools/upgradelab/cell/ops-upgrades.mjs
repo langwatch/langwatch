@@ -16,7 +16,7 @@ const {
   expect,
 } = JSON.parse(process.argv[2]);
 const browser = await chromium.launch({
-  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--disable-webgl", "--no-sandbox"],
+  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--disable-webgl"],
 });
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });

@@ -6,13 +6,21 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 )
 
-// profileDir holds a -profile cell's evidence: node CPU profiles and the samplers' TSVs.
-func (cell *run) profileDir() string { return filepath.Join(cell.options.RunDir, "profile") }
+// profileDir holds a -profile cell's evidence: node CPU profiles and the samplers' TSVs. Absolute,
+// since node writes it from each app's own directory.
+func (cell *run) profileDir() string {
+	dir, err := filepath.Abs(filepath.Join(cell.options.RunDir, "profile"))
+	if err != nil {
+		return filepath.Join(cell.options.RunDir, "profile")
+	}
+	return dir
+}
 
 // profileNodeOptions makes every node process the cell starts write a CPU profile when it exits.
 func (cell *run) profileNodeOptions() string {
@@ -22,7 +30,7 @@ func (cell *run) profileNodeOptions() string {
 // startProfiling samples processes every 15 s and Postgres activity every 5 s until the returned
 // stop runs; stop then writes the Redis, Postgres and ClickHouse totals beside them.
 func (cell *run) startProfiling(ctx context.Context) func() {
-	if !cell.options.Profile {
+	if !cell.options.ProfilingEnabled {
 		return func() {}
 	}
 	_ = os.MkdirAll(filepath.Join(cell.profileDir(), "node"), 0o750)
@@ -53,7 +61,6 @@ type sampler struct {
 	read  func(context.Context) string
 }
 
-// appendSamples writes the sampler's lines, each prefixed with the time, until ctx ends.
 func (cell *run) appendSamples(ctx context.Context, s sampler) {
 	file, err := os.OpenFile(filepath.Join(cell.profileDir(), s.name), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
@@ -74,7 +81,11 @@ func (cell *run) writeProfile(_ context.Context, name, body string) {
 	_ = os.WriteFile(filepath.Join(cell.profileDir(), name), []byte(body), 0o600)
 }
 
-// sampleProcesses answers every process above 1% CPU: pid, CPU, resident MB and its command.
+// credentials matches a URL's user:password, which a psql or node command line may carry.
+var credentials = regexp.MustCompile(`://[^/@\s]+@`)
+
+// sampleProcesses answers every process above 1% CPU: pid, CPU, resident MB and its command,
+// with any URL credentials masked.
 func sampleProcesses(ctx context.Context) string {
 	out, err := exec.CommandContext(ctx, "ps", "-axo", "pid=,pcpu=,rss=,command=").Output() // #nosec G204 -- fixed argv.
 	if err != nil {
@@ -93,7 +104,7 @@ func sampleProcesses(ctx context.Context) string {
 		if cpu < 1 {
 			continue
 		}
-		command := strings.Join(fields[3:], " ")
+		command := credentials.ReplaceAllString(strings.Join(fields[3:], " "), "://***@")
 		rows = append(rows, fmt.Sprintf("%s\t%.1f\t%d\t%.160s", fields[0], cpu, rss/1024, command))
 	}
 	return strings.Join(rows, "\n")

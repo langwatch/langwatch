@@ -59,10 +59,10 @@ async function signIn(page) {
   await dismissNudge(page);
 }
 
-// No GPU, WebGL or sandbox: the boot screen's shader otherwise renders in software on ~4 cores;
+// No GPU or WebGL: the boot screen's shader otherwise renders in software on ~4 cores;
 // without WebGL it shows its still background.
 const launchOptions = {
-  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--disable-webgl", "--no-sandbox"],
+  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--disable-webgl"],
 };
 let browser = await chromium.launch(launchOptions);
 let page;

@@ -135,11 +135,6 @@ async function checkCookie(browser, member) {
   await page
     .waitForFunction(() => document.body.innerText.trim() !== "", undefined, { timeout: 30_000 })
     .catch(() => undefined);
-  // Releases before the boot screen's fix drop it when the theme's <style> lands, a moment before
-  // the page itself: give the page the same 30 s to draw.
-  await page
-    .waitForFunction(() => document.body.innerText.trim() !== "", undefined, { timeout: 30_000 })
-    .catch(() => undefined);
   const at = new URL(page.url());
   const blank = (await page.innerText("body").catch(() => "")).trim() === "";
   let outcome = "neither";
@@ -290,7 +285,7 @@ async function signIn(browser, member) {
 }
 
 const browser = await chromium.launch({
-  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--disable-webgl", "--no-sandbox"],
+  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--disable-webgl"],
 });
 try {
   for (const member of members) {
