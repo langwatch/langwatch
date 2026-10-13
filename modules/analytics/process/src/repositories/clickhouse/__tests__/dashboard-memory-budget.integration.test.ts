@@ -242,32 +242,43 @@ describe("dashboard panels under a memory cap", () => {
     });
 
     // Ground truth straight from the seed, without any dedup machinery: the
-    // second version of a trace keeps its OccurredAt.
-    const [truth] = await (
-      await ch.query({
-        query: `
-          SELECT
-            uniqExactIf(TraceId, OccurredAt >= {start:DateTime64(3)}) AS currentTraces,
-            uniqExactIf(TraceId, OccurredAt < {start:DateTime64(3)}) AS previousTraces,
-            uniqExactIf(TraceId, OccurredAt >= {start:DateTime64(3)} AND HasError) AS currentErrorTraces,
-            uniqExactIf(UserId, OccurredAt >= {start:DateTime64(3)}) AS currentUsers
-          FROM trace_analytics
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {end:DateTime64(3)}
-        `,
-        query_params: {
-          tenantId: TENANT_ID,
-          start,
-          end,
-          previousStart: new Date(start.getTime() - RANGE_DAYS * DAY_MS),
-        },
-        format: "JSONEachRow",
-      })
-    ).json<Record<keyof typeof expected, string>>();
-    expected.currentTraces = Number(truth?.currentTraces);
-    expected.previousTraces = Number(truth?.previousTraces);
-    expected.currentErrorTraces = Number(truth?.currentErrorTraces);
-    expected.currentUsers = Number(truth?.currentUsers);
+    // second version of a trace keeps its OccurredAt. Each figure is a grouped
+    // count allowed to spill, so the truth stays exact without holding four
+    // million-key hash sets on the 1 GiB test server at once.
+    const window = {
+      current: "OccurredAt >= {start:DateTime64(3)} AND OccurredAt < {end:DateTime64(3)}",
+      previous:
+        "OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {start:DateTime64(3)}",
+    };
+    const distinctCount = async ({ column, where }: { column: string; where: string }) => {
+      const [row] = await (
+        await ch.query({
+          query: `
+            SELECT count() AS total FROM (
+              SELECT ${column} FROM trace_analytics
+              WHERE TenantId = {tenantId:String} AND ${where}
+              GROUP BY ${column}
+            )
+          `,
+          query_params: {
+            tenantId: TENANT_ID,
+            start,
+            end,
+            previousStart: new Date(start.getTime() - RANGE_DAYS * DAY_MS),
+          },
+          clickhouse_settings: { max_threads: 1, max_bytes_before_external_group_by: "50000000" },
+          format: "JSONEachRow",
+        })
+      ).json<{ total: string }>();
+      return Number(row?.total);
+    };
+    expected.currentTraces = await distinctCount({ column: "TraceId", where: window.current });
+    expected.previousTraces = await distinctCount({ column: "TraceId", where: window.previous });
+    expected.currentErrorTraces = await distinctCount({
+      column: "TraceId",
+      where: `${window.current} AND HasError`,
+    });
+    expected.currentUsers = await distinctCount({ column: "UserId", where: window.current });
     if (expected.currentTraces < 400_000) {
       throw new Error(`seed produced ${expected.currentTraces} traces in the current window`);
     }
