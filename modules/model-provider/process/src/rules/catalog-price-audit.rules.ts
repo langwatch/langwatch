@@ -1,4 +1,8 @@
-import type { LLMModelEntry, LLMModelPricing } from "@langwatch/model-provider-contract";
+import {
+  isVariablePriceRouter,
+  type LLMModelEntry,
+  type LLMModelPricing,
+} from "@langwatch/model-provider-contract";
 
 /**
  * Catalog audit: catches missing prices, wrong billing units, stale overlay
@@ -45,10 +49,19 @@ function hasAnyRate(pricing: LLMModelPricing | undefined): boolean {
   return pricedUnits(pricing).length > 0;
 }
 
+/** True when the entry has no price of its own to audit: priced elsewhere, or a router. */
+function isUnauditable({ modelId, entry }: { modelId: string; entry: LLMModelEntry }): boolean {
+  return (
+    isPricedElsewhere(modelId) ||
+    (!!entry.pricing && isVariablePriceRouter({ pricing: entry.pricing }))
+  );
+}
+
 /** Catalog entries that would price every request at zero. */
 export function findUnpricedModels(models: Record<string, LLMModelEntry>): string[] {
-  return Object.keys(models)
-    .filter((id) => !isPricedElsewhere(id) && !hasAnyRate(models[id]?.pricing))
+  return Object.entries(models)
+    .filter(([modelId, entry]) => !isUnauditable({ modelId, entry }) && !hasAnyRate(entry.pricing))
+    .map(([modelId]) => modelId)
     .toSorted();
 }
 
@@ -156,7 +169,7 @@ function checkModels({
   into: PriceDisagreement[];
 }): void {
   for (const [modelId, entry] of Object.entries(models)) {
-    if (isPricedElsewhere(modelId)) continue;
+    if (isUnauditable({ modelId, entry })) continue;
     if (!entry.pricing) continue;
     for (const [source, byId] of Object.entries(upstream)) {
       const upstreamPricing = byId[modelId];
