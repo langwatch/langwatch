@@ -58,7 +58,7 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
-    "@simplewebauthn/server": "^13.3.2",
+    "@simplewebauthn/server": "^14.0.3",
     "@slack/webhook": "catalog:",
     "@trpc/server": "catalog:",
     "bcrypt": "catalog:",
