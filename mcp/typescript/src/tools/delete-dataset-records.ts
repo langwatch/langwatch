@@ -1,10 +1,8 @@
-import { deleteDatasetRecords as apiDeleteDatasetRecords } from "../langwatch-api-datasets.js";
+import { deleteDatasetRecords as apiDeleteDatasetRecords } from "../langwatch-api-datasets.ts";
 
 /**
- * Handles the platform_delete_dataset_records MCP tool invocation.
- *
- * Deletes records from a dataset by IDs and returns confirmation
- * with the count of records deleted.
+ * Handles the platform_delete_dataset_records MCP tool: deletes records
+ * by ID and returns a confirmation with the count deleted.
  */
 export async function handleDeleteDatasetRecords(params: {
   slugOrId: string;
@@ -14,9 +12,7 @@ export async function handleDeleteDatasetRecords(params: {
 
   const lines: string[] = [];
   lines.push(`${result.deletedCount} record(s) deleted successfully!\n`);
-  lines.push(
-    "> Use `platform_get_dataset` to see the updated dataset.",
-  );
+  lines.push("> Use `platform_get_dataset` to see the updated dataset.");
 
   return lines.join("\n");
 }

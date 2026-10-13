@@ -1,0 +1,19 @@
+# LangWatch Enterprise
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+## Modules
+
+| Module                         | Subjects | Halves  | Entitlement gates             |
+| ------------------------------ | -------- | ------- | ----------------------------- |
+| [beta](modules/beta/README.md) | beta     | process | `enterprise` (`beta_runs`) ×1 |
+
+Every module is listed in `modules/catalogue.json` with `classification: enterprise`; the generated module lists install it beside the core modules. Gating is per route, never per mount.
+
+## Packages
+
+| Package       | Description                |
+| ------------- | -------------------------- |
+| `@lw/signing` | Signs licenses \| offline. |
+
+<!-- readme:generated:end -->

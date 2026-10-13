@@ -2,7 +2,7 @@ package domain
 
 import "time"
 
-// TypecheckReapLimits bound a single `haven typecheck` run so one runaway tsgo
+// TypecheckReapLimits bound a single `haven machine typecheck` run so one runaway tsgo
 // process can't sit on a slot forever or blow past the RAM budget TypecheckSlots
 // assumed when it granted that slot. Either bound alone is enough to kill.
 type TypecheckReapLimits struct {

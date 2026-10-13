@@ -1,39 +1,13 @@
-/**
- * Turns a `--project <idOrSlug>` value into the project id a command targets.
- *
- * The user-scoped login key (`cli_api_key`) reaches every project the user
- * selected while approving the login, but it carries no project identity of
- * its own: the server resolves the role binding from the project the REQUEST
- * names. So a command that runs against another project needs an id, and the
- * user is entitled to type the slug they see in the URL bar instead.
- *
- * One resolver for every command group. `--project` starts on the `trace`
- * commands and `session events`; anything that adopts the flag later passes
- * the value to `resolveCredentials({ project })` and gets the same lookup, the
- * same errors and the same wiring for free.
- *
- * Spec: specs/typescript-sdk/cli-cross-project-access.feature
- */
+/** Resolves a --project id/slug to the project id; spec in cli-cross-project-access.feature. */
 
 import {
   ProjectsApiService,
   type Project,
 } from "@/client-sdk/services/projects/projects-api.service";
+
 import type { GovernanceConfig } from "./governance/config";
 
-/**
- * A `--project` value the CLI could not turn into a project it may use.
- *
- * `code` is the contract; the message is copy. `project_not_accessible` covers
- * both shapes of that answer — a name nothing matches, and a name the login
- * key is not allowed to see — because the platform answers them identically:
- * a credential that cannot view a project does not get it in the listing.
- * `project_lookup_failed` is the different case, where the listing itself did
- * not come back and we know nothing about the project either way.
- * `project_scope_not_supported` is the third: the project was named fine, but
- * the credential in hand carries its own project and cannot be pointed at
- * another, so honouring the name is not something a lookup could fix.
- */
+/** Error on --project resolution: code is not_accessible or lookup_failed. */
 export class ProjectScopeError extends Error {
   constructor(
     public readonly code:
@@ -74,9 +48,7 @@ const statusOf = (error: unknown): number | undefined => {
  * listing is filtered server-side by what the credential holds `project:view`
  * on, so "not in here" and "not yours" are the same fact.
  */
-const listAccessibleProjects = async (
-  service: ProjectsApiService,
-): Promise<Project[]> => {
+const listAccessibleProjects = async (service: ProjectsApiService): Promise<Project[]> => {
   const collected: Project[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
     const result = await service.list({ page, limit: PAGE_SIZE });
@@ -98,19 +70,7 @@ const listAccessibleProjects = async (
   return collected;
 };
 
-/**
- * Resolve a `--project` value to a project id.
- *
- * The stored personal project answers without a round trip, since it is the
- * one project the CLI already knows by both id and slug. Everything else goes
- * through the listing, matching on id FIRST: ids and slugs live in one
- * namespace here, and an id is the exact reference, so a slug that happens to
- * read like another project's id can never steal the request.
- *
- * Throws `ProjectScopeError` rather than exiting, so the caller decides how to
- * render it (prose or the structured document) and the resolution stays
- * testable on its own.
- */
+/** Resolves a --project selector to id; checks personal first, then listing. */
 export const resolveProjectSelector = async ({
   selector,
   cfg,
@@ -166,11 +126,8 @@ export const resolveProjectSelector = async ({
 };
 
 /**
- * Where the key in hand came from, which decides what to tell someone whose
- * key cannot be pointed at the project they named. `--api-key` and
- * `LANGWATCH_API_KEY` are two sources, not one: the way out of the first is to
- * drop the flag, and telling that user to unset a variable they never set
- * points them at a key that is not the one answering.
+ * Where the key in hand came from, which decides the advice when it cannot be pointed at the named
+ * project: drop `--api-key`, or unset `LANGWATCH_API_KEY`.
  */
 export type BoundKeySource = "flag-key" | "env-key" | "personal-project-login";
 
@@ -208,13 +165,8 @@ const BOUND_KEY_COPY: Record<
 };
 
 /**
- * The refusal for a project named against a key that carries its own project.
- *
- * A legacy project key (`sk-lw-` with no lookup id) encodes its project in the
- * token, so the server reads the project off the key and ignores any the
- * request names. Running anyway answers from the key's own project, which is
- * the silence this replaces: the rows come back, they are from somewhere else,
- * and nothing on screen says so.
+ * The refusal for a project named against a legacy project key (`sk-lw-`, no lookup id), whose
+ * project the server reads off the token; running anyway would silently answer from elsewhere.
  */
 export const projectScopeNotSupported = ({
   selector,

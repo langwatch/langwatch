@@ -8,7 +8,11 @@
 // specs/langy/langy-github-prs.feature.
 package github
 
-import "github.com/langwatch/langwatch/services/langyagent/app"
+import (
+	"strings"
+
+	"github.com/langwatch/langwatch/services/langyagent/app"
+)
 
 // Capability is the GitHub access a worker was granted for the turn: the minted
 // installation token, the requesting user's login (an attribution label), and
@@ -18,6 +22,7 @@ type Capability struct {
 	token     string
 	login     string
 	repoScope string
+	host      string
 }
 
 // compile-time proof Capability satisfies the app port.
@@ -33,19 +38,41 @@ func New(token, login, repoScope string) Capability {
 	return Capability{token: token, login: login, repoScope: repoScope}
 }
 
+// WithHost points the worker at a GitHub host other than github.com: blank keeps
+// github.com. Dev stacks name their GitHub stand-in here (LANGY_GITHUB_HOST).
+func (c Capability) WithHost(host string) Capability {
+	c.host = strings.TrimSpace(host)
+	return c
+}
+
 // Name identifies the capability in logs and telemetry.
 func (Capability) Name() string { return "github" }
 
 // Contribute injects GH_TOKEN + GITHUB_LOGIN when a token is present, or nil when
 // there is none. GH_TOKEN is what `gh`/`git` authenticate with; GITHUB_LOGIN is
-// the login the skills surface in their output.
+// the login the skills surface in their output. With a host set (WithHost) it is
+// the enterprise-host set instead; spawn folds its NO_PROXY into the worker's.
 func (c Capability) Contribute() []string {
 	if c.token == "" {
 		return nil
 	}
+	if c.host == "" || strings.EqualFold(c.host, "github.com") {
+		return []string{
+			"GH_TOKEN=" + c.token,
+			"GITHUB_LOGIN=" + c.login,
+		}
+	}
+	// Another host: gh reads it as an enterprise host (GH_HOST + GH_ENTERPRISE_TOKEN),
+	// git rewrites github.com URLs to it, and the worker reaches it without the egress proxy.
+	hostname, _, _ := strings.Cut(c.host, ":")
 	return []string{
-		"GH_TOKEN=" + c.token,
+		"GH_HOST=" + c.host,
+		"GH_ENTERPRISE_TOKEN=" + c.token,
 		"GITHUB_LOGIN=" + c.login,
+		"GIT_CONFIG_COUNT=1",
+		"GIT_CONFIG_KEY_0=url.https://" + c.host + "/.insteadOf",
+		"GIT_CONFIG_VALUE_0=https://github.com/",
+		"NO_PROXY=" + hostname,
 	}
 }
 

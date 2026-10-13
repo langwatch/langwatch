@@ -116,3 +116,10 @@ Feature: Custom Models Management
     When the migration runs
     Then matching models are removed from the custom models list
     And non-matching models are converted to structured entries with Model ID and Display Name
+
+  @unit
+  Scenario: A stored custom model entry that fails the strict parse is dropped loudly
+    Given a provider's stored custom models include one entry with an unrecognised key
+    When the entries are read back
+    Then the malformed entry is named in a structured rejection rather than silently discarded
+    And the well-formed entries still parse

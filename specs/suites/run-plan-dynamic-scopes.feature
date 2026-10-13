@@ -84,6 +84,19 @@ Feature: Dynamic run plan scopes
     When the plan is run
     Then the plan reads back with the scenarios the run covered
 
+  # Two runs of the same plan resolve and write back its scenario list inside
+  # one transaction each, locking the plan's own row first so the second run
+  # waits for the first rather than writing a list the first has already moved
+  # past. The lock is by id and project alone: a plan row's own kind, so a
+  # predicate naming a different kind locks nothing and the guarantee above
+  # silently stops holding.
+  @unit
+  Scenario: The row lock matches the row the resolution reads
+    Given a run plan row
+    When its dynamic scope is resolved
+    Then the row lock names the plan's own id and project
+    And the row lock names no kind the plan's own row does not carry
+
   @integration
   Scenario: A dynamic scope that covers nothing is refused
     Given a run plan scoped to a label no scenario carries

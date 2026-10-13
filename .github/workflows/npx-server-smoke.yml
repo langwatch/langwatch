@@ -1,8 +1,8 @@
 # Smoke job for `npx @langwatch/server`. Builds the workspace package as a
 # tarball, then runs it from a fresh sandbox dir on every supported platform.
 # Asserts the full stack (postgres + redis + clickhouse + nlpgo + langevals
-# + ai-gateway + langwatch app) reaches healthy state and that the critical
-# user paths — workflow execution, evaluator run — return 200.
+# + ai-gateway + the langwatch backend) reaches healthy state and that the
+# backend serves the browser bundle at `/`.
 #
 # Trigger policy:
 # - workflow_dispatch (manual, with optional `port_base` input)
@@ -35,14 +35,16 @@ on:
       - "package.json"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
-      - "packages/server/**"
+      - "apps/server/**"
+      # The one process the CLI spawns: the api and the worker together.
+      - "apps/backend/**"
       - "services/langevals/pyproject.toml"
       - "services/langevals/uv.lock"
       - "services/aigateway/**"
       - "cmd/service/**"
-      - "platform/app/package.json"
-      - "platform/app/scripts/start.sh"
-      - "platform/app/scripts/check-ports.sh"
+      - "apps/api/package.json"
+      - "apps/worker/package.json"
+      - "apps/ui/package.json"
       - ".github/workflows/npx-server-smoke.yml"
       # The script that assembles the tarball. It decides what every npm user
       # receives, so a change to it is precisely what this job exists to
@@ -57,6 +59,7 @@ on:
       # served a request, on a push this job did not watch.
       - "sdks/typescript/package.json"
       - "packages/*/package.json"
+      - "apps/*/package.json"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -104,14 +107,15 @@ jobs:
           node --version || true
           go version || true
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
-        with:
-          node-version: "24"
-
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           run_install: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
+        with:
+          node-version: "24"
+          cache: pnpm
 
       # No Go setup. The npx flow ships only the prebuilt aigateway monobinary
       # download path; LANGWATCH_AIGATEWAY_DEV_BUILD is intentionally unset
@@ -167,12 +171,16 @@ jobs:
       - name: Install pnpm dependencies (workspace)
         run: pnpm install --frozen-lockfile
 
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: npx-smoke
+
       - name: Build @langwatch/server CLI
-        run: pnpm --filter @langwatch/server-cli build
+        run: pnpm exec nx run @langwatch/server:build --outputStyle=static
 
       # Runs here because this job's path filter is already the exact set of
       # files these assert about (the root manifest, the workspace definition,
-      # the lockfile, packages/server/**, the packing script) — and because
+      # the lockfile, apps/server/**, the packing script) — and because
       # nothing else in CI runs the CLI's tests at all, which would leave them
       # reading as coverage while never executing. Placed before the boot so a
       # workspace regression fails in seconds rather than 25 minutes.
@@ -181,19 +189,25 @@ jobs:
       # and surfacing those here would be a different change.
       - name: Check the workspace invariants (ADR-076)
         run: >
-          pnpm --filter @langwatch/server-cli run test:invariants
+          pnpm --filter @langwatch/server run test:invariants
 
-      # Same prebuild as npx-server-publish.yml: every published artifact
-      # ships platform/app/dist + mcp/typescript/dist (the publish sanity check
-      # asserts both), so the artifact THIS job boots must carry them too —
+      # Same prebuild as npx-server-publish.yml (the root `build:server`): every
+      # published artifact ships apps/ui/dist + mcp/typescript/dist (the publish
+      # sanity check asserts both), so the artifact THIS job boots must carry them too —
       # otherwise the smoke exercises a tree shape no npm user ever receives
       # and pays a full on-runner vite build for it inside the health budget.
       # No separate app install: since ADR-076 langwatch/ is a member of the
       # single root workspace, so "Install pnpm dependencies (workspace)"
       # above already covers it. Same redundancy that was removed from
       # npx-server-publish.yml.
-      - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm --filter "@langwatch/web..." run build
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      - name: Build what the backend serves (build:server)
+        run: pnpm run build:server
         env:
           NODE_ENV: production
 
@@ -228,7 +242,7 @@ jobs:
           # services/langyworker ships ONE file, its manifest, because the
           # lockfile names it as a workspace member and an install whose
           # directory is absent fails much later, inside a migration
-          # (packages/server/test/workspace-invariants.test.ts, "ships a
+          # (apps/server/test/workspace-invariants.test.ts, "ships a
           # manifest for every workspace member"). The subtraction names that
           # exact path rather than the directory, so its TypeScript sources
           # still fail this guard if they ever start shipping.
@@ -268,7 +282,7 @@ jobs:
           # (workspace)" step above left $GITHUB_WORKSPACE/node_modules on
           # disk. An install_dir nested under $GITHUB_WORKSPACE would still
           # have carried that as an ancestor and could silently satisfy a
-          # module the tarball forgot to ship, masking the exact tsx
+          # module the tarball forgot to ship, masking the exact loader
           # alias-skip bug this job exists to catch. $RUNNER_TEMP is a
           # sibling of the checkout, matching what a real npx cache dir
           # looks like.
@@ -320,6 +334,14 @@ jobs:
                 exit 0
               fi
             done
+            # The CLI gave up (or died): print the app's own lines now, since
+            # the trailing service shutdown buries the first app error.
+            if grep -q "langwatch did not become healthy" "$GITHUB_WORKSPACE/_smoke.log" 2>/dev/null \
+              || ! kill -0 "$(cat "$GITHUB_WORKSPACE/_smoke.pid")" 2>/dev/null; then
+              echo "✗ the CLI reported a failed boot after ${SECONDS}s — langwatch lines:"
+              grep -E "langwatch|migrat|exited|Error" "$GITHUB_WORKSPACE/_smoke.log" | tail -n 300 || true
+              exit 1
+            fi
             if [ $((i % 24)) -eq 0 ]; then
               echo "  …still waiting at ${SECONDS}s — last cli.log lines:"
               tail -n 10 "$GITHUB_WORKSPACE/_smoke.log" 2>/dev/null | sed 's/^/    /' || true
@@ -327,6 +349,7 @@ jobs:
             sleep 5
           done
           echo "✗ langwatch never reported healthy on any port slot within ${SECONDS}s"
+          grep -E "langwatch|migrat|exited|Error" "$GITHUB_WORKSPACE/_smoke.log" | tail -n 300 || true
           exit 1
 
       - name: Probe service health endpoints
@@ -415,7 +438,7 @@ jobs:
             echo "✗ no aigateway binary at $bin — predep install must have failed silently"
             exit 1
           fi
-          expected_version="$(node -p "require('$GITHUB_WORKSPACE/package.json').version")"
+          expected_version="$(node -p "require('$GITHUB_WORKSPACE/apps/server/package.json').version")"
           actual_version="$("$bin" --version 2>&1 | head -n1 | tr -d '\r')"
           echo "aigateway --version: $actual_version"
           echo "expected:            $expected_version"
@@ -451,27 +474,33 @@ jobs:
             fi
           fi
 
-      - name: Probe a workflow execution end-to-end
-        # `secrets.*` is not available in step-level `if:` expressions
-        # (only `env`, `inputs`, `github`, `runner`, etc. are valid there).
-        # We expose the secret as a step-env var, then short-circuit inside
-        # the script when it's empty. Net effect matches the original
-        # "skip if no key" intent without invalid YAML.
-        env:
-          OPENAI_API_KEY: ${{ secrets.NPX_SERVER_OPENAI_API_KEY }}
+      # The api half serves apps/ui/dist/client: `/` must answer with the
+      # built shell, and the hashed script it names must load. The first boot's
+      # upgrade can still hold product paths at 503, so this retries.
+      - name: Assert the backend serves the browser bundle at /
         run: |
-          set -e
-          if [[ -z "$OPENAI_API_KEY" ]]; then
-            echo "NPX_SERVER_OPENAI_API_KEY not set — skipping workflow execution probe."
-            exit 0
-          fi
-          # Placeholder until the real workflow-execution fixture lands.
-          # We hit nlpgo's /healthz (chi-routed liveness) — the only path
-          # that is actually wired. Earlier drafts hit /health and either
-          # 502'd (POST) or hung 5+min (GET → proxypass self-loop).
+          set -eo pipefail
           base=${RESOLVED_BASE}
-          curl -fsS --max-time 10 "http://127.0.0.1:$((base + 1))/healthz" >/dev/null
-          echo "(placeholder workflow probe — real fixture pending)"
+          for i in $(seq 1 180); do
+            if curl -fsSL --connect-timeout 2 --max-time 10 "http://127.0.0.1:$base/" > /tmp/index.html 2>/dev/null \
+                && grep -q '<div id="root">' /tmp/index.html; then
+              break
+            fi
+            if [ "$i" -eq 180 ]; then
+              echo "✗ / never answered with the UI shell"
+              head -c 2000 /tmp/index.html 2>/dev/null || true
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "✓ / answered with the UI shell after ${i}s"
+          asset="$(grep -oE 'src="/assets/[^"]+\.js"' /tmp/index.html | head -n1 | sed -E 's/^src="(.*)"$/\1/' || true)"
+          if [ -z "$asset" ]; then
+            echo "✗ the shell names no hashed /assets/*.js script — not the vite build"
+            exit 1
+          fi
+          curl -fsS --connect-timeout 2 --max-time 10 -o /dev/null "http://127.0.0.1:$base$asset"
+          echo "✓ $asset loads"
 
       - name: Tear down
         if: always()

@@ -1,8 +1,8 @@
 # Single-session lookups read only the data that can hold the session
 #
 # Implementation:
-#   platform/app/src/server/clickhouse/migrations/00101_add_coding_agent_sessions_session_id_index.sql (the SessionId skip index)
-#   platform/app/src/server/app-layer/coding-agent/repositories/coding-agent-session.clickhouse.repository.ts (findBySessionId)
+#   packages/clickhouse-migrations/migrations/00106_add_coding_agent_sessions_session_id_index.sql (the SessionId skip index)
+#   modules/coding-agent/process/src/repositories/clickhouse/clickhouse.coding-agent-session.repository.ts (findBySessionId)
 #
 # Related specs:
 #   specs/coding-agent/session-aggregate.feature , the session fold whose row these lookups read

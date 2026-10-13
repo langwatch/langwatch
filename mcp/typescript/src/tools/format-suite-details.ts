@@ -2,7 +2,7 @@ import type {
   EvaluatorAttachmentWire,
   ScenarioMapping,
   SuiteField,
-} from "../schemas/suite-fields.js";
+} from "../schemas/suite-fields.ts";
 
 /**
  * The digest lines for a suite's fields, the evaluators attached to a suite
@@ -19,10 +19,7 @@ export function describeMapping(mapping: ScenarioMapping): string {
 
 export function formatSuiteFields(fields: SuiteField[] | undefined): string[] {
   if (!fields || fields.length === 0) return [];
-  return [
-    "\n## Fields",
-    ...fields.map((field) => `- ${field.identifier} (${field.type})`),
-  ];
+  return ["\n## Fields", ...fields.map((field) => `- ${field.identifier} (${field.type})`)];
 }
 
 export function formatEvaluatorAttachments(
@@ -41,10 +38,9 @@ export function formatEvaluatorAttachments(
 }
 
 /**
- * The status the platform reports while a run's evaluators have not been
- * recorded yet. The conversation is over and the judge has decided, but a
- * required evaluator can still turn the run red, so a caller must not read
- * the verdict as final.
+ * Reported while a run's evaluators haven't recorded yet: the judge has
+ * decided, but a required evaluator can still turn the run red — a
+ * caller must not read this as final.
  */
 export const PENDING_EVALUATION_STATUS = "PENDING_EVALUATION";
 
@@ -79,9 +75,7 @@ export interface SimulationRunEvaluation {
   details?: string;
 }
 
-export function formatEvaluations(
-  evaluations: SimulationRunEvaluation[] | undefined,
-): string[] {
+export function formatEvaluations(evaluations: SimulationRunEvaluation[] | undefined): string[] {
   if (!evaluations || evaluations.length === 0) return [];
   const lines = ["\n## Evaluators"];
   for (const evaluation of evaluations) {
