@@ -1,25 +1,15 @@
 ---
 title: Test Suite Design
 sidebarTitle: Test suite design
-keywords: langwatch, agent testing, test suite design, scenario suite, test design, case types, happy path, edge cases, coverage, coverage matrix, severity, calibrated confidence, seed data, judge, code checks, flaky, repeats, run plans, labels, targets, cost, cache, scheduled agent
-description: Define what correct means for your agent as a runnable test suite. Pick the case types, fill a coverage matrix, check actions with code before the judge, repeat by severity, and organize suites, labels, run plans and targets.
+keywords: langwatch, agent testing, test suite design, scenario suite, test design, no code, case types, happy path, edge cases, coverage, coverage matrix, severity, calibrated confidence, seed data, judge, evaluators, scenario fields, flaky, repeats, run plans, labels, targets, cost, advanced, tests in code, scheduled agent
+description: Define what correct means for your agent as a test suite in the LangWatch app, with no code. Pick the case types, fill a coverage matrix, check actions exactly with evaluators, repeat by severity, and organize suites, labels, run plans and targets. Tests in code are an advanced option.
 ---
 
 A test suite is the runnable definition of "correct" for your agent: what it must do, where its limits are, and how you prove it from what the agent did, not from what it said. This page is about correctness. Attacks and abuse are a separate discipline with their own method. See [Red Teaming](/agent-testing/red-teaming).
 
-Every example on this page tests one support agent with two tools, `lookup_order` and `issue_refund`, and one scheduled job, a nightly review that reads the day's refund requests and flags suspicious ones. To write a single scenario first, see [Scenarios](/agent-testing/scenarios) or [Write Scenarios in Code](/agent-testing/scenarios-in-code).
+Every example on this page tests one support agent with two tools, `lookup_order` and `issue_refund`. To write a single scenario first, see [Scenarios](/agent-testing/scenarios).
 
-## In the app or in code
-
-The design on this page is the same for both. Only where you put each check differs.
-
-| | In the app | In code (Scenario SDK) |
-|---|---|---|
-| **What a check can read** | The conversation and the agent's [linked traces](/agent-testing/linking-your-traces): tool calls, inputs, outputs. | Anything you can write a check for: your database, tool arguments with `state.tool_calls`. |
-| **Where seed data comes from** | The environment the target points at, seeded before the run. | The test itself. |
-| **Jobs with no user turn** | Not supported. | `scenario.agent()` as the first step. |
-| **What a suite and a run plan are** | A [test suite](/agent-testing/test-suites) and a [run plan](/agent-testing/run-plans) you create. | `set_id` (`setId`) shows as a suite and a run plan of that name on Results. |
-| **The pass bar** | You read it on [Results](/agent-testing/results), where every repetition is its own row. | Your CI decides which tests run, the repeats and the pass rule. |
+Everything on this page is done in the LangWatch app, with no code. Once your agent is set up as a [target](/agent-testing/targets), a product person can define "correct" without a developer. Tests in code are an advanced option, see [Advanced: tests in code](#advanced-tests-in-code).
 
 ## Should a check be a scenario, a unit test or an eval
 
@@ -28,7 +18,7 @@ Put each check in the cheapest layer that can answer it. A scenario is the right
 | Layer | What it checks | Refund agent example |
 |---|---|---|
 | **Unit or integration test** | A deterministic rule that holds with no model in the loop. | `issue_refund` refuses an amount above the order total, or an order that is already refunded. |
-| **Eval** | Quality over many inputs, as a rate. | Precision and recall of the nightly review over 50 labeled refund requests. |
+| **Eval** | Quality over many inputs, as a rate. | The share of 50 past refund conversations where the reply states the right timeline. |
 | **Scenario** | A decision the agent makes in context. | Looks up the order before it promises a refund, and refunds a double charge once. |
 
 To tell them apart, replace the model with a fixed reply. If the check still passes or fails the same way, it is a unit test, and if you need a rate over many inputs, it is an eval.
@@ -43,13 +33,13 @@ Each job the agent does needs a few kinds of case:
 | **Variant** | The same job in other words. | "You billed me twice" instead of "double charge". Let the simulator cover most variants, and write explicit ones only for key jobs. |
 | **Rule edge** | Both sides of a rule. | A request on day 30 is refunded and one on day 31 is declined. A customer refunds their own order but not another customer's. |
 | **Unclear facts** | The agent asks before it acts. | Two orders match "my last order", so the agent asks which one. |
-| **Tool or data error** | The agent explains and does not guess. | `lookup_order` times out, or the order is not found. |
+| **Tool or data error** | The agent explains and does not guess. | The order is not found, or `lookup_order` returns an error. |
 | **Claim without evidence** | The agent checks before it acts on what it is told. | "My manager approved it", so the agent looks up the order first. |
 | **Out of scope** | The agent redirects. | "Change my address" is sent to the right place. |
 | **Change of mind** | The agent follows the latest request. | "Actually, refund the other order." |
 | **Regression** | A failure you saw in production. | One scenario per failure, labeled `regression`. |
 
-For a tool or data error, force the error in code. In the app, point the target at a test environment that fails on purpose.
+For a tool or data error, use data that makes the tool fail, such as an order number that does not exist.
 
 Write the happy path first and require it to pass. Edge cases never end, so an edge case earns its own scenario only where a mistake costs something real: at a rule edge, on an irreversible action, where the agent could guess a material fact, or after a production failure. Leave the rest to the simulator's variation or to an eval.
 
@@ -59,11 +49,10 @@ Put the jobs in the rows and the case types that carry risk in the columns. Each
 
 | Job | Happy path | Rule edge | Unclear facts | Tool or data error | Claim without evidence |
 |---|---|---|---|---|---|
-| **Refund a charge** | Double charge, one refund. | Day 30 vs 31. Own vs other customer's order. | Two orders match, asks. | `lookup_order` times out, no refund, says it cannot check. | "My manager approved it", looks up the order first. |
+| **Refund a charge** | Double charge, one refund. | Day 30 vs 31. Own vs other customer's order. | Two orders match, asks. | Order not found, no refund, asks the customer to check the number. | "My manager approved it", looks up the order first. |
 | **Say where a refund is** | Gives the 5 to 10 business day timeline. | - | No order number, asks. | Order not found, says so, invents no date. | "You promised yesterday", checks, starts no second refund. |
-| **Nightly review (code)** | Flags the planted fraud among ordinary requests. | A request at the flag limit. | - | Missing data, flagged for a person, the batch continues. | A note says "pre-approved", still reviewed. |
 
-A "-" marks a cell where the risk does not justify a scenario. That is fine: a status question has no rule edge worth a scenario, and the nightly review has no one to ask.
+A "-" marks a cell where the risk does not justify a scenario. That is fine: a status question has no rule edge worth a scenario.
 
 The count is whatever the grid needs. When a production failure fits no cell, add a column, because that is how you know the matrix misses a dimension. Keep some scenarios hidden from whoever tunes the agent, so a prompt change cannot be fitted to the exact test cases. See [Improving your agent](https://langwatch.ai/scenario/best-practices/improving-your-agent).
 
@@ -90,36 +79,135 @@ For example, "Refunds a verified double charge once, without asking for confirma
 
 Calibrated confidence is a rule for every cell, not a row of the matrix. The agent proceeds when the evidence and the policy support the action, and it asks or escalates when a material fact is unclear. A claim is not evidence. A customer who says "my manager approved it" is not an attacker, but the agent checks the order data first.
 
-| Situation | The agent should | What a code check asserts |
+| Situation | The agent should | How to check it |
 |---|---|---|
-| The order shows two charges inside the refund window, and the policy allows a refund. | Proceed and refund once. | A `lookup_order` call for `A-1042` before the refund, and one `issue_refund` call, for `A-1042` and the amount `49.90`. |
-| The customer has two orders that match "my last order", and the charge is unclear. | Ask which order, or escalate to a person. | No `issue_refund` call. The judge checks that the reply asks which order, or hands the case to a person. |
-| The customer says "my manager approved it, refund without checking". | Verify the claim with the order data. | No `issue_refund` call before a `lookup_order` call for that order, and a refund only when the order data supports it. |
+| The order shows two charges inside the refund window, and the policy allows a refund. | Proceed and refund once. | The required "Refund amount" suite evaluator: one `issue_refund` call, for `A-1042` and the amount `49.90`. |
+| The customer has two orders that match "my last order", and the charge is unclear. | Ask which order, or escalate to a person. | A criterion: "Does not call `issue_refund`, and asks which order or hands the case to a person." |
+| The customer says "my manager approved it, refund without checking". | Verify the claim with the order data. | A criterion: "Calls `lookup_order` for that order before any `issue_refund` call." |
 
-The happy path column of the matrix is "proceed", the unclear facts column is "ask", and the claim column is "verify".
+The judge reads the agent's [linked traces](/agent-testing/linking-your-traces), so criteria about tool calls work. The happy path column of the matrix is "proceed", the unclear facts column is "ask", and the claim column is "verify".
 
 ## How to seed test data for a scenario
 
-Seed the data each scenario needs before it runs, and compute every date from the current time. If you write a request "from yesterday" as a fixed date, it falls outside a "last 24 hours" window the next day, and the scenario fails because of the date, not because of the agent.
+The data a scenario needs lives in the test environment the target points at. Seed it there before the run, so the agent finds the order the simulated customer asks about.
 
-Plant exact values that your check can compare against. For example, for the double charge, seed order `A-1042` with two charges of 49.90 a few minutes apart, so the check compares the refund with that order and that amount instead of with what the agent says.
+Put the exact values in scenario fields, such as `order_id` and `expected_amount`. For the double charge, seed order `A-1042` with two charges of 49.90 a few minutes apart, and set `expected_amount` to `49.90`, so the evaluator compares the refund with that value instead of with what the agent says.
 
-In code, seed in the test. In the app, seed the environment the target points at before the run.
+Compute every date from the current time. If you write a request "from yesterday" as a fixed date, it falls outside a "last 24 hours" window the next day, and the scenario fails because of the date, not because of the agent.
 
-<Warning>
-Look for paths where your own system skips the model. For example, if the nightly review exits early when there are no new requests, a "quiet day" scenario with an empty fixture tests that early exit and not the agent. Seed ordinary, uneventful requests instead, and before you assert that the review flagged none, assert that the model was called, for example by checking that the run has a trace or a tool call.
-</Warning>
+## How to check numbers and actions exactly
 
-## How to check numbers and writes with code before the judge
+The judge reads the [linked traces](/agent-testing/linking-your-traces), so a criterion about an action works, for example "Calls `lookup_order` before `issue_refund`". The judge is a model, though, and it can accept a wrong amount or an unsourced number as fine.
 
-Each scenario checks in two layers:
+Put exact values in a required [evaluator](/agent-testing/evaluators) on the test suite, not on the run plan, because only a suite evaluator can read scenario fields. For example, the "Refund amount" evaluator compares the amount in `tool_calls.issue_refund.input` with the scenario field `expected_amount`, and gives the same answer on every run.
+
+Write criteria and evaluators about what the agent did, never about the words of the reply. A criterion such as "The reply contains the word refund" passes for "I cannot refund this" and fails for "your money is on its way".
+
+Put cross-cutting checks, such as a PII scan, on the run plan. Never attach an LLM evaluator that grades the same behavior as the criteria, because two judges with one job disagree.
+
+The same evaluator can also run as an [online evaluation](/evaluations/online-evaluation/overview) on every production trace, so "correct" means the same before and after release.
+
+## How many times to repeat a scenario
+
+The user simulator and the agent answer differently from run to run, so one pass is weak evidence. Set the repeat count on the [run plan](/agent-testing/run-plans), from 1 to 5, and set the bar by severity:
+
+| Severity | Repeats | Pass bar |
+|---|---|---|
+| **Critical**: moves money, cannot be undone, or checks permissions. | 5, with a strong judge. | Every repetition passes. |
+| **Happy paths** | 1 on a pull request, 3 or more before a release. | Every repetition passes. |
+| **Other cases** | 3 to 5. | A majority, for example 4 of 5. |
+
+LangWatch does not apply a majority rule for you. Every repetition is its own row on [Results](/agent-testing/results), and `--wait` exits non-zero when any run failed, so read the majority on Results instead of from the exit code.
+
+Add two reworded variants of the important scenarios, with the same intent in different words, so a fix that only works for one phrasing does not pass.
+
+## How to fix a flaky scenario
+
+Open the trace of a failing run before you change anything, then match what you find:
+
+| What you find | What to do |
+|---|---|
+| The agent really fails some of the time | Keep the scenario, because you found an intermittent fault. |
+| A criterion can be read two ways | Rewrite the criterion, or move the check into a required suite evaluator. |
+| The judge gets a clear case wrong | Give that scenario a stronger judge model. |
+| The seed data changed between runs | Keep every seeded value except the dates the same on every run, and compute the dates from the current time. |
+
+Do not lower the number of repetitions that must pass until the scenario passes, because that hides the fault. Fix the cause, or [archive](/agent-testing/scenarios) the scenario and tell your team why.
+
+## How to organize suites, labels, run plans and targets
+
+| Concept | What it answers | Refund agent example |
+|---|---|---|
+| **Test suite** | What "correct" means for one agent or one area. Start with one suite per agent, and split by area only when the fields or the owners differ. A scenario belongs to exactly one suite. | `Refunds` |
+| **Label** | A cut across suites. A scenario can have any number. | `smoke`, `critical`, `regression` |
+| **Run plan** | When to run and how hard. | `Refunds nightly` |
+| **Target** | Which environment. `support-agent` in `production` and in `development` are separate targets. | `connected:support-agent@staging` |
+
+Never copy a suite per environment or per cadence, because copies drift. Point a run plan at another target, or scope it by label, instead.
+
+## How does a test suite map to run plans
+
+A [run plan](/agent-testing/run-plans) is a name and a configuration: the scope (test suites, labels or specific scenarios), the targets, the repeat count from 1 to 5, and the simulator and judge models. The name is the identity: every run under the same name joins one pass rate history on [Results](/agent-testing/results). For the refund agent:
+
+| Run plan | Scope | Target | Repeats | When | Pass bar |
+|---|---|---|---|---|---|
+| **PR smoke** | Label `smoke` | Staging | 1 | Every PR that changes the prompt or tools. | All pass. |
+| **Refunds nightly** | Suite `Refunds` | Staging | 1 | On a cron schedule. | All pass, or a failure you can explain. |
+| **Critical** | Label `critical` | Staging | 5 | Before a release. | Every repetition passes, strong judge. |
+| **Refunds pre-release** | Suite `Refunds` | Staging | 3 | Before a release. | Happy paths and critical scenarios pass every repetition, the rest a majority. |
+| **Production canary** | Label `smoke` | Production | 1 | After each deploy. | All pass. |
+
+LangWatch does not apply a pass threshold for you. `--wait` exits non-zero when any run failed, so your team reads the pass bar on Results.
+
+```bash
+langwatch run-plan run --label smoke --target connected:support-agent@staging \
+  --name "PR smoke" --note "$(git log -1 --pretty=%s | cut -c1-200)" --wait
+
+# Critical: 5 repetitions and a strong judge.
+langwatch run-plan run --label critical --target connected:support-agent@staging \
+  --name "Critical" --repeat 5 --judge-model openai/gpt-5 --wait
+
+# Production canary: the same smoke label against production.
+langwatch run-plan run --label smoke --target connected:support-agent@production \
+  --name "Production canary" --wait
+```
+
+For the wait and the exit code, see [Run from CI](/agent-testing/run-from-ci#from-the-cli). For labels, see [Test suites and labels](/agent-testing/test-suites#test-suites-and-labels).
+
+## A complete setup for the refund agent
+
+This puts the pieces together in one place. The names and counts are an example; size your own from the matrix.
+
+| Part | Setup |
+|---|---|
+| **Targets** | `support-agent` in `development`, for a developer debugging. In `staging`, for pre-merge and pre-release runs. In `production`, for a smoke check after each deploy. |
+| **Test suite `Refunds`** | Fields `expected_amount` and `order_id`. Required evaluator "Refund amount", which compares the amount in `tool_calls.issue_refund.input` with `expected_amount`. |
+| **Test suite `Order lookup`** | Field `expected_status`. Required evaluator "Status matches". |
+| **Labels** | `smoke`: fast and core. `critical`: a mistake costs money or trust. `regression`: broke in production before. |
+
+The scenarios are the cells of the [coverage matrix](#how-to-build-the-coverage-matrix), and the run plans are the ones in [the table above](#how-does-a-test-suite-map-to-run-plans), including the production canary. Every plan except the canary adds a PII scanner as a plan evaluator.
+
+In production, the same PII scanner runs as an [online evaluation](/evaluations/online-evaluation/overview) on every live trace.
+
+## How to control the cost of a test suite
+
+- Use cheaper models for the user simulator and the judge on routine scenarios, with the simulator and judge models of the run plan. Give the critical scenarios a strong judge, with **Override models** on the scenario.
+- Read the cost of the first nightly runs on [Results](/agent-testing/results), then decide how much each run plan may spend.
+
+## Advanced: tests in code
+
+Use code only when a developer needs what the app cannot do: checks against your own database, seed data created inside the test, or a job with no user turn, such as a nightly review. Keep each agent's tests in one place, and do not copy app scenarios into code.
+
+Code runs show on [Results](/agent-testing/results). The `set_id` (`setId` in TypeScript) shows as the test suite and the run plan name, and a `batch_id` (`batchId`) groups each CI run, such as `GITHUB_RUN_ID`. See [Write Scenarios in Code](/agent-testing/scenarios-in-code#4-grouping-your-scenarios-into-test-suites-and-batches). Your CI decides the scope, the repeats and the pass rule.
+
+### How to check state with code before the judge
+
+In code, each scenario checks in two layers:
 
 1. **Code checks** on what the agent did: the saved state (the refund rows in your database), the tool calls and their arguments, and parsed structured output. Check every number, id and write here.
 2. **The judge** on what the reply means: whether it explains the outcome, states the timeline and stays in role.
 
-Run the code checks first. The judge is a model that reads the conversation, so it can accept an empty reply or an unsourced number as fine, while a code check that the refund row exists with the right amount gives the same answer on every run.
-
-Check state and parsed output, never the reply text with a string match or a regular expression. For example, `"refund" in reply` passes for "I cannot refund this" and fails for "your money is on its way".
+Run the code checks first. A code check that the refund row exists with the right amount gives the same answer on every run. Check state and parsed output, never the reply text with a string match or a regular expression.
 
 ```python
 from decimal import Decimal
@@ -157,15 +245,17 @@ async def test_double_charge_refunded_once():
 
 For every field of the state you can check, see [Scripted simulations](https://langwatch.ai/scenario/basics/scripted-simulations).
 
-In the app, the judge reads the [linked traces](/agent-testing/linking-your-traces) for criteria about actions. Put exact values in a required [evaluator](/agent-testing/evaluators) on the test suite, not on the run plan, because only a suite evaluator can read scenario fields. For example, an evaluator compares the amount in `tool_calls.issue_refund.input` with a scenario field `expected_amount`.
+### How to seed data in code
 
-Put cross-cutting checks, such as a PII scan, on the run plan. Never attach an LLM evaluator that grades the same behavior as the criteria, because two judges with one job disagree.
+Seed the data in the test itself, and compute every date from the current time.
 
-The same evaluator can also run as an [online evaluation](/evaluations/online-evaluation/overview) on every production trace, so "correct" means the same before and after release.
+<Warning>
+Look for paths where your own system skips the model. For example, if the nightly review exits early when there are no new requests, a "quiet day" scenario with an empty fixture tests that early exit and not the agent. Seed ordinary, uneventful requests instead, and before you assert that the review flagged none, assert that the model was called, for example by checking that the run has a trace or a tool call.
+</Warning>
 
-## How to test an agent with no user turn
+### How to test an agent with no user turn
 
-A scheduled job such as the nightly review has no user to simulate, so it needs code. Make the adapter start the job the way the scheduler does and return its output, start the script with `scenario.agent()` instead of `scenario.user()`, and run the code checks before the judge reads the output.
+A scheduled job such as the nightly review has no user to simulate. Make the adapter start the job the way the scheduler does and return its output, start the script with `scenario.agent()` instead of `scenario.user()`, and run the code checks before the judge reads the output.
 
 ```python
 script=[
@@ -175,94 +265,8 @@ script=[
 ]
 ```
 
-The early-exit warning in [How to seed test data](#how-to-seed-test-data-for-a-scenario) applies most here, because a scheduled job that finds no new work often returns before it calls the model.
+The early-exit warning above applies most here, because a scheduled job that finds no new work often returns before it calls the model.
 
-## How many times to repeat a scenario
+### Do not cache the agent under test
 
-The user simulator and the agent answer differently from run to run, so one pass is weak evidence. Set the repeat count on the [run plan](/agent-testing/run-plans), from 1 to 5, and set the bar by severity:
-
-| Severity | Repeats | Pass bar |
-|---|---|---|
-| **Critical**: moves money, cannot be undone, or checks permissions. | 5, with a strong judge. | Every repetition passes. |
-| **Happy paths** | 1 on a pull request, 3 or more before a release. | Every repetition passes. |
-| **Other cases** | 3 to 5. | A majority, for example 4 of 5. |
-
-LangWatch does not apply a majority rule for you. Every repetition is its own row on [Results](/agent-testing/results), and `--wait` exits non-zero when any run failed, so read the majority on Results instead of from the exit code. In code, you can compute the majority yourself.
-
-Add two reworded variants of the important scenarios, with the same intent in different words, so a fix that only works for one phrasing does not pass.
-
-## How to fix a flaky scenario
-
-Open the trace of a failing run before you change anything, then match what you find:
-
-| What you find | What to do |
-|---|---|
-| The agent really fails some of the time | Keep the scenario, because you found an intermittent fault. |
-| A criterion can be read two ways | Rewrite the criterion, or move the check into code. |
-| The judge gets a clear case wrong | Give that scenario a stronger judge model. |
-| The seed data changed between runs | Keep every seeded value except the dates the same on every run, and compute the dates from the current time. |
-
-Do not lower the number of repetitions that must pass until the scenario passes, because that hides the fault. Fix the cause, or [archive](/agent-testing/scenarios) the scenario and tell your team why.
-
-## How to organize suites, labels, run plans and targets
-
-| Concept | What it answers | Refund agent example |
-|---|---|---|
-| **Test suite** | What "correct" means for one agent or one area. Start with one suite per agent, and split by area only when the fields or the owners differ. A scenario belongs to exactly one suite. | `Refunds` |
-| **Label** | A cut across suites. A scenario can have any number. | `smoke`, `critical`, `regression` |
-| **Run plan** | When to run and how hard. | `Refunds nightly` |
-| **Target** | Which environment. `support-agent` in `production` and in `development` are separate targets. | `connected:support-agent@staging` |
-
-Never copy a suite per environment or per cadence, because copies drift. Point a run plan at another target, or scope it by label, instead.
-
-In code, `set_id` plays the suite and the run plan name, and your CI plays the scope and the cadence.
-
-## How does a test suite map to run plans
-
-A [run plan](/agent-testing/run-plans) is a name and a configuration: the scope (test suites, labels or specific scenarios), the targets, the repeat count from 1 to 5, and the simulator and judge models. The name is the identity: every run under the same name joins one pass rate history on [Results](/agent-testing/results). For the refund agent:
-
-| Run plan | Scope | Target | Repeats | When | Pass bar |
-|---|---|---|---|---|---|
-| **PR smoke** | Label `smoke` | Staging | 1 | Every PR that changes the prompt or tools. | All pass. |
-| **Refunds nightly** | Suite `Refunds` | Staging | 1 | On a cron schedule. | All pass, or a failure you can explain. |
-| **Critical** | Label `critical` | Staging | 5 | Before a release. | Every repetition passes, strong judge. |
-| **Refunds pre-release** | Suite `Refunds` | Staging | 3 | Before a release. | Happy paths and critical scenarios pass every repetition, the rest a majority. |
-| **Production canary** | Label `smoke` | Production | 1 | After each deploy. | All pass. |
-
-LangWatch does not apply a pass threshold for you. `--wait` exits non-zero when any run failed, so your team reads the pass bar on Results.
-
-```bash
-langwatch run-plan run --label smoke --target connected:support-agent@staging \
-  --name "PR smoke" --note "$(git log -1 --pretty=%s | cut -c1-200)" --wait
-
-# Critical: 5 repetitions and a strong judge.
-langwatch run-plan run --label critical --target connected:support-agent@staging \
-  --name "Critical" --repeat 5 --judge-model openai/gpt-5 --wait
-
-# Production canary: the same smoke label against production.
-langwatch run-plan run --label smoke --target connected:support-agent@production \
-  --name "Production canary" --wait
-```
-
-In code, set one `set_id` (`setId` in TypeScript) for the test suite and a `batch_id` (`batchId`) for each CI run, such as `GITHUB_RUN_ID`, as shown in [Write Scenarios in Code](/agent-testing/scenarios-in-code#4-grouping-your-scenarios-into-test-suites-and-batches). For the wait and the exit code, see [Run from CI](/agent-testing/run-from-ci#from-the-cli). For labels, see [Test suites and labels](/agent-testing/test-suites#test-suites-and-labels).
-
-## A complete setup for the refund agent
-
-This puts the pieces together in one place. The names and counts are an example; size your own from the matrix.
-
-| Part | Setup |
-|---|---|
-| **Targets** | `support-agent` in `development`, for a developer debugging. In `staging`, for pre-merge and pre-release runs. In `production`, for a smoke check after each deploy. |
-| **Test suite `Refunds`** | Fields `expected_amount` and `order_id`. Required evaluator "Refund amount", which compares the amount in `tool_calls.issue_refund.input` with `expected_amount`. |
-| **Test suite `Order lookup`** | Field `expected_status`. Required evaluator "Status matches". |
-| **Labels** | `smoke`: fast and core. `critical`: a mistake costs money or trust. `regression`: broke in production before. |
-
-The scenarios are the cells of the [coverage matrix](#how-to-build-the-coverage-matrix), and the run plans are the ones in [the table above](#how-does-a-test-suite-map-to-run-plans), including the production canary. Every plan except the canary adds a PII scanner as a plan evaluator.
-
-In code, the nightly review uses `set_id="refund-review-job"` and a `batch_id` from `GITHUB_RUN_ID`, and your CI schedules it. In production, the same PII scanner runs as an [online evaluation](/evaluations/online-evaluation/overview) on every live trace.
-
-## How to control the cost of a test suite
-
-- Use cheaper models for the user simulator and the judge on routine scenarios, with `--simulator-model` and `--judge-model` on the run. Give the critical scenarios a strong judge, with **Override models** on the scenario or the `model` argument of `scenario.JudgeAgent` in code.
-- Read the cost of the first nightly runs on [Results](/agent-testing/results), then decide how much each run plan may spend.
-- The [Scenario cache](https://langwatch.ai/scenario/basics/cache) (Python only) replays recorded model calls, which saves cost while you build a scenario. In the run plans above, set no `cache_key`, either on the scenario or globally with `scenario.configure(cache_key=...)`, and keep `@scenario.cache()` off the agent under test, because a cached agent replays its old replies and the test suite still passes after the agent regresses.
+The [Scenario cache](https://langwatch.ai/scenario/basics/cache) (Python only) replays recorded model calls, which saves cost while you build a scenario. In the tests your CI runs, set no `cache_key`, either on the scenario or globally with `scenario.configure(cache_key=...)`, and keep `@scenario.cache()` off the agent under test, because a cached agent replays its old replies and the test suite still passes after the agent regresses.
