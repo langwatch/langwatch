@@ -10,8 +10,9 @@ Feature: Trace list page size cap
   # ClickHouse, so an unbounded pageSize is a memory lever any caller can pull
   # (#8479).
   #
-  #   - UI list reads (getAllForProject) are capped at 1000, like tracesV2.list
-  #   - downloads are a deliberate bulk read: bounded at 10 000, their default
+  #   - UI list reads (getAllForProject) refuse above the caller's plan bound
+  #   - downloads are a deliberate bulk read: refused above the plan's download
+  #     bound (10 000 on every plan, also their default)
   #   - the public REST search routes clamp instead of rejecting, so existing
   #     API clients that ask for more keep working
   #   - the filtered annotations page needs more than one page of trace ids, so
@@ -19,16 +20,25 @@ Feature: Trace list page size cap
   #     and only shows ids once the whole walk finished without a failure
 
   @unit
-  Scenario: A trace list read above the page cap is rejected
+  Scenario: A trace list read above the caller's plan bound is refused by name
+    Given the caller's plan bounds a trace list page at 1000
     When a trace list is read with pageSize 1001
-    Then the read is rejected on pageSize
+    Then the read is refused with "trace_page_size_too_large" naming the bound 1000
     And a read with pageSize 1000 is accepted
 
   @unit
-  Scenario: A trace download may read up to the download ceiling
+  Scenario: A paid plan keeps its larger trace list page
+    Given the caller's plan bounds a trace list page at 2000
+    When a trace list is read with pageSize 2000
+    Then it is accepted
+    And a read with pageSize 2001 is refused with "trace_page_size_too_large"
+
+  @unit
+  Scenario: A trace download above the plan's download bound is refused by name
+    Given the caller's plan bounds a trace download page at 10 000
     When a trace download is requested with pageSize 10 000
     Then it is accepted
-    And a download with pageSize 10 001 is rejected
+    And a download with pageSize 10 001 is refused with "trace_page_size_too_large"
 
   @unit
   Scenario: Public trace search clamps an oversized page instead of rejecting it
@@ -48,3 +58,22 @@ Feature: Trace list page size cap
     When the annotations page collects trace ids
     Then no trace ids are used
     And the failure is reported
+
+  @integration
+  Scenario: The filtered annotations list reads the filters analytics lends
+    Given the address carries a trace filter and a period
+    When the annotations page asks the shell for the applied trace filters
+    Then analytics answers the filters with the period's start and end
+    And the answer carries no project id
+
+  @integration
+  Scenario: A free-text query alone leaves the annotations list unfiltered
+    Given the address carries a search query and no trace filter
+    When the annotations page asks the shell for the applied trace filters
+    Then no filters are applied
+
+  @integration
+  Scenario: A composition with no trace filters lender reads as unfiltered
+    Given no module lent the trace filters capability
+    When a screen asks for the applied trace filters
+    Then no filters are applied

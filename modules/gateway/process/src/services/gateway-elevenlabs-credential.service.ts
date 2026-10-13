@@ -1,0 +1,126 @@
+/**
+ * Reads the stored ElevenLabs credential for one provider row. Two callers need it with no session
+ * to authorize with — the HMAC-authenticated webhook route and the background reconciler — so the
+ * row and its decrypted keys come from model-provider's own `getCustomKeys`.
+ */
+
+import { GatewayVoiceKeyMissingError } from "@langwatch/gateway-contract";
+import {
+  isAllowedElevenLabsUrl,
+  type ModelProviderApi,
+  type ModelProviderCustomKeys,
+} from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
+
+import { isMissingProviderKeys } from "../rules/gateway-voice-credential.rules.ts";
+
+const logger = createLogger("langwatch:gateway:elevenlabs-credential");
+
+/** The custom key an operator stores the workspace webhook secret under. */
+export const ELEVENLABS_WEBHOOK_SECRET_KEY = "ELEVENLABS_WEBHOOK_SECRET";
+
+/** The vendor's default host, used when the row names none or names a bad one. */
+export const ELEVENLABS_DEFAULT_BASE_URL = "https://api.elevenlabs.io";
+
+export interface ElevenLabsWebhookSecret {
+  secret: string;
+  organizationId: string;
+}
+
+export interface ElevenLabsApiCredential {
+  apiKey: string;
+  baseUrl: string;
+}
+
+/** The one model-provider operation both voice credential reads stand on. */
+export type ElevenLabsCredentialCollaborators = {
+  modelProviders: Pick<ModelProviderApi, "getCustomKeys">;
+  /** The dev loopback switch (allowLoopbackVoiceProviders); absent is off. */
+  allowLoopbackVoiceProviders?: boolean;
+};
+
+export class GatewayElevenLabsCredentialService {
+  private constructor(private readonly collaborators: ElevenLabsCredentialCollaborators) {}
+
+  static create(
+    collaborators: ElevenLabsCredentialCollaborators,
+  ): GatewayElevenLabsCredentialService {
+    return new GatewayElevenLabsCredentialService(collaborators);
+  }
+
+  /** The decrypted custom keys of an ElevenLabs row, or null for anything else. */
+  private async elevenLabsKeys(modelProviderId: string): Promise<{
+    keys: Record<string, unknown>;
+    organizationId: string;
+  } | null> {
+    let provider: ModelProviderCustomKeys;
+    try {
+      provider = await this.collaborators.modelProviders.getCustomKeys({ modelProviderId });
+    } catch (error) {
+      if (isMissingProviderKeys(error)) return null;
+      throw error;
+    }
+    if (provider.provider !== "elevenlabs") {
+      return null;
+    }
+
+    return { keys: provider.customKeys, organizationId: provider.organizationId };
+  }
+
+  /**
+   * Workspace post-call webhook secret on one provider row. The organization comes back with it,
+   * since the webhook has no other way to know whose session a delivery may close: the tenant is a
+   * path parameter, so the match scopes to the org owning the secret the delivery was signed with.
+   */
+  async findWebhookSecret({
+    modelProviderId,
+  }: {
+    modelProviderId: string;
+  }): Promise<ElevenLabsWebhookSecret | null> {
+    const row = await this.elevenLabsKeys(modelProviderId);
+    if (!row) {
+      return null;
+    }
+
+    const secret = row.keys[ELEVENLABS_WEBHOOK_SECRET_KEY];
+    if (typeof secret !== "string" || secret.length === 0) {
+      return null;
+    }
+
+    return { secret, organizationId: row.organizationId };
+  }
+
+  /**
+   * API key and host to read a conversation back with, or GatewayVoiceKeyMissingError. The host is
+   * re-validated here since a row stored before the registry constrained it could send the key
+   * anywhere; a bad host falls back to the vendor default rather than refusing.
+   */
+  async getApiCredential({
+    modelProviderId,
+  }: {
+    modelProviderId: string;
+  }): Promise<ElevenLabsApiCredential> {
+    const row = await this.elevenLabsKeys(modelProviderId);
+    const apiKey = row?.keys.ELEVENLABS_API_KEY;
+    if (!row || typeof apiKey !== "string" || apiKey.length === 0) {
+      throw new GatewayVoiceKeyMissingError();
+    }
+
+    const configured = row.keys.ELEVENLABS_BASE_URL;
+    if (typeof configured !== "string" || configured.length === 0) {
+      return { apiKey, baseUrl: ELEVENLABS_DEFAULT_BASE_URL };
+    }
+
+    const allowLoopback = this.collaborators.allowLoopbackVoiceProviders ?? false;
+    if (!isAllowedElevenLabsUrl({ url: configured, secure: "https:", allowLoopback })) {
+      logger.warn(
+        { modelProviderId },
+        "an ElevenLabs credential names a base URL outside elevenlabs.io; using the default host instead",
+      );
+
+      return { apiKey, baseUrl: ELEVENLABS_DEFAULT_BASE_URL };
+    }
+
+    return { apiKey, baseUrl: configured.replace(/\/$/, "") };
+  }
+}

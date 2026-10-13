@@ -1,29 +1,35 @@
+import {
+  type LangWatchHandledErrorShape,
+  readCliErrorDocument,
+} from "@langwatch/handled-error/langwatch-handled-error";
+
+/** The CLI error document stdout carried; these cases all expect one. */
+function cliErrorDocument(output: unknown): LangWatchHandledErrorShape {
+  const read = readCliErrorDocument(output);
+  if (read.kind !== "error") throw new Error("stdout held no CLI error document");
+  return read.error;
+}
+
 /**
- * What a FAILING command actually puts on stdout, stderr and the exit code.
- *
- * This drives a real command (`trace search` — the one Langy leans on most) with
- * only the API service faked, because the contract being tested is the command's
- * OUTPUT, and a test of the renderer alone would not catch a command that forgot
- * to call it, printed the document to the wrong stream, or exited 0 on failure.
- *
- * Langy runs this CLI over a shell and parses its stdout. If a failure arrives
- * there as prose, the agent cannot tell a transient failure from a terminal one,
- * so it guesses — and the whole typed-error chain degrades to "Something went
- * wrong". The assertions below are that contract.
+ * Failing command output contract: failure must land on stdout in machine
+ * parseable format (Langy cannot distinguish transient from terminal failures).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+
 import type * as TracesApiModule from "@/client-sdk/services/traces/traces-api.service";
 
-vi.mock(
-  "@/client-sdk/services/traces/traces-api.service",
-  async (importOriginal) => {
-    const actual = await importOriginal<typeof TracesApiModule>();
-    return { ...actual, TracesApiService: vi.fn() };
-  },
-);
+vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal) => {
+  const actual = await importOriginal<typeof TracesApiModule>();
+  return { ...actual, TracesApiService: vi.fn() };
+});
 
-vi.mock("../../utils/apiKey", () => ({ resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })) }));
+vi.mock("../../utils/apiKey", () => ({
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
+}));
 
 const spinnerFail = vi.fn();
 vi.mock("ora", () => ({
@@ -38,8 +44,9 @@ vi.mock("ora", () => ({
 
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { LangWatchHandledError } from "@/internal/api/errors";
-import { searchTracesCommand } from "../traces/search";
+
 import { setOutputFormat } from "../../utils/errorOutput";
+import { searchTracesCommand } from "../traces/search";
 
 class ProcessExitError extends Error {
   constructor(public readonly code: number) {
@@ -56,6 +63,7 @@ const notFound = () =>
       httpStatus: 404,
       meta: { id: "trace-abc" },
       isHandled: true,
+      retryable: false,
       traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
     },
     body: { error: "trace_not_found", message: "Trace not found: trace-abc" },
@@ -99,14 +107,14 @@ describe("given a command fails with a domain error", () => {
     it("prints a structured document on stdout", async () => {
       await run({ format: "json" });
 
-      const parsed = readCliErrorDocument(stdout.join("\n"));
+      const parsed = cliErrorDocument(stdout.join("\n"));
       expect(parsed).not.toBeNull();
     });
 
     it("gives the machine the kind, the meta and the trace id", async () => {
       await run({ format: "json" });
 
-      expect(readCliErrorDocument(stdout.join("\n"))).toMatchObject({
+      expect(cliErrorDocument(stdout.join("\n"))).toMatchObject({
         kind: "trace_not_found",
         httpStatus: 404,
         meta: { id: "trace-abc" },

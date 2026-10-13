@@ -2,6 +2,9 @@ package app
 
 import (
 	"context"
+	"errors"
+	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +16,7 @@ import (
 func restartStack() domain.Stack {
 	return domain.Stack{
 		Slug: "feat-x", WorktreeDir: "/wt/feat-x", LauncherPID: 42,
-		APIPort: 9100, WorkerMetricsPort: 9200, HasStandaloneWorkers: true,
+		APIPort: 9100, WorkerMetricsPort: 9200,
 		Services: []domain.Service{
 			{Name: "app", Port: 9000},
 			{Name: "gateway", Port: 9001},
@@ -21,15 +24,6 @@ func restartStack() domain.Stack {
 			{Name: "clickhouse", Port: 8123},            // shared DB server — never a restart target
 		},
 	}
-}
-
-// inProcessWorkersStack is restartStack in the default in-process worker mode:
-// WorkerMetricsPort is set (the API child binds it) but HasStandaloneWorkers is
-// false, so there is no separate workers lane to bounce.
-func inProcessWorkersStack() domain.Stack {
-	st := restartStack()
-	st.HasStandaloneWorkers = false
-	return st
 }
 
 func restartOrch(store *fakeStore, sys *fakeSystem) *Orchestrator {
@@ -41,6 +35,8 @@ func restartOrch(store *fakeStore, sys *fakeSystem) *Orchestrator {
 
 // @scenario "Restarting one service bounces only that service"
 // @scenario "Restarting with no service named bounces every supervised child"
+// @scenario "Bouncing the backend lane touches only its own process group"
+// @scenario "The Go data-plane services are restarted as one lane"
 func TestRestart(t *testing.T) {
 	ctx := context.Background()
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
@@ -60,23 +56,26 @@ func TestRestart(t *testing.T) {
 	}
 
 	t.Run("given a live stack", func(t *testing.T) {
+		// gateway and nlp share one process, so they are offered as the one `go`
+		// lane rather than two names that would each take the other down without
+		// saying so.
 		t.Run("when restarting one service, it kills only that service's group", func(t *testing.T) {
 			_, sys, o := newFixture()
-			if err := o.Restart(ctx, params, "gateway", false); err != nil {
+			if err := o.Restart(ctx, params, GoLane, false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 101 {
-				t.Errorf("only gateway's group should be terminated, got %v", sys.groupTerminated)
+				t.Errorf("only the go lane's group should be terminated, got %v", sys.groupTerminated)
 			}
 		})
 
-		t.Run("when restarting the api, it resolves the API backend port", func(t *testing.T) {
+		t.Run("when restarting the backend, it resolves the API port", func(t *testing.T) {
 			_, sys, o := newFixture()
-			if err := o.Restart(ctx, params, "api", false); err != nil {
+			if err := o.Restart(ctx, params, APILane, false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 102 {
-				t.Errorf("api backend group should be terminated, got %v", sys.groupTerminated)
+				t.Errorf("backend group should be terminated, got %v", sys.groupTerminated)
 			}
 		})
 
@@ -85,8 +84,10 @@ func TestRestart(t *testing.T) {
 			if err := o.Restart(ctx, params, "", false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
-			// app, gateway, api, workers — NOT the fallback nlp, NOT clickhouse.
-			want := map[int]bool{100: true, 101: true, 102: true, 103: true}
+			// ui, go, backend — NOT the fallback nlp, NOT clickhouse. The
+			// worker's metrics port is inside the backend process, so it is not
+			// a target of its own.
+			want := map[int]bool{100: true, 101: true, 102: true}
 			if len(sys.groupTerminated) != len(want) {
 				t.Fatalf("expected %d groups terminated, got %v", len(want), sys.groupTerminated)
 			}
@@ -98,7 +99,7 @@ func TestRestart(t *testing.T) {
 		})
 
 		t.Run("when naming an unknown or shared service, it refuses with the restartable list", func(t *testing.T) {
-			for _, name := range []string{"clickhouse", "nlp", "bogus"} {
+			for _, name := range []string{"clickhouse", "nlp", "backend", "workers", "bogus"} {
 				_, sys, o := newFixture()
 				if err := o.Restart(ctx, params, name, false); err == nil {
 					t.Errorf("Restart(%q) should refuse", name)
@@ -112,8 +113,9 @@ func TestRestart(t *testing.T) {
 		t.Run("when the launcher itself owns the port, it is never signalled", func(t *testing.T) {
 			store, sys, _ := newFixture()
 			sys.pidsByPort[9000] = []int{42}
+			store.stacks[0].Refresh = domain.RefreshHMR
 			o := restartOrch(store, sys)
-			if err := o.Restart(ctx, params, "app", false); err != nil {
+			if err := o.Restart(ctx, params, "ui", false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			if len(sys.groupTerminated) != 0 {
@@ -121,37 +123,32 @@ func TestRestart(t *testing.T) {
 			}
 		})
 
-		t.Run("when workers run in-process, `workers` is not a restart target", func(t *testing.T) {
-			// Default haven mode: the API child hosts the workers and holds
-			// WorkerMetricsPort itself, so `restart workers` must refuse rather than
-			// terminate the API's group; `restart` (all) must not touch it either.
-			store := &fakeStore{
-				stacks:    []domain.Stack{inProcessWorkersStack()},
-				slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+		// The API and the worker share the backend process locally, so `backend`
+		// is the one name that bounces both, and it can never reach the ui lane's
+		// group or the go lane's.
+		t.Run("when `backend` is named, only the backend's own group is bounced", func(t *testing.T) {
+			store, sys, o := newFixture()
+			if err := o.Restart(ctx, params, APILane, false); err != nil {
+				t.Fatalf("Restart(backend): %v", err)
 			}
-			sys := &fakeSystem{
-				alive:      map[int]bool{42: true},
-				pidsByPort: map[int][]int{9000: {100}, 9001: {101}, 9100: {102}, 9200: {102}},
+			_ = store
+			if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 102 {
+				t.Errorf("expected only the backend group (pid 102) bounced, got %v", sys.groupTerminated)
 			}
-			o := restartOrch(store, sys)
+		})
 
-			if err := o.Restart(ctx, params, "workers", false); err == nil {
-				t.Error("restart workers should refuse in in-process mode")
-			}
-			if len(sys.groupTerminated) != 0 {
-				t.Errorf("restart workers must terminate nothing in in-process mode, got %v", sys.groupTerminated)
-			}
-
+		t.Run("when nothing is named, both Node lanes and the go lane are bounced", func(t *testing.T) {
+			_, sys, o := newFixture()
 			if err := o.Restart(ctx, params, "", false); err != nil {
 				t.Fatalf("Restart(all): %v", err)
 			}
-			// app, gateway, api — NOT workers (its port belongs to the API child).
+			// ui (9000), go (9001), backend (9100).
+			want := map[int]bool{100: true, 101: true, 102: true}
 			for _, pid := range sys.groupTerminated {
-				if pid == 103 {
-					t.Errorf("workers group must not be bounced in in-process mode")
+				if !want[pid] {
+					t.Errorf("unexpected group %d bounced, got %v", pid, sys.groupTerminated)
 				}
 			}
-			want := map[int]bool{100: true, 101: true, 102: true}
 			if len(sys.groupTerminated) != len(want) {
 				t.Fatalf("expected %d groups terminated, got %v", len(want), sys.groupTerminated)
 			}
@@ -163,7 +160,7 @@ func TestRestart(t *testing.T) {
 			store, sys, _ := newFixture()
 			sys.alive = map[int]bool{}
 			o := restartOrch(store, sys)
-			if err := o.Restart(ctx, params, "app", false); err == nil {
+			if err := o.Restart(ctx, params, "ui", false); err == nil {
 				t.Error("Restart should refuse when the launcher is dead")
 			}
 		})
@@ -190,9 +187,9 @@ func TestUpReconcilesRunningStack(t *testing.T) {
 			// Spelled out rather than derived through SelectionFromStack: deriving
 			// the expectation with the same function reconcile compares with makes
 			// the assertion f(x) == f(x), which holds for any implementation.
-			// restartStack runs app + a standalone worker lane + a real gateway;
-			// its nlp is a baseline fallback, so it is not part of the selection.
-			opts := PlanOptions{Selection: domain.Selection{Workers: true, Gateway: true}}
+			// restartStack runs the three Node lanes + a real gateway; its nlp is a
+			// baseline fallback, so it is not part of the selection.
+			opts := PlanOptions{Selection: domain.Selection{Gateway: true}}
 			proceed, err := o.reconcileRunningStack(params, opts)
 			if err != nil {
 				t.Fatalf("reconcile: %v", err)
@@ -300,7 +297,7 @@ func TestUpReconcilesRunningStack(t *testing.T) {
 	})
 }
 
-// @scenario "Down keeps the databases, always"
+// @scenario "Down keeps the databases unless it is told to destroy"
 func TestDownKeepsDatabases(t *testing.T) {
 	ctx := context.Background()
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
@@ -332,7 +329,7 @@ func TestDownKeepsDatabases(t *testing.T) {
 	})
 }
 
-// @scenario "Down -f kills hard"
+// @scenario "Down --force kills hard"
 func TestDownForceKillsHard(t *testing.T) {
 	ctx := context.Background()
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
@@ -472,5 +469,56 @@ func TestSelectionIsPerWorktree(t *testing.T) {
 				}
 			})
 		})
+	})
+}
+
+// @scenario "Restarting one service bounces only that service"
+func TestRestartUIOnABuiltStackRebuildsTheBundleWithoutBouncingTheBackend(t *testing.T) {
+	newFixture := func(mode domain.RefreshMode) (*fakeSystem, *Orchestrator, *[]string) {
+		st := restartStack()
+		st.Refresh = mode
+		store := &fakeStore{stacks: []domain.Stack{st}}
+		sys := &fakeSystem{alive: map[int]bool{42: true}, pidsByPort: map[int][]int{9000: {100}}}
+		o := restartOrch(store, sys)
+		var built []string
+		o.uiBuild = func(_ context.Context, dir string, _ io.Writer) error {
+			built = append(built, dir)
+			return nil
+		}
+		return sys, o, &built
+	}
+
+	for _, mode := range []domain.RefreshMode{domain.RefreshStill, domain.RefreshWatch} {
+		t.Run("a "+mode.Name()+" stack rebuilds the bundle and kills nothing", func(t *testing.T) {
+			sys, o, built := newFixture(mode)
+			msg, err := o.RestartStackQuiet("feat-x", "ui")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(msg, "the backend was not restarted") || len(*built) != 1 {
+				t.Fatalf("want one build and the swap message, got %q after %v", msg, *built)
+			}
+			if len(sys.groupTerminated) != 0 {
+				t.Fatalf("the backend must not be bounced, terminated %v", sys.groupTerminated)
+			}
+		})
+	}
+
+	t.Run("an hmr stack still bounces the ui lane", func(t *testing.T) {
+		sys, o, built := newFixture(domain.RefreshHMR)
+		if _, err := o.RestartStackQuiet("feat-x", "ui"); err != nil {
+			t.Fatal(err)
+		}
+		if len(*built) != 0 || len(sys.groupTerminated) == 0 {
+			t.Fatalf("want a bounce and no build, got build %v terminated %v", *built, sys.terminated)
+		}
+	})
+
+	t.Run("a failed build is an error", func(t *testing.T) {
+		_, o, _ := newFixture(domain.RefreshStill)
+		o.uiBuild = func(context.Context, string, io.Writer) error { return errors.New("vite failed") }
+		if _, err := o.RestartStackQuiet("feat-x", "ui"); err == nil {
+			t.Fatal("want the build error")
+		}
 	})
 }

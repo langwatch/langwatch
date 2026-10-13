@@ -1,21 +1,7 @@
 /**
- * The contracts the Claude Code plugin's launcher shares with this CLI.
- *
- * `plugins/langwatch/scripts/launch.mjs` runs the CLI for every plugin hook.
- * It shares no code with the CLI, on purpose: importing anything from here
- * would bring a bundle and a build step back into the plugin. What it shares
- * instead are two contracts, each written as one constant at the top of the
- * launcher: where the CLI keeps its config and which field records the CLI's
- * own location, and which CLI command each hook event runs. This suite reads
- * those constants out of the launcher file and asserts them against the SDK's
- * own, so drift fails a test rather than a session.
- *
- * The second half is the cross-version contract the launcher rests on: the
- * two hook commands accept and ignore options and arguments they do not know
- * and exit zero, so a plugin hooks.json from any version runs with a CLI from
- * any version.
- *
- * Spec: specs/ai-governance/agent-plugin/plugin-package.feature
+ * `launch.mjs` shares no code with this CLI (would need a bundle/build step
+ * in the plugin) — only two contracts, asserted here against the SDK's own so
+ * drift fails a test. Hook commands also ignore unknown options and exit 0.
  */
 
 import * as fs from "node:fs";
@@ -25,11 +11,11 @@ import * as vm from "node:vm";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { configPath, loadConfig } from "../utils/governance/config";
 import { recordCliLocation } from "../utils/governance/cli-location";
+import { configPath, loadConfig } from "../utils/governance/config";
 import { defaultStateDir } from "../utils/governance/hook-state";
-import { SESSION_CONTEXT_GUIDANCE } from "../utils/governance/session-guidance";
 import { installSessionContextHooks } from "../utils/governance/session-context-hooks";
+import { SESSION_CONTEXT_GUIDANCE } from "../utils/governance/session-guidance";
 
 const { hookCommandMock } = vi.hoisted(() => ({ hookCommandMock: vi.fn() }));
 
@@ -41,10 +27,7 @@ vi.mock("../commands/ingestion/hook.js", () => ({
 // no test runner defines (see help-topic.unit.test.ts).
 (globalThis as Record<string, unknown>).__CLI_VERSION__ ??= "0.0.0-test";
 
-const launcherPath = path.resolve(
-  __dirname,
-  "../../../../../plugins/langwatch/scripts/launch.mjs",
-);
+const launcherPath = path.resolve(__dirname, "../../../../../plugins/langwatch/scripts/launch.mjs");
 
 interface LauncherConfigContract {
   envVar: string;
@@ -91,9 +74,7 @@ describe("the launcher's config contract", () => {
     it("names the same file under the home directory, and the same state directory beside it", () => {
       delete process.env.LANGWATCH_CLI_CONFIG;
       expect(configPath()).toBe(path.join(os.homedir(), ...contract.path));
-      expect(defaultStateDir()).toBe(
-        path.join(path.dirname(configPath()), ...contract.stateDir),
-      );
+      expect(defaultStateDir()).toBe(path.join(path.dirname(configPath()), ...contract.stateDir));
     });
   });
 
@@ -104,10 +85,7 @@ describe("the launcher's config contract", () => {
 
       expect(recordCliLocation({ location })).toBe(true);
 
-      const raw = JSON.parse(fs.readFileSync(configPath(), "utf8")) as Record<
-        string,
-        unknown
-      >;
+      const raw = JSON.parse(fs.readFileSync(configPath(), "utf8")) as Record<string, unknown>;
       expect(raw[contract.locationField]).toEqual(location);
       expect(loadConfig().cli_location).toEqual(location);
     });
@@ -122,20 +100,17 @@ describe("the launcher's command contract", () => {
       const hooksFile = path.join(tmpDir, "settings.json");
       installSessionContextHooks({ tool: "claude_code", filePath: hooksFile });
       const settings = JSON.parse(fs.readFileSync(hooksFile, "utf8")) as {
-        hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>;
+        hooks: Record<string, { hooks: { command: string }[] }[]>;
       };
       const rawCommands = settings.hooks.SessionStart!.flatMap((group) =>
         group.hooks.map((hook) => hook.command),
       );
 
-      expect(Object.keys(commands).sort()).toEqual([
-        "session-context",
-        "session-guidance",
-      ]);
-      expect(rawCommands.sort()).toEqual(
+      expect(Object.keys(commands).toSorted()).toEqual(["session-context", "session-guidance"]);
+      expect(rawCommands.toSorted()).toEqual(
         Object.values(commands)
           .map((argv) => `langwatch ${argv.join(" ")}`)
-          .sort(),
+          .toSorted(),
       );
     });
   });
@@ -168,12 +143,7 @@ describe("the cross-version contract of the hook commands", () => {
   describe("given a plugin from a later version passing arguments this CLI does not know", () => {
     /** @scenario "The session context hook command accepts and ignores arguments it does not know" */
     it("runs the session context hook for the named agent and says nothing", async () => {
-      await parse([
-        ...commands["session-context"]!,
-        "--from-the-future",
-        "extra",
-        "--and=more",
-      ]);
+      await parse([...commands["session-context"]!, "--from-the-future", "extra", "--and=more"]);
 
       expect(hookCommandMock).toHaveBeenCalledTimes(1);
       expect(hookCommandMock).toHaveBeenCalledWith({ tool: "claude-code" });
@@ -183,11 +153,7 @@ describe("the cross-version contract of the hook commands", () => {
 
     /** @scenario "The guidance command accepts and ignores arguments it does not know" */
     it("prints the guidance JSON and exits zero", async () => {
-      await parse([
-        ...commands["session-guidance"]!,
-        "--from-the-future",
-        "extra",
-      ]);
+      await parse([...commands["session-guidance"]!, "--from-the-future", "extra"]);
 
       expect(exited).toEqual([]);
       expect(stdout).toHaveLength(1);

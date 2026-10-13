@@ -86,11 +86,11 @@ Feature: Role bindings REST API
     And no binding is created
 
   @integration
-  Scenario: A duplicate binding is reported as already existing
+  Scenario: An identical binding is written again
     Given a member is already bound as a member of a team
     When I create the same binding again
-    Then the request is refused with code role_binding_already_exists and status 409
-    And the member still has exactly one binding on that team
+    Then the request succeeds with a new binding id, because bindings are never unique
+    And the member holds two bindings on that team
 
   @integration
   Scenario: A binding into a personal workspace is refused

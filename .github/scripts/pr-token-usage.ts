@@ -1,18 +1,8 @@
 // Builds and upserts the sticky "coding agent usage" comment on a pull
-// request, from the LangWatch pull-request usage API
-// (GET /api/v1/coding-agent/pull-request-usage): sessions, tokens and estimated
-// cost per contributor and agent, plus a per-model breakdown, over the pull
-// request's whole lifetime.
-//
-// Deliberately non-blocking, like pr-impact-map: this script only describes
-// what the work cost, it never judges it. A LangWatch outage logs a warning
-// and exits 0, so the job can sit on every pull request without ever
-// painting a red X for a reporting failure.
-//
-// Deliberately dependency-free and run with `node --experimental-strip-types`,
-// matching guard-path-filters.ts: there is no install step on the runner.
-//
-// Spec: specs/ci/pr-token-usage.feature
+// request, from the LangWatch pull-request usage API: sessions, tokens, cost
+// and a per-model breakdown, over the pull request's whole lifetime.
+// Deliberately non-blocking, like pr-impact-map: a LangWatch outage logs a
+// warning and exits 0. Spec: specs/ci/pr-token-usage.feature
 
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -133,7 +123,9 @@ export const agentCell = (agent: string): string => {
 
 /** null cost means the caller may not price this row — an em dash, not $0. */
 export const formatCost = (cost: number | null): string =>
-  cost === null ? "—" : `$${cost.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  cost === null
+    ? "—"
+    : `$${cost.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const usageTable = (rows: UsageRow[], totals: UsageTotals): string[] => {
   const line = (cells: string[]) => `| ${cells.join(" | ")} |`;
@@ -164,10 +156,7 @@ const usageTable = (rows: UsageRow[], totals: UsageTotals): string[] => {
   return out;
 };
 
-const tokenDetailTable = (
-  rows: UsageRow[],
-  totals: UsageTotals,
-): string[] => {
+const tokenDetailTable = (rows: UsageRow[], totals: UsageTotals): string[] => {
   const line = (cells: string[]) => `| ${cells.join(" | ")} |`;
   const out = [
     line(["Contributor", "Input", "Output", "Cache read", "Cache write"]),
@@ -199,7 +188,15 @@ const tokenDetailTable = (
 const modelTable = (breakdown: ModelBreakdownRow[]): string[] => {
   const line = (cells: string[]) => `| ${cells.join(" | ")} |`;
   const out = [
-    line(["Model", "Input", "Output", "Cache read", "Cache write", "Total tokens", "Estimated cost"]),
+    line([
+      "Model",
+      "Input",
+      "Output",
+      "Cache read",
+      "Cache write",
+      "Total tokens",
+      "Estimated cost",
+    ]),
     line(["---", "--:", "--:", "--:", "--:", "--:", "--:"]),
   ];
   for (const row of breakdown) {
@@ -279,10 +276,7 @@ export const buildCommentBody = ({
       // never stored (an outage, a client too old to send them) still counts
       // in the totals, so the model rows can legitimately cover less. Say so
       // rather than leave two tables that appear to contradict each other.
-      const modelSum = usage.modelBreakdown.reduce(
-        (sum, row) => sum + row.totalTokens,
-        0,
-      );
+      const modelSum = usage.modelBreakdown.reduce((sum, row) => sum + row.totalTokens, 0);
       if (modelSum < usage.totals.totalTokens * 0.95) {
         details.push(
           "",
@@ -297,9 +291,7 @@ export const buildCommentBody = ({
     parts.push(...details);
   }
 
-  const stamp = final
-    ? `Final, at the merge of \`${shortSha}\``
-    : `Updated for \`${shortSha}\``;
+  const stamp = final ? `Final, at the merge of \`${shortSha}\`` : `Updated for \`${shortSha}\``;
   parts.push(
     "",
     "<sub>Tokens as reported by the agents to " +
@@ -435,8 +427,7 @@ const findExistingComment = async ({
   repository: string;
   prNumber: number;
 }): Promise<GithubComment | null> => {
-  let url: string | null =
-    `${apiUrl}/repos/${repository}/issues/${prNumber}/comments?per_page=100`;
+  let url: string | null = `${apiUrl}/repos/${repository}/issues/${prNumber}/comments?per_page=100`;
   while (url) {
     const response: Response = await fetch(url, {
       headers: githubHeaders(token),
@@ -446,9 +437,7 @@ const findExistingComment = async ({
     }
     const comments = (await response.json()) as GithubComment[];
     const existing = comments.find(
-      (comment) =>
-        comment.user?.login === "github-actions[bot]" &&
-        comment.body?.includes(MARKER),
+      (comment) => comment.user?.login === "github-actions[bot]" && comment.body?.includes(MARKER),
     );
     if (existing) return existing;
     url = nextPageUrl(response.headers.get("link"));
@@ -467,16 +456,13 @@ const fetchPullRequest = async ({
   repository: string;
   prNumber: number;
 }): Promise<Parameters<typeof readPullRequestHead>[0]["pullRequest"]> => {
-  const response = await fetch(
-    `${apiUrl}/repos/${repository}/pulls/${prNumber}`,
-    { headers: githubHeaders(token) },
-  );
+  const response = await fetch(`${apiUrl}/repos/${repository}/pulls/${prNumber}`, {
+    headers: githubHeaders(token),
+  });
   if (!response.ok) {
     throw new Error(`Reading the pull request failed with ${response.status}`);
   }
-  return (await response.json()) as Parameters<
-    typeof readPullRequestHead
-  >[0]["pullRequest"];
+  return (await response.json()) as Parameters<typeof readPullRequestHead>[0]["pullRequest"];
 };
 
 const upsertComment = async ({
@@ -577,9 +563,7 @@ export const reportUsage = async ({
   // exactly like a pull request nobody used an agent on, and the difference
   // is the whole point: the empty comment says what to check.
   await upsertComment({ apiUrl, token, repository, prNumber, body, existing });
-  console.log(
-    `${existing ? "Updated" : "Created"} usage comment on ${repository}#${prNumber}.`,
-  );
+  console.log(`${existing ? "Updated" : "Created"} usage comment on ${repository}#${prNumber}.`);
 };
 
 const run = async (): Promise<void> => {
@@ -633,8 +617,7 @@ const emptyTotals = (): UsageTotals => ({
 });
 
 const isMain =
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isMain) {
   run().catch((error) => {

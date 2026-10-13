@@ -11,7 +11,7 @@ T = TypeVar("T", bound="PostApiDatasetEvaluateBodyDataType0")
 
 @_attrs_define
 class PostApiDatasetEvaluateBodyDataType0:
-    """Extra fields merged into every row before evaluating"""
+    """ """
 
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
