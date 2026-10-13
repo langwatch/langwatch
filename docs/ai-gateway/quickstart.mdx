@@ -22,13 +22,19 @@ You need:
 6. Click **Create**.
 
 <Frame caption="The New virtual key drawer: name, ownership on the project, a $50 monthly budget with the inherited organization budget below it, and provider access.">
-  <img src="/images/ai-gateway/vk-create-drawer.png" alt="The New virtual key drawer filled in for acme-support-agent with Project ownership, a 50 dollar monthly budget and all providers selected" />
+  <img
+    src="/images/ai-gateway/vk-create-drawer.png"
+    alt="The New virtual key drawer filled in for acme-support-agent with Project ownership, a 50 dollar monthly budget and all providers selected"
+  />
 </Frame>
 
 The secret is shown once. Copy it and store it in your secret manager. LangWatch stores a hash, and the list shows only the prefix, for example `vk-lw-01HZX9N`.
 
 <Frame caption="The secret dialog, shown once, with a copy button and a usage example for the OpenAI SDK.">
-  <img src="/images/ai-gateway/vk-secret-once.png" alt="The Save your virtual key secret dialog with the masked secret and a Python usage example" />
+  <img
+    src="/images/ai-gateway/vk-secret-once.png"
+    alt="The Save your virtual key secret dialog with the masked secret and a Python usage example"
+  />
 </Frame>
 
 ## 2. Send a request
@@ -81,11 +87,11 @@ console.log(response.choices[0].message.content);
 
 The response is a normal OpenAI chat completion. The gateway adds these response headers:
 
-| Header | Value |
-|---|---|
-| `X-LangWatch-Gateway-Request-Id` | The id of this request. Search it in Trace Explorer or quote it to support. |
-| `Traceparent` | The W3C trace context of the span the gateway recorded in your project. Send your own `traceparent` header on the request to nest that span in your trace. |
-| `X-LangWatch-Budget-Warning` | Present when a budget on this key is at 80 percent or more, as `scope:percent`. |
+| Header                           | Value                                                                                                                                                      |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `X-LangWatch-Gateway-Request-Id` | The id of this request. Search it in Trace Explorer or quote it to support.                                                                                |
+| `Traceparent`                    | The W3C trace context of the span the gateway recorded in your project. Send your own `traceparent` header on the request to nest that span in your trace. |
+| `X-LangWatch-Budget-Warning`     | Present when a budget on this key is at 80 percent or more, as `scope:percent`.                                                                            |
 
 For the Anthropic SDK, set `base_url="https://gateway.langwatch.ai"` and the virtual key as `api_key`. The SDK sends the key in the `X-Api-Key` header, which the gateway accepts. See [Python SDK](/ai-gateway/sdks/python) and [TypeScript SDK](/ai-gateway/sdks/typescript).
 
@@ -93,15 +99,18 @@ For the Anthropic SDK, set `base_url="https://gateway.langwatch.ai"` and the vir
 
 Open **Trace Explorer** in the project you selected under Ownership. The request appears as a `gen_ai.chat` span with the model, the tokens, the cost and these attributes:
 
-| Attribute | Meaning |
-|---|---|
-| `langwatch.virtual_key_id` | The key that served the request. |
-| `langwatch.gateway_request_id` | The same id as the `X-LangWatch-Gateway-Request-Id` header. |
-| `langwatch.model_provider_id` | The provider credential that served the request. |
-| `langwatch.end_user_id` | The end user of your product, when the request carried one. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries). |
+| Attribute                      | Meaning                                                                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `langwatch.virtual_key_id`     | The key that served the request.                                                                                                                             |
+| `langwatch.gateway_request_id` | The same id as the `X-LangWatch-Gateway-Request-Id` header.                                                                                                  |
+| `langwatch.model_provider_id`  | The provider credential that served the request.                                                                                                             |
+| `langwatch.end_user_id`        | The end user of your product, when the request carried one. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries). |
 
 <Frame caption="One gateway request in Trace Explorer: duration, cost, tokens and model in the header, the gateway attributes under Metadata.">
-  <img src="/images/ai-gateway/trace-gateway-request.png" alt="Trace Explorer with a gen_ai.chat span open, showing cost, tokens, the model and the langwatch.virtual_key_id, gateway_request_id and model_provider_id attributes" />
+  <img
+    src="/images/ai-gateway/trace-gateway-request.png"
+    alt="Trace Explorer with a gen_ai.chat span open, showing cost, tokens, the model and the langwatch.virtual_key_id, gateway_request_id and model_provider_id attributes"
+  />
 </Frame>
 
 ## 4. See the spend
@@ -109,9 +118,13 @@ Open **Trace Explorer** in the project you selected under Ownership. The request
 Open **AI Gateway > Usage** for total spend, requests, cost per request, top virtual keys and top models over the selected period. The **Virtual Keys** list shows a **Spent this month** column per key, and clicking it opens Usage filtered to that key.
 
 <Frame caption="AI Gateway > Usage over the last 30 days: the four tiles, the top virtual keys and the top models.">
-  <img src="/images/ai-gateway/usage-page.png" alt="The Usage page with total spend, requests, average cost per request, blocked by guardrail, and the top keys and models tables" />
+  <img
+    src="/images/ai-gateway/usage-page.png"
+    alt="The Usage page with total spend, requests, average cost per request, blocked by guardrail, and the top keys and models tables"
+  />
 </Frame>
 
 <Note>
-**Also check:** [Budgets](/ai-gateway/budgets) to cap the key, the team or the project, and [Virtual keys](/ai-gateway/virtual-keys) for scopes, expiry, rotation and the CLI.
+  **Also check:** [Budgets](/ai-gateway/budgets) to cap the key, the team or the project, and
+  [Virtual keys](/ai-gateway/virtual-keys) for scopes, expiry, rotation and the CLI.
 </Note>

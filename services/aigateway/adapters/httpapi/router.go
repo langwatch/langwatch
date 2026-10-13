@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -30,6 +31,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/voicesession"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -39,8 +41,8 @@ type RouterDeps struct {
 	App    *app.App
 	Logger *zap.Logger
 	Health *health.Registry
-	// Metrics serves /metrics and backs the request middleware. Optional;
-	// when nil no metrics are recorded and /metrics is not mounted.
+	// Metrics backs the request middleware. Optional; when nil no metrics
+	// are recorded.
 	Metrics               *gatewaymetrics.Recorder
 	Version               string
 	TraceRegistry         *customertracebridge.Registry
@@ -75,6 +77,9 @@ type RouterDeps struct {
 	// answer 503: a gateway that cannot observe its control plane must not
 	// report itself healthy to a public status page.
 	Status StatusReporter
+	// CORSAllowedOrigins are the browser origins allowed to call /v1, from
+	// ParseCORSAllowedOrigins. Empty sends no CORS headers at all.
+	CORSAllowedOrigins []string
 	// ControlPlaneBaseURL is the resolved control-plane target this
 	// gateway process ships spend, budget and auth traffic to. Surfaced
 	// read-only on GET /debug/control-plane so dev tooling can tell a
@@ -87,6 +92,9 @@ type RouterDeps struct {
 	// when nil the webhook route is not mounted and a customer bills voice
 	// through the reconciler alone.
 	WebhookRelay WebhookRelay
+	// VoiceRelay relays vendor voice sockets for clients on the WebSocket
+	// transport. Optional; when nil the socket routes are not mounted.
+	VoiceRelay *voicesession.Manager
 }
 
 // WebhookRelay hands one vendor delivery to the control plane byte for byte.
@@ -140,21 +148,21 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Get("/health", statusRoute)
 	r.Head("/health", statusRoute)
 
-	// Unauthenticated like the probes: the cluster's scraper has no
-	// virtual key, and the endpoint is kept off the public ingress by the
-	// chart rather than by a credential.
-	if deps.Metrics != nil {
-		r.Handle("/metrics", deps.Metrics.Handler())
-	}
+	// /metrics is not served here: the scrape has its own listener (ADR-175).
 
 	// Unauthenticated and kept off the public ingress the same way as the
-	// probes and /metrics above (charts/gateway/templates/ingress.yaml
+	// probes above (charts/gateway/templates/ingress.yaml
 	// allowlists only /v1 and the exact /health path). Reveals nothing but
 	// a URL: dev tooling polls it to verify an already-running gateway
 	// before trusting it on a reused port.
 	r.Get("/debug/control-plane", debugControlPlaneHandler(deps.ControlPlaneBaseURL))
 
 	r.Route("/v1", func(v1 chi.Router) {
+		// Opt-in, and first so a preflight never reaches auth and a refusal
+		// (401, 402, 429) still carries the headers a page needs to read it.
+		if len(deps.CORSAllowedOrigins) > 0 {
+			v1.Use(CORSMiddleware(deps.CORSAllowedOrigins))
+		}
 		// The ElevenLabs post-call webhook, and the one route under /v1 that
 		// carries no virtual key. The caller is ElevenLabs, which has no key
 		// and never will; the delivery authenticates itself with the HMAC the
@@ -191,16 +199,28 @@ func NewRouter(deps RouterDeps) http.Handler {
 			// credential opens goes client to vendor and never comes here.
 			v1.Post("/realtime/client_secrets", openAIRealtimeSessionHandler(deps))
 			v1.Get("/convai/conversation/get-signed-url", elevenLabsSignedURLHandler(deps))
+			v1.Post("/single-use-token/{token_type}", elevenLabsSingleUseTokenHandler(deps))
+			// Brokered voice calls: the gateway makes the WebRTC call setup
+			// and meters the call from its own server-side socket.
+			v1.Post("/live/sessions", openAILiveSessionHandler(deps))
+			v1.Post("/realtime/calls", openAIRealtimeCallHandler(deps))
+			if deps.VoiceRelay != nil {
+				mountVoiceRelayRoutes(v1, deps)
+			}
 			// ElevenLabs' own audio paths, mirrored for the same reason the
 			// mint above is: an ElevenLabs SDK reaches them by base URL alone,
 			// so a customer already using that SDK gets metering, budgets and
 			// traces without rewriting their calls into the OpenAI shape the
 			// /v1/audio routes take.
-			v1.Post("/text-to-speech/{voice_id}", elevenLabsSpeechHandler(deps))
+			v1.Post("/text-to-speech/{voice_id}", elevenLabsSpeechHandler(deps, domain.ElevenLabsSpeechPlain))
+			v1.Post("/text-to-speech/{voice_id}/stream", elevenLabsSpeechHandler(deps, domain.ElevenLabsSpeechStream))
+			v1.Post("/text-to-speech/{voice_id}/stream/with-timestamps",
+				elevenLabsSpeechHandler(deps, domain.ElevenLabsSpeechStreamWithTimestamps))
 			v1.Post("/speech-to-text", elevenLabsTranscriptionHandler(deps))
 			// The OpenAI socket reports its usage to the client, not to us, so
 			// the client posts it back to close the session's spend record.
 			v1.Post("/realtime/sessions/{session_id}/usage", realtimeUsageHandler(deps))
+			v1.Post("/realtime/sessions/{session_id}/close", realtimeCloseHandler(deps))
 			// Hosted services (ADR-139). Open to a license token and to a
 			// virtual key alike; what each may do is decided by the control
 			// plane, which knows whether the key belongs to a license.
@@ -229,7 +249,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// secret (`LW_GATEWAY_INTERNAL_SECRET`). Currently used by the
 	// LangWatch governance ingestion pipeline to validate and execute
 	// OTTL statements over inbound OTLP payloads. See
-	// `platform/app/ee/governance/services/activity-monitor/ottlGatewayClient.ts`
+	// `enterprise/modules/governance/process/src/channels/http/http.ottl-transform.channel.ts`
 	// for the matching client.
 	if deps.OTTLServer != nil {
 		r.Route("/internal", func(in chi.Router) {
@@ -421,24 +441,208 @@ func embeddingsHandler(deps RouterDeps) http.HandlerFunc {
 }
 
 // speechHandler terminates POST /v1/audio/speech (OpenAI-wire TTS). The
-// request body is small JSON; the response body is binary audio whose
-// Content-Type the dispatcher attached, so writeJSONResponse forwards it
-// without a JSON envelope. Never streams.
+// request body is small JSON; the response is the provider's body relayed as
+// it arrives: audio bytes, or SSE when the caller sent stream_format "sse".
 func speechHandler(deps RouterDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bundle, ok := requireBundle(w, r, deps.Logger)
 		if !ok {
 			return
 		}
-
-		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
+		body, ok := readFullBody(deps.Logger, w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
-		defer release()
+		result, err := deps.App.HandleSpeechStream(r.Context(), bundle, body, app.PeekModel(body))
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+		writeAudioStream(r.Context(), w, result)
+	}
+}
 
-		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
-			return deps.App.HandleSpeech(r.Context(), bundle, body, app.PeekModel(peek))
+// writeAudioStream relays a provider's audio or event stream to the caller,
+// flushing every chunk. The response head leaves as soon as the provider has
+// answered, before the first chunk.
+//
+// A stream that fails after the head is committed cannot change its status.
+// An event stream gets a terminal error event; a binary one has its
+// connection aborted, so the caller sees a broken transfer and not a
+// complete file that is short.
+func writeAudioStream(ctx context.Context, w http.ResponseWriter, result *app.StreamResult) {
+	iter := result.Iterator
+	defer func() { _ = iter.Close() }()
+
+	events := writeAudioStreamHead(w, result)
+	flusher, _ := w.(http.Flusher)
+	if flusher != nil {
+		flusher.Flush()
+	}
+	if !relayAudioChunks(ctx, w, iter) || iter.Err() == nil || ctx.Err() != nil {
+		return
+	}
+	if !events {
+		panic(http.ErrAbortHandler)
+	}
+	_, _ = w.Write(sseErrorPrefix)
+	_, _ = w.Write(streamErrorFrame(iter.Err()))
+	_, _ = w.Write(sseDoubleNL)
+	if flusher != nil {
+		flusher.Flush()
+	}
+}
+
+// writeAudioStreamHead commits the 200 with the provider's headers and
+// reports whether the body is an event stream.
+func writeAudioStreamHead(w http.ResponseWriter, result *app.StreamResult) (events bool) {
+	for name, value := range domain.StreamHeadersOf(result.Iterator) {
+		w.Header().Set(name, value)
+	}
+	w.Header().Del(herr.HandledErrorHeader)
+	contentType := w.Header().Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+		w.Header().Set("Content-Type", contentType)
+	}
+	events = strings.HasPrefix(strings.ToLower(contentType), "text/event-stream")
+	if events {
+		w.Header().Set("Cache-Control", "no-cache")
+	}
+	setMetaHeaders(w, result.Meta)
+	w.WriteHeader(http.StatusOK)
+	return events
+}
+
+// relayAudioChunks writes and flushes each chunk. It reports false when the
+// caller went away, after one more Next under a canceled context so the
+// iterator records the cut before it is closed.
+func relayAudioChunks(ctx context.Context, w http.ResponseWriter, iter domain.StreamIterator) bool {
+	flusher, _ := w.(http.Flusher)
+	relayCtx, stop := context.WithCancel(ctx)
+	defer stop()
+	for iter.Next(relayCtx) {
+		if _, err := w.Write(iter.Chunk()); err != nil {
+			stop()
+			iter.Next(relayCtx)
+			return false
+		}
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+	return true
+}
+
+// maxTranscriptionBodyBytes caps a /v1/audio/transcriptions upload. OpenAI's
+// own endpoint accepts at most 25 MB of audio; one extra MB covers multipart
+// framing and the small text fields. Requests over the cap get 413 before any
+// provider is contacted.
+const maxTranscriptionBodyBytes = 26 << 20
+
+// transcriptionForm is a parsed /v1/audio/transcriptions body.
+type transcriptionForm struct {
+	model  string
+	upload *domain.TranscriptionUpload
+}
+
+// readTranscriptionForm reads the multipart body part by part, which keeps
+// the caller's text parts in the order they were sent. The gateway owns two
+// parts, model and file; every other text part is carried to the provider
+// under its own name, so a new provider option needs no gateway change.
+func readTranscriptionForm(r *http.Request) (*transcriptionForm, error) {
+	reader, err := r.MultipartReader()
+	if err != nil {
+		return nil, malformedTranscriptionForm(r.Context(), err)
+	}
+	form := &transcriptionForm{upload: &domain.TranscriptionUpload{Params: map[string]string{}}}
+	hasFile := false
+	for {
+		part, err := reader.NextPart()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, malformedTranscriptionForm(r.Context(), err)
+		}
+		data, err := io.ReadAll(part)
+		if err != nil {
+			return nil, malformedTranscriptionForm(r.Context(), err)
+		}
+		hasFile = form.add(part, data) || hasFile
+	}
+	if !hasFile {
+		return nil, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"message": `missing required multipart field: "file"`,
+		})
+	}
+	return form, nil
+}
+
+// add files one part, and reports whether it was the audio.
+func (f *transcriptionForm) add(part *multipart.Part, data []byte) (isFile bool) {
+	name := part.FormName()
+	switch {
+	case name == "file" && part.FileName() != "":
+		f.upload.File, f.upload.Filename = data, part.FileName()
+		return true
+	case part.FileName() != "" || name == "":
+		// A second upload under another name is not part of this wire.
+	case name == "model":
+		f.model = string(data)
+	default:
+		f.upload.Fields = append(f.upload.Fields, domain.FormField{Name: name, Value: string(data)})
+		if bare := strings.TrimSuffix(name, "[]"); f.upload.Params[bare] == "" {
+			f.upload.Params[bare] = string(data)
+		}
+	}
+	return false
+}
+
+func malformedTranscriptionForm(ctx context.Context, err error) error {
+	if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
+		return herr.New(ctx, domain.ErrPayloadTooLarge, herr.M{
+			"message": "audio upload exceeds the 25 MB transcription limit",
+		})
+	}
+	return herr.New(ctx, domain.ErrBadRequest, herr.M{
+		"message": "malformed multipart/form-data body: " + err.Error(),
+	})
+}
+
+// transcriptionsHandler terminates POST /v1/audio/transcriptions (OpenAI-wire
+// multipart STT). Unlike every other v1 route the body is multipart/form-data,
+// so the handler parses the form here, the only layer with the *http.Request,
+// and hands the app a normalized upload. With stream=true the provider's
+// transcript events are relayed as they arrive; otherwise one body.
+func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		if err := prepareRequestBody(w, r, maxTranscriptionBodyBytes); err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+		form, err := readTranscriptionForm(r)
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+
+		if form.upload.Streams() {
+			stream, err := deps.App.HandleTranscriptionStream(r.Context(), bundle, form.upload, form.model)
+			if err != nil {
+				writeError(deps.Logger, w, r.Context(), err)
+				return
+			}
+			writeAudioStream(r.Context(), w, stream)
+			return
+		}
+
+		result, hw, err := withHeartbeat(r.Context(), w, transcriptionHeartbeat(deps, form.upload), func() (*app.CompletionResult, error) {
+			return deps.App.HandleTranscription(r.Context(), bundle, form.upload, form.model)
 		})
 		if err != nil {
 			writeError(deps.Logger, hw, r.Context(), err)
@@ -449,82 +653,15 @@ func speechHandler(deps RouterDeps) http.HandlerFunc {
 	}
 }
 
-// maxTranscriptionBodyBytes caps a /v1/audio/transcriptions upload. OpenAI's
-// own endpoint accepts at most 25 MB of audio; one extra MB covers multipart
-// framing and the small text fields. Requests over the cap get 413 before any
-// provider is contacted.
-const maxTranscriptionBodyBytes = 26 << 20
-
-// transcriptionFormFields are the OpenAI-wire optional text fields forwarded
-// to the provider. Anything else in the form is dropped rather than sent
-// blind.
-var transcriptionFormFields = []string{"language", "prompt", "response_format", "temperature"}
-
-// transcriptionsHandler terminates POST /v1/audio/transcriptions (OpenAI-wire
-// multipart STT). Unlike every other v1 route the body is multipart/form-data,
-// so the handler parses the form here, the only layer with the *http.Request,
-// and hands the app a normalized upload. Never streams.
-func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		bundle, ok := requireBundle(w, r, deps.Logger)
-		if !ok {
-			return
-		}
-
-		if err := prepareRequestBody(w, r, maxTranscriptionBodyBytes); err != nil {
-			writeError(deps.Logger, w, r.Context(), err)
-			return
-		}
-		// Memory threshold: files up to 10 MB stay in memory, larger ones
-		// spill to a temp file ParseMultipartForm cleans up on r.Body close.
-		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
-				writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
-					"message": "audio upload exceeds the 25 MB transcription limit",
-				}))
-				return
-			}
-			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
-				"message": "malformed multipart/form-data body: " + err.Error(),
-			}))
-			return
-		}
-
-		file, header, err := r.FormFile("file")
-		if err != nil {
-			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
-				"message": `missing required multipart field: "file"`,
-			}))
-			return
-		}
-		defer func() { _ = file.Close() }()
-
-		data, err := io.ReadAll(file)
-		if err != nil {
-			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
-				"message": "failed reading uploaded file: " + err.Error(),
-			}))
-			return
-		}
-
-		params := make(map[string]string, len(transcriptionFormFields))
-		for _, f := range transcriptionFormFields {
-			if v := r.FormValue(f); v != "" {
-				params[f] = v
-			}
-		}
-		upload := &domain.TranscriptionUpload{File: data, Filename: header.Filename, Params: params}
-
-		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
-			return deps.App.HandleTranscription(r.Context(), bundle, upload, r.FormValue("model"))
-		})
-		if err != nil {
-			writeError(deps.Logger, hw, r.Context(), err)
-			return
-		}
-		setMetaHeaders(hw, result.Meta)
-		writeJSONResponse(hw, result.Response)
+// transcriptionHeartbeat turns the keep-alive off for the text, srt and vtt
+// formats. The keep-alive is leading JSON whitespace under a JSON content
+// type, which would corrupt a body that is not JSON.
+func transcriptionHeartbeat(deps RouterDeps, upload *domain.TranscriptionUpload) time.Duration {
+	switch strings.ToLower(upload.Params["response_format"]) {
+	case "text", "srt", "vtt":
+		return -1
 	}
+	return deps.HeartbeatInterval
 }
 
 // imageGenerationsHandler terminates POST /v1/images/generations (OpenAI-wire
@@ -887,13 +1024,14 @@ const maxElevenLabsSpeechBodyBytes = 1 << 20
 // costs this process nothing.
 const maxElevenLabsUploadBytes = maxTranscriptionBodyBytes
 
-// elevenLabsSpeechHandler terminates POST /v1/text-to-speech/{voice_id},
-// ElevenLabs' own synthesis path.
+// elevenLabsSpeechHandler terminates ElevenLabs' own synthesis paths: POST
+// /v1/text-to-speech/{voice_id}, and its /stream and /stream/with-timestamps
+// variants.
 //
 // The body reaches the vendor as the caller wrote it. Only the model is read
 // here, so the virtual key's aliases, allowlist, budgets and spend record all
-// apply to it, and the response is the vendor's audio bytes unchanged.
-func elevenLabsSpeechHandler(deps RouterDeps) http.HandlerFunc {
+// apply to it, and the response is the vendor's bytes relayed as they arrive.
+func elevenLabsSpeechHandler(deps RouterDeps, variant domain.ElevenLabsSpeechVariant) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bundle, ok := requireBundle(w, r, deps.Logger)
 		if !ok {
@@ -917,22 +1055,20 @@ func elevenLabsSpeechHandler(deps RouterDeps) http.HandlerFunc {
 			model = domain.ElevenLabsDefaultSpeechModel
 		}
 
-		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
-			return deps.App.HandleElevenLabsSpeech(r.Context(), bundle, app.ElevenLabsAudioDispatch{
-				Model: model,
-				Body:  body,
-				Route: domain.ElevenLabsAudioRequest{
-					VoiceID:  chi.URLParam(r, "voice_id"),
-					RawQuery: r.URL.RawQuery,
-				},
-			})
+		result, err := deps.App.HandleElevenLabsSpeechStream(r.Context(), bundle, app.ElevenLabsAudioDispatch{
+			Model: model,
+			Body:  body,
+			Route: domain.ElevenLabsAudioRequest{
+				VoiceID:  chi.URLParam(r, "voice_id"),
+				RawQuery: r.URL.RawQuery,
+				Variant:  variant,
+			},
 		})
 		if err != nil {
-			writeError(deps.Logger, hw, r.Context(), err)
+			writeError(deps.Logger, w, r.Context(), err)
 			return
 		}
-		setMetaHeaders(hw, result.Meta)
-		writeJSONResponse(hw, result.Response)
+		writeAudioStream(r.Context(), w, result)
 	}
 }
 
@@ -1106,16 +1242,16 @@ func isTruthyFormValue(value string) bool {
 	}
 }
 
-// maxRealtimeUsageBodyBytes caps a usage report. It is one usage object.
-const maxRealtimeUsageBodyBytes = 64 << 10
+// maxRealtimeUsageBodyBytes caps a usage report: one socket event, or a
+// batch of at most a hundred of them with their transcripts attached.
+const maxRealtimeUsageBodyBytes = 1 << 20
 
 // realtimeUsageHandler terminates
 // POST /v1/realtime/sessions/{session_id}/usage.
 //
-// OpenAI reports a realtime session's usage over the socket, in
-// response.done, and that socket runs client to vendor. The client posts
-// what it read back here, and the control plane closes the session's spend
-// record with it.
+// The vendor reports a session's usage over the socket, and that socket runs
+// client to vendor. The client posts what it read back here, once per
+// response or in batches, and the control plane records each as spend.
 //
 // Deliberately outside the dispatch pipeline: this is a report about a
 // request that was already admitted, not a new one. Running it through the
@@ -1133,13 +1269,12 @@ func realtimeUsageHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 		report := app.RealtimeUsagePost{SessionID: sessionID, Body: body}
-		if err := deps.App.ReportRealtimeUsage(r.Context(), bundle, report); err != nil {
+		answer, err := deps.App.ReportRealtimeUsage(r.Context(), bundle, report)
+		if err != nil {
 			writeError(deps.Logger, w, r.Context(), err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusAccepted)
-		_, _ = w.Write([]byte(`{"received":true}`))
+		writeRealtimeUsageAnswer(w, answer)
 	}
 }
 
@@ -1240,7 +1375,7 @@ func geminiPassthroughHandler(deps RouterDeps) http.HandlerFunc {
 		meta := domain.PassthroughRequest{
 			Method:   r.Method,
 			Path:     path,
-			RawQuery: r.URL.RawQuery,
+			RawQuery: forwardedPassthroughQuery(r.URL.RawQuery),
 			Headers:  forwardedPassthroughHeaders(r.Header),
 			Stream:   isStream,
 		}
@@ -1295,7 +1430,7 @@ func geminiModelFromPath(path string) string {
 }
 
 // forwardedPassthroughHeaders selects client headers safe to forward
-// upstream. Authorization + x-api-key + x-goog-api-key are dropped (the
+// upstream. Every header a virtual key may arrive in, and cookies, are dropped (the
 // gateway already resolved the VK secret and Bifrost injects the real
 // provider key). Hop-by-hop headers are dropped per RFC 7230 §6.1.
 func forwardedPassthroughHeaders(h http.Header) map[string]string {
@@ -1311,6 +1446,9 @@ func forwardedPassthroughHeaders(h http.Header) map[string]string {
 		case "authorization",
 			"x-api-key",
 			"x-goog-api-key",
+			"xi-api-key",
+			"cookie",
+			"x-langwatch-instance",
 			"host",
 			"content-length",
 			"connection",
@@ -1326,6 +1464,40 @@ func forwardedPassthroughHeaders(h http.Header) map[string]string {
 		out[k] = vals[0]
 	}
 	return out
+}
+
+// forwardedPassthroughQuery drops every `key` parameter, where a client may
+// carry its virtual key; the provider's real key is injected upstream. Both
+// `&` and `;` separate pairs, and every other byte is forwarded as sent.
+func forwardedPassthroughQuery(raw string) string {
+	var b strings.Builder
+	sep, rest, kept := "", raw, false
+	for {
+		i := strings.IndexAny(rest, "&;")
+		segment := rest
+		if i >= 0 {
+			segment = rest[:i]
+		}
+		if !namesKeyParameter(segment) {
+			if kept {
+				b.WriteString(sep)
+			}
+			b.WriteString(segment)
+			kept = true
+		}
+		if i < 0 {
+			return b.String()
+		}
+		sep, rest = rest[i:i+1], rest[i+1:]
+	}
+}
+
+// namesKeyParameter reports whether a query pair is named `key` in any case or
+// escaping. A name that does not unescape is treated as one, so it is dropped.
+func namesKeyParameter(segment string) bool {
+	name, _, _ := strings.Cut(segment, "=")
+	unescaped, err := url.QueryUnescape(name)
+	return err != nil || strings.EqualFold(unescaped, "key")
 }
 
 func modelsHandler(deps RouterDeps) http.HandlerFunc {
@@ -1497,6 +1669,18 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 		return nil, nil, func() {}, false
 	}
 	peeked = peeked[:n]
+
+	// OpenAI clients write `model` after `input`, so a large body can carry it
+	// past the window; the whole body is materialized for the provider anyway.
+	if n == peekSize && app.PeekModel(peeked) == "" {
+		rest, err := io.ReadAll(r.Body)
+		if err != nil {
+			writeError(clog.Get(r.Context()), w, r.Context(),
+				herr.New(r.Context(), bodyReadErrorCode(err), herr.M{"message": err.Error()}))
+			return nil, nil, func() {}, false
+		}
+		peeked = append(peeked, rest...)
+	}
 
 	buf := bodyPool.Get().(*bytes.Buffer)
 	body := io.MultiReader(bytes.NewReader(peeked), r.Body)
@@ -1738,6 +1922,11 @@ func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
 	}
 	if meta.CustomerTraceparent != "" {
 		h.Set("Traceparent", meta.CustomerTraceparent)
+		// The stored trace is the customer one; the ops ids set earlier name another.
+		if parts := strings.Split(meta.CustomerTraceparent, "-"); len(parts) == 4 {
+			h.Set(gatewaytracer.HeaderTraceID, parts[1])
+			h.Set(gatewaytracer.HeaderSpanID, parts[2])
+		}
 	}
 	if meta.GuardrailsNotApplied != "" {
 		h.Set("X-LangWatch-Guardrails-Not-Applied", meta.GuardrailsNotApplied)
@@ -2014,6 +2203,7 @@ func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrConnectLicenseRevoked, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrConnectLicenseExpired, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrConnectWrongInstance, http.StatusForbidden)
+	herr.RegisterStatus(domain.ErrConnectCredentialPending, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrConnectServiceNotEntitled, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrHostedServiceUnavailable, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrRateLimited, http.StatusTooManyRequests)
@@ -2074,4 +2264,6 @@ func registerErrorStatusesOnce() {
 	// 503: the control plane could not record the session, which is our
 	// fault and passes.
 	herr.RegisterStatus(domain.ErrRealtimeRegistryUnavailable, http.StatusServiceUnavailable)
+	// 503 with Retry-After: this instance is draining or full, another is not.
+	herr.RegisterStatus(domain.ErrVoiceBrokerUnavailable, http.StatusServiceUnavailable)
 }

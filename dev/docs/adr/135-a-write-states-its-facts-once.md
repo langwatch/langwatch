@@ -51,7 +51,7 @@ async proposeLink(input) {
 ```
 
 Those facts go to a ledger writer, which builds the events again, may append
-them, stages the command — and the queued handler decides *again*.
+them, stages the command — and the queued handler decides _again_.
 
 ### Three truths, and only one of them is true
 
@@ -59,10 +59,10 @@ them, stages the command — and the queued handler decides *again*.
 `waitedAppend: null`, so this path never appends anything:
 
 ```ts
-const events = identityEventsFor({ command, facts });   // the calling path's decision
-await this.writeProvisionalHeads({ command, events });  // projection rows from it
-await this.stageAndAwait({ command, events });          // the queue decides again, writes its own
-return events;                                          // the caller gets the discarded decision
+const events = identityEventsFor({ command, facts }); // the calling path's decision
+await this.writeProvisionalHeads({ command, events }); // projection rows from it
+await this.stageAndAwait({ command, events }); // the queue decides again, writes its own
+return events; // the caller gets the discarded decision
 ```
 
 ```
@@ -85,7 +85,7 @@ return events;                                          // the caller gets the d
 Guards read mutable state. Two runs separated by a queue hop can therefore
 decide differently, and `identityEventsFor` stamps
 `idempotencyKey: eventIdempotencyKey({ commandId, index })` — which collapses
-the two writes into one only when the two decisions are *identical*. That is
+the two writes into one only when the two decisions are _identical_. That is
 precisely the case the architecture cannot guarantee.
 
 ### It already reaches a person
@@ -160,8 +160,8 @@ exists to serve four callers, and it served three of them wrongly.
    legitimately states nothing never moves the cursor, and an unrelated command
    on the same lane can move it first. So "applied", "refused" and "not yet"
    collapse into one answer, and §Decision 1's receipt cannot distinguish them —
-   which also makes the spec's *"A write refused by the rule records nothing and
-   says so"* unimplementable as written. A per-command outcome channel (the
+   which also makes the spec's _"A write refused by the rule records nothing and
+   says so"_ unimplementable as written. A per-command outcome channel (the
    handler records `{commandId, outcome}`; dispatch reads it) is the obvious
    shape and is not yet designed. **This blocks the collapse in §Decision 4, and
    nothing else in this ADR.**
@@ -185,13 +185,13 @@ exists to serve four callers, and it served three of them wrongly.
    Sign-up returns as soon as the rows it writes **itself** are committed and
    the command is handed to the queue. It never blocks on the fold. The wait
    moves off the door and onto the surfaces that actually read projections, and
-   those say so: *this is still being set up*, with a poll, never a row the log
+   those say so: _this is still being set up_, with a poll, never a row the log
    has not caused.
 
    Note what the session is issued from, because it is easy to state this wrongly
    and an earlier draft of this decision did: it is issued from the **Postgres
    `User` row the entrance commits directly** (`birth.ts` → `commitNewborn`),
-   which is durable before anything returns. It is *not* issued "from the event
+   which is durable before anything returns. It is _not_ issued "from the event
    log" — `stage` is an enqueue (`processor.send(): Promise<void>`), so at the
    moment a session is minted the log has not been written and the fold has not
    run. The door is honest because it only claims what it wrote with its own
@@ -222,7 +222,7 @@ is what every other reader reads. A caller that read the log directly would be
 the only component in the system whose answer could differ from the screen's.
 
 **Why delete provisional heads rather than keep them as a cache?** They are not
-a cache — a cache is allowed to be stale, not allowed to be *wrong*. These rows
+a cache — a cache is allowed to be stale, not allowed to be _wrong_. These rows
 carry a decision the log may never make, and they are indistinguishable from
 folded rows to every reader except the guard that wrote them.
 
@@ -237,9 +237,9 @@ Deleting the rows does not delete the window. It makes the window **visible**,
 which is the point — and it means every reader in that window has to distinguish
 two things it currently cannot:
 
-| What the read sees | What it means | What it must say |
-| --- | --- | --- |
-| no identifier rows, cursor absent | the fold has not run yet | still being set up |
+| What the read sees                 | What it means                    | What it must say     |
+| ---------------------------------- | -------------------------------- | -------------------- |
+| no identifier rows, cursor absent  | the fold has not run yet         | still being set up   |
 | no identifier rows, cursor present | this person genuinely holds none | the real empty state |
 
 **`hasFolded` is the probe that separates them, so it survives.** An earlier
@@ -289,7 +289,7 @@ So a guard does two jobs and they separate cleanly:
 
 The defect this ADR removes is entirely in the second category. The first was
 never the problem, and §Decision 1's "does not run a guard" is too strong: it
-should read *does not decide*.
+should read _does not decide_.
 
 > Stage 2 of the plan is done (commit `49f323f317`): all three
 > readers that reach a person — the join-request expiry, the confirmation link's
@@ -317,7 +317,7 @@ drift further apart than they already are.
 already denotes a real money ledger in this codebase —
 `gateway_budget_ledger_events`, whose own schema comment labels its columns
 `-- Debit payload` — and in bookkeeping the chronological append-only record is
-a *journal* while the *ledger* is the posted, aggregated view, so the names here
+a _journal_ while the _ledger_ is the posted, aggregated view, so the names here
 are inverted with respect to the metaphor they borrow. Renaming is not part of
 this change: most of the layer is being deleted, and renaming code on its way
 out is waste. Whatever survives should be named for what it does.

@@ -1,9 +1,9 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import {
   CURSOR_WALK_PAGE_SIZE,
   collectCursorPages,
   walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
+import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import {
   idempotentCreateInit,
   mutationInit,
@@ -11,8 +11,9 @@ import {
   type MutationOptions,
   type ObservedRequestInit,
 } from "@/client-sdk/services/_shared/mutation-options";
-import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
+import { requestedProject, scopedApiKey, scopedProjectId } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
@@ -43,11 +44,9 @@ export interface VirtualKey {
   display_prefix: string;
   principal_user_id: string | null;
   /**
-   * Where this key's traces and costs land. Not a scope: it grants no
-   * access to the key. Decided when the key is written and stored on it,
-   * so editing what the key is scoped to never moves it. Null only on a
-   * key created before this was stored, in an organization that had no
-   * governance project to fall back to.
+   * Where this key's traces and costs land. Not a scope: it grants no access to the key.
+   * Decided when the key is written and stored on it, so editing what the key is scoped to
+   * never moves it. Null only on a pre-existing key with no governance project fallback.
    */
   trace_project_id: string | null;
   /**
@@ -66,10 +65,9 @@ export interface VirtualKey {
   last_used_at: string | null;
   revoked_at: string | null;
   /**
-   * When the key stops serving, or null for a key that never expires.
-   * Requests presented after this moment are refused with
-   * `virtual_key_expired`. `status` stays "active" past the date, so read
-   * this field rather than the status to tell an expired key apart.
+   * When the key stops serving, or null for a key that never expires. Requests presented
+   * after this moment are refused with `virtual_key_expired`. `status` stays "active" past
+   * the date, so read this field to tell an expired key apart, not status.
    */
   expires_at: string | null;
 }
@@ -120,10 +118,9 @@ export interface CreateVirtualKeyInput {
    */
   metadata?: Record<string, string>;
   /**
-   * Withhold the secret from the response and get a one-time reveal id
-   * instead. The secret is parked for 24 hours and served once, to the
-   * person the key is for, through the LangWatch app; the caller never
-   * holds it.
+   * Withhold the secret from the response and get a one-time reveal id instead. The secret is
+   * parked for 24 hours and served once, to the person the key is for, through the LangWatch app;
+   * the caller never holds it.
    */
   reveal_once?: boolean;
 }
@@ -175,10 +172,9 @@ export interface VirtualKeyWithReveal {
 export interface VirtualKeyPage {
   data: VirtualKey[];
   /**
-   * Pass back as `cursor` for the next page. Null means the walk is
-   * exhausted. Neither page length tells you anything here: visibility is
-   * applied to each page AFTER it is read, so a page can hold fewer rows
-   * than `limit` with more still to come.
+   * Pass back as `cursor` for the next page. Null means the walk is exhausted. Neither page
+   * length tells you anything here: visibility is applied to each page AFTER it is read, so
+   * a page can hold fewer rows than `limit` with more still to come.
    */
   next_cursor: string | null;
 }
@@ -204,30 +200,43 @@ export class VirtualKeysApiError extends Error {
 }
 
 /**
- * Client for the gateway virtual-key surface (/api/gateway/v1).
- *
- * Entity types and the create/update bodies mirror the wire verbatim, so
- * their fields are lowercase snake_case. Call options this SDK invents (query
- * filters, per-call behaviour, action arguments) are camelCase like the rest
- * of the SDK.
+ * Client for the gateway virtual-key surface (/api/gateway/v1). Entity types and the
+ * create/update bodies mirror the wire verbatim (lowercase snake_case); call options this
+ * SDK invents (filters, per-call behaviour, action arguments) are camelCase like the rest.
  */
 export class VirtualKeysApiService {
   private readonly endpoint: string;
   private readonly apiKey: string;
+  /** The project the caller asked for. Sent on every request, where it narrows what is read. */
   private readonly projectId: string | undefined;
+  /** Where a key created with no scope lands: the project asked for, else the one resolved. */
+  private readonly defaultProjectId: string | undefined;
 
   constructor(config?: { endpoint?: string; apiKey?: string; projectId?: string }) {
     this.endpoint = resolveEndpoint(config?.endpoint);
     this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-    this.projectId = config?.projectId ?? process.env.LANGWATCH_PROJECT_ID;
+    const resolved = scopedProjectId();
+    this.projectId =
+      config?.projectId ??
+      (requestedProject() === undefined ? undefined : resolved) ??
+      process.env.LANGWATCH_PROJECT_ID;
+    this.defaultProjectId = this.projectId ?? resolved;
+  }
+
+  private mergedHeaders(extra: HeadersInit | undefined): Headers {
+    const merged = new Headers(this.headers());
+    new Headers(extra).forEach((value, key) => merged.set(key, value));
+    return merged;
   }
 
   private headers(): Record<string, string> {
     return {
+      ...buildSdkIdentityHeaders(),
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
-      // Org-anchored API keys carry no project of their own; the surface
-      // scopes on this header. Absent for project keys, which self-scope.
+      // Only a project the caller asked for (`--project`, then the environment) is named here.
+      // Without one, a key that reaches several projects answers for every virtual key it can
+      // see, and a project key self-scopes.
       ...(this.projectId ? { "X-Project-Id": this.projectId } : {}),
     };
   }
@@ -241,7 +250,7 @@ export class VirtualKeysApiService {
       ...init,
       // A hung control plane must fail the command, not freeze it.
       signal: init?.signal ?? AbortSignal.timeout(30_000),
-      headers: { ...this.headers(), ...(init?.headers ?? {}) },
+      headers: this.mergedHeaders(init?.headers),
     });
     if (!response.ok) {
       let parsedBody: unknown;
@@ -268,13 +277,9 @@ export class VirtualKeysApiService {
   }
 
   /**
-   * ONE page of the virtual keys visible to the caller, newest first. Pass
-   * `next_cursor` back as `cursor` for the next page, verbatim: a cursor this
-   * endpoint did not issue answers 400 rather than restarting the walk.
-   *
-   * `limit` is the page size (server default 50, capped at 200), and it caps
-   * the rows READ, not the rows returned: the visibility filter runs on the
-   * page afterwards. Prefer `list()` unless you mean to page deliberately.
+   * ONE page of the virtual keys visible to the caller, newest first. Pass `next_cursor`
+   * back as `cursor` verbatim — an unrecognized cursor answers 400 rather than restarting.
+   * `limit` caps rows READ, not returned. Prefer `list()` unless paging deliberately.
    */
   async listPage(options?: {
     cursor?: string;
@@ -295,17 +300,9 @@ export class VirtualKeysApiService {
   }
 
   /**
-   * Every virtual key visible to the caller: keys scoped to this project, to
-   * its team, or to the whole organization.
-   *
-   * The endpoint pages; this follows `next_cursor` until it comes back null.
-   * Stopping on a short page would be wrong here specifically, because the
-   * server filters each page for visibility after reading it, so a page can
-   * hold fewer rows than the limit with more still to come.
-   *
-   * `limit` sizes each request in the walk, it does NOT cap what comes back.
-   * `cursor` resumes an interrupted walk. Take a single page with
-   * `listPage()`, or stream the walk with `iterate()`.
+   * Every virtual key visible to the caller (project, team, or org scoped). Follows
+   * `next_cursor` until null — a short page does NOT mean done, since the visibility filter
+   * runs after each page. `limit` sizes each request, it does not cap the total.
    */
   async list(options?: {
     cursor?: string;
@@ -317,10 +314,7 @@ export class VirtualKeysApiService {
       startCursor: options?.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
-        new VirtualKeysApiError(
-          `Failed to list virtual keys: ${reason}.`,
-          "list virtual keys",
-        ),
+        new VirtualKeysApiError(`Failed to list virtual keys: ${reason}.`, "list virtual keys"),
       fetchPage: (cursor) =>
         this.listPage({
           cursor,
@@ -332,11 +326,9 @@ export class VirtualKeysApiService {
   }
 
   /**
-   * Every visible virtual key, one row at a time, fetching each page only
-   * when the consumer reaches it. Stop early and the rest is never read,
-   * which `list()` cannot offer because it materialises the whole listing
-   * first. Raises rather than looping forever on a cursor chain that never
-   * ends, exactly like `list()`.
+   * Every visible virtual key, one row at a time, fetching each page only when the
+   * consumer reaches it — stop early and the rest is never read, unlike `list()` which
+   * materialises the whole listing first. Raises rather than looping forever, like `list()`.
    */
   async *iterate(options?: {
     cursor?: string;
@@ -348,10 +340,7 @@ export class VirtualKeysApiService {
       startCursor: options?.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
-        new VirtualKeysApiError(
-          `Failed to list virtual keys: ${reason}.`,
-          "list virtual keys",
-        ),
+        new VirtualKeysApiError(`Failed to list virtual keys: ${reason}.`, "list virtual keys"),
       fetchPage: (cursor) =>
         this.listPage({
           cursor,
@@ -373,10 +362,9 @@ export class VirtualKeysApiService {
   }
 
   /**
-   * Mint a key. The response carries the secret ONCE; nothing ever serves it
-   * again, so a create that times out is recovered with `idempotencyKey`
-   * rather than by listing. With `reveal_once` the response carries a reveal
-   * id in place of the secret.
+   * Mint a key. The response carries the secret ONCE; nothing ever serves it again, so a create
+   * that times out is recovered with `idempotencyKey` rather than by listing. With `reveal_once`
+   * the response carries a reveal id in place of the secret.
    */
   async create(
     input: CreateVirtualKeyInput & { reveal_once: true },
@@ -390,14 +378,16 @@ export class VirtualKeysApiService {
     input: CreateVirtualKeyInput,
     options?: IdempotentCreateOptions,
   ): Promise<VirtualKeyWithSecret | VirtualKeyWithReveal> {
+    const init = idempotentCreateInit(options);
+    const headers = new Headers(init.headers);
+    // A key with no scope defaults to its caller's project, so that project is named.
+    if (input.scopes === undefined && this.defaultProjectId) {
+      headers.set("X-Project-Id", this.defaultProjectId);
+    }
     return this.request<VirtualKeyWithSecret | VirtualKeyWithReveal>(
       "create virtual key",
       "/api/gateway/v1/virtual-keys",
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-        ...idempotentCreateInit(options),
-      },
+      { method: "POST", body: JSON.stringify(input), ...init, headers },
     );
   }
 
@@ -414,10 +404,7 @@ export class VirtualKeysApiService {
     return virtual_key;
   }
 
-  async rotate(
-    id: string,
-    options?: MutationOptions,
-  ): Promise<VirtualKeyWithSecret> {
+  async rotate(id: string, options?: MutationOptions): Promise<VirtualKeyWithSecret> {
     return this.request<VirtualKeyWithSecret>(
       `rotate virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}/rotate`,
@@ -462,10 +449,9 @@ export class VirtualKeysApiService {
   }
 
   /**
-   * Aggregate spend for one key over a window in epoch milliseconds.
-   * Defaults to the current UTC calendar month server-side. Reads the same
-   * cost path the dashboard reads, so this number and the UI agree by
-   * construction.
+   * Aggregate spend for one key over a window in epoch milliseconds. Defaults to the
+   * current UTC calendar month server-side. Reads the same cost path the dashboard reads,
+   * so this number and the UI agree by construction.
    */
   async spend(
     id: string,

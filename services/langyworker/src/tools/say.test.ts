@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { describe, expect, it } from "vitest";
+
 import {
   CLOSING_LINE,
   CLOSING_LINE_PUSHBACK,
@@ -26,7 +27,7 @@ type RegisteredTool = {
     toolCallId: string,
     params: { text: string },
     signal?: AbortSignal,
-  ) => Promise<{ content: Array<{ type: string; text: string }> }>;
+  ) => Promise<{ content: { type: string; text: string }[] }>;
 };
 
 function registerSay(refuse?: SayRefusal): RegisteredTool {
@@ -83,7 +84,8 @@ describe("the say tool", () => {
   });
 
   describe("given the closing line rule of the guided path", () => {
-    const withCalls = (calls: TurnCall[]) => registerSay((text) => closingLineRefusal({ text, calls }));
+    const withCalls = (calls: TurnCall[]) =>
+      registerSay((text) => closingLineRefusal({ text, calls }));
 
     /** @scenario "The closing line is refused before complete-path" */
     it("answers the closing line with the rule while the command has not run, and draws nothing", async () => {
@@ -91,7 +93,9 @@ describe("the say tool", () => {
       await expect(tool.execute("call_3", { text: CLOSING_LINE })).rejects.toThrow(
         CLOSING_LINE_PUSHBACK,
       );
-      expect(CLOSING_LINE_PUSHBACK).toContain("the closing line comes after `langwatch onboarding complete-path`");
+      expect(CLOSING_LINE_PUSHBACK).toContain(
+        "the closing line comes after `langwatch onboarding complete-path`",
+      );
       expect(CLOSING_LINE_PUSHBACK).toContain("the path is not done");
       // A line that carries the closing line with words around it is the same line early.
       await expect(
@@ -133,21 +137,25 @@ describe("the say tool", () => {
       ...over,
     });
     const withCalls = (calls: TurnCall[]) =>
-      registerSay((text) => closingLineRefusal({ text, calls }) ?? repeatedLineRefusal({ text, calls }));
+      registerSay(
+        (text) => closingLineRefusal({ text, calls }) ?? repeatedLineRefusal({ text, calls }),
+      );
 
     /** @scenario "A line already said in the turn is refused" */
     it("answers a line already said in the turn with the pushback, whitespace aside, and draws nothing", async () => {
       const tool = withCalls([said(BLOCK)]);
       await expect(tool.execute("call_9", { text: BLOCK })).rejects.toThrow(REPEATED_LINE_PUSHBACK);
-      await expect(tool.execute("call_10", { text: `  ${BLOCK.replaceAll("\n", "\n\n")}\n` })).rejects.toThrow(
-        REPEATED_LINE_PUSHBACK,
-      );
+      await expect(
+        tool.execute("call_10", { text: `  ${BLOCK.replaceAll("\n", "\n\n")}\n` }),
+      ).rejects.toThrow(REPEATED_LINE_PUSHBACK);
       expect(REPEATED_LINE_PUSHBACK).toBe("Already said; do not repeat it. Go on with the step.");
     });
 
     /** @scenario "A line already said in the turn is refused" */
     it("says a different line, the same line in a later turn, and a line whose earlier say was refused", async () => {
-      const other = await withCalls([said(BLOCK)]).execute("call_11", { text: "Running it against your agent now." });
+      const other = await withCalls([said(BLOCK)]).execute("call_11", {
+        text: "Running it against your agent now.",
+      });
       expect(other.content).toEqual([{ type: "text", text: SAID_RESULT }]);
       // One line of the block is not the block.
       const line = await withCalls([said(BLOCK)]).execute("call_12", { text: FRAMEWORK });
@@ -157,16 +165,23 @@ describe("the say tool", () => {
       expect(later.content).toEqual([{ type: "text", text: SAID_RESULT }]);
       // A say the rules refused drew nothing, so the line was never said.
       const refused = said(CLOSING_LINE, { isError: true, output: CLOSING_LINE_PUSHBACK });
-      const again = await withCalls([refused, completePath(0)]).execute("call_14", { text: CLOSING_LINE });
+      const again = await withCalls([refused, completePath(0)]).execute("call_14", {
+        text: CLOSING_LINE,
+      });
       expect(again.content).toEqual([{ type: "text", text: SAID_RESULT }]);
-      expect(repeatedLineRefusal({ text: BLOCK, calls: [{ name: "todowrite", input: { text: BLOCK }, isError: false, output: "" }] })).toBeUndefined();
+      expect(
+        repeatedLineRefusal({
+          text: BLOCK,
+          calls: [{ name: "todowrite", input: { text: BLOCK }, isError: false, output: "" }],
+        }),
+      ).toBeUndefined();
     });
 
     /** @scenario "A line already said in the turn is refused" */
     it("keeps the closing line rule ahead of it", async () => {
-      await expect(withCalls([said(CLOSING_LINE)]).execute("call_15", { text: CLOSING_LINE })).rejects.toThrow(
-        CLOSING_LINE_PUSHBACK,
-      );
+      await expect(
+        withCalls([said(CLOSING_LINE)]).execute("call_15", { text: CLOSING_LINE }),
+      ).rejects.toThrow(CLOSING_LINE_PUSHBACK);
       await expect(
         withCalls([completePath(0), said(CLOSING_LINE)]).execute("call_16", { text: CLOSING_LINE }),
       ).rejects.toThrow(REPEATED_LINE_PUSHBACK);

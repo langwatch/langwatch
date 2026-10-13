@@ -114,6 +114,9 @@ class DatasetsFacade:
         """
         Get a dataset by slug or ID, including its entries.
 
+        The entries are read from the API page by page, so the dataset can be
+        of any size. All of them are held in memory in the returned object.
+
         Args:
             slug_or_id: Dataset slug or ID.
             ignore_tracing: When True, uses a NoOpTracer so no span is emitted
@@ -337,9 +340,7 @@ class DatasetsFacade:
 
     def _upload_replace(self, slug_or_id: str, *, file_path: str) -> UploadResult:
         """Delete all records then upload, or create if not found."""
-        try:
-            self._api.get_dataset(slug_or_id)
-        except DatasetNotFoundError:
+        if not self._api.dataset_exists(slug_or_id):
             return self._create_from_file(slug_or_id, file_path=file_path)
 
         self._delete_all_records(slug_or_id)
@@ -348,9 +349,7 @@ class DatasetsFacade:
 
     def _upload_error(self, slug_or_id: str, *, file_path: str) -> UploadResult:
         """Create only -- raise if dataset already exists."""
-        try:
-            self._api.get_dataset(slug_or_id)
-        except DatasetNotFoundError:
+        if not self._api.dataset_exists(slug_or_id):
             return self._create_from_file(slug_or_id, file_path=file_path)
 
         raise DatasetApiError(

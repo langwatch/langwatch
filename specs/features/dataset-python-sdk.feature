@@ -5,7 +5,7 @@ Feature: Dataset Python SDK
 
   # All scenarios remain @unimplemented because parity bindings (`/** @scenario */`
   # JSDoc) only resolve in TypeScript test roots scanned by
-  # platform/app/scripts/check-feature-parity.ts: platform/app/src, platform/app/ee,
+  # packages/architecture-enforcer/src/check-feature-parity.ts: [gone] src, [gone] ee,
   # mcp/typescript/src, sdks/typescript/src, sdks/python/src — but `sdks/python/src`
   # has no `.test.ts` files; Python tests live in `sdks/python/tests/*.py`.
   # The scenarios below are AUDIT_MANIFEST KEEP-class — covered by
@@ -126,6 +126,9 @@ Feature: Dataset Python SDK
   Scenario: Get non-existent dataset raises an error
     When I call langwatch.dataset.get_dataset("does-not-exist")
     Then a DatasetNotFoundError is raised
+
+  # The paged read behind get_dataset() is specified in
+  # specs/python-sdk/dataset-paged-read.feature.
 
   # ── Update Dataset ─────────────────────────────────────────────
 

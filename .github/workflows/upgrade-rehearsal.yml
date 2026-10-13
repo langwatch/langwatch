@@ -1,0 +1,49 @@
+name: Upgrade rehearsal
+
+# Manual dispatch only for now; runner: dev/scripts/upgrade-rehearsal/rehearse.sh (see its README).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upgrade-rehearsal-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rehearse:
+    name: Rehearse from ${{ matrix.origin }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        origin: ["3.20.1", "main", "empty"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+
+      - name: Rehearse the upgrade
+        env:
+          ORIGIN: ${{ matrix.origin }}
+        run: |
+          args=(--origin "$ORIGIN" --build-head)
+          if [[ "$ORIGIN" == "main" ]]; then args+=(--build-main); fi
+          bash dev/scripts/upgrade-rehearsal/rehearse.sh "${args[@]}"
+
+      - name: Upload rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: upgrade-rehearsal-${{ matrix.origin }}
+          path: .claude/tmp/upgrade-rehearsal/**
+          if-no-files-found: warn
+          retention-days: 14

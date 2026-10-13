@@ -1,14 +1,16 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ApiKeysApiService } from "@/client-sdk/services/api-keys/api-keys-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import {
   parseBindingFlags,
   parsePermissionFlags,
   parsePermissionMode,
 } from "../../utils/managementFlags";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { withParsedFlags } from "../management/_shared";
 
 export interface CreateApiKeyOptions {
@@ -27,14 +29,8 @@ export interface CreateApiKeyOptions {
 }
 
 /**
- * Returns the created key rather than printing it: the output port renders it
- * in whatever format the caller asked for (utils/output.ts).
- *
- * `data` deliberately includes `result.token`. This is the ONE moment the token
- * exists (the server never returns it again) and the human output prints it
- * in full for exactly that reason, as did the previous `--format json` branch.
- * Withholding it from the machine payload would make `api-key create -o json`
- * useless for the scripted case it exists to serve.
+ * Returns the created key (including result.token, the only moment it exists).
+ * Output port renders it in requested format.
  */
 export const createApiKeyCommand = async (
   options: CreateApiKeyOptions,
@@ -72,12 +68,8 @@ export const createApiKeyCommand = async (
       ...(options.assignedToUserId !== undefined
         ? { assignedToUserId: options.assignedToUserId }
         : {}),
-      ...(access.permissionMode !== undefined
-        ? { permissionMode: access.permissionMode }
-        : {}),
-      ...(access.permissions.length > 0
-        ? { permissions: access.permissions }
-        : {}),
+      ...(access.permissionMode !== undefined ? { permissionMode: access.permissionMode } : {}),
+      ...(access.permissions.length > 0 ? { permissions: access.permissions } : {}),
       ...(access.bindings.length > 0 ? { bindings: access.bindings } : {}),
     });
 
@@ -92,7 +84,9 @@ export const createApiKeyCommand = async (
         console.log(`  ${chalk.green(result.token)}`);
         console.log();
         console.log(chalk.gray("API key id: ") + result.apiKey.id);
-        console.log(chalk.gray("Created:    ") + new Date(result.apiKey.createdAt).toLocaleString());
+        console.log(
+          chalk.gray("Created:    ") + new Date(result.apiKey.createdAt).toLocaleString(),
+        );
         console.log();
       },
     };

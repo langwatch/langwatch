@@ -182,7 +182,7 @@ boxd_env_files() {
 # Default target: `<vm>.boxd.sh`.
 #
 # Output values are double-quoted for shell-safety, mirroring the format
-# in `platform/app/.env.example`.
+# in `.env.example`.
 boxd_rewrite_env() {
   local vm="${1-}"
   if [ -z "$vm" ]; then
@@ -478,12 +478,12 @@ EOF
   if [ -n "$pr" ]; then
     local q_pr
     q_pr=$(_boxd_shell_quote "$pr")
-    if ! "$BOXD_BIN" exec "$vm" -- "cd platform/app && gh pr checkout $q_pr --force 2>&1" >/dev/null; then
+    if ! "$BOXD_BIN" exec "$vm" -- "cd langwatch && gh pr checkout $q_pr --force 2>&1" >/dev/null; then
       cat <<EOF >&2
 ERROR: 'gh pr checkout $pr' failed inside $vm. If the PR is from a fork
        repo, the in-VM gh may not have access to it. Inspect with:
          boxd connect $vm
-         cd platform/app && gh auth status && gh pr checkout $pr
+         cd langwatch && gh auth status && gh pr checkout $pr
        Aborting before envs / proxies are wired against the wrong branch.
 EOF
       return 1
@@ -492,7 +492,7 @@ EOF
     local q_branch q_origin_branch
     q_branch=$(_boxd_shell_quote "$branch")
     q_origin_branch=$(_boxd_shell_quote "origin/$branch")
-    if ! "$BOXD_BIN" exec "$vm" -- "cd platform/app && git fetch origin && git checkout $q_branch 2>/dev/null || git checkout -b $q_branch $q_origin_branch 2>/dev/null || git checkout $q_origin_branch" >/dev/null; then
+    if ! "$BOXD_BIN" exec "$vm" -- "cd langwatch && git fetch origin && git checkout $q_branch 2>/dev/null || git checkout -b $q_branch $q_origin_branch 2>/dev/null || git checkout $q_origin_branch" >/dev/null; then
       echo "ERROR: failed to check out '$branch' inside $vm." >&2
       return 1
     fi
@@ -510,7 +510,7 @@ EOF
     local q_tmux
     q_tmux=$(_boxd_shell_quote "$tmux")
     if "$BOXD_BIN" exec "$vm" -- \
-        "tmux new-session -d -s $q_tmux 'cd platform/app && claude --dangerously-skip-permissions'" \
+        "tmux new-session -d -s $q_tmux 'cd langwatch && claude --dangerously-skip-permissions'" \
         >/dev/null 2>&1; then
       printf '  started tmux session %s on %s\n' "$tmux" "$vm" >&2
     else
@@ -673,7 +673,7 @@ EOF
     if [ ! -d langwatch ]; then
       git clone https://github.com/$BOXD_FORK_REPO.git langwatch
     fi
-    cd platform/app && sudo corepack enable && pnpm -w install
+    cd langwatch && sudo corepack enable && pnpm -w install
   "; then
     echo "ERROR: provisioning $vm failed. Inspect with 'boxd connect $vm'." >&2
     return 1
@@ -810,7 +810,7 @@ EOF
   q_origin_branch=$(_boxd_shell_quote "origin/$branch")
   if ! "$BOXD_BIN" exec "$vm" -- bash -c "
     set -euo pipefail
-    cd platform/app
+    cd langwatch
     git fetch origin
     git checkout $q_branch 2>/dev/null \
       || git checkout -b $q_branch $q_origin_branch 2>/dev/null \
@@ -824,7 +824,7 @@ EOF
   # Start the full compose stack detached.
   if ! "$BOXD_BIN" exec "$vm" -- bash -c "
     set -euo pipefail
-    cd platform/app
+    cd langwatch
     docker compose -f dev/compose.dev.yml --project-directory . --profile full up -d --build
   "; then
     echo "ERROR: 'docker compose up' failed inside $vm." >&2
@@ -890,7 +890,7 @@ boxd_preview_status() {
 
   local git_info
   git_info=$("$BOXD_BIN" exec "$vm" -- bash -c "
-    cd platform/app 2>/dev/null || exit 0
+    cd langwatch 2>/dev/null || exit 0
     printf 'branch: %s\n' \"\$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)\"
     printf 'sha:    %s\n' \"\$(git rev-parse HEAD 2>/dev/null || echo unknown)\"
   " 2>/dev/null || echo "(could not read git state)")
@@ -898,7 +898,7 @@ boxd_preview_status() {
 
   printf '==> docker compose ps:\n'
   "$BOXD_BIN" exec "$vm" -- bash -c "
-    cd platform/app 2>/dev/null || exit 0
+    cd langwatch 2>/dev/null || exit 0
     docker compose -f dev/compose.dev.yml --project-directory . --profile full ps 2>/dev/null || echo '(compose not running)'
   " 2>/dev/null | sed 's/^/    /' || true
 }

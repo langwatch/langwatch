@@ -194,12 +194,10 @@ Feature: Starting Langy conversations with a project API key
   # Rollback
   # ---------------------------------------------------------------------------
 
-  # Being switched off is not enough on its own. While the surface is off it has
-  # to be INDISTINGUISHABLE from a route that was never built: any answer other
-  # than "no such route" — a permission denial, an error envelope carrying a
-  # trace id — confirms the feature is there to a caller who was only guessing.
-  # Both scenarios below are about that, and both are easy to break by moving a
-  # few lines, so they are pinned at unit level rather than left to integration.
+  # Being switched off is not enough on its own. For a key that passes the door
+  # the surface has to be INDISTINGUISHABLE from a route that was never built:
+  # no error envelope or trace id confirms the feature is there. The door's own
+  # key and permission refusals come first, as on every other route (Alex 2026-10-06).
   @unit
   Scenario: A switched-off surface answers exactly as a route that does not exist
     Given the key-authed Langy surface is disabled for my project
@@ -208,12 +206,12 @@ Feature: Starting Langy conversations with a project API key
     And it carries no error envelope, code or trace id that would confirm the surface
 
   @unit
-  Scenario: The rollback switch is checked before the caller's permissions
+  Scenario: The key's permission is checked before the rollback switch
     Given the key-authed Langy surface is disabled for my project
-    And my key lacks the permission a turn requires
+    And my key lacks the langy:create permission a turn requires
     When I start a turn
-    Then I am told there is no such route, not that I lack permission
-    And my permissions are never checked at all
+    Then I am told my key lacks the permission, as for any other route
+    And the rollback switch is never read
 
   @integration @unimplemented
   Scenario: The key-authed surface can be switched off without touching browser Langy

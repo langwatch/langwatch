@@ -65,27 +65,17 @@ Feature: Unified API Keys
     Then the row for "CI Pipeline" carries that anchor id
     And it is scrolled into view once the keys have loaded
 
-  Scenario: Legacy project key row names its project
+  Scenario: The legacy project key can no longer be found on the keys page
     Given the project has a legacy per-project service key
     When I navigate to Settings > API Keys
-    Then the legacy "Project API Key" row's scope names the project
+    Then no "Project API Key" row is listed
+    And no control copies or rotates the project key
 
   Scenario: Ingestion key names the device session that minted it
     Given the organization has an ingestion key minted from "Rogerio's MacBook Pro"
     When I navigate to Settings > API Keys
     Then the ingestion key row shows the device label "Rogerio's MacBook Pro"
     And an ingestion key with no captured device falls back to "Unknown device"
-
-  @unimplemented
-  Scenario: Legacy project key row displays in table
-    When I navigate to Settings > API Keys
-    Then the table contains a legacy project key row with:
-      | NAME        | Project API Key |
-      | STATUS      | Active          |
-      | SECRET KEY  | sk-...XXXX      |
-      | CREATED BY  | Service         |
-      | PERMISSIONS | All             |
-    And the legacy project key row has no edit or revoke button
 
   @unimplemented
   Scenario: Expired API key shows expired status
@@ -353,13 +343,6 @@ Feature: Unified API Keys
     Then the lastUsedAt timestamp is updated on the key
     And the API key ID is available in the request context for downstream logging
 
-  @unit
-  Scenario: Last used is written at most once a minute per key per process
-    Given a key used 100 times within one minute
-    Then its last-used time is written once
-    And a use after the minute writes it again
-    And a write that fails lets the next use try again
-
   # ── Naming a single key ────────────────────────────────────────
 
   # `apiKey.list` is admin-gated for the whole organization, so anywhere a key
@@ -397,6 +380,46 @@ Feature: Unified API Keys
     When I look it up against my own organization
     Then I get nothing back, so the two cases are indistinguishable
 
+  # ─────────────────────────────────────────────────────────────────────
+  # The page, as it behaves after the family moved out of `[gone]`.
+  # Every one of these held before the move and none was written down: the
+  # move is where somebody finally read both halves.
+  # ─────────────────────────────────────────────────────────────────────
+
+  @integration
+  Scenario: A key row never renders its secret
+    Given the organization has API keys and ingestion keys
+    When I open Settings > API Keys
+    Then each row shows five characters of the key's public lookup id
+    And no row shows any part of the key's secret, however it is styled
+
+  @integration
+  Scenario: A member manages only their own keys
+    Given I am not an organization admin
+    And the table lists a key of mine and a key of somebody else's
+    When I look at the row actions
+    Then my own key offers edit and revoke
+    And the other person's key offers neither
+
+  @integration
+  Scenario: A key needs at least one scope
+    Given I am creating a key and have emptied the scope picker
+    When I submit the form
+    Then the page refuses it with a sentence naming what to do
+    And nothing is sent to the mint
+
+  @integration
+  Scenario: A member sees the page and not the write controls
+    Given I hold only the grant every member of the organization inherits
+    When I open Settings > API Keys
+    Then the page opens rather than refusing me
+    And what I may change is decided row by row, not at the door
+
+  @unit
+  Scenario: Every key the family claims is served by it
+    Given the API Key frontend feature
+    When its page loaders are read
+    Then it registers the API keys settings, authorize, MCP authorize and CLI auth screens, and nothing else
   # ── The grants have to land before the key is handed out ───────
 
   # A key row is a plain insert and its grants are ledger commands, so the two

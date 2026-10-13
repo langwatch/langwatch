@@ -2,118 +2,30 @@ import {
   type Span,
   type SpanOptions,
   type Context,
+  type Exception,
   SpanStatusCode,
   type TracerProvider,
   trace,
 } from "@opentelemetry/api";
-import { createLangWatchSpan } from "../span";
-import { type LangWatchTracer } from "./types";
+
 import { emitEvaluationEvent, type AddEvaluationParams } from "../evaluation";
+import { createLangWatchSpan, type LangWatchSpan } from "../span";
+import { type LangWatchTracer } from "./types";
 
 /**
- * Get a LangWatch tracer from the global OpenTelemetry tracer provider.
- *
- * This is the primary entry point for obtaining a LangWatch tracer instance.
- * It uses the globally configured OpenTelemetry tracer provider and wraps
- * the resulting tracer with LangWatch-specific enhancements.
- *
- * **Prerequisites**: Ensure that LangWatch's observability setup has been
- * initialized before calling this function, otherwise the global tracer
- * provider may not be properly configured.
- *
- * @param name - The name of the tracer, typically your service or library name
- * @param version - Optional version identifier for the tracer
+ * @param name - Tracer name (service or library)
+ * @param version - Optional version identifier
  * @returns A LangWatch tracer with enhanced functionality
- *
- * @example Basic usage
- * ```typescript
- * import { getLangWatchTracer } from '@langwatch/typescript-sdk';
- *
- * const tracer = getLangWatchTracer('my-service', '1.0.0');
- *
- * // Use the tracer to create spans
- * const result = await tracer.withActiveSpan('operation', async (span) => {
- *   span.setAttributes({ userId: '123' });
- *   return await performOperation();
- * });
- * ```
- *
- * @example Multiple tracers for different components
- * ```typescript
- * const apiTracer = getLangWatchTracer('api-server', '2.1.0');
- * const dbTracer = getLangWatchTracer('database-client', '1.5.2');
- *
- * // Each tracer can be used independently
- * await apiTracer.withActiveSpan('handle-request', async (span) => {
- *   await dbTracer.withActiveSpan('query-users', async (dbSpan) => {
- *     // Nested spans with proper parent-child relationships
- *   });
- * });
- * ```
  */
-export function getLangWatchTracer(
-  name: string,
-  version?: string,
-): LangWatchTracer {
-  return getLangWatchTracerFromProvider(
-    trace.getTracerProvider(),
-    name,
-    version,
-  );
+export function getLangWatchTracer(name: string, version?: string): LangWatchTracer {
+  return getLangWatchTracerFromProvider(trace.getTracerProvider(), name, version);
 }
 
-
 /**
- * Get a LangWatch tracer from a specific OpenTelemetry tracer provider.
- *
- * This function provides more control over which tracer provider is used,
- * allowing you to work with custom or multiple tracer provider instances.
- * This is useful in advanced scenarios where you need to:
- * - Use different tracer providers for different parts of your application
- * - Work with custom tracer provider configurations
- * - Test with mock tracer providers
- *
  * @param tracerProvider - The OpenTelemetry tracer provider to use
- * @param name - The name of the tracer, typically your service or library name
- * @param version - Optional version identifier for the tracer
+ * @param name - Tracer name (service or library)
+ * @param version - Optional version identifier
  * @returns A LangWatch tracer with enhanced functionality
- *
- * @example Custom tracer provider
- * ```typescript
- * import { NodeTracerProvider } from '@opentelemetry/sdk-node';
- * import { getLangWatchTracerFromProvider } from '@langwatch/typescript-sdk';
- *
- * // Create a custom tracer provider with specific configuration
- * const customProvider = new NodeTracerProvider({
- *   resource: Resource.default().merge(
- *     new Resource({
- *       [SemanticResourceAttributes.SERVICE_NAME]: 'custom-service',
- *     })
- *   )
- * });
- *
- * const tracer = getLangWatchTracerFromProvider(
- *   customProvider,
- *   'custom-tracer',
- *   '1.0.0'
- * );
- * ```
- *
- * @example Testing with mock provider
- * ```typescript
- * import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base';
- *
- * const mockExporter = new InMemorySpanExporter();
- * const testProvider = new NodeTracerProvider();
- * testProvider.addSpanProcessor(new SimpleSpanProcessor(mockExporter));
- *
- * const testTracer = getLangWatchTracerFromProvider(
- *   testProvider,
- *   'test-tracer'
- * );
- *
- * // Use testTracer in tests and verify spans via mockExporter
- * ```
  */
 export function getLangWatchTracerFromProvider(
   tracerProvider: TracerProvider,
@@ -122,86 +34,14 @@ export function getLangWatchTracerFromProvider(
 ): LangWatchTracer {
   const tracer = tracerProvider.getTracer(name, version);
 
-  /**
-   * ⚠️ Do not remove, or worse, move this declaration.
-   * It's required so the proxy handler can reference the proxyInstance
-   * without running afoul of JavaScript's temporal dead zone.
-   */
-  let proxyInstance: LangWatchTracer;
-
   const handler: ProxyHandler<LangWatchTracer> = {
     get(target, prop) {
       switch (prop) {
         case "startActiveSpan":
-          return (...args: any[]) => {
-            const spanArgs = normalizeSpanArgs(args);
-            const options = withDefaultOrigin(spanArgs.options);
-
-            const wrappedFn = (span: Span, ...cbArgs: any[]) =>
-              spanArgs.fn(createLangWatchSpan(span), ...cbArgs);
-
-            if (spanArgs.context !== void 0)
-              return target.startActiveSpan(spanArgs.name, options, spanArgs.context, wrappedFn);
-
-            return target.startActiveSpan(spanArgs.name, options, wrappedFn);
-          };
+          return startActiveSpanOf(target);
 
         case "withActiveSpan":
-          return (...args: any[]) => {
-            const spanArgs = normalizeSpanArgs(args);
-            const optionsWithOrigin = withDefaultOrigin(spanArgs.options);
-
-            const cb = (span: Span) => {
-              const wrappedSpan = createLangWatchSpan(span);
-
-              try {
-                const result = spanArgs.fn(wrappedSpan);
-
-                // If result is a promise, handle it async
-                if (result && typeof result.then === "function") {
-                  return result
-                    .then((result: any) => {
-                      wrappedSpan.setStatus({
-                        code: SpanStatusCode.OK,
-                      });
-                      return result;
-                    })
-                    .catch((err: any) => {
-                      wrappedSpan.setStatus({
-                        code: SpanStatusCode.ERROR,
-                        message: err?.message ?? String(err),
-                      });
-                      wrappedSpan.recordException?.(err);
-                      throw err;
-                    })
-                    .finally(() => {
-                      wrappedSpan.end();
-                    });
-                }
-
-                // Sync result - end span and return
-                wrappedSpan.setStatus({
-                  code: SpanStatusCode.OK,
-                });
-                wrappedSpan.end();
-                return result;
-              } catch (err: any) {
-                wrappedSpan.setStatus({
-                  code: SpanStatusCode.ERROR,
-                  message: err?.message ?? String(err),
-                });
-                wrappedSpan.recordException?.(err);
-                wrappedSpan.end();
-                throw err;
-              }
-            };
-
-            // Call target.startActiveSpan to avoid double-wrapping
-            if (spanArgs.context !== void 0)
-              return target.startActiveSpan(spanArgs.name, optionsWithOrigin, spanArgs.context, cb);
-
-            return target.startActiveSpan(spanArgs.name, optionsWithOrigin, cb);
-          };
+          return withActiveSpanOf(target);
 
         case "startSpan":
           return (name: string, options?: SpanOptions, context?: Context) =>
@@ -215,7 +55,7 @@ export function getLangWatchTracerFromProvider(
           };
 
         default: {
-          const value = (target as any)[prop];
+          const value = Reflect.get(target, prop);
 
           return typeof value === "function" ? value.bind(target) : value;
         }
@@ -223,41 +63,62 @@ export function getLangWatchTracerFromProvider(
     },
   };
 
-  // See comment above about why.
-  // eslint-disable-next-line prefer-const
-  proxyInstance = new Proxy(tracer, handler) as LangWatchTracer;
-  return proxyInstance;
+  return new Proxy(tracer, handler) as LangWatchTracer;
+}
+
+type SpanCallback = (span: LangWatchSpan, ...args: unknown[]) => unknown;
+
+type SpanArgs =
+  | [name: string, fn: SpanCallback]
+  | [name: string, options: SpanOptions | undefined, fn: SpanCallback]
+  | [name: string, options: SpanOptions | undefined, context: Context, fn: SpanCallback];
+
+function hasContextArg(
+  args: readonly unknown[],
+): args is [string, SpanOptions | undefined, Context, SpanCallback] {
+  return typeof args[3] === "function";
+}
+
+function hasOptionsArg(
+  args: readonly unknown[],
+): args is [string, SpanOptions | undefined, SpanCallback] {
+  return typeof args[2] === "function";
+}
+
+function hasCallbackArg(args: readonly unknown[]): args is [string, SpanCallback] {
+  return typeof args[1] === "function";
 }
 
 /**
- * Normalizes the variable arguments passed to span methods.
- * Handles the following overloaded signatures:
- * - (name, fn)
- * - (name, options, fn)
- * - (name, options, context, fn)
- *
- * @param args - The arguments array from the span method
- * @returns An object with normalized name, options, context, and fn properties
- * @throws Error if no callback function is found in the arguments
+ * Normalizes the variable-arg overloads of a span method: (name, fn),
+ * (name, options, fn), or (name, options, context, fn). Throws if no
+ * callback is found.
  */
-function normalizeSpanArgs(args: any[]) {
-  const [name, arg2, arg3, arg4] = args;
-
-  if (typeof arg4 === "function")
-    return { name, options: arg2, context: arg3, fn: arg4 };
-
-  if (typeof arg3 === "function") return { name, options: arg2, fn: arg3 };
-  if (typeof arg2 === "function") return { name, fn: arg2 };
+function normalizeSpanArgs(args: SpanArgs): {
+  name: string;
+  options?: SpanOptions;
+  context?: Context;
+  fn: SpanCallback;
+} {
+  if (hasContextArg(args)) {
+    const [name, options, context, fn] = args;
+    return { name, options, context, fn };
+  }
+  if (hasOptionsArg(args)) {
+    const [name, options, fn] = args;
+    return { name, options, fn };
+  }
+  if (hasCallbackArg(args)) {
+    const [name, fn] = args;
+    return { name, fn };
+  }
 
   throw new Error("Expected a span callback as the last argument");
 }
 
 /**
- * Injects `langwatch.origin = "application"` into span options unless
- * the caller already provided a `langwatch.origin` attribute.
- *
- * This ensures regular application traces are explicitly tagged,
- * while experiments (which set `langwatch.origin = "evaluation"`) are not overridden.
+ * Injects `langwatch.origin = "application"` into span options unless the
+ * caller already set one -- so experiments (`"evaluation"`) aren't overridden.
  */
 function withDefaultOrigin(options?: SpanOptions): SpanOptions {
   const existing = options?.attributes?.["langwatch.origin"];
@@ -270,4 +131,103 @@ function withDefaultOrigin(options?: SpanOptions): SpanOptions {
       "langwatch.origin": "application",
     },
   };
+}
+
+/** `startActiveSpan` with the callback handed a LangWatch span. */
+function startActiveSpanOf(target: LangWatchTracer) {
+  return (...args: SpanArgs) => {
+    const spanArgs = normalizeSpanArgs(args);
+    const options = withDefaultOrigin(spanArgs.options);
+
+    const wrappedFn = (span: Span, ...cbArgs: unknown[]) =>
+      spanArgs.fn(createLangWatchSpan(span), ...cbArgs);
+
+    if (spanArgs.context !== void 0)
+      return target.startActiveSpan(spanArgs.name, options, spanArgs.context, wrappedFn);
+
+    return target.startActiveSpan(spanArgs.name, options, wrappedFn);
+  };
+}
+
+/** `withActiveSpan` through the target's own `startActiveSpan`, to avoid double-wrapping. */
+function withActiveSpanOf(target: LangWatchTracer) {
+  return (...args: SpanArgs) => {
+    const spanArgs = normalizeSpanArgs(args);
+    const optionsWithOrigin = withDefaultOrigin(spanArgs.options);
+
+    const cb = (span: Span) => runInLangWatchSpan(span, spanArgs.fn);
+
+    // Call target.startActiveSpan to avoid double-wrapping
+    if (spanArgs.context !== void 0)
+      return target.startActiveSpan(spanArgs.name, optionsWithOrigin, spanArgs.context, cb);
+
+    return target.startActiveSpan(spanArgs.name, optionsWithOrigin, cb);
+  };
+}
+
+/** Runs `fn` in a LangWatch span, setting its status and ending it, sync or async. */
+function runInLangWatchSpan(span: Span, fn: SpanCallback) {
+  const wrappedSpan = createLangWatchSpan(span);
+
+  try {
+    const result = fn(wrappedSpan);
+
+    // If result is a promise, handle it async
+    if (isThenable(result)) {
+      return result
+        .then((result) => {
+          wrappedSpan.setStatus({
+            code: SpanStatusCode.OK,
+          });
+          return result;
+        })
+        .catch((err: unknown) => {
+          markSpanFailed(wrappedSpan, err);
+          throw err;
+        })
+        .finally(() => {
+          wrappedSpan.end();
+        });
+    }
+
+    // Sync result - end span and return
+    wrappedSpan.setStatus({
+      code: SpanStatusCode.OK,
+    });
+    wrappedSpan.end();
+    return result;
+  } catch (err) {
+    markSpanFailed(wrappedSpan, err);
+    wrappedSpan.end();
+    throw err;
+  }
+}
+
+function isThenable(value: unknown): value is Promise<unknown> {
+  return (
+    (typeof value === "object" || typeof value === "function") &&
+    value !== null &&
+    "then" in value &&
+    typeof value.then === "function"
+  );
+}
+
+function isRecordableException(value: unknown): value is Exception {
+  return (
+    typeof value === "string" ||
+    ((typeof value === "object" || typeof value === "function") && value !== null)
+  );
+}
+
+function errorMessageOf(err: unknown): string {
+  const message =
+    (typeof err === "object" || typeof err === "function") && err !== null && "message" in err
+      ? err.message
+      : undefined;
+  return typeof message === "string" ? message : String(err);
+}
+
+function markSpanFailed(span: LangWatchSpan, err: unknown): void {
+  span.setStatus({ code: SpanStatusCode.ERROR, message: errorMessageOf(err) });
+  if (isRecordableException(err)) span.recordException?.(err);
 }

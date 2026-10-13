@@ -99,18 +99,19 @@ func (a executorAdapter) ExecuteStream(ctx context.Context, req app.WorkflowRequ
 		return ch, nil //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
 	}
 	in, err := a.eng.ExecuteStream(ctx, engine.ExecuteRequest{
-		Workflow:          wf,
-		Inputs:            req.Inputs,
-		Origin:            req.Origin,
-		TraceID:           req.TraceID,
-		ProjectID:         req.ProjectID,
-		ThreadID:          req.ThreadID,
-		NodeID:            req.NodeID,
-		Type:              req.Type,
-		RunID:             req.RunID,
-		WorkflowVersionID: req.WorkflowVersionID,
-		EvaluateOn:        req.EvaluateOn,
-		DatasetEntry:      req.DatasetEntry,
+		Workflow:           wf,
+		Inputs:             req.Inputs,
+		Origin:             req.Origin,
+		TraceID:            req.TraceID,
+		ProjectID:          req.ProjectID,
+		ThreadID:           req.ThreadID,
+		NodeID:             req.NodeID,
+		Type:               req.Type,
+		RunID:              req.RunID,
+		WorkflowVersionID:  req.WorkflowVersionID,
+		EvaluateOn:         req.EvaluateOn,
+		DatasetEntry:       req.DatasetEntry,
+		MaxAttachmentBytes: req.MaxAttachmentBytes,
 	}, engine.ExecuteStreamOptions{Heartbeat: opts.Heartbeat})
 	if err != nil {
 		ch := make(chan app.WorkflowStreamEvent, 1)
@@ -137,18 +138,19 @@ func (a executorAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (
 		}, nil
 	}
 	res, err := a.eng.Execute(ctx, engine.ExecuteRequest{
-		Workflow:          wf,
-		Inputs:            req.Inputs,
-		Origin:            req.Origin,
-		TraceID:           req.TraceID,
-		ProjectID:         req.ProjectID,
-		ThreadID:          req.ThreadID,
-		NodeID:            req.NodeID,
-		Type:              req.Type,
-		RunID:             req.RunID,
-		WorkflowVersionID: req.WorkflowVersionID,
-		EvaluateOn:        req.EvaluateOn,
-		DatasetEntry:      req.DatasetEntry,
+		Workflow:           wf,
+		Inputs:             req.Inputs,
+		Origin:             req.Origin,
+		TraceID:            req.TraceID,
+		ProjectID:          req.ProjectID,
+		ThreadID:           req.ThreadID,
+		NodeID:             req.NodeID,
+		Type:               req.Type,
+		RunID:              req.RunID,
+		WorkflowVersionID:  req.WorkflowVersionID,
+		EvaluateOn:         req.EvaluateOn,
+		DatasetEntry:       req.DatasetEntry,
+		MaxAttachmentBytes: req.MaxAttachmentBytes,
 	})
 	if err != nil {
 		return &app.WorkflowResult{ //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return

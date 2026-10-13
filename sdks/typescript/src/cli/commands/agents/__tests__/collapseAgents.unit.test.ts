@@ -1,12 +1,11 @@
 /**
- * The rule that keeps `langwatch agent list` to one row per name and
- * environment once an agent has moved scope, without hiding a row that is
- * live or recent.
- *
- * @see specs/typescript-sdk/cli-agents.feature
+ * One row per name and environment once an agent moved scope, never hiding a
+ * live or recent row. @see specs/typescript-sdk/cli-agents.feature
  */
 import { describe, expect, it } from "vitest";
+
 import type { AgentResponse } from "@/client-sdk/services/agents/agents-api.service";
+
 import { collapseStaleSiblings, STALE_SIBLING_MS } from "../collapseAgents";
 
 const NOW = Date.parse("2026-09-20T12:00:00Z");
@@ -49,7 +48,10 @@ describe("collapseStaleSiblings()", () => {
         agents: [
           row({ id: "agent_live", status: "online", lastSeenAt: hoursAgo(0) }),
           row({ id: "agent_at_edge", lastSeenAt: new Date(NOW - STALE_SIBLING_MS).toISOString() }),
-          row({ id: "agent_inside", lastSeenAt: new Date(NOW - STALE_SIBLING_MS + 1000).toISOString() }),
+          row({
+            id: "agent_inside",
+            lastSeenAt: new Date(NOW - STALE_SIBLING_MS + 1000).toISOString(),
+          }),
         ],
       });
 
@@ -102,7 +104,13 @@ describe("collapseStaleSiblings()", () => {
           row({ id: "agent_dev", lastSeenAt: hoursAgo(0) }),
           row({ id: "agent_staging", environment: "staging", lastSeenAt: hoursAgo(24 * 20) }),
           row({ id: "agent_other", name: "billing-agent", lastSeenAt: hoursAgo(24 * 20) }),
-          row({ id: "agent_http", type: "http", environment: null, status: null, lastSeenAt: null }),
+          row({
+            id: "agent_http",
+            type: "http",
+            environment: null,
+            status: null,
+            lastSeenAt: null,
+          }),
         ],
       });
 

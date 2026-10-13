@@ -1,0 +1,23 @@
+{
+  "skill_name": "architecture-guide",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Where should a helper that formats a model provider name for display live? It is used by both the API's REST responses and the settings screen.",
+      "expected_output": "Names the contract package of the owning module (model-provider/contract) as the home for a framework-free shared value, rejects a shared utils folder, and explains the dependency direction.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "feature-source-layout is failing on modules/trace/process/src/utils/spanTree.ts. Why, and where does it go?",
+      "expected_output": "Explains the closed server grammar, that utils/ is not a layer, and places the code in a service, a rules module, or the contract if pure, with the canonical kebab filename.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "A process needs to boot with one new module installed. What changes, and what must not change?",
+      "expected_output": "Installing a module edits modules/catalogue.json and `pnpm generate:modules`; main.ts composes the list through `withConfig(processConfig(processModules))` and `server.container(role)` and does not change; proven by the api, worker and tasks installation tests. Rejects withModules, withMember, .provide and any §15 spelling.",
+      "files": []
+    }
+  ]
+}

@@ -59,7 +59,7 @@ Feature: haven answers an agent's tool call before it runs
   @unit
   Scenario: Only a named set of commands is treated as heavy
     When the gate classifies a command
-    Then vitest, tsgo, biome, next build, go build and docker build are heavy
+    Then vitest, tsgo, next build, go build and docker build are heavy
     And everything else defers, because gating ordinary commands would be its own outage
 
   @unit @unimplemented
@@ -69,43 +69,6 @@ Feature: haven answers an agent's tool call before it runs
     And it never waits for a slot itself, because waiting is the wrapped command's job
 
   # --- The rewrap ---
-
-  @unit
-  Scenario: A heavy command is passed to haven as one escaped argument
-    Given a heavy command under pressure
-    When the gate rewrites it
-    Then the original command is passed as a single escaped argument for a shell to run
-    And it is not spliced after a separator, because the command is a shell string and not argv
-
-  @unit
-  Scenario: A command containing shell operators is gated as a whole
-    Given a heavy command joined to another command by a shell operator
-    When it is rewritten
-    Then the whole line runs under the slot
-    And no part of it escapes the slot by being parsed at the outer level
-
-  @unit
-  Scenario: A command already under haven's heavy class is not rewrapped again
-    Given a command that is already wrapped
-    When the gate is asked about it
-    Then it is left alone
-    Because a nested wrap makes the outer hold the slot the inner waits for
-
-  @unit
-  Scenario: The rewrap names haven by absolute path
-    Given haven is not on the caller's PATH
-    When a command is rewritten
-    Then the rewritten command still runs
-    Because installing haven onto PATH is optional, and a rewrite that fails has broken a working command
-
-  @unit
-  Scenario: The rewrap carries the decision it was given
-    Given the gate has resolved who is calling and how the run should be admitted
-    When it rewrites the command
-    Then the rewritten command names the calling agent
-    And it names the worker count the run was admitted at, when it was narrowed
-    Because the wrapped run otherwise re-derives all of it from an empty command line,
-    So every sub-agent takes the main-session ceiling and a narrowing never happens
 
   @unit @unimplemented
   Scenario: A rewrapped run is admitted once, not twice
@@ -191,13 +154,6 @@ Feature: haven answers an agent's tool call before it runs
     Then it is handed back to run in the background
     And the agent keeps working rather than waiting or retrying
     Because it was not going to get its result this turn either way
-
-  @unit
-  Scenario: A backgrounded run explains itself in the same breath
-    Given a command the gate has backgrounded
-    When the replacement is handed back
-    Then its description says haven queued it and that it is running in the background
-    So the agent does not read an immediate return as an immediate result
 
   @unit @unimplemented
   Scenario: A queued run reports its position while it waits
@@ -295,25 +251,6 @@ Feature: haven answers an agent's tool call before it runs
   # --- Fan-out ---
 
   @unit @unimplemented
-  Scenario: Spawning past the machine-wide agent cap is refused
-    Given the machine-wide limit on concurrent sub-agents is already reached
-    When another sub-agent spawn is gated
-    Then it is denied
-    And the reason says how many are already running
-
-  @unit @unimplemented
-  Scenario: The spawn count is decremented when a sub-agent ends
-    Given a sub-agent that has finished
-    Then the machine-wide count no longer includes it
-
-  @unit @unimplemented
-  Scenario: A spawn count that cannot be trusted admits
-    Given counted spawns that have outlived their expiry
-    When a spawn is gated
-    Then those entries are discarded and the spawn is admitted
-    Because a stale count would otherwise refuse every spawn on the machine forever
-
-  @unit @unimplemented
   Scenario: An agent that holds no slot is preferred over one that holds several
     Given one agent already holds a heavy slot and another holds none
     And both are waiting
@@ -345,7 +282,7 @@ Feature: haven answers an agent's tool call before it runs
   # --- Installing the hook, which edits a file haven does not own ---
   #
   # The gate only runs if Claude Code is told about it, and telling it means
-  # writing settings in the developer's checkout. It is opt-in — `haven setup
+  # writing settings in the developer's checkout. It is opt-in — `haven self setup
   # gate-hook`, never `haven up` — and worktree-local, so it configures this
   # checkout and commits nothing into anyone else's.
 
@@ -424,3 +361,10 @@ Feature: haven answers an agent's tool call before it runs
     Then the registration is not touched
     Because it covers both hooks, and widening it would re-route the developer's
     And own hook onto tools they never pointed it at
+
+  @unit
+  Scenario: The gate points an agent at haven browser instead of interactive Playwright
+    Given haven's gate hook is installed
+    When an agent calls a Playwright MCP tool, playwright-cli or `npx playwright open`
+    Then the call is denied with a reason naming `haven browser`
+    And `playwright test` and `pnpm test:e2e` are not affected
