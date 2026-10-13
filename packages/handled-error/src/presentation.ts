@@ -2143,11 +2143,6 @@ const presentations = {
     title: "That team isn't in this organization",
     describe: () => "Pick a team that belongs to this organization.",
   },
-  user_email_ambiguous: {
-    title: "More than one account uses this address",
-    describe: () =>
-      "Two or more accounts hold this email address in different letter case. Change one of their addresses, then try again.",
-  },
   user_last_platform_operator: {
     title: "This is the last platform operator",
     describe: () =>

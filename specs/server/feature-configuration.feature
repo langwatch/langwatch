@@ -37,7 +37,7 @@ Feature: Feature configuration is one schema, validated at boot
 
   @unit
   Scenario: A switch the previous release compared to one word reads any other value as it did
-    Given a deployment that sets MFA_ENROLLMENT_OPEN, LOCAL_PASSWORDS_ENABLED, SCIM_V2_GRANTS or PASSKEYS_ENABLED to a value other than "on" or "off"
+    Given a deployment that sets one of the sign-in or SCIM switches to a value other than "on" or "off"
     When the process resolves its configuration
     Then the process starts
     And two-step enrolment, own passwords and directory grants read it as off, and passkeys read it as on
