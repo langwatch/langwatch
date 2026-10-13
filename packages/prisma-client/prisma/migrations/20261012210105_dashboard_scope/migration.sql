@@ -22,5 +22,5 @@ ALTER TABLE "Dashboard"
 CREATE INDEX IF NOT EXISTS "Dashboard_organizationId_scope_idx" ON "Dashboard" ("organizationId", "scope");
 
 -- No row is changed here, and none needs it. "createdById" arrives with this release
--- (20261011160001), so no board made by an earlier image has an author, and a member's own
+-- (20261012210101), so no board made by an earlier image has an author, and a member's own
 -- My dashboard made from this release on starts at Only me where Dashboards is on (AC170).
