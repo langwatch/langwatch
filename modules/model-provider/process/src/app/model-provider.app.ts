@@ -191,7 +191,7 @@ type ModelProviderBuildConfig = Readonly<{
   egress: Readonly<{ blockLocal: boolean; allowedHosts: string[]; verifyTls: boolean }>;
   /** Where a resolved model is executed, fully formed: nlpgo's `/go/proxy/v1`. */
   executionProxyBaseUrl: string;
-  /** A system provider's fallback-credential env map. Always empty: see the handoff. */
+  /** The install-wide value a provider row falls back to for each field it left empty. */
   environment: Readonly<Record<string, string | undefined>>;
   /** Per provider, the API root the credential probe uses in place of the vendor's own. */
   probeBaseUrls: Readonly<Record<string, string | undefined>>;
@@ -246,15 +246,31 @@ export class ModelProviderModule implements ModelProviderApi {
     /** The engine hop's shared credential: the same handle the process owner holds. */
     nlpInternal: nlpInternalSecret,
   } as const;
+  /** Install-wide provider credentials a row falls back to, beside the config's settings. */
+  static readonly fallbackSecrets = {
+    awsSecretAccessKey: Secret.load("AWS_SECRET_ACCESS_KEY", { optional: true }),
+  } as const;
   static readonly secrets = {
     ...ModelProviderModule.platformCredentials,
     ...ModelProviderModule.operationalSecrets,
+    ...ModelProviderModule.fallbackSecrets,
   } as const;
 
   static async create(setup: ModelProviderSetup): Promise<ModelProviderModule> {
     const platformChain = await ModelProviderModule.resolvePlatformChain(setup.secrets);
     return setup.secrets.into(ModelProviderModule.secrets.nlpInternal, (nlpInternalSecret) =>
-      ModelProviderModule.withPlatformChain(setup, { platformChain, nlpInternalSecret }),
+      setup.secrets.into(
+        ModelProviderModule.fallbackSecrets.awsSecretAccessKey,
+        (awsSecretAccessKey) =>
+          ModelProviderModule.withPlatformChain(setup, {
+            platformChain,
+            nlpInternalSecret,
+            environment: {
+              ...setup.config.providerFallbacks,
+              AWS_SECRET_ACCESS_KEY: awsSecretAccessKey,
+            },
+          }),
+      ),
     );
   }
 
@@ -278,7 +294,12 @@ export class ModelProviderModule implements ModelProviderApi {
     {
       platformChain,
       nlpInternalSecret,
-    }: { platformChain: PlatformProviderChainService; nlpInternalSecret: string | undefined },
+      environment,
+    }: {
+      platformChain: PlatformProviderChainService;
+      nlpInternalSecret: string | undefined;
+      environment: Readonly<Record<string, string | undefined>>;
+    },
   ): ModelProviderModule {
     const executionProxyBaseUrl = executionProxyBaseUrlOf(config);
     const buildConfig: ModelProviderBuildConfig = {
@@ -288,7 +309,7 @@ export class ModelProviderModule implements ModelProviderApi {
         verifyTls: true,
       },
       executionProxyBaseUrl,
-      environment: {},
+      environment,
       probeBaseUrls: config.probeBaseUrls,
       codexOAuthIssuer: config.codexOAuthIssuer,
       isSaas: false,
@@ -306,6 +327,7 @@ export class ModelProviderModule implements ModelProviderApi {
       executionProxyBaseUrl,
       nlpInternalSecret,
       platformChain,
+      environment,
     });
   }
 
@@ -377,6 +399,7 @@ export class ModelProviderModule implements ModelProviderApi {
         setup.executionProxyBaseUrl ?? "http://nlp-engine-not-configured.invalid",
       nlpInternalSecret: void 0,
       platformChain: setup.platformChain ?? PlatformProviderChainService.create(),
+      environment: {},
     });
   }
 
@@ -419,6 +442,7 @@ export class ModelProviderModule implements ModelProviderApi {
     executionProxyBaseUrl,
     nlpInternalSecret,
     platformChain,
+    environment,
   }: {
     repositories: ModelProviderRepositories;
     dependencies: ModelProviderSetup["dependencies"];
@@ -426,6 +450,7 @@ export class ModelProviderModule implements ModelProviderApi {
     executionProxyBaseUrl: string;
     nlpInternalSecret: string | undefined;
     platformChain: PlatformProviderChainService;
+    environment: Readonly<Record<string, string | undefined>>;
   }) {
     this.platformChain = platformChain;
     this.#dataPrivacy = dependencies.dataPrivacy;
@@ -452,10 +477,10 @@ export class ModelProviderModule implements ModelProviderApi {
     this.#credentialProbe = infrastructure.credentialProbe;
     this.#codexAccounts = infrastructure.codexAccounts;
     this.#spans = infrastructure.spans;
-    // The same always-empty fallback map `ModelProviderBuildConfig.environment` carries.
+    // The same install-wide fallback map `ModelProviderBuildConfig.environment` carries.
     this.#evaluatorModelEnv = ModelProviderEvaluatorModelEnvService.create({
       modelProviders: this,
-      environment: {},
+      environment,
     });
     this.#playground = ModelProviderPlaygroundService.create({
       modelProviders: this,

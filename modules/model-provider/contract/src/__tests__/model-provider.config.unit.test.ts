@@ -10,6 +10,22 @@ const read = (environment: Record<string, string | undefined>) =>
   })["model-provider"];
 
 describe("model provider server configuration", () => {
+  describe("given install-wide provider settings", () => {
+    /** @scenario "A provider row falls back to the install-wide provider settings" */
+    it("reads each by its provider field name, and a blank one as unset", () => {
+      const fallbacks = read({
+        OPENAI_BASE_URL: "https://proxy.example.com/v1",
+        VERTEXAI_PROJECT: "acme-project",
+        AWS_REGION_NAME: " ",
+      }).providerFallbacks;
+      expect(fallbacks).toMatchObject({
+        OPENAI_BASE_URL: "https://proxy.example.com/v1",
+        VERTEXAI_PROJECT: "acme-project",
+      });
+      expect(fallbacks.AWS_REGION_NAME).toBeUndefined();
+    });
+  });
+
   describe("given the deployment sets no allowlist", () => {
     /** @scenario "An absent allowlist resolves to an empty one, never a wildcard" */
     it("resolves an empty allowlist rather than a wildcard", () => {

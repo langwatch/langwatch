@@ -98,3 +98,17 @@ Feature: Feature configuration is one schema, validated at boot
     When the browser application boots
     Then every feature's own web schema has parsed its slice
     And nothing is rendered over a configuration that did not parse
+
+  @unit
+  Scenario: An instance administrator key shorter than 32 characters refuses the boot
+    Given a deployment that sets LANGWATCH_INSTANCE_ADMIN_API_KEY
+    When the key is shorter than 32 characters
+    Then the API refuses to start and names the setting
+    And a blank or unset key reads as absent rather than refusing
+
+  @unit
+  Scenario: A worker told to skip migrations says the skip is ignored
+    Given a deployment that sets SKIP_PRISMA_MIGRATE or SKIP_CLICKHOUSE_MIGRATE to "true"
+    When the worker boots
+    Then it logs one warning naming each such setting as ignored
+    And it still runs the upgrade, because the API waits for it
