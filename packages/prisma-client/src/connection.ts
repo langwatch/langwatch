@@ -24,8 +24,8 @@ function prismaLoggerLevel(level: Prisma.LogLevel): "error" | "warn" | "info" | 
   return level === "query" ? "debug" : level;
 }
 
-/** P2021/P2022 and Postgres wording: the schema is behind mid-upgrade, which is expected. */
-const SCHEMA_BEHIND_MESSAGE = /P2021|P2022|(table|column) .*does not exist/i;
+/** P2021/P2022, 42P01/42703 and Postgres wording: the schema is behind mid-upgrade, as expected. */
+const SCHEMA_BEHIND_MESSAGE = /P2021|P2022|42P01|42703|(table|column|relation) .*does not exist/i;
 
 /** A query event carries `query` where a log event carries `message`. */
 function prismaEventMessage(event: Prisma.LogEvent | Prisma.QueryEvent): string {
