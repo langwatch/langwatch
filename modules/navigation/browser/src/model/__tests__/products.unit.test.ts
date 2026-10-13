@@ -39,9 +39,9 @@ describe("product registry", () => {
     });
 
     /** @scenario "AC1 Flag off hides the area" */
-    it("gates Dashboards on its release flag and analytics:view", () => {
+    it("gates Dashboards on its release flag, which closes its pages, and analytics:view", () => {
       expect(productById("dashboards").gates).toEqual([
-        { flag: "release_dashboards" },
+        { flag: "release_dashboards", closesPages: true },
         { permission: "analytics:view" },
       ]);
     });

@@ -327,6 +327,39 @@ describe("an address naming a product whose release flag is off", () => {
     });
   });
 
+  describe("when Dashboards is switched off", () => {
+    const dashboardsOff = {
+      ...BASE_READINGS.flags,
+      release_dashboards: { enabled: false, isLoading: false },
+    };
+
+    /** @scenario "AC1b A Dashboards address with the flag off is a 404 with no Dashboards sidebar" */
+    it.each(["/demo/dashboards", "/demo/dashboards/agent-flight-deck"])(
+      "draws the not-found page at %s with no product sidebar around it",
+      (pathname) => {
+        renderShell({
+          readings: {
+            pathname,
+            permissions: [...(BASE_READINGS.permissions ?? []), "analytics:view"],
+            flags: dashboardsOff,
+            notFound: <div data-testid="not-found" />,
+          },
+        });
+
+        expect(screen.getByTestId("not-found")).toBeInTheDocument();
+        expect(screen.queryByTestId("product-sidebar")).toBeNull();
+        expect(screen.queryByTestId("page-body")).toBeNull();
+      },
+    );
+
+    it("still draws a project page in its chrome", () => {
+      renderShell({ readings: { pathname: "/demo/traces", flags: dashboardsOff } });
+
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+      expect(screen.getByTestId("product-sidebar")).toBeInTheDocument();
+    });
+  });
+
   describe("when the gateway menu flag is off", () => {
     it("still draws a gateway page in its chrome, the flag hiding only the menu", () => {
       renderShell({
