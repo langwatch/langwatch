@@ -87,7 +87,6 @@ function mountKey({
   const runtime = createRestRuntime({
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
-    audit: { record: () => {} },
     identity: {
       // A project-tier route asks its permission of the door itself.
       authenticate: ({ permission }) => {

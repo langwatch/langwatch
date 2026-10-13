@@ -48,10 +48,7 @@ function renderHeaderReferences() {
     { host: fakeGovernanceHost() },
   );
   const text = (name: string) => screen.getByText(name).closest("button")!.className;
-  const marked = (name: string) => screen.getByText(name).closest("button")!.hasAttribute("data-primary");
   return {
-    primaryMarked: marked("primary reference"),
-    outlineMarked: marked("outline reference"),
     primary: text("primary reference"),
     outline: text("outline reference"),
     primaryTrigger: text("primary trigger reference"),

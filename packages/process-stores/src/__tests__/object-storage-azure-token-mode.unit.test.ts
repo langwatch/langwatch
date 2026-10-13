@@ -65,7 +65,6 @@ async function objectStorageFor(options: { production: boolean; azure?: Partial<
     secrets: resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets)),
     pipelines: PipelineParticipation.producer(),
     production,
-    members: { prisma: organizationOfEveryProject },
   });
   try {
     const storage = members.read("objectStorage");

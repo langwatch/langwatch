@@ -20,7 +20,6 @@ import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
@@ -89,9 +88,6 @@ async function bootWorker({ slack }: { slack: SlackApi }) {
       "data-retention": createApiFixture<DataRetentionApi>(),
       annotation: createApiFixture<AnnotationApi>(),
       authz: createApiFixture<AuthzApi>(),
-      "data-retention": createApiFixture<DataRetentionApi>({
-        getPlatformDefaultRetentionDays: () => 30,
-      }),
       notification: createApiFixture<NotificationService>(),
       slack,
       webhook: createApiFixture<WebhookApi>(),
@@ -102,7 +98,7 @@ async function bootWorker({ slack }: { slack: SlackApi }) {
   const step = (id: string) => {
     const found = steps.find((candidate) => candidate.id === id);
     if (!found) throw new Error(`step ${id} is not declared`);
-    return found as MigrationStep;
+    return found;
   };
   return { runtime, automations, step };
 }

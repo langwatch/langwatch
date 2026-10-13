@@ -56,9 +56,6 @@ function process(
       "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
       project: createApiFixture<ProjectApi>(),
-      authz: createApiFixture<AuthzApi>({
-        authorizeInternal: async ({ projectId }) => ownProof({ projectId }),
-      }),
       "data-retention": createApiFixture<DataRetentionApi>({
         getPlatformDefaultRetentionDays: () => 30,
         getResolvedForProject: async () => RETAINED,
