@@ -19,6 +19,14 @@ const catalogRouterIds = Object.entries(llmModels.models)
   .filter(([, entry]) => isVariablePriceRouter(entry))
   .map(([id]) => id);
 
+/** The ways a client writes a router id: letter case, a repeated provider, a variant tag. */
+const clientSpellings = (id: string): string[] => [
+  id.toUpperCase(),
+  id.replace(/^./, (first) => first.toUpperCase()),
+  `${id.slice(0, id.indexOf("/"))}/${id}`,
+  `${id}:free`,
+];
+
 describe("withoutNegativeRates", () => {
   describe("given a router's pricing", () => {
     it("drops every negative rate", () => {
@@ -75,33 +83,53 @@ describe("given the committed catalog", () => {
   });
 
   describe("when a router's cost is matched", () => {
-    /** @scenario A router never borrows another model's cost rule */
-    it.each(catalogRouterIds)("finds no rule for %s, not even a borrowed one", (id) => {
-      // `openrouter/pareto-code` prefix-matched `unbiased/pareto` and billed its price.
-      expect(findMatchingModelCost(id, getStaticModelCostRates())).toEqual([]);
-    });
+    // Routers whose id, past the provider prefix, matches a priced model's rule: the fallback the
+    // matcher takes for any other id. `openrouter/pareto-code` borrowed `unbiased/pareto` this way.
+    const borrowingRouterIds = catalogRouterIds.filter(
+      (id) =>
+        findMatchingModelCost(id.slice(id.indexOf("/") + 1), getStaticModelCostRates()).length > 0,
+    );
 
-    /** @scenario A router id in another letter case borrows no cost rule */
-    it("finds no borrowed rule when the router id arrives in another letter case", () => {
-      // The case-insensitive fallbacks lent `OpenRouter/Pareto-Code` the `unbiased/pareto` price.
-      for (const id of catalogRouterIds.map((routerId) => routerId.toUpperCase())) {
+    /** @scenario A router never borrows another model's cost rule */
+    it("finds no rule for a router whose id prefix-matches a priced model", () => {
+      expect(borrowingRouterIds.length).toBeGreaterThan(0);
+      for (const id of borrowingRouterIds) {
         expect(findMatchingModelCost(id, getStaticModelCostRates())).toEqual([]);
       }
     });
 
+    it.each(catalogRouterIds)("finds no rule for %s", (id) => {
+      expect(findMatchingModelCost(id, getStaticModelCostRates())).toEqual([]);
+    });
+
+    /** @scenario A router id in a client's spelling borrows no cost rule */
+    it("finds no borrowed rule when the router id arrives in a client's spelling", () => {
+      expect(borrowingRouterIds.length).toBeGreaterThan(0);
+      for (const id of borrowingRouterIds) {
+        // LiteLLM and DSPy send `openrouter/openrouter/pareto-code`, which borrowed the price too.
+        for (const spelling of clientSpellings(id)) {
+          expect(findMatchingModelCost(spelling, getStaticModelCostRates())).toEqual([]);
+        }
+      }
+    });
+
+    it("does not read a bare name with no provider as a router", () => {
+      expect(isVariablePriceRouterId("auto")).toBe(false);
+    });
+
     /** @scenario A cost rule that names the router still prices it */
-    it("still takes a rule that names the router itself", () => {
-      const [router] = catalogRouterIds;
+    it("still takes a project rule that names the router, in any client's spelling", () => {
+      const [router] = borrowingRouterIds;
+      // Written the way a project rule is typed: the plain id, unanchored and unescaped.
       const own: ModelCostRate = {
         model: router!,
-        regex: `^${router!.replace("/", "\\/")}$`,
+        regex: router!,
         inputCostPerToken: 1e-6,
         outputCostPerToken: 2e-6,
       };
-      expect(findMatchingModelCost(router!, [own, ...getStaticModelCostRates()])).toEqual([own]);
-      expect(
-        findMatchingModelCost(router!.toUpperCase(), [own, ...getStaticModelCostRates()]),
-      ).toEqual([own]);
+      for (const spelling of [router!, ...clientSpellings(router!)]) {
+        expect(findMatchingModelCost(spelling, [own, ...getStaticModelCostRates()])).toEqual([own]);
+      }
     });
   });
 });

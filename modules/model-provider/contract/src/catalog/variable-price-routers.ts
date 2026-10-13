@@ -27,12 +27,31 @@ export function isVariablePriceRouter({ pricing }: { pricing: LLMModelPricing })
 
 let routerIds: ReadonlySet<string> | null = null;
 
-/** True when the catalog lists this id as a router, in any letter case. */
-export function isVariablePriceRouterId(modelId: string): boolean {
+export type RouterMatch = { kind: "router"; routerId: string } | { kind: "not-router" };
+
+/**
+ * Which catalog router, if any, a model string names (its id in lower case). Takes the spellings
+ * clients send: any letter case, extra leading segments (LiteLLM's `openrouter/openrouter/auto`)
+ * and a `:variant` tag. A bare name with no provider is not read as a router.
+ */
+export function matchVariablePriceRouter(modelId: string): RouterMatch {
   routerIds ??= new Set(
     Object.entries(llmModels.models)
       .filter(([, entry]) => isVariablePriceRouter(entry))
       .map(([id]) => id.toLowerCase()),
   );
-  return routerIds.has(modelId.toLowerCase());
+  const segments = modelId
+    .toLowerCase()
+    .replace(/:[^/]*$/, "")
+    .split("/");
+  for (let start = 0; start < segments.length - 1; start++) {
+    const candidate = segments.slice(start).join("/");
+    if (routerIds.has(candidate)) return { kind: "router", routerId: candidate };
+  }
+  return { kind: "not-router" };
+}
+
+/** True when the model string names a catalog router, in any of the spellings above. */
+export function isVariablePriceRouterId(modelId: string): boolean {
+  return matchVariablePriceRouter(modelId).kind === "router";
 }
