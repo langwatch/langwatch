@@ -8,7 +8,8 @@ without leaking how the work is done, and to never read the resource before it
 is ready.
 
 This is the pattern. The dataset upload is the reference implementation
-(`src/pages/[project]/datasets/[id].tsx`); reuse it for the next
+(`modules/dataset/browser/src/ui/sections/dataset-editor.screen.tsx`);
+reuse it for the next
 processing-then-ready resource instead of reinventing the poll/banner/gate.
 
 ## 1. Poll the status with a self-stopping interval
@@ -24,46 +25,56 @@ const datasetQuery = api.dataset.getById.useQuery(
   {
     enabled: !!project && !!datasetId,
     refetchInterval: (data) =>
-      data?.status === "processing" || data?.status === "uploading"
-        ? 3000
-        : false,
+      data?.status === "processing" || data?.status === "uploading" ? 3000 : false,
   },
 );
 ```
 
-Reference: `src/pages/[project]/datasets/[id].tsx` (the `getById` poll). The
+Reference: `modules/dataset/browser/src/ui/sections/dataset-editor.screen.tsx`
+(the `getById` poll). The
 functional-`refetchInterval` idiom mirrors
-`src/features/traces-v2/hooks/useTraceFacets.ts`, where the same form drives a
+`modules/trace/browser/src/ui/sections/explorer/hooks/use-trace-facets.ts`, where the same form drives a
 cold-miss backoff poll that stops as soon as the payload settles. Read the
 interval from `data`, not from React state — the scheduler reads it outside the
 render cycle.
 
-## 2. Render a Chakra `Alert` banner for processing / failed
+## 2. Render an `Alert` banner for processing / failed
 
 One banner, driven by `status`. Processing gets a spinner; failed gets a
-message and a **Retry** affordance. Use Chakra `Alert.Root` /
-`Alert.Indicator` / `Alert.Content`, the same primitive the experiment views use
-(`src/components/experiments/DSPyExperiment.tsx`).
+message and a **Retry** affordance. Use `Alert.Root` / `Alert.Indicator` /
+`Alert.Content` from `@langwatch/design-system/primitives` (feature code never imports
+Chakra), as the experiment views do
+(`modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx`).
 
 ```tsx
-{(status === "uploading" || status === "processing") && (
-  <Alert.Root status="info">
-    <Alert.Indicator><Spinner size="sm" /></Alert.Indicator>
-    <Alert.Content>
-      <Alert.Title>Preparing your dataset, this can take a few minutes</Alert.Title>
-    </Alert.Content>
-  </Alert.Root>
-)}
-{status === "failed" && (
-  <Alert.Root status="error">
-    <Alert.Indicator />
-    <Alert.Content>
-      <Alert.Title>We could not prepare your dataset</Alert.Title>
-      <Alert.Description>{statusError ?? "Something went wrong. You can retry."}</Alert.Description>
-    </Alert.Content>
-    <Button loading={isRetrying} onClick={handleRetry}>Retry</Button>
-  </Alert.Root>
-)}
+{
+  (status === "uploading" || status === "processing") && (
+    <Alert.Root status="info">
+      <Alert.Indicator>
+        <Spinner size="sm" />
+      </Alert.Indicator>
+      <Alert.Content>
+        <Alert.Title>Preparing your dataset, this can take a few minutes</Alert.Title>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+{
+  status === "failed" && (
+    <Alert.Root status="error">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>We could not prepare your dataset</Alert.Title>
+        <Alert.Description>
+          {statusError ?? "Something went wrong. You can retry."}
+        </Alert.Description>
+      </Alert.Content>
+      <Button loading={isRetrying} onClick={handleRetry}>
+        Retry
+      </Button>
+    </Alert.Root>
+  );
+}
 ```
 
 Retry calls the backend's re-enqueue endpoint and then refetches the status
@@ -78,7 +89,7 @@ once the status settles:
 ```tsx
 const isReady = status === "ready" || status == null;
 // ...
-<DatasetEditorTable datasetId={datasetId} readEnabled={isReady} />
+<DatasetEditorTable datasetId={datasetId} readEnabled={isReady} />;
 // inside the table:
 api.datasetRecord.getAll.useQuery(args, {
   enabled: !!project && !!datasetId && readEnabled,
@@ -86,9 +97,9 @@ api.datasetRecord.getAll.useQuery(args, {
 ```
 
 Belt and suspenders on the server: the read procedure maps a not-ready resource
-to a precondition failure rather than serving partial data — tRPC
-`PRECONDITION_FAILED`, REST `425`
-(`src/server/api/routers/datasetRecord.ts`). A consumer that can still fire a
+to a precondition failure rather than serving partial data: the service throws
+`DatasetNotReadyError` (`dataset_not_ready`, HTTP 425,
+`modules/dataset/contract/src/dataset.errors.ts`). A consumer that can still fire a
 read before the gate flips should pass `retry: false` so it surfaces the
 precondition failure once instead of hammering the endpoint while it waits.
 
@@ -112,9 +123,10 @@ User-facing copy describes what the customer gets, never how the work is done
 
 ## Reference implementation
 
-- Poll + banner + retry + read-gate: `src/pages/[project]/datasets/[id].tsx`
-- Functional `refetchInterval` idiom: `src/features/traces-v2/hooks/useTraceFacets.ts`
-- `Alert` banner primitive: `src/components/experiments/DSPyExperiment.tsx`
-- Gated dependent read: `src/components/datasets/editor/DatasetEditorTable.tsx`
-- Server not-ready mapping: `src/server/api/routers/datasetRecord.ts`
+- Poll + banner + retry + read-gate:
+  `modules/dataset/browser/src/ui/sections/dataset-editor.screen.tsx`
+- Functional `refetchInterval` idiom: `modules/trace/browser/src/ui/sections/explorer/hooks/use-trace-facets.ts`
+- `Alert` banner in use: `modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx`
+- Gated dependent read: `modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx`
+- Server not-ready refusal: `DatasetNotReadyError` in `modules/dataset/contract/src/dataset.errors.ts`
 - Architecture: ADR-032 (`dev/docs/adr/032-datasets-s3-jsonl.md`), Decision 6 / I-READY.

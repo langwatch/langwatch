@@ -36,9 +36,7 @@ const noop = () => {
 
 /** Everything the human form printed, joined. */
 function printed(log: ReturnType<typeof vi.spyOn>): string {
-  return log.mock.calls
-    .map((call: unknown[]) => call.map(String).join(" "))
-    .join("\n");
+  return log.mock.calls.map((call: unknown[]) => call.map(String).join(" ")).join("\n");
 }
 
 describe("langwatch virtual-keys create", () => {
@@ -92,9 +90,7 @@ describe("langwatch virtual-keys create", () => {
 
       const result = await createVirtualKeyCommand({ name: "production-app" });
 
-      expect(create).toHaveBeenCalledWith(
-        expect.not.objectContaining({ reveal_once: true }),
-      );
+      expect(create).toHaveBeenCalledWith(expect.not.objectContaining({ reveal_once: true }));
       expect(result!.data).toEqual({ virtual_key: VIRTUAL_KEY, secret: SECRET });
       result!.table();
       expect(printed(log)).toContain(SECRET);

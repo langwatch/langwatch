@@ -1,0 +1,231 @@
+/**
+ * `/api/v1/agents` - the current agents REST family: CRUD over a project's
+ * agents and the relay call to an online connected agent. One flat declaration,
+ * mounted by the process on its project door. Scenario serves `/:id/test` (R10).
+ */
+import {
+  AgentApi,
+  AgentPayloadTooLargeError,
+  agentListResponseSchema,
+  agentResponseSchema,
+  agentRestParamsSchema,
+  agentRestQuerySchema,
+  archiveResultSchema,
+  createAgentRequestSchema,
+  relayCallBodySchema,
+  relayCallResponseSchema,
+  relayPayloadCaps,
+  updateAgentRequestSchema,
+  type AgentOverview,
+} from "@langwatch/agent-contract";
+import {
+  defineMiddlewareContext,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  projectRequestContext,
+  type RestDoorCredential,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
+import { z } from "zod";
+
+import { agentConfigWithoutSecrets } from "../rules/agent-secrets.rules.ts";
+
+/** The W3C trace context header a call carries, bound by the process from the request. */
+export const agentTraceparent = defineMiddlewareContext("traceparent", z.string().nullable());
+
+function response(
+  agent: AgentOverview,
+  app: AgentApi,
+  projectSlug: string,
+): Pick<
+  AgentOverview,
+  | "id"
+  | "name"
+  | "type"
+  | "config"
+  | "environment"
+  | "ownerUserId"
+  | "hostLabel"
+  | "lastSeenAt"
+  | "parameters"
+  | "owner"
+  | "status"
+  | "instances"
+  | "selectable"
+  | "notSelectableReason"
+  | "createdAt"
+  | "updatedAt"
+> & { platformUrl: string } {
+  return {
+    id: agent.id,
+    name: agent.name,
+    type: agent.type,
+    config: agentConfigWithoutSecrets(agent),
+    environment: agent.environment,
+    ownerUserId: agent.ownerUserId,
+    hostLabel: agent.hostLabel,
+    lastSeenAt: agent.lastSeenAt,
+    parameters: agent.parameters,
+    owner: agent.owner,
+    status: agent.status,
+    instances: agent.instances,
+    selectable: agent.selectable,
+    notSelectableReason: agent.notSelectableReason,
+    createdAt: agent.createdAt,
+    updatedAt: agent.updatedAt,
+    platformUrl: app.platformUrl({ projectSlug, agentId: agent.id, agentType: agent.type }),
+  };
+}
+
+/**
+ * Builds the `/api/v1/agents` family. `relayMaxPayloadMb` is resolved by the
+ * caller at mount time (`LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`); it must never
+ * be read at module load, or every deployment gets the protocol default.
+ */
+export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<
+    AgentApi,
+    RestDoorCredential,
+    typeof projectRequestContext | typeof agentTraceparent
+  >;
+}> {
+  const relayMaxBytes = relayPayloadCaps(relayMaxPayloadMb).envelopeBytes;
+
+  return (
+    defineRestRouter(AgentApi)
+      .withNamespace("agents")
+      .withVersion(MANAGEMENT_API_VERSION)
+      // `/api/v1/agents` is this family's whole contract: the bare `/api/agents`
+      // belongs to the deprecated legacy family, which answers a reduced field
+      // set there.
+      .withAddressing("v1-only")
+
+      .get("/", "listAgents")
+      .withQuery(agentRestQuerySchema)
+      .withPermission("project:view")
+      .withOutput(agentListResponseSchema)
+      .withDocs({ summary: "List agents with their current presence and owner" })
+      .withMiddlewareContext(projectRequestContext)
+      .handle(async ({ app, input, scope }, context) => {
+        const page = await app.listWithPresence({
+          ...input,
+          projectId: scope.id,
+          viewerUserId: context.viewerUserId,
+        });
+
+        return {
+          pagination: page.pagination,
+          data: page.data.map((agent) => response(agent, app, context.projectSlug)),
+        };
+      })
+
+      .post("/", "createAgent")
+      .withAudit("agents.create")
+      .withInput(createAgentRequestSchema)
+      .withPermission("project:update")
+      .withOutput(agentResponseSchema)
+      .withStatus(201)
+      .withDocs({ summary: "Create an authored agent; connected agents register through the SDK" })
+      .withMiddlewareContext(projectRequestContext)
+      .handle(async ({ app, input, scope }, context) => {
+        const created = await app.create({ ...input, projectId: scope.id });
+        const agent = await app.getById({
+          id: created.id,
+          projectId: scope.id,
+          viewerUserId: context.viewerUserId,
+        });
+
+        return response(agent, app, context.projectSlug);
+      })
+
+      .get("/:id", "getAgent")
+      .withParams(agentRestParamsSchema)
+      .withPermission("project:view")
+      .withOutput(agentResponseSchema)
+      .withDocs({ summary: "Get an agent in the caller's project" })
+      .withMiddlewareContext(projectRequestContext)
+      .handle(async ({ app, input, scope }, context) => {
+        const agent = await app.getById({
+          ...input,
+          projectId: scope.id,
+          viewerUserId: context.viewerUserId,
+        });
+
+        return response(agent, app, context.projectSlug);
+      })
+
+      .patch("/:id", "updateAgent")
+      .withAudit("agents.update")
+      .withParams(agentRestParamsSchema)
+      .withInput(updateAgentRequestSchema)
+      .withPermission("project:update")
+      .withOutput(agentResponseSchema)
+      .withDocs({ summary: "Update an authored agent" })
+      .withMiddlewareContext(projectRequestContext)
+      .handle(async ({ app, input, scope }, context) => {
+        await app.update({ ...input, projectId: scope.id });
+        const agent = await app.getById({
+          id: input.id,
+          projectId: scope.id,
+          viewerUserId: context.viewerUserId,
+        });
+
+        return response(agent, app, context.projectSlug);
+      })
+
+      .put("/:id", "replaceAgent")
+      .withAudit("agents.update")
+      .withParams(agentRestParamsSchema)
+      .withInput(updateAgentRequestSchema)
+      .withPermission("project:update")
+      .withOutput(agentResponseSchema)
+      .withDocs({ summary: "Update an authored agent; PUT retains partial update semantics" })
+      .withMiddlewareContext(projectRequestContext)
+      .handle(async ({ app, input, scope }, context) => {
+        await app.update({ ...input, projectId: scope.id });
+        const agent = await app.getById({
+          id: input.id,
+          projectId: scope.id,
+          viewerUserId: context.viewerUserId,
+        });
+
+        return response(agent, app, context.projectSlug);
+      })
+
+      .delete("/:id", "archiveAgent")
+      .withAudit("agents.delete")
+      .withParams(agentRestParamsSchema)
+      .withPermission("project:delete")
+      .withOutput(archiveResultSchema)
+      .withDocs({ summary: "Archive an agent while keeping its runs" })
+      .handle(async ({ app, input, scope }) => {
+        const agent = await app.archive({ ...input, projectId: scope.id });
+
+        return { id: agent.id, name: agent.name, type: agent.type, archivedAt: agent.archivedAt };
+      })
+
+      .post("/:id/call", "callConnectedAgent")
+      .withoutAudit("run, not a change")
+      .withParams(agentRestParamsSchema)
+      .withInput(relayCallBodySchema)
+      .withPermission("scenarios:create")
+      .withOutput(relayCallResponseSchema)
+      .withDocs({ summary: "Send one conversation turn to an online connected agent" })
+      .withBodyLimit({
+        maxBytes: relayMaxBytes,
+        onExceeded: () =>
+          new AgentPayloadTooLargeError({ what: "envelope", limitBytes: relayMaxBytes }),
+      })
+      .withMiddlewareContext(projectRequestContext, agentTraceparent)
+      .handle(({ app, input: { id, ...turn }, scope, signal }, context, header) =>
+        app.call(
+          { ...turn, id, projectId: scope.id },
+          { viewerUserId: context.viewerUserId, traceparent: header, signal },
+        ),
+      )
+
+      .build()
+  );
+}

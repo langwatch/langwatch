@@ -5,7 +5,7 @@
 # specs/migration/system-migrations-runner.feature.
 #
 # The ADR-110 one-shot migration is registered
-# (platform/app/src/server/app-layer/authz/authz-engine.migration.ts); the
+# ([gone] src/server/app-layer/authz/authz-engine.migration.ts); the
 # scenarios still tagged @unimplemented are the integration-level ones its
 # unit harness cannot honestly bind.
 
@@ -62,6 +62,12 @@ Feature: Moving an organization onto the grants projection
     Given a legacy row created long before the migration
     When it is stated as a fact
     Then the fact carries the row's original time, not the migration's clock
+
+  @unit
+  Scenario: Reassigning a grant's role clears the role it was imported with
+    Given a grant imported with a legacy role alongside its new custom role
+    When the grant is reassigned to a different role
+    Then the projected row no longer carries the legacy role it was imported with
 
   # ═══ How it runs ══════════════════════════════════════════════════════
 
@@ -123,6 +129,18 @@ Feature: Moving an organization onto the grants projection
     And a share link whose head only lags on views is not stated again
     And the first pass over an organization still states everything
     And the held report is unchanged by what the pass skipped
+
+  # One cloud organization can hold tens of thousands of members, and every
+  # grant fans out into more jobs. Pacing between organizations alone let one
+  # organization fill the queue with every command it had (2026-10-12).
+  @unit
+  Scenario: One large organization sends its grants a page at a time
+    Given an organization whose legacy rows state 20,000 grants
+    When a pass on a queue list runs it
+    Then it waits for the pass's queue room between pages of commands
+    And no more than the pass's limit plus one page of its jobs are ever outstanding
+    And every grant is stated
+    And the check runs once, after the last page
 
   @unit
   Scenario: A pass that failed partway is safe to repeat

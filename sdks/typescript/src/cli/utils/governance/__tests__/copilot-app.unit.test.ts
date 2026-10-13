@@ -1,9 +1,7 @@
 /**
- * Unit tests for the GitHub Copilot app capture core (ADR-039
- * §Extension): the OTLP env block the login agent injects, app-executable
- * detection per platform, and the per-OS login-agent descriptors. All
- * pure — no disk, no OS registration (that lives in the imperative
- * installer, tested separately).
+ * Unit tests for the Copilot app capture core (ADR-039 §Extension): the
+ * OTLP env block, app-executable detection per platform, and per-OS
+ * login-agent descriptors. All pure -- no disk, no OS registration.
  */
 
 import { describe, expect, it } from "vitest";
@@ -26,9 +24,7 @@ describe("buildCopilotAppEnv", () => {
         captureContent: true,
       });
 
-      expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
-        "https://app.langwatch.ai/api/otel",
-      );
+      expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("https://app.langwatch.ai/api/otel");
       expect(env.COPILOT_OTEL_ENABLED).toBe("true");
     });
 
@@ -40,9 +36,7 @@ describe("buildCopilotAppEnv", () => {
         captureContent: true,
       });
 
-      expect(env.OTEL_EXPORTER_OTLP_HEADERS).toBe(
-        "Authorization=Bearer ik-lw-abc_secret",
-      );
+      expect(env.OTEL_EXPORTER_OTLP_HEADERS).toBe("Authorization=Bearer ik-lw-abc_secret");
     });
 
     /** @scenario Content capture is enabled by default */
@@ -76,9 +70,7 @@ describe("buildCopilotAppEnv", () => {
         captureContent: false,
       });
 
-      expect(
-        env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
-      ).toBeUndefined();
+      expect(env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT).toBeUndefined();
       // still exports — only content is withheld
       expect(env.COPILOT_OTEL_ENABLED).toBe("true");
     });
@@ -94,9 +86,7 @@ describe("findCopilotApp", () => {
         (p) => p === "/Applications/GitHub Copilot.app/Contents/MacOS/github",
       );
 
-      expect(found).toBe(
-        "/Applications/GitHub Copilot.app/Contents/MacOS/github",
-      );
+      expect(found).toBe("/Applications/GitHub Copilot.app/Contents/MacOS/github");
     });
   });
 
@@ -143,9 +133,7 @@ describe("renderLaunchAgent", () => {
       const plist = d.files[0]!;
       expect(plist.path).toBe(d.registerPath);
       expect(plist.content).toContain("<key>RunAtLoad</key>");
-      expect(plist.content).toContain(
-        "/Applications/GitHub Copilot.app/Contents/MacOS/github",
-      );
+      expect(plist.content).toContain("/Applications/GitHub Copilot.app/Contents/MacOS/github");
       expect(plist.content).toContain("Authorization=Bearer ik-lw-abc_secret");
     });
 
@@ -180,9 +168,7 @@ describe("renderLaunchAgent", () => {
       );
       // the fix: quoted, so systemd treats the spaced path as one token
       expect(unit).toContain('ExecStart="/opt/GitHub Copilot/github-copilot"');
-      expect(unit).not.toContain(
-        "ExecStart=/opt/GitHub Copilot/github-copilot",
-      );
+      expect(unit).not.toContain("ExecStart=/opt/GitHub Copilot/github-copilot");
     });
 
     it("escapes backslashes BEFORE quotes so a trailing backslash cannot unterminate the value (CodeQL #249)", () => {
@@ -190,7 +176,7 @@ describe("renderLaunchAgent", () => {
         platform: "linux",
         home: "/home/dev",
         execPath: "/usr/bin/github-copilot",
-        env: { WEIRD: 'ends-with-backslash\\', QUOTED: 'has "quote" inside' },
+        env: { WEIRD: "ends-with-backslash\\", QUOTED: 'has "quote" inside' },
       });
 
       const unit = d.files[0]!.content;
@@ -232,8 +218,7 @@ describe("renderLaunchAgent", () => {
     const winSpec = {
       platform: "win32" as const,
       home: "C:\\Users\\dev",
-      execPath:
-        "C:\\Users\\dev\\AppData\\Local\\Programs\\GitHub Copilot\\GitHub Copilot.exe",
+      execPath: "C:\\Users\\dev\\AppData\\Local\\Programs\\GitHub Copilot\\GitHub Copilot.exe",
       env,
     };
 

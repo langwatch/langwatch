@@ -1,0 +1,273 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { PresenceApi } from "@langwatch/presence-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import { MemoryLangyRepositories } from "../../../../repositories/memory/memory.langy.repositories.ts";
+import type { LangyService } from "../../../../services/langy.service.ts";
+import { LangyUiActionPageService } from "../../../ui-action/services/langy-ui-action-page.service.ts";
+import { LangyPanelAccessService } from "../langy-panel-access.service.ts";
+import {
+  LangyPanelConversationService,
+  type LangyPanelConversationMembers,
+} from "../langy-panel-conversation.service.ts";
+import { LangyPanelEgressService } from "../langy-panel-egress.service.ts";
+import {
+  LangyPanelLocalService,
+  type LangyPanelLocalMembers,
+} from "../langy-panel-local.service.ts";
+import {
+  LangyPanelTurnStreamService,
+  type LangyPanelTurnStreamMembers,
+} from "../langy-panel-turn-stream.service.ts";
+
+type UiActions = NonNullable<LangyPanelConversationMembers["uiActions"]>;
+
+const caller = { userId: "user_1", name: "Ada", email: "ada@example.com" };
+const projectId = "project_1";
+
+function access({ enabled = true, demo = false } = {}): LangyPanelAccessService {
+  return LangyPanelAccessService.create({
+    featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => enabled }),
+    projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "org_1" }),
+    authz: createApiFixture<AuthzApi>({ isDemoProject: () => demo }),
+  });
+}
+
+function panel(
+  overrides: Partial<LangyPanelConversationMembers> = {},
+): LangyPanelConversationService {
+  const repositories = MemoryLangyRepositories.create();
+  return LangyPanelConversationService.create({
+    access: access(),
+    langy: createApiFixture<LangyPanelConversationMembers["langy"]>(),
+    turnBounds: createApiFixture<LangyPanelConversationMembers["turnBounds"]>(),
+    rateLimits: { check: async () => ({ allowed: true }) },
+    presence: createApiFixture<PresenceApi>(),
+    uiActions: LangyUiActionPageService.create({ uiActions: repositories.uiActions }),
+    ...overrides,
+  });
+}
+
+describe("LangyPanelConversationService", () => {
+  /** @scenario "A person outside the Langy rollout is answered not enabled" */
+  it("refuses a person outside the rollout before reading anything", async () => {
+    const service = panel({ access: access({ enabled: false }) });
+
+    await expect(service.listConversations({ caller, projectId, limit: 30 })).rejects.toMatchObject(
+      { code: "langy_not_enabled" },
+    );
+  });
+
+  /** @scenario "The demo project never runs Langy" */
+  it("refuses the demo project", async () => {
+    const service = panel({ access: access({ demo: true }) });
+
+    await expect(service.listConversations({ caller, projectId, limit: 30 })).rejects.toMatchObject(
+      { code: "langy_not_enabled" },
+    );
+  });
+
+  /** @scenario "The demo project refuses Langy on every surface" */
+  it("refuses the panel and the egress allow-list read on the demo project", async () => {
+    const demoAccess = access({ demo: true });
+    const conversations = panel({ access: demoAccess });
+    const egress = LangyPanelEgressService.create({
+      access: demoAccess,
+      langy: createApiFixture<Pick<LangyService, "findEgressAllowlist" | "setEgressAllowlist">>(),
+    });
+
+    await expect(
+      conversations.listConversations({ caller, projectId, limit: 30 }),
+    ).rejects.toMatchObject({ code: "langy_not_enabled" });
+    await expect(egress.getEgressState({ caller, projectId })).rejects.toMatchObject({
+      code: "langy_not_enabled",
+    });
+  });
+
+  /** @scenario "The conversation list reaches the browser as epoch-millisecond rows" */
+  it("answers the list as epoch-millisecond rows", async () => {
+    const service = panel({
+      langy: createApiFixture<LangyPanelConversationMembers["langy"]>({
+        getPage: async () => ({
+          items: [
+            {
+              id: "conversation_1",
+              title: "Why is my agent slow",
+              isShared: false,
+              isOwn: true,
+              messageCount: 2,
+              lastActivityAt: Temporal.Instant.fromEpochMilliseconds(1_700_000_000_000),
+            },
+          ],
+          nextCursor: null,
+        }),
+      }),
+    });
+
+    const page = await service.listConversations({ caller, projectId, limit: 30 });
+
+    expect(page.items).toEqual([
+      {
+        id: "conversation_1",
+        title: "Why is my agent slow",
+        isShared: false,
+        isOwn: true,
+        messageCount: 2,
+        lastActivityAtMs: 1_700_000_000_000,
+      },
+    ]);
+  });
+
+  /** @scenario "A conversation that is not visible yet reads as absent" */
+  it("answers an unprojected conversation's detail as empty", async () => {
+    const service = panel({
+      langy: createApiFixture<LangyPanelConversationMembers["langy"]>({
+        findByIdVisible: async () => null,
+      }),
+    });
+
+    await expect(
+      service.findVisibleConversationDetails({ caller, projectId, conversationId: "c_1" }),
+    ).resolves.toEqual([]);
+  });
+
+  /** @scenario "A person over the message budget is refused before a turn dispatches" */
+  it("refuses a send over the message budget before any turn starts", async () => {
+    const service = panel({ rateLimits: { check: async () => ({ allowed: false }) } });
+
+    await expect(
+      service.continueConversationTurn({
+        caller,
+        projectId,
+        conversationId: "conversation_1",
+        idempotencyKey: "send-0001",
+        messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }],
+      }),
+    ).rejects.toMatchObject({ code: "langy_rate_limited" });
+  });
+
+  /** @scenario "A panel-open warm over its budget is a cold start, never an error" */
+  it("answers an over-budget warm as a cold start", async () => {
+    const service = panel({ rateLimits: { check: async () => ({ allowed: false }) } });
+
+    await expect(
+      service.warmPanelWorker({ caller, projectId, conversationId: "conversation_1" }),
+    ).resolves.toEqual({ conversationId: "conversation_1", warmed: false });
+  });
+
+  /** @scenario "A tab cannot claim an action in a conversation it cannot see" */
+  it("answers a claim in an invisible conversation as not claimed", async () => {
+    const service = panel({
+      langy: createApiFixture<LangyPanelConversationMembers["langy"]>({
+        findByIdVisible: async () => null,
+      }),
+      uiActions: createApiFixture<UiActions>(),
+    });
+
+    await expect(
+      service.claimUiAction({ caller, projectId, conversationId: "c_1", actionId: "a_1" }),
+    ).resolves.toEqual({ isClaimed: false });
+  });
+
+  /** @scenario "A tab's completion reaches the action as the signed-in person's" */
+  it("hands the completion on under the caller's id", async () => {
+    const seen: Parameters<UiActions["complete"]>[0][] = [];
+    const service = panel({
+      uiActions: createApiFixture<UiActions>({
+        complete: async (args) => {
+          seen.push(args);
+          return { isAccepted: true };
+        },
+      }),
+    });
+
+    await expect(
+      service.completeUiAction({
+        caller,
+        projectId,
+        conversationId: "c_1",
+        actionId: "a_1",
+        ok: true,
+        result: { rows: 2 },
+      }),
+    ).resolves.toEqual({ isAccepted: true });
+    expect(seen).toEqual([
+      {
+        projectId,
+        userId: "user_1",
+        conversationId: "c_1",
+        actionId: "a_1",
+        completion: { ok: true, result: { rows: 2 } },
+      },
+    ]);
+  });
+});
+
+describe("LangyPanelLocalService", () => {
+  /** @scenario "Remembering the code access choice writes it for the signed-in person" */
+  it("writes the remembered choice for the caller", async () => {
+    const written: { userId: string; preference: "github" | null }[] = [];
+    const service = LangyPanelLocalService.create({
+      access: access(),
+      conversations: createApiFixture<LangyPanelLocalMembers["conversations"]>(),
+      runtime: createApiFixture<LangyPanelLocalMembers["runtime"]>(),
+      commands: createApiFixture<LangyPanelLocalMembers["commands"]>(),
+      workspace: createApiFixture<LangyPanelLocalMembers["workspace"]>({
+        setCodeAccessPreference: async (input) => {
+          written.push(input);
+          return { preference: input.preference };
+        },
+      }),
+      projects: createApiFixture<ProjectApi>(),
+      baseHost: undefined,
+    });
+
+    await expect(
+      service.setCodeAccessPreference({ caller, projectId, preference: "github" }),
+    ).resolves.toEqual({ preference: "github" });
+    expect(written).toEqual([{ userId: "user_1", preference: "github" }]);
+  });
+});
+
+describe("LangyPanelTurnStreamService", () => {
+  const turn = { caller, projectId, conversationId: "conv_1", turnId: "turn_1" };
+
+  function turnStream({ isActor }: { isActor: boolean }) {
+    const findByIdVisible = vi.fn(async () => null);
+    const openBuffer = vi.fn<LangyPanelTurnStreamMembers["openBuffer"]>(() => {
+      throw new Error("buffer opened");
+    });
+    const service = LangyPanelTurnStreamService.create({
+      access: access(),
+      langy: createApiFixture<LangyPanelTurnStreamMembers["langy"]>({ findByIdVisible }),
+      turnAccess: createApiFixture<LangyPanelTurnStreamMembers["turnAccess"]>({
+        isTurnActor: async () => isActor,
+      }),
+      openBuffer,
+    });
+    return { service, findByIdVisible, openBuffer };
+  }
+
+  /** @scenario "Attaching to a turn in someone else's conversation answers not found" */
+  it("answers a stranger's attach with not found and opens no buffer", async () => {
+    const { service, openBuffer } = turnStream({ isActor: false });
+
+    await expect(service.watchTurnStream(turn).next()).rejects.toMatchObject({
+      code: "langy_conversation_not_found",
+    });
+    expect(openBuffer).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "The person who started a turn attaches before its conversation is visible" */
+  it("lets the turn's actor through without reading the conversation", async () => {
+    const { service, findByIdVisible, openBuffer } = turnStream({ isActor: true });
+
+    await expect(service.watchTurnStream(turn).next()).rejects.toThrow("buffer opened");
+    expect(openBuffer).toHaveBeenCalledOnce();
+    expect(findByIdVisible).not.toHaveBeenCalled();
+  });
+});

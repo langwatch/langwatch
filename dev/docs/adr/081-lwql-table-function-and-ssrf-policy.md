@@ -69,8 +69,8 @@ someone who knows to ask it. A positional rule has no such question.
 
 Second, a name list is a denylist wearing an allowlist's clothes. Whichever way
 it is written, a table function ClickHouse adds after we wrote it lands on the
-side we did not choose — and for a name-keyed *allow* list the new function is
-refused, which is fine, while for the name-keyed *deny* list it is permitted,
+side we did not choose — and for a name-keyed _allow_ list the new function is
+refused, which is fine, while for the name-keyed _deny_ list it is permitted,
 which is not. Refusing the position avoids picking a side at all.
 
 Third, the value of the inert ones to a customer is close to zero. `numbers()`

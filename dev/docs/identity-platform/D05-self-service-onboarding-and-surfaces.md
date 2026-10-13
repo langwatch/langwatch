@@ -1,6 +1,12 @@
 # D05 — Self-service SSO onboarding + identity surfaces
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D04 + **authz precondition checklist (hard)** · Flag: `SELF_SERVE_SSO` (per-org)
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D04 + **authz precondition checklist (hard)** · Flag: `SELF_SERVE_SSO` (per-org)
+
+> **Historical (marked 2026-10-05):** written against main's monolith, before `platform/app` was
+> deleted. Paths under `src/server/`, `server/app-layer/` and `packages/authz*` describe that tree.
+> Today a feature is a module (ARCHITECTURE.md §3), pipelines are `definePipeline` in
+> `modules/<name>/process/src/eventing` (§9), and the permission registry is
+> `packages/authorization/src/registry.ts`. Check the current tree before treating a path below as live.
 
 # Overview
 
@@ -92,7 +98,7 @@ them re-opened by the implementation:
      all — the only thing left that needs them is somebody completing a test
      sign-in, which is the entire point of a test sign-in. Attestation is a
      D04 amendment (below). This is the bulk of the value: it is what makes
-     cloud onboarding easy for *us*, and it is the safety net that ends DB
+     cloud onboarding easy for _us_, and it is the safety net that ends DB
      surgery.
    - **Tier 2 — self-hosted self-serve, licence-gated.** A self-hosted
      customer cannot reach our operators at all, so they self-serve or they

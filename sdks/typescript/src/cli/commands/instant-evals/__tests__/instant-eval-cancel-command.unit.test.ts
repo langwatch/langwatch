@@ -50,15 +50,13 @@ describe("instant-eval cancel, given a running run", () => {
       const result = await cancelInstantEvalCommand("instant_eval_abc");
 
       expect(cancelSpy).toHaveBeenCalledWith("instant_eval_abc");
-      expect((result?.data as { status: string }).status).toBe("cancelled");
+      expect((result?.data as { status: string } | undefined)?.status).toBe("cancelled");
     });
 
     it("exits non-zero when the run already finished", async () => {
       cancelSpy.mockRejectedValue(new Error("instant_eval_already_finished"));
 
-      await expect(
-        cancelInstantEvalCommand("instant_eval_abc"),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(cancelInstantEvalCommand("instant_eval_abc")).rejects.toThrow(ProcessExitError);
     });
   });
 });

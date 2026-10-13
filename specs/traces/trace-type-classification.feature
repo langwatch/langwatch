@@ -6,7 +6,7 @@ Feature: Trace origin classification
 
   # All scenarios describe the trace projection's origin classification
   # in the event-sourcing pipeline. Need targeted unit tests in
-  # `platform/app/src/server/event-sourcing/pipelines/trace-processing/projections/`
+  # `[gone] src/server/event-sourcing/pipelines/trace-processing/projections/`
   # for the origin-classification projection. Cheap to add.
 
   # =========================================================================
@@ -446,7 +446,7 @@ Feature: Trace origin classification
   # based on origin — it dispatches for any known origin and lets the
   # precondition matcher (precondition-matchers.ts) filter per monitor config.
   # The exception is empty origin with no SDK info: that path schedules a
-  # deferred check via originGate.subscriber.ts.
+  # deferred check via the deferredOriginResolution subscriber.
 
   @unit @unimplemented
   Scenario: Online evaluations dispatch for evaluation-origin traces (preconditions filter)
@@ -469,7 +469,7 @@ Feature: Trace origin classification
     And a trace arrives without "langwatch.origin" and without sdk.name
     When the evaluation trigger subscriber processes the trace
     Then no evaluation is triggered immediately
-    And a deferred origin-resolution check is scheduled (originGate.subscriber)
+    And a deferred origin-resolution check is scheduled (the deferredOriginResolution subscriber)
 
   @unit @unimplemented
   Scenario: Online evaluations dispatch for simulation/workflow/playground traces (preconditions filter)

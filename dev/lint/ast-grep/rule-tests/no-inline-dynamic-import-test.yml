@@ -1,8 +1,0 @@
-id: no-inline-dynamic-import-ts
-valid:
-  - 'import { foo } from "./module";'
-  - 'import type { Bar } from "./types";'
-  - 'export { baz } from "./module";'
-invalid:
-  - 'const mod = import("./module");'
-  - 'async function load() { const mod = await import("./heavy"); return mod; }'

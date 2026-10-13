@@ -146,3 +146,10 @@ Feature: Analytics Chart Rendering
     When the query succeeds but returns no data
     Then the chart shows a "No data" message instead of a blank area
     And the empty chart content is not rendered underneath
+
+  @regression @integration
+  Scenario: An empty summary keeps its figure labels inside its own bounds
+    Given a summary figure drawn inside a narrow tab header
+    When the query succeeds but returns no data
+    Then the tab header shows the figure label with "-" and "No data yet"
+    And no chart placeholder text is drawn over the neighbouring figures

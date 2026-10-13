@@ -1,0 +1,32 @@
+{
+  // The emitting half of the package. Node cannot load `.tsx`, so the three
+  // server processes import `dist` while the studio and the tests read `src`.
+  // tsc is the whole build: `rewriteRelativeImportExtensions` turns the `.ts`
+  // and `.tsx` specifiers into `.js`, so no bundler has to learn the shape of
+  // the package and `dist` mirrors `src` file for file.
+  // tsconfig.build.json emits the declarations (dist/typecheck); this config
+  // emits the JavaScript the server processes load (`pnpm build`).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "paths": {
+      "@langwatch/mail": ["./src/index.ts"]
+    },
+    "declaration": false,
+    "sourceMap": true,
+    "types": ["node"],
+    // Inside `dist` on purpose: the build clears `dist` first, and an
+    // incremental tsc with its build info elsewhere sees an up-to-date project
+    // and emits nothing into the directory that was just deleted.
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+
+    "customConditions": [],
+
+    "rewriteRelativeImportExtensions": true,
+    "composite": false
+  },
+  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts", "src/**/*.test.tsx"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

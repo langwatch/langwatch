@@ -1,0 +1,528 @@
+import type { TransportPeers } from "@langwatch/api";
+import { ModuleApiToken, type ResolvedTokens } from "@langwatch/module";
+import { type StoresMemberSource } from "@langwatch/process-stores";
+
+import { ApplicationBuilder, type BootedRuntime } from "./application.ts";
+import { channelsBind } from "./channel-registry.ts";
+import type {
+  InstallableServerFeature,
+  ModuleSecretsScope,
+  ServerRole,
+} from "./feature-installer.ts";
+import type { RuntimeService } from "./lifecycle/runtime-lifecycle.ts";
+import { ObservabilitySupply } from "./process-supply.options.ts";
+import type {
+  InstalledPeersInAnyBranch,
+  InstalledSupplyPeers,
+  Merge,
+  MissingRequirementFields,
+  MissingRequirementFieldsFrom,
+  RequiredConfig,
+  RequiredMembers,
+  RequiredPeers,
+  SupplyModule,
+  ValidateSupply,
+} from "./process-supply.types.ts";
+import { type TestPeer, testPeer } from "./testing.ts";
+import type { FeatureTransportHosts } from "./transport-mounting.ts";
+
+type SupplyRecord = Readonly<Record<string, unknown>>;
+type MemberValueFrom<RequiredMemberSet, Name extends string> = Name extends keyof RequiredMemberSet
+  ? RequiredMemberSet[Name]
+  : unknown;
+type MissingFrom<
+  RequiredMemberSet,
+  RequiredConfigSet,
+  RequiredPeerSet,
+  InstalledPeerSet,
+  InstalledPeerSetInAnyBranch,
+  Members,
+  Config,
+  Peers,
+> =
+  MissingRequirementFieldsFrom<
+    RequiredMemberSet,
+    RequiredConfigSet,
+    RequiredPeerSet,
+    InstalledPeerSet,
+    InstalledPeerSetInAnyBranch,
+    Members,
+    Config,
+    Peers
+  > extends infer Fields
+    ? Extract<keyof Fields, string>
+    : never;
+/**
+ * What a process exposes: the hosts every declared transport mounts on, and the one handler it
+ * serves once they have. Both come from ONE call, at the one moment either can be built — every
+ * module's application exists and nothing is listening yet.
+ */
+export interface ExposedSurface<Rest, Trpc> {
+  readonly hosts: FeatureTransportHosts<Rest, Trpc>;
+  /** Called after every declaration mounted. Its answer is what `serve` hosts. */
+  readonly serve: () => unknown;
+}
+interface SupplyState<Rest, Trpc> {
+  readonly role: ServerRole;
+  /** Scopes the process resolver per module, as the Server does; absent where none was stated. */
+  readonly secrets?: ModuleSecretsScope;
+  readonly modules: readonly SupplyModule[];
+  readonly members: SupplyRecord;
+  readonly config: SupplyRecord;
+  readonly peers: SupplyRecord;
+  readonly services: readonly RuntimeService[];
+  readonly transport?: (peers: TransportPeers) => ExposedSurface<Rest, Trpc>;
+  readonly stores?: StoresMemberSource;
+}
+
+/** Every member a stores source materializes, in the supply's canonical names. */
+type StoreSuppliedNames =
+  | "clock"
+  | "secrets"
+  | "encryption"
+  | "prisma"
+  | "clickhouse"
+  | "redis"
+  | "objectStorage"
+  | "logger"
+  | "telemetry"
+  | "eventing"
+  | "rateLimiter"
+  | "cache"
+  | "idempotency"
+  | "clickhouseAdmin"
+  | "databaseTarget";
+
+declare const supplyState: unique symbol;
+declare const missingSupply: unique symbol;
+interface MissingRequirement<Names extends string> {
+  readonly [missingSupply]: Names;
+}
+type Boot<
+  Modules extends readonly SupplyModule[],
+  Members extends SupplyRecord,
+  Config extends SupplyRecord,
+  Peers extends SupplyRecord,
+  Missing extends string,
+  Rest,
+  Trpc,
+  RequiredMemberSet extends SupplyRecord,
+  RequiredConfigSet extends SupplyRecord,
+  RequiredPeerSet extends SupplyRecord,
+  InstalledPeerSet extends SupplyRecord,
+  InstalledPeerSetInAnyBranch extends SupplyRecord,
+> = [Missing] extends [never]
+  ? (
+      this: ProcessSupply<
+        Modules,
+        Members,
+        Config,
+        Peers,
+        never,
+        Rest,
+        Trpc,
+        RequiredMemberSet,
+        RequiredConfigSet,
+        RequiredPeerSet,
+        InstalledPeerSet,
+        InstalledPeerSetInAnyBranch
+      >,
+    ) => Promise<BootedRuntime<SupplyRecord, Rest, Trpc>>
+  : "" & MissingRequirement<Missing>;
+type Exact<Left, Right> = [Left] extends [Right]
+  ? [Right] extends [Left]
+    ? unknown
+    : never
+  : never;
+type CheckedModule<Module extends SupplyModule> = Module extends {
+  readonly types: { readonly dependencies: infer Dependencies };
+}
+  ? Exact<ResolvedTokens<Module["dependencies"]>, Dependencies> extends never
+    ? never
+    : Module
+  : never;
+type CheckedModuleUnion<Modules extends readonly SupplyModule[]> = [Modules[number]] extends [
+  CheckedModule<Modules[number]>,
+]
+  ? unknown
+  : never;
+type CheckedModules<Modules extends readonly SupplyModule[]> = number extends Modules["length"]
+  ? never
+  : string extends Modules[number]["name"]
+    ? never
+    : SupplyModule["configType"] extends Modules[number]["configType"]
+      ? never
+      : CheckedModuleUnion<Modules>;
+
+export class ProcessSupply<
+  Modules extends readonly SupplyModule[] = [],
+  Members extends SupplyRecord = Record<never, never>,
+  Config extends SupplyRecord = Record<never, never>,
+  Peers extends SupplyRecord = Record<never, never>,
+  Missing extends string = keyof MissingRequirementFields<Modules, Members, Config, Peers> & string,
+  Rest = never,
+  Trpc = never,
+  RequiredMemberSet extends SupplyRecord = RequiredMembers<Modules>,
+  RequiredConfigSet extends SupplyRecord = RequiredConfig<Modules>,
+  RequiredPeerSet extends SupplyRecord = RequiredPeers<Modules>,
+  InstalledPeerSet extends SupplyRecord = InstalledSupplyPeers<Modules>,
+  InstalledPeerSetInAnyBranch extends SupplyRecord = InstalledPeersInAnyBranch<Modules>,
+> {
+  declare readonly [supplyState]: (state: {
+    modules: Modules;
+    members: Members;
+    config: Config;
+    peers: Peers;
+    missing: Missing;
+    rest: Rest;
+    trpc: Trpc;
+  }) => void;
+  declare readonly boot: Boot<
+    Modules,
+    Members,
+    Config,
+    Peers,
+    Missing,
+    Rest,
+    Trpc,
+    RequiredMemberSet,
+    RequiredConfigSet,
+    RequiredPeerSet,
+    InstalledPeerSet,
+    InstalledPeerSetInAnyBranch
+  >;
+  readonly #state: SupplyState<Rest, Trpc>;
+
+  private constructor(state: SupplyState<Rest, Trpc>) {
+    this.#state = state;
+    Object.defineProperty(this, "boot", {
+      configurable: false,
+      enumerable: false,
+      value: () => this.#boot(),
+      writable: false,
+    });
+  }
+
+  static create(options: CreateAppOptions): ProcessSupply {
+    return new ProcessSupply({
+      ...options,
+      modules: [],
+      members: {},
+      config: {},
+      peers: {},
+      services: [],
+    });
+  }
+
+  withModules<const Next extends readonly SupplyModule[]>(
+    modules: Next,
+    ..._checked: [CheckedModules<Next>] extends [never] ? [never] : []
+  ) {
+    return new ProcessSupply<
+      [...Modules, ...Next],
+      Members,
+      Config,
+      Peers,
+      MissingFrom<
+        Merge<RequiredMemberSet, RequiredMembers<Next>>,
+        Merge<RequiredConfigSet, RequiredConfig<Next>>,
+        Merge<RequiredPeerSet, RequiredPeers<Next>>,
+        Merge<InstalledPeerSet, InstalledSupplyPeers<Next>>,
+        Merge<InstalledPeerSetInAnyBranch, InstalledPeersInAnyBranch<Next>>,
+        Members,
+        Config,
+        Peers
+      >,
+      Rest,
+      Trpc,
+      Merge<RequiredMemberSet, RequiredMembers<Next>>,
+      Merge<RequiredConfigSet, RequiredConfig<Next>>,
+      Merge<RequiredPeerSet, RequiredPeers<Next>>,
+      Merge<InstalledPeerSet, InstalledSupplyPeers<Next>>,
+      Merge<InstalledPeerSetInAnyBranch, InstalledPeersInAnyBranch<Next>>
+    >({
+      ...this.#state,
+      modules: [...this.#state.modules, ...modules],
+    });
+  }
+
+  withConfig<const Next extends RequiredConfigSet>(config: Next) {
+    return new ProcessSupply<
+      Modules,
+      Members,
+      Next,
+      Peers,
+      MissingFrom<
+        RequiredMemberSet,
+        RequiredConfigSet,
+        RequiredPeerSet,
+        InstalledPeerSet,
+        InstalledPeerSetInAnyBranch,
+        Members,
+        Next,
+        Peers
+      >,
+      Rest,
+      Trpc,
+      RequiredMemberSet,
+      RequiredConfigSet,
+      RequiredPeerSet,
+      InstalledPeerSet,
+      InstalledPeerSetInAnyBranch
+    >({ ...this.#state, config });
+  }
+
+  provide<const Next extends SupplyRecord>(peers: Next & ValidateSupply<Next, RequiredPeerSet>) {
+    return new ProcessSupply<
+      Modules,
+      Members,
+      Config,
+      Merge<Peers, Next>,
+      MissingFrom<
+        RequiredMemberSet,
+        RequiredConfigSet,
+        RequiredPeerSet,
+        InstalledPeerSet,
+        InstalledPeerSetInAnyBranch,
+        Members,
+        Config,
+        Merge<Peers, Next>
+      >,
+      Rest,
+      Trpc,
+      RequiredMemberSet,
+      RequiredConfigSet,
+      RequiredPeerSet,
+      InstalledPeerSet,
+      InstalledPeerSetInAnyBranch
+    >({
+      ...this.#state,
+      peers: { ...this.#state.peers, ...peers },
+    });
+  }
+
+  withClock<Value extends MemberValueFrom<RequiredMemberSet, "clock">>(clock: Value) {
+    return this.#withMembers({ clock });
+  }
+
+  withSecrets<Value extends MemberValueFrom<RequiredMemberSet, "secrets">>(secrets: Value) {
+    return this.#withMembers({ secrets });
+  }
+
+  withEncryption<Value extends MemberValueFrom<RequiredMemberSet, "encryption">>(
+    encryption: Value,
+  ) {
+    return this.#withMembers({ encryption });
+  }
+
+  withEventing<Value extends MemberValueFrom<RequiredMemberSet, "eventing">>(eventing: Value) {
+    return this.#withMembers({ eventing });
+  }
+
+  /**
+   * The one supply call for storage: the opened stores answer every standard
+   * member lazily, in their own build order; the tier rides the value.
+   */
+  withStores(stores: StoresMemberSource) {
+    return this.#withStores<
+      Pick<RequiredMemberSet, Extract<StoreSuppliedNames, keyof RequiredMemberSet>>
+    >(stores);
+  }
+
+  #withStores<Next extends object>(stores: StoresMemberSource) {
+    return new ProcessSupply<
+      Modules,
+      Merge<Members, Next>,
+      Config,
+      Peers,
+      MissingFrom<
+        RequiredMemberSet,
+        RequiredConfigSet,
+        RequiredPeerSet,
+        InstalledPeerSet,
+        InstalledPeerSetInAnyBranch,
+        Merge<Members, Next>,
+        Config,
+        Peers
+      >,
+      Rest,
+      Trpc,
+      RequiredMemberSet,
+      RequiredConfigSet,
+      RequiredPeerSet,
+      InstalledPeerSet,
+      InstalledPeerSetInAnyBranch
+    >({
+      ...this.#state,
+      stores,
+    });
+  }
+
+  withMembers<const Next extends Partial<RequiredMemberSet>>(
+    members: Next & ValidateSupply<Next, RequiredMemberSet>,
+  ) {
+    return this.#withMembers(members);
+  }
+
+  withObservability<Next extends object>(
+    configure: (observability: ObservabilitySupply<Modules>) => ObservabilitySupply<Modules, Next>,
+  ) {
+    return this.#withMembers(configure(new ObservabilitySupply<Modules>({})).supplied);
+  }
+
+  /**
+   * What this process serves; a worker never calls it. The whole composition (surfaces, prefixes,
+   * middleware) is written inside this call, so a main never sees a mount or transport internals.
+   */
+  expose<NextRest, NextTrpc>(
+    surface: (peers: TransportPeers) => ExposedSurface<NextRest, NextTrpc>,
+  ) {
+    return new ProcessSupply<
+      Modules,
+      Members,
+      Config,
+      Peers,
+      Missing,
+      NextRest,
+      NextTrpc,
+      RequiredMemberSet,
+      RequiredConfigSet,
+      RequiredPeerSet,
+      InstalledPeerSet,
+      InstalledPeerSetInAnyBranch
+    >({ ...this.#state, transport: surface });
+  }
+
+  withService(service: RuntimeService) {
+    return new ProcessSupply<
+      Modules,
+      Members,
+      Config,
+      Peers,
+      Missing,
+      Rest,
+      Trpc,
+      RequiredMemberSet,
+      RequiredConfigSet,
+      RequiredPeerSet,
+      InstalledPeerSet,
+      InstalledPeerSetInAnyBranch
+    >({
+      ...this.#state,
+      services: [...this.#state.services, service],
+    });
+  }
+
+  #withMembers<Next extends object>(members: Next) {
+    return new ProcessSupply<
+      Modules,
+      Merge<Members, Next>,
+      Config,
+      Peers,
+      MissingFrom<
+        RequiredMemberSet,
+        RequiredConfigSet,
+        RequiredPeerSet,
+        InstalledPeerSet,
+        InstalledPeerSetInAnyBranch,
+        Merge<Members, Next>,
+        Config,
+        Peers
+      >,
+      Rest,
+      Trpc,
+      RequiredMemberSet,
+      RequiredConfigSet,
+      RequiredPeerSet,
+      InstalledPeerSet,
+      InstalledPeerSetInAnyBranch
+    >({
+      ...this.#state,
+      members: { ...this.#state.members, ...members },
+    });
+  }
+
+  #boot(): Promise<BootedRuntime<SupplyRecord, Rest, Trpc>> {
+    const state = this.#state;
+    const supplied = new Set<ModuleApiToken<unknown>>();
+    const peers: TestPeer[] = [];
+    for (const module of state.modules) {
+      for (const token of [...Object.values(module.dependencies), ...boundTokens(module)]) {
+        if (
+          token instanceof ModuleApiToken &&
+          Object.hasOwn(state.peers, token.name) &&
+          !supplied.has(token)
+        ) {
+          peers.push(testPeer({ token, instance: state.peers[token.name] }));
+          supplied.add(token);
+        }
+      }
+    }
+    const options = {
+      peers,
+      role: state.role,
+      config: state.config,
+      ...(state.secrets ? { secrets: state.secrets } : {}),
+      stores: storesWith(state.stores, state.members),
+    };
+    const transport = state.transport;
+    let exposed: ExposedSurface<Rest, Trpc> | undefined;
+    const builder = transport
+      ? new ApplicationBuilder<SupplyRecord>(options).withTransports(
+          (peers) => {
+            exposed = transport(peers);
+            return exposed.hosts;
+          },
+          () => exposed?.serve(),
+        )
+      : new ApplicationBuilder<SupplyRecord, Rest, Trpc>(options);
+    for (const service of state.services) builder.withService(service);
+    const modules = state.modules as readonly InstallableServerFeature[];
+    const selectedModules = modules.map((module) =>
+      state.stores?.tier && module.repositoryRegistry
+        ? { ...module, tier: state.stores.tier }
+        : module,
+    );
+    return (
+      builder
+        // SupplyModule existentially erases each admitted module's contravariant member input.
+        .withModules(selectedModules)
+        .boot()
+    );
+  }
+}
+
+/** A bound channel's `*Api` on either tier, so `provide()` can stand in for it (record §5). */
+function boundTokens(module: SupplyModule): readonly ModuleApiToken<unknown>[] {
+  const channels = module.channelRegistry;
+  if (channels === undefined) return [];
+  return (["live", "memory"] as const).flatMap((tier) =>
+    channelsBind(channels, tier).map(([, token]) => token),
+  );
+}
+
+interface CreateAppOptions {
+  readonly role: ServerRole;
+  readonly secrets?: ModuleSecretsScope;
+}
+
+/** `.withMembers(...)` values answer before the stores' own and extend their order. */
+function storesWith(
+  stores: StoresMemberSource | undefined,
+  overrides: SupplyRecord,
+): StoresMemberSource {
+  const opened = stores?.order.filter((name) => !Object.hasOwn(overrides, name)) ?? [];
+  return {
+    ...(stores?.tier === void 0 ? {} : { tier: stores.tier }),
+    order: [...opened, ...Object.keys(overrides)],
+    read(name) {
+      if (Object.hasOwn(overrides, name)) return overrides[name];
+      if (stores === void 0) throw new Error(`No "${name}" member was handed to this process.`);
+      return stores.read(name);
+    },
+  };
+}
+
+export function createApp(options: CreateAppOptions): ProcessSupply {
+  return ProcessSupply.create(options);
+}

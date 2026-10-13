@@ -1,0 +1,29 @@
+import { Config, type ConfigOf, nodeEnvironment } from "@langwatch/config";
+import { langevalsEndpoint } from "@langwatch/evaluation-contract";
+import { z } from "zod";
+
+/**
+ * Redaction pipeline config: DLP engines and enforcement switch.
+ * `googleApplicationCredentials` resolves through the process's declared
+ * secrets (ADR-132), never this slice — see `DataPrivacyModule.secrets`.
+ */
+export const dataPrivacyConfig = Config.define((c) => ({
+  googleDlpDisabled: c.env(
+    "LANGWATCH_DISABLE_GOOGLE_DLP",
+    z.union([z.boolean(), z.string()]).optional(),
+  ),
+  /** Anything but the literal `off` enforces the native policy. */
+  enforcement: c.env("LANGWATCH_DATA_PRIVACY_ENFORCEMENT", z.string().optional()),
+  /** The shared leaf: production decides whether a missing redaction service refuses. */
+  nodeEnvironment,
+  /** Evaluation's leaf, held by instance: this module calls Presidio itself (R5, 2026-10-06). */
+  langevalsEndpoint,
+}));
+
+export type DataPrivacyServerConfig = ConfigOf<typeof dataPrivacyConfig>;
+
+/**
+ * How long a redaction call may take. Not configurable: the ceiling belongs
+ * to the pipeline's own budget, and no deployment has ever set it.
+ */
+export const DATA_PRIVACY_PRESIDIO_TIMEOUT_MS = 60_000;
