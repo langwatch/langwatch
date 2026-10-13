@@ -81,6 +81,7 @@ export const reads = {
     "modules/github/**/*",
     "modules/hosted-mcp/**/*",
     "modules/identity/**/*",
+    "modules/insight/**/*",
     "modules/instant-eval-judge/**/*",
     "modules/instant-eval/**/*",
     "modules/integration/**/*",
@@ -143,6 +144,7 @@ export const reads = {
   "@langwatch/langy-contract": ["services/langyagent/**/*", "pnpm-workspace.yaml"],
   "@langwatch/insight-process": [
     "services/langyagent/internal/assets/skills/daily-insights/SKILL.md",
+    "pnpm-workspace.yaml",
   ],
   "@langwatch/enterprise-billing-process": ["docs/pricing/**/*", "docs/pricing.mdx"],
   "@langwatch/trace-process": [
@@ -181,7 +183,10 @@ export const reads = {
     "apps/ui/src/shell/route-patterns.generated.json",
   ],
   "@langwatch/onboarding-browser": ["apps/ui/src/shell/route-patterns.generated.json"],
-  "@langwatch/analytics-browser": ["apps/ui/public/images/dashboards/templates/*"],
+  "@langwatch/analytics-browser": [
+    "apps/ui/public/images/dashboards/templates/**/*",
+    "pnpm-workspace.yaml",
+  ],
   "@langwatch/webhook-verify": ["specs/webhooks/signature-vectors.json"],
   "@langwatch/oxlint-rules": [
     ".oxlintrc.jsonc",
@@ -268,7 +273,6 @@ export const reads = {
   ],
   "@langwatch/user-browser": ["docs/coding-agents/explore-your-usage-with-your-own-agent.mdx"],
   "@langwatch/gateway-contract": [".env.example"],
-  "@langwatch/analytics-browser": ["pnpm-workspace.yaml"],
   "@langwatch/analytics-contract": ["dev/scripts/build-charts-lib.mjs"],
   "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/image/code-steps.json"],
   "@langwatch/seedgen-runner": ["tools/seedgen/**/*"],

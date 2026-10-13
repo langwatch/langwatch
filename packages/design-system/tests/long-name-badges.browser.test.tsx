@@ -12,7 +12,6 @@ import { Badge, Table, Text } from "../src/primitives.ts";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 const LONG_NAME = "A".repeat(300);
-const SHOTS = "/Users/lw/Source/github.com/langwatch/langwatch/.claude/tmp/long-names";
 
 afterEach(() => cleanup());
 
@@ -45,9 +44,7 @@ describe("a table row with 300-character names", () => {
       (element) => element.textContent === LONG_NAME,
     );
     expect(text.length).toBeGreaterThan(0);
-    await page.screenshot({ path: `${SHOTS}/badge-chip-table.png` });
     for (const element of text) expect(element.scrollWidth).toBeGreaterThan(element.clientWidth);
-    await page.screenshot({ path: `${SHOTS}/badge-chip-table.png` });
   });
 
   it("truncates a name wrapped in a span inside a badge, and names it on hover", () => {
