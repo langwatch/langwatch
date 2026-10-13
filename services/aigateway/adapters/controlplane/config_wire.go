@@ -57,6 +57,9 @@ type configWire struct {
 	// field a control plane older than it never sent, which are different
 	// answers: see keyExpiry.
 	ExpiresAt json.RawMessage `json:"expires_at"`
+	// Status is "active" or "revoked". Empty from a control plane older than
+	// the field, which reads as active.
+	Status string `json:"status"`
 }
 
 // keyExpiry reads the key's own expiration date off the wire as the tri-state
@@ -198,7 +201,7 @@ type cacheRuleWire struct {
 }
 
 // cacheMatchersWire mirrors the matchers shape emitted by the control-plane
-// materialiser (platform/app/src/server/gateway/config.materialiser.ts:121-128).
+// materialiser (modules/gateway/process/src/services/gateway-config-materialisation.service.ts:121-128).
 // Every recognized matcher must have an explicit field — silently dropping a
 // matcher at unmarshal collapses the rule's effective scope to "match all",
 // which has caused stripped `cache_control` on system blocks in matrix tests.

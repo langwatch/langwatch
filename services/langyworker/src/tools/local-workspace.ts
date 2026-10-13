@@ -1,44 +1,31 @@
 /**
- * The local workspace tools: `code_access`, the seven `local_*` mirrors of
- * pi's built-ins and the credentials call (ADR-129).
- *
- * A `local_*` call does not run in the worker. It is posted to the app, which
- * hands it to `langwatch langy --share-control` on the developer's machine and
- * gives the answer back on a long poll. The parameter names mirror the
- * built-in each tool stands in for, so the model keeps one habit.
- *
- * The worker's stderr goes to /dev/null (the manager sets cmd.Stderr = nil), so
- * a tool cannot log. Everything the model or the user must know travels in the
- * tool result.
+ * The local workspace tools: `code_access`, the `local_*` mirrors of pi's
+ * built-ins and the credentials call (ADR-129), posted to the app and
+ * answered from `langwatch langy --share-control` on a long poll.
  */
 
-import { Type } from "typebox";
 import {
   createBashTool,
   type ExtensionAPI,
   type InlineExtension,
 } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+
 import { callIds, conversationId, type TurnContext } from "./turn-context.js";
 
 export const CODE_ACCESS_TOOL_NAME = "code_access";
 
 /**
- * The shell the model reaches for by its standard name. Registered by this
- * extension in place of pi's built-in, so that while the developer's folder is
- * connected a command lands in that folder, through the local_bash path with
- * its permission card, and a `langwatch` command still runs here, where the
- * CLI is provisioned with this conversation's login. With no folder
- * connected it is the sandbox shell it always was.
+ * The shell the model reaches for by its standard name, registered in
+ * place of pi's built-in: while the folder is connected a command lands
+ * there through local_bash, but `langwatch` still runs here.
  */
 export const BASH_TOOL_NAME = "bash";
 
 /**
- * The result details of a call that ran in the developer's folder. The event
- * mapper lifts it onto the tool_end event as `local: true`, and it rides the
- * frame to the manager and the panel: the GitHub gate and the panel's
- * install card both stand down on it, since a git push or a gh call there
- * used the developer's own credentials. The tool name cannot say this: the
- * shell that delegates to the folder is named `bash`.
+ * The result details of a call that ran in the developer's folder: the
+ * event mapper lifts it onto tool_end as `local: true`, so the GitHub gate
+ * and install card stand down (their own credentials ran the call).
  */
 export const LOCAL_RESULT_DETAILS = { local: true } as const;
 
@@ -51,10 +38,9 @@ export function ranInFolder(result: unknown): boolean {
 }
 
 /**
- * Is this command an invocation of the langwatch CLI? Leading environment
- * assignments are skipped, and `npx langwatch` counts. The CLI runs in the
- * sandbox whatever the folder's state: its cards, its navigate opens and its
- * login belong to this conversation, not to the developer's machine.
+ * Is this command an invocation of the langwatch CLI (leading env
+ * assignments skipped, `npx langwatch` counts)? It always runs in the
+ * sandbox: its cards and login belong to this conversation.
  */
 export function isLangwatchCliCommand(command: string): boolean {
   const words = command.trim().split(/\s+/);
@@ -81,23 +67,10 @@ export const LOCAL_TOOL_NAMES = [
 export type LocalToolName = (typeof LOCAL_TOOL_NAMES)[number];
 
 /**
- * pi's own file tools, the ones that read and write the worker's sandbox.
- *
- * While the developer's folder is connected these are withdrawn from the
- * turn's tool set: the folder is the one place the user's project exists, and
- * a model offered both sets picks the sandbox one often enough. A sandbox
- * `edit` on a file it had just read through `local_read` answers ENOENT, and
- * a model reads that as the share being broken and stops the whole path.
- * `bash` stays: it runs the `langwatch` CLI.
+ * pi's own file tools, withdrawn while the folder is connected: a model
+ * offered both sets picks the sandbox one often enough. `bash` stays.
  */
-export const SANDBOX_FILE_TOOL_NAMES = [
-  "read",
-  "edit",
-  "write",
-  "grep",
-  "find",
-  "ls",
-] as const;
+export const SANDBOX_FILE_TOOL_NAMES = ["read", "edit", "write", "grep", "find", "ls"] as const;
 
 /**
  * The turn's tool set, given the folder's state: the sandbox file tools are
@@ -145,10 +118,8 @@ const APP_RETRY_MAX_NAMED_WAIT_MS = 60_000;
 const CALL_MAX_WAIT_MS = 20 * 60 * 1000;
 
 /**
- * What the model reads when the folder is not there.
- *
- * It names both ways on, because a reply that only reports the folder is gone
- * leaves the user with nothing to do next.
+ * What the model reads when the folder is not there; names both ways on,
+ * so the user is left with something to do next.
  */
 export const OFFLINE_PUSHBACK = [
   "The shared folder is not connected any more, so this call did not run.",
@@ -159,13 +130,9 @@ export const OFFLINE_PUSHBACK = [
 ].join(" ");
 
 /**
- * What the model reads when LangWatch lost the call and the folder is still
- * there.
- *
- * A poll that answers "not found" says the app dropped the envelope, which is
- * a different thing from the machine going away. Sending the user to share
- * their folder again, while their command line sits connected, is advice they
- * cannot act on.
+ * What the model reads when LangWatch lost the call and the folder is
+ * still there: a "not found" poll means the app dropped the envelope, not
+ * that the machine went away, so re-sharing is not the fix.
  */
 export const CALL_LOST_PUSHBACK = [
   "LangWatch lost this call, so it did not run. The shared folder is still connected.",
@@ -182,19 +149,8 @@ const STATUS_UNAVAILABLE_PUSHBACK =
   "LangWatch did not answer the code access check. Tell the user in one line and end your turn.";
 
 /**
- * How long the folder-state read waits out a "not found" on the worker's own
- * conversation.
- *
- * The conversation this worker runs on was accepted before the worker was
- * created, but the app answers its reads from a projection that is folded
- * asynchronously, so in the first seconds of a conversation the row may not
- * be there yet and the read says "not found". Under load that fold has taken
- * over ten seconds. A "not found" on this worker's own conversation inside
- * this window means "not yet", never "no such conversation", so `code_access`
- * repeats the read, and only that read: a 404 on a call envelope still means
- * the app lost the call, and the folder check behind a lost call is
- * mid-conversation, long after the fold. After the window the answer is the
- * usual pushback.
+ * How long the folder-state read waits out a "not found" on the worker's
+ * own conversation before the projection folds (`code_access` retries).
  */
 export const WORKSPACE_READ_NOT_FOUND_WINDOW_MS = 30_000;
 const WORKSPACE_READ_RETRY_MS = 2_000;
@@ -290,11 +246,8 @@ function appRetryWaitMs({ error, attempt }: { error: unknown; attempt: number })
 }
 
 /**
- * The app answered, and it does not hold this call any more.
- *
- * A subclass of the one above, so every existing catch still reads it as a
- * call that did not run; the tools that can act on the difference test for
- * this one first.
+ * The app answered, and it does not hold this call any more. A subclass of
+ * the one above, so every catch still reads it as a call that did not run.
  */
 export class CallLostError extends AppUnreachableError {}
 
@@ -347,6 +300,28 @@ function combineSignals(signal: AbortSignal | undefined, timeoutMs: number): Abo
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 
+async function throwForBadRequest(response: Response): Promise<never> {
+  let body: ApiErrorBody = {};
+  try {
+    body = (await response.json()) as ApiErrorBody;
+  } catch {
+    body = {};
+  }
+  if (body.error?.code === "langy_api_request_invalid") {
+    throw new CallRejectedError(rejectionText(body));
+  }
+  throw new AppUnreachableError("the LangWatch app did not answer");
+}
+
+async function throwForBusy(response: Response): Promise<never> {
+  // A 503 is also how the app says no folder is connected, after it waited
+  // for one: asking again would only wait again.
+  if (response.status === 503 && (await errorCode(response)) === WORKSPACE_OFFLINE_CODE) {
+    throw new AppUnreachableError("no local folder is connected to this conversation");
+  }
+  throw new AppBusyError(retryAfterHeaderMs(response));
+}
+
 /**
  * One request to the app. The session key in LANGWATCH_API_KEY is the whole
  * credential and it names the conversation. Any failure the model cannot act
@@ -383,26 +358,8 @@ export async function callApp<T>({
   if (response.status === 404) {
     throw new CallLostError("the LangWatch app does not hold this call any more");
   }
-  if (response.status === 400) {
-    let body: ApiErrorBody = {};
-    try {
-      body = (await response.json()) as ApiErrorBody;
-    } catch {
-      body = {};
-    }
-    if (body.error?.code === "langy_api_request_invalid") {
-      throw new CallRejectedError(rejectionText(body));
-    }
-    throw new AppUnreachableError("the LangWatch app did not answer");
-  }
-  if (response.status === 429 || response.status === 503) {
-    // A 503 is also how the app says no folder is connected, after it waited
-    // for one: asking again would only wait again.
-    if (response.status === 503 && (await errorCode(response)) === WORKSPACE_OFFLINE_CODE) {
-      throw new AppUnreachableError("no local folder is connected to this conversation");
-    }
-    throw new AppBusyError(retryAfterHeaderMs(response));
-  }
+  if (response.status === 400) return throwForBadRequest(response);
+  if (response.status === 429 || response.status === 503) return throwForBusy(response);
   if (!response.ok) throw new AppUnreachableError("the LangWatch app did not answer");
   try {
     return (await response.json()) as T;
@@ -420,17 +377,24 @@ async function cancelCall(callId: string): Promise<void> {
     });
   } catch {
     // The turn is over. A cancel the app never got changes nothing here.
+    return;
   }
 }
 
 function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
   return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const timer = setTimeout(settle, ms);
     signal?.addEventListener(
       "abort",
       () => {
         clearTimeout(timer);
-        resolve();
+        settle();
       },
       { once: true },
     );
@@ -457,6 +421,12 @@ export function renderBashOutput(output: BashOutput): string {
   return lines.join("\n\n");
 }
 
+/** A tri-state flag read as a fact line's value. */
+function yesNoUnknown(value: boolean | undefined): string {
+  if (value === undefined) return "unknown";
+  return value ? "yes" : "no";
+}
+
 /**
  * The git facts: one line saying the folder is not a repository, so the
  * skill asks about `git init` instead of walking into a checkout; otherwise
@@ -467,7 +437,7 @@ function gitFacts(workspace: WorkspaceInfo): string[] {
   return [
     `git branch: ${workspace.gitBranch ?? "unknown"}`,
     `git remote: ${workspace.gitRemote ?? "none"}`,
-    `uncommitted changes: ${workspace.gitDirty === undefined ? "unknown" : workspace.gitDirty ? "yes" : "no"}`,
+    `uncommitted changes: ${yesNoUnknown(workspace.gitDirty)}`,
   ];
 }
 
@@ -480,20 +450,15 @@ export function renderWorkspaceFacts(workspace: WorkspaceInfo): string {
     `operating system: ${workspace.os}`,
     `node: ${workspace.nodeVersion ?? "not found"}`,
     `python: ${workspace.pythonVersion ?? "not found"}`,
-    `GitHub CLI signed in: ${workspace.ghAuthenticated === undefined ? "unknown" : workspace.ghAuthenticated ? "yes" : "no"}`,
+    `GitHub CLI signed in: ${yesNoUnknown(workspace.ghAuthenticated)}`,
     `package manager: ${workspace.packageManager ?? "unknown"}`,
   ];
-  return [
-    "The user's folder is connected. Work with the local_* tools.",
-    ...lines,
-  ].join("\n");
+  return ["The user's folder is connected. Work with the local_* tools.", ...lines].join("\n");
 }
 
 /**
  * The folder's state for this worker's own conversation. With `retry`, a
- * "not found" inside the window is read again, see
- * `WORKSPACE_READ_NOT_FOUND_WINDOW_MS`; without it, and for any other failure,
- * the error is thrown as it is.
+ * "not found" inside the window is read again; any other failure throws.
  */
 async function readWorkspaceStatus({
   signal,
@@ -528,11 +493,7 @@ async function readWorkspaceStatus({
  * The folder's own state, read from the app. False when the app could not
  * answer at all, so a failed read never claims the folder is there.
  */
-async function isWorkspaceConnected({
-  signal,
-}: {
-  signal?: AbortSignal;
-}): Promise<boolean> {
+async function isWorkspaceConnected({ signal }: { signal?: AbortSignal }): Promise<boolean> {
   try {
     const status = await readWorkspaceStatus({ signal });
     return status.connected === true;
@@ -542,27 +503,17 @@ async function isWorkspaceConnected({
 }
 
 /**
- * What a local call that did not run tells the model.
- *
- * The folder going away and the app losing the call are different things, and
- * only the first one is fixed by sharing the folder again, so the folder's own
- * state is read before either is said.
+ * What a local call that did not run tells the model: the folder's own
+ * state is read first, since only its going away is fixed by re-sharing.
  */
-export async function localCallPushback({
-  signal,
-}: {
-  signal?: AbortSignal;
-}): Promise<string> {
-  return (await isWorkspaceConnected({ signal }))
-    ? CALL_LOST_PUSHBACK
-    : OFFLINE_PUSHBACK;
+export async function localCallPushback({ signal }: { signal?: AbortSignal }): Promise<string> {
+  return (await isWorkspaceConnected({ signal })) ? CALL_LOST_PUSHBACK : OFFLINE_PUSHBACK;
 }
 
 /**
- * Posts the call. The app does not deduplicate a start, so it is sent again
- * only when the app said it did not take it (429, 503), never after a network
- * error or another 5xx that may have reached it: running a command twice on
- * the developer's machine is worse than a failed tool call.
+ * Posts the call. The app does not deduplicate a start, so it is resent only
+ * when the app said it did not take it (429, 503), never after an error that
+ * may have reached it: running a command twice is worse than a failed call.
  */
 async function startLocalCall({
   body,
@@ -615,60 +566,89 @@ export async function runLocalCall({
     body: { ...callIds({ turnContext, ...(toolCallId ? { toolCallId } : {}) }), tool, params },
     signal,
   });
+  return pollLocalCall({ callId: started.callId, startedAt, signal, now });
+}
 
-  let transientFailures = 0;
-  let lostFailures = 0;
+type PollFailures = { transient: number; lost: number };
+
+/** One poll of a local call; a failed one waits, and throws once its retry budget runs out. */
+async function pollOneLocalCall({
+  callId,
+  signal,
+  failures,
+}: {
+  callId: string;
+  signal: AbortSignal | undefined;
+  failures: PollFailures;
+}): Promise<{ poll?: PollCallResponse; failures: PollFailures }> {
+  try {
+    const poll = await callApp<PollCallResponse>({
+      path: `/api/langy/local/calls/${encodeURIComponent(callId)}`,
+      method: "GET",
+      signal,
+      timeoutMs: POLL_REQUEST_TIMEOUT_MS,
+    });
+    return { poll, failures: { transient: 0, lost: 0 } };
+  } catch (error) {
+    if (error instanceof CallCancelledError || signal?.aborted) {
+      await cancelCall(callId);
+      throw new CallCancelledError(CANCELLED_PUSHBACK);
+    }
+    // A read repeats nothing, so an app that did not answer, failed or was
+    // busy is asked again with a growing wait. A call the app says it lost
+    // keeps its own short count: waiting longer does not bring it back.
+    if (error instanceof AppUnreachableError && !(error instanceof CallLostError)) {
+      const transient = failures.transient + 1;
+      const waitMs = appRetryWaitMs({ error, attempt: transient });
+      if (transient > APP_RETRY_MAX_ATTEMPTS || waitMs === null) throw error;
+      await sleep(waitMs, signal);
+      return { failures: { ...failures, transient } };
+    }
+    const lost = failures.lost + 1;
+    if (lost >= MAX_POLL_FAILURES) throw error;
+    await sleep(POLL_RETRY_DELAY_MS, signal);
+    return { failures: { ...failures, lost } };
+  }
+}
+
+/** The done poll's text, or a thrown error naming the machine's refusal. */
+function localCallResult(poll: PollCallResponse): string {
+  if (poll.ok === false || poll.error) {
+    const code = poll.error?.code ?? "exec_failed";
+    const message = poll.error?.message ?? "the call did not run";
+    throw new Error(`${code}: ${message}`);
+  }
+  const text = poll.output ? renderBashOutput(poll.output) : (poll.text ?? "");
+  return text === "" ? "(no output)" : text;
+}
+
+/** Long-polls one local call until it settles, is cancelled, or its budget runs out. */
+async function pollLocalCall({
+  callId,
+  startedAt,
+  signal,
+  now,
+}: {
+  callId: string;
+  startedAt: number;
+  signal: AbortSignal | undefined;
+  now: () => number;
+}): Promise<string> {
+  let failures: PollFailures = { transient: 0, lost: 0 };
   for (;;) {
     if (signal?.aborted) {
-      await cancelCall(started.callId);
+      await cancelCall(callId);
       throw new CallCancelledError(CANCELLED_PUSHBACK);
     }
     if (now() - startedAt > CALL_MAX_WAIT_MS) {
-      await cancelCall(started.callId);
+      await cancelCall(callId);
       throw new AppUnreachableError("the LangWatch app did not answer");
     }
 
-    let poll: PollCallResponse;
-    try {
-      poll = await callApp<PollCallResponse>({
-        path: `/api/langy/local/calls/${encodeURIComponent(started.callId)}`,
-        method: "GET",
-        signal,
-        timeoutMs: POLL_REQUEST_TIMEOUT_MS,
-      });
-    } catch (error) {
-      if (error instanceof CallCancelledError || signal?.aborted) {
-        await cancelCall(started.callId);
-        throw new CallCancelledError(CANCELLED_PUSHBACK);
-      }
-      // A read repeats nothing, so an app that did not answer, failed or was
-      // busy is asked again with a growing wait. A call the app says it lost
-      // keeps its own short count: waiting longer does not bring it back.
-      const transient = error instanceof AppUnreachableError && !(error instanceof CallLostError);
-      if (transient) {
-        transientFailures += 1;
-        const waitMs = appRetryWaitMs({ error, attempt: transientFailures });
-        if (transientFailures > APP_RETRY_MAX_ATTEMPTS || waitMs === null) throw error;
-        await sleep(waitMs, signal);
-        continue;
-      }
-      lostFailures += 1;
-      if (lostFailures >= MAX_POLL_FAILURES) throw error;
-      await sleep(POLL_RETRY_DELAY_MS, signal);
-      continue;
-    }
-    transientFailures = 0;
-    lostFailures = 0;
-
-    if (poll.state !== "done") continue;
-
-    if (poll.ok === false || poll.error) {
-      const code = poll.error?.code ?? "exec_failed";
-      const message = poll.error?.message ?? "the call did not run";
-      throw new Error(`${code}: ${message}`);
-    }
-    const text = poll.output ? renderBashOutput(poll.output) : (poll.text ?? "");
-    return text === "" ? "(no output)" : text;
+    const result = await pollOneLocalCall({ callId, signal, failures });
+    failures = result.failures;
+    if (!result.poll || result.poll.state !== "done") continue;
+    return localCallResult(result.poll);
   }
 }
 
@@ -739,7 +719,7 @@ const codeAccessParams = Type.Object({
   offer_describe: Type.Optional(
     Type.Boolean({
       description:
-        "Also offer a quiet third way out, \"I'd rather describe it\". The pick arrives as the next message. Off unless a skill asks for it.",
+        'Also offer a quiet third way out, "I\'d rather describe it". The pick arrives as the next message. Off unless a skill asks for it.',
     }),
   ),
 });
@@ -803,7 +783,9 @@ const localFindParams = Type.Object({
 });
 
 const localLsParams = Type.Object({
-  path: Type.Optional(Type.String({ description: "Directory to list. Default is the folder root." })),
+  path: Type.Optional(
+    Type.String({ description: "Directory to list. Default is the folder root." }),
+  ),
   limit: Type.Optional(Type.Number({ description: "The largest number of entries to return." })),
 });
 
@@ -858,6 +840,86 @@ function localTextResult(text: string) {
   return { content: [{ type: "text" as const, text }], details: LOCAL_RESULT_DETAILS };
 }
 
+/** What a failed local call becomes as a tool result: a pushback or a thrown refusal. */
+async function localToolFailureResult({
+  error,
+  signal,
+}: {
+  error: unknown;
+  signal: AbortSignal | undefined;
+}) {
+  // A call that did not run is a pushback the model acts on, not a
+  // failure; a lost call is retried, a folder that is gone is offered
+  // the two ways on.
+  if (error instanceof AppUnreachableError) {
+    return textResult(await localCallPushback({ signal }));
+  }
+  // A refusal names the parameter, so the model corrects the call. The
+  // developer's CLI answered it, so the call did reach their machine.
+  if (error instanceof CallRejectedError) {
+    return localTextResult(error.message);
+  }
+  throw error;
+}
+
+/** One local call as a tool result, with the pushbacks the model acts on. */
+async function runLocalTool({
+  tool,
+  params,
+  turnContext,
+  toolCallId,
+  signal,
+}: {
+  tool: LocalToolName;
+  params: unknown;
+  turnContext: TurnContext;
+  toolCallId: string;
+  signal?: AbortSignal;
+}) {
+  try {
+    return localTextResult(await runLocalCall({ tool, params, turnContext, toolCallId, signal }));
+  } catch (error) {
+    return localToolFailureResult({ error, signal });
+  }
+}
+
+/**
+ * The `bash` tool's execute: a command delegates to the developer's folder
+ * through `local_bash` when it is connected and the command is not the
+ * langwatch CLI itself; otherwise it runs in the sandbox as it always did.
+ */
+function runBashOrDelegate({
+  sandboxBash,
+  folder,
+  turnContext,
+  toolCallId,
+  params,
+  signal,
+  onUpdate,
+}: {
+  sandboxBash: ReturnType<typeof createBashTool>;
+  folder: { connected: boolean };
+  turnContext: TurnContext;
+  toolCallId: string;
+  params: Parameters<ReturnType<typeof createBashTool>["execute"]>[1];
+  signal: Parameters<ReturnType<typeof createBashTool>["execute"]>[2];
+  onUpdate: Parameters<ReturnType<typeof createBashTool>["execute"]>[3];
+}) {
+  if (folder.connected && !isLangwatchCliCommand(params.command)) {
+    return runLocalTool({
+      tool: "local_bash",
+      params: {
+        command: params.command,
+        ...(params.timeout !== undefined ? { timeout: params.timeout } : {}),
+      },
+      turnContext,
+      toolCallId,
+      signal,
+    });
+  }
+  return sandboxBash.execute(toolCallId, params, signal, onUpdate);
+}
+
 export function createLocalWorkspaceExtension({
   turnContext,
   sandboxCwd,
@@ -884,59 +946,22 @@ export function createLocalWorkspaceExtension({
         );
       });
 
-      /** One local call as a tool result, with the pushbacks the model acts on. */
-      async function runLocalTool({
-        tool,
-        params,
-        toolCallId,
-        signal,
-      }: {
-        tool: LocalToolName;
-        params: unknown;
-        toolCallId: string;
-        signal?: AbortSignal;
-      }) {
-        try {
-          return localTextResult(
-            await runLocalCall({ tool, params, turnContext, toolCallId, signal }),
-          );
-        } catch (error) {
-          // A call that did not run is a pushback the model acts on, not a
-          // failure. Which pushback depends on the folder, which is read
-          // rather than guessed: a lost call is retried, a folder that is
-          // gone is offered the two ways on.
-          if (error instanceof AppUnreachableError) {
-            return textResult(await localCallPushback({ signal }));
-          }
-          // A refusal names the parameter, so the model corrects the call. The
-          // developer's CLI answered it, so the call did reach their machine.
-          if (error instanceof CallRejectedError) {
-            return localTextResult(error.message);
-          }
-          throw error;
-        }
-      }
-
       const sandboxBash = createBashTool(sandboxCwd);
       pi.registerTool({
         name: BASH_TOOL_NAME,
         label: sandboxBash.label,
         description: `${sandboxBash.description} While the user's folder is connected the command runs there, on their machine, as local_bash does; a langwatch command runs here either way.`,
         parameters: sandboxBash.parameters,
-        async execute(toolCallId, params, signal, onUpdate) {
-          if (folder.connected && !isLangwatchCliCommand(params.command)) {
-            return runLocalTool({
-              tool: "local_bash",
-              params: {
-                command: params.command,
-                ...(params.timeout !== undefined ? { timeout: params.timeout } : {}),
-              },
-              toolCallId,
-              signal,
-            });
-          }
-          return sandboxBash.execute(toolCallId, params, signal, onUpdate);
-        },
+        execute: (toolCallId, params, signal, onUpdate) =>
+          runBashOrDelegate({
+            sandboxBash,
+            folder,
+            turnContext,
+            toolCallId,
+            params,
+            signal,
+            onUpdate,
+          }),
       });
 
       pi.registerTool({
@@ -967,7 +992,7 @@ export function createLocalWorkspaceExtension({
           description: localToolDescriptions[name],
           parameters: localToolParams[name],
           async execute(toolCallId, params, signal) {
-            return runLocalTool({ tool: name, params, toolCallId, signal });
+            return runLocalTool({ tool: name, params, turnContext, toolCallId, signal });
           },
         });
       }

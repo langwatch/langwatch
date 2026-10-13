@@ -13,11 +13,12 @@ Feature: An unhealthy health probe names the underlying cause
   them.
 
   # Bindings:
-  #   platform/app/src/server/health-probes/probe-cause.ts
-  #   platform/app/src/server/health-probes/__tests__/probe-cause.unit.test.ts
-  #   platform/app/src/server/health-probes/langy-canary.service.ts
-  #   platform/app/src/server/health-probes/scenario-canary.service.ts
-  #   platform/app/src/server/routes/health-checks.ts
+  #   modules/platform-health/process/src/rules/probe-cause.rules.ts
+  #   modules/platform-health/process/src/rules/__tests__/probe-cause.rules.unit.test.ts
+  #   modules/platform-health/process/src/rules/langy-canary.rules.ts
+  #   modules/platform-health/process/src/rules/scenario-canary.rules.ts
+  #   modules/platform-health/process/src/services/langy-canary.service.ts
+  #   modules/platform-health/process/src/services/scenario-canary.service.ts
 
   @unit
   Scenario: A typed error chain reports its innermost code

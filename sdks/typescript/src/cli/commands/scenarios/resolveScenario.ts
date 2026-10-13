@@ -1,15 +1,12 @@
 import chalk from "chalk";
-import type {
-  ScenarioResponse,
-  ScenariosApiService,
-} from "@/client-sdk/services/scenarios";
+
+import type { ScenarioResponse, ScenariosApiService } from "@/client-sdk/services/scenarios";
+
 import { createCliScenariosService } from "./cli-scenarios-service";
 
 /**
- * A scenario reference that names nothing, or more than one thing.
- *
- * Both readings are refusals the caller can fix from the message alone, so
- * they carry the offered ids rather than a generic failure.
+ * A scenario reference that names nothing, or more than one thing; the
+ * message carries the offered ids so the caller can fix it from that alone.
  */
 export class ScenarioReferenceError extends Error {
   constructor(message: string) {
@@ -19,17 +16,9 @@ export class ScenarioReferenceError extends Error {
 }
 
 /**
- * Finds the scenario a reference names.
- *
- * The reference is read as an id first, with one fetch, so `scenario get
- * <id>` does not download every scenario in the project with its situation,
- * criteria, labels and parameters. Only a reference the platform does not
- * hold as an id reaches the listing, where an exact name is tried and then a
- * name compared without case. A name two scenarios share is refused with both
- * ids, because picking one for the caller would act on a scenario they did
- * not ask for. The same reading `test-suite` commands give a suite reference.
- *
- * @see specs/features/scenario-cli.feature
+ * Finds the scenario a reference names: as an id first (one fetch), then an
+ * exact name, then a name without case. A shared name is refused with both
+ * ids. @see specs/features/scenario-cli.feature
  */
 export async function resolveScenarioReference({
   reference,
@@ -63,9 +52,7 @@ export async function resolveScenarioReference({
   const matches =
     exact.length > 0
       ? exact
-      : scenarios.filter(
-          (scenario) => scenario.name.toLowerCase() === wanted.toLowerCase(),
-        );
+      : scenarios.filter((scenario) => scenario.name.toLowerCase() === wanted.toLowerCase());
 
   if (matches.length === 1) return matches[0]!;
 
@@ -83,11 +70,8 @@ export async function resolveScenarioReference({
 }
 
 /**
- * Finds the scenario a reference names, ending the command when the name
- * matches nothing or more than one scenario. Kept here rather than in a
- * command module so every command that takes a scenario reference refuses
- * it the same way. A failure to read the list is not a refusal and is left
- * to the caller.
+ * Finds the scenario a reference names, ending the command when it matches
+ * nothing or more than one. A failure to read the list is left to the caller.
  */
 export async function resolveScenarioOrExit({
   reference,

@@ -10,10 +10,10 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Released image tag to sign (e.g. 3.4.0)'
+        description: "Released image tag to sign (e.g. 3.4.0)"
         required: true
       attach_to_release:
-        description: 'Attach the SBOMs to the langwatch@v<version> GitHub release'
+        description: "Attach the SBOMs to the langwatch@v<version> GitHub release"
         type: boolean
         default: true
 

@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-10
-- **Related:** ADR-003 (logging — prod stays on CloudWatch), ADR-004 (docker dev environment), ADR-018 (governance unified observability substrate — the *product* ingest path, distinct from this)
+- **Related:** ADR-003 (logging — prod stays on CloudWatch), ADR-004 (docker dev environment), ADR-018 (governance unified observability substrate — the _product_ ingest path, distinct from this)
 - **Behavioural contract:** [specs/ops/local-observability-stack.feature](../../../specs/ops/local-observability-stack.feature)
 
 ## Context
@@ -14,13 +14,13 @@ into the local LangWatch app. An agent asked to debug a local failure has no
 single, queryable place to correlate "what happened" across the TS app and the
 two Go services (nlpgo, aigateway).
 
-The plumbing to *export* was largely already there: the TS app self-instruments
+The plumbing to _export_ was largely already there: the TS app self-instruments
 with OpenTelemetry and exports traces + logs over OTLP when
 `OTEL_EXPORTER_OTLP_ENDPOINT` / `PINO_OTEL_ENABLED` are set; the Go services
 export traces via `otelsetup`. What was missing: (a) a collector + backends to
-export *to* — there is no OTel Collector or LGTM stack deployed anywhere, and no
+export _to_ — there is no OTel Collector or LGTM stack deployed anywhere, and no
 dev Grafana; (b) TS + Go **metrics**; (c) Go **OTLP logs**; (d) a way for an
-agent to *read* the result.
+agent to _read_ the result.
 
 Production logging deliberately uses AWS CloudWatch (ADR-003), not Loki. This
 stack is strictly a **local-dev debugging aid** and must not touch the prod path.
@@ -49,7 +49,7 @@ it.
 
 3. **Go services** — `otelsetup` gains an **additive** debug-collector pipeline
    gated on `OTEL_DEBUG_COLLECTOR_ENDPOINT`. When set, every span is
-   *dual-exported* (a second BatchSpanProcessor on both the multi-tenant nlpgo
+   _dual-exported_ (a second BatchSpanProcessor on both the multi-tenant nlpgo
    path and the single-tenant aigateway path) — the primary product/ops pipeline
    is untouched — plus net-new OTLP **logs** (zap teed via the official
    `otelzap` bridge, stdout preserved) and OTLP **metrics** (Go runtime metrics).
@@ -59,7 +59,7 @@ it.
 
 4. **Reading it** — `make observability-connect` mints a Grafana service-account
    token and wires two read paths for an agent: the **`gcx` CLI** (`gcx logs/
-   metrics/traces query`) and the **Grafana skills** plugins
+metrics/traces query`) and the **Grafana skills** plugins
    (`grafana-lgtm`/`grafana-core`/`grafana-datasources`).
 
 ## Consequences
@@ -80,13 +80,15 @@ it.
 ## Amendment: haven owns the stack and auto-wires the split
 
 The stack's lifecycle moved from the `dev/compose.dev.yml` `observability` profile to
-**haven** (`tools/thuishaven`, the `otellgtm` adapter): it defaults on, shares
-ClickHouse's colima VM, and `make haven doctor` reports its health. `make
+**haven** (`tools/thuishaven`): it defaults on and `make haven doctor` reports
+its health. On macOS it now runs natively (see the 2026-10-09 amendment below);
+the `otellgtm` container on ClickHouse's colima VM is the fallback tier. `make
 observability{,-connect,-down}` still work; they now front haven.
 
 Because haven already knows when the stack is up, it stops making the developer
 hand-tune `.env` and wires the console/Grafana split itself. When the collector
-is running, the overlay (`.env.portless`) additionally carries:
+is running, the environment haven injects into each process additionally
+carries:
 
 - `LOG_CONSOLE_LEVEL=warn` — the console shows only warnings/errors while
   `info`/`debug` flow to Loki (`LOG_OTEL_LEVEL=debug`, unchanged). This reverses
@@ -102,3 +104,41 @@ is running, the overlay (`.env.portless`) additionally carries:
 
 See `specs/ops/local-observability-stack.feature` (the "console stays quiet" and
 "error links straight to its trace" scenarios) and ADR-003.
+
+## Amendment (2026-10-09): native on macOS, container as the fallback
+
+The stack stays on by default, because it is what makes agent debugging work,
+but on macOS it no longer holds a colima VM open. haven's `otelnative` adapter
+starts the same components the `grafana/otel-lgtm` bundle carries as host
+processes: Grafana, Prometheus and Loki from Homebrew core, Grafana Alloy 1.20.1
+(the Grafana OpenTelemetry Collector distribution) as the OTLP collector from its
+official darwin release zip (the `grafana/grafana/alloy` tap builds from source and
+needs current Command Line Tools; `HAVEN_OBS_ALLOY_BIN` overrides), and Tempo 3.1.0 from its official darwin release tarball (Tempo
+has no Homebrew formula). haven fetches that tarball itself with the same pinned,
+sha256-checked downloader as the native ClickHouse binary (`adapters/pinnedrelease`;
+digests from GitHub's recorded release-asset digests) and keeps it under
+`observability/bin`; `HAVEN_OBS_TEMPO_BIN` overrides it. 3.1.0 is pinned because no
+later 2.x release ships darwin builds and 2.7.2's assets carry no digest; its
+config is the 3.x monolithic schema (`backend_worker.compaction`, `live_store`).
+Pyroscope 2.3.2 comes the same way, from its darwin release tarball
+(`HAVEN_OBS_PYROSCOPE_BIN` overrides), running the bundle's v2-storage config
+on the container's profiling port 4040.
+
+- **Same surface.** OTLP on `:4317`/`:4318`, Grafana on `:3000` behind
+  `observability.langwatch.localhost`, datasource uids `prometheus`, `loki`,
+  `tempo` and `pyroscope`, `langwatch.worktree` promoted to a metric label. Everything binds
+  loopback only, as before, because anonymous Grafana access is Admin.
+- **Bounded.** Configs, data and logs live under haven's home
+  (`observability/{config,data,logs}`); the same retention window and Loki
+  ingestion cap apply; each process gets an even share of the memory budget as
+  `GOMEMLIMIT` (a soft cap: there is no cgroup without a VM); a log past the
+  rotation size starts afresh. `haven observability down` stops the processes
+  and discards the data, as removing the container did.
+- **Never blocks boot.** A missing binary prints its install line. Without the
+  collector or Grafana the stack comes up unobserved, as it did when the
+  container failed.
+- **Fallback.** `LANGWATCH_HAVEN_OBS_TIER=container` selects the LGTM container
+  on colima; it is the default off macOS. `LANGWATCH_HAVEN_OBS=0` still turns
+  observability off.
+
+See `specs/setup/haven-observability-native.feature`.

@@ -1,0 +1,248 @@
+/**
+ * @see specs/ai-gateway/budgets.feature
+ * Which period an anchored budget row is in, and the floor a spend read
+ * for it must honor (cycle arithmetic itself: anchoredBudgetCycles.unit.test.ts).
+ */
+
+import { computeBudgetPeriodFloorMs, effectiveBudgetPeriod } from "@langwatch/gateway-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
+import { MemoryGatewayStore } from "../repositories/memory/memory.gateway.store.ts";
+import { memoryProjectWithTeam } from "./support/gateway-memory-seeds.fixture.ts";
+import { memoryGatewayService } from "./support/memory.gateway-service.ts";
+
+describe("computeBudgetPeriodFloorMs on an anchored budget", () => {
+  const anchor = Temporal.Instant.from("2026-06-17T09:00:00.000Z");
+  const createdAt = Temporal.Instant.from("2026-06-17T09:00:00.000Z");
+
+  /** @scenario "An anchored budget floors every read at its own period start" */
+  it("floors every read at the anchored period start, reset or not", () => {
+    // Unreset: the rollup buckets by calendar month and has no row for a
+    // period that starts on the 17th, so the read must take the floor.
+    expect(
+      computeBudgetPeriodFloorMs(
+        {
+          window: "MONTH",
+          currentPeriodStartedAt: createdAt,
+          lastResetAt: null,
+          cycleAnchorAt: anchor,
+        },
+        Temporal.Instant.from("2026-07-15T00:00:00.000Z"),
+      ),
+    ).toBe(Temporal.Instant.from("2026-06-17T09:00:00.000Z").epochMilliseconds);
+
+    // After the anchored rollover the floor moves with it, so the spend that
+    // was counted a moment ago now belongs to the closed period.
+    expect(
+      computeBudgetPeriodFloorMs(
+        {
+          window: "MONTH",
+          currentPeriodStartedAt: createdAt,
+          lastResetAt: null,
+          cycleAnchorAt: anchor,
+        },
+        Temporal.Instant.from("2026-07-20T00:00:00.000Z"),
+      ),
+    ).toBe(Temporal.Instant.from("2026-07-17T09:00:00.000Z").epochMilliseconds);
+
+    // A future anchor floors at the anchor: nothing has been spent in a
+    // period that has not begun.
+    expect(
+      computeBudgetPeriodFloorMs(
+        {
+          window: "MONTH",
+          currentPeriodStartedAt: createdAt,
+          lastResetAt: null,
+          cycleAnchorAt: Temporal.Instant.from("2026-09-01T00:00:00.000Z"),
+        },
+        Temporal.Instant.from("2026-08-04T12:00:00.000Z"),
+      ),
+    ).toBe(Temporal.Instant.from("2026-09-01T00:00:00.000Z").epochMilliseconds);
+  });
+
+  /** @scenario "A reset inside an anchored period forgives spend until the next anchored boundary" */
+  it("clamps to the reset instant, then expires exactly at the next anchored boundary", () => {
+    const resetAt = Temporal.Instant.from("2026-07-02T14:00:00.000Z");
+    const row = {
+      window: "MONTH" as const,
+      currentPeriodStartedAt: resetAt,
+      lastResetAt: resetAt,
+      cycleAnchorAt: anchor,
+    };
+
+    // Inside the period the reset opened, the reset instant outranks the
+    // anchored start: the forgiven spend stays forgiven.
+    expect(computeBudgetPeriodFloorMs(row, Temporal.Instant.from("2026-07-10T00:00:00.000Z"))).toBe(
+      resetAt.epochMilliseconds,
+    );
+    // One millisecond before the anchored boundary it still holds...
+    expect(computeBudgetPeriodFloorMs(row, Temporal.Instant.from("2026-07-17T08:59:59.999Z"))).toBe(
+      resetAt.epochMilliseconds,
+    );
+    // ...and at the boundary the cycle takes over again, unmoved by the
+    // reset. A reset forgives spend; it never re-phases the cycle.
+    expect(computeBudgetPeriodFloorMs(row, Temporal.Instant.from("2026-07-17T09:00:00.000Z"))).toBe(
+      Temporal.Instant.from("2026-07-17T09:00:00.000Z").epochMilliseconds,
+    );
+  });
+
+  it("leaves MANUAL on its stored boundary even if an anchor is on the row", () => {
+    const boundary = Temporal.Instant.from("2026-07-10T09:30:00.000Z");
+    expect(
+      computeBudgetPeriodFloorMs(
+        {
+          window: "MANUAL",
+          currentPeriodStartedAt: boundary,
+          lastResetAt: null,
+          cycleAnchorAt: anchor,
+        },
+        Temporal.Instant.from("2026-07-15T12:00:00.000Z"),
+      ),
+    ).toBe(boundary.epochMilliseconds);
+  });
+});
+
+describe("effectiveBudgetPeriod", () => {
+  /** @scenario "The reported period is computed at read time, not stored" */
+  it("reports the period a budget is in rather than the one its columns claim", () => {
+    const now = Temporal.Instant.from("2026-07-15T12:00:00.000Z");
+
+    // A calendar budget created in March and never reset: the stored columns
+    // still say March, and nothing sweeps them forward. What enforcement
+    // reads is the July period, and so is what the wire must say.
+    const stale = {
+      window: "MONTH" as const,
+      currentPeriodStartedAt: Temporal.Instant.from("2026-03-05T08:00:00.000Z"),
+      resetsAt: Temporal.Instant.from("2026-04-01T00:00:00.000Z"),
+      lastResetAt: null,
+      cycleAnchorAt: null,
+    };
+    expect(effectiveBudgetPeriod(stale, now)).toEqual({
+      currentPeriodStartedAt: Temporal.Instant.from("2026-07-01T00:00:00.000Z"),
+      resetsAt: Temporal.Instant.from("2026-08-01T00:00:00.000Z"),
+    });
+
+    // An anchored budget reports its own bounds.
+    const anchored = {
+      window: "MONTH" as const,
+      currentPeriodStartedAt: Temporal.Instant.from("2026-06-17T09:00:00.000Z"),
+      resetsAt: Temporal.Instant.from("2026-07-17T09:00:00.000Z"),
+      lastResetAt: null,
+      cycleAnchorAt: Temporal.Instant.from("2026-06-17T09:00:00.000Z"),
+    };
+    expect(effectiveBudgetPeriod(anchored, now)).toEqual({
+      currentPeriodStartedAt: Temporal.Instant.from("2026-06-17T09:00:00.000Z"),
+      resetsAt: Temporal.Instant.from("2026-07-17T09:00:00.000Z"),
+    });
+
+    // A calendar budget reset mid-period reports the reset instant, because
+    // that is the bound its spend figure is actually read from.
+    const resetAt = Temporal.Instant.from("2026-07-10T09:30:00.000Z");
+    expect(
+      effectiveBudgetPeriod(
+        {
+          window: "MONTH",
+          currentPeriodStartedAt: resetAt,
+          resetsAt: Temporal.Instant.from("2026-08-01T00:00:00.000Z"),
+          lastResetAt: resetAt,
+          cycleAnchorAt: null,
+        },
+        now,
+      ),
+    ).toEqual({
+      currentPeriodStartedAt: resetAt,
+      resetsAt: Temporal.Instant.from("2026-08-01T00:00:00.000Z"),
+    });
+
+    // TOTAL and MANUAL have no boundary to drift past, so their stored pair
+    // passes through, sentinel and all.
+    const sentinel = Temporal.PlainDateTime.from({ year: 9999, month: 12, day: 31 })
+      .toZonedDateTime("UTC")
+      .toInstant();
+    const manualStart = Temporal.Instant.from("2026-02-01T00:00:00.000Z");
+    for (const window of ["TOTAL", "MANUAL"] as const) {
+      expect(
+        effectiveBudgetPeriod(
+          {
+            window,
+            currentPeriodStartedAt: manualStart,
+            resetsAt: sentinel,
+            lastResetAt: null,
+            cycleAnchorAt: null,
+          },
+          now,
+        ),
+      ).toEqual({
+        currentPeriodStartedAt: manualStart,
+        resetsAt: sentinel,
+      });
+    }
+  });
+});
+
+describe("GatewayService.create with a cycle anchor", () => {
+  function serviceOver() {
+    const store = MemoryGatewayStore.create();
+    const { service } = memoryGatewayService({
+      store,
+      projects: createApiFixture<ProjectApi>({
+        findWithTeam: async (id) =>
+          memoryProjectWithTeam({ projectId: id, teamId: "team_1", organizationId: "org_1" }),
+        // No active keys, the one shape the reach guard always allows, so these
+        // tests keep answering the anchor question rather than a later guard's.
+        listTraceDestinations: async () => [],
+      }),
+    });
+    return { service, store };
+  }
+
+  const cycleAnchorAt = Temporal.Instant.from("2026-06-17T09:00:00.000Z");
+  const baseInput = {
+    organizationId: "org_1",
+    scope: { kind: "PROJECT" as const, projectId: "project_1" },
+    name: "ACME monthly allowance",
+    limitUsd: 100,
+    actorUserId: "user_1",
+    cycleAnchorAt,
+  };
+
+  /** @scenario "A cycle anchor needs a cyclic window" */
+  it("refuses an anchor on the two windows that do not cycle", async () => {
+    for (const window of ["TOTAL", "MANUAL"] as const) {
+      const { service, store } = serviceOver();
+      // The whole refusal contract, not just the code: the message is what
+      // the REST body carries, the fault is what decides whether this is an
+      // incident or routine, and meta.window is the caller's own value.
+      await expect(service.create({ ...baseInput, window })).rejects.toMatchObject({
+        code: "gateway_budget_cycle_anchor_invalid",
+        message: "That window does not cycle, so it cannot take a cycle anchor",
+        fault: "customer",
+        httpStatus: 400,
+        meta: { window: window.toLowerCase() },
+      });
+      expect(store.budgets.size).toBe(0);
+    }
+  });
+
+  it("accepts an anchor on a cyclic window", async () => {
+    const { service, store } = serviceOver();
+    const created = await service.create({ ...baseInput, window: "MONTH" });
+
+    expect(created.window).toBe("MONTH");
+    expect(created.cycleAnchorAt?.equals(cycleAnchorAt)).toBe(true);
+    expect(store.budgets.has(created.id)).toBe(true);
+  });
+
+  it("leaves the two non-cycling windows alone when no anchor is sent", async () => {
+    for (const window of ["TOTAL", "MANUAL"] as const) {
+      const { service } = serviceOver();
+      const created = await service.create({ ...baseInput, window, cycleAnchorAt: null });
+
+      expect(created.window).toBe(window);
+      expect(created.cycleAnchorAt).toBeNull();
+    }
+  });
+});

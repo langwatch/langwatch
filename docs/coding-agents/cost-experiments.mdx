@@ -1,0 +1,105 @@
+---
+title: Run Your Own Cost Experiments
+sidebarTitle: Cost Experiments
+description: A/B test a Claude Code setting on your own tasks before you roll it out, with the steps, the metric and where LangWatch shows the result. Includes the runs we did.
+keywords:
+  - claude code a/b test
+  - claude code compaction experiment
+  - claude code model comparison cost
+  - prompt cache ttl experiment
+  - claude code subagent model
+---
+
+The savings on [Reduce coding agent cost](/coding-agents/reduce-coding-agent-cost) come from many organisations' sessions. Your work may differ, so measure a setting on your own tasks before you change it for a whole team. Each experiment below runs the same task twice or more under two settings and compares what LangWatch recorded.
+
+These are manual experiments: you run them on your machine, and LangWatch records the sessions.
+
+## How to run any of them
+
+1. [Connect Claude Code to LangWatch](/coding-agents/claude-code) on the machine you test on.
+2. Pick tasks you really do, with a check that says whether the result is right: a failing test to fix, a question with a known answer. Without the check, a cheaper arm may just be doing less.
+3. Run each arm with `claude -p` and pass the setting with `--settings`, which wins over your user settings. A shell `export` loses to a value in any `settings.json` `env` block, so the run silently tests the default.
+
+   ```bash
+   claude -p "<task prompt>" --output-format json \
+     --settings '{"autoCompactWindow": 150000}' > arm-b-run-1.json
+   ```
+
+4. Give each run its own directory with a fresh checkout at the same commit, so the runs do not read each other's cache and no run starts from an earlier run's changes.
+5. Alternate the arms (A, B, A, B) instead of running all of one first.
+6. Run each arm at least three times. Agent behaviour varies: in one of our pilots the same prompt took 19 API calls in one run and 150 in another.
+7. Compare cost, cache reads, model calls and the task check. The JSON result has `total_cost_usd` and `usage`, and each run shows up as a session in the [sessions list](/coding-agents/sessions) with its cost, model calls, peak context and compactions.
+
+On a Claude subscription, `total_cost_usd` and LangWatch both show API-equivalent USD: the result tells you how much more work fits in your plan, not a bill.
+
+## Compaction window
+
+**Question:** does compacting earlier cost less on your sessions, and what does the agent lose?
+
+**Arms:** default against `{"autoCompactWindow": <n>}`, where `n` sits below the peak context your long sessions reach. [Find your context sweet spot](/coding-agents/find-your-context-sweet-spot) suggests a value from your own data.
+
+**Task:** one that grows the context well past `n`, for example reading a large module file by file and answering questions about it. Ask one or two questions at the end about something from early in the session, to see what compaction dropped.
+
+**Metric:** cost and cache-read tokens per run, compactions per run, and the answers. In LangWatch, the session detail shows each compaction with the context before and after it.
+
+**What we measured:** a scripted session read 145 source files one per turn, then answered 6 questions about details in the first files. The default window never compacted and peaked at 488k tokens. A 150k window compacted 4 to 5 times, each at about 118k.
+
+| | Default | `autoCompactWindow: 150000` |
+|---|---|---|
+| Runs | 4 | 4 |
+| Cost per run, list prices | 9.78 USD | 4.81 USD |
+| Cache reads per run | 75.7M | 20.6M |
+| Questions about early files answered | 6 of 6 | 0 of 6 |
+
+The early window cut cost by 51%, but the agent lost what it had read before each compaction. Pick a window that compacts long sessions without cutting into the part of the session your agent still needs, and check the answers, not only the cost.
+
+## Model version
+
+**Question:** does the current model cost less on your tasks than the version you pinned, at the same quality?
+
+**Arms:** `--model claude-opus-5` against `--model claude-opus-5-5`, or whichever pinned id and successor you use.
+
+**Task:** three to five real bug fixes, each with a failing test. Keep a second, hidden set of tests per bug and run it after the agent finishes, to check the fix and not only the visible test.
+
+**Metric:** cost, model calls, duration and hidden tests passed. In LangWatch, [usage analytics](/coding-agents/usage-analytics) splits cost by model.
+
+**What we measured:** 5 bug fixes in a small Python library, 3 runs per model per bug, alternating models, each scored by hidden tests.
+
+| | Opus 5 | Opus 5.5 |
+|---|---|---|
+| Runs | 15 | 15 |
+| Hidden tests passed | 15 of 15 | 15 of 15 |
+| Mean cost per fix | 0.50 USD | 0.19 USD |
+| Median turns | 8 | 5 |
+| Median duration | 51 s | 17 s |
+
+Opus 5.5 cost 63% less per fix (95% CI 56 to 69%) at the same quality. Its lower prices explain about a third of the cost; the rest came from fewer tokens, with half the cache reads and a third of the output.
+
+## Prompt cache lifetime
+
+**Question:** for pay-per-token users, does a one-hour cache on the main conversation cost less than the default five minutes?
+
+**Arms:** `{"promptCacheTtl": "5m"}` against `{"promptCacheTtl": "1h"}`.
+
+**Task:** a session with real pauses. Run three or four prompts in one session with `claude -p --resume <session id>`, and wait 10 to 20 minutes between them, the length of a review or a meeting.
+
+**Metric:** cache-write tokens and cost per session. The JSON result splits writes into `usage.cache_creation.ephemeral_5m_input_tokens` and `ephemeral_1h_input_tokens`. On the five-minute arm, the first call after each pause writes the whole context again. Run this on an API key: a subscription already gets the hour on the main conversation.
+
+## Sub-agent model
+
+**Question:** do built-in sub-agents on Sonnet cost less without hurting the result?
+
+**Arms:** default against `{"env": {"CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"}}`. Explore and Plan keep the main model unless you also set `"CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"`, so decide whether they belong in the test.
+
+**Task:** work that makes the agent search and read code through sub-agents, such as "find every place that reads this config value and change it", with a test that checks the change.
+
+**Metric:** cost of the sub-agent calls and the test result. In LangWatch, sub-agent calls carry a query source that starts with `agent:`, so you can split the cost by thread:
+
+```bash
+langwatch query run "SELECT QuerySource, Model, round(sum(CostUsd), 2) AS cost_usd
+  FROM langwatch.coding_session_events
+  WHERE EventKind = 'model_call' AND SessionId IN ('<run 1>', '<run 2>')
+  GROUP BY QuerySource, Model ORDER BY cost_usd DESC"
+```
+
+**Also check:** [Test how your codebase steers an agent](/coding-agents/codebase-experiment) for a larger experiment on speed and defects, run on our own monorepo.

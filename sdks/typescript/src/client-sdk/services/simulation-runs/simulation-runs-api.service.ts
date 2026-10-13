@@ -1,20 +1,18 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
-import type { InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
+import type { InternalConfig } from "@/client-sdk/types";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 export type SimulationRunsListResponse =
-  paths["/api/simulation-runs"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/simulation-runs"]["get"]["responses"]["200"]["content"]["application/json"];
 
 export type SimulationRunResponse =
-  paths["/api/simulation-runs/{scenarioRunId}"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/simulation-runs/{scenarioRunId}"]["get"]["responses"]["200"]["content"]["application/json"];
 
 /**
  * One evaluator's result on a finished run: its status, whether it was
@@ -25,14 +23,14 @@ export type SimulationRunEvaluation = NonNullable<
 >[number];
 
 export type SimulationRunsBatchesListResponse =
-  paths["/api/simulation-runs/batches/list"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/simulation-runs/batches/list"]["get"]["responses"]["200"]["content"]["application/json"];
 
 export type SimulationRunsListParams = NonNullable<
-  paths["/api/simulation-runs"]["get"]["parameters"]["query"]
+  paths["/api/v1/simulation-runs"]["get"]["parameters"]["query"]
 >;
 
 export type SimulationRunsBatchesListParams =
-  paths["/api/simulation-runs/batches/list"]["get"]["parameters"]["query"];
+  paths["/api/v1/simulation-runs/batches/list"]["get"]["parameters"]["query"];
 
 export class SimulationRunsApiError extends Error {
   constructor(
@@ -52,44 +50,62 @@ export class SimulationRunsApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: response?.status ?? extractStatusFromResponse(error),
+      },
+    });
     throwIfHandledError({ operation, error, message });
     throw new SimulationRunsApiError(message, operation, error);
   }
 
   async getAll(params?: SimulationRunsListParams): Promise<SimulationRunsListResponse> {
-    const { data, error } = await this.apiClient.GET("/api/simulation-runs", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/simulation-runs", {
       params: { query: params },
     });
-    if (error) this.handleApiError("list simulation runs", error);
-    return data;
+    return unwrapApiResult({
+      operation: "list simulation runs",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async get(scenarioRunId: string): Promise<SimulationRunResponse> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/simulation-runs/{scenarioRunId}",
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/simulation-runs/{scenarioRunId}",
       {
         params: { path: { scenarioRunId } },
       },
     );
-    if (error)
-      this.handleApiError(`get simulation run "${scenarioRunId}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `get simulation run "${scenarioRunId}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async listBatches(
     params: SimulationRunsBatchesListParams,
   ): Promise<SimulationRunsBatchesListResponse> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/simulation-runs/batches/list",
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/simulation-runs/batches/list",
       {
         params: { query: params },
       },
     );
-    if (error) this.handleApiError("list simulation run batches", error);
-    return data;
+    return unwrapApiResult({
+      operation: "list simulation run batches",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 }

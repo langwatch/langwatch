@@ -78,6 +78,13 @@ Feature: Datasets list page
     Then I see that the list is loading
     And I am not shown an empty-project message
 
+  @integration
+  Scenario: A failed refresh keeps the datasets I already see
+    Given my datasets have loaded
+    When a later refresh of the list fails
+    Then I still see my datasets
+    And I am told the refresh failed, above them
+
   # ============================================================================
   # Creating
   # ============================================================================
@@ -109,3 +116,9 @@ Feature: Datasets list page
     When I choose "Replicate to another project" from a dataset's row menu
     Then I can pick a target project
     And the dataset is copied there
+
+  @integration
+  Scenario: Replicating a dataset offers only the projects I may create datasets in
+    Given I may create datasets in one of my projects and not in another
+    When I open the dataset replicate dialog
+    Then only the project I may create datasets in is offered

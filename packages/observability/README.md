@@ -15,7 +15,7 @@ logger.info("hello");
 
 There is intentionally no separate server logger. `createLogger` detects Node.js at runtime:
 
-- **Node.js** uses a shared Pino transport, optional OTel log export, request-log causes reduced to a bounded summary (type, message, code, stack) while other error logs keep their full pino serialization (without superjson metadata), and registered async request context.
+- **Node.js** uses a shared Pino transport, optional OTel log export, request-log causes reduced to a bounded summary (type, message, code, stack) while other error logs keep pino's serialization plus the error's own fields, and registered async request context.
 - **Browser** uses Pino's browser output. The root package does not import OpenTelemetry or Node-only modules.
 
 Disable automatic server context injection only for exceptional cases:
@@ -48,10 +48,7 @@ Queue producers and consumers can use `getJobContextMetadata` and `createContext
 OpenTelemetry helpers are also isolated from the browser-safe package root:
 
 ```ts
-import {
-  getActiveTraceId,
-  injectTraceContextHeaders,
-} from "@langwatch/observability/tracing";
+import { getActiveTraceId, injectTraceContextHeaders } from "@langwatch/observability/tracing";
 
 const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
 ```
@@ -70,17 +67,23 @@ logHttpRequest(logger, {
 });
 ```
 
-## Environment variables
+## Process configuration
 
-| Variable | Default | Description |
-|---|---|---|
-| `PINO_LOG_LEVEL` | `debug` in Node.js, `info` in browser | Base logger level |
-| `LOG_CONSOLE_LEVEL` | `info` | Console level (`PINO_CONSOLE_LEVEL` is the compatibility fallback) |
-| `LOG_OTEL_LEVEL` | `debug` | OTel level (`PINO_OTEL_LEVEL` is the compatibility fallback) |
-| `PINO_OTEL_ENABLED` | `false` | Set to `true` to enable OTel log export |
+The package does not read environment variables. Each process composition root
+maps its deployment environment into `LoggerConfiguration`, calls
+`configureLogger()` before importing modules that create loggers, then reuses
+that configured factory for the process lifetime. The legacy environment names
+remain process-composition compatibility inputs:
+
+| Variable            | Default                               | Description                                                        |
+| ------------------- | ------------------------------------- | ------------------------------------------------------------------ |
+| `PINO_LOG_LEVEL`    | `debug` in Node.js, `info` in browser | Base logger level                                                  |
+| `LOG_CONSOLE_LEVEL` | `info`                                | Console level (`PINO_CONSOLE_LEVEL` is the compatibility fallback) |
+| `LOG_OTEL_LEVEL`    | `debug`                               | OTel level (`PINO_OTEL_LEVEL` is the compatibility fallback)       |
+| `PINO_OTEL_ENABLED` | `false`                               | Set to `true` to enable OTel log export                            |
 
 ## Testing
 
 ```bash
-pnpm test:unit
+pnpm test
 ```

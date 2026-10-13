@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/oklog/ulid/v2"
 	"go.uber.org/zap"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -35,6 +34,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/adapters/providers"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ratelimit"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/spendemitter"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/voicesession"
 )
 
 // Deps holds validated infrastructure adapters needed by the gateway.
@@ -49,12 +49,14 @@ type Deps struct {
 	Providers     *providers.BifrostRouter
 	RateLimiter   *ratelimit.Limiter
 	BudgetChecker *budget.Checker
-	Policy        *policy.Matcher
-	Cache         *cacherules.Evaluator
-	Models        *modelresolver.Resolver
-	Health        *health.Registry
-	Metrics       *gatewaymetrics.Recorder
-	Breaker       *breaker.Registry
+	// Voice supervises brokered voice calls and ends them on shutdown.
+	Voice   *voicesession.Manager
+	Policy  *policy.Matcher
+	Cache   *cacherules.Evaluator
+	Models  *modelresolver.Resolver
+	Health  *health.Registry
+	Metrics *gatewaymetrics.Recorder
+	Breaker *breaker.Registry
 	// Spend emission (nil when LW_GATEWAY_SPEND_ENABLED is off).
 	SpendEmitter *spendemitter.Emitter
 	SpendSpool   *spendemitter.Spool
@@ -73,7 +75,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	}
 	logger := clog.New(ctx, cfg.Log)
 	ctx = clog.Set(ctx, logger)
-	nodeID := resolveNodeID(ctx)
+	nodeID := otelsetup.ResolveNodeID(logger)
 
 	// Built first so every adapter below can be handed the recorder it
 	// reports into. Holds no resources and starts no goroutines.
@@ -172,7 +174,8 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		AllowedEndpointHosts:          splitAllowedHosts(cfg.AllowedProxyHosts),
 		// The control plane owns codex OAuth sessions; the router calls back
 		// through it to refresh a 401'd access token once.
-		CodexRefresher: cpClient,
+		CodexRefresher:  cpClient,
+		CodexBackendURL: codexBackendURL(cfg.CodexAPIBase),
 	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("bifrost init: %w", err)
@@ -189,6 +192,18 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		// Attributed-user templates enforce per end user through a cached
 		// control-plane bucket read; everything else stays bundle-local.
 		Buckets: budget.NewCachedBucketSpend(cpClient),
+	})
+
+	voice := voicesession.NewManager(voicesession.Options{
+		Registry:      cpClient,
+		Vendor:        voicesession.NewOpenAIVendor(router.VoiceHTTPClient(), providers.OpenAIVoiceEndpoint),
+		RelayEndpoint: providers.VoiceRelayEndpoint,
+		Budget:        budgetChecker.Precheck,
+		Keys:          authSvc,
+		Metrics:       metrics,
+		Logger:        logger,
+		MaxSessions:   cfg.Voice.MaxSupervisedSessions,
+		DrainBudget:   time.Duration(cfg.Voice.DrainSeconds) * time.Second,
 	})
 
 	// Per-credential circuit breaker. A provider that keeps failing is
@@ -287,6 +302,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Providers:     router,
 		RateLimiter:   limiter,
 		BudgetChecker: budgetChecker,
+		Voice:         voice,
 		Policy:        policy.NewMatcher(),
 		Cache:         cacherules.NewEvaluator(),
 		Models:        modelresolver.New(),
@@ -329,14 +345,4 @@ func (a changePollerAdapter) PollChanges(ctx context.Context, organizationID, si
 		}
 	}
 	return out, next, nil
-}
-
-func resolveNodeID(ctx context.Context) string {
-	hostname, err := os.Hostname()
-	if err != nil {
-		id := ulid.Make().String()
-		clog.Get(ctx).Warn("hostname_unavailable", zap.Error(err), zap.String("fallback_node_id", id))
-		return id
-	}
-	return hostname
 }
