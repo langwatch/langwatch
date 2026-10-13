@@ -99,13 +99,42 @@ async function loadedNoiseTexture(): Promise<HTMLImageElement | undefined> {
  */
 const LIVE_ONLY_ON_A_GPU: WebGLContextAttributes = { failIfMajorPerformanceCaveat: true };
 
+/** A frame slower than this is under ten a second: the drawing holds up the page's thread. */
+const SLOW_FRAME_MS = 100;
+
+/**
+ * Watches the first frames and calls `stop` after three slow ones in a row, which is what
+ * software WebGL gives. One slow frame is a busy load; sixty fast ones end the watch.
+ */
+export function stopWhenFramesAreSlow({
+  stop,
+  requestFrame = requestAnimationFrame,
+}: {
+  stop: () => void;
+  requestFrame?: (tick: FrameRequestCallback) => unknown;
+}): void {
+  let last: number | undefined;
+  let slowInARow = 0;
+  let frames = 0;
+  const tick = (now: number) => {
+    if (last !== undefined) slowInARow = now - last > SLOW_FRAME_MS ? slowInARow + 1 : 0;
+    last = now;
+    if (slowInARow >= 3) return stop();
+    if (++frames <= 60) requestFrame(tick);
+  };
+  requestFrame(tick);
+}
+
 /** Starts the mesh or the warp in `element` and resolves to the stop; rejects without WebGL. */
 export async function mountAmbientShader({
   element,
   mode,
+  onSlow,
 }: {
   element: HTMLElement;
   mode: "light" | "dark";
+  /** Called once the shader has stopped itself because its frames were too slow. */
+  onSlow?: () => void;
 }): Promise<() => void> {
   const noiseTexture = mode === "dark" ? await loadedNoiseTexture() : undefined;
   const mount =
@@ -146,5 +175,18 @@ export async function mountAmbientShader({
           MESH_AT_REST.speed,
           wallClockFrame({ speed: MESH_AT_REST.speed }),
         );
-  return () => mount.dispose();
+  let stopped = false;
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    mount.dispose();
+  };
+  stopWhenFramesAreSlow({
+    stop: () => {
+      if (stopped) return;
+      stop();
+      onSlow?.();
+    },
+  });
+  return stop;
 }

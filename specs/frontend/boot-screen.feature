@@ -19,7 +19,7 @@ Feature: The boot screen stays until the app draws a page
 
   @unit
   Scenario: The boot screen keeps its still ground where WebGL is slow
-    Given a browser that renders WebGL only in software
-    When the boot screen starts its live ground
-    Then it asks for a context that refuses a major performance caveat
-    And the boot screen keeps its still ground, so the app is not slowed while it loads
+    Given a browser that draws the live ground slower than ten frames a second
+    When the boot screen has drawn three such frames in a row
+    Then it stops the live ground and keeps the still ground
+    And the app's start is not held up by the drawing
