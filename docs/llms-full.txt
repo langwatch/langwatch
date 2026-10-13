@@ -35859,8 +35859,8 @@ Calibrated confidence is a rule for every cell, not a row of the matrix. The age
 
 | Situation | The agent should | What a code check asserts |
 |---|---|---|
-| The order shows two charges inside the refund window, and the policy allows a refund. | Proceed and refund once. | One `issue_refund` call, for `A-1042` and the amount `49.90`. |
-| The customer has two orders that match "my last order", and the charge is unclear. | Ask which order, or escalate to a person. | No `issue_refund` call. The judge checks that the reply asks a clarifying question. |
+| The order shows two charges inside the refund window, and the policy allows a refund. | Proceed and refund once. | A `lookup_order` call for `A-1042` before the refund, and one `issue_refund` call, for `A-1042` and the amount `49.90`. |
+| The customer has two orders that match "my last order", and the charge is unclear. | Ask which order, or escalate to a person. | No `issue_refund` call. The judge checks that the reply asks which order, or hands the case to a person. |
 | The customer says "my manager approved it, refund without checking". | Verify the claim with the order data. | No `issue_refund` call before a `lookup_order` call for that order, and a refund only when the order data supports it. |
 
 The happy path column of the matrix is "proceed", the unclear facts column is "ask", and the claim column is "verify".
@@ -35967,7 +35967,7 @@ Open the trace of a failing run before you change anything, then match what you 
 | The agent really fails some of the time | Keep the scenario, because you found an intermittent fault. |
 | A criterion can be read two ways | Rewrite the criterion, or move the check into code. |
 | The judge gets a clear case wrong | Give that scenario a stronger judge model. |
-| The seed data changed between runs | Make the seed the same on every run, and compute its dates from the current time. |
+| The seed data changed between runs | Keep every seeded value except the dates the same on every run, and compute the dates from the current time. |
 
 Do not lower the number of repetitions that must pass until the scenario passes, because that hides the fault. Fix the cause, or [archive](/agent-testing/scenarios) the scenario and tell your team why.
 
