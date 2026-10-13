@@ -178,6 +178,11 @@ void describe("given a pull request description", () => {
       );
       assert.match(checkBody(text)[0]!, /not ticked/);
     });
+
+    void it("is not fooled by a section that only exists inside a fenced code example", () => {
+      const text = ["## What changed", "An example:", "```markdown", body(), "```"].join("\n");
+      assert.ok(checkBody(text).length > 0);
+    });
   });
 });
 
