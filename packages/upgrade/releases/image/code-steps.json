@@ -97,7 +97,7 @@
     "kind": "data",
     "mode": "background",
     "owner": "dataset",
-    "description": "Moves each dataset's content out of Postgres and into object-storage chunks.",
+    "description": "Moves each dataset's content out of Postgres, and copies each single-file dataset, into object-storage chunks.",
     "needsOldWritersGone": true
   },
   {

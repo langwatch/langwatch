@@ -8,7 +8,9 @@ import type {
   DatasetMigrationRepository,
 } from "../../repositories/dataset-migration.repository.ts";
 import { MemoryDatasetMigrationRepository } from "../../repositories/memory/memory.dataset-migration.repository.ts";
+import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
 import { ObjectStorageDatasetChunkRepository } from "../../repositories/object-storage/object-storage.dataset-chunk.repository.ts";
+import { ObjectStorageDatasetSingleFileRepository } from "../../repositories/object-storage/object-storage.dataset-single-file.repository.ts";
 import { DatasetMigrationService } from "../dataset-migration.service.ts";
 
 const PAGES: Record<string, { ids: string[]; next: string | null }> = {
@@ -20,13 +22,18 @@ const PAGES: Record<string, { ids: string[]; next: string | null }> = {
 function subject(
   listAllIds: (input?: ProjectIdPageInput) => Promise<{ ids: string[]; next: string | null }>,
 ) {
-  const repository: DatasetMigrationRepository = MemoryDatasetMigrationRepository.create();
+  const repository: DatasetMigrationRepository = MemoryDatasetMigrationRepository.create({
+    database: MemoryDatasetDatabase.create(),
+  });
   const findPostgresDatasetIds = vi.spyOn(repository, "findPostgresDatasetIds");
   const projects = { listAllIds: vi.fn(listAllIds) };
   const migration = DatasetMigrationService.create({
     repository,
     storage: ObjectStorageDatasetChunkRepository.create({ objectStorage: memoryObjectStorage() }),
     projects,
+    singleFiles: ObjectStorageDatasetSingleFileRepository.create({
+      objectStorage: memoryObjectStorage(),
+    }),
   });
   return { findPostgresDatasetIds, migration, projects };
 }
@@ -99,6 +106,9 @@ function step(
     getFingerprint: async () => ({ count: 1, maxUpdatedAt: null }),
     findRecordPage: async ({ afterId }) => (afterId ? [] : [{ id: "record_1", entry: { a: 1 } }]),
     commit,
+    findSingleFileDatasetIds: async () => [],
+    isSingleFileLayout: async () => false,
+    commitSingleFile: async () => "already-migrated",
     isSchemaPending: () => false,
   };
   const objectStorage = memoryObjectStorage();
@@ -109,6 +119,7 @@ function step(
     projects: {
       listAllIds: async (page) => PAGES[page?.after ?? "start"] ?? { ids: [], next: null },
     },
+    singleFiles: ObjectStorageDatasetSingleFileRepository.create({ objectStorage }),
   });
   const saved: string[] = [];
   const onProjectDone = async ({ afterProjectId }: { afterProjectId: string }) => {
@@ -190,7 +201,10 @@ describe("DatasetMigrationService as an upgrade step", () => {
           signal: new AbortController().signal,
         }),
       ).rejects.toThrow("1 datasets failed");
-      expect(reports).toEqual([{ afterProjectId: "project_a" }, { afterProjectId: "project_b" }]);
+      expect(reports).toEqual([
+        { afterProjectId: "project_a", singleFileSkipped: [] },
+        { afterProjectId: "project_b", singleFileSkipped: [] },
+      ]);
     });
 
     /** @scenario "A retry of an unfinished content move completes it" */
@@ -214,7 +228,7 @@ describe("DatasetMigrationService as an upgrade step", () => {
         "project_d",
         "project_e",
       ]);
-      expect(reports.at(-1)).toEqual({ afterProjectId: "project_e" });
+      expect(reports.at(-1)).toEqual({ afterProjectId: "project_e", singleFileSkipped: [] });
     });
   });
 

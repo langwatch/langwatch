@@ -1,5 +1,7 @@
 import type { Instant } from "@langwatch/time";
 
+import type { SkippedSingleFile } from "../rules/dataset-single-file.rules.ts";
+
 export type DatasetMigrationOutcome =
   | "migrated"
   | "already-migrated"
@@ -12,6 +14,11 @@ export type DatasetMigrationSummary = {
   alreadyMigrated: number;
   skippedConcurrentWrite: number;
   failed: number;
+  /** Single-file datasets (`useS3`) copied into chunks, or that a dry run would copy. */
+  singleFileConverted: number;
+  singleFileWouldConvert: number;
+  /** Single-file datasets left in place: the file is missing or not a record array. */
+  singleFileSkipped: SkippedSingleFile[];
 };
 
 /** `incomplete`: some dataset failed or changed mid-move; the checkpoint never passed it. */
@@ -56,6 +63,17 @@ export interface DatasetMigrationRepository {
       baseline: DatasetMigrationFingerprint;
       metadata: DatasetMigrationMetadata;
     },
+  ): Promise<DatasetMigrationOutcome>;
+  /** One id-ordered page of a project's single-file datasets (`useS3`) not yet in chunks. */
+  findSingleFileDatasetIds(input: {
+    projectId: string;
+    afterId?: string | undefined;
+    limit: number;
+  }): Promise<string[]>;
+  isSingleFileLayout(input: DatasetKey): Promise<boolean>;
+  /** Flips a single-file dataset onto its chunks under a lock, unless it was flipped meanwhile. */
+  commitSingleFile(
+    input: DatasetKey & { metadata: DatasetMigrationMetadata },
   ): Promise<DatasetMigrationOutcome>;
   /** Whether a failure means the schema this migration needs is not applied yet. */
   isSchemaPending(error: unknown): boolean;
