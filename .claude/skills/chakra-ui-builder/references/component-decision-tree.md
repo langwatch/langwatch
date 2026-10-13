@@ -7,7 +7,6 @@
 > `ListPage` and `ListTable`, `ResourceTile`, `ActionRow` for footer buttons, `NoDataInfoBlock`
 > for empty states. Not every Chakra component below is exported by `/primitives`.
 
-
 When the user hasn't specified a component, choose the most appropriate one
 based on the guidelines below. Prefer an existing Chakra component over a custom
 implementation. Match the interaction model first, then the visual treatment.

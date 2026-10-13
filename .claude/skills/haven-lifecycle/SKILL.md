@@ -75,11 +75,11 @@ bundle). An open page then reloads once nobody has touched it for 60 s, or at on
 Old chunks stay loadable for 24 h after a swap. Outside haven, `pnpm dev` builds the UI once and serves it like a still stack; `pnpm dev:hmr` is the one that runs Vite. Numbers for each mode: `dev/docs/LOCAL_STACK.md`.
 
 |             | Vite (`--hmr`, `pnpm dev:hmr`) | built (still, --watch, `pnpm dev`) |
-| ----------- | ---------------- | ----------------------------- |
-| Role        | almost never     | testing without changing code |
-| Page memory | 708 MB           | 396 MB                        |
-| JS heap     | 242 MB           | 69 MB                         |
-| Requests    | 2289             | 563                           |
+| ----------- | ------------------------------ | ---------------------------------- |
+| Role        | almost never                   | testing without changing code      |
+| Page memory | 708 MB                         | 396 MB                             |
+| JS heap     | 242 MB                         | 69 MB                              |
+| Requests    | 2289                           | 563                                |
 
 - The app's own process sheds the UI's Vite server too.
 - The orb is there on any haven stack, built or Vite (`haven orb feedback`, see `haven-orb`); a built page has no HMR and runs its production code paths.
