@@ -99,7 +99,9 @@ export function AppHeaderUserMenu() {
               </Menu.Item>
               {host.opsAccess().hasAccess && (
                 <Menu.Item value="admin" asChild>
-                  <NavigationLink href={OPERATIONS_CONSOLE.href}>{OPERATIONS_CONSOLE.label}</NavigationLink>
+                  <NavigationLink href={OPERATIONS_CONSOLE.href}>
+                    {OPERATIONS_CONSOLE.label}
+                  </NavigationLink>
                 </Menu.Item>
               )}
               {accountMenu?.presence}
