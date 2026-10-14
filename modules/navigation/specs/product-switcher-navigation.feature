@@ -23,6 +23,12 @@ Feature: Product switcher navigation
     And I see "Gateway" with "Route, meter and bill LLM usage"
     And the product I am in carries the active mark
 
+  @unit
+  Scenario: Dashboards leads the product switcher
+    Given I can reach Dashboards, Me and LLM Ops
+    When I open the product switcher
+    Then "Dashboards" is the first product in the list
+
   @integration
   Scenario: A product I cannot reach is not offered
     Given I am on the product-switcher mode

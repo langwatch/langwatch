@@ -48,10 +48,11 @@ describe("the product colour map", () => {
     expect(PRODUCT_COLOURS).toEqual({
       me: "blue",
       "llm-ops": "accent",
+      dashboards: "accent",
       gateway: "accent",
       governance: "accent",
     });
-    expect(PRODUCT_NAMES).toEqual(["me", "llm-ops", "gateway", "governance"]);
+    expect(PRODUCT_NAMES).toEqual(["me", "llm-ops", "dashboards", "gateway", "governance"]);
   });
 
   /** @scenario "The map gives Me blue and keeps the current accent for the other products" */

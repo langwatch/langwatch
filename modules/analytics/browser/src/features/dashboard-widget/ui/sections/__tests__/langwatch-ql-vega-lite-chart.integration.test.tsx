@@ -152,11 +152,13 @@ const chart = ({
   rows = ROWS,
   columns = COLUMNS,
   ariaLabel,
+  isResultNoteHidden,
 }: {
   spec?: unknown;
   rows?: LangWatchQLDataset;
   columns?: readonly LangWatchQLDatasetColumn[];
   ariaLabel?: string;
+  isResultNoteHidden?: boolean;
 } = {}) => (
   <LangWatchQLVegaLiteChart
     spec={spec}
@@ -166,8 +168,18 @@ const chart = ({
     pinnedConfig={PINNED_CONFIG}
     colorMode={colorModeHarness.mode}
     {...(ariaLabel === undefined ? {} : { ariaLabel })}
+    {...(isResultNoteHidden === undefined ? {} : { isResultNoteHidden })}
   />
 );
+
+/** The declarations the injected styles give an element's classes; jsdom computes none of them. */
+const cssDeclarationsOf = (element: Element) => {
+  const css = [...document.querySelectorAll("style")].map((tag) => tag.textContent ?? "").join("");
+  return [...element.classList]
+    .flatMap((name) => [...css.matchAll(new RegExp(`\\.${name}\\{([^}]*)\\}`, "g"))])
+    .map((match) => match[1])
+    .join(";");
+};
 
 const failureCode = () =>
   screen.getByTestId("lwql-chart-failure").getAttribute("data-failure-code");
@@ -293,6 +305,17 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         expect(describedBy).not.toBeNull();
         expect(document.getElementById(describedBy!)?.textContent).toContain("table");
         expect(view.getAttribute("tabindex")).toBeNull();
+      });
+
+      it("keeps the description for screen readers only when its note is hidden", async () => {
+        withChakra(chart({ ariaLabel: "Evidence", isResultNoteHidden: true }));
+
+        const view = await screen.findByRole("figure", { name: "Evidence" });
+        const description = document.getElementById(view.getAttribute("aria-describedby")!);
+        expect(description?.textContent).toContain("table");
+        expect(view).toHaveAccessibleDescription(expect.stringContaining("table"));
+        expect(cssDeclarationsOf(description!)).toMatch(/position:absolute/);
+        expect(cssDeclarationsOf(description!)).toMatch(/width:1px/);
       });
     });
 

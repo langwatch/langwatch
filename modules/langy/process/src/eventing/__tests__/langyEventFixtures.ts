@@ -59,6 +59,7 @@ export function conversationStartedEvent(params: {
   occurredAt: number;
   /** A title chosen at creation; absent means the first message derives one. */
   title?: string;
+  origin?: "interactive" | "run";
 }) {
   return LangyConversationStartedEventSchema.parse({
     ...base(params),
@@ -69,6 +70,7 @@ export function conversationStartedEvent(params: {
       userId: USER_ID,
       title: params.title ?? null,
       runToken: SENTINELS.runToken,
+      ...(params.origin ? { origin: params.origin } : {}),
     },
   });
 }

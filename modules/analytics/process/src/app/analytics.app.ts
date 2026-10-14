@@ -7,7 +7,6 @@ import {
   analyticsServerConfig,
   type AnalyticsServerConfig,
   AnalyticsApi as AnalyticsApiToken,
-  CustomChartPlaygroundNotEnabledError,
   MAX_LWQL_LENGTH,
   type AnalyticsFeedbacksPageParams,
   type AnalyticsFeedbacksPageResult,
@@ -95,11 +94,11 @@ import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } fro
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
-import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
+import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
-import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
+import { DashboardWidgetAccessService } from "../services/dashboard-widget-access.service.ts";
 import { FilterService } from "../services/filter.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
 import {
@@ -471,7 +470,7 @@ export class AnalyticsModule
 
   #dependencies: AnalyticsAppDependencies;
   #publicBaseUrl: string | undefined;
-  #playgroundAccess: CustomChartPlaygroundAccessService;
+  #widgetAccess: DashboardWidgetAccessService;
   #hydration: LangWatchQLHydrationService;
   #queryScope: LangWatchQLQueryScopeService;
   #protections: WorkbenchProtectionsService;
@@ -486,7 +485,7 @@ export class AnalyticsModule
       protections: this.#protections,
     });
     this.#publicBaseUrl = publicBaseUrl;
-    this.#playgroundAccess = CustomChartPlaygroundAccessService.create(dependencies);
+    this.#widgetAccess = DashboardWidgetAccessService.create(dependencies);
     this.#hydration = dependencies.hydration;
   }
 
@@ -579,6 +578,7 @@ export class AnalyticsModule
     readonly projectId: string;
     readonly source: AnalyticsMetricSource;
     readonly since: Instant;
+    readonly excludeOrigins?: readonly string[];
   }): Promise<Instant[]> {
     return this.#dependencies.recency.findLastOccurredAt(input);
   }
@@ -858,6 +858,15 @@ export class AnalyticsModule
     });
   }
 
+  /** Whether this project's rollout admits it to the Dashboards area at all. */
+  isDashboardsEnabled(input: { projectId: string }): Promise<boolean> {
+    return dashboardsEnabled({
+      featureFlags: this.#dependencies.featureFlags,
+      projectId: input.projectId,
+      projects: this.#dependencies.projects,
+    });
+  }
+
   /** What one signed-in member may see of a project's content and spend. */
   resolveProtections(input: {
     userId: string;
@@ -943,9 +952,7 @@ export class AnalyticsModule
    * This must be implemented on the bound app so refusal returns the domain 403
    * instead of the feature-api proxy's “not callable” error.
    */
-  async assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void> {
-    const enabled = await this.#playgroundAccess.isEnabled(input);
-
-    if (!enabled) throw new CustomChartPlaygroundNotEnabledError();
+  assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void> {
+    return this.#widgetAccess.assertEnabled(input);
   }
 }

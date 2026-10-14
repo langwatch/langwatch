@@ -3,7 +3,7 @@ import { findLandingProjects } from "@langwatch/project-contract";
 
 import { useNavigationHost } from "../model/navigation-host.ts";
 
-/** Which project LLM Ops opens; moved from platform/app, team access now delegated to host */
+/** Which project the project products (LLM Ops, Dashboards) open; team access comes from host */
 export function resolveLlmOpsProjectSlug({
   ambientProject,
   rememberedProjectSlug,
