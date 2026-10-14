@@ -4,11 +4,13 @@
  * @see modules/auth/specs/cli-device-flow.feature
  */
 
-import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 import type { CliKeySelection } from "@langwatch/api-key-contract";
 import type { CliTokenRecordEntry } from "@langwatch/auth-contract";
 import { HandledError } from "@langwatch/handled-error";
+import type { SharedCredentialAddress } from "@langwatch/secrets/shared-credential";
+import { z } from "zod";
 
 /** Redis key prefix for device-code records. */
 const DEVICE_CODE_PREFIX = "lwcli:device:";
@@ -34,8 +36,6 @@ export const EXCHANGE_CLAIM_SECONDS = 30;
  * lost response, or a second window of the same client, gets that pair rather than a sign-in.
  */
 export const ROTATION_REPLAY_SECONDS = 60;
-/** How long a presentation waits for the pair a concurrent rotation of the same token mints. */
-export const ROTATION_REPLAY_WAIT_MS = 5000;
 /**
  * Default refresh-token lifetime.
  */
@@ -159,8 +159,14 @@ export type CliMintedSession = Readonly<{
 }>;
 
 /** A rotation's pair as its old refresh token can replay it, with the project it is capped at. */
-export type CliRememberedRotation = CliMintedSession &
-  Readonly<{ project?: Readonly<{ id: string; slug: string; name: string }> }>;
+export const cliRememberedRotationSchema = z.object({
+  accessToken: z.string(),
+  refreshToken: z.string(),
+  accessTtlSeconds: z.number(),
+  refreshTtlSeconds: z.number(),
+  project: z.object({ id: z.string(), slug: z.string(), name: z.string() }).optional(),
+});
+export type CliRememberedRotation = z.infer<typeof cliRememberedRotationSchema>;
 
 /**
  * The one grammar for a CLI bearer access token.
@@ -205,49 +211,12 @@ export function exchangeClaimKey(deviceCode: string): string {
   return `${DEVICE_CODE_PREFIX}claim:${deviceCode}`;
 }
 
-/** Where a rotation's pair is remembered: a digest of the spent token, never the token itself. */
-export function rotationReplayKey(refreshToken: string): string {
-  return `lwcli:refresh-replay:${createHash("sha256").update(refreshToken).digest("hex")}`;
-}
-
-/** The key a remembered pair is sealed under: derived from the spent token, which is not stored. */
-function rotationReplayCipherKey(refreshToken: string): Buffer {
-  return Buffer.from(hkdfSync("sha256", refreshToken, "", "lw-cli-rotation-replay", 32));
-}
-
-/** Seals a rotation's pair so only a presentation of the spent token it rotated can open it. */
-export function sealRotation({
-  refreshToken,
-  rotated,
-}: {
-  refreshToken: string;
-  rotated: CliRememberedRotation;
-}): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", rotationReplayCipherKey(refreshToken), iv);
-  const sealed = Buffer.concat([cipher.update(JSON.stringify(rotated), "utf8"), cipher.final()]);
-
-  return [iv, cipher.getAuthTag(), sealed].map((part) => part.toString("base64url")).join(".");
-}
-
-/** The pair a sealed rotation holds; throws when this token cannot open it. */
-export function openRotation({
-  refreshToken,
-  sealed,
-}: {
-  refreshToken: string;
-  sealed: string;
-}): CliRememberedRotation {
-  const [iv = "", tag = "", body = ""] = sealed.split(".");
-  const decipher = createDecipheriv(
-    "aes-256-gcm",
-    rotationReplayCipherKey(refreshToken),
-    Buffer.from(iv, "base64url"),
-  );
-  decipher.setAuthTag(Buffer.from(tag, "base64url"));
-  const opened = Buffer.concat([decipher.update(Buffer.from(body, "base64url")), decipher.final()]);
-
-  return JSON.parse(opened.toString("utf8")) as CliRememberedRotation;
+/**
+ * Where one refresh token's rotation is minted once and its pair shared: a spent token names no
+ * person or organization, so the token is its own tenant, under a digest, never the token itself.
+ */
+export function rotationReplayAddress(refreshToken: string): SharedCredentialAddress {
+  return { tenantId: createHash("sha256").update(refreshToken).digest("hex") };
 }
 
 /** The token keys of the children forked from one session family. */

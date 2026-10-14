@@ -11,6 +11,7 @@ import { createRestRuntime } from "@langwatch/api/rest";
 import { CliSessionRecordNotFoundError, cliRefreshTokenKey } from "@langwatch/auth-contract";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
+import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { UserNotFoundError } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -1510,6 +1511,7 @@ function deviceFlowWorld(
   const sessions = CliDeviceSessionService.create({
     store,
     settlements: MemoryCliDeviceSettlementChannel.create(),
+    rotations: MemorySharedCredentialStore.create(),
   });
 
   const collaborators: CliDeviceFlowCollaborators = {

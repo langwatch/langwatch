@@ -54,7 +54,8 @@ Feature: A project login is a person's session capped at one project
     Given a CLI holding a project session
     When the same refresh token is presented twice at the same moment
     Then one presentation rotates the session
-    And the other waits for that rotation and is answered the same new pair
+    And the other waits up to 10 seconds for that rotation and is answered the same new pair
+    And a presentation whose wait ends with no pair is answered 401 "invalid_grant"
 
   # A rotated refresh token answers the pair it minted for 60 seconds, so a
   # retry after a lost response, or a second window of the same client, keeps

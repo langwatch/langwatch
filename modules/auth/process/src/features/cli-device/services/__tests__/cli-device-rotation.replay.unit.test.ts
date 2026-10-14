@@ -8,32 +8,47 @@ import { cliRefreshTokenKey } from "@langwatch/auth-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
+import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryCliDeviceSettlementChannel } from "../../../../channels/memory/memory.cli-device-settlement.channel.ts";
 import { MemoryCliDeviceSessionRepository } from "../../../../repositories/memory/memory.cli-device-session.repository.ts";
 import {
   ROTATION_REPLAY_SECONDS,
-  rotationReplayKey,
+  rotationReplayAddress,
 } from "../../rules/cli-device-session.rules.ts";
-import type { CliDeviceDirectory } from "../cli-device-directory.service.ts";
+import type { AuthDirectoryProject, CliDeviceDirectory } from "../cli-device-directory.service.ts";
 import type { CliDeviceFlowCollaborators } from "../cli-device-flow.service.ts";
 import { CliDeviceRotationService } from "../cli-device-rotation.service.ts";
 import { CliDeviceSessionService, type CliMintedSession } from "../cli-device-session.service.ts";
 
 const USER_ID = "usr-replay";
 const ORGANIZATION_ID = "org-replay";
+const OTHER_PROJECT: AuthDirectoryProject = {
+  id: "project-other",
+  slug: "other",
+  name: "Other",
+  teamId: "team-other",
+  isPersonal: false,
+  ownerUserId: null,
+  kind: "application",
+};
 
-/** The rotation over the real session service and a store whose clock a test moves. */
+/** The rotation over the real session service and stores whose clock a test moves. */
 function rotationWorld() {
   const clock = { nowMs: Date.now() };
   const store = MemoryCliDeviceSessionRepository.create({ now: () => clock.nowMs });
+  const rotations = MemorySharedCredentialStore.create({
+    now: () => Temporal.Instant.fromEpochMilliseconds(clock.nowMs),
+  });
   const sessions = CliDeviceSessionService.create({
     store,
     settlements: MemoryCliDeviceSettlementChannel.create(),
+    rotations,
   });
-  const state = { activeMembership: true };
+  const state = { activeMembership: true, otherProjectReachable: false };
   const directory: CliDeviceDirectory = {
     getOrganizationIdBySsoDomain: () => Promise.reject(new OrganizationNotFoundError()),
     getPerson: () => Promise.resolve({ id: USER_ID, name: "Jane", email: "jane@example.test" }),
@@ -42,7 +57,10 @@ function rotationWorld() {
     hasActiveMembership: () => Promise.resolve(state.activeMembership),
     findActiveMemberRole: () => Promise.resolve(state.activeMembership ? "ADMIN" : null),
     getLiveProject: () => Promise.reject(new ProjectNotFoundError()),
-    getLiveProjectByRef: () => Promise.reject(new ProjectNotFoundError()),
+    getLiveProjectByRef: () =>
+      state.otherProjectReachable
+        ? Promise.resolve(OTHER_PROJECT)
+        : Promise.reject(new ProjectNotFoundError()),
   };
   const flow: CliDeviceFlowCollaborators = {
     sessions: () => sessions,
@@ -54,7 +72,7 @@ function rotationWorld() {
         extendCliLoginKeyExpiry: () => Promise.resolve(),
       }),
     ensurePersonalWorkspace: () => Promise.reject(new Error("not reached by a rotation")),
-    canViewProject: () => Promise.resolve(false),
+    canViewProject: () => Promise.resolve(state.otherProjectReachable),
     featureFlags: () =>
       createApiFixture<FeatureFlagApi>({ isEnabled: () => Promise.resolve(true) }),
     publicBaseUrl: () => "https://app.test",
@@ -67,7 +85,7 @@ function rotationWorld() {
       clientInfo: { hostname: "laptop", session_started_at: Date.now() },
     });
 
-  return Object.assign(state, { clock, store, sessions, rotation, signIn });
+  return Object.assign(state, { clock, store, rotations, sessions, rotation, signIn });
 }
 
 const spent = { refusal: { error: "invalid_grant" } };
@@ -103,16 +121,12 @@ describe("presenting a refresh token its rotation already spent", () => {
         expect(next.refreshToken).not.toBe(first.refreshToken);
       });
 
-      it("keeps no token in the clear: the key is a digest and the pair is sealed", () => {
-        const replayKeys = [...world.store.values.keys()].filter((key) =>
-          key.startsWith("lwcli:refresh-replay:"),
-        );
+      it("shares the pair under a digest of the spent token, never the token itself", async () => {
+        const address = rotationReplayAddress(issued.refreshToken);
 
-        expect(replayKeys).toEqual([rotationReplayKey(issued.refreshToken)]);
-        expect(replayKeys[0]).not.toContain(issued.refreshToken);
-        const sealed = world.store.values.get(rotationReplayKey(issued.refreshToken));
-        expect(sealed).not.toContain(first.refreshToken);
-        expect(sealed).not.toContain(first.accessToken);
+        expect(address.tenantId).toMatch(/^[0-9a-f]{64}$/);
+        expect(JSON.stringify(address)).not.toContain(issued.refreshToken);
+        await expect(world.rotations.find(address)).resolves.toHaveLength(1);
       });
     });
 
@@ -168,6 +182,24 @@ describe("presenting a refresh token its rotation already spent", () => {
     });
   });
 
+  describe("when a refresh re-scopes the session to another project", () => {
+    it("forks a child the parent's retry does not replay: it forks again", async () => {
+      world.otherProjectReachable = true;
+      const reScope = () =>
+        world.rotation.refreshSession({
+          raw: JSON.stringify({ refresh_token: issued.refreshToken, project_slug: "other" }),
+        });
+
+      const forked = await reScope();
+      const again = await reScope();
+
+      expect(again.body).not.toEqual(forked.body);
+      await expect(
+        world.rotations.find(rotationReplayAddress(issued.refreshToken)),
+      ).resolves.toEqual([]);
+    });
+  });
+
   describe("when two windows of one client refresh at the same moment", () => {
     it("rotates once and answers both the same pair", async () => {
       const [first, second] = await Promise.all([retry(), retry()]);
@@ -179,13 +211,16 @@ describe("presenting a refresh token its rotation already spent", () => {
       expect(refreshKeys).toEqual([cliRefreshTokenKey(first.refreshToken)]);
     });
 
-    it("refuses the waiting presentation when the rotation it waited on mints nothing", async () => {
-      vi.useFakeTimers({ toFake: ["setTimeout"] });
+    it("refuses the waiting presentation when the rotation it waited on shares nothing", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
       // A rotation that holds the claim and never finishes, as a process that died mid-way.
-      await world.sessions.claimRotation(issued.refreshToken);
+      await world.rotations.claim({
+        address: rotationReplayAddress(issued.refreshToken),
+        ttlMs: 30_000,
+      });
 
       const settled = retry().catch((error: unknown) => error);
-      await vi.advanceTimersByTimeAsync(10_000);
+      await vi.advanceTimersByTimeAsync(11_000);
 
       expect(await settled).toMatchObject(spent);
     });
