@@ -162,7 +162,7 @@ export const SearchBar: React.FC = () => {
   // Gate the inline Ask AI composer on having at least one model provider configured.
   // The AI mode submits requests against the user's own keys; with none enabled the
   // request would 4xx.
-  const { project, organization } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
   const { hasEnabledProviders, isLoading: isLoadingProviders } = useModelProvidersSettings({
     projectId: project?.id,
   });
@@ -275,13 +275,10 @@ export const SearchBar: React.FC = () => {
 
   // Enter on a sentence: the router answers what it is, a `langy` answer takes the button's door,
   // and a judgement goes to the cost rule (specs/traces-v2/instant-eval-search.feature). While the
-  // flag read is in flight the submit counts as available: a server refusal then says why, so a
-  // slow flag read never hides a feature the project actually has.
-  // The organization's own switch is read beside the flag; it names a refused reader's offer.
-  const instantEvalAccess = useInstantEvalAccess({
-    projectId: project?.id,
-    organizationId: organization?.id,
-  });
+  // access read is in flight the submit counts as available: a server refusal then says why, so a
+  // slow read never hides a feature the project actually has. The server's read also names a
+  // refused reader's offer.
+  const instantEvalAccess = useInstantEvalAccess({ projectId: project?.id });
   const isInstantEvalAvailable = instantEvalAccess.isAvailable;
   const instantEval = useInstantEvalRoute({
     isInstantEvalAvailable,

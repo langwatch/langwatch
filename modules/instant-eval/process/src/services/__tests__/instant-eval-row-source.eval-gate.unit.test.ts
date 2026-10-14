@@ -33,6 +33,7 @@ function passFor({
     judgesThroughConnect,
     optIns: { isOptedIn: () => Promise.resolve(isOptedIn) },
     isJudgeConfigured: () => true,
+    hostedPlans: null,
     ...(judgesThroughConnect
       ? { judge: { isAvailableForOrganization: () => Promise.resolve(isLicensed) } }
       : {}),
