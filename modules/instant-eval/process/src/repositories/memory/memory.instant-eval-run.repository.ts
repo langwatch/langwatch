@@ -113,7 +113,9 @@ function keyOf({ projectId, runId }: { projectId: string; runId: string }): stri
 
 function newestFirst(left: InstantEvalRunRow, right: InstantEvalRunRow): number {
   const byInstant = right.createdAt.epochMilliseconds - left.createdAt.epochMilliseconds;
-  return byInstant === 0 ? right.id.localeCompare(left.id) : byInstant;
+  if (byInstant !== 0) return byInstant;
+  if (left.id === right.id) return 0;
+  return left.id < right.id ? 1 : -1;
 }
 
 /** The same total order the paged read uses: the instant, then the id. */
