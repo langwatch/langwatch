@@ -15,6 +15,7 @@ import { MemoryInstanceAdminRepository } from "../../repositories/memory/memory.
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { AdminAuditSink } from "../impersonation.service.ts";
 import { InstanceAdminService } from "../instance-admin.service.ts";
+import { noOperators } from "./support/admin-doubles.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 const MiB = 1024 * 1024;
@@ -45,6 +46,7 @@ async function instanceAdmin() {
   const repository = MemoryInstanceAdminRepository.create({ store: MemoryOpsStore.create() });
   const audit = new RecordingAudit();
   const service = InstanceAdminService.create({
+    operators: noOperators,
     repository,
     users: new TestUserApi(),
     accounts: {

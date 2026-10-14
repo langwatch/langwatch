@@ -87,7 +87,7 @@ describe("the admin REST declaration", () => {
     it.each([
       ["no session", null, "POST", "/api/admin/impersonate"],
       ["a customer", "customer", "POST", "/api/admin/impersonate"],
-      ["a view-only operator", "viewer", "DELETE", "/api/admin/impersonate"],
+      ["a view-only operator", "viewer", "POST", "/api/admin/impersonate"],
       ["a customer", "customer", "POST", "/api/admin/user"],
     ])(
       "answers %s main's hidden 404 before the body is read",
@@ -126,6 +126,7 @@ describe("the admin REST declaration", () => {
       });
     });
 
+    /** @scenario "An impersonating operator can always end the impersonation" */
     it("hands an impersonating operator's stop the impersonator beside the session's user", async () => {
       const stopAdminImpersonation = vi.fn(async () => ({
         message: "Impersonation ended" as const,
@@ -141,6 +142,19 @@ describe("the admin REST declaration", () => {
         session: { id: "session_1" },
         req: { headers: { "user-agent": "test" } },
       });
+    });
+  });
+
+  describe("given an operator holding ops:manage who is impersonating", () => {
+    /** @scenario "An impersonating operator keeps ops reads and loses ops writes" */
+    it("answers a route that asks ops:manage the hidden 404 before the app runs", async () => {
+      const app = createApiFixture<OpsApi>({}, "OpsApi");
+      const body = JSON.stringify({ userIdToImpersonate: "user_2", reason: "support" });
+      const { path, init } = request("impersonating", "POST", "/api/admin/impersonate", body);
+
+      const response = await mount(app).request(path, init);
+
+      expect(response.status).toBe(404);
     });
   });
 

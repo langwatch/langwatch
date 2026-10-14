@@ -125,7 +125,7 @@ function stringCommands({ store }: { store: MemoryRedisStore }): ClientScript<Re
       if (options.includes("NX") && isHeld) return null;
       if (options.includes("XX") && !isHeld) return null;
       store.strings.set(name, String(value));
-      store.expiries.delete(name);
+      if (!options.includes("KEEPTTL")) store.expiries.delete(name);
       const ttlMs = expiryOf(options);
       if (ttlMs !== undefined) store.expiries.set(name, ttlMs);
       return "OK";

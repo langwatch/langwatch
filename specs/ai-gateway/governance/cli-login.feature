@@ -218,6 +218,14 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And the response body contains a fresh `access_token` and a fresh `refresh_token`
     And both tokens are persisted as in the previous scenario
 
+  @bdd @cli @refresh
+  Scenario: A refresh retried within a minute keeps the session
+    Given the CLI or an MCP client presented its refresh_token and lost the response
+    When it POSTs to "/api/auth/cli/refresh" with the same refresh_token within 60 seconds
+    Then the response status is 200
+    And the response body carries the same tokens the first refresh minted
+    And after 60 seconds the same refresh_token is answered 401 "invalid_grant"
+
   @bdd @cli @refresh @errors
   Scenario: CLI handles refresh-token revocation cleanly
     Given the refresh_token has been revoked (e.g. user deactivated, admin revoke)

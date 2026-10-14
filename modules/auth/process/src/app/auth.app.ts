@@ -519,6 +519,7 @@ export class AuthModule implements AuthApiContract {
       refreshTokenTtlSeconds: config.cliRefreshTokenTtlSeconds,
       store: repositories.cliSessions,
       settlements: channels.cliSettlements,
+      rotations: repositories.cliRotations,
     });
 
     const cliDeviceDirectory = CliDeviceDirectoryService.create({
@@ -1503,8 +1504,14 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
     this.logger.error({ error }, "Better Auth swallowed an error on a best-effort path");
   }
 
-  announceSignup(input: { userName: string; userEmail: string; organizationName: string }): void {
-    void this.signups.announce(input).catch((error: unknown) => this.reportError(error));
+  announceSignup(input: {
+    userId: string;
+    userName: string;
+    userEmail: string;
+    organizationId: string;
+    organizationName: string;
+  }): void {
+    void this.signups.announceJoin(input).catch((error: unknown) => this.reportError(error));
   }
 
   ssoAutoAddNurturing(input: {

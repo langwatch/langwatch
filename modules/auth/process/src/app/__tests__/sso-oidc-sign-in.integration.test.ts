@@ -65,6 +65,7 @@ function identityFor(provider: ServedOidcProvider): IdentityApi {
         return { action: "continue" };
       },
       resolveUser: async () => ({ action: "continue" }),
+      isBrokeredAddressProved: async () => false,
     }),
     ssoArrival: () => ({ admit: async () => undefined }),
     ssoActivity: () => ({ record: async () => undefined }),

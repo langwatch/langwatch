@@ -3,7 +3,12 @@
  * Who reaches the back office's single sign-on surface, what it refuses by name,
  * and that nothing on it writes a field (specs/identity/sso-onboarding-tiers).
  */
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import {
+  createTrpcRuntime,
+  type TrpcProcedureFactory,
+  type TrpcRouterMount,
+  type TrpcRuntimeMembers,
+} from "@langwatch/api/trpc";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type {
   SsoConnectionAdminApi,
@@ -57,6 +62,9 @@ function runtimePorts(): TrpcRuntimeMembers<TestContext> {
         getDecision: async () => ({ permitted: true, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
+        getPlatformDecision: async ({ userId, permission }) => ({
+          permitted: permission === "ops:manage" && userId === STAFF_ID,
+        }),
       }),
     },
     denials: {
@@ -119,6 +127,25 @@ async function harness() {
   return { connections, record, router, callerFor, getHistory, getMigrationProgress, commands };
 }
 
+/** Every procedure the declaration binds, with the access it asked of the door. */
+function boundAccess(): Record<string, string> {
+  const declared: Record<string, string> = {};
+  const runtime: TrpcProcedureFactory<object> = {
+    procedure: ({ procedure, access }) => {
+      declared[procedure] =
+        access.kind === "permission-platform"
+          ? `${access.kind}:${access.permission}:${access.refusal}`
+          : access.kind;
+      return {};
+    },
+    router: (record) => record,
+  };
+  (ssoConnectionTrpcTransport as { router: TrpcRouterMount<never, never> }).router(runtime, () => {
+    throw new Error("the wire table never resolves an application");
+  });
+  return declared;
+}
+
 const TARGET = { organizationId: "org_acme", connectionId: "ssoc_1" };
 const EVIDENCE = { evidenceRef: "ticket:SEC-123", note: "Signed contract names acme.com" };
 const IDP = {
@@ -160,6 +187,15 @@ describe("the admin single sign-on surface", () => {
 
   beforeEach(async () => {
     context = await harness();
+  });
+
+  describe("given the route declaration", () => {
+    it("asks ops:manage at the platform tier of the door on every procedure and hides the surface", () => {
+      const declared = Object.values(boundAccess());
+
+      expect(declared).toHaveLength(14);
+      expect(new Set(declared)).toEqual(new Set(["permission-platform:ops:manage:hidden"]));
+    });
   });
 
   describe("given somebody without the platform-operator grant", () => {
@@ -264,14 +300,13 @@ describe("the admin single sign-on surface", () => {
       ]);
     });
 
-    it("reads the impersonator, so debugging a customer stays operator work", async () => {
+    it("refuses an impersonating operator, who writes only signed in as themselves", async () => {
       const caller = context.callerFor({ id: CUSTOMER_ID, impersonatorId: STAFF_ID });
 
-      await caller.attestDomain({ ...TARGET, ...EVIDENCE, domain: "acme.com" });
-
-      expect(context.connections.attestDomain.mock.calls[0]![0]).toMatchObject({
-        operator: { userId: STAFF_ID },
-      });
+      await expect(
+        caller.attestDomain({ ...TARGET, ...EVIDENCE, domain: "acme.com" }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(context.connections.attestDomain).not.toHaveBeenCalled();
     });
 
     it("records the command in the audit log", async () => {
