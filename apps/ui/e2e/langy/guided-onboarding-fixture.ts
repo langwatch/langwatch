@@ -515,7 +515,7 @@ export async function seedGuidedOrganization({
 }
 
 /** The provider the takeover connects (README.md "guided-onboarding-fixture.ts"). */
-async function attachProvider({
+export async function attachProvider({
   cookie,
   organizationId,
   projectId,
@@ -537,7 +537,9 @@ async function attachProvider({
         "no OPENAI_API_KEY in the environment or the workspace-root .env; the seeded provider needs one",
       );
     }
-    customKeys = { OPENAI_API_KEY: key };
+    // A gateway virtual key stands in for an OpenAI key when OPENAI_BASE_URL names its gateway.
+    const baseUrl = process.env.OPENAI_BASE_URL;
+    customKeys = { OPENAI_API_KEY: key, ...(baseUrl ? { OPENAI_BASE_URL: baseUrl } : {}) };
   }
   await trpcMutate({
     cookie,

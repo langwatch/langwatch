@@ -41,8 +41,21 @@ export async function seedDashboardsProject({ label }: { label: string }): Promi
   const apiKey = await getCliApiKey();
   process.env.LANGWATCH_API_KEY = apiKey;
   useApiKey(apiKey);
+  reportResultsToStableProject();
   console.log(`[dashboards] seeded ${JSON.stringify(seeded)}`);
   return seeded;
+}
+
+/**
+ * With LANGY_REPORT_API_KEY set, the scenario library's results and spans go
+ * to that stable project, while Langy still runs on APP_BASE (README.md
+ * "Dashboards and Insights helpers").
+ */
+function reportResultsToStableProject(): void {
+  const apiKey = process.env.LANGY_REPORT_API_KEY;
+  if (!apiKey) return;
+  process.env.LANGWATCH_API_KEY = apiKey;
+  process.env.LANGWATCH_ENDPOINT = process.env.LANGY_REPORT_ENDPOINT ?? "https://app.langwatch.ai";
 }
 
 /** A dashboard as `POST /api/dashboards` answers it. */

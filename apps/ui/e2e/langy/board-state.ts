@@ -77,6 +77,15 @@ function chartsPath(): string {
   return `/api/v1/projects/${CONFIG.PROJECT_ID}/analytics/charts`;
 }
 
+/** Every widget and saved chart in the project, placed on a board or not. */
+export async function countProjectItems(): Promise<number> {
+  const [widgets, charts] = await Promise.all([
+    lwGet(dashboardWidgetsPath()) as Promise<{ data: WidgetResource[] }>,
+    lwGet(chartsPath()) as Promise<{ data: ChartResource[] }>,
+  ]);
+  return widgets.data.length + charts.data.length;
+}
+
 /** Both lists are project-wide; only the items placed on this dashboard are kept. */
 export async function readBoard({ dashboardId }: { dashboardId: string }): Promise<BoardSnapshot> {
   const [widgets, charts] = await Promise.all([
@@ -176,9 +185,12 @@ export interface QueryOutcome extends Omit<BoardStatement, "sql" | "parameters">
 export async function runBoardQueries({
   snapshot,
   window,
+  granularitySeconds,
 }: {
   snapshot: BoardSnapshot;
   window: TimeWindow;
+  /** Fills `dashboard_context_granularity_seconds`, as a board's grain picker does. */
+  granularitySeconds?: number;
 }): Promise<QueryOutcome[]> {
   const timeWindow = {
     start: new Date(window.start).toISOString(),
@@ -189,7 +201,7 @@ export async function runBoardQueries({
       try {
         const result = (await lwPost({
           path: "/api/v1/query",
-          body: { sql, parameters, timeWindow, projectId: CONFIG.PROJECT_ID },
+          body: { sql, parameters, timeWindow, granularitySeconds, projectId: CONFIG.PROJECT_ID },
         })) as { rows: Record<string, unknown>[] };
         return { ...statement, rows: result.rows, error: null };
       } catch (error) {
