@@ -1,0 +1,472 @@
+[
+  {
+    "entry": {
+      "output": "My name is John Smith and I work here."
+    },
+    "name": "person",
+    "result": {
+      "cost": null,
+      "details": "PII detected: PERSON (likelihood: 0.85)",
+      "label": null,
+      "passed": false,
+      "raw_response": {
+        "anonymized": "My name is <PERSON> and I work here.",
+        "results": [
+          {
+            "analysis_explanation": null,
+            "end": 21,
+            "entity_type": "PERSON",
+            "recognition_metadata": {
+              "recognizer_identifier": "SpacyRecognizer_5211744528",
+              "recognizer_name": "SpacyRecognizer"
+            },
+            "score": 0.85,
+            "start": 11
+          }
+        ]
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "entities": {
+        "au_abn": false,
+        "au_acn": false,
+        "au_medicare": false,
+        "au_tfn": false,
+        "credit_card": false,
+        "crypto": false,
+        "email_address": false,
+        "iban_code": false,
+        "in_aadhaar": false,
+        "in_pan": false,
+        "in_passport": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "ip_address": false,
+        "location": false,
+        "medical_license": false,
+        "person": true,
+        "phone_number": false,
+        "sg_nric_fin": false,
+        "uk_nhs": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false
+      }
+    }
+  },
+  {
+    "entry": {
+      "output": "I live in Paris, France."
+    },
+    "name": "location",
+    "result": {
+      "cost": null,
+      "details": "PII detected: LOCATION (likelihood: 0.85), LOCATION (likelihood: 0.85)",
+      "label": null,
+      "passed": false,
+      "raw_response": {
+        "anonymized": "I live in <LOCATION>, <LOCATION>.",
+        "results": [
+          {
+            "analysis_explanation": null,
+            "end": 15,
+            "entity_type": "LOCATION",
+            "recognition_metadata": {
+              "recognizer_identifier": "SpacyRecognizer_5211744528",
+              "recognizer_name": "SpacyRecognizer"
+            },
+            "score": 0.85,
+            "start": 10
+          },
+          {
+            "analysis_explanation": null,
+            "end": 23,
+            "entity_type": "LOCATION",
+            "recognition_metadata": {
+              "recognizer_identifier": "SpacyRecognizer_5211744528",
+              "recognizer_name": "SpacyRecognizer"
+            },
+            "score": 0.85,
+            "start": 17
+          }
+        ]
+      },
+      "score": 2.0,
+      "status": "processed"
+    },
+    "settings": {
+      "entities": {
+        "au_abn": false,
+        "au_acn": false,
+        "au_medicare": false,
+        "au_tfn": false,
+        "credit_card": false,
+        "crypto": false,
+        "email_address": false,
+        "iban_code": false,
+        "in_aadhaar": false,
+        "in_pan": false,
+        "in_passport": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "ip_address": false,
+        "location": true,
+        "medical_license": false,
+        "person": false,
+        "phone_number": false,
+        "sg_nric_fin": false,
+        "uk_nhs": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false
+      }
+    }
+  },
+  {
+    "entry": {
+      "output": "Angela Merkel visited Berlin last week."
+    },
+    "name": "person and location",
+    "result": {
+      "cost": null,
+      "details": "PII detected: PERSON (likelihood: 0.85), LOCATION (likelihood: 0.85)",
+      "label": null,
+      "passed": false,
+      "raw_response": {
+        "anonymized": "<PERSON> visited <LOCATION> last week.",
+        "results": [
+          {
+            "analysis_explanation": null,
+            "end": 13,
+            "entity_type": "PERSON",
+            "recognition_metadata": {
+              "recognizer_identifier": "SpacyRecognizer_5211744528",
+              "recognizer_name": "SpacyRecognizer"
+            },
+            "score": 0.85,
+            "start": 0
+          },
+          {
+            "analysis_explanation": null,
+            "end": 28,
+            "entity_type": "LOCATION",
+            "recognition_metadata": {
+              "recognizer_identifier": "SpacyRecognizer_5211744528",
+              "recognizer_name": "SpacyRecognizer"
+            },
+            "score": 0.85,
+            "start": 22
+          }
+        ]
+      },
+      "score": 2.0,
+      "status": "processed"
+    },
+    "settings": {
+      "entities": {
+        "au_abn": false,
+        "au_acn": false,
+        "au_medicare": false,
+        "au_tfn": false,
+        "credit_card": false,
+        "crypto": false,
+        "email_address": false,
+        "iban_code": false,
+        "in_aadhaar": false,
+        "in_pan": false,
+        "in_passport": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "ip_address": false,
+        "location": true,
+        "medical_license": false,
+        "person": true,
+        "phone_number": false,
+        "sg_nric_fin": false,
+        "uk_nhs": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false
+      }
+    }
+  },
+  {
+    "entry": {
+      "output": "Contact Maria Garcia at maria@example.com"
+    },
+    "name": "person with email",
+    "result": {
+      "cost": null,
+      "details": "PII detected: EMAIL_ADDRESS (likelihood: 1.0), PERSON (likelihood: 0.85)",
+      "label": null,
+      "passed": false,
+      "raw_response": {
+        "anonymized": "Contact <PERSON> at <EMAIL_ADDRESS>",
+        "results": [
+          {
+            "analysis_explanation": null,
+            "end": 41,
+            "entity_type": "EMAIL_ADDRESS",
+            "recognition_metadata": {
+              "recognizer_identifier": "EmailRecognizer_5171588944",
+              "recognizer_name": "EmailRecognizer"
+            },
+            "score": 1.0,
+            "start": 24
+          },
+          {
+            "analysis_explanation": null,
+            "end": 20,
+            "entity_type": "PERSON",
+            "recognition_metadata": {
+              "recognizer_identifier": "SpacyRecognizer_5211744528",
+              "recognizer_name": "SpacyRecognizer"
+            },
+            "score": 0.85,
+            "start": 8
+          }
+        ]
+      },
+      "score": 2.0,
+      "status": "processed"
+    },
+    "settings": {
+      "entities": {
+        "au_abn": false,
+        "au_acn": false,
+        "au_medicare": false,
+        "au_tfn": false,
+        "credit_card": false,
+        "crypto": false,
+        "email_address": true,
+        "iban_code": false,
+        "in_aadhaar": false,
+        "in_pan": false,
+        "in_passport": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "ip_address": false,
+        "location": false,
+        "medical_license": false,
+        "person": true,
+        "phone_number": false,
+        "sg_nric_fin": false,
+        "uk_nhs": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false
+      }
+    }
+  },
+  {
+    "entry": {
+      "output": "Our office in London can be reached on +44 20 7031 3000."
+    },
+    "name": "location with phone",
+    "result": {
+      "cost": null,
+      "details": "PII detected: LOCATION (likelihood: 0.85)",
+      "label": null,
+      "passed": false,
+      "raw_response": {
+        "anonymized": "Our office in <LOCATION> can be reached on +44 20 7031 3000.",
+        "results": [
+          {
+            "analysis_explanation": null,
+            "end": 20,
+            "entity_type": "LOCATION",
+            "recognition_metadata": {
+              "recognizer_identifier": "SpacyRecognizer_5211744528",
+              "recognizer_name": "SpacyRecognizer"
+            },
+            "score": 0.85,
+            "start": 14
+          }
+        ]
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "entities": {
+        "au_abn": false,
+        "au_acn": false,
+        "au_medicare": false,
+        "au_tfn": false,
+        "credit_card": false,
+        "crypto": false,
+        "email_address": false,
+        "iban_code": false,
+        "in_aadhaar": false,
+        "in_pan": false,
+        "in_passport": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "ip_address": false,
+        "location": true,
+        "medical_license": false,
+        "person": false,
+        "phone_number": true,
+        "sg_nric_fin": false,
+        "uk_nhs": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false
+      }
+    }
+  },
+  {
+    "entry": {
+      "output": "The quick brown fox jumps over the lazy dog."
+    },
+    "name": "no person",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "raw_response": {
+        "anonymized": "The quick brown fox jumps over the lazy dog.",
+        "results": []
+      },
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "entities": {
+        "au_abn": false,
+        "au_acn": false,
+        "au_medicare": false,
+        "au_tfn": false,
+        "credit_card": false,
+        "crypto": false,
+        "email_address": false,
+        "iban_code": false,
+        "in_aadhaar": false,
+        "in_pan": false,
+        "in_passport": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "ip_address": false,
+        "location": true,
+        "medical_license": false,
+        "person": true,
+        "phone_number": false,
+        "sg_nric_fin": false,
+        "uk_nhs": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false
+      }
+    }
+  },
+  {
+    "entry": {
+      "output": "Jordan said hi"
+    },
+    "name": "person below threshold",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "raw_response": {
+        "anonymized": "Jordan said hi",
+        "results": []
+      },
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "entities": {
+        "au_abn": false,
+        "au_acn": false,
+        "au_medicare": false,
+        "au_tfn": false,
+        "credit_card": false,
+        "crypto": false,
+        "email_address": false,
+        "iban_code": false,
+        "in_aadhaar": false,
+        "in_pan": false,
+        "in_passport": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "ip_address": false,
+        "location": false,
+        "medical_license": false,
+        "person": true,
+        "phone_number": false,
+        "sg_nric_fin": false,
+        "uk_nhs": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false
+      },
+      "min_threshold": 0.9
+    }
+  },
+  {
+    "entry": {
+      "output": "Barack Obama was born in Hawaii."
+    },
+    "name": "person and location defaults",
+    "result": {
+      "cost": null,
+      "details": "PII detected: PERSON (likelihood: 0.85), LOCATION (likelihood: 0.85)",
+      "label": null,
+      "passed": false,
+      "raw_response": {
+        "anonymized": "<PERSON> was born in <LOCATION>.",
+        "results": [
+          {
+            "analysis_explanation": null,
+            "end": 12,
+            "entity_type": "PERSON",
+            "recognition_metadata": {
+              "recognizer_identifier": "SpacyRecognizer_5211744528",
+              "recognizer_name": "SpacyRecognizer"
+            },
+            "score": 0.85,
+            "start": 0
+          },
+          {
+            "analysis_explanation": null,
+            "end": 31,
+            "entity_type": "LOCATION",
+            "recognition_metadata": {
+              "recognizer_identifier": "SpacyRecognizer_5211744528",
+              "recognizer_name": "SpacyRecognizer"
+            },
+            "score": 0.85,
+            "start": 25
+          }
+        ]
+      },
+      "score": 2.0,
+      "status": "processed"
+    },
+    "settings": {
+      "entities": {
+        "location": true,
+        "person": true
+      }
+    }
+  }
+]

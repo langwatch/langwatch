@@ -102,6 +102,7 @@ linters:
       # The repository writes British English; "catalogue" is the domain word (modules/catalogue.json).
       ignore-rules:
         - catalogue
+        - explaination # ragas 0.4.3 spells its JSON key this way; the Go port must match it
         - licence
         - cancelled
 
@@ -145,6 +146,7 @@ linters:
       - std-error-handling
 
     paths:
+      - third_party # vendored upstream code, kept as released
       - node_modules
       - \.claude
       - \.worktrees
@@ -251,6 +253,7 @@ formatters:
   exclusions:
     paths:
       - vendor
+      - third_party
       - node_modules
       - \.claude
       - \.worktrees

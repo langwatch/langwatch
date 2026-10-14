@@ -1,0 +1,684 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an impartial judge picking the best of several candidate outputs. Reason briefly, then pick the winning slot label using the provided function call. Judge the candidates' content only, ignore the order in which they are presented. In your reasoning write every slot as \"Candidate A\", \"Candidate B\" and so on, never as a bare letter; the winner field still takes the bare label.",
+              "role": "system"
+            },
+            {
+              "content": "Pick the best of N candidate replies to the task — there is no reference\nanswer, so compare them on their own merits.\n\nTask:  What is the capital of France?\n\nCandidates:\n- A: Paris\n- B: Lyon\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it's better than the others, then pick the winning\nslot label. Use \"tie\" only when no candidate is clearly better.\n",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "temperature": 0.0,
+          "tool_choice": {
+            "function": {
+              "name": "select_best_verdict"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Record the select-best verdict. Reason first, then pick the winning slot label.",
+                "name": "select_best_verdict",
+                "parameters": {
+                  "properties": {
+                    "reasoning": {
+                      "description": "Brief explanation of why the winning candidate is the best reply — keep it brief.",
+                      "type": "string"
+                    },
+                    "winner": {
+                      "description": "The winning slot label. Use 'tie' only when no candidate clearly wins.",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reasoning",
+                    "winner"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"winner\": \"A\"}",
+                      "name": "select_best_verdict"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 217,
+            "total_tokens": 227
+          }
+        }
+      }
+    ],
+    "entry": {
+      "candidates": [
+        {
+          "id": "paris",
+          "output": "Paris"
+        },
+        {
+          "id": "lyon",
+          "output": "Lyon"
+        }
+      ],
+      "input": "What is the capital of France?"
+    },
+    "env": {},
+    "name": "picks_first",
+    "result": {
+      "cost": {
+        "amount": 3.855e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted reasoning.",
+      "label": "paris",
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini",
+      "randomize_order": false,
+      "swap_and_reconcile": false
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an impartial judge picking the best of several candidate outputs. Reason briefly, then pick the winning slot label using the provided function call. Judge the candidates' content only, ignore the order in which they are presented. In your reasoning write every slot as \"Candidate A\", \"Candidate B\" and so on, never as a bare letter; the winner field still takes the bare label.",
+              "role": "system"
+            },
+            {
+              "content": "Pick the best of N candidate replies to the task — there is no reference\nanswer, so compare them on their own merits.\n\nTask:  What is the capital of France?\n\nCandidates:\n- A: Paris\n- B: Lyon\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it's better than the others, then pick the winning\nslot label. Use \"tie\" only when no candidate is clearly better.\n",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "temperature": 0.0,
+          "tool_choice": {
+            "function": {
+              "name": "select_best_verdict"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Record the select-best verdict. Reason first, then pick the winning slot label.",
+                "name": "select_best_verdict",
+                "parameters": {
+                  "properties": {
+                    "reasoning": {
+                      "description": "Brief explanation of why the winning candidate is the best reply — keep it brief.",
+                      "type": "string"
+                    },
+                    "winner": {
+                      "description": "The winning slot label. Use 'tie' only when no candidate clearly wins.",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reasoning",
+                    "winner"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"winner\": \"B\"}",
+                      "name": "select_best_verdict"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 217,
+            "total_tokens": 227
+          }
+        }
+      }
+    ],
+    "entry": {
+      "candidates": [
+        {
+          "id": "paris",
+          "output": "Paris"
+        },
+        {
+          "id": "lyon",
+          "output": "Lyon"
+        }
+      ],
+      "input": "What is the capital of France?"
+    },
+    "env": {},
+    "name": "picks_second",
+    "result": {
+      "cost": {
+        "amount": 3.855e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted reasoning.",
+      "label": "lyon",
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini",
+      "randomize_order": false,
+      "swap_and_reconcile": false
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an impartial judge picking the best of several candidate outputs. Reason briefly, then pick the winning slot label using the provided function call. Judge the candidates' content only, ignore the order in which they are presented. In your reasoning write every slot as \"Candidate A\", \"Candidate B\" and so on, never as a bare letter; the winner field still takes the bare label.",
+              "role": "system"
+            },
+            {
+              "content": "Pick the best of N candidate replies to the task — there is no reference\nanswer, so compare them on their own merits.\n\nTask:  What is the capital of France?\n\nCandidates:\n- A: Paris\n- B: Lyon\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it's better than the others, then pick the winning\nslot label. Use \"tie\" only when no candidate is clearly better.\n",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "temperature": 0.0,
+          "tool_choice": {
+            "function": {
+              "name": "select_best_verdict"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Record the select-best verdict. Reason first, then pick the winning slot label.",
+                "name": "select_best_verdict",
+                "parameters": {
+                  "properties": {
+                    "reasoning": {
+                      "description": "Brief explanation of why the winning candidate is the best reply — keep it brief.",
+                      "type": "string"
+                    },
+                    "winner": {
+                      "description": "The winning slot label. Use 'tie' only when no candidate clearly wins.",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reasoning",
+                    "winner"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"winner\": \"tie\"}",
+                      "name": "select_best_verdict"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 217,
+            "total_tokens": 227
+          }
+        }
+      }
+    ],
+    "entry": {
+      "candidates": [
+        {
+          "id": "paris",
+          "output": "Paris"
+        },
+        {
+          "id": "lyon",
+          "output": "Lyon"
+        }
+      ],
+      "input": "What is the capital of France?"
+    },
+    "env": {},
+    "name": "tie",
+    "result": {
+      "cost": {
+        "amount": 3.855e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted reasoning.",
+      "label": "tie",
+      "passed": null,
+      "score": 0.5,
+      "status": "processed"
+    },
+    "settings": {
+      "allow_tie": true,
+      "model": "openai/gpt-4o-mini",
+      "randomize_order": false,
+      "swap_and_reconcile": false
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an impartial judge picking the best of several candidate outputs. Reason briefly, then pick the winning slot label using the provided function call. Judge the candidates' content only, ignore the order in which they are presented. In your reasoning write every slot as \"Candidate A\", \"Candidate B\" and so on, never as a bare letter; the winner field still takes the bare label.",
+              "role": "system"
+            },
+            {
+              "content": "Pick the best of N candidate replies to the task — there is no reference\nanswer, so compare them on their own merits.\n\nTask:  What is the capital of France?\n\nCandidates:\n- A: Lyon\n- B: Paris\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it's better than the others, then pick the winning\nslot label. Use \"tie\" only when no candidate is clearly better.\n",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "temperature": 0.0,
+          "tool_choice": {
+            "function": {
+              "name": "select_best_verdict"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Record the select-best verdict. Reason first, then pick the winning slot label.",
+                "name": "select_best_verdict",
+                "parameters": {
+                  "properties": {
+                    "reasoning": {
+                      "description": "Brief explanation of why the winning candidate is the best reply — keep it brief.",
+                      "type": "string"
+                    },
+                    "winner": {
+                      "description": "The winning slot label. Use 'tie' only when no candidate clearly wins.",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reasoning",
+                    "winner"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"winner\": \"A\"}",
+                      "name": "select_best_verdict"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 217,
+            "total_tokens": 227
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an impartial judge picking the best of several candidate outputs. Reason briefly, then pick the winning slot label using the provided function call. Judge the candidates' content only, ignore the order in which they are presented. In your reasoning write every slot as \"Candidate A\", \"Candidate B\" and so on, never as a bare letter; the winner field still takes the bare label.",
+              "role": "system"
+            },
+            {
+              "content": "Pick the best of N candidate replies to the task — there is no reference\nanswer, so compare them on their own merits.\n\nTask:  What is the capital of France?\n\nCandidates:\n- A: Paris\n- B: Lyon\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it's better than the others, then pick the winning\nslot label. Use \"tie\" only when no candidate is clearly better.\n",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "temperature": 0.0,
+          "tool_choice": {
+            "function": {
+              "name": "select_best_verdict"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Record the select-best verdict. Reason first, then pick the winning slot label.",
+                "name": "select_best_verdict",
+                "parameters": {
+                  "properties": {
+                    "reasoning": {
+                      "description": "Brief explanation of why the winning candidate is the best reply — keep it brief.",
+                      "type": "string"
+                    },
+                    "winner": {
+                      "description": "The winning slot label. Use 'tie' only when no candidate clearly wins.",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reasoning",
+                    "winner"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"winner\": \"A\"}",
+                      "name": "select_best_verdict"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 217,
+            "total_tokens": 227
+          }
+        }
+      }
+    ],
+    "entry": {
+      "candidates": [
+        {
+          "id": "paris",
+          "output": "Paris"
+        },
+        {
+          "id": "lyon",
+          "output": "Lyon"
+        }
+      ],
+      "input": "What is the capital of France?"
+    },
+    "env": {},
+    "name": "swapped_order_disagrees",
+    "result": {
+      "cost": {
+        "amount": 7.71e-05,
+        "currency": "USD"
+      },
+      "details": "Order-sensitive verdict: this row does not establish a winner.\n\nOriginal order picked paris:\nScripted reasoning.\n\nReversed order picked lyon:\nScripted reasoning.\n\nThe verdict changed with candidate order.",
+      "status": "skipped"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini",
+      "randomize_order": false
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an impartial judge picking the best of several candidate outputs. Reason briefly, then pick the winning slot label using the provided function call. Judge the candidates' content only, ignore the order in which they are presented. In your reasoning write every slot as \"Candidate A\", \"Candidate B\" and so on, never as a bare letter; the winner field still takes the bare label.",
+              "role": "system"
+            },
+            {
+              "content": "Pick the best of N candidate replies to the task — there is no reference\nanswer, so compare them on their own merits.\n\nTask:  What is the capital of France?\n\nCandidates:\n- A: Paris\n- B: Lyon\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it's better than the others, then pick the winning\nslot label. Use \"tie\" only when no candidate is clearly better.\n",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-5-mini",
+          "temperature": 1.0,
+          "tool_choice": {
+            "function": {
+              "name": "select_best_verdict"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Record the select-best verdict. Reason first, then pick the winning slot label.",
+                "name": "select_best_verdict",
+                "parameters": {
+                  "properties": {
+                    "reasoning": {
+                      "description": "Brief explanation of why the winning candidate is the best reply — keep it brief.",
+                      "type": "string"
+                    },
+                    "winner": {
+                      "description": "The winning slot label. Use 'tie' only when no candidate clearly wins.",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reasoning",
+                    "winner"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"winner\": \"A\"}",
+                      "name": "select_best_verdict"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-5-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 217,
+            "total_tokens": 227
+          }
+        }
+      }
+    ],
+    "entry": {
+      "candidates": [
+        {
+          "id": "paris",
+          "output": "Paris"
+        },
+        {
+          "id": "lyon",
+          "output": "Lyon"
+        }
+      ],
+      "input": "What is the capital of France?"
+    },
+    "env": {},
+    "name": "gpt5_temperature_pinned",
+    "result": {
+      "cost": {
+        "amount": 7.424999999999999e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted reasoning.",
+      "label": "paris",
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-5-mini",
+      "randomize_order": false,
+      "swap_and_reconcile": false
+    }
+  }
+]

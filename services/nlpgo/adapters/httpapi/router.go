@@ -55,6 +55,9 @@ type RouterDeps struct {
 	// the process. nil → no per-request flush (tests, dev runs without
 	// telemetry).
 	OTel *otelsetup.Provider
+	// Evaluators serves /go/evaluators/*, bearer-guarded by its own
+	// transport. nil leaves the route to the go-only fallback.
+	Evaluators http.Handler
 }
 
 // NewRouter assembles the chi router.
@@ -94,6 +97,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 		})
 		g.HandleFunc("/proxy/v1/*", proxyPassthroughHandler(deps.PlaygroundProxy))
 		g.HandleFunc("/proxy/v1beta/*", proxyPassthroughHandler(deps.PlaygroundProxy))
+		if deps.Evaluators != nil {
+			g.Handle("/evaluators/*", deps.Evaluators)
+		}
 	})
 
 	// Anything outside /go/* and the health routes gets a typed 502 with

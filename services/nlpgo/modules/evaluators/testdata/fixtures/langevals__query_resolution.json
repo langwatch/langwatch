@@ -1,0 +1,230 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an accurate Query Resolution Evaluator. Your goal is to find out if all of the user querries were resolved in the conversation with the chatbot.",
+              "role": "system"
+            },
+            {
+              "content": "USER: How do I reset my password?\n ASSISTANT: Click 'Forgot password' on the login page.\n",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "tool_choice": {
+            "function": {
+              "name": "query_resolution_evaluator"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Evaluate if all of the queries were answered",
+                "name": "query_resolution_evaluator",
+                "parameters": {
+                  "properties": {
+                    "queries_answered": {
+                      "description": "Number of resolved user queries in the dialogue",
+                      "type": "number"
+                    },
+                    "queries_total": {
+                      "description": "Number of total user queries in the dialogue, greetings and non-requests do not count",
+                      "type": "number"
+                    },
+                    "reasoning": {
+                      "description": "Reasoning for the answer",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reasoning",
+                    "queries_total",
+                    "queries_answered"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"queries_total\": 1, \"queries_answered\": 1}",
+                      "name": "query_resolution_evaluator"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 77,
+            "total_tokens": 87
+          }
+        }
+      }
+    ],
+    "entry": {
+      "conversation": [
+        {
+          "input": "How do I reset my password?",
+          "output": "Click 'Forgot password' on the login page."
+        }
+      ]
+    },
+    "env": {},
+    "name": "resolved",
+    "result": {
+      "cost": {
+        "amount": 1.755e-05,
+        "currency": "USD"
+      },
+      "details": "There were 1 queries in total and 1 of them were resolved in the conversation. Reasoning: Scripted reasoning.",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an accurate Query Resolution Evaluator. Your goal is to find out if all of the user querries were resolved in the conversation with the chatbot.",
+              "role": "system"
+            },
+            {
+              "content": "USER: How do I reset my password?\n ASSISTANT: Click 'Forgot password' on the login page.\nUSER: And how do I delete my account?\n ASSISTANT: I am not sure.\n",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "tool_choice": {
+            "function": {
+              "name": "query_resolution_evaluator"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Evaluate if all of the queries were answered",
+                "name": "query_resolution_evaluator",
+                "parameters": {
+                  "properties": {
+                    "queries_answered": {
+                      "description": "Number of resolved user queries in the dialogue",
+                      "type": "number"
+                    },
+                    "queries_total": {
+                      "description": "Number of total user queries in the dialogue, greetings and non-requests do not count",
+                      "type": "number"
+                    },
+                    "reasoning": {
+                      "description": "Reasoning for the answer",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reasoning",
+                    "queries_total",
+                    "queries_answered"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"queries_total\": 2, \"queries_answered\": 1}",
+                      "name": "query_resolution_evaluator"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 94,
+            "total_tokens": 104
+          }
+        }
+      }
+    ],
+    "entry": {
+      "conversation": [
+        {
+          "input": "How do I reset my password?",
+          "output": "Click 'Forgot password' on the login page."
+        },
+        {
+          "input": "And how do I delete my account?",
+          "output": "I am not sure."
+        }
+      ]
+    },
+    "env": {},
+    "name": "unresolved",
+    "result": {
+      "cost": {
+        "amount": 2.01e-05,
+        "currency": "USD"
+      },
+      "details": "There were 2 queries in total and 1 of them were resolved in the conversation. Reasoning: Scripted reasoning.",
+      "label": null,
+      "passed": false,
+      "score": 0.5,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  }
+]

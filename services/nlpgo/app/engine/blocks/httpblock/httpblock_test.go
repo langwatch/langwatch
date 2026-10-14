@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
 
@@ -126,21 +127,21 @@ func TestSSRF_BlocksLoopback(t *testing.T) {
 		"http://169.254.169.254/latest/meta-data/",
 	} {
 		t.Run(u, func(t *testing.T) {
-			err := httpblock.CheckURL(u, httpblock.SSRFOptions{})
+			err := ssrf.CheckURL(u, ssrf.Options{})
 			require.Error(t, err)
 		})
 	}
 }
 
 func TestSSRF_AllowList(t *testing.T) {
-	err := httpblock.CheckURL("http://127.0.0.1:9001/x", httpblock.SSRFOptions{
+	err := ssrf.CheckURL("http://127.0.0.1:9001/x", ssrf.Options{
 		AllowedHosts: []string{"127.0.0.1"},
 	})
 	assert.NoError(t, err)
 }
 
 func TestSSRF_AlwaysBlocksMetadataEvenIfAllowed(t *testing.T) {
-	err := httpblock.CheckURL("http://169.254.169.254/x", httpblock.SSRFOptions{
+	err := ssrf.CheckURL("http://169.254.169.254/x", ssrf.Options{
 		AllowedHosts: []string{"169.254.169.254"},
 	})
 	require.Error(t, err)
@@ -150,7 +151,7 @@ func TestSSRF_DNSResolutionToPrivate(t *testing.T) {
 	resolver := func(host string) ([]net.IP, error) {
 		return []net.IP{net.ParseIP("10.0.0.5")}, nil
 	}
-	err := httpblock.CheckURL("http://internal.test/", httpblock.SSRFOptions{
+	err := ssrf.CheckURL("http://internal.test/", ssrf.Options{
 		Resolver: resolver,
 	})
 	require.Error(t, err)
@@ -179,7 +180,7 @@ func TestSSRF_WhenStrictEgressIsOff(t *testing.T) {
 	t.Run("permits addresses outside the historical deny set", func(t *testing.T) {
 		for _, ip := range newlyCoveredAddresses {
 			t.Run(ip, func(t *testing.T) {
-				err := httpblock.CheckURL("http://"+ip+"/x", httpblock.SSRFOptions{})
+				err := ssrf.CheckURL("http://"+ip+"/x", ssrf.Options{})
 				assert.NoError(t, err,
 					"%s was reachable before strict egress existed and must stay reachable by default", ip)
 			})
@@ -188,7 +189,7 @@ func TestSSRF_WhenStrictEgressIsOff(t *testing.T) {
 
 	t.Run("logs each permitted non-public address so the operator can prepare", func(t *testing.T) {
 		logger, logs := observedLogs()
-		err := httpblock.CheckURL("http://100.64.0.1/x", httpblock.SSRFOptions{Logger: logger})
+		err := ssrf.CheckURL("http://100.64.0.1/x", ssrf.Options{Logger: logger})
 		require.NoError(t, err)
 
 		entries := logs.FilterMessage("ssrf_permitted_non_public_address").All()
@@ -205,7 +206,7 @@ func TestSSRF_WhenStrictEgressIsOff(t *testing.T) {
 	t.Run("still refuses the historical deny set", func(t *testing.T) {
 		for _, ip := range []string{"127.0.0.1", "10.0.0.1", "192.168.1.1", "169.254.1.1"} {
 			t.Run(ip, func(t *testing.T) {
-				err := httpblock.CheckURL("http://"+ip+"/x", httpblock.SSRFOptions{})
+				err := ssrf.CheckURL("http://"+ip+"/x", ssrf.Options{})
 				require.Error(t, err)
 			})
 		}
@@ -215,7 +216,7 @@ func TestSSRF_WhenStrictEgressIsOff(t *testing.T) {
 		// Azure WireServer is globally-routable-looking and sits in no
 		// special range, so only the metadata set catches it. It was
 		// reachable before pkg/ssrf; that hole closes for everyone.
-		err := httpblock.CheckURL("http://168.63.129.16/x", httpblock.SSRFOptions{})
+		err := ssrf.CheckURL("http://168.63.129.16/x", ssrf.Options{})
 		require.Error(t, err)
 	})
 }
@@ -224,7 +225,7 @@ func TestSSRF_WhenStrictEgressIsOn(t *testing.T) {
 	t.Run("refuses every non-globally-routable address", func(t *testing.T) {
 		for _, ip := range newlyCoveredAddresses {
 			t.Run(ip, func(t *testing.T) {
-				err := httpblock.CheckURL("http://"+ip+"/x", httpblock.SSRFOptions{
+				err := ssrf.CheckURL("http://"+ip+"/x", ssrf.Options{
 					StrictPublicOnly: true,
 				})
 				require.Error(t, err)
@@ -234,7 +235,7 @@ func TestSSRF_WhenStrictEgressIsOn(t *testing.T) {
 
 	t.Run("names the range and the escape hatch in the refusal log", func(t *testing.T) {
 		logger, logs := observedLogs()
-		err := httpblock.CheckURL("http://100.64.0.1/x", httpblock.SSRFOptions{
+		err := ssrf.CheckURL("http://100.64.0.1/x", ssrf.Options{
 			StrictPublicOnly: true,
 			Logger:           logger,
 		})
@@ -250,7 +251,7 @@ func TestSSRF_WhenStrictEgressIsOn(t *testing.T) {
 	})
 
 	t.Run("keeps the allow-list working as the escape hatch", func(t *testing.T) {
-		err := httpblock.CheckURL("http://100.64.0.1/x", httpblock.SSRFOptions{
+		err := ssrf.CheckURL("http://100.64.0.1/x", ssrf.Options{
 			StrictPublicOnly: true,
 			AllowedHosts:     []string{"100.64.0.1"},
 		})
@@ -258,7 +259,7 @@ func TestSSRF_WhenStrictEgressIsOn(t *testing.T) {
 	})
 
 	t.Run("permits globally routable addresses", func(t *testing.T) {
-		err := httpblock.CheckURL("http://93.184.216.34/x", httpblock.SSRFOptions{
+		err := ssrf.CheckURL("http://93.184.216.34/x", ssrf.Options{
 			StrictPublicOnly: true,
 		})
 		assert.NoError(t, err)
@@ -269,7 +270,7 @@ func TestSSRF_RefusalLogNeverReachesTheCaller(t *testing.T) {
 	// The log names the range; the error must not. An SSRF refusal that
 	// echoes which internal range was hit hands the tenant a network map.
 	logger, logs := observedLogs()
-	err := httpblock.CheckURL("http://10.1.2.3/x", httpblock.SSRFOptions{Logger: logger})
+	err := ssrf.CheckURL("http://10.1.2.3/x", ssrf.Options{Logger: logger})
 
 	require.Error(t, err)
 	assert.Equal(t, "ssrf_blocked", err.Error())
@@ -280,14 +281,14 @@ func TestSSRF_RefusalLogNeverReachesTheCaller(t *testing.T) {
 func TestSSRF_StrictEgressAppliesAtDialTime(t *testing.T) {
 	// CheckURL is the optimistic gate; SafeDialer is the one that holds
 	// under DNS rebinding. Strict mode must be enforced in both.
-	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+	dial := ssrf.SafeDialer(ssrf.Options{
 		StrictPublicOnly: true,
 		Resolver: func(host string) ([]net.IP, error) {
 			return []net.IP{net.ParseIP("100.64.0.1")}, nil
 		},
 	})
 	_, err := dial(context.Background(), "tcp", "rebind.test:80")
-	require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+	require.ErrorIs(t, err, ssrf.ErrBlocked)
 }
 
 func TestExecute_HappyPath(t *testing.T) {
@@ -305,7 +306,7 @@ func TestExecute_HappyPath(t *testing.T) {
 	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
 
 	exec := httpblock.New(httpblock.Options{
-		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{host}},
+		SSRF: ssrf.Options{AllowedHosts: []string{host}},
 	})
 	res, err := exec.Execute(context.Background(), httpblock.Request{
 		URL:          srv.URL + "/echo",
@@ -347,7 +348,7 @@ func TestExecute_RedactsCredentialResponseHeaders(t *testing.T) {
 	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
 
 	exec := httpblock.New(httpblock.Options{
-		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{host}},
+		SSRF: ssrf.Options{AllowedHosts: []string{host}},
 	})
 	res, err := exec.Execute(context.Background(), httpblock.Request{
 		URL:    srv.URL + "/echo",
@@ -386,7 +387,7 @@ func TestExecute_TimeoutAbortsRequest(t *testing.T) {
 	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
 
 	exec := httpblock.New(httpblock.Options{
-		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{host}},
+		SSRF: ssrf.Options{AllowedHosts: []string{host}},
 	})
 	start := time.Now()
 	_, err := exec.Execute(context.Background(), httpblock.Request{
@@ -408,7 +409,7 @@ func TestExecute_NonSuccessStatusReturnsUpstreamError(t *testing.T) {
 	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
 
 	exec := httpblock.New(httpblock.Options{
-		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{host}},
+		SSRF: ssrf.Options{AllowedHosts: []string{host}},
 	})
 	_, err := exec.Execute(context.Background(), httpblock.Request{
 		URL:    srv.URL + "/broken",
@@ -430,7 +431,7 @@ func TestExecute_ApiKeyAuth(t *testing.T) {
 	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
 
 	exec := httpblock.New(httpblock.Options{
-		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{host}},
+		SSRF: ssrf.Options{AllowedHosts: []string{host}},
 	})
 	_, err := exec.Execute(context.Background(), httpblock.Request{
 		URL:    srv.URL + "/x",
@@ -450,7 +451,7 @@ func TestExecute_BasicAuth(t *testing.T) {
 	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
 
 	exec := httpblock.New(httpblock.Options{
-		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{host}},
+		SSRF: ssrf.Options{AllowedHosts: []string{host}},
 	})
 	_, err := exec.Execute(context.Background(), httpblock.Request{
 		URL:    srv.URL + "/x",
@@ -467,7 +468,7 @@ func TestExecute_BlocksSSRF(t *testing.T) {
 		Method: "GET",
 	})
 	require.Error(t, err)
-	assert.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+	assert.ErrorIs(t, err, ssrf.ErrBlocked)
 }
 
 // TestSafeDialer_BlocksPrivateIPAtDialTime simulates the DNS-rebinding
@@ -475,34 +476,34 @@ func TestExecute_BlocksSSRF(t *testing.T) {
 // dialer must reject before opening a connection. This is independent
 // of CheckURL — it's the second line of defense.
 func TestSafeDialer_BlocksPrivateIPAtDialTime(t *testing.T) {
-	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+	dial := ssrf.SafeDialer(ssrf.Options{
 		Resolver: func(host string) ([]net.IP, error) {
 			return []net.IP{net.ParseIP("10.0.0.5")}, nil
 		},
 	})
 	_, err := dial(context.Background(), "tcp", "rebound.example:80")
 	require.Error(t, err)
-	assert.ErrorIs(t, err, httpblock.ErrSSRFBlocked,
+	assert.ErrorIs(t, err, ssrf.ErrBlocked,
 		"expected ErrSSRFBlocked, got %v", err)
 }
 
 func TestSafeDialer_BlocksMetadataIPAtDialTime(t *testing.T) {
-	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+	dial := ssrf.SafeDialer(ssrf.Options{
 		Resolver: func(host string) ([]net.IP, error) {
 			return []net.IP{net.ParseIP("169.254.169.254")}, nil
 		},
 	})
 	_, err := dial(context.Background(), "tcp", "imds-bait.example:80")
 	require.Error(t, err)
-	assert.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+	assert.ErrorIs(t, err, ssrf.ErrBlocked)
 }
 
 // TestSafeDialer_BlocksLiteralPrivateIP catches direct dials by IP.
 func TestSafeDialer_BlocksLiteralPrivateIP(t *testing.T) {
-	dial := httpblock.SafeDialer(httpblock.SSRFOptions{})
+	dial := ssrf.SafeDialer(ssrf.Options{})
 	_, err := dial(context.Background(), "tcp", "10.0.0.1:80")
 	require.Error(t, err)
-	assert.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+	assert.ErrorIs(t, err, ssrf.ErrBlocked)
 }
 
 // TestExecute_TruncatedBodySurfacesError proves a partial-read on a
@@ -522,7 +523,7 @@ func TestExecute_TruncatedBodySurfacesError(t *testing.T) {
 	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
 
 	exec := httpblock.New(httpblock.Options{
-		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{host}},
+		SSRF: ssrf.Options{AllowedHosts: []string{host}},
 	})
 	_, err := exec.Execute(context.Background(), httpblock.Request{
 		URL:    srv.URL + "/short",
@@ -548,7 +549,7 @@ func TestExecute_TruncatesResponseAtMaxBytes(t *testing.T) {
 	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
 
 	exec := httpblock.New(httpblock.Options{
-		SSRF:             httpblock.SSRFOptions{AllowedHosts: []string{host}},
+		SSRF:             ssrf.Options{AllowedHosts: []string{host}},
 		MaxResponseBytes: 64,
 	})
 	res, err := exec.Execute(context.Background(), httpblock.Request{
@@ -585,7 +586,7 @@ func TestDefaultTimeoutAccommodatesSlowAgents(t *testing.T) {
 // the engine refusing it regardless of the setting is what made an HTTP agent
 // pass its test button and then fail the evaluation with ssrf_blocked.
 func TestSSRF_WhenLocalDestinationsArePermitted(t *testing.T) {
-	permissive := httpblock.SSRFOptions{
+	permissive := ssrf.Options{
 		AllowLocal: true,
 		Resolver: func(_ string) ([]net.IP, error) {
 			return []net.IP{net.ParseIP("127.0.0.1")}, nil
@@ -603,13 +604,13 @@ func TestSSRF_WhenLocalDestinationsArePermitted(t *testing.T) {
 			"http://172.16.4.9/x",
 		} {
 			t.Run(u, func(t *testing.T) {
-				assert.NoError(t, httpblock.CheckURL(u, permissive))
+				assert.NoError(t, ssrf.CheckURL(u, permissive))
 			})
 		}
 	})
 
 	t.Run("permits a hostname that resolves to a private address", func(t *testing.T) {
-		err := httpblock.CheckURL("http://agent.internal/", httpblock.SSRFOptions{
+		err := ssrf.CheckURL("http://agent.internal/", ssrf.Options{
 			AllowLocal: true,
 			Resolver: func(_ string) ([]net.IP, error) {
 				return []net.IP{net.ParseIP("10.0.0.5")}, nil
@@ -625,18 +626,18 @@ func TestSSRF_WhenLocalDestinationsArePermitted(t *testing.T) {
 			"http://168.63.129.16/x",
 		} {
 			t.Run(u, func(t *testing.T) {
-				require.Error(t, httpblock.CheckURL(u, permissive),
+				require.Error(t, ssrf.CheckURL(u, permissive),
 					"%s stays refused however permissive the deployment is", u)
 			})
 		}
 	})
 
 	t.Run("strict egress overrides the permission", func(t *testing.T) {
-		err := httpblock.CheckURL("http://10.0.0.1/x", httpblock.SSRFOptions{
+		err := ssrf.CheckURL("http://10.0.0.1/x", ssrf.Options{
 			AllowLocal:       true,
 			StrictPublicOnly: true,
 		})
-		require.ErrorIs(t, err, httpblock.ErrSSRFBlocked,
+		require.ErrorIs(t, err, ssrf.ErrBlocked,
 			"strict egress means globally routable only, which a private address is not")
 	})
 
@@ -646,7 +647,7 @@ func TestSSRF_WhenLocalDestinationsArePermitted(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		dial := httpblock.SafeDialer(httpblock.SSRFOptions{AllowLocal: true})
+		dial := ssrf.SafeDialer(ssrf.Options{AllowLocal: true})
 		conn, err := dial(context.Background(), "tcp", strings.TrimPrefix(srv.URL, "http://"))
 		require.NoError(t, err, "the dialer must permit what CheckURL permitted")
 		require.NoError(t, conn.Close())
@@ -664,7 +665,7 @@ func TestExecute_ReachesALocalEndpointWhenPermitted(t *testing.T) {
 	defer srv.Close()
 
 	exec := httpblock.New(httpblock.Options{
-		SSRF: httpblock.SSRFOptions{AllowLocal: true},
+		SSRF: ssrf.Options{AllowLocal: true},
 	})
 	res, err := exec.Execute(context.Background(), httpblock.Request{
 		URL:        srv.URL,

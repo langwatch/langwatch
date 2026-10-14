@@ -1,0 +1,676 @@
+[
+  {
+    "entry": {
+      "expected_output": "the quick brown fox jumps over the lazy dog",
+      "output": "the quick brown fox jumps over the lazy dog"
+    },
+    "name": "default identical",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "one two three four",
+      "output": "alpha beta gamma delta"
+    },
+    "name": "default disjoint",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the cat lay on the mat today",
+      "output": "the cat sat on the mat"
+    },
+    "name": "default partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.7692307692307692,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the cat lay on the mat today",
+      "output": "the cat sat on the mat"
+    },
+    "name": "rouge1 fmeasure partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.7692307692307692,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "fmeasure",
+      "rouge_type": "rouge1"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "the cat lay on the mat today",
+      "output": "the cat sat on the mat"
+    },
+    "name": "rouge1 precision partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.8333333333333334,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "precision",
+      "rouge_type": "rouge1"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "the cat lay on the mat today",
+      "output": "the cat sat on the mat"
+    },
+    "name": "rouge1 recall partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.7142857142857143,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "recall",
+      "rouge_type": "rouge1"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "the cat lay on the mat today",
+      "output": "the cat sat on the mat"
+    },
+    "name": "rougeL fmeasure partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.7692307692307692,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "fmeasure",
+      "rouge_type": "rougeL"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "the cat lay on the mat today",
+      "output": "the cat sat on the mat"
+    },
+    "name": "rougeL precision partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.8333333333333334,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "precision",
+      "rouge_type": "rougeL"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "the cat lay on the mat today",
+      "output": "the cat sat on the mat"
+    },
+    "name": "rougeL recall partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.7142857142857143,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "recall",
+      "rouge_type": "rougeL"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "same text here",
+      "output": "same text here"
+    },
+    "name": "rouge1 fmeasure identical",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "fmeasure",
+      "rouge_type": "rouge1"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "same text here",
+      "output": "same text here"
+    },
+    "name": "rouge1 precision identical",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "precision",
+      "rouge_type": "rouge1"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "same text here",
+      "output": "same text here"
+    },
+    "name": "rouge1 recall identical",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "recall",
+      "rouge_type": "rouge1"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "same text here",
+      "output": "same text here"
+    },
+    "name": "rougeL fmeasure identical",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "fmeasure",
+      "rouge_type": "rougeL"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "same text here",
+      "output": "same text here"
+    },
+    "name": "rougeL precision identical",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "precision",
+      "rouge_type": "rougeL"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "same text here",
+      "output": "same text here"
+    },
+    "name": "rougeL recall identical",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "recall",
+      "rouge_type": "rougeL"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "gamma delta",
+      "output": "alpha beta"
+    },
+    "name": "rouge1 fmeasure disjoint",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "fmeasure",
+      "rouge_type": "rouge1"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "gamma delta",
+      "output": "alpha beta"
+    },
+    "name": "rougeL recall disjoint",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "recall",
+      "rouge_type": "rougeL"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "the cat sat",
+      "output": "the cat sat on the mat and then went out to play in the garden all day long"
+    },
+    "name": "rouge1 precision output much longer",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.16666666666666666,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "precision",
+      "rouge_type": "rouge1"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "the cat sat",
+      "output": "the cat sat on the mat and then went out to play in the garden all day long"
+    },
+    "name": "rouge1 recall output much longer",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "recall",
+      "rouge_type": "rouge1"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "the cat sat on the mat",
+      "output": "mat the on sat cat the"
+    },
+    "name": "rougeL word order swapped",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.5,
+      "status": "processed"
+    },
+    "settings": {
+      "rouge_type": "rougeL"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "the cat sat on the mat",
+      "output": "mat the on sat cat the"
+    },
+    "name": "rouge1 word order swapped",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rouge_type": "rouge1"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "first sentence here.\nsecond phrase there.",
+      "output": "first sentence here.\nsecond sentence there."
+    },
+    "name": "rougeL multi-line",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.8333333333333334,
+      "status": "processed"
+    },
+    "settings": {
+      "rouge_type": "rougeL"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "the cat sat",
+      "output": "The Cat Sat"
+    },
+    "name": "rouge1 case differs",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "Hello world",
+      "output": "Hello, world!"
+    },
+    "name": "rouge1 punctuation differs",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the cat sat",
+      "output": ""
+    },
+    "name": "empty output",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "",
+      "output": "the cat sat"
+    },
+    "name": "empty reference",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "",
+      "output": ""
+    },
+    "name": "both empty",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "",
+      "output": ""
+    },
+    "name": "both empty rougeL recall",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "recall",
+      "rouge_type": "rougeL"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": " \n ",
+      "output": "   "
+    },
+    "name": "whitespace-only both",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "我喜欢吃苹果和香蕉",
+      "output": "我喜欢吃苹果和香蕉"
+    },
+    "name": "CJK identical",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "我 喜欢 吃 香蕉",
+      "output": "我 喜欢 吃 苹果"
+    },
+    "name": "CJK spaced partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "great job 👎 well done 🎉",
+      "output": "great job 👍 well done 🎉"
+    },
+    "name": "emoji tokens",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "שלום עולם זה טקסט אחר קצר",
+      "output": "שלום עולם זה טקסט בדיקה קצר"
+    },
+    "name": "RTL partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "cafe resume naive",
+      "output": "café résumé naïve"
+    },
+    "name": "accented latin",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the cat",
+      "output": "the the the the"
+    },
+    "name": "repeated words rouge1",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.25,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "precision",
+      "rouge_type": "rouge1"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "price was 1234 dollars",
+      "output": "price is 1234 dollars"
+    },
+    "name": "numbers and symbols",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.75,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Ut enim ad minim veniam quis nostrud.",
+      "output": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
+    },
+    "name": "long partial rougeL",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.6582278481012659,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "fmeasure",
+      "rouge_type": "rougeL"
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Ut enim ad minim veniam quis nostrud.",
+      "output": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
+    },
+    "name": "long partial rouge1",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.6582278481012659,
+      "status": "processed"
+    },
+    "settings": {
+      "measure_type": "fmeasure",
+      "rouge_type": "rouge1"
+    }
+  }
+]

@@ -136,6 +136,9 @@ spec:
                   name: {{ include "langwatch.appSecretName" . }}
                   key: {{ include "langwatch.nlpInternalSecretKey" . }}
                   optional: true
+            {{- if (.Values.langwatch_nlp.evaluatorRuntime).enabled }}
+            {{- include "langwatch.nlpInternalSecretEnv" . | nindent 12 }}
+            {{- end }}
 
             {{- with .Values.langwatch_nlp.extraEnvs}}
             {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "langwatch_nlp.extraEnvs") }}

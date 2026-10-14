@@ -7,10 +7,11 @@ import (
 	"testing"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/services/nlpgo/litellmparams"
 )
 
 // encodeCreds is the same shape llmexecutor's translator emits.
-func encodeCreds(t *testing.T, ic inlineCreds) string {
+func encodeCreds(t *testing.T, ic litellmparams.InlineCredentials) string {
 	t.Helper()
 	b, err := json.Marshal(ic)
 	if err != nil {
@@ -20,7 +21,7 @@ func encodeCreds(t *testing.T, ic inlineCreds) string {
 }
 
 func TestCredentialFromHeaders_OpenAI(t *testing.T) {
-	hdr := encodeCreds(t, inlineCreds{
+	hdr := encodeCreds(t, litellmparams.InlineCredentials{
 		Provider: "openai",
 		OpenAI: map[string]string{
 			"api_key":      "sk-test",
@@ -47,7 +48,7 @@ func TestCredentialFromHeaders_OpenAI(t *testing.T) {
 }
 
 func TestCredentialFromHeaders_Anthropic(t *testing.T) {
-	hdr := encodeCreds(t, inlineCreds{
+	hdr := encodeCreds(t, litellmparams.InlineCredentials{
 		Provider: "anthropic",
 		Anthropic: map[string]string{
 			"api_key":  "sk-ant-test",
@@ -67,7 +68,7 @@ func TestCredentialFromHeaders_Anthropic(t *testing.T) {
 }
 
 func TestCredentialFromHeaders_Azure(t *testing.T) {
-	hdr := encodeCreds(t, inlineCreds{
+	hdr := encodeCreds(t, litellmparams.InlineCredentials{
 		Provider: "azure",
 		Azure: map[string]any{
 			"api_key":           "az-secret",
@@ -99,7 +100,7 @@ func TestCredentialFromHeaders_Azure(t *testing.T) {
 }
 
 func TestCredentialFromHeaders_Bedrock(t *testing.T) {
-	hdr := encodeCreds(t, inlineCreds{
+	hdr := encodeCreds(t, litellmparams.InlineCredentials{
 		Provider: "bedrock",
 		Bedrock: map[string]string{
 			"aws_access_key_id":            "AKIA-TEST",
@@ -135,7 +136,7 @@ func TestCredentialFromHeaders_Bedrock(t *testing.T) {
 
 func TestCredentialFromHeaders_Vertex(t *testing.T) {
 	saJSON := `{"type":"service_account","project_id":"acme"}`
-	hdr := encodeCreds(t, inlineCreds{
+	hdr := encodeCreds(t, litellmparams.InlineCredentials{
 		Provider: "vertex_ai",
 		VertexAI: map[string]string{
 			"vertex_credentials": saJSON,
@@ -163,7 +164,7 @@ func TestCredentialFromHeaders_Vertex(t *testing.T) {
 }
 
 func TestCredentialFromHeaders_Gemini(t *testing.T) {
-	hdr := encodeCreds(t, inlineCreds{
+	hdr := encodeCreds(t, litellmparams.InlineCredentials{
 		Provider: "gemini",
 		Gemini:   map[string]string{"api_key": "gem-key"},
 	})
@@ -184,7 +185,7 @@ func TestCredentialFromHeaders_GenericAPIKeyProviders(t *testing.T) {
 	// disambiguates and maps 1:1 onto the domain provider id.
 	for _, provider := range []string{"xai", "groq", "cerebras", "deepseek"} {
 		t.Run(provider, func(t *testing.T) {
-			hdr := encodeCreds(t, inlineCreds{
+			hdr := encodeCreds(t, litellmparams.InlineCredentials{
 				Provider: provider,
 				Generic:  map[string]string{"api_key": "gen-key"},
 			})
@@ -203,7 +204,7 @@ func TestCredentialFromHeaders_GenericAPIKeyProviders(t *testing.T) {
 }
 
 func TestCredentialFromHeaders_Custom(t *testing.T) {
-	hdr := encodeCreds(t, inlineCreds{
+	hdr := encodeCreds(t, litellmparams.InlineCredentials{
 		Provider: "custom",
 		Custom: map[string]string{
 			"api_key":  "cust-key",
@@ -254,7 +255,7 @@ func TestCredentialFromHeaders_BadJSON(t *testing.T) {
 }
 
 func TestCredentialFromHeaders_EmptyProvider(t *testing.T) {
-	hdr := encodeCreds(t, inlineCreds{Provider: ""})
+	hdr := encodeCreds(t, litellmparams.InlineCredentials{Provider: ""})
 	_, err := credentialFromHeaders(map[string]string{headerInlineCredentials: hdr})
 	if err == nil {
 		t.Fatalf("expected provider-required error")
@@ -262,7 +263,7 @@ func TestCredentialFromHeaders_EmptyProvider(t *testing.T) {
 }
 
 func TestCredentialFromHeaders_UnsupportedProvider(t *testing.T) {
-	hdr := encodeCreds(t, inlineCreds{Provider: "cohere"})
+	hdr := encodeCreds(t, litellmparams.InlineCredentials{Provider: "cohere"})
 	_, err := credentialFromHeaders(map[string]string{headerInlineCredentials: hdr})
 	if err == nil || !strings.Contains(err.Error(), "unsupported") {
 		t.Fatalf("expected unsupported-provider error, got %v", err)
@@ -301,7 +302,7 @@ func TestWithDeploymentSelfMap_IgnoresNonMappedProviders(t *testing.T) {
 
 // @scenario "A Gemini or Vertex provider with a base URL reaches that host instead of Google's"
 func TestCredentialFromHeaders_VertexBaseURL(t *testing.T) {
-	hdr := encodeCreds(t, inlineCreds{
+	hdr := encodeCreds(t, litellmparams.InlineCredentials{
 		Provider: "vertex_ai",
 		VertexAI: map[string]string{"vertex_project": "p1", "vertex_location": "us-central1", "api_base": "http://127.0.0.1:21651"},
 	})
@@ -316,7 +317,7 @@ func TestCredentialFromHeaders_VertexBaseURL(t *testing.T) {
 
 // @scenario "A Bedrock provider whose runtime host is on the customer-endpoint allowlist reaches that host"
 func TestCredentialFromHeaders_BedrockBaseURL(t *testing.T) {
-	hdr := encodeCreds(t, inlineCreds{
+	hdr := encodeCreds(t, litellmparams.InlineCredentials{
 		Provider: "bedrock",
 		Bedrock:  map[string]string{"aws_access_key_id": "k", "aws_secret_access_key": "s", "aws_region_name": "us-east-1", "api_base": "http://127.0.0.1:21651"},
 	})

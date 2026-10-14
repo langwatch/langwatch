@@ -1,0 +1,126 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "\n    Explain and compare two SQL queries (Q1 and Q2) based on the provided database schema. First, explain each query, then determine if they have significant logical differences.\n    \nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"response_query_explaination\": {\"description\": \"Explanation of the generated SQL\", \"title\": \"Response Query Explaination\", \"type\": \"string\"}, \"reference_query_explaination\": {\"description\": \"Explanation of the reference SQL\", \"title\": \"Reference Query Explaination\", \"type\": \"string\"}, \"equivalence\": {\"description\": \"Whether the generated SQL is equivalent to the reference SQL\", \"title\": \"Equivalence\", \"type\": \"boolean\"}}, \"required\": [\"response_query_explaination\", \"reference_query_explaination\", \"equivalence\"], \"title\": \"EquivalenceOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"reference\": \"SELECT id, name FROM users WHERE active = 1;\",\n    \"response\": \"SELECT id, name FROM users WHERE active = true;\",\n    \"database_schema\": \"\\n                    Table users:\\n                    - id: INT\\n                    - name: VARCHAR\\n                    - active: BOOLEAN\\n                \"\n}\nOutput: {\n    \"response_query_explaination\": \"The generated SQL query retrieves the id and name of users where the active field is true.\",\n    \"reference_query_explaination\": \"The reference SQL query retrieves the id and name of users where the active field equals 1.\",\n    \"equivalence\": true\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"reference\": \"SELECT u.name FROM users u\",\n    \"response\": \"SELECT name FROM users\",\n    \"database_schema\": \"CREATE TABLE users (id INT PRIMARY KEY, name TEXT, active BOOLEAN)\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"response_query_explaination\": \"Scripted response_query_explaination.\", \"reference_query_explaination\": \"Scripted reference_query_explaination.\", \"equivalence\": true}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 517,
+            "total_tokens": 527
+          }
+        }
+      }
+    ],
+    "entry": {
+      "expected_contexts": [
+        "CREATE TABLE users (id INT PRIMARY KEY, name TEXT, active BOOLEAN)"
+      ],
+      "expected_output": "SELECT u.name FROM users u",
+      "output": "SELECT name FROM users"
+    },
+    "env": {},
+    "name": "equivalent",
+    "result": {
+      "cost": {
+        "amount": 8.355e-05,
+        "currency": "USD"
+      },
+      "details": "Response query explaination: Scripted response_query_explaination.\nReference query explaination: Scripted reference_query_explaination.\nEquivalence: True",
+      "label": null,
+      "passed": true,
+      "score": null,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "\n    Explain and compare two SQL queries (Q1 and Q2) based on the provided database schema. First, explain each query, then determine if they have significant logical differences.\n    \nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"response_query_explaination\": {\"description\": \"Explanation of the generated SQL\", \"title\": \"Response Query Explaination\", \"type\": \"string\"}, \"reference_query_explaination\": {\"description\": \"Explanation of the reference SQL\", \"title\": \"Reference Query Explaination\", \"type\": \"string\"}, \"equivalence\": {\"description\": \"Whether the generated SQL is equivalent to the reference SQL\", \"title\": \"Equivalence\", \"type\": \"boolean\"}}, \"required\": [\"response_query_explaination\", \"reference_query_explaination\", \"equivalence\"], \"title\": \"EquivalenceOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"reference\": \"SELECT id, name FROM users WHERE active = 1;\",\n    \"response\": \"SELECT id, name FROM users WHERE active = true;\",\n    \"database_schema\": \"\\n                    Table users:\\n                    - id: INT\\n                    - name: VARCHAR\\n                    - active: BOOLEAN\\n                \"\n}\nOutput: {\n    \"response_query_explaination\": \"The generated SQL query retrieves the id and name of users where the active field is true.\",\n    \"reference_query_explaination\": \"The reference SQL query retrieves the id and name of users where the active field equals 1.\",\n    \"equivalence\": true\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"reference\": \"SELECT name FROM users\",\n    \"response\": \"SELECT name FROM users WHERE active\",\n    \"database_schema\": \"CREATE TABLE users (id INT PRIMARY KEY, name TEXT, active BOOLEAN)\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"response_query_explaination\": \"Scripted response_query_explaination.\", \"reference_query_explaination\": \"Scripted reference_query_explaination.\", \"equivalence\": false}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 519,
+            "total_tokens": 529
+          }
+        }
+      }
+    ],
+    "entry": {
+      "expected_contexts": [
+        "CREATE TABLE users (id INT PRIMARY KEY, name TEXT, active BOOLEAN)"
+      ],
+      "expected_output": "SELECT name FROM users",
+      "output": "SELECT name FROM users WHERE active"
+    },
+    "env": {},
+    "name": "not_equivalent",
+    "result": {
+      "cost": {
+        "amount": 8.384999999999999e-05,
+        "currency": "USD"
+      },
+      "details": "Response query explaination: Scripted response_query_explaination.\nReference query explaination: Scripted reference_query_explaination.\nEquivalence: False",
+      "label": null,
+      "passed": false,
+      "score": null,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  }
+]

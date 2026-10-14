@@ -255,6 +255,9 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		MockInstantEvalJudge: o.cfg.ShouldMockInstantEvalJudge,
 		PortlessDisabled:     o.cfg.PortlessDisabled,
 	}
+	if opts.Selection.GoEvaluators {
+		st.EvaluatorRuntimeSecret = domain.NewEvaluatorRuntimeSecret()
+	}
 	if p.UntrustedCheckout {
 		st.NxPrivateDir = o.nxPrivateDir(slug)
 	}

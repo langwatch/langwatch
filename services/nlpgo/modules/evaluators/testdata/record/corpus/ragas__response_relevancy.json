@@ -1,0 +1,63 @@
+[
+  {
+    "name": "committal_n3",
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris is the capital of France."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "noncommittal": 0
+      }
+    }
+  },
+  {
+    "name": "noncommittal",
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "I am not sure."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "noncommittal": 1
+      }
+    }
+  },
+  {
+    "name": "provider_ignores_n",
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris is the capital of France."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "noncommittal": 0
+      },
+      "ignore_n": true
+    }
+  },
+  {
+    "name": "gpt5_temperature_pinned",
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris is the capital of France."
+    },
+    "settings": {
+      "model": "openai/gpt-5-mini"
+    },
+    "script": {
+      "values": {
+        "noncommittal": 0
+      }
+    }
+  }
+]

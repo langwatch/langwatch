@@ -1,0 +1,731 @@
+[
+  {
+    "entry": {
+      "contexts": [
+        "Paris is the capital of France."
+      ],
+      "expected_contexts": [
+        "Paris is the capital of France."
+      ]
+    },
+    "name": "default identical single",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "Paris is the capital of France.",
+        "Berlin is the capital of Germany."
+      ],
+      "expected_contexts": [
+        "Paris is the capital of France.",
+        "Berlin is the capital of Germany."
+      ]
+    },
+    "name": "default identical multiple",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.99999999995, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.999999999975,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "completely unrelated text"
+      ],
+      "expected_contexts": [
+        "Paris is the capital of France."
+      ]
+    },
+    "name": "default disjoint",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.0, Recall: 0.0",
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "Paris is the capital of France"
+      ],
+      "expected_contexts": [
+        "Paris is the capital city of France."
+      ]
+    },
+    "name": "default partial similarity",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "Paris is the capital of France.",
+        "Bananas are yellow.",
+        "The sky is blue."
+      ],
+      "expected_contexts": [
+        "Paris is the capital of France."
+      ]
+    },
+    "name": "default extra retrieved noise",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "Paris is the capital of France."
+      ],
+      "expected_contexts": [
+        "Paris is the capital of France.",
+        "Berlin is the capital of Germany.",
+        "Madrid is the capital of Spain."
+      ]
+    },
+    "name": "default fewer retrieved than expected",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "Berlin is the capital of Germany.",
+        "Paris is the capital of France."
+      ],
+      "expected_contexts": [
+        "Paris is the capital of France.",
+        "Berlin is the capital of Germany."
+      ]
+    },
+    "name": "default order swapped",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.99999999995, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.999999999975,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [],
+      "expected_contexts": []
+    },
+    "name": "both empty lists",
+    "result": {
+      "cost": null,
+      "details": "Precision: 1.0, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "something"
+      ],
+      "expected_contexts": []
+    },
+    "name": "expected empty, retrieved present",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.0, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [],
+      "expected_contexts": [
+        "something"
+      ]
+    },
+    "name": "retrieved empty, expected present",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.0, Recall: 0.0",
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        ""
+      ],
+      "expected_contexts": [
+        ""
+      ]
+    },
+    "name": "empty strings in lists",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        ""
+      ],
+      "expected_contexts": [
+        "Paris"
+      ]
+    },
+    "name": "empty string vs text",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.0, Recall: 0.0",
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "   "
+      ],
+      "expected_contexts": [
+        "   "
+      ]
+    },
+    "name": "whitespace-only contexts",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "line one\nline two"
+      ],
+      "expected_contexts": [
+        "line one\nline 2"
+      ]
+    },
+    "name": "multi-line contexts",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "PARIS IS THE CAPITAL"
+      ],
+      "expected_contexts": [
+        "paris is the capital"
+      ]
+    },
+    "name": "case differs",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.0, Recall: 0.0",
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "巴黎是法国的首都"
+      ],
+      "expected_contexts": [
+        "巴黎是法国的首都城市"
+      ]
+    },
+    "name": "CJK contexts",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "great 👍 job"
+      ],
+      "expected_contexts": [
+        "great 👎 job"
+      ]
+    },
+    "name": "emoji contexts",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "פריז היא בירת צרפת"
+      ],
+      "expected_contexts": [
+        "פריז היא בירת צרפת."
+      ]
+    },
+    "name": "RTL contexts",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
+      ],
+      "expected_contexts": [
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Excepteur sint occaecat cupidatat non proident."
+      ]
+    },
+    "name": "long contexts",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "kitten"
+      ],
+      "expected_contexts": [
+        "sitting"
+      ]
+    },
+    "name": "levenshtein partial",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "levenshtein"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [
+        "karolin"
+      ],
+      "expected_contexts": [
+        "kathrin"
+      ]
+    },
+    "name": "hamming same length partial",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "hamming"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [
+        "short"
+      ],
+      "expected_contexts": [
+        "much longer text"
+      ]
+    },
+    "name": "hamming different lengths",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.0, Recall: 0.0",
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "hamming"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [
+        "same"
+      ],
+      "expected_contexts": [
+        "same"
+      ]
+    },
+    "name": "hamming identical",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "hamming"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [
+        "abcd",
+        "wxyz"
+      ],
+      "expected_contexts": [
+        "abce",
+        "wxyy",
+        "qqqq"
+      ]
+    },
+    "name": "hamming multiple contexts",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.99999999995, Recall: 0.6666666666666666",
+      "label": null,
+      "passed": null,
+      "score": 0.7999999999840001,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "hamming"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [
+        "martha"
+      ],
+      "expected_contexts": [
+        "marhta"
+      ]
+    },
+    "name": "jaro partial",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "jaro"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [
+        "abc"
+      ],
+      "expected_contexts": [
+        "xyz"
+      ]
+    },
+    "name": "jaro disjoint",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.0, Recall: 0.0",
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "jaro"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [
+        "dixon",
+        "dicksonx"
+      ],
+      "expected_contexts": [
+        "dickson",
+        "jellyfish"
+      ]
+    },
+    "name": "jaro multiple",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.99999999995, Recall: 0.5",
+      "label": null,
+      "passed": null,
+      "score": 0.6666666666555555,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "jaro"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [
+        "martha"
+      ],
+      "expected_contexts": [
+        "marhta"
+      ]
+    },
+    "name": "jaro_winkler partial",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "jaro_winkler"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [
+        "prefix matches here"
+      ],
+      "expected_contexts": [
+        "prefix matches there"
+      ]
+    },
+    "name": "jaro_winkler prefix boost",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "jaro_winkler"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [
+        "dixon",
+        "dicksonx",
+        "noise"
+      ],
+      "expected_contexts": [
+        "dickson"
+      ]
+    },
+    "name": "jaro_winkler multiple",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999666667, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.9999999999833333,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "jaro_winkler"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [],
+      "expected_contexts": []
+    },
+    "name": "jaro_winkler empty vs empty lists",
+    "result": {
+      "cost": null,
+      "details": "Precision: 1.0, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "jaro_winkler"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [
+        "x"
+      ],
+      "expected_contexts": []
+    },
+    "name": "hamming empty expected",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.0, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "hamming"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [],
+      "expected_contexts": [
+        "x"
+      ]
+    },
+    "name": "jaro empty retrieved",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.0, Recall: 0.0",
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "distance_measure": "jaro"
+    }
+  },
+  {
+    "entry": {
+      "contexts": [
+        "Paris is the capital of France.",
+        "Paris is the capital of France."
+      ],
+      "expected_contexts": [
+        "Paris is the capital of France."
+      ]
+    },
+    "name": "duplicate retrieved contexts",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.99999999995, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.999999999975,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "contexts": [
+        "Paris is the capital of France."
+      ],
+      "expected_contexts": [
+        "Paris is the capital of France.",
+        "Paris is the capital of France."
+      ]
+    },
+    "name": "duplicate expected contexts",
+    "result": {
+      "cost": null,
+      "details": "Precision: 0.9999999999, Recall: 1.0",
+      "label": null,
+      "passed": null,
+      "score": 0.99999999995,
+      "status": "processed"
+    },
+    "settings": {}
+  }
+]

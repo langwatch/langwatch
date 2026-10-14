@@ -1,0 +1,191 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Your input fields are:\n1. `question` (str): \n2. `gold_answer` (str): correct answer for question\n3. `predicted_answer` (str): predicted answer for question\nYour output fields are:\n1. `reasoning` (str): reasoning for the answer\n2. `is_correct` (str): True or False\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## gold_answer ## ]]\n{gold_answer}\n\n[[ ## predicted_answer ## ]]\n{predicted_answer}\n\n[[ ## reasoning ## ]]\n{reasoning}\n\n[[ ## is_correct ## ]]\n{is_correct}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Verify that the predicted answer matches the gold answer for the question. Style does not matter, for example the gold answer may be more direct while the predicted answer more verbose and still be correct.",
+              "role": "system"
+            },
+            {
+              "content": "[[ ## question ## ]]\nWhat is the capital of France?\n\n[[ ## gold_answer ## ]]\nParis\n\n[[ ## predicted_answer ## ]]\nParis\n\nRespond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## is_correct ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "temperature": 0
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "[[ ## reasoning ## ]]\nScripted reasoning.\n\n[[ ## is_correct ## ]]\nTrue\n\n[[ ## completed ## ]]",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 312,
+            "total_tokens": 322
+          }
+        }
+      }
+    ],
+    "entry": {
+      "expected_output": "Paris",
+      "input": "What is the capital of France?",
+      "output": "Paris"
+    },
+    "env": {},
+    "name": "match",
+    "result": {
+      "cost": {
+        "amount": 5.2799999999999996e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted reasoning.",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Your input fields are:\n1. `question` (str): \n2. `gold_answer` (str): correct answer for question\n3. `predicted_answer` (str): predicted answer for question\nYour output fields are:\n1. `reasoning` (str): reasoning for the answer\n2. `is_correct` (str): True or False\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## gold_answer ## ]]\n{gold_answer}\n\n[[ ## predicted_answer ## ]]\n{predicted_answer}\n\n[[ ## reasoning ## ]]\n{reasoning}\n\n[[ ## is_correct ## ]]\n{is_correct}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Verify that the predicted answer matches the gold answer for the question. Style does not matter, for example the gold answer may be more direct while the predicted answer more verbose and still be correct.",
+              "role": "system"
+            },
+            {
+              "content": "[[ ## question ## ]]\nWhat is the capital of France?\n\n[[ ## gold_answer ## ]]\nParis\n\n[[ ## predicted_answer ## ]]\nLyon\n\nRespond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## is_correct ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "temperature": 0
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "[[ ## reasoning ## ]]\nScripted reasoning.\n\n[[ ## is_correct ## ]]\nFalse\n\n[[ ## completed ## ]]",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 312,
+            "total_tokens": 322
+          }
+        }
+      }
+    ],
+    "entry": {
+      "expected_output": "Paris",
+      "input": "What is the capital of France?",
+      "output": "Lyon"
+    },
+    "env": {},
+    "name": "mismatch",
+    "result": {
+      "cost": {
+        "amount": 5.2799999999999996e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted reasoning.",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Your input fields are:\n1. `question` (str): \n2. `gold_answer` (str): correct answer for question\n3. `predicted_answer` (str): predicted answer for question\nYour output fields are:\n1. `reasoning` (str): reasoning for the answer\n2. `is_correct` (str): True or False\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## gold_answer ## ]]\n{gold_answer}\n\n[[ ## predicted_answer ## ]]\n{predicted_answer}\n\n[[ ## reasoning ## ]]\n{reasoning}\n\n[[ ## is_correct ## ]]\n{is_correct}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Verify that the predicted answer matches the gold answer for the question. Style does not matter, for example the gold answer may be more direct while the predicted answer more verbose and still be correct.",
+              "role": "system"
+            },
+            {
+              "content": "[[ ## question ## ]]\nWhat is the capital of France?\n\n[[ ## gold_answer ## ]]\nParis\n\n[[ ## predicted_answer ## ]]\nParis\n\nRespond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## is_correct ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-5-mini",
+          "temperature": 1.0
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "[[ ## reasoning ## ]]\nScripted reasoning.\n\n[[ ## is_correct ## ]]\nTrue\n\n[[ ## completed ## ]]",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-5-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 312,
+            "total_tokens": 322
+          }
+        }
+      }
+    ],
+    "entry": {
+      "expected_output": "Paris",
+      "input": "What is the capital of France?",
+      "output": "Paris"
+    },
+    "env": {},
+    "name": "gpt5_temperature_pinned",
+    "result": {
+      "cost": {
+        "amount": 9.8e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted reasoning.",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-5-mini"
+    }
+  }
+]

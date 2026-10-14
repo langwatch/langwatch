@@ -92,6 +92,9 @@ type Selection struct {
 	// GitHub App and points the github module's API and install page at the
 	// sim. `haven up +github` once.
 	Github bool `json:"github"`
+	// GoEvaluators runs the app's evaluators on the Go runtime hosted by the nlp
+	// lane instead of the Python one. Off by default; it needs nlp selected.
+	GoEvaluators bool `json:"go-evaluators"`
 }
 
 // RefreshMode is the one stack mode switch: still (the zero value, `haven up`),
@@ -128,7 +131,7 @@ func DefaultSelection() Selection {
 }
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{AppSelection, "gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "lambda", "github", "design-system", "mail-room", "langevals"}
+var SelectableServices = []string{AppSelection, "gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "lambda", "github", "design-system", "mail-room", "langevals", "go-evaluators"}
 
 // AppSelection is the ±name of the LangWatch app: ui, api and worker as one.
 const AppSelection = "app"
@@ -184,6 +187,9 @@ func ApplySelectionDeltasForLayout(sel Selection, deltas []string, layout Layout
 			return sel, err
 		}
 		sel = next
+	}
+	if sel.GoEvaluators && !sel.NLP {
+		return sel, fmt.Errorf("go-evaluators needs the nlp lane, which hosts the Go evaluator runtime: keep nlp on or say -go-evaluators")
 	}
 	return sel, nil
 }
@@ -258,6 +264,8 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 		sel.Lambda = on
 	case GithubService:
 		sel.Github = on
+	case "go-evaluators":
+		sel.GoEvaluators = on
 	default:
 		return sel, fmt.Errorf("unknown service %q — services: %s", name, strings.Join(SelectableServices, ", "))
 	}
@@ -307,6 +315,7 @@ func SelectionFromStack(st Stack) Selection {
 			sel.Github = local
 		}
 	}
+	sel.GoEvaluators = st.EvaluatorRuntimeSecret != ""
 	return sel
 }
 
@@ -380,6 +389,7 @@ func (s Selection) DescribeForLayout(layout Layout) string {
 	add(s.DesignSystem, "design-system")
 	add(s.MailRoom, "mail-room")
 	add(s.Langevals, LangevalsService)
+	add(s.GoEvaluators, "go-evaluators")
 	out := "services: " + strings.Join(on, " · ")
 	if len(off) > 0 {
 		out += "   off: " + strings.Join(off, " · ")

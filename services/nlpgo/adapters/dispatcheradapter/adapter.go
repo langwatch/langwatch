@@ -5,7 +5,7 @@
 // HMAC bridge to reach the gateway — it dispatches in-process.
 //
 // The adapter parses the inline-credentials header that llmexecutor
-// already produces (via litellm.InlineCredentials.Encode) into a
+// already produces (via litellmparams.InlineCredentials.Encode) into a
 // domain.Credential and hands it to the dispatcher. This keeps
 // llmexecutor unchanged through the migration; once we're confident
 // the adapter is the only path, we can flatten the encode/decode and
@@ -22,6 +22,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
+	"github.com/langwatch/langwatch/services/nlpgo/litellmparams"
 )
 
 // Adapter implements app.GatewayClient.
@@ -131,23 +132,6 @@ func (s *streamIteratorAdapter) Chunk() []byte                 { return s.inner.
 func (s *streamIteratorAdapter) Err() error                    { return s.inner.Err() }
 func (s *streamIteratorAdapter) Close() error                  { return s.inner.Close() }
 
-// inlineCreds mirrors litellm.InlineCredentials. We don't import that
-// type to avoid coupling adapter wire format to its package; a small
-// duplicate struct here is the right cost.
-type inlineCreds struct {
-	Provider  string            `json:"provider"`
-	OpenAI    map[string]string `json:"openai,omitempty"`
-	Anthropic map[string]string `json:"anthropic,omitempty"`
-	Azure     map[string]any    `json:"azure,omitempty"`
-	Bedrock   map[string]string `json:"bedrock,omitempty"`
-	VertexAI  map[string]string `json:"vertex_ai,omitempty"`
-	Gemini    map[string]string `json:"gemini,omitempty"`
-	Custom    map[string]string `json:"custom,omitempty"`
-	// Generic carries plain api-key providers (xai, groq, cerebras,
-	// deepseek); Provider disambiguates which one.
-	Generic map[string]string `json:"generic,omitempty"`
-}
-
 // credentialFromHeaders reads the inline-credentials header that
 // llmexecutor sets, base64-decodes it, and builds a domain.Credential
 // the dispatcher can use.
@@ -160,163 +144,11 @@ func credentialFromHeaders(headers map[string]string) (domain.Credential, error)
 	if err != nil {
 		return domain.Credential{}, fmt.Errorf("dispatcheradapter: decode inline-credentials: %w", err)
 	}
-	var ic inlineCreds
+	var ic litellmparams.InlineCredentials
 	if err := json.Unmarshal(decoded, &ic); err != nil {
 		return domain.Credential{}, fmt.Errorf("dispatcheradapter: unmarshal inline-credentials: %w", err)
 	}
-	return toDomainCredential(ic)
-}
-
-// toDomainCredential maps the inline-creds JSON shape into a single
-// domain.Credential the BifrostRouter understands. The "active" provider
-// slot is read; everything else is ignored.
-func toDomainCredential(ic inlineCreds) (domain.Credential, error) {
-	switch ic.Provider {
-	case "openai":
-		return apiKeyCred(domain.ProviderOpenAI, ic.OpenAI), nil
-	case "anthropic":
-		return apiKeyCred(domain.ProviderAnthropic, ic.Anthropic), nil
-	case "azure":
-		return azureCred(ic.Azure), nil
-	case "bedrock":
-		return bedrockCred(ic.Bedrock), nil
-	case "vertex_ai", "vertex":
-		return vertexCred(ic.VertexAI), nil
-	case "gemini":
-		return apiKeyCred(domain.ProviderGemini, ic.Gemini), nil
-	case "xai", "groq", "cerebras", "deepseek":
-		// Plain api-key providers share the Generic slot. DeepSeek routes
-		// through the gateway's openai-compat (vLLM) path with its public
-		// endpoint as the default base URL; the rest are Bifrost-native.
-		return apiKeyCred(domain.ProviderID(ic.Provider), ic.Generic), nil
-	case "custom":
-		// Custom routes through Bifrost's openai-compat adapter — same
-		// credential layout as OpenAI but a different ProviderID so the
-		// gateway-side custom-→-openai mapping logic stays applicable.
-		return apiKeyCred(domain.ProviderOpenAI, ic.Custom), nil
-	case "":
-		return domain.Credential{}, errors.New("dispatcheradapter: provider is required in inline credentials")
-	default:
-		return domain.Credential{}, fmt.Errorf("dispatcheradapter: unsupported provider %q", ic.Provider)
-	}
-}
-
-// inlineCredentialID is the synthetic credential id we put on every
-// Credential we build from inline credentials. Bifrost's account
-// resolver requires a non-empty id (see services/aigateway/adapters/
-// providers/bifrost.go:486). nlpgo only ever sends one credential per
-// call so a constant suffices; aigateway's HTTP layer assigns real
-// ULIDs because it picks among many configured credentials per VK.
-func inlineCredentialID(provider domain.ProviderID) string {
-	return "nlpgo-inline-" + string(provider)
-}
-
-// apiKeyCred builds the Credential for providers that authenticate with
-// a plain api_key (plus optional pass-through extras like api_base).
-func apiKeyCred(provider domain.ProviderID, m map[string]string) domain.Credential {
-	return domain.Credential{
-		ID:         inlineCredentialID(provider),
-		ProviderID: provider,
-		APIKey:     m["api_key"],
-		Extra:      stringExtras(m, "api_key"),
-	}
-}
-
-func azureCred(m map[string]any) domain.Credential {
-	apiKey, _ := m["api_key"].(string)
-	extra := make(map[string]string, len(m))
-	// Bifrost's Azure key reader expects Extra["endpoint"] and
-	// Extra["api_version"]. The Studio-side litellm_params shape names
-	// the endpoint "api_base" — translate so Bifrost picks it up. Any
-	// unrecognized fields are still passed through stringified for
-	// forward compatibility (e.g. extra_headers, use_azure_gateway).
-	for k, v := range m {
-		if k == "api_key" {
-			continue
-		}
-		dst := k
-		if k == "api_base" {
-			dst = "endpoint"
-		}
-		switch x := v.(type) {
-		case string:
-			extra[dst] = x
-		case map[string]any, []any:
-			b, err := json.Marshal(x)
-			if err == nil {
-				extra[dst] = string(b)
-			}
-		case bool:
-			if x {
-				extra[dst] = "true"
-			} else {
-				extra[dst] = "false"
-			}
-		default:
-			extra[dst] = fmt.Sprintf("%v", x)
-		}
-	}
-	return domain.Credential{
-		ID:         inlineCredentialID(domain.ProviderAzure),
-		ProviderID: domain.ProviderAzure,
-		APIKey:     apiKey,
-		Extra:      extra,
-	}
-}
-
-func bedrockCred(m map[string]string) domain.Credential {
-	// Bifrost's Bedrock key reader expects Extra keys "access_key",
-	// "secret_key", "session_token", "region". The Studio-side
-	// litellm_params names them aws_access_key_id / aws_secret_access_key
-	// / aws_session_token / aws_region_name. Translate at the boundary.
-	extra := map[string]string{}
-	if v := m["aws_access_key_id"]; v != "" {
-		extra["access_key"] = v
-	}
-	if v := m["aws_secret_access_key"]; v != "" {
-		extra["secret_key"] = v
-	}
-	if v := m["aws_session_token"]; v != "" {
-		extra["session_token"] = v
-	}
-	if v := m["aws_region_name"]; v != "" {
-		extra["region"] = v
-	}
-	if v := m["aws_bedrock_runtime_endpoint"]; v != "" {
-		extra["bedrock_runtime_endpoint"] = v
-	}
-	if v := m["api_base"]; v != "" {
-		extra["base_url"] = v // a stand-in runtime host such as llmsim; the gateway checks its allowlist
-	}
-	return domain.Credential{
-		ID:         inlineCredentialID(domain.ProviderBedrock),
-		ProviderID: domain.ProviderBedrock,
-		APIKey:     m["aws_access_key_id"],
-		Extra:      extra,
-	}
-}
-
-func vertexCred(m map[string]string) domain.Credential {
-	// Bifrost's Vertex key reader expects Extra["project_id"],
-	// Extra["region"], and APIKey carrying the SA JSON. The
-	// litellm_params names the SA JSON "vertex_credentials" and uses
-	// vertex_project / vertex_location for routing.
-	extra := map[string]string{}
-	if v := m["vertex_project"]; v != "" {
-		extra["project_id"] = v
-	}
-	if v := m["vertex_location"]; v != "" {
-		extra["region"] = v
-	}
-	if v := m["api_base"]; v != "" {
-		extra["base_url"] = v // a stand-in host such as llmsim; the gateway's Vertex override
-	}
-	return domain.Credential{
-		ID:         inlineCredentialID(domain.ProviderVertex),
-		ProviderID: domain.ProviderVertex,
-		APIKey:     m["vertex_credentials"],
-		Extra:      extra,
-	}
+	return ic.Credential()
 }
 
 // bareModel strips the langwatch-internal provider prefix
@@ -341,31 +173,4 @@ func indexByte(s string, b byte) int {
 		}
 	}
 	return -1
-}
-
-// stringExtras copies a string-map dropping the named keys. Used to
-// place provider-specific non-key fields (api_base, api_version, etc.)
-// into Credential.Extra without dragging the API key in twice.
-func stringExtras(m map[string]string, drop ...string) map[string]string {
-	if len(m) == 0 {
-		return nil
-	}
-	out := make(map[string]string, len(m))
-	skip := make(map[string]struct{}, len(drop))
-	for _, d := range drop {
-		skip[d] = struct{}{}
-	}
-	for k, v := range m {
-		if _, found := skip[k]; found {
-			continue
-		}
-		if v == "" {
-			continue
-		}
-		out[k] = v
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
 }

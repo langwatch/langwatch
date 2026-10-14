@@ -1,0 +1,640 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Generate a question for the given answer and Identify if answer is noncommittal. Give noncommittal as 1 if the answer is noncommittal and 0 if the answer is committal. A noncommittal answer is one that is evasive, vague, or ambiguous. For example, \"I don't know\" or \"I'm not sure\" are noncommittal answers\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"question\": {\"title\": \"Question\", \"type\": \"string\"}, \"noncommittal\": {\"title\": \"Noncommittal\", \"type\": \"integer\"}}, \"required\": [\"question\", \"noncommittal\"], \"title\": \"ResponseRelevanceOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"response\": \"Albert Einstein was born in Germany.\"\n}\nOutput: {\n    \"question\": \"Where was Albert Einstein born?\",\n    \"noncommittal\": 0\n}\n\nExample 2\nInput: {\n    \"response\": \"I don't know about the  groundbreaking feature of the smartphone invented in 2023 as am unaware of information beyond 2022. \"\n}\nOutput: {\n    \"question\": \"What was the groundbreaking feature of the smartphone invented in 2023?\",\n    \"noncommittal\": 1\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"response\": \"Paris is the capital of France.\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 3,
+          "temperature": 0.7
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"question\": \"Scripted question.\", \"noncommittal\": 0}",
+                "role": "assistant"
+              }
+            },
+            {
+              "finish_reason": "stop",
+              "index": 1,
+              "message": {
+                "content": "{\"question\": \"Scripted question 1.\", \"noncommittal\": 0}",
+                "role": "assistant"
+              }
+            },
+            {
+              "finish_reason": "stop",
+              "index": 2,
+              "message": {
+                "content": "{\"question\": \"Scripted question 2.\", \"noncommittal\": 0}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 30,
+            "prompt_tokens": 372,
+            "total_tokens": 402
+          }
+        }
+      },
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": "What is the capital of France?",
+          "model": "text-embedding-ada-002"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                -0.8666666666666667,
+                -0.37254901960784315,
+                -0.42745098039215684,
+                0.27058823529411763,
+                0.19215686274509805,
+                -0.34901960784313724,
+                -0.6627450980392157,
+                0.7725490196078432
+              ],
+              "index": 0,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-ada-002",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 8,
+            "total_tokens": 8
+          }
+        }
+      },
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": [
+            "Scripted question.",
+            "Scripted question 1.",
+            "Scripted question 2."
+          ],
+          "model": "text-embedding-ada-002"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                -0.15294117647058825,
+                0.5215686274509804,
+                -0.44313725490196076,
+                -0.5294117647058824,
+                0.09019607843137255,
+                0.17647058823529413,
+                -0.4196078431372549,
+                0.16862745098039217
+              ],
+              "index": 0,
+              "object": "embedding"
+            },
+            {
+              "embedding": [
+                0.09803921568627451,
+                -0.4745098039215686,
+                0.7647058823529411,
+                -0.8431372549019608,
+                -0.4745098039215686,
+                -0.8431372549019608,
+                0.08235294117647059,
+                0.23921568627450981
+              ],
+              "index": 1,
+              "object": "embedding"
+            },
+            {
+              "embedding": [
+                -0.796078431372549,
+                -0.8901960784313725,
+                -0.9607843137254902,
+                0.5058823529411764,
+                -0.4745098039215686,
+                -0.8431372549019608,
+                -0.09803921568627451,
+                -0.23137254901960785
+              ],
+              "index": 2,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-ada-002",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 17,
+            "total_tokens": 17
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris is the capital of France."
+    },
+    "env": {},
+    "name": "committal_n3",
+    "result": {
+      "cost": {
+        "amount": 7.379999999999999e-05,
+        "currency": "USD"
+      },
+      "details": "Questions generated from output:\n\n- Scripted question.\n- Scripted question 1.\n- Scripted question 2.\n\nSimilarity to original question: [ 0.2260137  -0.05337068  0.57098413]\nEvasive answer: False",
+      "label": null,
+      "passed": null,
+      "score": 0.2478757188289459,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Generate a question for the given answer and Identify if answer is noncommittal. Give noncommittal as 1 if the answer is noncommittal and 0 if the answer is committal. A noncommittal answer is one that is evasive, vague, or ambiguous. For example, \"I don't know\" or \"I'm not sure\" are noncommittal answers\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"question\": {\"title\": \"Question\", \"type\": \"string\"}, \"noncommittal\": {\"title\": \"Noncommittal\", \"type\": \"integer\"}}, \"required\": [\"question\", \"noncommittal\"], \"title\": \"ResponseRelevanceOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"response\": \"Albert Einstein was born in Germany.\"\n}\nOutput: {\n    \"question\": \"Where was Albert Einstein born?\",\n    \"noncommittal\": 0\n}\n\nExample 2\nInput: {\n    \"response\": \"I don't know about the  groundbreaking feature of the smartphone invented in 2023 as am unaware of information beyond 2022. \"\n}\nOutput: {\n    \"question\": \"What was the groundbreaking feature of the smartphone invented in 2023?\",\n    \"noncommittal\": 1\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"response\": \"I am not sure.\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 3,
+          "temperature": 0.7
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"question\": \"Scripted question.\", \"noncommittal\": 1}",
+                "role": "assistant"
+              }
+            },
+            {
+              "finish_reason": "stop",
+              "index": 1,
+              "message": {
+                "content": "{\"question\": \"Scripted question 1.\", \"noncommittal\": 1}",
+                "role": "assistant"
+              }
+            },
+            {
+              "finish_reason": "stop",
+              "index": 2,
+              "message": {
+                "content": "{\"question\": \"Scripted question 2.\", \"noncommittal\": 1}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 30,
+            "prompt_tokens": 368,
+            "total_tokens": 398
+          }
+        }
+      },
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": "What is the capital of France?",
+          "model": "text-embedding-ada-002"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                -0.8666666666666667,
+                -0.37254901960784315,
+                -0.42745098039215684,
+                0.27058823529411763,
+                0.19215686274509805,
+                -0.34901960784313724,
+                -0.6627450980392157,
+                0.7725490196078432
+              ],
+              "index": 0,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-ada-002",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 8,
+            "total_tokens": 8
+          }
+        }
+      },
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": [
+            "Scripted question.",
+            "Scripted question 1.",
+            "Scripted question 2."
+          ],
+          "model": "text-embedding-ada-002"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                -0.15294117647058825,
+                0.5215686274509804,
+                -0.44313725490196076,
+                -0.5294117647058824,
+                0.09019607843137255,
+                0.17647058823529413,
+                -0.4196078431372549,
+                0.16862745098039217
+              ],
+              "index": 0,
+              "object": "embedding"
+            },
+            {
+              "embedding": [
+                0.09803921568627451,
+                -0.4745098039215686,
+                0.7647058823529411,
+                -0.8431372549019608,
+                -0.4745098039215686,
+                -0.8431372549019608,
+                0.08235294117647059,
+                0.23921568627450981
+              ],
+              "index": 1,
+              "object": "embedding"
+            },
+            {
+              "embedding": [
+                -0.796078431372549,
+                -0.8901960784313725,
+                -0.9607843137254902,
+                0.5058823529411764,
+                -0.4745098039215686,
+                -0.8431372549019608,
+                -0.09803921568627451,
+                -0.23137254901960785
+              ],
+              "index": 2,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-ada-002",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 17,
+            "total_tokens": 17
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "I am not sure."
+    },
+    "env": {},
+    "name": "noncommittal",
+    "result": {
+      "cost": {
+        "amount": 7.32e-05,
+        "currency": "USD"
+      },
+      "details": "Questions generated from output:\n\n- Scripted question.\n- Scripted question 1.\n- Scripted question 2.\n\nSimilarity to original question: [ 0.2260137  -0.05337068  0.57098413]\nEvasive answer: True",
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Generate a question for the given answer and Identify if answer is noncommittal. Give noncommittal as 1 if the answer is noncommittal and 0 if the answer is committal. A noncommittal answer is one that is evasive, vague, or ambiguous. For example, \"I don't know\" or \"I'm not sure\" are noncommittal answers\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"question\": {\"title\": \"Question\", \"type\": \"string\"}, \"noncommittal\": {\"title\": \"Noncommittal\", \"type\": \"integer\"}}, \"required\": [\"question\", \"noncommittal\"], \"title\": \"ResponseRelevanceOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"response\": \"Albert Einstein was born in Germany.\"\n}\nOutput: {\n    \"question\": \"Where was Albert Einstein born?\",\n    \"noncommittal\": 0\n}\n\nExample 2\nInput: {\n    \"response\": \"I don't know about the  groundbreaking feature of the smartphone invented in 2023 as am unaware of information beyond 2022. \"\n}\nOutput: {\n    \"question\": \"What was the groundbreaking feature of the smartphone invented in 2023?\",\n    \"noncommittal\": 1\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"response\": \"Paris is the capital of France.\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 3,
+          "temperature": 0.7
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"question\": \"Scripted question.\", \"noncommittal\": 0}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 372,
+            "total_tokens": 382
+          }
+        }
+      },
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": "What is the capital of France?",
+          "model": "text-embedding-ada-002"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                -0.8666666666666667,
+                -0.37254901960784315,
+                -0.42745098039215684,
+                0.27058823529411763,
+                0.19215686274509805,
+                -0.34901960784313724,
+                -0.6627450980392157,
+                0.7725490196078432
+              ],
+              "index": 0,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-ada-002",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 8,
+            "total_tokens": 8
+          }
+        }
+      },
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": [
+            "Scripted question."
+          ],
+          "model": "text-embedding-ada-002"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                -0.15294117647058825,
+                0.5215686274509804,
+                -0.44313725490196076,
+                -0.5294117647058824,
+                0.09019607843137255,
+                0.17647058823529413,
+                -0.4196078431372549,
+                0.16862745098039217
+              ],
+              "index": 0,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-ada-002",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 5,
+            "total_tokens": 5
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris is the capital of France."
+    },
+    "env": {},
+    "name": "provider_ignores_n",
+    "result": {
+      "cost": {
+        "amount": 6.18e-05,
+        "currency": "USD"
+      },
+      "details": "Questions generated from output:\n\n- Scripted question.\n\nSimilarity to original question: [0.2260137]\nEvasive answer: False",
+      "label": null,
+      "passed": null,
+      "score": 0.22601370424117628,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Generate a question for the given answer and Identify if answer is noncommittal. Give noncommittal as 1 if the answer is noncommittal and 0 if the answer is committal. A noncommittal answer is one that is evasive, vague, or ambiguous. For example, \"I don't know\" or \"I'm not sure\" are noncommittal answers\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"question\": {\"title\": \"Question\", \"type\": \"string\"}, \"noncommittal\": {\"title\": \"Noncommittal\", \"type\": \"integer\"}}, \"required\": [\"question\", \"noncommittal\"], \"title\": \"ResponseRelevanceOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"response\": \"Albert Einstein was born in Germany.\"\n}\nOutput: {\n    \"question\": \"Where was Albert Einstein born?\",\n    \"noncommittal\": 0\n}\n\nExample 2\nInput: {\n    \"response\": \"I don't know about the  groundbreaking feature of the smartphone invented in 2023 as am unaware of information beyond 2022. \"\n}\nOutput: {\n    \"question\": \"What was the groundbreaking feature of the smartphone invented in 2023?\",\n    \"noncommittal\": 1\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"response\": \"Paris is the capital of France.\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-5-mini",
+          "n": 3,
+          "temperature": 1.0
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"question\": \"Scripted question.\", \"noncommittal\": 0}",
+                "role": "assistant"
+              }
+            },
+            {
+              "finish_reason": "stop",
+              "index": 1,
+              "message": {
+                "content": "{\"question\": \"Scripted question 1.\", \"noncommittal\": 0}",
+                "role": "assistant"
+              }
+            },
+            {
+              "finish_reason": "stop",
+              "index": 2,
+              "message": {
+                "content": "{\"question\": \"Scripted question 2.\", \"noncommittal\": 0}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-5-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 30,
+            "prompt_tokens": 372,
+            "total_tokens": 402
+          }
+        }
+      },
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": "What is the capital of France?",
+          "model": "text-embedding-ada-002"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                -0.8666666666666667,
+                -0.37254901960784315,
+                -0.42745098039215684,
+                0.27058823529411763,
+                0.19215686274509805,
+                -0.34901960784313724,
+                -0.6627450980392157,
+                0.7725490196078432
+              ],
+              "index": 0,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-ada-002",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 8,
+            "total_tokens": 8
+          }
+        }
+      },
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": [
+            "Scripted question.",
+            "Scripted question 1.",
+            "Scripted question 2."
+          ],
+          "model": "text-embedding-ada-002"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                -0.15294117647058825,
+                0.5215686274509804,
+                -0.44313725490196076,
+                -0.5294117647058824,
+                0.09019607843137255,
+                0.17647058823529413,
+                -0.4196078431372549,
+                0.16862745098039217
+              ],
+              "index": 0,
+              "object": "embedding"
+            },
+            {
+              "embedding": [
+                0.09803921568627451,
+                -0.4745098039215686,
+                0.7647058823529411,
+                -0.8431372549019608,
+                -0.4745098039215686,
+                -0.8431372549019608,
+                0.08235294117647059,
+                0.23921568627450981
+              ],
+              "index": 1,
+              "object": "embedding"
+            },
+            {
+              "embedding": [
+                -0.796078431372549,
+                -0.8901960784313725,
+                -0.9607843137254902,
+                0.5058823529411764,
+                -0.4745098039215686,
+                -0.8431372549019608,
+                -0.09803921568627451,
+                -0.23137254901960785
+              ],
+              "index": 2,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-ada-002",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 17,
+            "total_tokens": 17
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris is the capital of France."
+    },
+    "env": {},
+    "name": "gpt5_temperature_pinned",
+    "result": {
+      "cost": {
+        "amount": 0.00015299999999999998,
+        "currency": "USD"
+      },
+      "details": "Questions generated from output:\n\n- Scripted question.\n- Scripted question 1.\n- Scripted question 2.\n\nSimilarity to original question: [ 0.2260137  -0.05337068  0.57098413]\nEvasive answer: False",
+      "label": null,
+      "passed": null,
+      "score": 0.2478757188289459,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-5-mini"
+    }
+  }
+]

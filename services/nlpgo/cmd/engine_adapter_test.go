@@ -7,12 +7,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/langwatch/langwatch/pkg/ssrf"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
-	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
 
 type stubLLM struct{}
@@ -60,7 +61,7 @@ func TestEngineAdapter_MapsMaxAttachmentBytes(t *testing.T) {
 
 	adapter := engineAdapter{eng: engine.New(engine.Options{
 		LLM:  stubLLM{},
-		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{"127.0.0.1"}},
+		SSRF: ssrf.Options{AllowedHosts: []string{"127.0.0.1"}},
 	})}
 	request := func(limit int64) app.WorkflowRequest {
 		return app.WorkflowRequest{

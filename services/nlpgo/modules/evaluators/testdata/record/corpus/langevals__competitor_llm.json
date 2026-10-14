@@ -1,0 +1,34 @@
+[
+  {
+    "name": "no_competitor",
+    "entry": {
+      "input": "How do I trace my agent?",
+      "output": "Use the LangWatch SDK."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "competitor_mentioned": false,
+        "confidence": 0.9
+      }
+    }
+  },
+  {
+    "name": "competitor_mentioned",
+    "entry": {
+      "input": "Is LangSmith better than you?",
+      "output": "Both are tools."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "competitor_mentioned": true,
+        "confidence": 0.8
+      }
+    }
+  }
+]

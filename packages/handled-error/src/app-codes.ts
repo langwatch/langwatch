@@ -239,6 +239,7 @@ export const APP_ERROR_CODES = [
   "email_already_registered",
   "email_provider_not_configured",
   "enterprise_plan_required",
+  "evaluation_busy",
   "evaluation_log_results_too_large",
   "evaluation_not_found",
   "evaluation_trace_not_evaluatable",
