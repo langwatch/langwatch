@@ -598,7 +598,9 @@ closed: a table is refused if any of its projects lacks it. Filtering per projec
 is a tracked gap (`@unimplemented` in `specs/lwql/catalogue-grants.feature`).
 
 **Authority fails closed, tooling fails open** (Alex, 2026-09-30). A failed authz check is a plain 500
-with no rows, never a partial answer. The LWQL editor still edits without a schema (grammar only), a
+with no rows, never a partial answer. The hosted MCP endpoint answers a grant or credential re-check
+that could not run as a 503 with `Retry-After` (`mcp_store_unavailable`), because MCP clients read a
+401 as "sign in again" and a 500 as fatal (Alex, 2026-10-14). The LWQL editor still edits without a schema (grammar only), a
 failed validation clears its markers, and Run always asks the server. Its markers come from the
 `analytics.lwql.validate` query (Alex, 2026-09-30), the server's own validator, which never executes;
 the browser never validates.

@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { McpMetadataUnpublishedError } from "@langwatch/hosted-mcp-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
@@ -66,11 +67,8 @@ export class McpOAuthEndpointService {
    * The discovery subtree this server claims but publishes nothing at. Falling through to the
    * single-page app would answer 200 text/html; a JSON 404 lets the client move on.
    */
-  handleUnpublishedMetadata(res: ServerResponse): void {
-    this.#collaborators.http.sendJson(res, 404, {
-      error: "not_found",
-      error_description: "No metadata document is published at this path",
-    });
+  async handleUnpublishedMetadata(res: ServerResponse): Promise<void> {
+    await this.#collaborators.http.sendHandled(res, new McpMetadataUnpublishedError());
   }
 
   /**
