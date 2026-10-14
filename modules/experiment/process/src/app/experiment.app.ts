@@ -255,7 +255,6 @@ export class ExperimentModule implements ExperimentApi {
       newId: () => generate(EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE).toString(),
       references: { prompts, agents, evaluators, workflows, dataset },
       traces: dependencies.traces,
-      idIndex,
       updates: ExperimentWorkbenchPresenceUpdatesService.create({
         presence: dependencies.presence,
         logger,

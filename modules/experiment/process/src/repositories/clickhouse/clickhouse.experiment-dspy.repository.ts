@@ -101,6 +101,8 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
   static create(options: {
     resolveClient: ExperimentDspyClickHouseResolver;
     telemetry: ExperimentDspyTelemetry;
+    /** With it on, an experiment's steps are read only in the weeks its id index names. */
+    idIndex?: IdIndexFlags | undefined;
   }): ClickHouseExperimentDspyRepository {
     return new ClickHouseExperimentDspyRepository(options);
   }
@@ -109,6 +111,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     private readonly options: {
       resolveClient: ExperimentDspyClickHouseResolver;
       telemetry: ExperimentDspyTelemetry;
+      idIndex?: IdIndexFlags | undefined;
     },
   ) {
     super();
@@ -117,16 +120,14 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
   async upsert({
     step: input,
     retention,
-    idIndex,
   }: {
     step: ExperimentDspyStep;
     retention: ExperimentDspyRetentionRepository;
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<void> {
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return;
-      const existing = await this.findWithClient({ client, input, idIndex });
+      const existing = await this.findWithClient({ client, input });
       const examples = mergeByHash<ExperimentDspyExample>(existing?.examples ?? [], input.examples);
       const llmCalls = mergeByHash<ExperimentDspyLlmCall>(existing?.llmCalls ?? [], input.llmCalls);
       const summary = llmSummary(llmCalls);
@@ -170,18 +171,13 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     }
   }
 
-  async findAll({
-    idIndex,
-    ...input
-  }: ExperimentDspyStepsLookup & {
-    idIndex?: IdIndexFlags | undefined;
-  }): Promise<ExperimentDspyStepSummary[]> {
+  async findAll(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]> {
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return [];
       const found = await readByIdIndex<unknown[]>({
         client,
-        idIndex,
+        idIndex: this.options.idIndex,
         tenantId: input.tenantId,
         table: TABLE_NAME,
         index: `${TABLE_NAME}_id_index`,
@@ -244,16 +240,11 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     }
   }
 
-  async findStep({
-    idIndex,
-    ...input
-  }: ExperimentDspyStepLookup & {
-    idIndex?: IdIndexFlags | undefined;
-  }): Promise<ExperimentDspyStep | null> {
+  async findStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep | null> {
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return null;
-      const step = await this.findWithClient({ client, input, idIndex });
+      const step = await this.findWithClient({ client, input });
       return step === null ? null : experimentDspyStepSchema.parse(step);
     } catch (error) {
       this.options.telemetry.warn(
@@ -267,16 +258,14 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
   private async findWithClient({
     client,
     input,
-    idIndex,
   }: {
     client: ExperimentDspyClickHouseClient;
     input: ExperimentDspyStepLookup;
-    idIndex: IdIndexFlags | undefined;
   }): Promise<ExperimentDspyStep | null> {
     const { tenantId, experimentId, runId, stepIndex } = input;
     const found = await readByIdIndex<unknown[]>({
       client,
-      idIndex,
+      idIndex: this.options.idIndex,
       tenantId,
       table: TABLE_NAME,
       index: `${TABLE_NAME}_id_index`,

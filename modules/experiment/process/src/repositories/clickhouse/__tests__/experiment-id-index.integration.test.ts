@@ -267,24 +267,21 @@ describe("experiment lookups by id with the id index", () => {
 
     /** @scenario "a lookup by id reads only the partitions the index names" */
     it("reads the run's history row by id alone inside the index's range", async () => {
-      const repository = ClickHouseExperimentRunRepository.create({
-        workflowVersions: { findByIds: async () => ({}) },
-        resolveClient,
-        tupleParam: (values) => values,
-        telemetry: {
-          trace: (_input, operation) => operation(),
-          warnOldRuns: () => undefined,
-          error: () => undefined,
-          warn: () => undefined,
-        },
-      });
+      const runRepository = (idIndex?: IdIndexFlags) =>
+        ClickHouseExperimentRunRepository.create({
+          workflowVersions: { findByIds: async () => ({}) },
+          resolveClient,
+          tupleParam: (values) => values,
+          idIndex,
+          telemetry: {
+            trace: (_input, operation) => operation(),
+            warnOldRuns: () => undefined,
+            error: () => undefined,
+            warn: () => undefined,
+          },
+        });
 
-      const found = await repository.findRun({
-        projectId: tenantId,
-        experimentId,
-        runId,
-        idIndex: ON,
-      });
+      const found = await runRepository(ON).findRun({ projectId: tenantId, experimentId, runId });
 
       expect(found?.runId).toBe(runId);
       expect(outcomes).toContainEqual({ table: "experiment_runs", outcome: "index_hit" });
@@ -294,7 +291,7 @@ describe("experiment lookups by id with the id index", () => {
         toMs: eightWeeksAgoMs + DAY_MS,
       });
       statements = [];
-      await repository.findRun({ projectId: tenantId, experimentId, runId });
+      await runRepository().findRun({ projectId: tenantId, experimentId, runId });
       expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
         await partsAfterPartitionPruning({
           query: queryRows,
@@ -305,18 +302,15 @@ describe("experiment lookups by id with the id index", () => {
 
     /** @scenario "a lookup by id reads only the partitions the index names" */
     it("reads its DSPy step and the experiment's steps inside the index's range", async () => {
-      const repository = ClickHouseExperimentDspyRepository.create({
-        resolveClient,
-        telemetry: { warn: () => undefined },
-      });
+      const dspyRepository = (idIndex?: IdIndexFlags) =>
+        ClickHouseExperimentDspyRepository.create({
+          resolveClient,
+          telemetry: { warn: () => undefined },
+          idIndex,
+        });
+      const repository = dspyRepository(ON);
 
-      const step = await repository.findStep({
-        tenantId,
-        experimentId,
-        runId,
-        stepIndex: "0",
-        idIndex: ON,
-      });
+      const step = await repository.findStep({ tenantId, experimentId, runId, stepIndex: "0" });
 
       expect(step?.runId).toBe(runId);
       expect(outcomes).toContainEqual({ table: "dspy_steps", outcome: "index_hit" });
@@ -326,13 +320,13 @@ describe("experiment lookups by id with the id index", () => {
         toMs: eightWeeksAgoMs + DAY_MS,
       });
       statements = [];
-      await repository.findStep({ tenantId, experimentId, runId, stepIndex: "0" });
+      await dspyRepository().findStep({ tenantId, experimentId, runId, stepIndex: "0" });
       expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
         await partsAfterPartitionPruning({ query: queryRows, request: sourceReadOf("dspy_steps") }),
       );
 
       outcomes = [];
-      const summaries = await repository.findAll({ tenantId, experimentId, idIndex: ON });
+      const summaries = await repository.findAll({ tenantId, experimentId });
       expect(summaries.map((each) => each.runId)).toContain(runId);
       expect(outcomes).toContainEqual({ table: "dspy_steps", outcome: "index_hit" });
     });

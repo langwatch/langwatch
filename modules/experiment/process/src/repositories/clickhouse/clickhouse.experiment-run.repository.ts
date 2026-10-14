@@ -43,6 +43,8 @@ type ClickHouseExperimentRunRepositoryOptions = {
   workflowVersions: ExperimentWorkflowVersionRepository;
   resolveClient: (projectId: string) => Promise<ExperimentClickHouseClient | null>;
   tupleParam: (values: string[]) => unknown;
+  /** With it on, a run is read only in the weeks its id index names. */
+  idIndex?: IdIndexFlags | undefined;
   telemetry: {
     trace<T>(
       input: {
@@ -341,12 +343,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     );
   }
 
-  async findRun({
-    idIndex,
-    ...input
-  }: ExperimentRunLookup & {
-    idIndex?: IdIndexFlags | undefined;
-  }): Promise<ExperimentRunWithItems | null> {
+  async findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
     return this.options.telemetry.trace(
       {
         name: "ExperimentRunService.getRun",
@@ -359,7 +356,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         try {
           const runRows = await readByIdIndex<RunRow[]>({
             client,
-            idIndex,
+            idIndex: this.options.idIndex,
             tenantId: input.projectId,
             table: "experiment_runs",
             index: "experiment_runs_id_index",

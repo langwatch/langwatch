@@ -48,6 +48,8 @@ export class LiveExperimentRepositories {
     const folds = RedisExperimentRunFoldRepository.create({ redis });
     const abort = RedisExperimentRunAbortRepository.create({ redis });
     const stream = RedisExperimentRunEventStreamRepository.create({ redis });
+    const idIndexFill = ExperimentIdIndexFillClickHouseRepository.create({ clickhouse });
+    const idIndex = idIndexFill.readiness;
 
     return {
       experiments: PrismaExperimentRepository.create(prisma),
@@ -55,11 +57,12 @@ export class LiveExperimentRepositories {
         workflowVersions: PrismaExperimentWorkflowVersionRepository.create(prisma),
         resolveClient,
         tupleParam: (values) => ClickHouseExperimentRunRepository.tupleParam(values),
+        idIndex,
         telemetry,
       }),
-      dspySteps: ClickHouseExperimentDspyRepository.create({ resolveClient, telemetry }),
+      dspySteps: ClickHouseExperimentDspyRepository.create({ resolveClient, telemetry, idIndex }),
       people: PrismaExperimentPeopleRepository.create(prisma),
-      idIndexFill: ExperimentIdIndexFillClickHouseRepository.create({ clickhouse }),
+      idIndexFill,
       runProcessing: {
         open: ({ defaultRetentionDays, idIndex }) => {
           const cached = RedisExperimentRunProcessingRepository.create({
