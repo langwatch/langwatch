@@ -1,3 +1,4 @@
+import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import { chartGridBottomRow } from "@langwatch/analytics-contract/chart-grid";
 import {
   dashboardSchema,
@@ -247,6 +248,23 @@ export class PrismaDashboardRepository
         data: input.data,
       }),
     );
+  }
+
+  async findLegacyDashboardIds(input: {
+    projectIds: readonly string[];
+    dashboardIds: readonly string[];
+  }): Promise<string[]> {
+    if (input.dashboardIds.length === 0) return [];
+    const rows = await this.prisma.customGraph.findMany({
+      where: {
+        projectId: { in: [...input.projectIds] },
+        dashboardId: { in: [...input.dashboardIds] },
+        kind: { not: DASHBOARD_SRCDOC_CHART_KIND },
+      },
+      distinct: ["dashboardId"],
+      select: { dashboardId: true },
+    });
+    return rows.flatMap((row) => (row.dashboardId === null ? [] : [row.dashboardId]));
   }
 
   async deleteDashboard(input: {

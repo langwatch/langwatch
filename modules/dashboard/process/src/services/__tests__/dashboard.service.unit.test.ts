@@ -467,6 +467,82 @@ describe("DashboardService", () => {
       ).rejects.toBeInstanceOf(GraphNotFoundError);
     });
   });
+
+  describe("given a board made in Analytics Reports beside a new empty board", () => {
+    const viewer = { userId: "member" };
+
+    async function reportsAndNewBoard() {
+      const built = serviceWith();
+      const reports = await built.service.create({ projectId: PROJECT, name: "Reports" });
+      await built.service.createGraph({
+        projectId: PROJECT,
+        name: "Latency",
+        graph: { graphType: "line" },
+        dashboardId: reports.id,
+      });
+      const fresh = await built.service.create({ projectId: PROJECT, name: "Fresh" });
+      for (const dashboardId of [reports.id, fresh.id]) {
+        await built.stars.star({
+          projectId: PROJECT,
+          userId: viewer.userId,
+          star: { kind: "board", dashboardId },
+        });
+      }
+      return { ...built, reports, fresh };
+    }
+
+    const listedIds = async (
+      service: DashboardService,
+      options: { excludeLegacy?: boolean } = {},
+    ) =>
+      (await service.getAll({ projectId: PROJECT, graphCountScope: "builder", viewer, ...options }))
+        .map(({ id }) => id)
+        .toSorted();
+
+    /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
+    it("leaves it out of the Dashboards list and stars, and keeps it in the Reports list", async () => {
+      const { service, stars, reports, fresh } = await reportsAndNewBoard();
+      const starred = await stars.listStarred({ projectId: PROJECT, userId: viewer.userId });
+
+      expect({
+        dashboards: await listedIds(service, { excludeLegacy: true }),
+        starred: starred.map((star) => (star.kind === "board" ? star.dashboard.id : star)),
+        reports: await listedIds(service),
+      }).toEqual({
+        dashboards: [fresh.id],
+        starred: [fresh.id],
+        reports: [fresh.id, reports.id].toSorted(),
+      });
+    });
+
+    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+    it("refuses the Dashboards delete as a conflict and keeps the board and its graph", async () => {
+      const { service, reports } = await reportsAndNewBoard();
+      const ref = { projectId: PROJECT, dashboardId: reports.id, viewer };
+
+      await expect(service.delete({ ...ref, refuseLegacy: true })).rejects.toMatchObject({
+        code: "dashboard_lives_in_reports",
+        httpStatus: 409,
+      });
+      await expect(service.listGraphs({ ...ref })).resolves.toHaveLength(1);
+    });
+
+    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+    it("still deletes it from Analytics Reports, and deletes a new board from Dashboards", async () => {
+      const { service, reports, fresh } = await reportsAndNewBoard();
+
+      await service.delete({ projectId: PROJECT, dashboardId: reports.id, viewer });
+      await service.delete({
+        projectId: PROJECT,
+        dashboardId: fresh.id,
+        viewer,
+        refuseLegacy: true,
+      });
+
+      await expect(listedIds(service)).resolves.toEqual([]);
+      await expect(service.listGraphs({ projectId: PROJECT, viewer })).resolves.toEqual([]);
+    });
+  });
 });
 
 describe("DashboardService.getOrCreateFirst", () => {

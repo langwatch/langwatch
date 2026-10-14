@@ -170,6 +170,21 @@ export class MemoryDashboardRepository implements DashboardRepository {
     return updated;
   }
 
+  /** Every chart this twin holds is a builder or workbench one; widgets live in their own twin. */
+  async findLegacyDashboardIds(input: {
+    projectIds: readonly string[];
+    dashboardIds: readonly string[];
+  }): Promise<string[]> {
+    const legacy = this.#charts.flatMap((chart) =>
+      chart.dashboardId !== null &&
+      input.projectIds.includes(chart.projectId) &&
+      input.dashboardIds.includes(chart.dashboardId)
+        ? [chart.dashboardId]
+        : [],
+    );
+    return [...new Set(legacy)];
+  }
+
   async deleteDashboard(input: {
     projectId: string;
     dashboardId: string;

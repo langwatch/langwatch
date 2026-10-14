@@ -422,7 +422,7 @@ describe("the Dashboards sidebar", () => {
 
       await waitFor(() =>
         expect(inputsTo(calls, "dashboards.delete")).toEqual([
-          { projectId: "proj-1", dashboardId: "board-1" },
+          { projectId: "proj-1", dashboardId: "board-1", refuseLegacy: true },
         ]),
       );
     });

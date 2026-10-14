@@ -113,8 +113,29 @@ describe("given the project has boards", () => {
       asked: mocks.listInputs.at(-1),
       organizationBoards: result.current.organizationBoards,
     }).toEqual({
-      asked: { projectId: "project-1", includeOrganization: true },
+      asked: { projectId: "project-1", includeOrganization: true, excludeLegacy: true },
       organizationBoards: [mocks.shared],
     });
+  });
+
+  /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
+  it("asks the list without the boards made in Analytics Reports", () => {
+    renderHook(() => useSavedDashboards());
+
+    expect(mocks.listInputs.at(-1)).toMatchObject({ excludeLegacy: true });
+  });
+});
+
+describe("given a member deletes a board", () => {
+  /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+  it("asks the server to refuse a board made in Analytics Reports", () => {
+    const { result } = renderHook(() => useSavedDashboards());
+
+    act(() => result.current.deleteBoard({ dashboardId: "board-1", onDeleted: vi.fn() }));
+
+    expect(mocks.remove.mutate).toHaveBeenCalledWith(
+      { projectId: "project-1", dashboardId: "board-1", refuseLegacy: true },
+      expect.anything(),
+    );
   });
 });

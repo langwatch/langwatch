@@ -33,7 +33,10 @@ export class DashboardStarService {
     return new DashboardStarService(options.repository, options.access);
   }
 
-  /** The member's stars for this project, boards and templates, in their own order. */
+  /**
+   * The member's stars for this project, boards and templates, in their own order. Only the
+   * Dashboards area lists stars, so a board made in Analytics Reports is left out (AC199).
+   */
   async listStarred(input: Starring): Promise<StarredDashboard[]> {
     const projectId = projectIdSchema.parse(input.projectId);
     const { visibleIds, sharedProjectIds } = await this.#listed({ ...input, projectId });
@@ -42,7 +45,13 @@ export class DashboardStarService {
       userId: input.userId,
       sharedProjectIds,
     });
-    return starred.filter((star) => star.kind === "template" || visibleIds.has(star.dashboard.id));
+    const boards = starred.flatMap((star) => (star.kind === "board" ? [star.dashboard] : []));
+    const listable = new Set((await this.#access.withoutLegacy(boards)).map((board) => board.id));
+    return starred.filter(
+      (star) =>
+        star.kind === "template" ||
+        (visibleIds.has(star.dashboard.id) && listable.has(star.dashboard.id)),
+    );
   }
 
   /** Stars a board the member may open here, or a template, which only the browser can check. */

@@ -64,7 +64,8 @@ export function useSavedDashboards() {
   const utils = analyticsApi.useUtils();
 
   const list = analyticsApi.dashboards.getAll.useQuery(
-    { projectId, includeOrganization: true },
+    // Boards made in Analytics Reports stay there: their delete cascades to their alerts.
+    { projectId, includeOrganization: true, excludeLegacy: true },
     { enabled: !!projectId },
   );
   const create = analyticsApi.dashboards.create.useMutation();
@@ -111,7 +112,7 @@ export function useSavedDashboards() {
     onDeleted: () => void;
   }) => {
     remove.mutate(
-      { projectId, dashboardId },
+      { projectId, dashboardId, refuseLegacy: true },
       {
         onSuccess: () => {
           void refresh();

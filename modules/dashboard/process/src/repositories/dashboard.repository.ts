@@ -76,6 +76,14 @@ export interface DashboardRepository {
     dashboardId: string;
     data: DashboardUpdate;
   }): Promise<DashboardRecord>;
+  /**
+   * The boards among these, stored under these projects, that hold a chart other than a
+   * Dashboards widget: legacy Analytics Reports boards. An empty board is not one.
+   */
+  findLegacyDashboardIds(input: {
+    projectIds: readonly string[];
+    dashboardIds: readonly string[];
+  }): Promise<string[]>;
   /** Removes the board, its graphs, and the row from every member's favourites. */
   deleteDashboard(input: { projectId: string; dashboardId: string }): Promise<DashboardRecord>;
   updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void>;

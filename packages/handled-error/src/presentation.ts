@@ -604,6 +604,11 @@ const presentations = {
     title: "Dashboard not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  dashboard_lives_in_reports: {
+    title: "This dashboard lives in Analytics Reports",
+    describe: () =>
+      "Open Analytics > Reports to change or delete it. Deleting it there also removes its charts and the alerts on them.",
+  },
   dashboard_read_only_here: {
     title: "This dashboard is read-only here",
     describe: () =>

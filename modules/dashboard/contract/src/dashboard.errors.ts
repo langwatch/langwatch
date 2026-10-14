@@ -42,6 +42,27 @@ export class DashboardReadOnlyHereError extends HandledError {
   }
 }
 
+/**
+ * A delete from the Dashboards area of a board made in Analytics Reports. Its delete would also
+ * remove its charts and the alerts on them, so only Reports manages it (dashboards-v2 AC199b).
+ */
+export class DashboardLivesInReportsError extends HandledError {
+  declare readonly code: "dashboard_lives_in_reports";
+
+  constructor(projectId: string) {
+    super(
+      "dashboard_lives_in_reports",
+      "This dashboard lives in Analytics > Reports. Manage it from there.",
+      {
+        httpStatus: 409,
+        meta: { projectId },
+        ...remediation("dashboard_lives_in_reports"),
+      },
+    );
+    this.name = "DashboardLivesInReportsError";
+  }
+}
+
 /** A change of scope by anyone but the board's author; a project administrator is refused too. */
 export class DashboardScopeAuthorOnlyError extends HandledError {
   declare readonly code: "dashboard_scope_author_only";

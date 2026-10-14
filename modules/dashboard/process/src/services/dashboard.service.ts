@@ -11,6 +11,7 @@ import {
   DashboardNotFoundError,
   DashboardReorderUnknownIdsError,
   dashboardDetailsUpdateSchema,
+  DashboardLivesInReportsError,
   GRAPH_KSUID_RESOURCE,
   graphCreateInputSchema,
   graphIdSchema,
@@ -83,12 +84,16 @@ export class DashboardService {
     return this.#repository.countUsage(input);
   }
 
-  /** The project's boards the viewer may see; `includeOrganization` adds the organization's. */
+  /**
+   * The project's boards the viewer may see; `includeOrganization` adds the organization's, and
+   * `excludeLegacy` leaves out the boards made in Analytics Reports.
+   */
   async getAll(input: {
     projectId: string;
     graphCountScope: DashboardGraphCountScope;
     viewer?: DashboardViewer;
     includeOrganization?: boolean;
+    excludeLegacy?: boolean;
   }): Promise<DashboardSummary[]> {
     const projectId = projectIdSchema.parse(input.projectId);
 
@@ -97,7 +102,14 @@ export class DashboardService {
         ? (["builder"] as const)
         : await this.#placeableKinds(projectId);
 
-    const listed = await this.#access.listBoards({ projectId, viewer: input.viewer, graphKinds });
+    const all = await this.#access.listBoards({ projectId, viewer: input.viewer, graphKinds });
+    const listed =
+      input.excludeLegacy === true
+        ? {
+            home: await this.#access.withoutLegacy(all.home),
+            guests: await this.#access.withoutLegacy(all.guests),
+          }
+        : all;
     const guests = input.includeOrganization === true ? listed.guests : [];
     const sharedProjectIds = [...new Set(guests.map((board) => board.projectId))];
     // Every guest is a board of the reader's own organization.
@@ -215,13 +227,21 @@ export class DashboardService {
     });
   }
 
+  /**
+   * Deletes the board, cascading to its charts. `refuseLegacy` is the Dashboards area's delete:
+   * a board made in Analytics Reports is refused there, since its charts carry alerts.
+   */
   async delete(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
+    refuseLegacy?: boolean;
   }): Promise<Dashboard> {
     const ref = dashboardRef(input);
-    await this.#access.getWritable({ ...ref, viewer: input.viewer });
+    const board = await this.#access.getWritable({ ...ref, viewer: input.viewer });
+    if (input.refuseLegacy === true && (await this.#access.withoutLegacy([board])).length === 0) {
+      throw new DashboardLivesInReportsError(ref.projectId);
+    }
 
     return this.#repository.deleteDashboard(ref);
   }

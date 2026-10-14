@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
  * when a test database is named at `LANGWATCH_TEST_DATABASE_URL`.
  * @see specs/dashboard-service.feature
  */
+import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import type { SavedWorkbenchChartDefinition } from "@langwatch/dashboard-contract";
 import {
   PrismaConfigService,
@@ -181,6 +182,40 @@ function contractCases(backend: Backend): void {
       });
       await expect(repository.unplaceSavedWorkbenchChart(missing)).rejects.toMatchObject({
         code: "saved_workbench_chart_not_found",
+      });
+    });
+  });
+
+  describe("when boards hold charts made in Analytics Reports", () => {
+    /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
+    it("names a board with a builder graph or a placed saved chart, never an empty one", async () => {
+      const repository = backend.repository();
+      const [empty, withGraph, withChart] = [
+        await dashboard("Empty"),
+        await dashboard("Graph"),
+        await dashboard("Chart"),
+      ];
+      await graph(withGraph.id);
+      const saved = await chart();
+      await repository.placeSavedWorkbenchChart({
+        projectId: backend.projectId(),
+        chartId: saved.id,
+        dashboardId: withChart.id,
+        ...LAYOUT,
+      });
+
+      const legacy = await repository.findLegacyDashboardIds({
+        projectIds: [backend.projectId()],
+        dashboardIds: [empty.id, withGraph.id, withChart.id],
+      });
+      const elsewhere = await repository.findLegacyDashboardIds({
+        projectIds: [backend.otherProjectId()],
+        dashboardIds: [withGraph.id],
+      });
+
+      expect({ legacy: legacy.toSorted(), elsewhere }).toEqual({
+        legacy: [withGraph.id, withChart.id].toSorted(),
+        elsewhere: [],
       });
     });
   });
@@ -1241,6 +1276,31 @@ describe.skipIf(!databaseUrl)("given the Postgres dashboard repository", () => {
         data: { archivedAt: new Date() },
       });
     },
+  });
+
+  // Widgets share the table but are written by the widget repository, so only here.
+  /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
+  it("does not name a board that holds only Dashboards widgets", async () => {
+    const repository = PrismaDashboardRepository.create({ prisma: database() });
+    const board = await repository.createDashboard({
+      id: `dash_${randomUUID()}`,
+      projectId,
+      name: "Widgets",
+      order: 0,
+    });
+    await database().customGraph.create({
+      data: {
+        projectId,
+        dashboardId: board.id,
+        name: "Usage",
+        kind: DASHBOARD_SRCDOC_CHART_KIND,
+        graph: { version: 1, code: "export default () => null;", queries: [] },
+      },
+    });
+
+    await expect(
+      repository.findLegacyDashboardIds({ projectIds: [projectId], dashboardIds: [board.id] }),
+    ).resolves.toEqual([]);
   });
 });
 import { createLogger } from "@langwatch/observability";

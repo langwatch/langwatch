@@ -46,14 +46,15 @@ export interface DashboardUsageCount {
 export interface DashboardApi {
   /**
    * The project's boards the viewer may see, with their own `isStarred`; a project credential
-   * (no viewer) sees no Only me board. `includeOrganization` adds the Organization boards other
-   * projects of the organization own, each with its `ownerProject`.
+   * (no viewer) sees no Only me board. `includeOrganization` adds the Organization boards with
+   * their `ownerProject`; `excludeLegacy` drops boards holding charts made in Analytics Reports.
    */
   getAll(input: {
     projectId: string;
     graphCountScope: DashboardGraphCountScope;
     viewer?: DashboardViewer;
     includeOrganization?: boolean;
+    excludeLegacy?: boolean;
   }): Promise<DashboardSummary[]>;
   /** One board the viewer may open here: the project's own, or the organization's. */
   getById(input: {
@@ -69,11 +70,15 @@ export interface DashboardApi {
     name: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard>;
-  /** Deletes the board and its graphs, and removes it from every member's stars. */
+  /**
+   * Deletes the board and its graphs, and removes it from every member's stars. With
+   * `refuseLegacy`, a board holding charts made in Analytics Reports is refused instead.
+   */
   delete(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
+    refuseLegacy?: boolean;
   }): Promise<Dashboard>;
   /** The legacy board `order`; written only by the REST reorder endpoint. */
   reorder(input: {

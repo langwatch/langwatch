@@ -2,7 +2,7 @@
  * @vitest-environment node
  * Board scope at the doors: the member tRPC procedures and the REST routes, called with a key
  * that names a person and with one that names nobody, over the real application and its memory
- * repositories. Spec: dashboards-v2.feature AC171 to AC174, AC189, AC196 and AC197.
+ * repositories. Spec: dashboards-v2.feature AC171 to AC174, AC189, AC196, AC197 and AC199.
  */
 import { langWatchQLCallerProtections } from "@langwatch/analytics-contract";
 import {
@@ -710,6 +710,30 @@ describe("board scope at the doors", () => {
       expect({ refused, scope: changed.scope }).toEqual({
         refused: "dashboard_scope_author_only",
         scope: "PRIVATE",
+      });
+    });
+  });
+
+  describe("given a board that holds a graph made in Analytics Reports", () => {
+    /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
+    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+    it("is kept out of the Dashboards list and delete, and the Reports page still deletes it", async () => {
+      const { call, boardId } = await boardAt("PROJECT");
+      const list = (input: Input) => call(AUTHOR, "dashboards.getAll", input).then(idsOf);
+      const on = { projectId: HOME, dashboardId: boardId };
+
+      const dashboardsList = await list({ projectId: HOME, excludeLegacy: true });
+      const reportsList = await list({ projectId: HOME });
+      const refused = await codeOf(
+        call(AUTHOR, "dashboards.delete", { ...on, refuseLegacy: true }),
+      );
+      const deleted = await codeOf(call(AUTHOR, "dashboards.delete", on));
+
+      expect({ dashboardsList, reportsList, refused, deleted }).toEqual({
+        dashboardsList: [],
+        reportsList: [boardId],
+        refused: "dashboard_lives_in_reports",
+        deleted: "<resolved>",
       });
     });
   });

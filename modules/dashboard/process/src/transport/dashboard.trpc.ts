@@ -16,6 +16,7 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
         graphCountScope: "builder",
         viewer: { userId: actor.id },
         ...(input.includeOrganization === true ? { includeOrganization: true } : {}),
+        ...(input.excludeLegacy === true ? { excludeLegacy: true } : {}),
       });
 
       return dashboards.map(({ graphCount, ...dashboard }) => ({
@@ -58,6 +59,7 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
         projectId: input.projectId,
         dashboardId: input.dashboardId,
         viewer: { userId: actor.id },
+        ...(input.refuseLegacy === true ? { refuseLegacy: true } : {}),
       }),
     )
 

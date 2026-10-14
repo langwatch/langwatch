@@ -185,6 +185,7 @@ export const APP_ERROR_CODES = [
   "custom_role_name_taken",
   "custom_role_not_assignable",
   "custom_role_not_found",
+  "dashboard_lives_in_reports",
   "dashboard_not_found",
   "dashboard_read_only_here",
   "dashboard_reorder_unknown_ids",

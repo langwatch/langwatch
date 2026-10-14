@@ -182,8 +182,8 @@ type BorrowedProcedures = {
   dashboards: {
     getAll: {
       query: {
-        /** `includeOrganization` adds the Organization boards other projects own. */
-        input: ProjectScope & { includeOrganization?: boolean };
+        /** `includeOrganization` adds the Organization boards; `excludeLegacy` drops Reports'. */
+        input: ProjectScope & { includeOrganization?: boolean; excludeLegacy?: boolean };
         output: DashboardSummaryRow[];
       };
     };
@@ -206,7 +206,11 @@ type BorrowedProcedures = {
       };
     };
     delete: {
-      mutation: { input: ProjectScope & { dashboardId: string }; output: unknown };
+      /** `refuseLegacy` refuses a board made in Analytics Reports; the Dashboards area sends it. */
+      mutation: {
+        input: ProjectScope & { dashboardId: string; refuseLegacy?: boolean };
+        output: unknown;
+      };
     };
     // Legacy Analytics reports ordering; the Dashboards feature uses favourites.
     reorderDashboards: {

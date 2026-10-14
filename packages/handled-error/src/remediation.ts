@@ -179,6 +179,12 @@ const registry = {
       "Use the lwql-charts skill / `langwatch chart` commands for a saved dashboard chart instead",
     ],
   },
+  dashboard_lives_in_reports: {
+    tips: [
+      "This board holds charts made in Analytics Reports; manage or delete it from Analytics > Reports",
+      "Deleting it there also deletes its charts and the alerts set on them",
+    ],
+  },
   saved_workbench_chart_already_exists: {
     tips: [
       "A saved chart with this id already exists in this project",

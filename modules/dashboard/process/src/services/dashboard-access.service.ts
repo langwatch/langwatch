@@ -94,6 +94,22 @@ export class DashboardAccessService {
     return dashboardsListedFor({ boards, viewer: input.viewer, place });
   }
 
+  /**
+   * These boards less the ones made in Analytics Reports, which the Dashboards area neither
+   * lists nor deletes: their delete cascades to their charts and alerts (dashboards-v2 AC199).
+   */
+  async withoutLegacy<Board extends Pick<DashboardRecord, "id" | "projectId">>(
+    boards: readonly Board[],
+  ): Promise<Board[]> {
+    const legacy = new Set(
+      await this.#repository.findLegacyDashboardIds({
+        projectIds: [...new Set(boards.map((board) => board.projectId))],
+        dashboardIds: boards.map((board) => board.id),
+      }),
+    );
+    return boards.filter((board) => !legacy.has(board.id));
+  }
+
   /** The board when the reader may open it here: at home, or as the organization's guest. */
   async findReadable(
     input: BoardReading & { dashboardId: string },

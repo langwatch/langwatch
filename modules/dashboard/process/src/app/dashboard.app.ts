@@ -259,6 +259,7 @@ export class DashboardModule implements DashboardApi {
     graphCountScope: DashboardGraphCountScope;
     viewer?: DashboardViewer;
     includeOrganization?: boolean;
+    excludeLegacy?: boolean;
   }): Promise<DashboardSummary[]> {
     return this.#dashboards.getAll(input);
   }
@@ -292,6 +293,7 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
+    refuseLegacy?: boolean;
   }): Promise<Dashboard> {
     return this.#dashboards.delete(input);
   }
