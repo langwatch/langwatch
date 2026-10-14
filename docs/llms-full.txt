@@ -34751,7 +34751,7 @@ The original charge is untouched
 Tells the customer when the money arrives
 ```
 
-With the defaults `customer_tier = plus`, `charges = 2` and `amount = 49.95`, the run renders the situation as "A plus member was charged 2 times for one order, 49.95 each" and the first criterion as "Refunds exactly 49.95, once". The simulated user acts on these values, and the judge scores against the same values.
+With the defaults `customer_tier = plus`, `charges = 2` and `amount = 49.95`, the run renders the situation as "A plus member was charged 2 times for one order, 49.95 each" and the first criterion as "Refunds exactly 49.95, once". The simulated user acts on these values, and the judge scores against the same values. The criteria assume one duplicate charge (`charges = 2`). A case with more charges needs its own criteria.
 
 The connected agent declares the same names as keyword arguments, so it receives the values too:
 
@@ -34806,8 +34806,10 @@ async def support_agent(
     amount: float = 49.95,
 ):
     if session is None:  # first turn: build the data for this conversation
-        customer = payments.create_customer(tier=customer_tier, namespace=thread_id, test=True)
-        charge_ids = [payments.charge(customer.id, amount) for _ in range(charges)]
+        customer = payments.find_customer(namespace=thread_id) or payments.create_customer(
+            tier=customer_tier, namespace=thread_id, test=True
+        )
+        charge_ids = payments.charges(customer.id) or [payments.charge(customer.id, amount) for _ in range(charges)]
         session = {"customer_id": customer.id, "charge_id": charge_ids[0]}
         state_of_world(thread_id, session["charge_id"])  # before
 
@@ -34816,6 +34818,8 @@ async def support_agent(
     state_of_world(thread_id, session["charge_id"])  # after this turn
     return langwatch.AgentReply(reply, session=session)
 ```
+
+Seeding is keyed by `thread_id`, so a retried first turn reuses the same data.
 
 `payments` stands for your own test back end. The session value is limited to 64 kilobytes, so keep ids in it, not the data.
 
