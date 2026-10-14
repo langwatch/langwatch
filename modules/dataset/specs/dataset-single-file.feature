@@ -35,6 +35,7 @@ Feature: Single-file datasets keep working where the previous release kept them
       When a caller lists a page, previews the head or reads the dataset whole
       Then the records come from the file in stored order
       And the total is the number of records in the file
+      And each record shows the timestamps stored with it, or the dataset's when it has none
 
     @unit
     Scenario: Single-file dataset records are searched in the file

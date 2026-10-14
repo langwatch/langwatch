@@ -37,6 +37,12 @@ export function parseSingleFileRecords(
   return parsed.success ? { outcome: "parsed", records: parsed.data } : { outcome: "unreadable" };
 }
 
+/** The timestamps the previous release stored with each record it wrote. */
+export const storedRecordTimestampsSchema = z.object({
+  createdAt: z.iso.datetime({ offset: true }),
+  updatedAt: z.iso.datetime({ offset: true }),
+});
+
 /** New records after the stored ones, in the shape and positions the previous release wrote. */
 export function appendSingleFileRecords(
   input: DatasetKey & {

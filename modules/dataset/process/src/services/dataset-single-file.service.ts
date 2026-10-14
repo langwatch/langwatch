@@ -19,7 +19,7 @@ import {
   type DeleteDatasetRecordsInput,
   type UpdateDatasetRecordInput,
 } from "@langwatch/dataset-contract";
-import { nowInstant } from "@langwatch/time";
+import { Temporal, nowInstant, toDate } from "@langwatch/time";
 
 import type { DatasetContent } from "../app/dataset.app.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
@@ -38,6 +38,7 @@ import {
   appendSingleFileRecords,
   parseSingleFileRecords,
   removeSingleFileRecords,
+  storedRecordTimestampsSchema,
   upsertSingleFileRecord,
   type SingleFileRecord,
 } from "../rules/dataset-single-file.rules.ts";
@@ -272,17 +273,23 @@ export class DatasetSingleFileService implements Omit<
     return parsed.records;
   }
 
+  /** The record's own stored timestamps when it has them, else the dataset's. */
   private toDatasetRecord(
-    record: { id?: string | undefined; entry: Record<string, unknown> },
+    record: { id?: string | undefined; entry: Record<string, unknown>; [field: string]: unknown },
     dataset: Dataset,
   ): DatasetRecord {
+    const stored = storedRecordTimestampsSchema.safeParse(record);
     return datasetRecordSchema.parse({
       id: record.id,
       entry: record.entry,
       datasetId: dataset.id,
       projectId: dataset.projectId,
-      createdAt: dataset.createdAt,
-      updatedAt: dataset.updatedAt,
+      createdAt: stored.success
+        ? toDate(Temporal.Instant.from(stored.data.createdAt))
+        : dataset.createdAt,
+      updatedAt: stored.success
+        ? toDate(Temporal.Instant.from(stored.data.updatedAt))
+        : dataset.updatedAt,
     });
   }
 }

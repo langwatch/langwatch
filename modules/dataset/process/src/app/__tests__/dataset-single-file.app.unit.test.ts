@@ -102,6 +102,8 @@ describe.each(storages)("a single-file dataset in $name", (storage) => {
       const whole = await app.getDatasetWithRecords({ slugOrId: datasetId, projectId });
       expect(whole.records.map((record) => record.id)).toEqual(["rec_1", "rec_2", "rec_3"]);
       expect(whole.truncated).toBe(false);
+      expect(whole.records[0]?.createdAt.toISOString()).toBe("2025-01-01T00:00:00.000Z");
+      expect(whole.records[1]?.createdAt).toEqual(whole.dataset.createdAt);
 
       const last = await app.getDatasetWithRecords({
         slugOrId: datasetId,
