@@ -19,6 +19,7 @@ import type {
   DashboardSummaryRecord,
   GraphRecord,
 } from "../repositories/dashboard.repository.ts";
+import type { BoardArea } from "../rules/dashboard-board-area.rules.ts";
 
 /** The `release_dashboards` rollout, resolved for one project. */
 export interface DashboardsRollout {
@@ -27,9 +28,6 @@ export interface DashboardsRollout {
 
 /** A board as the chart holdings name it. */
 type BoardRef = Pick<DashboardRecord, "id" | "projectId">;
-
-/** Which boards a list keeps: the ones the Dashboards area opens, or the Reports boards alone. */
-export type BoardArea = "dashboards" | "reports";
 
 /** Charts made in Analytics Reports and no widget: the board opens empty in Dashboards. */
 const isReportsBoard = (held: DashboardChartHoldings | undefined) =>

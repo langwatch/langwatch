@@ -34,7 +34,8 @@ import type {
   DashboardGraphKind,
   DashboardRepository,
 } from "../repositories/dashboard.repository.ts";
-import type { BoardArea, DashboardAccessService } from "./dashboard-access.service.ts";
+import { listedArea } from "../rules/dashboard-board-area.rules.ts";
+import type { DashboardAccessService } from "./dashboard-access.service.ts";
 
 const defaultLayout: GraphLayout = {
   gridColumn: 0,
@@ -195,12 +196,7 @@ export class DashboardService {
     const { viewer, ...fields } = input;
     const parsed = dashboardRenameInputSchema.parse(fields);
 
-    return this.updateDetails({
-      projectId: parsed.projectId,
-      dashboardId: parsed.dashboardId,
-      name: parsed.name,
-      viewer,
-    });
+    return this.updateDetails({ ...parsed, viewer });
   }
 
   /** The inline name and description; an absent field is left as it is. */
@@ -494,10 +490,3 @@ const graphRef = (input: { projectId: string; graphId: string }) => ({
   projectId: projectIdSchema.parse(input.projectId),
   graphId: graphIdSchema.parse(input.graphId),
 });
-
-/** The area a list asks for: the Reports boards alone, the Dashboards area's, or every board. */
-function listedArea(input: { excludeLegacy?: boolean; onlyLegacy?: boolean }): BoardArea | "all" {
-  if (input.onlyLegacy === true) return "reports";
-  if (input.excludeLegacy === true) return "dashboards";
-  return "all";
-}
