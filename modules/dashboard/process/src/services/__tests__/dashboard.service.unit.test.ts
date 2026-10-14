@@ -15,6 +15,7 @@ import {
   createDashboardTestProjects,
   DASHBOARDS_ROLLED_OUT,
 } from "../../app/__tests__/dashboard.fixture.ts";
+import { MemoryDashboardWidgetRepository } from "../../repositories/memory/memory.dashboard-widget.repository.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
 import { DashboardAccessService } from "../dashboard-access.service.ts";
 import { DashboardStarService } from "../dashboard-star.service.ts";
@@ -30,7 +31,8 @@ class FixedWorkbenchAccess implements WorkbenchAccess {
 }
 
 function serviceWith(workbenchEnabled = true) {
-  const repository = MemoryDashboardRepository.create();
+  const widgets = MemoryDashboardWidgetRepository.create();
+  const repository = MemoryDashboardRepository.create({ widgets });
   const access = DashboardAccessService.create({
     repository,
     projects: createDashboardTestProjects(),
@@ -40,6 +42,7 @@ function serviceWith(workbenchEnabled = true) {
 
   return {
     repository,
+    widgets,
     stars: DashboardStarService.create({ repository, access }),
     service: DashboardService.create({
       repository,
@@ -468,27 +471,52 @@ describe("DashboardService", () => {
     });
   });
 
-  describe("given a board made in Analytics Reports beside a new empty board", () => {
+  describe("given a Reports board, a new empty board and a mixed board", () => {
     const viewer = { userId: "member" };
 
-    async function reportsAndNewBoard() {
+    async function threeBoards() {
       const built = serviceWith();
-      const reports = await built.service.create({ projectId: PROJECT, name: "Reports" });
+      const board = (name: string) => built.service.create({ projectId: PROJECT, name });
+      const [reports, fresh, mixed] = [
+        await board("Reports"),
+        await board("Fresh"),
+        await board("Shop assistant health"),
+      ];
       await built.service.createGraph({
         projectId: PROJECT,
         name: "Latency",
         graph: { graphType: "line" },
         dashboardId: reports.id,
       });
-      const fresh = await built.service.create({ projectId: PROJECT, name: "Fresh" });
-      for (const dashboardId of [reports.id, fresh.id]) {
+      await built.widgets.createWidget({
+        id: "widget_1",
+        projectId: PROJECT,
+        dashboardId: mixed.id,
+        input: { name: "Usage", code: "export default () => null;", queries: [] },
+      });
+      await built.repository.createSavedWorkbenchChart({
+        id: "chart_1",
+        projectId: PROJECT,
+        name: "Spend",
+        definition: { version: 1, sql: "SELECT 1", parameters: {} },
+      });
+      await built.repository.placeSavedWorkbenchChart({
+        projectId: PROJECT,
+        chartId: "chart_1",
+        dashboardId: mixed.id,
+        gridColumn: 0,
+        gridRow: 5,
+        colSpan: 1,
+        rowSpan: 1,
+      });
+      for (const dashboardId of [reports.id, fresh.id, mixed.id]) {
         await built.stars.star({
           projectId: PROJECT,
           userId: viewer.userId,
           star: { kind: "board", dashboardId },
         });
       }
-      return { ...built, reports, fresh };
+      return { ...built, reports, fresh, mixed };
     }
 
     const listedIds = async (
@@ -500,8 +528,8 @@ describe("DashboardService", () => {
         .toSorted();
 
     /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
-    it("leaves it out of the Dashboards list and stars, and keeps it in the Reports list", async () => {
-      const { service, stars, reports, fresh } = await reportsAndNewBoard();
+    it("leaves only the Reports board out of the Dashboards list and stars, and Reports lists all", async () => {
+      const { service, stars, reports, fresh, mixed } = await threeBoards();
       const starred = await stars.listStarred({ projectId: PROJECT, userId: viewer.userId });
 
       expect({
@@ -509,27 +537,32 @@ describe("DashboardService", () => {
         starred: starred.map((star) => (star.kind === "board" ? star.dashboard.id : star)),
         reports: await listedIds(service),
       }).toEqual({
-        dashboards: [fresh.id],
-        starred: [fresh.id],
-        reports: [fresh.id, reports.id].toSorted(),
+        dashboards: [fresh.id, mixed.id].toSorted(),
+        starred: [fresh.id, mixed.id],
+        reports: [reports.id, fresh.id, mixed.id].toSorted(),
       });
     });
 
     /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
-    it("refuses the Dashboards delete as a conflict and keeps the board and its graph", async () => {
-      const { service, reports } = await reportsAndNewBoard();
-      const ref = { projectId: PROJECT, dashboardId: reports.id, viewer };
+    it("refuses the Dashboards delete of the Reports board and the mixed one, and keeps both", async () => {
+      const { service, reports, mixed } = await threeBoards();
+      const refusal = { code: "dashboard_lives_in_reports", httpStatus: 409 };
 
-      await expect(service.delete({ ...ref, refuseLegacy: true })).rejects.toMatchObject({
-        code: "dashboard_lives_in_reports",
-        httpStatus: 409,
-      });
-      await expect(service.listGraphs({ ...ref })).resolves.toHaveLength(1);
+      for (const dashboardId of [reports.id, mixed.id]) {
+        await expect(
+          service.delete({ projectId: PROJECT, dashboardId, viewer, refuseLegacy: true }),
+        ).rejects.toMatchObject(refusal);
+      }
+
+      await expect(listedIds(service)).resolves.toContain(mixed.id);
+      await expect(
+        service.listGraphs({ projectId: PROJECT, dashboardId: reports.id, viewer }),
+      ).resolves.toHaveLength(1);
     });
 
     /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
     it("still deletes it from Analytics Reports, and deletes a new board from Dashboards", async () => {
-      const { service, reports, fresh } = await reportsAndNewBoard();
+      const { service, reports, fresh, mixed } = await threeBoards();
 
       await service.delete({ projectId: PROJECT, dashboardId: reports.id, viewer });
       await service.delete({
@@ -539,7 +572,7 @@ describe("DashboardService", () => {
         refuseLegacy: true,
       });
 
-      await expect(listedIds(service)).resolves.toEqual([]);
+      await expect(listedIds(service)).resolves.toEqual([mixed.id]);
       await expect(service.listGraphs({ projectId: PROJECT, viewer })).resolves.toEqual([]);
     });
   });

@@ -188,7 +188,7 @@ function contractCases(backend: Backend): void {
 
   describe("when boards hold charts made in Analytics Reports", () => {
     /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
-    it("names a board with a builder graph or a placed saved chart, never an empty one", async () => {
+    it("holds Reports charts on a board with a graph or a placed saved chart, nothing on an empty one", async () => {
       const repository = backend.repository();
       const [empty, withGraph, withChart] = [
         await dashboard("Empty"),
@@ -204,17 +204,24 @@ function contractCases(backend: Backend): void {
         ...LAYOUT,
       });
 
-      const legacy = await repository.findLegacyDashboardIds({
+      const holdings = await repository.findChartHoldings({
         projectIds: [backend.projectId()],
         dashboardIds: [empty.id, withGraph.id, withChart.id],
       });
-      const elsewhere = await repository.findLegacyDashboardIds({
+      const elsewhere = await repository.findChartHoldings({
         projectIds: [backend.otherProjectId()],
         dashboardIds: [withGraph.id],
       });
 
-      expect({ legacy: legacy.toSorted(), elsewhere }).toEqual({
-        legacy: [withGraph.id, withChart.id].toSorted(),
+      expect({
+        holdings: holdings.toSorted((left, right) =>
+          left.dashboardId.localeCompare(right.dashboardId),
+        ),
+        elsewhere,
+      }).toEqual({
+        holdings: [withGraph.id, withChart.id]
+          .toSorted()
+          .map((dashboardId) => ({ dashboardId, legacyCharts: true, widgets: false })),
         elsewhere: [],
       });
     });
@@ -1280,27 +1287,43 @@ describe.skipIf(!databaseUrl)("given the Postgres dashboard repository", () => {
 
   // Widgets share the table but are written by the widget repository, so only here.
   /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
-  it("does not name a board that holds only Dashboards widgets", async () => {
+  it("tells widgets from Reports charts, on a widget board and on a mixed one", async () => {
     const repository = PrismaDashboardRepository.create({ prisma: database() });
-    const board = await repository.createDashboard({
-      id: `dash_${randomUUID()}`,
-      projectId,
-      name: "Widgets",
-      order: 0,
-    });
+    const board = (name: string) =>
+      repository.createDashboard({ id: `dash_${randomUUID()}`, projectId, name, order: 0 });
+    const [widgetsOnly, mixed] = [await board("Widgets"), await board("Mixed")];
+    for (const dashboardId of [widgetsOnly.id, mixed.id]) {
+      await database().customGraph.create({
+        data: {
+          projectId,
+          dashboardId,
+          name: "Usage",
+          kind: DASHBOARD_SRCDOC_CHART_KIND,
+          graph: { version: 1, code: "export default () => null;", queries: [] },
+        },
+      });
+    }
     await database().customGraph.create({
       data: {
         projectId,
-        dashboardId: board.id,
-        name: "Usage",
-        kind: DASHBOARD_SRCDOC_CHART_KIND,
-        graph: { version: 1, code: "export default () => null;", queries: [] },
+        dashboardId: mixed.id,
+        name: "Spend",
+        kind: "workbench_sql",
+        graph: { version: 1, sql: "SELECT 1", parameters: {} },
       },
     });
 
-    await expect(
-      repository.findLegacyDashboardIds({ projectIds: [projectId], dashboardIds: [board.id] }),
-    ).resolves.toEqual([]);
+    const holdings = await repository.findChartHoldings({
+      projectIds: [projectId],
+      dashboardIds: [widgetsOnly.id, mixed.id],
+    });
+
+    expect(new Map(holdings.map((held) => [held.dashboardId, held]))).toEqual(
+      new Map([
+        [widgetsOnly.id, { dashboardId: widgetsOnly.id, legacyCharts: false, widgets: true }],
+        [mixed.id, { dashboardId: mixed.id, legacyCharts: true, widgets: true }],
+      ]),
+    );
   });
 });
 import { createLogger } from "@langwatch/observability";

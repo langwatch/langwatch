@@ -43,7 +43,7 @@ export class DashboardReadOnlyHereError extends HandledError {
 }
 
 /**
- * A delete from the Dashboards area of a board made in Analytics Reports. Its delete would also
+ * A delete from the Dashboards area of a board holding Analytics Reports charts. It would also
  * remove its charts and the alerts on them, so only Reports manages it (dashboards-v2 AC199b).
  */
 export class DashboardLivesInReportsError extends HandledError {

@@ -35,7 +35,7 @@ export class DashboardStarService {
 
   /**
    * The member's stars for this project, boards and templates, in their own order. Only the
-   * Dashboards area lists stars, so a board made in Analytics Reports is left out (AC199).
+   * Dashboards area lists stars, so a board holding only Analytics Reports charts is left out.
    */
   async listStarred(input: Starring): Promise<StarredDashboard[]> {
     const projectId = projectIdSchema.parse(input.projectId);

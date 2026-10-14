@@ -41,7 +41,7 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
       ...projectScopeSchema.shape,
       /** Also lists the Organization boards other projects own; only the Dashboards area asks. */
       includeOrganization: z.boolean().optional(),
-      /** Leaves out boards made in Analytics Reports; only the Dashboards area asks (AC199). */
+      /** Leaves out boards with Analytics Reports charts and no widget; Dashboards asks (AC199). */
       excludeLegacy: z.boolean().optional(),
     }),
   )
@@ -61,7 +61,7 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
 
   /**
    * Cascades to the dashboard's graphs, and removes it from everyone's stars. `refuseLegacy`,
-   * sent by the Dashboards area alone, refuses a board made in Analytics Reports (AC199b).
+   * sent by the Dashboards area alone, refuses a board holding any Analytics Reports chart.
    */
   .mutation("delete")
   .withInput(z.object({ ...dashboardRefSchema.shape, refuseLegacy: z.boolean().optional() }))

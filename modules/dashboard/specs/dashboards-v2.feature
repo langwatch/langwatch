@@ -959,22 +959,25 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And a board it makes has no recorded author and the scope Project
     And no REST route changes a board's scope, whichever key calls it
 
-  # Boards made in Analytics Reports share the dashboards table. A legacy board holds a chart
-  # other than a Dashboards widget; deleting it deletes those charts and the alerts set on them,
-  # so only Analytics > Reports manages it. A new board, empty or with widgets, is not legacy.
+  # Boards made in Analytics Reports share the dashboards table. A board holding charts made
+  # there and no widget opens empty in Dashboards, so Dashboards does not list it. Deleting any
+  # board with such charts deletes them and the alerts set on them, so only Analytics > Reports
+  # deletes it, even when it also holds widgets. A new board, empty or with widgets, is untouched.
 
   @unit @integration
   Scenario: AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports
-    Given a board that holds a chart made in Analytics Reports
+    Given a board that holds a chart made in Analytics Reports and no widget
     And a new board with no widgets
+    And a mixed board that holds widgets and a saved workbench chart
     When a member lists the boards or reads their starred boards in the Dashboards area
-    Then the board made in Analytics Reports is in neither list, and the new board is listed
+    Then the board made in Analytics Reports is in neither list
+    And the new board and the mixed board are listed
     And opened by its Dashboards address it is not available, so no delete is offered there
     And Analytics Reports still lists it
 
   @unit @integration
   Scenario: AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports
-    Given a board that holds a chart made in Analytics Reports
+    Given a board that holds a chart made in Analytics Reports, with or without widgets
     When a member deletes it from the Dashboards area
     Then the delete is refused with the code "dashboard_lives_in_reports", a 409 conflict
       that says to manage the board from Analytics > Reports

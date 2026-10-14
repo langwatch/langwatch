@@ -229,7 +229,7 @@ export class DashboardService {
 
   /**
    * Deletes the board, cascading to its charts. `refuseLegacy` is the Dashboards area's delete:
-   * a board made in Analytics Reports is refused there, since its charts carry alerts.
+   * a board holding any chart made in Analytics Reports is refused, since those carry alerts.
    */
   async delete(input: {
     projectId: string;
@@ -239,7 +239,7 @@ export class DashboardService {
   }): Promise<Dashboard> {
     const ref = dashboardRef(input);
     const board = await this.#access.getWritable({ ...ref, viewer: input.viewer });
-    if (input.refuseLegacy === true && (await this.#access.withoutLegacy([board])).length === 0) {
+    if (input.refuseLegacy === true && (await this.#access.holdsLegacyCharts(board))) {
       throw new DashboardLivesInReportsError(ref.projectId);
     }
 

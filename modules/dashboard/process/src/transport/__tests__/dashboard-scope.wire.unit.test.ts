@@ -714,25 +714,29 @@ describe("board scope at the doors", () => {
     });
   });
 
-  describe("given a board that holds a graph made in Analytics Reports", () => {
+  describe("given a board that holds a widget and charts made in Analytics Reports", () => {
     /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
     /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
-    it("is kept out of the Dashboards list and delete, and the Reports page still deletes it", async () => {
-      const { call, boardId } = await boardAt("PROJECT");
+    it("is listed while it holds a widget, its delete is refused, and Reports still deletes it", async () => {
+      const { call, boardId, widgetId } = await boardAt("PROJECT");
       const list = (input: Input) => call(AUTHOR, "dashboards.getAll", input).then(idsOf);
+      const dashboardsList = () => list({ projectId: HOME, excludeLegacy: true });
       const on = { projectId: HOME, dashboardId: boardId };
 
-      const dashboardsList = await list({ projectId: HOME, excludeLegacy: true });
-      const reportsList = await list({ projectId: HOME });
+      const mixedListed = await dashboardsList();
       const refused = await codeOf(
         call(AUTHOR, "dashboards.delete", { ...on, refuseLegacy: true }),
       );
+      await call(AUTHOR, "dashboardWidgets.delete", { projectId: HOME, id: widgetId });
+      const reportsOnlyListed = await dashboardsList();
+      const reportsList = await list({ projectId: HOME });
       const deleted = await codeOf(call(AUTHOR, "dashboards.delete", on));
 
-      expect({ dashboardsList, reportsList, refused, deleted }).toEqual({
-        dashboardsList: [],
-        reportsList: [boardId],
+      expect({ mixedListed, refused, reportsOnlyListed, reportsList, deleted }).toEqual({
+        mixedListed: [boardId],
         refused: "dashboard_lives_in_reports",
+        reportsOnlyListed: [],
+        reportsList: [boardId],
         deleted: "<resolved>",
       });
     });

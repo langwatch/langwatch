@@ -39,6 +39,13 @@ export type SavedWorkbenchChartRecord = Omit<SavedWorkbenchChart, "definition"> 
   definition: unknown;
 };
 
+/** Which kinds of chart one board holds: Analytics Reports charts, Dashboards widgets or both. */
+export type DashboardChartHoldings = Readonly<{
+  dashboardId: string;
+  legacyCharts: boolean;
+  widgets: boolean;
+}>;
+
 /** One member's stars as one project lists them. */
 export type MemberStars = Readonly<{
   projectId: string;
@@ -77,13 +84,13 @@ export interface DashboardRepository {
     data: DashboardUpdate;
   }): Promise<DashboardRecord>;
   /**
-   * The boards among these, stored under these projects, that hold a chart other than a
-   * Dashboards widget: legacy Analytics Reports boards. An empty board is not one.
+   * What each of these boards, stored under these projects, holds; a board holding nothing is
+   * left out. A widget is a Dashboards card; any other chart was made in Analytics Reports.
    */
-  findLegacyDashboardIds(input: {
+  findChartHoldings(input: {
     projectIds: readonly string[];
     dashboardIds: readonly string[];
-  }): Promise<string[]>;
+  }): Promise<DashboardChartHoldings[]>;
   /** Removes the board, its graphs, and the row from every member's favourites. */
   deleteDashboard(input: { projectId: string; dashboardId: string }): Promise<DashboardRecord>;
   updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void>;

@@ -14,7 +14,9 @@ import {
 } from "@langwatch/dashboard-contract";
 import { Temporal, toDate } from "@langwatch/time";
 
+import type { DashboardWidgetRepository } from "../dashboard-widget.repository.ts";
 import type {
+  DashboardChartHoldings,
   DashboardGraphKind,
   DashboardReach,
   DashboardRecord,
@@ -57,6 +59,10 @@ type StoredFavourite = {
   position: number;
 };
 
+/** The widget rows the twin reads; a twin standing alone holds none. */
+type WidgetRows = Pick<DashboardWidgetRepository, "findAll">;
+const NO_WIDGETS: WidgetRows = { findAll: async () => [] };
+
 /** The same observable behaviour as the Prisma twin, over three arrays. */
 export class MemoryDashboardRepository implements DashboardRepository {
   #dashboards: DashboardRecord[] = [];
@@ -65,16 +71,24 @@ export class MemoryDashboardRepository implements DashboardRepository {
   #clock = 0;
   #favouriteId = 0;
   #archivedProjectIds: ReadonlySet<string>;
+  #widgets: WidgetRows;
 
-  private constructor(archivedProjectIds: ReadonlySet<string>) {
+  private constructor(archivedProjectIds: ReadonlySet<string>, widgets: WidgetRows) {
     this.#archivedProjectIds = archivedProjectIds;
+    this.#widgets = widgets;
   }
 
-  /** The twin holds no project rows, so a test names the archived ones in a set it keeps. */
+  /**
+   * The twin holds no project rows, so a test names the archived ones in a set it keeps.
+   * `widgets` is the widget twin, whose rows share the chart table in Postgres.
+   */
   static create(
-    options: { archivedProjectIds?: ReadonlySet<string> } = {},
+    options: { archivedProjectIds?: ReadonlySet<string>; widgets?: WidgetRows } = {},
   ): MemoryDashboardRepository {
-    return new MemoryDashboardRepository(options.archivedProjectIds ?? new Set());
+    return new MemoryDashboardRepository(
+      options.archivedProjectIds ?? new Set(),
+      options.widgets ?? NO_WIDGETS,
+    );
   }
 
   async countUsage({
@@ -170,19 +184,31 @@ export class MemoryDashboardRepository implements DashboardRepository {
     return updated;
   }
 
-  /** Every chart this twin holds is a builder or workbench one; widgets live in their own twin. */
-  async findLegacyDashboardIds(input: {
+  /** This twin holds builder and workbench charts; widgets are read from the widget twin. */
+  async findChartHoldings(input: {
     projectIds: readonly string[];
     dashboardIds: readonly string[];
-  }): Promise<string[]> {
-    const legacy = this.#charts.flatMap((chart) =>
-      chart.dashboardId !== null &&
-      input.projectIds.includes(chart.projectId) &&
-      input.dashboardIds.includes(chart.dashboardId)
-        ? [chart.dashboardId]
-        : [],
+  }): Promise<DashboardChartHoldings[]> {
+    const boardsOf = (rows: readonly { projectId: string; dashboardId: string | null }[]) =>
+      new Set(
+        rows.flatMap(({ projectId, dashboardId }) =>
+          dashboardId !== null &&
+          input.projectIds.includes(projectId) &&
+          input.dashboardIds.includes(dashboardId)
+            ? [dashboardId]
+            : [],
+        ),
+      );
+    const legacy = boardsOf(this.#charts);
+    const widgetRows = await Promise.all(
+      input.projectIds.map((projectId) => this.#widgets.findAll({ projectId })),
     );
-    return [...new Set(legacy)];
+    const widgets = boardsOf(widgetRows.flat());
+    return [...new Set([...legacy, ...widgets])].map((dashboardId) => ({
+      dashboardId,
+      legacyCharts: legacy.has(dashboardId),
+      widgets: widgets.has(dashboardId),
+    }));
   }
 
   async deleteDashboard(input: {

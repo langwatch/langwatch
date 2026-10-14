@@ -206,7 +206,7 @@ type BorrowedProcedures = {
       };
     };
     delete: {
-      /** `refuseLegacy` refuses a board made in Analytics Reports; the Dashboards area sends it. */
+      /** `refuseLegacy` refuses a board holding Analytics Reports charts; Dashboards sends it. */
       mutation: {
         input: ProjectScope & { dashboardId: string; refuseLegacy?: boolean };
         output: unknown;

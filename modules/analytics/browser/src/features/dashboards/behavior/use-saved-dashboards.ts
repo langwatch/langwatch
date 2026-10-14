@@ -64,7 +64,7 @@ export function useSavedDashboards() {
   const utils = analyticsApi.useUtils();
 
   const list = analyticsApi.dashboards.getAll.useQuery(
-    // Boards made in Analytics Reports stay there: their delete cascades to their alerts.
+    // A board holding only Analytics Reports charts opens empty here, so it stays there.
     { projectId, includeOrganization: true, excludeLegacy: true },
     { enabled: !!projectId },
   );

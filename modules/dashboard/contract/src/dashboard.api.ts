@@ -47,7 +47,7 @@ export interface DashboardApi {
   /**
    * The project's boards the viewer may see, with their own `isStarred`; a project credential
    * (no viewer) sees no Only me board. `includeOrganization` adds the Organization boards with
-   * their `ownerProject`; `excludeLegacy` drops boards holding charts made in Analytics Reports.
+   * their `ownerProject`; `excludeLegacy` drops boards holding only Analytics Reports charts.
    */
   getAll(input: {
     projectId: string;

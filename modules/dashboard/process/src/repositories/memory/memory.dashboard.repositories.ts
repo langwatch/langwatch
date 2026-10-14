@@ -7,9 +7,10 @@ export class MemoryDashboardRepositories {
   static readonly requires = [] as const;
 
   static create(): DashboardRepositories {
+    const dashboardWidgets = MemoryDashboardWidgetRepository.create();
     return {
-      dashboards: MemoryDashboardRepository.create(),
-      dashboardWidgets: MemoryDashboardWidgetRepository.create(),
+      dashboards: MemoryDashboardRepository.create({ widgets: dashboardWidgets }),
+      dashboardWidgets,
       savedViews: MemorySavedViewRepository.create(),
     };
   }

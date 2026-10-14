@@ -20,6 +20,7 @@ import { PrismaRepository } from "@langwatch/prisma-client";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 
 import type {
+  DashboardChartHoldings,
   DashboardGraphKind,
   DashboardReach,
   DashboardRecord,
@@ -250,21 +251,34 @@ export class PrismaDashboardRepository
     );
   }
 
-  async findLegacyDashboardIds(input: {
+  async findChartHoldings(input: {
     projectIds: readonly string[];
     dashboardIds: readonly string[];
-  }): Promise<string[]> {
+  }): Promise<DashboardChartHoldings[]> {
     if (input.dashboardIds.length === 0) return [];
     const rows = await this.prisma.customGraph.findMany({
       where: {
         projectId: { in: [...input.projectIds] },
         dashboardId: { in: [...input.dashboardIds] },
-        kind: { not: DASHBOARD_SRCDOC_CHART_KIND },
       },
-      distinct: ["dashboardId"],
-      select: { dashboardId: true },
+      distinct: ["dashboardId", "kind"],
+      select: { dashboardId: true, kind: true },
     });
-    return rows.flatMap((row) => (row.dashboardId === null ? [] : [row.dashboardId]));
+    const holdings = new Map<string, DashboardChartHoldings>();
+    for (const { dashboardId, kind } of rows) {
+      if (dashboardId === null) continue;
+      const held = holdings.get(dashboardId) ?? {
+        dashboardId,
+        legacyCharts: false,
+        widgets: false,
+      };
+      const isWidget = kind === DASHBOARD_SRCDOC_CHART_KIND;
+      holdings.set(
+        dashboardId,
+        isWidget ? { ...held, widgets: true } : { ...held, legacyCharts: true },
+      );
+    }
+    return [...holdings.values()];
   }
 
   async deleteDashboard(input: {

@@ -12,6 +12,7 @@ import {
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type {
+  DashboardChartHoldings,
   DashboardGraphKind,
   DashboardRecord,
   DashboardRepository,
@@ -23,6 +24,9 @@ import type {
 export interface DashboardsRollout {
   isDashboardsEnabled(input: { projectId: string }): Promise<boolean>;
 }
+
+/** A board as the chart holdings name it. */
+type BoardRef = Pick<DashboardRecord, "id" | "projectId">;
 
 /** Who is reading, from which project; no viewer is a project credential. */
 export type BoardReading = Readonly<{ projectId: string; viewer?: DashboardViewer }>;
@@ -95,19 +99,28 @@ export class DashboardAccessService {
   }
 
   /**
-   * These boards less the ones made in Analytics Reports, which the Dashboards area neither
-   * lists nor deletes: their delete cascades to their charts and alerts (dashboards-v2 AC199).
+   * These boards less the ones that open empty in the Dashboards area: charts made in Analytics
+   * Reports and no widget. A board holding both stays listed (dashboards-v2 AC199).
    */
-  async withoutLegacy<Board extends Pick<DashboardRecord, "id" | "projectId">>(
-    boards: readonly Board[],
-  ): Promise<Board[]> {
-    const legacy = new Set(
-      await this.#repository.findLegacyDashboardIds({
-        projectIds: [...new Set(boards.map((board) => board.projectId))],
-        dashboardIds: boards.map((board) => board.id),
-      }),
-    );
-    return boards.filter((board) => !legacy.has(board.id));
+  async withoutLegacy<Board extends BoardRef>(boards: readonly Board[]): Promise<Board[]> {
+    const holdings = await this.#holdings(boards);
+    return boards.filter((board) => {
+      const held = holdings.get(board.id);
+      return held === undefined || !held.legacyCharts || held.widgets;
+    });
+  }
+
+  /** Whether the board holds a chart made in Analytics Reports, so its delete would cascade. */
+  async holdsLegacyCharts(board: BoardRef): Promise<boolean> {
+    return (await this.#holdings([board])).get(board.id)?.legacyCharts === true;
+  }
+
+  async #holdings(boards: readonly BoardRef[]): Promise<Map<string, DashboardChartHoldings>> {
+    const holdings = await this.#repository.findChartHoldings({
+      projectIds: [...new Set(boards.map((board) => board.projectId))],
+      dashboardIds: boards.map((board) => board.id),
+    });
+    return new Map(holdings.map((held) => [held.dashboardId, held]));
   }
 
   /** The board when the reader may open it here: at home, or as the organization's guest. */
