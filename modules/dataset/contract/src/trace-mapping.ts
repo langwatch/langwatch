@@ -27,6 +27,9 @@ import {
   getRAGInfo,
 } from "@langwatch/trace-contract";
 
+/** Tracked events store each detail as `event.details.<name>`. */
+const EVENT_DETAILS_PREFIX = "event.details.";
+
 /** The label a span is listed under: its own name, or an LLM span's model. */
 const getSpanNameOrModel = (span: Span) =>
   span.name ?? (span.type === "llm" ? (span as LLMSpan).model : undefined);
@@ -731,7 +734,14 @@ export const TRACE_MAPPINGS = {
       );
 
       const eventDetails = events.flatMap((event) =>
-        Object.keys(event.event_details).map((detailKey) => `event_details.${detailKey}`),
+        Object.keys(event.event_details).map(
+          (detailKey) =>
+            `event_details.${
+              detailKey.startsWith(EVENT_DETAILS_PREFIX)
+                ? detailKey.slice(EVENT_DETAILS_PREFIX.length)
+                : detailKey
+            }`,
+        ),
       );
 
       return Array.from(new Set([...eventMetrics, ...eventDetails])).map((event) => ({
@@ -756,7 +766,12 @@ export const TRACE_MAPPINGS = {
       if (subkey.startsWith("event_details.")) {
         return trace.events
           ?.filter((event) => event.event_type === key)
-          ?.map((event) => event.event_details[subkey.replace("event_details.", "")]);
+          ?.map((event) => {
+            const name = subkey.replace("event_details.", "");
+            return (
+              event.event_details[name] ?? event.event_details[`${EVENT_DETAILS_PREFIX}${name}`]
+            );
+          });
       }
       // `apps/ui` compiles this package under `noImplicitReturns`, and a
       // subkey naming neither namespace maps to nothing.
