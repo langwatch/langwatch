@@ -123,14 +123,16 @@ describe("ScenarioChildSpawn.resolve", () => {
       });
 
       /** @scenario "Processor falls back to tsx with loud logging when bundle is missing in production" */
-      it("throws instead of falling back to pnpm exec tsx", () => {
-        expect(() => ScenarioChildSpawn.create().resolve(spawnOptions("production"))).toThrow(
-          /NOT FOUND/,
-        );
+      it("falls back to tsx instead of crashing", () => {
+        const result = ScenarioChildSpawn.create().resolve(spawnOptions("production"));
+
+        expect(result.command).toBe("pnpm");
+        expect(result.args[0]).toBe("exec");
+        expect(result.args[1]).toBe("tsx");
       });
 
       it("logs an error with the missing bundle path", () => {
-        expect(() => ScenarioChildSpawn.create().resolve(spawnOptions("production"))).toThrow();
+        ScenarioChildSpawn.create().resolve(spawnOptions("production"));
 
         expect(mockLogger.error).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -138,6 +140,15 @@ describe("ScenarioChildSpawn.resolve", () => {
               path.join(PACKAGE_ROOT, "dist", "server", "scenario-child-process.mjs"),
             ),
           }),
+          expect.stringContaining("NOT FOUND"),
+        );
+      });
+
+      it("logs a remediation hint in the error message", () => {
+        ScenarioChildSpawn.create().resolve(spawnOptions("production"));
+
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.any(Object),
           expect.stringContaining("build:server"),
         );
       });
