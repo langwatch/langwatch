@@ -160,13 +160,13 @@ func (s *EvaluationService) Evaluate(ctx context.Context, req contract.EvaluateR
 		Trace:     req.Trace,
 	})
 	results = make([]contract.Result, len(req.Entries))
-	for i, entry := range req.Entries {
+	for i := range req.Entries {
 		// ponytail: entries run one after another; run them in parallel when batches grow past one or two.
 		results[i] = s.runEntry(traceCtx, entryJob{
 			definition: evaluator.Definition,
 			score:      score,
 			tenant:     req.Tenant,
-			entry:      entry,
+			entry:      req.Entries[i],
 			stats:      stats,
 		})
 	}
