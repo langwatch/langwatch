@@ -361,23 +361,35 @@ describe("given a self-hosted install that judges through LangWatch, with the re
   });
 });
 
-describe("given an install that does not judge through LangWatch, with the release flag off", () => {
+/** A development checkout with no classifier: it judges, but not through LangWatch. */
+function devCheckout({ flagOn }: { flagOn: boolean }) {
+  return InstantEvalAccessService.create({
+    flags: { isEnabled: async () => flagOn },
+    projects: { findOrganizationId: async () => "organization-1" },
+    judgesThroughConnect: false,
+    optIns: NEVER_OPTED_IN,
+    isJudgeConfigured: () => true,
+    hostedPlans: null,
+    judge: {
+      isAvailableForOrganization: () => {
+        throw new Error("the gate read the license");
+      },
+    },
+  });
+}
+
+describe("given a development checkout", () => {
   describe("when the project asks whether it may judge", () => {
-    /** @scenario "An install that does not judge through LangWatch waits for the release flag" */
-    it("is not released, and the license is not read", async () => {
-      const access = InstantEvalAccessService.create({
-        flags: { isEnabled: async () => false },
-        projects: { findOrganizationId: async () => "organization-1" },
-        judgesThroughConnect: false,
-        optIns: NEVER_OPTED_IN,
-        isJudgeConfigured: () => true,
-        hostedPlans: null,
-        judge: {
-          isAvailableForOrganization: () => {
-            throw new Error("the gate read the license");
-          },
-        },
-      });
+    /** @scenario "A development checkout waits for the release flag" */
+    it("is released with the flag on, and the license is not read", async () => {
+      const access = devCheckout({ flagOn: true });
+
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(true);
+    });
+
+    /** @scenario "A development checkout waits for the release flag" */
+    it("is not released with the flag off, and the license is not read", async () => {
+      const access = devCheckout({ flagOn: false });
 
       await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(false);
     });

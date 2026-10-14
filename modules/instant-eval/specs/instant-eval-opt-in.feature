@@ -76,10 +76,11 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Then it may not, and neither the flag nor the organization's own switch is read
 
     @unit
-    Scenario: An install that does not judge through LangWatch waits for the release flag
-      Given an install with judging turned off or its own key, with the release flag off
+    Scenario: A development checkout waits for the release flag
+      Given a development checkout that does not judge through LangWatch
       When the project asks whether it may judge
-      Then it may not, and the license is not read
+      Then it may when the release flag is on and may not when it is off
+      And the license is not read
 
     @unit
     Scenario: A self-hosted install is told why from its judge and its license, and the plan is not read
