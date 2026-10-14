@@ -217,6 +217,22 @@ describe("Datasets list screen", () => {
     });
   });
 
+  describe("given the datasets loaded", () => {
+    /** @scenario The datasets list shows no error when the read succeeded */
+    it("shows the rows with no error notice", () => {
+      datasetsQuery.current = {
+        data: [makeDataset("ds-1", "offline evals", 12)],
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      };
+      renderWithDatasetHost(<DatasetsScreen />);
+
+      expect(screen.getByText("offline evals")).toBeInTheDocument();
+      expect(screen.queryByText("Couldn't load the datasets")).not.toBeInTheDocument();
+    });
+  });
+
   describe("given a refresh fails after the datasets loaded", () => {
     /** @scenario A failed refresh keeps the datasets I already see */
     it("keeps the rows with the error as a notice over them", () => {

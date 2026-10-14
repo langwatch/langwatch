@@ -79,6 +79,13 @@ Feature: Datasets list page
     And I am not shown an empty-project message
 
   @integration
+  Scenario: The datasets list shows no error when the read succeeded
+    Given my datasets have loaded
+    When nothing has failed
+    Then I see my datasets
+    And no "Couldn't load the datasets" notice is shown
+
+  @integration
   Scenario: A failed refresh keeps the datasets I already see
     Given my datasets have loaded
     When a later refresh of the list fails

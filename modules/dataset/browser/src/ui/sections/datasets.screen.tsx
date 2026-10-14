@@ -379,12 +379,17 @@ export default function DatasetsScreen() {
                 },
               }
         }
-        error={{
-          title: "Couldn't load the datasets",
-          description: "Try again, or read how datasets work.",
-          onRetry: () => void datasets.refetch(),
-          next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
-        }}
+        // Only a failed read passes it: with rows on screen, ListPage draws any error it is given.
+        error={
+          datasets.isError
+            ? {
+                title: "Couldn't load the datasets",
+                description: "Try again, or read how datasets work.",
+                onRetry: () => void datasets.refetch(),
+                next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
+              }
+            : undefined
+        }
         empty={{
           title: "No datasets yet",
           description:
