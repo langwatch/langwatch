@@ -132,18 +132,15 @@ function federatedProvidersOf({
   authProvider,
   providers,
   isSaas,
-  localPasswords,
 }: {
   authProvider: string | undefined;
   providers: AuthServerConfig["signInProviders"];
   isSaas: boolean;
-  localPasswords: boolean;
 }): string[] {
   if (!authProvider || authProvider === "email") return [];
   const named = namedProviderServesOnlyLegacySso({
     authProvider,
     selfHosted: !isSaas,
-    issuesOwnPasswords: localPasswords,
   })
     ? []
     : [authProvider];
@@ -175,7 +172,6 @@ export const authBrowserConfig = defineBrowserConfig({
         authProvider,
         providers: config.signInProviders,
         isSaas: config.isSaas,
-        localPasswords: config.localPasswords,
       }),
       signUpMode: config.signUpMode,
       ...(authProvider ? { authProvider } : {}),

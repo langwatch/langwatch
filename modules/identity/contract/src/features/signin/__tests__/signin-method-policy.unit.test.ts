@@ -309,7 +309,7 @@ describe("the instance sign-in method policy", () => {
     });
 
     /** @scenario "A deployment whose door is its named provider keeps offering it" */
-    it("keeps the broker where it is the way in, and never draws a branded connection", async () => {
+    it("keeps the broker on a self-hosted install, and never on cloud", async () => {
       selfHosted = true;
       issuesOwnPasswords = true;
       mountedSocial = ["google"];
@@ -319,7 +319,7 @@ describe("the instance sign-in method policy", () => {
       selfHosted = false;
       issuesOwnPasswords = false;
 
-      expect(await offeredIds()).toEqual(["auth0", "google"]);
+      expect(await offeredIds()).toEqual(["google"]);
     });
   });
 });

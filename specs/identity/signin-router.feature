@@ -312,13 +312,11 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
   # organization still on legacy Auth0 SSO, whose people reach it by typing
   # their address. The rail never draws the broker, nor a branded button for
   # one of its social connections. A self-hosted install naming Auth0 keeps it
-  # as its door, and so does a deployment issuing no passwords of its own,
-  # whose password holders would otherwise have no way in.
+  # as its door.
 
   @unit
   Scenario: Cloud never offers the Auth0 broker on the sign-in screen
     Given a SaaS deployment whose provider is the Auth0 broker
-    And that deployment issues its own passwords
     And credentials are present for the native Google and GitHub providers
     When the sign-in page is requested
     Then the native Google and GitHub methods and the password are offered
@@ -337,7 +335,7 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Given a deployment whose provider is the Auth0 broker
     When the sign-in page is requested on a self-hosted install
     Then the broker is offered ahead of the native social methods
-    And a SaaS deployment issuing no passwords of its own offers the broker too
+    And a SaaS deployment never offers the broker, whatever its password setting
     And no branded button for one of the broker's connections is offered anywhere
 
   # What of the ask survives on every deployment: the address was already

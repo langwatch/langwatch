@@ -36,17 +36,14 @@ export const AUTH0_BRIDGE_METHODS: readonly Auth0BridgeMethod[] = AUTH0_SOCIAL_S
 
 /**
  * Whether the named provider is only the broker for legacy SSO organizations, never a way in from
- * the rail: Auth0 on cloud, where passwords are issued here. A self-hosted install naming Auth0, or
- * a deployment issuing no passwords of its own, still has it as its front door.
+ * the rail: Auth0 on cloud. A self-hosted install naming Auth0 still has it as its front door.
  */
 export function namedProviderServesOnlyLegacySso({
   authProvider,
   selfHosted,
-  issuesOwnPasswords,
 }: {
   authProvider: string | undefined;
   selfHosted: boolean;
-  issuesOwnPasswords: boolean;
 }): boolean {
-  return authProvider === "auth0" && !selfHosted && issuesOwnPasswords;
+  return authProvider === "auth0" && !selfHosted;
 }

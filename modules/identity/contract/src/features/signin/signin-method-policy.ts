@@ -124,7 +124,6 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
     const brokerOnly = namedProviderServesOnlyLegacySso({
       authProvider: federated[0]?.id,
       selfHosted: this.inputs.selfHosted(),
-      issuesOwnPasswords: this.inputs.issuesOwnPasswords(),
     });
     const federatedMethods = dedupeById([...(brokerOnly ? [] : federated), ...social]);
     // Offered alongside whatever else answers, never instead of it: somebody
