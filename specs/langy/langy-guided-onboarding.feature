@@ -682,7 +682,7 @@ Feature: Langy guides the first setup after sign-up
     Scenario: A folder with no LLM agent gets a question, never a stop
       When the compiled guided-onboarding skill is read
       Then a folder where no file calls a model or builds an agent is the fourth unlock question of "When a step fails", asked before the branch and the first edit
-      And the question names the folder and says there is nothing to trace yet
+      And the question names the folder by its own name, never "." or the full path, and says there is nothing to trace yet
       And the options are "Write a starter agent for me" and "I'll connect another folder", plain answers with no ref
       And the first option writes a small agent in a folder of its own, on the langy branch, and step 2 goes on against it
       And a starter agent whose provider key is missing from the env file gets a question naming the key, never a start that cannot answer

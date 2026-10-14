@@ -998,6 +998,9 @@ describe("the guided-onboarding skill", () => {
       );
       expect(section).toContain(VERBATIM_LINES["the no-agent question"]);
       expect(section).toContain(
+        "with {folder} the folder's own name, the last part of the path the workspace facts name (never `.` and never the full path)",
+      );
+      expect(section).toContain(
         'Options, in this order: "Write a starter agent for me" and "I\'ll connect another folder".',
       );
       expect(section).toContain(
