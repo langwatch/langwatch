@@ -20,6 +20,7 @@ import { useNavigationMode } from "../../behavior/use-navigation-mode.ts";
 import { usePersonalWorkspaceEntries } from "../../behavior/use-personal-workspace-entries.ts";
 import { useUserAvatarUrl } from "../../behavior/user/use-user-avatar-url.ts";
 import { useNavigationHost, type NavigationHost } from "../../model/navigation-host.ts";
+import { OPERATIONS_CONSOLE } from "../../model/products.ts";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 
 const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {
@@ -98,7 +99,7 @@ export function AppHeaderUserMenu() {
               </Menu.Item>
               {host.opsAccess().hasAccess && (
                 <Menu.Item value="admin" asChild>
-                  <NavigationLink href="/ops">Operations</NavigationLink>
+                  <NavigationLink href={OPERATIONS_CONSOLE.href}>{OPERATIONS_CONSOLE.label}</NavigationLink>
                 </Menu.Item>
               )}
               {accountMenu?.presence}

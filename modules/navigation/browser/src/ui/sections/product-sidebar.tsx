@@ -3,7 +3,7 @@
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
-import { ArrowLeft, ArrowUpRight, Crown, Search } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
@@ -17,7 +17,12 @@ import { featureIcons } from "../../model/feature-icons.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { readLastVisitedProduct } from "../../model/product-memory.ts";
-import { isAdminShellRoute, isPathUnder, type ProductId } from "../../model/products.ts";
+import {
+  isAdminShellRoute,
+  isPathUnder,
+  OPERATIONS_CONSOLE,
+  type ProductId,
+} from "../../model/products.ts";
 import { QUIET_SIDEBAR_CHIP } from "../../model/quiet-chip-style.ts";
 import { resolveSettingsBackTarget } from "../../model/resolve-settings-back-target.ts";
 import {
@@ -217,13 +222,11 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
         <>
           <Box flex={1} width="full" />
           <SideMenuLink
-            icon={Crown}
+            icon={OPERATIONS_CONSOLE.icon}
             label="Ops have moved"
-            href="/ops"
+            href={OPERATIONS_CONSOLE.href}
             showLabel={showExpanded}
-            rightElement={
-              <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />
-            }
+            rightElement={<OutboundArrow />}
           />
         </>
       )}
@@ -279,7 +282,7 @@ function SectionItemsNav({
       tourId={item.tourId}
       rightElement={
         isPathUnder({ pathname: item.href, base: sectionPath }) ? undefined : (
-          <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />
+          <OutboundArrow />
         )
       }
     />
@@ -483,6 +486,11 @@ export function ProductSidebar({
       </Box>
     </SideMenuDensityProvider>
   );
+}
+
+/** Marks an entry that leaves the current section. */
+function OutboundArrow() {
+  return <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />;
 }
 
 /** The quiet "ENT" chip on an Enterprise entry the plan includes; a locked entry shows a lock. */

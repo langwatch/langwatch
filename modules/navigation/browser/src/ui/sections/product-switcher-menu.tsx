@@ -1,12 +1,14 @@
 import { Menu } from "@langwatch/design-system/menu";
+import type { ReactNode } from "react";
 import type { ButtonProps } from "@langwatch/design-system/primitives";
 import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
-import { Check, ChevronsUpDown, Crown } from "lucide-react";
+import { Check, ChevronsUpDown, type LucideIcon } from "lucide-react";
 
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import {
+  OPERATIONS_CONSOLE,
   PRODUCTS,
   type ProductDefinition,
   type ProductId,
@@ -31,6 +33,32 @@ const productPillStyle = {
   boxShadow: "0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 5%, transparent)",
   _hover: { backgroundColor: "bg.panel", borderColor: "border.emphasized" },
 } satisfies ButtonProps;
+
+/** One switcher row: icon and label, the pitch beneath, an optional mark at the end. */
+function SwitcherEntry({
+  icon: Icon,
+  label,
+  pitch,
+  trailing,
+}: {
+  icon: LucideIcon;
+  label: string;
+  pitch: string;
+  trailing?: ReactNode;
+}) {
+  return (
+    <VStack align="start" gap={0.5} width="full">
+      <HStack gap={2} width="full">
+        <Icon size={13} color="var(--chakra-colors-fg-muted)" />
+        <Text textStyle="label">{label}</Text>
+        {trailing}
+      </HStack>
+      <Text textStyle="micro" color="fg.muted" paddingLeft="21px">
+        {pitch}
+      </Text>
+    </VStack>
+  );
+}
 
 /** Product dropdown: reachable products with pitch. Marks current product. Tracking removed. */
 export function ProductSwitcherMenu({ activeProductId }: { activeProductId: ProductId }) {
@@ -63,7 +91,6 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
       <Portal>
         <Menu.Content minWidth="280px" padding={1.5}>
           {options.map((product) => {
-            const Icon = product.icon;
             const home = product.homeHref({ projectSlug });
             const isActive = product.id === activeProductId;
             return (
@@ -76,20 +103,18 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
                 borderRadius="lg"
                 marginBottom="1px"
               >
-                <VStack align="start" gap={0.5} width="full">
-                  <HStack gap={2} width="full">
-                    <Icon size={13} color="var(--chakra-colors-fg-muted)" />
-                    <Text textStyle="label">{product.label}</Text>
-                    {isActive && (
+                <SwitcherEntry
+                  icon={product.icon}
+                  label={product.label}
+                  pitch={product.pitch}
+                  trailing={
+                    isActive && (
                       <Box marginLeft="auto" display="flex">
                         <Check size={13} aria-label="Current product" />
                       </Box>
-                    )}
-                  </HStack>
-                  <Text textStyle="micro" color="fg.muted" paddingLeft="21px">
-                    {product.pitch}
-                  </Text>
-                </VStack>
+                    )
+                  }
+                />
               </Menu.Item>
             );
           })}
@@ -100,19 +125,11 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
               <Menu.Item
                 value="admin"
                 data-testid="product-switcher-admin"
-                onClick={() => host.navigate("/ops")}
+                onClick={() => host.navigate(OPERATIONS_CONSOLE.href)}
                 paddingY={2}
                 borderRadius="lg"
               >
-                <VStack align="start" gap={0.5} width="full">
-                  <HStack gap={2} width="full">
-                    <Crown size={13} color="var(--chakra-colors-fg-muted)" />
-                    <Text textStyle="label">Operations</Text>
-                  </HStack>
-                  <Text textStyle="micro" color="fg.muted" paddingLeft="21px">
-                    With LangWatch's great features, come great responsibility
-                  </Text>
-                </VStack>
+                <SwitcherEntry {...OPERATIONS_CONSOLE} />
               </Menu.Item>
             </>
           ) : null}

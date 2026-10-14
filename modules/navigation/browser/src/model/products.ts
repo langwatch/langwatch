@@ -1,6 +1,6 @@
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
-import { Boxes, Building2, type LucideIcon, UserRound, Waypoints } from "lucide-react";
+import { Boxes, Building2, Crown, type LucideIcon, UserRound, Waypoints } from "lucide-react";
 
 /** Product registry; Settings excluded (no switcher, no memory, own shell) */
 export type ProductId = "me" | "llm-ops" | "gateway" | "governance";
@@ -143,6 +143,14 @@ export function productFromPathname(pathname: string): ProductId | null {
   // "/[project]/*" pattern spelling).
   return "llm-ops";
 }
+
+/** The operator console: not a product, so it sits apart in the switcher and its own sidebar. */
+export const OPERATIONS_CONSOLE = {
+  label: "Operations",
+  pitch: "With LangWatch's great features, come great responsibility",
+  icon: Crown,
+  href: "/ops",
+} as const;
 
 /** The operator console (/ops): inside the settings detour, but with its own Admin sidebar. */
 export function isAdminShellRoute(pathname: string): boolean {

@@ -3,12 +3,12 @@
 import { AppTopBar } from "@langwatch/design-system/app-shell";
 import { LogoIcon } from "@langwatch/design-system/logo-icon";
 import { HStack, Text } from "@langwatch/design-system/primitives";
-import { Crown, Settings as SettingsIcon } from "lucide-react";
+import { Settings as SettingsIcon } from "lucide-react";
 
 import type { NavigationShellReadyState } from "../../behavior/use-navigation-shell-state.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
-import { isAdminShellRoute, type ProductId } from "../../model/products.ts";
+import { isAdminShellRoute, OPERATIONS_CONSOLE, type ProductId } from "../../model/products.ts";
 import { DevBadge } from "../elements/dev-badge.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { AppHeaderUserMenu } from "./app-header-user-menu.tsx";
@@ -89,7 +89,7 @@ function ProductCluster({
   width: string | undefined;
 }) {
   const isAdmin = isAdminShellRoute(useNavigationHost().pathname());
-  const DetourIcon = isAdmin ? Crown : SettingsIcon;
+  const DetourIcon = isAdmin ? OPERATIONS_CONSOLE.icon : SettingsIcon;
   return (
     <HStack
       data-testid="shell-product-cluster"
@@ -111,7 +111,7 @@ function ProductCluster({
         // way out is the sidebar's back entry. The switcher pill's inset keeps the icon in place.
         <HStack gap={2} paddingX={2.5} height="28px">
           <DetourIcon size={14} color="var(--chakra-colors-fg-muted)" />
-          <Text textStyle="label">{isAdmin ? "Operations" : "Settings"}</Text>
+          <Text textStyle="label">{isAdmin ? OPERATIONS_CONSOLE.label : "Settings"}</Text>
         </HStack>
       )}
     </HStack>
