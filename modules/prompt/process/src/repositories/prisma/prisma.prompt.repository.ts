@@ -17,7 +17,7 @@ import {
   getSchemaValidator,
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
-  parseLlmConfigVersion,
+  parseLlmConfigVersion as parseLlmConfigVersionStrict,
   parseRuntimeParameters,
   sortKeysDeep,
   type PromptUsageCount,
@@ -33,6 +33,16 @@ import {
 import { PrismaLlmConfigVersionsRepository } from "./prisma.prompt-version.repository.ts";
 
 const logger = createLogger("langwatch:prompt-config:prisma.prompt.repository");
+
+/** Parses a stored version, tolerating (and logging) legacy prompting_technique values. */
+const parseLlmConfigVersion: typeof parseLlmConfigVersionStrict = (version) =>
+  parseLlmConfigVersionStrict(version, {
+    onLegacyPromptingTechnique: (change) =>
+      logger.warn(
+        { versionId: (version as { id?: string }).id, ...change },
+        "Normalised legacy prompting_technique in stored prompt version",
+      ),
+  });
 
 /**
  * The client slice prompt persistence binds to, transaction included: a config row, its
