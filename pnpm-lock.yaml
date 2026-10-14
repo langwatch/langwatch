@@ -4530,6 +4530,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/prompt-client':
+        specifier: workspace:*
+        version: link:../../prompt/client
       '@langwatch/scenario-client':
         specifier: workspace:*
         version: link:../../scenario/client
