@@ -34,13 +34,17 @@ export class WorkflowStudioSyncService {
       ...(input.parentTrace ? { parentTrace: input.parentTrace } : {}),
     });
     if (!response.ok) {
-      const refusal = new Error(`The engine answered ${response.status} ${response.statusText}`);
       logger.error(
-        { status: response.status, projectId: input.projectId, origin: input.origin },
+        {
+          status: response.status,
+          statusText: response.statusText,
+          projectId: input.projectId,
+          origin: input.origin,
+        },
         "nlpgo execute_sync returned a non-OK response",
       );
 
-      throw new WorkflowExecutionFailedError({ reasons: [refusal] });
+      throw new WorkflowExecutionFailedError();
     }
 
     return workflowRunAnswerSchema.parse(await response.json());
