@@ -130,7 +130,9 @@ describe("ScenarioChildSpawn.resolve", () => {
       });
 
       it("logs an error with the missing bundle path", () => {
-        expect(() => ScenarioChildSpawn.create().resolve(spawnOptions("production"))).toThrow();
+        expect(() => ScenarioChildSpawn.create().resolve(spawnOptions("production"))).toThrow(
+          /NOT FOUND/,
+        );
 
         expect(mockLogger.error).toHaveBeenCalledWith(
           expect.objectContaining({

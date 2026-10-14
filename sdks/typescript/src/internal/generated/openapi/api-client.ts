@@ -1754,6 +1754,7 @@ export interface operations {
                         isCustom?: boolean;
                         /** @constant */
                         behave_as?: "evaluator";
+                        timeoutMs?: number;
                         scenarioMappings?: {
                             [key: string]: {
                                 /** @constant */

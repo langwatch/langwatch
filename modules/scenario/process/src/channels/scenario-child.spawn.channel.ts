@@ -38,7 +38,7 @@ export class ScenarioChildSpawn {
     sourceRoots: string[];
   }): SpawnConfig {
     if (nodeEnv === "production") {
-      return resolveProductionSpawn(packageRoot, sourcePath);
+      return resolveProductionSpawn(packageRoot);
     }
 
     // Bundle is optimisation, used if current; tsx costs 4-6s per spawn.
@@ -101,7 +101,7 @@ function hasFileNewerThan(dir: string, thresholdMs: number): boolean {
   return false;
 }
 
-function resolveProductionSpawn(packageRoot: string, sourcePath: string): SpawnConfig {
+function resolveProductionSpawn(packageRoot: string): SpawnConfig {
   const bundlePath = path.join(packageRoot, "dist", "server", "scenario-child-process.mjs");
 
   if (fs.existsSync(bundlePath)) {
