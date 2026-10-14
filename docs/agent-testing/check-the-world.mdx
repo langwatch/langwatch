@@ -92,7 +92,8 @@ async def support_agent(
         customer = payments.find_customer(namespace=thread_id) or payments.create_customer(
             tier=customer_tier, namespace=thread_id, test=True
         )
-        charge_ids = payments.charges(customer.id) or [payments.charge(customer.id, amount) for _ in range(charges)]
+        existing = payments.charges(customer.id)
+        charge_ids = existing + [payments.charge(customer.id, amount) for _ in range(charges - len(existing))]
         session = {"customer_id": customer.id, "charge_id": charge_ids[0]}
         state_of_world(thread_id, session["charge_id"])  # before
 
@@ -102,7 +103,7 @@ async def support_agent(
     return langwatch.AgentReply(reply, session=session)
 ```
 
-Seeding is keyed by `thread_id`, so a retried first turn reuses the same data.
+Seeding is keyed by `thread_id`, so a retried first turn reuses the data and completes a partial seed.
 
 `payments` stands for your own test back end. The session value is limited to 64 kilobytes, so keep ids in it, not the data.
 
