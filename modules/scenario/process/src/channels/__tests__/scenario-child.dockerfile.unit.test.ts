@@ -10,6 +10,10 @@ const DOCKERFILE = readFileSync(
 describe("infra/docker/Dockerfile scenario child", () => {
   // The worker does not depend on @langwatch/scenario-child, so the worker filter never builds it.
   // Without its own filter the image ships no dist/server bundle and production runs fail.
+  it("installs @langwatch/scenario-child's dependencies in the builder, so its build finds esbuild", () => {
+    expect(DOCKERFILE).toMatch(/pnpm install --frozen-lockfile [^\n]*--filter "@langwatch\/scenario-child\.\.\."/);
+  });
+
   it("builds @langwatch/scenario-child", () => {
     expect(DOCKERFILE).toMatch(/--filter "@langwatch\/scenario-child\.\.\."[^\n]*run build/);
   });
