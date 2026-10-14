@@ -36,13 +36,13 @@ function gate({
   flags = LOUD_FLAGS,
   projects = LOUD_PROJECTS,
   optIns = NEVER_OPTED_IN,
-  hostedPlans = null,
+  hostedPlans,
 }: {
   isJudgeConfigured: () => boolean;
   flags?: InstantEvalFlagReader;
   projects?: InstantEvalProjectReader;
   optIns?: InstantEvalOptInReader;
-  hostedPlans?: InstantEvalPlanReader | null;
+  hostedPlans: InstantEvalPlanReader | null;
 }) {
   return InstantEvalAccessService.create({
     flags,
@@ -58,7 +58,9 @@ describe("given a deployment with no judge configured", () => {
     /** @scenario "An eval function is refused when the deployment has no classifier" */
     it("answers no without resolving the flag or reading the project", async () => {
       await expect(
-        gate({ isJudgeConfigured: () => false }).isEnabled({ projectId: "project-1" }),
+        gate({ isJudgeConfigured: () => false, hostedPlans: null }).isEnabled({
+          projectId: "project-1",
+        }),
       ).resolves.toBe(false);
     });
   });
@@ -68,7 +70,9 @@ describe("given a deployment with a judge configured", () => {
   describe("when a project asks whether it may judge", () => {
     it("goes on to the flag, which needs the project's organization", async () => {
       await expect(
-        gate({ isJudgeConfigured: () => true }).isEnabled({ projectId: "project-1" }),
+        gate({ isJudgeConfigured: () => true, hostedPlans: null }).isEnabled({
+          projectId: "project-1",
+        }),
       ).rejects.toThrow(REACHED);
     });
 
@@ -76,6 +80,7 @@ describe("given a deployment with a judge configured", () => {
       const asked: { flagKey: string; target: Record<string, unknown> }[] = [];
       const enabled = await gate({
         isJudgeConfigured: () => true,
+        hostedPlans: null,
         projects: { findOrganizationId: async () => "organization-1" },
         flags: {
           isEnabled: async (flagKey, target) => {
@@ -99,6 +104,7 @@ describe("given a deployment with a judge configured", () => {
       await gate({
         isJudgeConfigured: () => true,
         projects: { findOrganizationId: async () => undefined },
+        hostedPlans: null,
         flags: {
           isEnabled: async (_flagKey, target) => {
             targets.push(target);
@@ -115,6 +121,7 @@ describe("given a deployment with a judge configured", () => {
     it("answers the flag whether or not a judge is configured", async () => {
       const released = gate({
         isJudgeConfigured: () => false,
+        hostedPlans: null,
         projects: { findOrganizationId: async () => undefined },
         flags: { isEnabled: async () => true },
       });
@@ -278,6 +285,7 @@ describe("given an install off the hosted service, with the release flag on", ()
           isJudgeConfigured: () => true,
           flags: { isEnabled: async () => true },
           projects: { findOrganizationId: async () => "organization-1" },
+          hostedPlans: null,
           optIns: {
             isOptedIn: () => {
               throw new Error("the gate read the switch");

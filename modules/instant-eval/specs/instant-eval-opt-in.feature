@@ -24,8 +24,8 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     sends its text to the judge without having agreed to it; an enterprise organization is released
     by the flag alone, which is how one that asked gets them, and a switch thrown before it was on
     an enterprise plan no longer counts;
-  - elsewhere the operator's release flag stays as it was, and the flag or the license makes a
-    project judgeable.
+  - elsewhere the operator's release flag stays as it was, and the flag, the license, or the
+    organization's own switch makes a project judgeable.
 
   Rule: The offer depends on the plan, the deployment, and whether the member may throw the switch
 
