@@ -40,7 +40,10 @@ import {
   type CodingAgentModelUsage,
   type CodingAgentUsageRow,
 } from "./coding-agent-pull-request-usage.service.ts";
-import type { CodingAgentSessionListPullRequestService } from "./coding-agent-session-list-pull-request.service.ts";
+import {
+  type CodingAgentSessionListPullRequestService,
+  sessionListKey,
+} from "./coding-agent-session-list-pull-request.service.ts";
 
 export const SESSIONS_LIST_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 export const SESSIONS_LIST_LIMIT = 200;
@@ -132,7 +135,7 @@ export class CodingAgentPullRequestReadService {
       activeTimeCliSec: row.activeTimeCliSec,
       blockedOnUserMs: row.blockedOnUserMs,
       models: row.models,
-      pullRequests: pullRequests.get(row.sessionId) ?? [],
+      pullRequests: pullRequests.get(sessionListKey(row)) ?? [],
     }));
   }
 

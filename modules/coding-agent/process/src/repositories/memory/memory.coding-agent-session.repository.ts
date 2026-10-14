@@ -1,4 +1,4 @@
-import type { Authorization } from "@langwatch/authorization";
+import { AccessNotGrantedError, type Authorization } from "@langwatch/authorization";
 import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
@@ -85,12 +85,22 @@ export class MemoryCodingAgentSessionRepository extends CodingAgentSessionReposi
     toMs: number;
     limit: number;
   }): Promise<CodingAgentSession[]> {
-    const grants = input.authorization.grants.filter(
-      (grant) =>
-        grant.permissions.includes("traces:view") &&
-        (input.authorization.narrowedTo === undefined ||
-          grant.projectId === input.authorization.narrowedTo),
+    // Mirrors `fenceFor` in the clickhouse client, which a memory twin may not import:
+    // no own grant with the permission, or a narrowing that matches nothing, is refused.
+    const carrying = input.authorization.grants.filter((grant) =>
+      grant.permissions.includes("traces:view"),
     );
+    if (!carrying.some((grant) => grant.kind === "own")) {
+      throw new AccessNotGrantedError("traces:view");
+    }
+    const grants = carrying.filter(
+      (grant) =>
+        input.authorization.narrowedTo === undefined ||
+        grant.projectId === input.authorization.narrowedTo,
+    );
+    if (grants.length === 0) {
+      throw new AccessNotGrantedError("traces:view");
+    }
     const admitted = (row: CodingAgentSession) =>
       grants.some((grant) => {
         if (grant.projectId !== row.tenantId) return false;
