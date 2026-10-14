@@ -51,8 +51,8 @@ const ANY_HEADING = /^(#{1,6})[ \t]+\S/;
 const TICKED = /^[ \t]*[-*][ \t]+\[x\]/i;
 const UNTICKED = /^[ \t]*[-*][ \t]+\[ \]/;
 
-/** CRLF-normalised lines with HTML comments removed: what the author actually wrote. */
-const FENCE = /^ {0,3}(`{3,}|~{3,})/;
+/** A fence line: its marker, then the rest. A closing fence has only spaces after it. */
+const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 
 /** The body as a reader sees it: no HTML comments, no fenced code examples. */
 const visibleLines = (body: string): string[] => {
@@ -63,11 +63,16 @@ const visibleLines = (body: string): string[] => {
   const visible: string[] = [];
   let fence: string | undefined;
   for (const line of lines) {
-    const marker = FENCE.exec(line)?.[1];
+    const match = FENCE.exec(line);
+    const marker = match?.[1];
     if (fence === undefined) {
       if (marker === undefined) visible.push(line);
       else fence = marker;
-    } else if (marker?.[0] === fence[0] && marker.length >= fence.length) {
+    } else if (
+      marker?.[0] === fence[0] &&
+      marker.length >= fence.length &&
+      /^[ \t]*$/.test(match?.[2] ?? "")
+    ) {
       fence = undefined;
     }
   }

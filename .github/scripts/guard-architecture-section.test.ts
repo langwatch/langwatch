@@ -183,6 +183,11 @@ void describe("given a pull request description", () => {
       const text = ["## What changed", "An example:", "```markdown", body(), "```"].join("\n");
       assert.ok(checkBody(text).length > 0);
     });
+
+    void it("keeps a fence open past a backtick line followed by text", () => {
+      const text = ["## What changed", "```markdown", "```not-a-close", body(), "```"].join("\n");
+      assert.ok(checkBody(text).length > 0);
+    });
   });
 });
 
