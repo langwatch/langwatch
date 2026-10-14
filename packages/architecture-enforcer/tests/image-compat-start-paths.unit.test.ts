@@ -54,7 +54,7 @@ describe("image compatibility start paths", () => {
     );
   });
 
-  describe("task.sh", () => {
+  describe("given the compat task script", () => {
     const script = new URL("infra/docker/compat/platform-app/task.sh", root).pathname;
     const bin = mkdtempSync(join(tmpdir(), "task-sh-"));
     writeFileSync(join(bin, "pnpm"), '#!/bin/sh\necho "pnpm $* out=${LWQL_RENDER_OUT_DIR:-}"\n');
