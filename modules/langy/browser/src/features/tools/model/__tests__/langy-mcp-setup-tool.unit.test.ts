@@ -25,7 +25,6 @@ function stepsText(steps: ReturnType<typeof mcpSetupSteps>): string {
 
 describe("mcpSetupCalls", () => {
   describe("given a message with an answered mcp_setup call", () => {
-    /** @scenario "The MCP setup call is a card, not an activity row" */
     it("yields one card with the client and OAuth preselected", () => {
       expect(
         mcpSetupCalls([{ type: "text", text: "Here is how." }, call("c1", { client: "cursor" })]),
@@ -55,7 +54,6 @@ describe("mcpSetupCalls", () => {
 });
 
 describe("mcpServerUrl", () => {
-  /** @scenario "The card shows this deployment's own MCP address" */
   it("is the deployment's base URL and /mcp, never /sse", () => {
     expect(mcpServerUrl(`${BASE}/`)).toBe(`${BASE}/mcp`);
     expect(mcpServerUrl(BASE)).not.toContain("/sse");
@@ -64,7 +62,6 @@ describe("mcpServerUrl", () => {
 
 describe("mcpSetupSteps", () => {
   describe("when the method is OAuth", () => {
-    /** @scenario "Claude Code gets a copyable command" */
     it("gives Claude Code the claude mcp add command with this deployment's URL", () => {
       const steps = mcpSetupSteps({ client: "claude-code", method: "oauth", appBaseUrl: BASE });
 
@@ -81,7 +78,6 @@ describe("mcpSetupSteps", () => {
   });
 
   describe("when the method is an API key", () => {
-    /** @scenario "The API key method links to the API keys page and shows the header" */
     it("links to the API keys page and sends the key as a Bearer header", () => {
       const steps = mcpSetupSteps({ client: "cursor", method: "api-key", appBaseUrl: BASE });
 
