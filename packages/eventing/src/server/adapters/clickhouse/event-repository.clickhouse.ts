@@ -141,15 +141,24 @@ export class EventingClickHouseEventRepository implements EventRepository {
 
   private readonly appendFold: EventLogAppendFold;
 
-  private constructor(
-    private readonly resolveClient: EventingClickHouseClientResolver,
-    /** Absent on a reads-only repository, which refuses to insert. */
-    private readonly retention: EventingRetentionConfiguration | undefined,
-    /** The organisation a tenant's rows are written for; absent, every append inserts alone. */
-    private readonly organizationOf?: (tenantId: string) => Promise<string | null>,
-    /** Bounds an aggregate's reads once its pipeline's flag is on; absent, reads stay as today. */
-    private readonly eventLogIndex?: EventLogIdIndex,
-  ) {
+  private readonly resolveClient: EventingClickHouseClientResolver;
+  /** Absent on a reads-only repository, which refuses to insert. */
+  private readonly retention: EventingRetentionConfiguration | undefined;
+  /** The organisation a tenant's rows are written for; absent, every append inserts alone. */
+  private readonly organizationOf: ((tenantId: string) => Promise<string | null>) | undefined;
+  /** Bounds an aggregate's reads once its pipeline's flag is on; absent, reads stay as today. */
+  private readonly eventLogIndex: EventLogIdIndex | undefined;
+
+  private constructor(options: {
+    resolveClient: EventingClickHouseClientResolver;
+    retention?: EventingRetentionConfiguration;
+    organizationOf?: (tenantId: string) => Promise<string | null>;
+    eventLogIndex?: EventLogIdIndex;
+  }) {
+    this.resolveClient = options.resolveClient;
+    this.retention = options.retention;
+    this.organizationOf = options.organizationOf;
+    this.eventLogIndex = options.eventLogIndex;
     this.appendFold = new EventLogAppendFold({
       insert: (insert) => this.insertEventLog(insert),
       maxInFlight: EVENT_LOG_FOLD_MAX_IN_FLIGHT,
@@ -162,12 +171,10 @@ export class EventingClickHouseEventRepository implements EventRepository {
     resolveClient: EventingClickHouseClientResolver;
     eventLogIndex?: EventLogIdIndex;
   }): Pick<EventRepository, "getEventRecord" | "getEventRecords"> {
-    return new EventingClickHouseEventRepository(
-      options.resolveClient,
-      undefined,
-      undefined,
-      options.eventLogIndex,
-    );
+    return new EventingClickHouseEventRepository({
+      resolveClient: options.resolveClient,
+      ...(options.eventLogIndex === undefined ? {} : { eventLogIndex: options.eventLogIndex }),
+    });
   }
 
   static create(options: {
@@ -177,12 +184,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
     organizationOf?: (tenantId: string) => Promise<string | null>;
     eventLogIndex?: EventLogIdIndex;
   }): EventingClickHouseEventRepository {
-    return new EventingClickHouseEventRepository(
-      options.resolveClient,
-      options.retention,
-      options.organizationOf,
-      options.eventLogIndex,
-    );
+    return new EventingClickHouseEventRepository(options);
   }
 
   /**
