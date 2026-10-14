@@ -339,7 +339,14 @@ Feature: Physical application workspace boundaries
       When the image runs that command
       Then it runs "lwql-render-access-config" from /app/apps/tasks
       And the output folder reaches the task as LWQL_RENDER_OUT_DIR, not as an argument
-      And without --out it exits 2 and names the flag
+      And without --out, or with no folder after it, it exits 2, names the flag and runs nothing
+
+    @unit @deployment
+    Scenario: The image's production install keeps the committed package versions
+      Given the image re-resolves the lockfile to drop dev-tool peer dependencies
+      When the re-resolved lockfile names a package version the committed lockfile does not
+      Then the image build fails and names that version
+      And a re-resolve that only drops packages passes
 
     @unimplemented
     @integration @deployment

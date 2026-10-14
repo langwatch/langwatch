@@ -205,10 +205,14 @@ RUN find . -name node_modules -type d -prune -exec rm -rf {} + \
 # A hook only runs when pnpm resolves, so the lockfile is re-resolved first, keeping every locked
 # version, and then installed frozen: the install itself still takes only what that lockfile names.
 # pnpm_config_pnpmfile is how pnpm 12 takes a hook file; only these two commands set it.
+# The version check fails the build on any version the committed lockfile does not name.
 COPY infra/docker/image.pnpmfile.cjs /tmp/image.pnpmfile.cjs
+COPY infra/docker/check-locked-versions.mjs /tmp/check-locked-versions.mjs
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     export pnpm_config_pnpmfile=/tmp/image.pnpmfile.cjs CI=true \
+ && cp pnpm-lock.yaml /tmp/committed-pnpm-lock.yaml \
  && pnpm install --lockfile-only \
+ && node /tmp/check-locked-versions.mjs /tmp/committed-pnpm-lock.yaml pnpm-lock.yaml \
  && pnpm install --frozen-lockfile --prod --filter-prod "@langwatch/platform-api..." --filter-prod "@langwatch/worker..." --filter-prod "@langwatch/tasks..." --filter-prod "@langwatch/backend..."
 
 # What no process runs, removed before the runtime stage copies the trees: the module halves the
