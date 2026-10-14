@@ -27,6 +27,15 @@ docs/self-hosting/usage-report-dictionary.mdx linguist-generated=true
 services/langyagent/internal/assets/skills/** linguist-generated=true
 **/__snapshots__/**                     linguist-generated=true
 mcp/typescript/src/__tests__/fixtures/*.json linguist-generated=true
+# Go evaluator runtime: langevals answers recorded by testdata/record/record_fixtures.py
+# and record_llm_fixtures.py, and the clustering answers recorded by
+# services/langevals/evaluators/topic_clustering/scripts/record_go_fixtures.py.
+services/nlpgo/modules/evaluators/testdata/fixtures/*.json linguist-generated=true
+services/nlpgo/modules/evaluators/rules/testdata/clustering/*.json linguist-generated=true
+services/nlpgo/modules/evaluators/services/testdata/clustering/*.json linguist-generated=true
+# Vendored lingua-go: stringer and protoc output.
+services/third_party/lingua-go/*_string.go linguist-generated=true
+services/third_party/lingua-go/serialization/*.pb.go linguist-generated=true
 # pnpm generate:readmes (tools/readmegen): index pages, module pages, process and browser pages.
 modules/README.md                       linguist-generated=true
 packages/README.md                      linguist-generated=true
