@@ -225,6 +225,14 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     CI=true pnpm prune --prod
 
+# ── Stage 2b: CDN assets ───────────────────────────────────────────
+# Not part of the runtime image: nothing reaches the default target through it.
+# publish-docker-ecr.yml builds this target with a local output to upload the
+# content-hashed files to the CDN bucket (ADR-086) from the builder layers it
+# just cached, without pulling the pushed image back.
+FROM scratch AS ui-assets
+COPY --from=builder /app/apps/ui/dist/client/assets /assets
+
 # ── Stage 3: runtime ───────────────────────────────────────────────
 FROM node:24-alpine
 RUN apk --no-cache add curl openssl bash
@@ -326,12 +334,6 @@ COPY dev/scripts/download-tiktoken-encodings.mjs ./dev/scripts/download-tiktoken
 RUN cd modules/trace/process && node ../../../dev/scripts/download-tiktoken-encodings.mjs "$TIKTOKENS_PATH"
 
 EXPOSE 5560
-
-# The previous image started from /app/platform/app (`pnpm start`, `pnpm run start:workers`,
-# `pnpm run start:prepare:db`). Those commands still work: each warns on stderr and runs the
-# new equivalent. Outside any workspace, so pnpm needs no install there.
-COPY infra/docker/compat/platform-app/package.json /app/platform/app/package.json
-COPY infra/docker/compat/platform-app/task.sh /app/platform/app/task.sh
 
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
