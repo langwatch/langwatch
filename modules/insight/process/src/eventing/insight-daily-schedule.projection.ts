@@ -1,7 +1,7 @@
 /**
  * One person's run on one board, folded onto its row: whose it is, which board, what they
- * chose for it and how the last run ended. The row is keyed by the schedule id, which is also
- * its aggregate id.
+ * chose for it, the run in flight and how the last run ended. The row is keyed by the schedule
+ * id, which is also its aggregate id.
  */
 
 import type { StateProjectionDefinition, StateProjectionStore } from "@langwatch/eventing";
@@ -47,6 +47,11 @@ export interface InsightDailyScheduleState {
   /** The scheduled days in a row whose run ended skipped, and the slot of the newest counted. */
   readonly consecutiveSkips: number;
   readonly skipStreakSlot: number | null;
+  /** The run that started and has not settled, its conversation and when; null when none. */
+  readonly runInFlightId: string | null;
+  readonly runInFlightConversationId: string | null;
+  /** Epoch milliseconds. */
+  readonly runInFlightStartedAt: number | null;
 }
 
 const INITIAL_INSIGHT_DAILY_SCHEDULE_STATE: InsightDailyScheduleState = {
@@ -68,7 +73,16 @@ const INITIAL_INSIGHT_DAILY_SCHEDULE_STATE: InsightDailyScheduleState = {
   lastRunConversationId: null,
   consecutiveSkips: 0,
   skipStreakSlot: null,
+  runInFlightId: null,
+  runInFlightConversationId: null,
+  runInFlightStartedAt: null,
 };
+
+const NO_RUN_IN_FLIGHT = {
+  runInFlightId: null,
+  runInFlightConversationId: null,
+  runInFlightStartedAt: null,
+} as const;
 
 /** Whether the event leaves the row as it is: no event of the row's, or one it does not take. */
 function leavesRow(state: InsightDailyScheduleState, event: InsightDailyRunEvent): boolean {
@@ -78,6 +92,9 @@ function leavesRow(state: InsightDailyScheduleState, event: InsightDailyRunEvent
     case INSIGHT_DAILY_RUN_EVENT_TYPES.TURNED_OFF:
       // A run that found its board gone turns off a schedule that is on, and decides no other.
       return event.data.by === "system" && state.state !== "on";
+    case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_STARTED:
+      // A start delivered again after its run settled is not a run in flight.
+      return state.lastRunId === event.data.runId;
     case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED:
       // Delivery is at least once: a run settled again keeps the outcome it first recorded.
       return state.lastRunId === event.data.runId;
@@ -99,6 +116,12 @@ function changeOf(
     }
     case INSIGHT_DAILY_RUN_EVENT_TYPES.TURNED_OFF:
       return { state: "off", offReason: event.data.reason };
+    case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_STARTED:
+      return {
+        runInFlightId: event.data.runId,
+        runInFlightConversationId: event.data.conversationId,
+        runInFlightStartedAt: event.occurredAt,
+      };
     case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED: {
       const streak = foldSkipStreak({
         streak: { count: state.consecutiveSkips, slot: state.skipStreakSlot },
@@ -114,6 +137,8 @@ function changeOf(
         lastRunConversationId: event.data.conversationId,
         consecutiveSkips: streak.count,
         skipStreakSlot: streak.slot,
+        // A lost run settles after the run that replaced it started: that one is still in flight.
+        ...(state.runInFlightId === event.data.runId ? NO_RUN_IN_FLIGHT : {}),
       };
     }
     default:

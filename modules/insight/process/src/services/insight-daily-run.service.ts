@@ -245,6 +245,8 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
           window: windows.window,
           timezone: RUN_TIMEZONE,
         }),
+        // No rate limit on Insights runs for now: what is worth running is not known yet.
+        isExemptFromRateLimit: true,
       });
     } catch (error) {
       const refusal = START_REFUSALS[codeOf(error)];

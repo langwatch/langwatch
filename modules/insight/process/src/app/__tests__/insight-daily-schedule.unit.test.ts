@@ -124,6 +124,7 @@ describe("given a member turned their daily run on for a board", () => {
         conversationId: "conversation-1",
       },
       offReason: null,
+      runInFlight: null,
     });
   });
 
@@ -137,6 +138,7 @@ describe("given a member turned their daily run on for a board", () => {
       settings: null,
       lastRun: null,
       offReason: null,
+      runInFlight: null,
     });
   });
 
@@ -157,6 +159,7 @@ describe("given a member turned their daily run on for a board", () => {
         settings: { hour: 9, timezone: "UTC", maxInsights: 3 },
         lastRun: null,
         offReason: null,
+        runInFlight: null,
       });
     });
   });

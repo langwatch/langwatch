@@ -12,28 +12,40 @@ import {
   type TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
 import { INSIGHT_DAILY_RUN_EVENT_TYPES, type InsightRunBoard } from "@langwatch/insight-contract";
+import { extractLangyTextFromParts, type LangyTurnSettlementWait } from "@langwatch/langy-contract";
 import { testAuthorizeDefaults, trpcTestMembers } from "@langwatch/test-harness/trpc-members";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  answerWith,
   BOARD,
   installDailyRuns,
   type InstalledDailyRuns,
   MEMBER,
   OTHER_MEMBER,
+  stampedParts,
 } from "../../app/__tests__/insight-daily-run.fixture.ts";
 import { PROJECT } from "../../app/__tests__/insight.fixture.ts";
+import { INSIGHT_DAILY_RUN_EXPIRY_MS } from "../../eventing/insight-daily-run.intent.ts";
 import { insightTrpcTransport } from "../insight.trpc.ts";
 
 type TestContext = { actor: { id: string } };
 
-const { CONFIGURED, TURNED_OFF } = INSIGHT_DAILY_RUN_EVENT_TYPES;
+const { CONFIGURED, TURNED_OFF, RUN_REQUESTED, RUN_STARTED, RUN_SETTLED } =
+  INSIGHT_DAILY_RUN_EVENT_TYPES;
 const VIEW = ["analytics:view"];
 const VIEW_AND_ASK = ["analytics:view", "langy:create"];
 const SCOPE = { projectId: PROJECT, board: { kind: BOARD.kind, id: BOARD.id } };
 const ON = { projectId: PROJECT, board: BOARD, hour: 9, timezone: "Europe/Amsterdam" };
 const OFF = { projectId: PROJECT, board: BOARD };
-const UNDECIDED = { state: "undecided", settings: null, lastRun: null, offReason: null };
+const RUN_NOW = { projectId: PROJECT, board: BOARD, maxInsights: 3 } as const;
+const UNDECIDED = {
+  state: "undecided",
+  settings: null,
+  lastRun: null,
+  offReason: null,
+  runInFlight: null,
+};
 const TEMPLATE: InsightRunBoard = { kind: "template", id: "llm-costs", name: "LLM costs" };
 const PRIVATE_BOARD: InsightRunBoard = { kind: "dashboard", id: "dashboard-private", name: "Mine" };
 
@@ -130,6 +142,7 @@ describe("given a member with analytics:view and a board they can open", () => {
         settings: { hour: 9, timezone: "Europe/Amsterdam", maxInsights: 3 },
         lastRun: null,
         offReason: null,
+        runInFlight: null,
       });
       expect(changed.settings).toEqual({ hour: 17, timezone: "Europe/Amsterdam", maxInsights: 10 });
       expect(off).toEqual({
@@ -137,6 +150,7 @@ describe("given a member with analytics:view and a board they can open", () => {
         settings: { hour: 17, timezone: "Europe/Amsterdam", maxInsights: 10 },
         lastRun: null,
         offReason: null,
+        runInFlight: null,
       });
       expect(await daily.runEventsOf()).toEqual([CONFIGURED, CONFIGURED, TURNED_OFF]);
     });
@@ -165,7 +179,7 @@ describe("given a member with analytics:view and a board they can open", () => {
       const declined = await member.getBoardDailyRun(SCOPE);
       await member.configureBoardDailyRun({ ...ON, maxInsights: 5 });
 
-      expect(declined).toEqual({ state: "off", settings: null, lastRun: null, offReason: null });
+      expect(declined).toEqual({ ...UNDECIDED, state: "off" });
       expect(await member.getBoardDailyRun(SCOPE)).toMatchObject({ state: "on" });
     });
   });
@@ -236,6 +250,7 @@ describe("given a member turned their daily run on for a board", () => {
         settings: { hour: 9, timezone: "Europe/Amsterdam", maxInsights: 3 },
         lastRun: null,
         offReason: null,
+        runInFlight: null,
       });
       expect(await daily.runEventsOf({ userId: MEMBER })).toEqual([CONFIGURED]);
     });
@@ -354,5 +369,136 @@ describe("given a member with analytics:view and without langy:create", () => {
     await viewer.turnOffBoardDailyRun(OFF);
     expect(await viewer.getBoardDailyRun(SCOPE)).toMatchObject({ state: "off" });
     expect(await daily.runEventsOf()).toEqual([TURNED_OFF]);
+  });
+});
+
+/** A Langy turn that waits to settle until the test lets it, with an answer that finds nothing. */
+function heldTurn(daily: InstalledDailyRuns) {
+  let release = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  daily.world.langy.settle = async (input): Promise<LangyTurnSettlementWait> => {
+    await released;
+    const parts = stampedParts(answerWith([]));
+    return {
+      kind: "settled",
+      settlement: {
+        succeeded: true,
+        outcome: "completed",
+        text: extractLangyTextFromParts(parts),
+        messageId: `message-of-${input.turnId}`,
+        parts,
+        error: null,
+      },
+    };
+  };
+  return { release };
+}
+
+/** Carries out the run the schedule's process wrote for a request, as the outbox does. */
+async function carryOutRequest(daily: InstalledDailyRuns, requestId: string) {
+  const intent = (await daily.intentsOf()).find(
+    ({ payload }) => (payload as { runId?: string }).runId === requestId,
+  );
+  if (!intent) throw new Error(`The schedule wrote no intent for request ${requestId}`);
+  return daily.carryOut(intent.payload);
+}
+
+describe("given a member with analytics:view and langy:create, and a board that is on", () => {
+  describe("when they run the board now", () => {
+    /** @scenario "Run now asks for a run and opens Langy on it" */
+    it("requests a run for them, names its conversation while it runs, and none once it settled", async () => {
+      const { as, daily } = await project();
+      const member = as({ userId: MEMBER });
+      await member.configureBoardDailyRun({ ...ON, maxInsights: 3 });
+      const { release } = heldTurn(daily);
+
+      const { requestId } = await member.runBoardDailyRunNow(RUN_NOW);
+      const running = carryOutRequest(daily, requestId);
+      await vi.waitFor(async () => expect(await daily.runEventsOf()).toContain(RUN_STARTED));
+      const during = await member.getBoardDailyRun(SCOPE);
+      release();
+      await running;
+
+      expect(requestId).toEqual(expect.any(String));
+      expect(during.runInFlight).toEqual({
+        conversationId: "conversation-1",
+        startedAt: expect.any(Number),
+      });
+      expect(daily.langy.starts).toEqual([expect.objectContaining({ userId: MEMBER })]);
+      expect(await member.getBoardDailyRun(SCOPE)).toMatchObject({
+        runInFlight: null,
+        lastRun: { outcome: "nothing", conversationId: "conversation-1" },
+      });
+      expect(await daily.runEventsOf()).toEqual([
+        CONFIGURED,
+        RUN_REQUESTED,
+        RUN_STARTED,
+        RUN_SETTLED,
+      ]);
+    });
+
+    it("names no run in flight once it started longer ago than a run may take", async () => {
+      const { as, daily } = await project();
+      const member = as({ userId: MEMBER });
+      const { release } = heldTurn(daily);
+      const { requestId } = await member.runBoardDailyRunNow(RUN_NOW);
+      const running = carryOutRequest(daily, requestId);
+      await vi.waitFor(async () => expect(await daily.runEventsOf()).toContain(RUN_STARTED));
+
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(Date.now() + INSIGHT_DAILY_RUN_EXPIRY_MS);
+        expect((await member.getBoardDailyRun(SCOPE)).runInFlight).toBeNull();
+      } finally {
+        vi.useRealTimers();
+        release();
+        await running;
+      }
+    });
+  });
+});
+
+describe("given a member without analytics:view or without langy:create", () => {
+  /** @scenario "Run now asks for analytics:view and langy:create" */
+  it.each([
+    ["without analytics:view", ["langy:create"]],
+    ["without langy:create", VIEW],
+  ])("refuses running a board now %s as forbidden, and requests no run", async (_what, held) => {
+    const { as, daily } = await project();
+
+    await expect(as({ userId: MEMBER, held }).runBoardDailyRunNow(RUN_NOW)).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+
+    expect(await daily.runEventsOf()).toEqual([]);
+  });
+});
+
+describe("given an aggregate project, or a project with release_insights off", () => {
+  /** @scenario "Run now is refused on an aggregate project, and with the flag off" */
+  it("refuses running a board now on an aggregate as read only, and requests no run", async () => {
+    const { as, daily } = await project();
+
+    await expect(
+      as({ userId: MEMBER, isOnAggregate: true }).runBoardDailyRunNow(RUN_NOW),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      cause: { code: "aggregate_project_is_read_only" },
+    });
+
+    expect(await daily.runEventsOf()).toEqual([]);
+  });
+
+  /** @scenario "Run now is refused on an aggregate project, and with the flag off" */
+  it("refuses running a board now with the flag off, and requests no run", async () => {
+    const { as, daily } = await project({ isEnabled: false });
+
+    await expect(as({ userId: MEMBER }).runBoardDailyRunNow(RUN_NOW)).rejects.toMatchObject({
+      cause: { code: "insights_not_enabled" },
+    });
+
+    expect(await daily.runEventsOf()).toEqual([]);
   });
 });

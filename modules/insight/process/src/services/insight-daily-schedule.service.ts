@@ -14,6 +14,7 @@ import {
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
 
+import { INSIGHT_DAILY_RUN_EXPIRY_MS } from "../eventing/insight-daily-run.intent.ts";
 import type { InsightDailyScheduleRepository } from "../repositories/insight-daily-schedule.repository.ts";
 import { dailyScheduleId, pointerName } from "../rules/insight-daily-run.rules.ts";
 import { UNDECIDED_DAILY_RUN_SETTING } from "../rules/insight-daily-schedule-row.rules.ts";
@@ -63,18 +64,25 @@ export class InsightDailyScheduleService {
     return this.members.schedules.findForUser(input);
   }
 
-  /** The person's own setting on the board; a board they never decided on reads `undecided`. */
+  /**
+   * The person's own setting on the board; a board they never decided on reads `undecided`. A
+   * run that started longer ago than a run may take is lost, so it is no run in flight.
+   */
   async getSetting({
     projectId,
     userId,
     board,
   }: InsightBoardDailyRunScope & Reader): Promise<InsightDailyRunSetting> {
-    const [setting] = await this.members.schedules.findSetting({
+    const [setting = UNDECIDED_DAILY_RUN_SETTING] = await this.members.schedules.findSetting({
       projectId,
       userId,
       scheduleId: dailyScheduleId({ projectId, userId, board }),
     });
-    return setting ?? UNDECIDED_DAILY_RUN_SETTING;
+    const { runInFlight } = setting;
+    const isLost =
+      runInFlight !== null &&
+      nowInstant().epochMilliseconds - runInFlight.startedAt >= INSIGHT_DAILY_RUN_EXPIRY_MS;
+    return isLost ? { ...setting, runInFlight: null } : setting;
   }
 
   /**

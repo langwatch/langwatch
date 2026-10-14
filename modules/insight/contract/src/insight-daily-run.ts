@@ -188,6 +188,11 @@ const insightDailyRunSettingSchemaDefinition = z.object({
   lastRun: insightLastRunSchema.nullable(),
   /** Why the system turned it off; null while it is on, and when the person turned it off. */
   offReason: insightScheduleOffReasonSchema.nullable(),
+  /**
+   * The run that started and has not settled, with its Langy conversation. Null when none has,
+   * or it started longer ago than a run may take. `startedAt` is epoch milliseconds.
+   */
+  runInFlight: z.object({ conversationId: z.string(), startedAt: z.number() }).nullable(),
 });
 export interface InsightDailyRunSettingSchema extends Named<
   typeof insightDailyRunSettingSchemaDefinition
@@ -271,6 +276,24 @@ export interface RequestInsightDailyRunInputSchema extends Named<
 export const requestInsightDailyRunInputSchema: RequestInsightDailyRunInputSchema =
   requestInsightDailyRunInputSchemaDefinition;
 export type RequestInsightDailyRunInput = z.input<typeof requestInsightDailyRunInputSchema>;
+
+/** Run now: the caller asks for one run of their own on a board, the run a schedule asks for. */
+const runInsightDailyRunNowInputSchemaDefinition = requestInsightDailyRunInputSchemaDefinition.omit(
+  { userId: true },
+);
+export interface RunInsightDailyRunNowInputSchema extends Named<
+  typeof runInsightDailyRunNowInputSchemaDefinition
+> {}
+export const runInsightDailyRunNowInputSchema: RunInsightDailyRunNowInputSchema =
+  runInsightDailyRunNowInputSchemaDefinition;
+
+/** The request's id; it names no run, since none starts while one is in flight for the board. */
+const insightDailyRunRequestedSchemaDefinition = z.object({ requestId: z.string() });
+export interface InsightDailyRunRequestedSchema extends Named<
+  typeof insightDailyRunRequestedSchemaDefinition
+> {}
+export const insightDailyRunRequestedSchema: InsightDailyRunRequestedSchema =
+  insightDailyRunRequestedSchemaDefinition;
 
 /** The fence tag of the block an answer ended with before the card; read for one release. */
 export const INSIGHT_RUN_FINDINGS_FENCE_TAG = "langwatch-insights";
