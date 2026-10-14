@@ -739,7 +739,7 @@ export const TRACE_MAPPINGS = {
             ? detailKey.slice(EVENT_DETAILS_PREFIX.length)
             : detailKey;
           // Keep the full name when the plain one is already a separate detail.
-          return `event_details.${plain !== detailKey && plain in event.event_details ? detailKey : plain}`;
+          return `event_details.${plain !== detailKey && Object.hasOwn(event.event_details, plain) ? detailKey : plain}`;
         }),
       );
 
@@ -767,9 +767,10 @@ export const TRACE_MAPPINGS = {
           ?.filter((event) => event.event_type === key)
           ?.map((event) => {
             const name = subkey.replace("event_details.", "");
-            return (
-              event.event_details[name] ?? event.event_details[`${EVENT_DETAILS_PREFIX}${name}`]
-            );
+            const details = event.event_details;
+            if (Object.hasOwn(details, name)) return details[name];
+            const stored = `${EVENT_DETAILS_PREFIX}${name}`;
+            return Object.hasOwn(details, stored) ? details[stored] : undefined;
           });
       }
       // `apps/ui` compiles this package under `noImplicitReturns`, and a

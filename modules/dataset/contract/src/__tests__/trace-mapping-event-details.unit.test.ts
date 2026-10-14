@@ -111,3 +111,22 @@ describe("given an event with both a feedback detail and one named event.details
     });
   });
 });
+
+describe("given an event whose stored detail is named like an Object member", () => {
+  const inherited = traceWithDetails({ "event.details.toString": "text" });
+
+  describe("when the subkeys are listed and the plain name is mapped", () => {
+    it("offers and resolves the detail, not the inherited member", () => {
+      const keys = TRACE_MAPPINGS.events.subkeys([inherited], "thumbs_up_down").map((o) => o.key);
+
+      expect(keys).toContain("event_details.toString");
+      expect(
+        TRACE_MAPPINGS.events.mapping({
+          trace: inherited,
+          key: "thumbs_up_down",
+          subkey: "event_details.toString",
+        }),
+      ).toEqual(["text"]);
+    });
+  });
+});
