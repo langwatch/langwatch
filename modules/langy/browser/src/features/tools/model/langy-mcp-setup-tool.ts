@@ -141,9 +141,9 @@ function oauthSteps({ client, url }: { client: McpSetupClient; url: string }): M
     case "chatgpt":
       return [
         {
-          text: "In ChatGPT, turn on developer mode, then add a custom MCP server in the apps settings. In a Business, Enterprise or Edu workspace an admin has to allow developer mode first; on Business only admins and owners can add one.",
+          text: "In ChatGPT on the web, open Plugins (Apps in older workspaces), click + and choose Add custom MCP server. A workspace admin may need to allow custom MCP servers first. Full MCP is on Business and Enterprise/Edu; Pro connects for read and fetch only, with developer mode on.",
         },
-        { text: "Paste the URL above, choose OAuth as the authentication and click Connect." },
+        { text: "Paste the URL above, choose OAuth as the authentication and create it." },
         SIGN_IN_STEP,
       ];
     case "cursor":
