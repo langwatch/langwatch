@@ -33,6 +33,7 @@ function conversation(overrides: Partial<LangyConversationStateData>): LangyConv
     CurrentTurnId: null,
     LastError: null,
     LastModel: null,
+    Origin: "interactive",
     PendingHandoffToken: null,
     PendingHandoffTurnId: null,
     RunToken: null,

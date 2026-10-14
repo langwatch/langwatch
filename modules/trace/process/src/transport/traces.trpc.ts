@@ -311,7 +311,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
-      const filterWhere = app.compileExplorerTraceFilter({
+      const filterWhere = await app.compileExplorerTraceFilter({
         query: input.query ?? "",
         tenantId: input.projectId,
         timeRange: input.timeRange,
@@ -355,7 +355,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
     .procedure("newCount")
     .withPermission("traces:view")
     .handle(async ({ app, input, actor, authorization }) => {
-      const filterWhere = app.compileExplorerTraceFilter({
+      const filterWhere = await app.compileExplorerTraceFilter({
         query: input.query ?? "",
         tenantId: input.projectId,
         timeRange: input.timeRange,

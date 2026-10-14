@@ -190,11 +190,45 @@ function watchPin({
   };
 }
 
+/**
+ * Content changed size (a token, a card, a status line): follow it while we hold the pin. A
+ * column that shrank to the bottom (a new chat) is at the live edge with no scroll to say so.
+ */
+function followContent({
+  el,
+  content,
+  enabled,
+  pinnedRef,
+  setPinned,
+  setCanScroll,
+  follow,
+}: {
+  el: HTMLElement;
+  content: HTMLElement;
+  enabled: boolean;
+  pinnedRef: RefObject<boolean>;
+  setPinned: (pinned: boolean) => void;
+  setCanScroll: (canScroll: boolean) => void;
+  follow: () => void;
+}): () => void {
+  const observer = new ResizeObserver(() => {
+    const { atBottom, overflows } = measureScroller(el);
+    setCanScroll(overflows);
+    if (atBottom) setPinned(true);
+    if (enabled && pinnedRef.current) follow();
+  });
+  observer.observe(content);
+  return () => observer.disconnect();
+}
+
 export interface LangyStickToBottom {
   /** Attach to the scrolling element (`overflow-y: auto`). */
   scrollRef: React.RefObject<HTMLDivElement | null>;
-  /** Attach to the element INSIDE the scroller whose height tracks content. */
-  contentRef: React.RefObject<HTMLDivElement | null>;
+  /**
+   * Attach to the element INSIDE the scroller whose height tracks content. A callback, so a
+   * remounted column (the recents view swapped out and back) is watched afresh.
+   */
+  contentRef: (content: HTMLDivElement | null) => void;
   /** Attach to an empty sentinel as the LAST child of the content. */
   endRef: React.RefObject<HTMLDivElement | null>;
   /** True while auto-follow is engaged (the viewport is at the live edge). */
@@ -216,7 +250,7 @@ export function useLangyStickToBottom({
   enabled?: boolean;
 } = {}): LangyStickToBottom {
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [content, setContent] = useState<HTMLDivElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const [scheduler] = useState(() => new LiveEdgeScheduler(scrollRef, endRef));
   const reduceMotion = useReducedMotion();
@@ -240,23 +274,28 @@ export function useLangyStickToBottom({
     scheduler.request(behavior);
   }, [behavior, scheduler, setPinned]);
 
+  // Keyed on the content element: a remounted column is a new scroller, which starts at its live
+  // edge, and the listeners on the old one would never hear the reader again.
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) return watchPin({ el, setPinned, setCanScroll });
-  }, [setPinned]);
+    if (!el || !content) return;
+    setPinned(true);
+    return watchPin({ el, setPinned, setCanScroll });
+  }, [content, setPinned]);
 
-  // Content got taller (a token, a card, a status line) — follow it, while we hold the pin.
   useEffect(() => {
     const el = scrollRef.current;
-    const content = contentRef.current;
     if (!el || !content || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => {
-      setCanScroll(measureScroller(el).overflows);
-      if (enabled && pinnedRef.current) scheduler.request(behavior);
+    return followContent({
+      el,
+      content,
+      enabled,
+      pinnedRef,
+      setPinned,
+      setCanScroll,
+      follow: () => scheduler.request(behavior),
     });
-    observer.observe(content);
-    return () => observer.disconnect();
-  }, [behavior, scheduler, enabled]);
+  }, [content, behavior, scheduler, enabled, setPinned]);
 
-  return { scrollRef, contentRef, endRef, isPinned, canScroll, jumpToLatest };
+  return { scrollRef, contentRef: setContent, endRef, isPinned, canScroll, jumpToLatest };
 }

@@ -75,7 +75,8 @@ describe.skipIf(!DB_URL)("PrismaIdentityProjectionRepository", () => {
   async function withUserRow() {
     await prisma!.user.upsert({
       where: { id: USER },
-      create: { id: USER, email: `${USER}@acme.com` },
+      // Addresses are stored lower-cased; the fact below still names it with capitals.
+      create: { id: USER, email: `${USER}@acme.com`.toLowerCase() },
       update: {},
     });
   }

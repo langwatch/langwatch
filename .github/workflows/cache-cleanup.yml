@@ -1,0 +1,31 @@
+# A closed pull request's caches are unreadable by anyone else, so delete them
+# rather than leave them to count against the repository limit until they
+# expire. Fork pull requests never saved one: they only read main's.
+name: cache-cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Delete this pull request's caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CACHE_REF: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: |
+          # A failed listing fails the job; a single failed delete only warns.
+          ids=$(gh cache list --ref "$CACHE_REF" --limit 1000 --json id --jq '.[].id') || {
+            echo "::error::Could not list caches on $CACHE_REF; nothing deleted."
+            exit 1
+          }
+          for id in $ids; do
+            gh cache delete "$id" || echo "::warning::Could not delete cache $id; continuing."
+          done

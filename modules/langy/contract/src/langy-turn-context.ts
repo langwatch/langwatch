@@ -92,8 +92,8 @@ export const LANGY_TURN_SKILL_IDS = [
   "support.bug-reports",
 ] as const;
 
-/** The one flag the mutually-exclusive chart-authoring skills pivot on. */
-export const LANGY_SKILL_GATE_FLAG = "release_custom_chart_playground" as const;
+/** The one flag the mutually-exclusive chart-authoring skills pivot on: Dashboards on, widgets. */
+export const LANGY_SKILL_GATE_FLAG = "release_dashboards" as const;
 
 export type LangySkillGateFlag = typeof LANGY_SKILL_GATE_FLAG;
 

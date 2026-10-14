@@ -87,18 +87,20 @@ function accumulateReservedTokenSums(
 }
 
 /**
- * The slim `trace_analytics` row's fold step: one normalised span over the
- * trace state, skipping IO/prompt accumulation. `spanCost` is the span's price,
- * looked up by the caller. Synthetic spans leave the state untouched.
+ * The slim `trace_analytics` row's fold step: one normalised span over the trace state, skipping
+ * IO/prompt accumulation. `spanCost` is the span's price and `spanUnpriced` whether no price rule
+ * covers it, both looked up by the caller. Synthetic spans leave the state untouched.
  */
 export function foldSpanIntoTraceAnalytics({
   state,
   span,
   spanCost,
+  spanUnpriced,
 }: {
   state: TraceSummaryData;
   span: NormalizedSpan;
   spanCost: number;
+  spanUnpriced: boolean;
 }): TraceSummaryData {
   if (SYNTHETIC_TRACE_SPAN_NAMES.has(span.name)) {
     return state;
@@ -109,6 +111,7 @@ export function foldSpanIntoTraceAnalytics({
     state,
     span,
     spanCost,
+    spanUnpriced,
     totalDurationMs: timing.totalDurationMs,
   });
   const status = accumulateSpanStatus({ state, span });
@@ -149,6 +152,8 @@ export function foldSpanIntoTraceAnalytics({
     rootSpanStartTimeMs,
     totalCost: tokens.totalCost,
     nonBilledCost: tokens.nonBilledCost,
+    unpricedSpanCount: tokens.unpricedSpanCount,
+    unpricedModels: tokens.unpricedModels,
     totalPromptTokenCount: tokens.totalPromptTokenCount,
     totalCompletionTokenCount: tokens.totalCompletionTokenCount,
     timeToFirstTokenMs: tokens.timeToFirstTokenMs,
