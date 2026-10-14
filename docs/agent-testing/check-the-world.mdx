@@ -76,7 +76,7 @@ def state_of_world(thread_id: str, charge_id: str) -> dict:
     }
 
 
-@langwatch.connect_agent(name="support-agent", environment="staging")
+@langwatch.connect_agent(name="support-agent")
 async def support_agent(
     messages: list[dict],
     thread_id: str,
@@ -121,24 +121,43 @@ state_of_world, indicating it was left untouched.
 
 ### Check a value without the judge
 
-For an exact check, attach an evaluator to the [test suite](/agent-testing/evaluators) or the run plan, and map one of its inputs to the span output: source **Trace**, tool call `state_of_world`, `output`. In the API, the mapping is:
+For an exact check, compare one fact. Add a second tool span that returns only that number:
+
+```python
+@langwatch.span(name="refund_total", type="tool")
+def refund_total(thread_id: str) -> float:
+    return round(sum(r.amount for r in payments.refunds(namespace=thread_id)), 2)
+```
+
+Call it after the turn, next to `state_of_world`. Then attach an Exact Match evaluator to the [test suite](/agent-testing/evaluators) or the run plan:
+
+1. Run the scenario once first. The tool calls picker lists only spans that a past run produced, so `refund_total` is not there before that.
+2. Map `output` to source **Trace**, tool call `refund_total`, `output`.
+3. Set `expected_output` to the literal `49.95`.
+
+When you attach the evaluator, `output` defaults to the agent's last message. Change it to the tool call, or the check compares the wrong text.
+
+Exact Match compares two numbers as numbers, so `49.95` and `49.950` both pass. In the API, the attachment is:
 
 ```json
 {
-  "evaluatorId": "evaluator_abc123",
-  "required": true,
-  "mappings": {
-    "output": { "type": "source", "sourceId": "trace", "path": ["tool_calls", "state_of_world", "output"] },
-    "expected_output": { "type": "value", "value": "{\"refund_count\":1,\"refund_total\":49.95,\"original_charge_status\":\"captured\"}" }
-  }
+  "evaluators": [
+    {
+      "id": "attachment_abc123",
+      "evaluatorId": "evaluator_abc123",
+      "required": true,
+      "mappings": {
+        "output": { "type": "source", "sourceId": "trace", "path": ["tool_calls", "refund_total", "output"] },
+        "expected_output": { "type": "value", "value": "49.95" }
+      }
+    }
+  ]
 }
 ```
 
-Set this mapping by hand. The platform never infers a tool call mapping.
+Set this mapping by hand. The platform never infers a tool call mapping. The last `refund_total` call wins, by start time. That is the value after the last turn.
 
-- The last `state_of_world` call wins, by start time. That is the state after the last turn.
-- The output arrives as JSON text.
-- Exact Match compares two numbers as numbers. It does not compare objects: with its default settings it strips punctuation and spacing and compares the rest as text, so the keys must come in the same order. To compare one fact, emit a span with that one fact, or use the judge.
+To compare the whole `state_of_world` object instead, turn `remove_punctuation` off and `case_sensitive` on. The defaults strip punctuation and ignore case, so a wrong total of `499.5` would match `49.95`. Exact Match then compares text, not fields: the keys must come in the same order as in the expected value. One fact is safer.
 
 ## Caveats
 
