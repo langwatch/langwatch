@@ -574,10 +574,11 @@ export async function createDemoRepo({
 }
 
 /** Folders a scenario can share that are NOT a demo app (README.md "local-control-fixture.ts"). */
-export type FixtureFolderName = "acme-notes";
+export type FixtureFolderName = "acme-notes" | "acme-pocket";
 
 const FIXTURE_FOLDER: Record<FixtureFolderName, string> = {
   "acme-notes": path.join(REPO_ROOT, "dev", "dogfood", "acme-notes", "python"),
+  "acme-pocket": path.join(REPO_ROOT, "dev", "dogfood", "acme-pocket"),
 };
 
 /** A shared folder that is not a demo repository, and what a test reads of it. */
@@ -1375,8 +1376,7 @@ function dispatchTurnFrame(frame: string, onEntry: (entry: StreamEntry) => void)
     if (!payload) continue;
     try {
       const parsed: unknown = JSON.parse(payload);
-      if (typeof parsed !== "object" || parsed === null || !("json" in parsed)) continue;
-      if (isStreamEntry(parsed.json)) onEntry(parsed.json);
+      if (isStreamEntry(parsed)) onEntry(parsed);
     } catch (error) {
       // A frame the suite does not understand is not this suite's business.
       console.debug(`[fixture] unparsed stream frame: ${String(error)}`);
@@ -1398,10 +1398,11 @@ async function readTurnEntries({
   signal: AbortSignal;
 }): Promise<void> {
   const input = encodeURIComponent(
-    JSON.stringify({ json: { projectId: CONFIG.PROJECT_ID, conversationId, turnId } }),
+    JSON.stringify({ projectId: CONFIG.PROJECT_ID, conversationId, turnId }),
   );
+  // The live channel opens only from the app's own origin (BrowserOriginGuard).
   const response = await fetch(`${APP_BASE}/api/sse/langy.onTurnStream?input=${input}`, {
-    headers: { Cookie: cookie, Accept: "text/event-stream" },
+    headers: { Cookie: cookie, Accept: "text/event-stream", Origin: APP_BASE },
     signal,
   });
   if (!response.ok || !response.body) return;
