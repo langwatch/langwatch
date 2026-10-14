@@ -32947,10 +32947,10 @@ The server speaks the Streamable HTTP transport and supports OAuth Authorization
 
 ### Run it locally instead
 
-Coding assistants can also run the MCP server on your machine with your API key. For Claude Code:
+Coding assistants can also run the MCP server on your machine with your API key and the project to work in. For Claude Code:
 
 ```bash
-claude mcp add langwatch --env LANGWATCH_API_KEY=your-api-key-here -- npx -y @langwatch/mcp-server
+claude mcp add langwatch --env LANGWATCH_API_KEY=your-api-key-here --env LANGWATCH_PROJECT_ID=your-project-id -- npx -y @langwatch/mcp-server
 ```
 
 For other editors, add an entry named `langwatch` under your editor's MCP servers with these fields:
@@ -32958,6 +32958,7 @@ For other editors, add an entry named `langwatch` under your editor's MCP server
 - `command`: `npx`
 - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
 - `env.LANGWATCH_API_KEY`: your LangWatch API key
+- `env.LANGWATCH_PROJECT_ID`: your LangWatch project ID
 
 <Info>
 This page intentionally describes the config in prose rather than as a JSON snippet. Some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104) for details. The bash `claude mcp add` form above is safe: the package name is followed by a whitespace terminator.
@@ -32970,6 +32971,7 @@ Once connected, open your AI assistant's chat and ask it to help with LangWatch 
 | Environment Variable | CLI Argument | Description |
 |---------------------|-------------|-------------|
 | `LANGWATCH_API_KEY` | `--apiKey` | API key for authentication |
+| `LANGWATCH_PROJECT_ID` | `--projectId` | The project to work in; needed for a personal API key, which can reach several projects |
 | `LANGWATCH_ENDPOINT` | `--endpoint` | API endpoint (default: `https://app.langwatch.ai`) |
 
 ### Two Modes
