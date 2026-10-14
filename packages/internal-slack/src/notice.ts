@@ -193,7 +193,6 @@ const cardText = ({ text, limit }: { text: NoticeText; limit: number }): MrkdwnE
   text: clipMrkdwn({ text, limit }),
 });
 
-/** The card look: one card block, then where and when it was sent. */
 function composeCard({
   noticeId,
   layout,
