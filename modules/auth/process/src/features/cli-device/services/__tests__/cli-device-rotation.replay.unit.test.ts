@@ -48,12 +48,12 @@ function rotationWorld() {
     settlements: MemoryCliDeviceSettlementChannel.create(),
     rotations,
   });
-  const state = { activeMembership: true, otherProjectReachable: false };
+  const state = { activeMembership: true, otherProjectReachable: false, maxDurationDays: 0 };
   const directory: CliDeviceDirectory = {
     getOrganizationIdBySsoDomain: () => Promise.reject(new OrganizationNotFoundError()),
     getPerson: () => Promise.resolve({ id: USER_ID, name: "Jane", email: "jane@example.test" }),
     getOrganization: () => Promise.resolve({ id: ORGANIZATION_ID, name: "Acme", slug: "acme" }),
-    maxSessionDurationDays: () => Promise.resolve(0),
+    maxSessionDurationDays: () => Promise.resolve(state.maxDurationDays),
     hasActiveMembership: () => Promise.resolve(state.activeMembership),
     findActiveMemberRole: () => Promise.resolve(state.activeMembership ? "ADMIN" : null),
     getLiveProject: () => Promise.reject(new ProjectNotFoundError()),
@@ -78,11 +78,15 @@ function rotationWorld() {
     publicBaseUrl: () => "https://app.test",
   };
   const rotation = CliDeviceRotationService.create({ flow });
-  const signIn = () =>
+  const signIn = ({
+    projectId,
+    startedAtMs = Date.now(),
+  }: { projectId?: string; startedAtMs?: number } = {}) =>
     sessions.mintSession({
       userId: USER_ID,
       organizationId: ORGANIZATION_ID,
-      clientInfo: { hostname: "laptop", session_started_at: Date.now() },
+      projectId,
+      clientInfo: { hostname: "laptop", session_started_at: startedAtMs },
     });
 
   return Object.assign(state, { clock, store, rotations, sessions, rotation, signIn });
@@ -160,6 +164,44 @@ describe("presenting a refresh token its rotation already spent", () => {
         world.activeMembership = false;
 
         await expect(retry()).rejects.toMatchObject(spent);
+      });
+
+      it("refuses the retry once the session outlived the organization's maximum duration", async () => {
+        const old = await world.signIn({ startedAtMs: Date.now() - 2 * 86_400_000 });
+        await world.rotation.rotateSession({ refreshToken: old.refreshToken });
+        world.maxDurationDays = 1;
+
+        await expect(
+          world.rotation.rotateSession({ refreshToken: old.refreshToken }),
+        ).rejects.toMatchObject(spent);
+      });
+
+      /** @scenario The replay window re-proves the project the pair is bound to */
+      it("refuses the retry once the person lost the project the pair is bound to", async () => {
+        world.otherProjectReachable = true;
+        const bound = await world.signIn({ projectId: OTHER_PROJECT.id });
+        const rotated = await world.rotation.rotateSession({ refreshToken: bound.refreshToken });
+        expect(rotated.project?.id).toBe(OTHER_PROJECT.id);
+        world.otherProjectReachable = false;
+
+        await expect(
+          world.rotation.rotateSession({ refreshToken: bound.refreshToken }),
+        ).rejects.toMatchObject({ refusal: { error: "forbidden" } });
+      });
+    });
+
+    describe("when the shared pair does not read as a rotation", () => {
+      it("refuses the retry as a spent token, not a server error", async () => {
+        const fresh = await world.signIn();
+        await world.rotations.hold({
+          address: rotationReplayAddress(fresh.refreshToken),
+          value: "not json",
+          ttlMs: ROTATION_REPLAY_SECONDS * 1000,
+        });
+
+        await expect(
+          world.rotation.rotateSession({ refreshToken: fresh.refreshToken }),
+        ).rejects.toMatchObject(spent);
       });
     });
 

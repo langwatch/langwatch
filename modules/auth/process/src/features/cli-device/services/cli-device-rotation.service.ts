@@ -107,15 +107,11 @@ async function getReplayedRotation({
     throw refused("invalid_grant", "Refresh token is invalid or revoked", 401);
   }
 
-  // The pair's own refresh token is the session's liveness: logout and revocation drop it.
+  // The pair's own refresh token is the session's liveness: logout and revocation drop it. The
+  // pair is admitted, and its project re-proved, exactly as presenting that pair would be.
   const record = await flow.sessions().getRefreshToken(remembered.refreshToken);
-  const live =
-    nowInstant().epochMilliseconds <= record.expires_at &&
-    (await flow.directory().hasActiveMembership({
-      userId: record.user_id,
-      organizationId: record.organization_id,
-    }));
-  if (!live) throw refused("invalid_grant", "Refresh token is invalid or revoked", 401);
+  await assertSessionAdmitted({ flow, refreshToken: remembered.refreshToken, record });
+  if (project !== undefined) await reScopedProjectOf({ flow, record, projectRef: project.id });
 
   logger.info(
     { userId: record.user_id, organizationId: record.organization_id },
@@ -125,7 +121,6 @@ async function getReplayedRotation({
   return remembered;
 }
 
-/** The rotation a held claim buys: re-proves the session, then rotates or forks it. */
 /** Refuses a rotation the session may no longer make; answers the anchor and policy it used. */
 async function assertSessionAdmitted({
   flow,
@@ -264,6 +259,7 @@ async function retireSessionKey({
   }
 }
 
+/** The rotation a held claim buys: re-proves the session, then rotates or forks it. */
 async function rotateClaimed({
   flow,
   refreshToken: refresh_token,

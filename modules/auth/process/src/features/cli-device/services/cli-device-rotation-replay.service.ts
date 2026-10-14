@@ -28,6 +28,15 @@ export function spentRefreshToken(): CliDeviceFlowRefusedError {
   });
 }
 
+/** The shared value as JSON, or `undefined` when it does not parse, so the schema refuses it. */
+function parsedJson(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+}
+
 /** What one rotation under the claim came to: a rotated pair to share, or a fork never shared. */
 export type CliRotationOutcome =
   | Readonly<{ rotated: CliRememberedRotation }>
@@ -90,7 +99,7 @@ export class CliDeviceRotationReplayService {
         },
       });
       if (minted) return { session: minted, replayed: false };
-      const remembered = cliRememberedRotationSchema.safeParse(JSON.parse(value));
+      const remembered = cliRememberedRotationSchema.safeParse(parsedJson(value));
       if (!remembered.success) throw spentRefreshToken();
 
       return { session: remembered.data, replayed: true };

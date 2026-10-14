@@ -76,9 +76,16 @@ Feature: A project login is a person's session capped at one project
   @unit
   Scenario: The replay window never brings back a session that was ended
     Given a refresh token that was rotated less than 60 seconds ago
-    And the session was since logged out, revoked, or its person left the organization
+    And the session was since logged out, revoked, outlived the organization's maximum session duration, or its person left the organization
     When the old refresh token is presented again
     Then it is answered 401 "invalid_grant"
+
+  @unit
+  Scenario: The replay window re-proves the project the pair is bound to
+    Given a project session whose refresh token was rotated less than 60 seconds ago
+    And the person can no longer view that project
+    When the old refresh token is presented again
+    Then it is answered 403 "forbidden"
 
   @integration
   Scenario: A session consented to one project cannot be re-scoped to another
