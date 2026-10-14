@@ -11,8 +11,8 @@ import type {
   EventingClickHouseClientResolver,
 } from "../../clickhouse-client-resolver.ts";
 import type { EventingRetentionConfiguration } from "../../eventing-server-runtime.ts";
-import { EventLogAppendFold, type EventLogInsert } from "./event-log-append-fold.ts";
 import { type EventLogIdIndex, eventLogOccurredRange } from "../../tables/event-log-id-index.ts";
+import { EventLogAppendFold, type EventLogInsert } from "./event-log-append-fold.ts";
 
 const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
 
