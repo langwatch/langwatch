@@ -1,7 +1,7 @@
 # Single-session lookups read only the data that can hold the session
 #
 # Implementation:
-#   packages/clickhouse-migrations/migrations/00106_add_coding_agent_sessions_session_id_index.sql (the SessionId skip index)
+#   packages/clickhouse-migrations/migrations/00110_add_coding_agent_sessions_session_id_index.sql (the SessionId skip index)
 #   modules/coding-agent/process/src/repositories/clickhouse/clickhouse.coding-agent-session.repository.ts (findBySessionId)
 #
 # Related specs:

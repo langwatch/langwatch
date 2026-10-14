@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * @integration
- * The coding_agent_sessions SessionId skip index (migration 00106), measured as rows read by
+ * The coding_agent_sessions SessionId skip index (migration 00110), measured as rows read by
  * the repository's own lookup. The suite cannot cover the inline backfill of older parts.
  * @see specs/coding-agent/session-lookup-pruning.feature
  */
