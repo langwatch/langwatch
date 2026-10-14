@@ -38,7 +38,11 @@ export interface EvaluatorCodeExecution {
 }
 
 export class EvaluatorCodeExecutionService implements EvaluatorCodeExecution {
-  static create({ workflows }: { workflows: EvaluatorStudioRunner }): EvaluatorCodeExecutionService {
+  static create({
+    workflows,
+  }: {
+    workflows: EvaluatorStudioRunner;
+  }): EvaluatorCodeExecutionService {
     return new EvaluatorCodeExecutionService(workflows);
   }
 

@@ -1,4 +1,4 @@
-/** A code evaluator runs on the project's engine through the workflow module, never refusing by default. */
+/** A code evaluator runs on the project's engine through the workflow module. */
 
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioClientEvent, WorkflowApi } from "@langwatch/workflow-contract";
@@ -8,7 +8,7 @@ import { EvaluatorCodeExecutionService } from "../evaluator-code-execution.servi
 
 type SyncInput = Parameters<WorkflowApi["executeStudioEventSync"]>[0];
 
-const event = { type: "execute_flow", payload: {} } as unknown as StudioClientEvent;
+const event: StudioClientEvent = { type: "is_alive", payload: {} };
 
 function buildService(answer: Awaited<ReturnType<WorkflowApi["executeStudioEventSync"]>>) {
   const calls: SyncInput[] = [];
