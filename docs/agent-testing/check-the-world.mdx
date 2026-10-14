@@ -60,6 +60,8 @@ The agent builds the data for the case on the first turn, and reports the state 
 4. Call it once after the setup, and once after each turn.
 5. Return the session, so the next turn finds the same data.
 
+The name `state_of_world` is only an example: any span name works, and the platform gives it no special meaning, so the evaluator mapping uses the name you choose.
+
 ```python
 import langwatch
 
