@@ -64,6 +64,7 @@ import {
   type WorkflowRunOrigin,
   type WorkflowRunPrincipal,
   type WorkflowSourceRow,
+  type WorkflowStudioSyncAnswer,
   type WorkflowVersion,
   type WorkflowVersionHistoryEntry,
   type WorkflowVersionHistoryMode,
@@ -286,6 +287,8 @@ interface WorkflowInfrastructure {
   studioDispatch?: WorkflowStudioDispatchService;
   /** Relays a scenario child's turn to its project's own engine. */
   executeSyncRelay: WorkflowExecuteSyncRelayService;
+  /** The project's engine, for a peer's prepared event run synchronously. */
+  nlpRuntime: WorkflowNlpRuntime;
   /** The ONE workflow graph service on this process. */
   workflows: WorkflowService;
   /** The dataset copies a Studio graph carries with it into another project. */
@@ -569,6 +572,7 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
       }),
       publications: publicationsOf(setup.repositories.lineage),
       signals: WorkflowSignalsService.create(),
+      nlpRuntime,
       executeSyncRelay: WorkflowExecuteSyncRelayService.create({
         runtime: nlpRuntime,
         turnCeilingMs: relayTurnCeilingMs({ configured: setup.config.relayTurnCeilingMs }),
@@ -693,6 +697,33 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     principal?: WorkflowRunPrincipal | undefined;
   }): Promise<StudioClientEvent> {
     return this.#infrastructure.workflows.enrichStudioEvent(input);
+  }
+
+  /** One prepared Studio event run to completion on the project's engine. */
+  async executeStudioEventSync(input: {
+    projectId: string;
+    event: StudioClientEvent;
+    origin: WorkflowRunOrigin;
+    causalityDepth?: number;
+    parentTrace?: { traceId: string; parentSpanId: string };
+  }): Promise<WorkflowStudioSyncAnswer> {
+    const response = await this.#infrastructure.nlpRuntime.dispatch({
+      projectId: input.projectId,
+      body: input.event,
+      origin: input.origin,
+      ...(input.causalityDepth === undefined ? {} : { causalityDepth: input.causalityDepth }),
+      ...(input.parentTrace ? { parentTrace: input.parentTrace } : {}),
+    });
+
+    const text = await response.text();
+    let body: unknown = text;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      // A gateway's HTML error page stays text; the caller branches on `ok` first.
+    }
+
+    return { ok: response.ok, status: response.status, statusText: response.statusText, body };
   }
 
   /** The evaluator-fields shape a peer's guard and run read off this workflow. */
