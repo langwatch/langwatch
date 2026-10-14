@@ -331,6 +331,7 @@ EXPOSE 5560
 # `pnpm run start:prepare:db`). Those commands still work: each warns on stderr and runs the
 # new equivalent. Outside any workspace, so pnpm needs no install there.
 COPY infra/docker/compat/platform-app/package.json /app/platform/app/package.json
+COPY infra/docker/compat/platform-app/task.sh /app/platform/app/task.sh
 
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]

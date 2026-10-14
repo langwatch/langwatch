@@ -35,6 +35,13 @@ Feature: The worker runs the upgrade from every entry point; the api never migra
     And a script with no equivalent, such as `prisma:seed`, warns and exits non-zero
 
   @unit
+  Scenario: An old task name from the old chart still runs its new task
+    Given the old chart runs `pnpm run task renderLwqlAccessConfig --out /render` in /app/platform/app
+    When the compat task script runs
+    Then it warns on stderr and runs `lwql-render-access-config` with LWQL_RENDER_OUT_DIR set to /render
+    And an old task name with no equivalent warns and exits non-zero
+
+  @unit
   Scenario: The one preparation script runs the upgrade and nothing else
     Given the api's preparation script
     When an entry point runs it
