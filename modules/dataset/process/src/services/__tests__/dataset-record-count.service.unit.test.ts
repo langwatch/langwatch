@@ -132,6 +132,22 @@ describe("DatasetRecordCountService", () => {
     });
   });
 
+  describe("given an archived dataset", () => {
+    describe("when its count is asked for by id", () => {
+      it("answers nothing for it", async () => {
+        const { repository, records } = seeded({
+          datasets: [makeDataset({ id: "archived", archivedAt: new Date("2026-02-01") })],
+          entries: { archived: 3 },
+        });
+        const service = DatasetRecordCountService.create({ datasets: repository, records });
+
+        await expect(
+          service.countRecords({ projectId: PROJECT_ID, datasetIds: ["archived"] }),
+        ).resolves.toEqual([]);
+      });
+    });
+  });
+
   describe("given entries were added to a dataset after it was counted", () => {
     describe("when its entries are counted again", () => {
       /** @scenario "An entry count refreshes after records are added" */

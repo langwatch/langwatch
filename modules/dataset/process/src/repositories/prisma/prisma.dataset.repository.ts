@@ -116,7 +116,7 @@ export class PrismaDatasetRepository
   }): Promise<DatasetRecordCountColumns[]> {
     if (input.datasetIds.length === 0) return [];
     const rows = await this.database.dataset.findMany({
-      where: { projectId: input.projectId, id: { in: [...input.datasetIds] } },
+      where: { projectId: input.projectId, id: { in: [...input.datasetIds] }, archivedAt: null },
       select: { id: true, contentLayout: true, useS3: true, rowCount: true, s3RecordCount: true },
     });
     return rows.map((row) => datasetRecordCountColumnsSchema.parse(row));

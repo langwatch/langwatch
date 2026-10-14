@@ -33,7 +33,10 @@ function eitherSignal(
   const follow = () => controller.abort(signal?.reason);
   if (signal?.aborted) follow();
   else signal?.addEventListener("abort", follow, { once: true });
+  let released = false;
   const release = () => {
+    if (released) return;
+    released = true;
     clearTimeout(timer);
     signal?.removeEventListener("abort", follow);
   };
@@ -71,8 +74,7 @@ export function readTimeoutFetch({
 
 /**
  * Headers can arrive long before the body, so the limit and the caller's cancel stay on until the
- * body ends: an error (the abort among them) needs no release, since the timer can only abort a
- * read that is already over.
+ * body ends, fails or is cancelled; each of those releases them.
  */
 function releasedWithBody({
   response,
@@ -85,7 +87,27 @@ function releasedWithBody({
     release();
     return response;
   }
-  const body = response.body.pipeThrough(new TransformStream({ flush: release }));
+  const reader = response.body.getReader();
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const chunk = await reader.read();
+        if (chunk.done) {
+          release();
+          controller.close();
+          return;
+        }
+        controller.enqueue(chunk.value);
+      } catch (error) {
+        release();
+        controller.error(error);
+      }
+    },
+    cancel(reason) {
+      release();
+      return reader.cancel(reason);
+    },
+  });
   return new Response(body, {
     status: response.status,
     statusText: response.statusText,

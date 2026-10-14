@@ -92,15 +92,41 @@ describe("readTimeoutFetch", () => {
   });
 
   describe("given reads that share one long-lived signal", () => {
+    let page: AbortController;
+    let added: ReturnType<typeof vi.spyOn>;
+    let removed: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      page = new AbortController();
+      added = vi.spyOn(page.signal, "addEventListener");
+      removed = vi.spyOn(page.signal, "removeEventListener");
+    });
+
     it("leaves no listener on it once each read's body has been read", async () => {
-      const page = new AbortController();
-      const added = vi.spyOn(page.signal, "addEventListener");
-      const removed = vi.spyOn(page.signal, "removeEventListener");
       const answering = vi.fn<typeof globalThis.fetch>(async () => new Response("{}"));
       const send = readTimeoutFetch({ fetch: answering });
 
       await (await send("/api/trpc/a", { signal: page.signal })).text();
       await (await send("/api/trpc/b", { signal: page.signal })).text();
+
+      expect(removed).toHaveBeenCalledTimes(added.mock.calls.length);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("leaves no listener on it when a read's body fails or is cancelled", async () => {
+      const failing = readTimeoutFetch({
+        fetch: async () =>
+          new Response(
+            new ReadableStream({
+              pull: (controller) => controller.error(new Error("connection reset")),
+            }),
+          ),
+      });
+      const endless = readTimeoutFetch({ fetch: async () => new Response(new ReadableStream()) });
+
+      await expect((await failing("/api/trpc/a", { signal: page.signal })).text()).rejects.toThrow(
+        "connection reset",
+      );
+      await (await endless("/api/trpc/b", { signal: page.signal })).body?.cancel();
 
       expect(removed).toHaveBeenCalledTimes(added.mock.calls.length);
       expect(vi.getTimerCount()).toBe(0);

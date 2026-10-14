@@ -208,16 +208,17 @@ async function datasetByIds({
   const matched = ids
     .map((id) => datasets.find((candidate) => matchesId(candidate, id, ["id", "slug"])))
     .filter((dataset) => dataset !== undefined);
-  const counts = await utils.dataset.recordCounts.fetch({
-    projectId,
-    datasetIds: matched.map((dataset) => dataset.id),
-  });
+  const counts = await utils.dataset.recordCounts
+    .fetch({ projectId, datasetIds: matched.map((dataset) => dataset.id) })
+    .catch(() => []);
   const rows: CapabilityHydratedRow[] = matched.map((dataset) => {
-    const records = counts.find((count) => count.datasetId === dataset.id)?.recordCount ?? 0;
+    const records = counts.find((count) => count.datasetId === dataset.id)?.recordCount;
     return {
       id: dataset.id,
       primary: dataset.name,
-      secondary: `${records.toLocaleString()} ${records === 1 ? "record" : "records"}`,
+      ...(records === undefined
+        ? {}
+        : { secondary: `${records.toLocaleString()} ${records === 1 ? "record" : "records"}` }),
     };
   });
   return { rows };

@@ -54,7 +54,7 @@ describe("dataset picker list", () => {
     renderPicker(vi.fn(), new Map());
 
     expect(screen.getByTestId("dataset-card-turn 10")).toBeInTheDocument();
-    expect(screen.getByText("… entries")).toBeInTheDocument();
+    expect(screen.getByLabelText("Counting entries")).toBeInTheDocument();
   });
 
   /** @scenario Picking a dataset binds it to the node */

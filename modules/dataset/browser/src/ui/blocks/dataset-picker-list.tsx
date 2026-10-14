@@ -10,6 +10,7 @@ import {
   chakra,
   HStack,
   Input,
+  Skeleton,
   Spinner,
   Text,
   VStack,
@@ -168,7 +169,11 @@ function DatasetCard({
             {name}
           </Text>
           <HStack gap={2} fontSize="xs" color="fg.muted">
-            <Text>{entryCount === undefined ? "… entries" : `${entryCount} entries`}</Text>
+            {entryCount === undefined ? (
+              <Skeleton height="1em" width="4.5em" aria-label="Counting entries" />
+            ) : (
+              <Text>{entryCount} entries</Text>
+            )}
             <Text>•</Text>
             <Text>{columnCount} columns</Text>
             <Text>•</Text>

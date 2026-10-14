@@ -21,7 +21,14 @@ import {
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Badge, Button, HStack, Text, useDisclosure } from "@langwatch/design-system/primitives";
+import {
+  Badge,
+  Button,
+  HStack,
+  Skeleton,
+  Text,
+  useDisclosure,
+} from "@langwatch/design-system/primitives";
 import { AggregateReadOnlyGate } from "@langwatch/error-views";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { readableDate } from "@langwatch/time";
@@ -181,14 +188,17 @@ function DatasetTable({
   );
 }
 
-/** The entry count, or a muted placeholder while it is still being counted. */
 function RecordCount({ count }: { count: number | undefined }) {
   if (count !== undefined) return <>{count}</>;
 
   return (
-    <Text as="span" color="fg.muted" aria-label="Counting entries">
-      …
-    </Text>
+    <Skeleton
+      display="inline-block"
+      height="1em"
+      width="2.5em"
+      verticalAlign="middle"
+      aria-label="Counting entries"
+    />
   );
 }
 

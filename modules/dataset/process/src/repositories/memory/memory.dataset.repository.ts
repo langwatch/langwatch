@@ -122,7 +122,10 @@ export class MemoryDatasetRepository implements DatasetRepository {
   }): Promise<DatasetRecordCountColumns[]> {
     return this.#database
       .datasets()
-      .filter((row) => row.projectId === input.projectId && input.datasetIds.includes(row.id))
+      .filter(
+        (row) =>
+          row.projectId === input.projectId && !row.archivedAt && input.datasetIds.includes(row.id),
+      )
       .map(({ id, contentLayout, useS3, rowCount, s3RecordCount }) =>
         datasetRecordCountColumnsSchema.parse({
           id,
