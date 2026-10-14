@@ -250,9 +250,10 @@ export class McpStreamableTransportService {
 
     const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => generate(SESSION_KSUID_RESOURCE).toString(),
-      onsessioninitialized: (id) => {
+      onsessioninitialized: async (id) => {
         sessions.streamable.set(id, sessions.openSession({ transport, apiKey, projectId, userId }));
-        sessions.storeRecordInBackground({ sessionId: id, apiKey, projectId, userId });
+        // The SDK awaits this before it answers with the id, so the record precedes any DELETE.
+        await sessions.storeRecord({ sessionId: id, apiKey, projectId, userId });
       },
     });
     transport.onclose = () => this.#forgetLocalCopy(transport);

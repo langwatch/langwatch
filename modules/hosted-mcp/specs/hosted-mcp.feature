@@ -81,6 +81,12 @@ Feature: Hosted MCP answers main's root paths on the api process
     When the session is used and its record is rewritten for a refreshed token
     Then the record still ends within those ten seconds
 
+  @unit
+  Scenario: A late rewrite never brings back a session the client ended
+    Given a client ended its session with DELETE
+    When a rewrite for its refreshed token lands afterwards
+    Then the session's record stays removed
+
   @integration
   Scenario: A session survives the replica that opened it shutting down
     Given a session opened on a replica that is then shut down for a deploy

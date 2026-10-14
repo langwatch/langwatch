@@ -65,34 +65,38 @@ export class RedisMcpSessionRepository extends McpSessionRepository {
     return this.#redis !== null;
   }
 
-  async store({
-    sessionId,
-    apiKey,
-    projectId,
-    userId,
-  }: {
+  async store(input: {
     sessionId: string;
     apiKey: string;
     projectId?: string;
     userId?: string;
   }): Promise<void> {
     if (!this.#redis) return;
-    const encryptedApiKey = this.#cipher.encrypt(apiKey);
-    const recordKey = `${LAYOUT.record}${sessionId}`;
-    // A record rewritten for a refreshed token keeps the time its session has left.
-    const secondsLeft = await this.#redis.ttl(recordKey);
-    await this.#redis.set(
-      recordKey,
-      JSON.stringify({
-        encryptedApiKey,
-        projectId,
-        userId,
-        createdAt: nowInstant().epochMilliseconds,
-      }),
-      "EX",
-      secondsLeft > 0 ? secondsLeft : LAYOUT.ttlSeconds,
-    );
-    await this.#markActive({ sessionId, apiKey });
+    const recordKey = `${LAYOUT.record}${input.sessionId}`;
+    await this.#redis.set(recordKey, this.#serialize(input), "EX", LAYOUT.ttlSeconds, "NX");
+    await this.#markActive(input);
+  }
+
+  async rewrite(input: {
+    sessionId: string;
+    apiKey: string;
+    projectId?: string;
+    userId?: string;
+  }): Promise<void> {
+    if (!this.#redis) return;
+    const recordKey = `${LAYOUT.record}${input.sessionId}`;
+    // One conditional write, so a record removed in the meantime is not brought back.
+    const written = await this.#redis.set(recordKey, this.#serialize(input), "KEEPTTL", "XX");
+    if (written === "OK") await this.#markActive(input);
+  }
+
+  #serialize(input: { apiKey: string; projectId?: string; userId?: string }): string {
+    return JSON.stringify({
+      encryptedApiKey: this.#cipher.encrypt(input.apiKey),
+      projectId: input.projectId,
+      userId: input.userId,
+      createdAt: nowInstant().epochMilliseconds,
+    });
   }
 
   async touch({ sessionId, apiKey }: { sessionId: string; apiKey: string }): Promise<void> {

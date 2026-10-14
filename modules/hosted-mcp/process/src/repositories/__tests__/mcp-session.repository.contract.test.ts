@@ -75,7 +75,7 @@ describe.each(TIERS)("the %s MCP session records", (_tier, build) => {
     it("counts it under the new key only, and keeps the record", async () => {
       const records = build();
       await records.store({ sessionId: "s-1", apiKey: "token-old", userId: "user-1" });
-      await records.store({ sessionId: "s-1", apiKey: "token-new", userId: "user-1" });
+      await records.rewrite({ sessionId: "s-1", apiKey: "token-new", userId: "user-1" });
       await records.forgetKey({ sessionId: "s-1", apiKey: "token-old" });
 
       await expect(records.countActive({ apiKey: "token-old", since: 0 })).resolves.toBe(0);
@@ -83,6 +83,33 @@ describe.each(TIERS)("the %s MCP session records", (_tier, build) => {
       await expect(records.getRecord({ sessionId: "s-1" })).resolves.toMatchObject({
         kind: "found",
         apiKey: "token-new",
+      });
+    });
+  });
+
+  describe("given a session the client already removed", () => {
+    /** @scenario "A late rewrite never brings back a session the client ended" */
+    it("does not bring the record back for a late refreshed-token rewrite", async () => {
+      const records = build();
+      await records.store({ sessionId: "s-1", apiKey: "token-old", userId: "user-1" });
+      await records.remove({ sessionId: "s-1", apiKey: "token-old" });
+      await records.rewrite({ sessionId: "s-1", apiKey: "token-new", userId: "user-1" });
+
+      await expect(records.getRecord({ sessionId: "s-1" })).resolves.toEqual({ kind: "missing" });
+      await expect(records.countActive({ apiKey: "token-new", since: 0 })).resolves.toBe(0);
+    });
+  });
+
+  describe("given a session id already recorded", () => {
+    it("leaves the recorded session as it is", async () => {
+      const records = build();
+      await records.store({ sessionId: "s-1", apiKey: "key-a", projectId: "project-1" });
+      await records.store({ sessionId: "s-1", apiKey: "key-b", projectId: "project-2" });
+
+      await expect(records.getRecord({ sessionId: "s-1" })).resolves.toMatchObject({
+        kind: "found",
+        apiKey: "key-a",
+        projectId: "project-1",
       });
     });
   });
@@ -104,7 +131,7 @@ describe("the redis MCP session records' lifetime", () => {
     // Ten seconds left: neither use nor a refreshed token buys it more.
     store.expiries.set("mcp:session:s-1", 10_000);
     await records.touch({ sessionId: "s-1", apiKey: "token-old" });
-    await records.store({ sessionId: "s-1", apiKey: "token-new", userId: "user-1" });
+    await records.rewrite({ sessionId: "s-1", apiKey: "token-new", userId: "user-1" });
     const later = await records.getRecord({ sessionId: "s-1" });
 
     expect(later).toMatchObject({ kind: "found", apiKey: "token-new" });

@@ -28,8 +28,19 @@ export abstract class McpSessionRepository {
   /** False where the deployment has no shared store; records are then kept nowhere. */
   abstract isAvailable(): boolean;
 
-  /** A record rewritten for the same session (a refreshed token) keeps the time it has left. */
+  /** Records a newly opened session for 30 days; an id already recorded is left as it is. */
   abstract store(input: {
+    sessionId: string;
+    apiKey: string;
+    projectId?: string;
+    userId?: string;
+  }): Promise<void>;
+
+  /**
+   * Rewrites a recorded session (a refreshed token, a backfilled project), keeping the time it has
+   * left. A record already removed stays removed, so a late rewrite cannot undo a client's DELETE.
+   */
+  abstract rewrite(input: {
     sessionId: string;
     apiKey: string;
     projectId?: string;

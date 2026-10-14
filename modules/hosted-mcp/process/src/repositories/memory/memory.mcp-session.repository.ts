@@ -36,10 +36,27 @@ export class MemoryMcpSessionRepository extends McpSessionRepository {
     projectId?: string;
     userId?: string;
   }): Promise<void> {
-    const now = nowInstant().epochMilliseconds;
-    const kept = this.#records.get(input.sessionId);
+    if (this.#liveRecord(input.sessionId)) return Promise.resolve();
     this.#records.set(input.sessionId, {
-      expiresAt: kept && kept.expiresAt > now ? kept.expiresAt : now + SESSION_LIFETIME_MS,
+      expiresAt: nowInstant().epochMilliseconds + SESSION_LIFETIME_MS,
+      apiKey: input.apiKey,
+      projectId: input.projectId,
+      userId: input.userId,
+    });
+    this.#markActive(input);
+    return Promise.resolve();
+  }
+
+  rewrite(input: {
+    sessionId: string;
+    apiKey: string;
+    projectId?: string;
+    userId?: string;
+  }): Promise<void> {
+    const kept = this.#liveRecord(input.sessionId);
+    if (!kept) return Promise.resolve();
+    this.#records.set(input.sessionId, {
+      expiresAt: kept.expiresAt,
       apiKey: input.apiKey,
       projectId: input.projectId,
       userId: input.userId,
@@ -54,11 +71,15 @@ export class MemoryMcpSessionRepository extends McpSessionRepository {
   }
 
   getRecord(input: { sessionId: string }): Promise<McpSessionRecordLookup> {
-    const record = this.#records.get(input.sessionId);
-    if (!record || record.expiresAt <= nowInstant().epochMilliseconds) {
-      return Promise.resolve({ kind: "missing" });
-    }
+    const record = this.#liveRecord(input.sessionId);
+    if (!record) return Promise.resolve({ kind: "missing" });
     return Promise.resolve({ kind: "found", ...record });
+  }
+
+  #liveRecord(sessionId: string): MemoryRecord | undefined {
+    const record = this.#records.get(sessionId);
+    if (!record || record.expiresAt <= nowInstant().epochMilliseconds) return void 0;
+    return record;
   }
 
   remove(input: { sessionId: string; apiKey?: string }): Promise<void> {

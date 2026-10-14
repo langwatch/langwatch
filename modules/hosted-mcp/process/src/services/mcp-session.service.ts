@@ -133,12 +133,13 @@ export class McpSessionService {
     const previous = session.apiKey;
     session.apiKey = caller.apiKey;
     // Written under the new token before the old one stops counting, so no failure loses it.
-    void this.storeRecord({
-      sessionId: input.sessionId,
-      apiKey: caller.apiKey,
-      projectId,
-      userId: session.userId,
-    })
+    void this.#collaborators.records
+      .rewrite({
+        sessionId: input.sessionId,
+        apiKey: caller.apiKey,
+        projectId,
+        userId: session.userId,
+      })
       .then(() =>
         this.#collaborators.records.forgetKey({ sessionId: input.sessionId, apiKey: previous }),
       )
@@ -152,23 +153,17 @@ export class McpSessionService {
     session.lastActivityAt = nowInstant().epochMilliseconds;
   }
 
+  /**
+   * Awaited before the client learns the session id, so its DELETE always lands after this write.
+   * A failure is logged, never raised: the session still serves from the replica that opened it.
+   */
   async storeRecord(input: {
     sessionId: string;
     apiKey: string;
     projectId: string;
     userId: string | undefined;
   }): Promise<void> {
-    await this.#collaborators.records.store(input);
-  }
-
-  /** Written in the background; a failure is logged, never raised. */
-  storeRecordInBackground(input: {
-    sessionId: string;
-    apiKey: string;
-    projectId: string;
-    userId: string | undefined;
-  }): void {
-    this.storeRecord(input).catch((err: unknown) => {
+    await this.#collaborators.records.store(input).catch((err: unknown) => {
       logger.error({ error: err }, "Failed to store session in Redis");
     });
   }
@@ -190,12 +185,14 @@ export class McpSessionService {
   }): Promise<void> {
     const { record, projectId } = input;
     if (record.projectId || !projectId) return;
-    await this.storeRecord({
-      sessionId: input.sessionId,
-      apiKey: record.apiKey,
-      projectId,
-      userId: record.userId,
-    }).catch(() => undefined);
+    await this.#collaborators.records
+      .rewrite({
+        sessionId: input.sessionId,
+        apiKey: record.apiKey,
+        projectId,
+        userId: record.userId,
+      })
+      .catch(() => undefined);
   }
 
   /** A record that cannot be read or decrypted reads as missing, and is logged. */
