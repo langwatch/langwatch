@@ -126,6 +126,13 @@ func CustomerTraceMiddleware() func(http.Handler) http.Handler {
 			r.Header.Del(headerEndUserIDLiteLLM)
 			r.Header.Del(headerRequestMetadata)
 
+			// The Langy relay's per-turn mirror withhold (ADR-061): consumed
+			// here and never forwarded upstream.
+			if r.Header.Get(customertracebridge.HeaderLangyMirror) == customertracebridge.LangyMirrorWithheld {
+				ctx = customertracebridge.WithMirrorWithheld(ctx)
+			}
+			r.Header.Del(customertracebridge.HeaderLangyMirror)
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

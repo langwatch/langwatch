@@ -147,6 +147,14 @@ export const requestBounds = [
     enterprise: 80,
   },
   {
+    key: "langyUnattendedTurnsPerMinute",
+    description: "Langy turns started for a person by a scheduled run, per project per minute.",
+    unit: "requests-per-minute",
+    free: 5,
+    paid: 10,
+    enterprise: 20,
+  },
+  {
     key: "webhookTestPerMinute",
     description: "Webhook test dispatches per caller per minute.",
     unit: "requests-per-minute",

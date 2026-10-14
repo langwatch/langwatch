@@ -1,4 +1,5 @@
 export * from "./dashboard.ts";
+export * from "./dashboard-scope.ts";
 export * from "./dashboard.errors.ts";
 export * from "./dashboard.responses.ts";
 export * from "./dashboard.trpc.ts";

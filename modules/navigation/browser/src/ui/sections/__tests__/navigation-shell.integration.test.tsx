@@ -327,6 +327,39 @@ describe("an address naming a product whose release flag is off", () => {
     });
   });
 
+  describe("when Dashboards is switched off", () => {
+    const dashboardsOff = {
+      ...BASE_READINGS.flags,
+      release_dashboards: { enabled: false, isLoading: false },
+    };
+
+    /** @scenario "AC1b A Dashboards address with the flag off is a 404 with no Dashboards sidebar" */
+    it.each(["/demo/dashboards", "/demo/dashboards/agent-flight-deck"])(
+      "draws the not-found page at %s with no product sidebar around it",
+      (pathname) => {
+        renderShell({
+          readings: {
+            pathname,
+            permissions: [...(BASE_READINGS.permissions ?? []), "analytics:view"],
+            flags: dashboardsOff,
+            notFound: <div data-testid="not-found" />,
+          },
+        });
+
+        expect(screen.getByTestId("not-found")).toBeInTheDocument();
+        expect(screen.queryByTestId("product-sidebar")).toBeNull();
+        expect(screen.queryByTestId("page-body")).toBeNull();
+      },
+    );
+
+    it("still draws a project page in its chrome", () => {
+      renderShell({ readings: { pathname: "/demo/traces", flags: dashboardsOff } });
+
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+      expect(screen.getByTestId("product-sidebar")).toBeInTheDocument();
+    });
+  });
+
   describe("when the gateway menu flag is off", () => {
     it("still draws a gateway page in its chrome, the flag hiding only the menu", () => {
       renderShell({
@@ -819,6 +852,84 @@ describe("the product-switcher top bar", () => {
       await openProductSwitcher();
 
       expect(productMenuItem("LLM Ops")).toHaveAttribute("data-disabled");
+    });
+  });
+
+  describe("when Dashboards is released to a member who holds analytics:view", () => {
+    const dashboardsReadings: Partial<StubNavigationReadings> = {
+      permissions: [...(BASE_READINGS.permissions ?? []), "analytics:view"],
+      flags: {
+        ...BASE_READINGS.flags,
+        release_dashboards: { enabled: true, isLoading: false },
+      },
+    };
+
+    it("offers Dashboards as its own product and opens the project's Dashboards area", async () => {
+      renderShell({ readings: dashboardsReadings });
+      const user = await openProductSwitcher();
+
+      expect(screen.getByText("Your saved dashboards, in one place")).toBeInTheDocument();
+      await user.click(screen.getByText("Dashboards"));
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/demo/dashboards");
+      });
+    });
+
+    it("names Dashboards in the switcher and keeps the project chip on a board", () => {
+      renderShell({
+        readings: { ...dashboardsReadings, pathname: "/demo/dashboards/agent-flight-deck" },
+      });
+
+      expect(screen.getByRole("button", { name: "Switch product" })).toHaveTextContent(
+        "Dashboards",
+      );
+      expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent("Demo");
+      expect(screen.queryByRole("link", { name: "Home" })).not.toBeInTheDocument();
+    });
+
+    it("stays in Dashboards when another project is picked", async () => {
+      renderShell({
+        readings: { ...dashboardsReadings, pathname: "/demo/dashboards/agent-flight-deck" },
+      });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Switch project" }));
+      await waitFor(() => {
+        expect(screen.getByText("Support Bot")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText("Support Bot"));
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/support-bot/dashboards/agent-flight-deck");
+      });
+    });
+  });
+
+  describe("when Dashboards is not released or the member lacks analytics:view", () => {
+    /** @scenario "AC1 Flag off hides the area" */
+    it("leaves Dashboards out of the switcher", async () => {
+      renderShell({
+        readings: { permissions: [...(BASE_READINGS.permissions ?? []), "analytics:view"] },
+      });
+      await openProductSwitcher();
+
+      expect(screen.queryByText("Dashboards")).not.toBeInTheDocument();
+    });
+
+    it("leaves Dashboards out for a member without analytics:view", async () => {
+      renderShell({
+        readings: {
+          flags: {
+            ...BASE_READINGS.flags,
+            release_dashboards: { enabled: true, isLoading: false },
+          },
+        },
+      });
+      await openProductSwitcher();
+
+      expect(screen.queryByText("Dashboards")).not.toBeInTheDocument();
     });
   });
 

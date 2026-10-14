@@ -85,6 +85,34 @@ const CONTEXT_ICON: Record<LangyContextChip["kind"], LucideIcon> = {
 // stays out of the way of what the person is trying to type.
 const COMPOSER_PLACEHOLDER = "Ask Langy or describe what you want…";
 
+/**
+ * An `askLangy` handoff asks the panel's composer to take focus so the reader can keep
+ * typing. Honored on mount (the panel usually opens WITH the handoff) or on change (panel
+ * already open), then consumed so it fires once.
+ */
+function useComposerFocusHandoff({
+  textareaRef,
+  hero,
+}: {
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  hero: boolean;
+}) {
+  const composerFocusRequested = useLangyStore((s) => s.composerFocusRequested);
+  const consumeComposerFocus = useLangyStore((s) => s.consumeComposerFocus);
+  // A panel still opening is hidden and its field refuses focus: the request then waits
+  // for the panel to finish showing, which bumps this count.
+  const panelShownCount = useLangyStore((s) => s.panelShownCount);
+  useEffect(() => {
+    if (!composerFocusRequested || hero) return;
+    const frame = requestAnimationFrame(() => {
+      const field = textareaRef.current;
+      field?.focus();
+      if (field && document.activeElement === field) consumeComposerFocus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [composerFocusRequested, hero, consumeComposerFocus, textareaRef, panelShownCount]);
+}
+
 /** While a turn runs and nothing is waiting on the reader. */
 export const MID_TURN_PLACEHOLDER = "Langy is working. You can send when it stops.";
 
@@ -112,26 +140,6 @@ function turnLock({ turnActive }: { turnActive: boolean }) {
 function composerGutter({ hero, floating }: { hero: boolean; floating: boolean }) {
   if (hero) return 0;
   return floating ? 3 : 3.5;
-}
-
-/** The focus an `askLangy` handoff asks for: honoured on mount or on change, then consumed once. */
-function useComposerFocusRequest({
-  hero,
-  textareaRef,
-}: {
-  hero: boolean;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-}) {
-  const composerFocusRequested = useLangyStore((s) => s.composerFocusRequested);
-  const consumeComposerFocus = useLangyStore((s) => s.consumeComposerFocus);
-  useEffect(() => {
-    if (!composerFocusRequested || hero) return;
-    const frame = requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-      consumeComposerFocus();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [composerFocusRequested, hero, consumeComposerFocus, textareaRef]);
 }
 
 /** The bottom rail: the per-send model picker and the `#` and `/` palette buttons. */
@@ -318,7 +326,7 @@ function ComposerImpl({
   const turnPhase = useLangyStore((s) => s.turnPhase);
   const turnActive = turnPhase !== "idle";
 
-  useComposerFocusRequest({ hero, textareaRef });
+  useComposerFocusHandoff({ textareaRef, hero });
 
   // The rainbow sheen is an ACTIVITY signal, not an invitation.
 

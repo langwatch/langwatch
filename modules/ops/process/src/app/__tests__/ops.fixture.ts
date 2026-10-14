@@ -12,6 +12,7 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
+import type { InsightApi } from "@langwatch/insight-contract";
 import type { OpsOperatorPermission } from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
@@ -150,6 +151,7 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
       featureFlags: options.featureFlags ?? createApiFixture<FeatureFlagApi>(),
       shares: createApiFixture<ShareApi>(),
       automations: createApiFixture<AutomationApi>(),
+      insights: createApiFixture<InsightApi>(),
     },
     repositories,
     ...(options.checkup === undefined ? {} : { checkup: options.checkup }),
