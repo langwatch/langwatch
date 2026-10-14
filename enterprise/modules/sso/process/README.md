@@ -338,24 +338,24 @@ None: this module declares no REST family.
 
 ### `ssoConnections`
 
-Contract `../contract/src/sso-connection.trpc.ts:32`, router `src/transport/sso-connection.trpc.ts:48`.
+Contract `../contract/src/sso-connection.trpc.ts:32`, router `src/transport/sso-connection.trpc.ts:37`.
 
-| Procedure                             | Kind     | Gate                                                                                                                                                  | Input                                     | Output                         |
-| ------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------ |
-| `ssoConnections.getAll`               | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `listSsoConnectionsInputSchema`           | `adminSsoConnectionPageSchema` |
-| `ssoConnections.getById`              | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionByIdSchema`                 | inline                         |
-| `ssoConnections.getHistory`           | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionByIdSchema`                 | inline                         |
-| `ssoConnections.getMigrationProgress` | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `operatorSsoMigrationProgressInputSchema` | inline                         |
-| `ssoConnections.startLegacyMigration` | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoSetupStartMigrationSchema`            | `ssoSetupRegisteredSchema`     |
-| `ssoConnections.register`             | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `registerSsoConnectionInputSchema`        | –                              |
-| `ssoConnections.claimDomain`          | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoDomainTargetSchema`                   | inline                         |
-| `ssoConnections.approveDomainClaim`   | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoDomainTargetSchema`                   | inline                         |
-| `ssoConnections.rejectDomainClaim`    | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `rejectSsoDomainClaimInputSchema`         | inline                         |
-| `ssoConnections.attestDomain`         | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `attestSsoDomainInputSchema`              | inline                         |
-| `ssoConnections.activate`             | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `activateSsoConnectionInputSchema`        | inline                         |
-| `ssoConnections.suspend`              | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionReasonInputSchema`          | inline                         |
-| `ssoConnections.resume`               | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionTargetSchema`               | inline                         |
-| `ssoConnections.requestTeardown`      | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionReasonInputSchema`          | inline                         |
+| Procedure                             | Kind     | Gate                             | Input                                     | Output                         |
+| ------------------------------------- | -------- | -------------------------------- | ----------------------------------------- | ------------------------------ |
+| `ssoConnections.getAll`               | query    | Platform permission `ops:manage` | `listSsoConnectionsInputSchema`           | `adminSsoConnectionPageSchema` |
+| `ssoConnections.getById`              | query    | Platform permission `ops:manage` | `ssoConnectionByIdSchema`                 | inline                         |
+| `ssoConnections.getHistory`           | query    | Platform permission `ops:manage` | `ssoConnectionByIdSchema`                 | inline                         |
+| `ssoConnections.getMigrationProgress` | query    | Platform permission `ops:manage` | `operatorSsoMigrationProgressInputSchema` | inline                         |
+| `ssoConnections.startLegacyMigration` | mutation | Platform permission `ops:manage` | `ssoSetupStartMigrationSchema`            | `ssoSetupRegisteredSchema`     |
+| `ssoConnections.register`             | mutation | Platform permission `ops:manage` | `registerSsoConnectionInputSchema`        | –                              |
+| `ssoConnections.claimDomain`          | mutation | Platform permission `ops:manage` | `ssoDomainTargetSchema`                   | inline                         |
+| `ssoConnections.approveDomainClaim`   | mutation | Platform permission `ops:manage` | `ssoDomainTargetSchema`                   | inline                         |
+| `ssoConnections.rejectDomainClaim`    | mutation | Platform permission `ops:manage` | `rejectSsoDomainClaimInputSchema`         | inline                         |
+| `ssoConnections.attestDomain`         | mutation | Platform permission `ops:manage` | `attestSsoDomainInputSchema`              | inline                         |
+| `ssoConnections.activate`             | mutation | Platform permission `ops:manage` | `activateSsoConnectionInputSchema`        | inline                         |
+| `ssoConnections.suspend`              | mutation | Platform permission `ops:manage` | `ssoConnectionReasonInputSchema`          | inline                         |
+| `ssoConnections.resume`               | mutation | Platform permission `ops:manage` | `ssoConnectionTargetSchema`               | inline                         |
+| `ssoConnections.requestTeardown`      | mutation | Platform permission `ops:manage` | `ssoConnectionReasonInputSchema`          | inline                         |
 
 ```typescript
 // ssoConnections.getAll

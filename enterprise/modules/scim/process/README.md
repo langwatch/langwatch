@@ -596,14 +596,14 @@ type Response = unknown;
 
 ### `scimOversight`
 
-Contract `../contract/src/scim-oversight.trpc.ts:18`, router `src/transport/scim-oversight.trpc.ts:28`.
+Contract `../contract/src/scim-oversight.trpc.ts:18`, router `src/transport/scim-oversight.trpc.ts:26`.
 
-| Procedure                           | Kind     | Gate                                                                                                                                                  | Input                            | Output                            |
-| ----------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------- |
-| `scimOversight.getAll`              | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `listOversightSyncsInputSchema`  | `oversightSyncListSchema`         |
-| `scimOversight.getById`             | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `oversightConnectionInputSchema` | inline                            |
-| `scimOversight.directoryIdentities` | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `oversightConnectionInputSchema` | inline                            |
-| `scimOversight.redriveRetiredApply` | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `redriveRetiredApplyInputSchema` | `redriveRetiredApplyResultSchema` |
+| Procedure                           | Kind     | Gate                             | Input                            | Output                            |
+| ----------------------------------- | -------- | -------------------------------- | -------------------------------- | --------------------------------- |
+| `scimOversight.getAll`              | query    | Platform permission `ops:manage` | `listOversightSyncsInputSchema`  | `oversightSyncListSchema`         |
+| `scimOversight.getById`             | query    | Platform permission `ops:manage` | `oversightConnectionInputSchema` | inline                            |
+| `scimOversight.directoryIdentities` | query    | Platform permission `ops:manage` | `oversightConnectionInputSchema` | inline                            |
+| `scimOversight.redriveRetiredApply` | mutation | Platform permission `ops:manage` | `redriveRetiredApplyInputSchema` | `redriveRetiredApplyResultSchema` |
 
 ```typescript
 // scimOversight.getAll

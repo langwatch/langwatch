@@ -3636,7 +3636,7 @@ const presentations = {
   platform_operator_user_not_found: {
     title: "No active user has that address",
     describe: () =>
-      "Only an existing, active account can be made a platform operator. Ask them to sign up first.",
+      "Only an existing, active account with a verified address can be made a platform operator; on LangWatch Cloud, only a staff account.",
   },
   platform_permission_not_assignable: {
     title: "Operations permissions cannot be added to a role",
