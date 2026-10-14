@@ -53,10 +53,9 @@ const MAX_MESSAGE_CONTENT_BYTES = 64 * 1024;
 const MAX_MESSAGE_REST_BYTES = 64 * 1024;
 
 /**
- * Half-width of the run-state read-back window (±7 days around the folded event),
- * the trace-summary fold's width. A run's events land within hours of its start
- * (a stalled run is closed after a day), so the window holds the run's weeks; a
- * later event (an archive) misses and the executor re-reads it unwindowed.
+ * Half-width of the run-state read-back window around the folded event. A run's
+ * events land within hours of its start (a stalled run closes after a day); a
+ * later one (an archive) misses and the executor re-reads it unwindowed.
  */
 export const SIMULATION_RUN_STATE_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 

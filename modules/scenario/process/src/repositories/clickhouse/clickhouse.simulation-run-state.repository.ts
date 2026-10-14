@@ -38,12 +38,9 @@ import {
 const TABLE_NAME = "simulation_runs" as const;
 
 /**
- * How far the latest-version lookup reaches past the row read's window. A run's
- * StartedAt (the partition key) moves only until the run starts: from the
- * queue-time placeholder to the started event's time, hours apart at most since
- * a stalled run is closed after a day. Reaching wider means a latest version that
- * moved just out of the row window still wins the lookup, so the read answers
- * empty and the executor retries unwindowed, never with an older in-window version.
+ * How far the latest-version lookup reaches past the row window. StartedAt moves
+ * (hours, until the run starts), so a latest version just outside the row window
+ * still wins the lookup and the read answers empty, never an older version.
  */
 export const LATEST_VERSION_LOOKUP_MARGIN_MS = 7 * 24 * 60 * 60 * 1000;
 
