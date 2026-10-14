@@ -184,6 +184,16 @@ void describe("given a pull request description", () => {
       assert.ok(checkBody(text).length > 0);
     });
 
+    void it("reads a section after a fenced example that shows an unclosed comment", () => {
+      const text = ["```html", "<!-- an example", "```", body()].join("\n");
+      assert.deepEqual(checkBody(text), []);
+    });
+
+    void it("is not fooled by a fence inside a comment", () => {
+      const text = ["<!--", "```", "-->", body({ box: "- [ ]" }), "```"].join("\n");
+      assert.match(checkBody(text)[0]!, /not ticked/);
+    });
+
     void it("is not fooled by a section that only exists inside a fenced code example", () => {
       const text = ["## What changed", "An example:", "```markdown", body(), "```"].join("\n");
       assert.ok(checkBody(text).length > 0);

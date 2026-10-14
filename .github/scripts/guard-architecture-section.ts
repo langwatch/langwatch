@@ -54,32 +54,59 @@ const UNTICKED = /^[ \t]*[-*][ \t]+\[ \]/;
 /** A fence line: its marker, then the rest. A closing fence has only spaces after it. */
 const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 
-/** An HTML comment; an unclosed one hides the rest of the body, as GitHub renders it. */
-const COMMENT = /<!--[\s\S]*?(?:-->|$)/g;
-
-const withoutComments = (text: string): string => {
-  const stripped = text.replace(COMMENT, "");
-  return stripped === text ? text : withoutComments(stripped);
+const closesFence = ({ line, fence }: { line: string; fence: string }): boolean => {
+  const match = FENCE.exec(line);
+  const marker = match?.[1];
+  return (
+    marker?.[0] === fence[0] && marker.length >= fence.length && /^[ \t]*$/.test(match?.[2] ?? "")
+  );
 };
 
-/** The body as a reader sees it: no HTML comments, no fenced code examples. */
+/** The part of one line outside HTML comments, and whether a comment is still open after it. */
+const outsideComments = ({
+  line,
+  inComment,
+}: {
+  line: string;
+  inComment: boolean;
+}): { text: string; inComment: boolean } => {
+  let text = "";
+  let rest = line;
+  let open = inComment;
+  while (rest.length > 0) {
+    const token = open ? "-->" : "<!--";
+    const at = rest.indexOf(token);
+    if (!open) text += at < 0 ? rest : rest.slice(0, at);
+    if (at < 0) break;
+    rest = rest.slice(at + token.length);
+    open = !open;
+  }
+  return { text, inComment: open };
+};
+
+/**
+ * The body as a reader sees it: no HTML comments, no fenced code examples.
+ * One pass, so a `<!--` inside a fence stays literal and a fence inside a
+ * comment stays hidden; an unclosed comment hides the rest, as GitHub renders it.
+ */
 const visibleLines = (body: string): string[] => {
-  const lines = withoutComments(body.replace(/\r\n?/g, "\n")).split("\n");
   const visible: string[] = [];
   let fence: string | undefined;
-  for (const line of lines) {
-    const match = FENCE.exec(line);
-    const marker = match?.[1];
-    if (fence === undefined) {
-      if (marker === undefined) visible.push(line);
-      else fence = marker;
-    } else if (
-      marker?.[0] === fence[0] &&
-      marker.length >= fence.length &&
-      /^[ \t]*$/.test(match?.[2] ?? "")
-    ) {
-      fence = undefined;
+  let inComment = false;
+  for (const line of body.replace(/\r\n?/g, "\n").split("\n")) {
+    if (fence !== undefined) {
+      if (closesFence({ line, fence })) fence = undefined;
+      continue;
     }
+    const marker = inComment ? undefined : FENCE.exec(line)?.[1];
+    if (marker !== undefined) {
+      fence = marker;
+      continue;
+    }
+    const scanned = outsideComments({ line, inComment });
+    const text = scanned.text;
+    inComment = scanned.inComment;
+    if (text.length > 0 || line.length === 0) visible.push(text);
   }
   return visible;
 };
