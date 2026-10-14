@@ -1,6 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
 import {
-  isConfiguredLegacySsoRoute,
   isSsoConnectionInSetup,
   looksLikeSsoConnectionId,
   normalizeDomain,
@@ -28,6 +27,7 @@ import type {
   SsoDomainReproofRequest,
   SsoRegistrantReads,
 } from "../rules/sso-assertion-contract.rules.ts";
+import { admitsAssertedDomain, pinsBrokeredSubject } from "../rules/sso-brokered-address.rules.ts";
 import type { SsoUserResolutionService } from "./sso-user-resolution.service.ts";
 
 const logger = createLogger("langwatch:identity:sso-assertion");
@@ -256,12 +256,7 @@ export class SsoAssertionService {
   }): Promise<SsoAssertionDecision> {
     const carryOn = { action: "continue" } as const;
 
-    const legacyCompatibility =
-      isConfiguredLegacySsoRoute({
-        source: connection.source,
-        providerId: connection.idpMetadata.providerId,
-      }) && connection.verifiedDomains.includes(domain);
-    if (standing.proved || legacyCompatibility) return carryOn;
+    if (admitsAssertedDomain({ connection, domain })) return carryOn;
 
     if (!standing.lapsed) {
       return this.refuse({
@@ -297,6 +292,36 @@ export class SsoAssertionService {
       organizationId: connection.organizationId,
       detail: "the domain's published record lapsed and this account is new",
     });
+  }
+
+  /**
+   * Whether a subject the deployment's broker asserted came through the connection of the
+   * organization that proved the address's domain (ADR-096): that organization's live legacy
+   * route pins the subject's upstream connection. Anything less answers no.
+   */
+  async isBrokeredAddressProved({
+    subject,
+    email,
+  }: {
+    subject: string;
+    email: string | null | undefined;
+  }): Promise<boolean> {
+    const asserted = readAssertedDomain(email);
+    if (!asserted.matched) return false;
+    const { domain } = asserted;
+
+    const owner = await this.deps.connections.getDomainOwner({ domain }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
+      throw error;
+    });
+    if (!owner) return false;
+
+    const held = await this.deps.connections.findForOrganization({
+      organizationId: owner.organizationId,
+    });
+    const proving = held.find((connection) => connection.connectionId === owner.connectionId);
+    if (!proving || !admitsAssertedDomain({ connection: proving, domain })) return false;
+    return held.some((connection) => pinsBrokeredSubject({ connection, subject }));
   }
 
   /**

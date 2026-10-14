@@ -15,6 +15,7 @@ import {
   type BatchEvaluationRecord,
   type BatchEvaluationSummary,
   type CopyDatasetInput,
+  type CountDatasetRecordsInput,
   type CreateDatasetAttachmentUploadInput,
   type CreateDatasetFromStoredObjectInput,
   type CreateDatasetFromUploadInput,
@@ -38,8 +39,10 @@ import {
   type DatasetPage,
   type DatasetPageInput,
   type DatasetRecord,
+  type DatasetRecordCount,
   type DatasetRecordMutationResult,
   type DatasetRecordPage,
+  type DatasetSummary,
   type DatasetUsageCount,
   type DatasetWithRecords,
   type DatasetApiDeleteInput,
@@ -235,6 +238,16 @@ export class DatasetModule implements DatasetApi {
   /** A page of the project's non-archived datasets. */
   listDatasets(input: ListDatasetsInput): Promise<DatasetListResult> {
     return this.#datasets.listDatasets(input);
+  }
+
+  /** The same page without entry counts, so a list renders before its counts arrive. */
+  findDatasetSummaries(input: ListDatasetsInput): Promise<DatasetSummary[]> {
+    return this.#datasets.findDatasetSummaries(input);
+  }
+
+  /** Each named dataset's entry count, whichever storage it uses. */
+  countRecords(input: CountDatasetRecordsInput): Promise<DatasetRecordCount[]> {
+    return this.#datasets.countRecords(input);
   }
 
   /** One dataset by slug or id. Missing or archived refuses. */

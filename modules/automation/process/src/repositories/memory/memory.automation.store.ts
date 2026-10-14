@@ -7,6 +7,7 @@ import type {
 import type { Instant } from "@langwatch/time";
 
 import type { AnalyticsMetricSource } from "../graph-trigger-sent.repository.ts";
+import type { TriggerJsonColumn } from "../trigger.repository.ts";
 
 /** One claimed send: the row `claimSend` writes once per trigger and trace. */
 interface StoredTriggerSend {
@@ -36,6 +37,11 @@ export class MemoryAutomationStore {
   }
 
   readonly triggers = new Map<string, Trigger>();
+  /**
+   * Columns an earlier release stored as JSON text, by trigger id: what Postgres holds as a jsonb
+   * string. The row in `triggers` is what reading it answers; a test seeds the text here.
+   */
+  readonly triggerJsonText = new Map<string, Partial<Record<TriggerJsonColumn, string>>>();
   readonly sends: StoredTriggerSend[] = [];
   readonly fires: (TriggerFire & { projectId: string })[] = [];
   readonly suppressions: EmailSuppression[] = [];

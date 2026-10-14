@@ -1,18 +1,15 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Integration lane: the cross-replica suites, which need Redis at
- * `LANGWATCH_TEST_REDIS_URL`/`REDIS_URL`. A relayed message is a real publish
- * between two handlers, provable with neither one handler nor a stub.
+ * Integration lane: the cross-replica suite, which needs Redis at
+ * `LANGWATCH_TEST_REDIS_URL`/`REDIS_URL`: a session recovered on another
+ * replica is a real read between two handlers.
  */
 export default defineConfig({
   test: {
     fsModuleCache: true,
     environment: "node",
-    include: [
-      "src/**/hosted-mcp.sse-relay.integration.test.ts",
-      "src/**/hosted-mcp.streamable-reconnect.integration.test.ts",
-    ],
+    include: ["src/**/hosted-mcp.streamable-reconnect.integration.test.ts"],
     pool: "forks",
     fileParallelism: false,
     testTimeout: 60_000,

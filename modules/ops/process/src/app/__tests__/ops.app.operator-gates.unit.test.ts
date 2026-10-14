@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * Every operator gate asks authz for the platform-operator grant: ops:view for reads,
- * ops:manage for writes, the impersonator's own grant when impersonating.
+ * ops:manage for writes; impersonating, the impersonator's grant answers reads only.
  * Spec: modules/ops/specs/admin.feature
  */
 import type { AdminOperationInput, OpsOperator } from "@langwatch/ops-contract";
@@ -49,9 +49,13 @@ describe("given the platform-operator grant answers through authz", () => {
 
   /** @scenario "Operator gates ask the platform-operator grant" */
   /** @scenario "The banner and the way out keep working on the new claims" */
-  it("reads an impersonating operator by the impersonator's own grant", async () => {
-    await expect(app.admitOperator(IMPERSONATING_MANAGER, "ops:manage")).resolves.toBeUndefined();
+  /** @scenario "An impersonating operator keeps ops reads and loses ops writes" */
+  it("reads an impersonating operator by the impersonator's own grant, for reads only", async () => {
+    await expect(app.admitOperator(IMPERSONATING_MANAGER, "ops:view")).resolves.toBeUndefined();
     expect(await app.operatorScope(IMPERSONATING_MANAGER)).toEqual({ kind: "platform" });
+    await expect(app.admitOperator(IMPERSONATING_MANAGER, "ops:manage")).rejects.toMatchObject({
+      code: "ops_impersonated_operator_refused",
+    });
   });
 
   /** @scenario "Operator gates ask the platform-operator grant" */
@@ -90,7 +94,7 @@ describe("given an impersonating operator in the Back office", () => {
       },
     },
   });
-  const run = (method: "create" | "update", data: Record<string, unknown>) =>
+  const run = (method: "create" | "update" | "getList", data: Record<string, unknown>) =>
     adminApp.runAdminOperation({
       actor: IMPERSONATING_MANAGER,
       req: { headers: {} },
@@ -118,15 +122,21 @@ describe("given an impersonating operator in the Back office", () => {
     },
   );
 
-  /** @scenario "An impersonating operator cannot deactivate or reactivate an account from the back office" */
-  /** @scenario "An impersonating admin stays the acting person" */
-  it("still lets the impersonating operator update a user's other fields", async () => {
+  /** @scenario "An impersonating operator keeps ops reads and loses ops writes" */
+  it("refuses every other write too, and never reaches the back office", async () => {
     adminCalls.length = 0;
-    await expect(run("update", { name: "Renamed" })).resolves.toEqual({
-      data: { id: "user_target" },
+    await expect(run("update", { name: "Renamed" })).rejects.toMatchObject({
+      code: "ops_impersonated_operator_refused",
     });
-    expect(adminCalls.map((call) => [call.method, call.params.data, call.actorId])).toEqual([
-      ["update", { name: "Renamed" }, MANAGER.id],
+    expect(adminCalls).toEqual([]);
+  });
+
+  /** @scenario "An impersonating admin stays the acting person" */
+  it("still reads as the impersonating operator, named as the actor", async () => {
+    adminCalls.length = 0;
+    await expect(run("getList", {})).resolves.toEqual({ data: { id: "user_target" } });
+    expect(adminCalls.map((call) => [call.method, call.actorId])).toEqual([
+      ["getList", MANAGER.id],
     ]);
   });
 });

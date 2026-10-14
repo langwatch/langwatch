@@ -31,16 +31,25 @@ export function isStoredObjectDeliveryAudience(
   return isRegistryPermission(value) && value.endsWith(":view");
 }
 
+/**
+ * Every purpose the previous release wrote to the ClickHouse `stored_objects` index,
+ * mapped to the audience its reads were gated behind before the refactor
+ * (avatars were readable by any authenticated project viewer).
+ */
 export const LEGACY_PURPOSE_AUDIENCE = {
   scenario_event: "scenarios:view",
   trace_content: "traces:view",
   evaluation_inputs: "evaluations:view",
+  dataset_attachment: "datasets:view",
+  user_avatar: "project:view",
 } as const satisfies Record<string, StoredObjectDeliveryAudience>;
 
 export const legacyStoredObjectPurposeSchema = z.enum([
   "scenario_event",
   "trace_content",
   "evaluation_inputs",
+  "dataset_attachment",
+  "user_avatar",
 ]);
 export type LegacyStoredObjectPurpose = z.infer<typeof legacyStoredObjectPurposeSchema>;
 

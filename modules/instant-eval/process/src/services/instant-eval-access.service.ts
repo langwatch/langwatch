@@ -70,11 +70,11 @@ export class InstantEvalAccessService {
     flags: InstantEvalFlagReader;
     projects: InstantEvalProjectReader;
     /**
-     * A self-hosted install judging through LangWatch: there the license that names hosted
-     * judging, left on by an admin, releases them; an install with judging turned off never does.
+     * A self-hosted install judging through LangWatch: there only the license that names hosted
+     * judging, left on by an admin, releases them, whatever the flag says.
      */
     judgesThroughConnect?: boolean;
-    /** The organization's own switch: on the hosted service, what releases a self-serve one. */
+    /** The organization's own switch: what releases a regular one on the hosted service only. */
     optIns: InstantEvalOptInReader;
     /** Reads the deployment's own configuration, injected so a test states it. */
     isJudgeConfigured: () => boolean;
@@ -123,7 +123,8 @@ export class InstantEvalAccessService {
 
   /**
    * Hosted: the flag for an enterprise organization, its own switch otherwise, so a switch thrown
-   * before an upgrade no longer counts. Elsewhere the flag, then the license, then the switch.
+   * before an upgrade no longer counts. Judging through Connect: the license alone, never the
+   * flag. Elsewhere, a checkout judging with its own key, the flag.
    */
   private async releasedFor({
     projectId,
@@ -139,10 +140,10 @@ export class InstantEvalAccessService {
       }
       return this.optIns.isOptedIn(organizationId);
     }
-    if (await this.isFlagged({ projectId, organizationId })) return true;
-    if (organizationId === undefined) return false;
-    if (await this.isLicensed(organizationId)) return true;
-    return this.optIns.isOptedIn(organizationId);
+    if (this.judgesThroughConnect) {
+      return organizationId === undefined ? false : this.isLicensed(organizationId);
+    }
+    return this.isFlagged({ projectId, organizationId });
   }
 
   private isFlagged({
@@ -161,7 +162,7 @@ export class InstantEvalAccessService {
 
   /** The judge's own per-organization answer is the license's: named, and not switched off. */
   private async isLicensed(organizationId: string): Promise<boolean> {
-    if (!this.judgesThroughConnect || !this.judge.isAvailableForOrganization) return false;
+    if (!this.judge.isAvailableForOrganization) return false;
     return this.judge.isAvailableForOrganization(organizationId);
   }
 }
