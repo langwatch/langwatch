@@ -146,6 +146,9 @@ them. Module code never reads `process.env`.
   before committing. Don't push or open a PR unless asked.
 - British English in prose; no em dashes; no attribution lines or agent names in
   commits, PRs or specs. Never name a customer: the repo is public.
+- Every PR description fills `## Architecture` honestly: tick the box only after reading the
+  sections of `dev/docs/ARCHITECTURE.md` the change touches, and list anything unusual under
+  "Needs a human look" rather than leaving it for the reviewer to find.
 - Commit messages are Conventional Commits (`feat(scope): …`, `fix: …`).
 - Branches: `issue123/slug` for issues, `feat/slug` for features.
 - Worktrees go in `.worktrees/<branch-with-slash-as-hyphen>` via
