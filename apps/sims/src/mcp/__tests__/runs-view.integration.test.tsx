@@ -60,6 +60,25 @@ describe("RunsView", () => {
     });
   });
 
+  /** @scenario "The console refuses a scenario setting that is not a whole number" */
+  it("refuses an empty soak client count and posts nothing", async () => {
+    const calls = fakeSim({
+      routes: {
+        "GET /_sim/api/status": () => json({ body: wireStatus }),
+        "GET /_sim/api/runs/run-2": () => json({ body: wireRun }),
+        "POST /_sim/api/runs": () => json({ body: wireRun, status: 202 }),
+      },
+    });
+    render(<McpConsole />);
+
+    await waitFor(() => expect(screen.getAllByTestId("run-row")).toHaveLength(1));
+    fireEvent.change(screen.getByLabelText("Clients (soak)"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "soak" }));
+
+    expect(await screen.findByText("Clients takes a whole number of 1 or more.")).toBeTruthy();
+    expect(calls.some((call) => call.method === "POST")).toBe(false);
+  });
+
   /** @scenario "The console disables a scenario the chosen flow cannot run" */
   it("disables oauth-only scenarios on the apikey flow", async () => {
     fakeSim({ routes: { "GET /_sim/api/status": () => json({ body: wireStatus }) } });

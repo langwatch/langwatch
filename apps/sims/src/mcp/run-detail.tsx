@@ -163,7 +163,7 @@ const StepsPanel = ({ run }: { run: Run }) => (
 export const RunDetail = ({ summary, onStop }: { summary: Run; onStop: () => void }) => {
   const detail = useSimPoll({
     fetch: () => fetchRun({ id: summary.id }),
-    everyMs: isActive(summary) ? 1_500 : 30_000,
+    everyMs: (data) => (isActive(data ?? summary) ? 1_500 : 30_000),
   });
   const run = detail.data ?? summary;
   return (

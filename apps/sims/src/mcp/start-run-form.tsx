@@ -24,6 +24,15 @@ const isTransport = (value: string): value is Transport =>
 /** oauth-connect has its own panel in Setup, since it needs a mode and a person. */
 const startable = (scenario: Scenario) => scenario.name !== "oauth-connect";
 
+/** A whole number above zero, or a refusal naming the field; an empty field is not 0. */
+const countOf = ({ value, label }: { value: string; label: string }) => {
+  const count = Number(value);
+  if (value.trim() === "" || !Number.isInteger(count) || count < 1) {
+    throw new Error(`${label} takes a whole number of 1 or more.`);
+  }
+  return count;
+};
+
 /** Only the fields a scenario reads go on the wire; the sim fills the rest. */
 const extrasOf = ({
   scenario,
@@ -38,9 +47,15 @@ const extrasOf = ({
   soakClients: string;
   duration: string;
 }) => {
-  if (scenario === "stream") return { holdSeconds: Number(hold) };
-  if (scenario === "idle") return { idleSeconds: Number(idle) };
-  if (scenario === "soak") return { clients: Number(soakClients), duration };
+  if (scenario === "stream") {
+    return { holdSeconds: countOf({ value: hold, label: "Hold seconds" }) };
+  }
+  if (scenario === "idle") {
+    return { idleSeconds: countOf({ value: idle, label: "Idle seconds" }) };
+  }
+  if (scenario === "soak") {
+    return { clients: countOf({ value: soakClients, label: "Clients" }), duration };
+  }
   return {};
 };
 

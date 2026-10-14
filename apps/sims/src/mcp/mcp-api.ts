@@ -151,6 +151,9 @@ export const connectRequestSchema = z.object({
 });
 export type ConnectRequest = z.infer<typeof connectRequestSchema>;
 
+/** An interactive connect answers within ten seconds; a hung sim must not leave a button busy. */
+const SEND_TIMEOUT_MS = 15_000;
+
 const refusalSchema = z.object({ error: z.string() });
 
 const refusalOf = async ({ response, fallback }: { response: Response; fallback: string }) => {
@@ -173,6 +176,7 @@ const send = async ({
     method,
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
   });
   if (!response.ok) {
     throw new SimFetchError({
