@@ -151,4 +151,53 @@ describe("extractTraceSpanAttributes and the Vercel AI SDK metadata channel", ()
       expect(Object.keys(result).filter((key) => key.startsWith("metadata."))).toEqual([]);
     });
   });
+
+  describe("when a span carries AI SDK 7 runtime context keys", () => {
+    /** @scenario Labels passed as AI SDK 7 runtime context reach the trace */
+    it("folds labels into langwatch.labels", () => {
+      const result = extractTraceSpanAttributes(
+        makeSpan({
+          spanAttributes: { "ai.settings.context.labels": ["checkout", "beta"] },
+        }),
+      );
+      expect(JSON.parse(result["langwatch.labels"]!)).toEqual(["checkout", "beta"]);
+    });
+
+    /** @scenario Identity keys passed as AI SDK 7 runtime context identify the trace */
+    it("fills the conversation id and user id", () => {
+      const result = extractTraceSpanAttributes(
+        makeSpan({
+          spanAttributes: {
+            "ai.settings.context.thread_id": "thread-9",
+            "ai.settings.context.user_id": "user-42",
+          },
+        }),
+      );
+      expect(result["gen_ai.conversation.id"]).toBe("thread-9");
+      expect(result["langwatch.user_id"]).toBe("user-42");
+    });
+
+    /** @scenario A key that is not reserved in AI SDK 7 runtime context becomes custom metadata */
+    it("keeps other keys as custom metadata", () => {
+      const result = extractTraceSpanAttributes(
+        makeSpan({
+          spanAttributes: { "ai.settings.context.tenant": "eu-west" },
+        }),
+      );
+      expect(result["metadata.tenant"]).toBe("eu-west");
+    });
+
+    /** @scenario An explicit LangWatch attribute wins over AI SDK 7 runtime context */
+    it("keeps the explicit LangWatch value", () => {
+      const result = extractTraceSpanAttributes(
+        makeSpan({
+          spanAttributes: {
+            "langwatch.user.id": "explicit-user",
+            "ai.settings.context.user_id": "context-user",
+          },
+        }),
+      );
+      expect(result["langwatch.user_id"]).toBe("explicit-user");
+    });
+  });
 });
