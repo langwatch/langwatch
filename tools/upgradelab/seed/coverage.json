@@ -43,6 +43,11 @@
       "cells": ["C1", "C3"],
       "note": "one webhook connection per organization; paused triggers not yet written"
     },
+    "automation:unwrap-trigger-json-text": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs Trigger rows whose filters or actionParams hold JSON text, as the previous release saved them; no seed writes one yet"
+    },
     "billing:fill-seat-change-organizations": {
       "status": "seeded",
       "seed": "tenancy-sql:subscription",

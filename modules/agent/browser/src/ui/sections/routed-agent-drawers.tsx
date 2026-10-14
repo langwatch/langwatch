@@ -197,20 +197,22 @@ export function RoutedAgentCodeEditorDrawer({ agentId, onSave }: AgentEditorDraw
           {...(code.options.projectId ? { projectId: code.options.projectId } : {})}
         />
       )}
-      renderInputs={({ inputs, onChange }) => (
+      renderInputs={(section) => (
         <VariablesSection
           title="Inputs"
-          variables={inputs}
-          onChange={onChange}
+          variables={section.inputs}
+          onChange={(next) => section.onChange(next)}
           showMappings={false}
           canAddRemove
         />
       )}
-      renderOutputs={({ outputs, onChange }) => (
+      renderOutputs={(section) => (
         <VariablesSection
           title="Outputs"
-          variables={outputs}
-          onChange={(next) => onChange(outputsNamedAsOutputs({ previous: outputs, next }))}
+          variables={section.outputs}
+          onChange={(next) =>
+            section.onChange(outputsNamedAsOutputs({ previous: section.outputs, next }))
+          }
           showMappings={false}
           canAddRemove
         />
