@@ -232,6 +232,17 @@ export interface WorkflowApi {
     projectId: string;
     principal?: WorkflowRunPrincipal | undefined;
   }): Promise<StudioClientEvent>;
+  /**
+   * One prepared Studio event run to completion on the project's engine. An engine refusal
+   * throws `WorkflowExecutionFailedError`; the run's own failure is in the answer's `error`.
+   */
+  executeStudioEventSync(input: {
+    projectId: string;
+    event: StudioClientEvent;
+    origin: WorkflowRunOrigin;
+    causalityDepth?: number;
+    parentTrace?: { traceId: string; parentSpanId: string };
+  }): Promise<WorkflowRunAnswer>;
   /** The evaluator-fields shape a peer's guard and run read off this workflow. */
   getFields(input: { workflowId: string; projectId: string }): Promise<WorkflowEvaluatorFields>;
   prepareStudioDsl(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow>;
