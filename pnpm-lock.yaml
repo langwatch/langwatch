@@ -6715,6 +6715,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
+      '@langwatch/clickhouse-markers':
+        specifier: workspace:*
+        version: link:../../../packages/clickhouse-markers
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../contract

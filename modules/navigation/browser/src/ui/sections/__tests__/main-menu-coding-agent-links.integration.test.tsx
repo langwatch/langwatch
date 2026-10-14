@@ -61,6 +61,20 @@ describe("given a project that recorded a coding-agent session in the last fifte
   });
 });
 
+describe("given an aggregate project that recorded no coding-agent session of its own", () => {
+  /**
+   * @see specs/governance/aggregate-project.feature
+   * @scenario "The aggregate offers Sessions without a session of its own"
+   */
+  it("offers the Sessions destination beside Trace Explorer", () => {
+    renderMenu({ ...PROJECT, kind: "aggregate" });
+
+    expect(screen.getByText("Sessions")).toBeInTheDocument();
+    expect(screen.getByText("Trace Explorer")).toBeInTheDocument();
+    expect(screen.queryByText("Pull requests")).not.toBeInTheDocument();
+  });
+});
+
 describe("given a project that recorded nothing from a coding agent", () => {
   /** @scenario "A project with no coding-agent activity carries neither destination" */
   it("offers neither coding-agent destination", () => {

@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import {
   codingAgentPullRequestDetailSchema,
   codingAgentPullRequestUsageInputSchema,
@@ -89,10 +90,13 @@ export class CodingAgentPullRequestReadService {
     },
   ) {}
 
-  async listForProject(input: { projectId: string }): Promise<CodingAgentSessionListRow[]> {
+  async listForProject(input: {
+    projectId: string;
+    authorization: Authorization;
+  }): Promise<CodingAgentSessionListRow[]> {
     const toMs = this.dependencies.clock.nowMs();
-    const rows = await this.dependencies.sessionReads.listRecent({
-      projectId: input.projectId,
+    const rows = await this.dependencies.sessionReads.listRecentFenced({
+      authorization: input.authorization,
       fromMs: toMs - SESSIONS_LIST_WINDOW_MS,
       toMs,
       limit: SESSIONS_LIST_LIMIT,

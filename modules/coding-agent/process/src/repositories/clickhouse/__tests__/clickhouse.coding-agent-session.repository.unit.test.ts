@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   TestClickHouseEndpoint,
   TestClock,
+  aggregateProof,
   session,
 } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { NoopCodingAgentReadMetricsService } from "../../../__tests__/support/coding-agent-read-metrics-noop.service.ts";
@@ -114,6 +115,34 @@ describe("Coding Agent session ClickHouse repository", () => {
     const dedup = request?.body.split("SELECT TenantId, SessionId, max(UpdatedAt)")[1] ?? "";
     expect(dedup).not.toContain("StartedAt BETWEEN");
     expect(dedup).not.toContain("UserId =");
+  });
+
+  /**
+   * @see specs/governance/aggregate-project.feature
+   * @scenario "A sessions read through the proof names no tenant of its own"
+   */
+  it("reads an aggregate's page under the proof's tenants and StartedAt windows", async () => {
+    const { endpoint, repository } = await createRepository();
+    endpoint.queryRows.push([]);
+
+    await repository.findManyRecentFenced({
+      authorization: aggregateProof({
+        projectId: "aggregate",
+        members: [{ projectId: "member-a", from: 1_000 }],
+      }),
+      fromMs: 100,
+      toMs: 200,
+      limit: 25,
+    });
+
+    const request = endpoint.requests[0];
+    expect(request?.body).not.toContain("{tenantId:String}");
+    expect(request?.body).toContain("StartedAt BETWEEN");
+    expect(request?.body).toContain("TenantId IN (");
+    expect(request?.body).toMatch(/transform\(TenantId.*StartedAt/s);
+    const dedup = request?.body.split("SELECT TenantId, SessionId, max(UpdatedAt)")[1] ?? "";
+    expect(dedup).toContain("TenantId IN (");
+    expect(dedup).not.toContain("StartedAt BETWEEN");
   });
 
   describe("given two versions of one session inside the same millisecond", () => {

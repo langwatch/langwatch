@@ -86,13 +86,14 @@ export interface CodingAgentApi {
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>;
   /**
-   * The Sessions screen's rows, cut to what this viewer may see: the generated
-   * title follows the project's content visibility, the cost follows
-   * `cost:view`.
+   * The Sessions screen's rows, cut to what this viewer may see (title under
+   * content visibility, cost under `cost:view`), read through the route's
+   * proof so an aggregate's page spans its members (ADR-177).
    */
   listForProject(
     input: CodingAgentSessionsListInput,
     by: CodingAgentViewer,
+    authorization: Authorization,
   ): Promise<CodingAgentSessionListRow[]>;
   /** Queues one span's bounded session facts onto coding_agent_processing (ADR-056/069). */
   contributeSpanFacts(data: ContributeSpanFactsCommandData): Promise<void>;
