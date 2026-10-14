@@ -384,3 +384,41 @@ func TestWellKnownInsertsTheSegmentBeforeTheIssuerPath(t *testing.T) {
 		t.Error(got)
 	}
 }
+
+func TestHeldCredentialsOnlyGoToTheirOwnEndpoint(t *testing.T) {
+	f := newFakeLangWatch(t)
+	_, sim := simAt(t, f, func(c *Config) { c.Cookie = "better-auth.session_token=configured" })
+	mustPass(t, connectOAuth(t, sim))
+
+	// The grant's token never goes to an endpoint other than the one that issued it.
+	code, ans := call[map[string]string](t, http.MethodPost, sim+"/_sim/api/runs",
+		RunRequest{Scenario: ScenarioConnect, Flow: FlowOAuth, Endpoint: "http://elsewhere.test"})
+	if code != http.StatusBadRequest || !strings.Contains(ans["error"], "only goes there") {
+		t.Errorf("an oauth run to another endpoint answered %d %v", code, ans)
+	}
+
+	// The configured session never goes elsewhere: with no cookie of its own, the approval is refused.
+	other := newFakeLangWatch(t)
+	_, st := call[RunStatus](t, http.MethodPost, sim+"/_sim/api/oauth/connect",
+		ConnectRequest{Mode: "auto", Endpoint: other.URL(), Wait: true})
+	for _, s := range st.Steps {
+		if s.Kind == "approve" {
+			t.Errorf("the configured session was sent to another endpoint: %s", stepLine(st))
+		}
+	}
+}
+
+func TestAPostThatIsNotJSONIsRefused(t *testing.T) {
+	f := newFakeLangWatch(t)
+	_, sim := simAt(t, f)
+	for _, path := range []string{"/_sim/api/runs", "/_sim/api/oauth/connect"} {
+		resp, err := http.Post(sim+path, "text/plain", strings.NewReader(`{"scenario":"connect"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusUnsupportedMediaType {
+			t.Errorf("a text/plain POST to %s answered %d", path, resp.StatusCode)
+		}
+	}
+}

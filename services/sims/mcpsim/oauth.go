@@ -419,6 +419,9 @@ func (a *oauthAttempt) signIn(ctx context.Context) (string, error) {
 	if host := u.Hostname(); host != "localhost" && host != "127.0.0.1" && !strings.HasSuffix(host, ".localhost") {
 		return "", fmt.Errorf("refusing to sign in to %s: the sim only signs in to a local stack", host)
 	}
+	if a.req.Endpoint != cfg.Endpoint {
+		return "", fmt.Errorf("refusing to sign in to %s: the configured login only goes to %s", a.req.Endpoint, cfg.Endpoint)
+	}
 	body, _ := json.Marshal(map[string]string{"email": cfg.SignInEmail, "password": cfg.SignInPassword})
 	target := originOf(a.req.Endpoint) + "/api/auth/sign-in/email"
 	x := a.s.do(ctx, httpCall{method: http.MethodPost, url: target, body: bytes.NewReader(body), headers: map[string]string{
@@ -521,7 +524,11 @@ func (a *oauthAttempt) obtainCode(ctx context.Context) (string, error) {
 	if a.projectID == "" {
 		return "", errors.New("auto approval needs a project id (projectId, or MCPSIM_PROJECT_ID)")
 	}
-	cookie := firstOf(a.req.Cookie, a.s.cfg.Cookie)
+	// The configured session only ever goes to the configured endpoint.
+	cookie := a.req.Cookie
+	if cookie == "" && a.req.Endpoint == a.s.cfg.Endpoint {
+		cookie = a.s.cfg.Cookie
+	}
 	if cookie == "" {
 		var err error
 		if cookie, err = a.signIn(ctx); err != nil {

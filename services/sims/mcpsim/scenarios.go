@@ -67,9 +67,11 @@ func (s *Server) planFlow(p *plan, endpointGiven bool) error {
 		if g == nil {
 			return errors.New("the oauth flow needs a grant: run the OAuth connect first (POST /_sim/api/oauth/connect, haven sim mcp oauth)")
 		}
-		if !endpointGiven {
-			p.Endpoint = g.endpoint
+		// The grant's token only ever goes to the endpoint that issued it.
+		if endpointGiven && p.Endpoint != g.endpoint {
+			return fmt.Errorf("the OAuth grant was issued by %s and only goes there: connect OAuth to %s first", g.endpoint, p.Endpoint)
 		}
+		p.Endpoint = g.endpoint
 	default:
 		return fmt.Errorf("flow %q is neither apikey nor oauth", p.Flow)
 	}

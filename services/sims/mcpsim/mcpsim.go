@@ -104,11 +104,11 @@ func NewServer(cfg Config) *Server {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, http.StatusOK, map[string]bool{"ok": true}) })
 	mux.HandleFunc("GET /_sim/api/status", s.handleStatus)
 	mux.HandleFunc("GET /_sim/api/runs", s.handleRuns)
-	mux.HandleFunc("POST /_sim/api/runs", s.handleStart)
+	mux.HandleFunc("POST /_sim/api/runs", jsonOnly(s.handleStart))
 	mux.HandleFunc("DELETE /_sim/api/runs", s.handleClear)
 	mux.HandleFunc("GET /_sim/api/runs/{id}", s.handleRun)
 	mux.HandleFunc("DELETE /_sim/api/runs/{id}", s.handleStop)
-	mux.HandleFunc("POST /_sim/api/oauth/connect", s.handleConnect)
+	mux.HandleFunc("POST /_sim/api/oauth/connect", jsonOnly(s.handleConnect))
 	mux.HandleFunc("GET /_sim/api/oauth", func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, http.StatusOK, s.grants.status()) })
 	mux.HandleFunc("DELETE /_sim/api/oauth", func(w http.ResponseWriter, _ *http.Request) {
 		s.grants.set(nil)
@@ -575,4 +575,17 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 
 func writeError(w http.ResponseWriter, code int, message string) {
 	writeJSON(w, code, map[string]string{"error": message})
+}
+
+// jsonOnly refuses a POST that is not JSON. A web page can only send JSON across origins after a
+// preflight this sim never answers, so a page the developer visits cannot start a run that
+// spends the sim's held session or tokens.
+func jsonOnly(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.Header.Get("Content-Type"), applicationJSON) {
+			writeError(w, http.StatusUnsupportedMediaType, "send the request as application/json")
+			return
+		}
+		next(w, r)
+	}
 }
