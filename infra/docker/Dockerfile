@@ -107,11 +107,12 @@ COPY apps/api/package.json ./apps/api/package.json
 COPY apps/ui/package.json ./apps/ui/package.json
 COPY apps/tasks/package.json ./apps/tasks/package.json
 COPY apps/scenario-child/package.json ./apps/scenario-child/package.json
-# Four filters: the four applications are four dependency subtrees and none is
-# a subset of another. apps/server and the SDK's e2e suites stay out. No
-# workspace member has an install lifecycle script, so no source is needed yet.
+# Five filters: the five applications are five dependency subtrees and none is
+# a subset of another (the scenario child's build needs its own esbuild). apps/server
+# and the SDK's e2e suites stay out. No workspace member has an install lifecycle
+# script, so no source is needed yet.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    CI=true pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
+    CI=true pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..." --filter "@langwatch/scenario-child..."
 
 # Source, after the install. The app imports the SDK and mcp/typescript as
 # workspace copies and builds them; the SDK's prebuild (copy-types.sh) reads
@@ -146,8 +147,10 @@ COPY --from=devscripts /out/devscripts /app/.bin/devscripts/devscripts
 # `@langwatch/mcp-server`, whose dist the API needs at boot. Both are reached
 # through the api/worker filters, not the ui one. apps/api declares no `build`
 # of its own and runs from source through node; apps/worker declares none either
-# now — the pre-compiled scenario child is its own app, @langwatch/scenario-child,
-# reached through the worker filter's `...`. The worker runs from source, but the child is a fresh
+# now — the pre-compiled scenario child is its own app, @langwatch/scenario-child.
+# The worker does not depend on it, so the worker filter's `...` never reaches it and
+# it has its own filter (and its own --filter-prod below, for its external requires).
+# The worker runs from source, but the child is a fresh
 # process per simulation, so it is spawned as `node` on that bundle rather than
 # `pnpm exec` on a TypeScript tree (the --prod
 # install below drops it, so the bundle is the only supported path in an image).
@@ -187,7 +190,7 @@ RUN pnpm run ensure:ai-gateway-secrets && pnpm run generate:modules \
  && pnpm --filter @langwatch/langy-process run generate:setup-skill-bodies \
  && pnpm --filter "langwatch..." --filter "@langwatch/mcp-server..." --filter "@langwatch/ksuid..." --filter "@langwatch/mail..." run build \
  && NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -b --builders 16 modules/*/contract/tsconfig.build.json \
- && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build
+ && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/scenario-child..." run build
 
 # The production tree: every node_modules directory goes, then the three server roles (and the
 # backend that hosts two of them) are installed again with --prod. A fresh install, not a prune
@@ -213,7 +216,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
  && cp pnpm-lock.yaml /tmp/committed-pnpm-lock.yaml \
  && pnpm install --lockfile-only \
  && node /tmp/check-locked-versions.mjs /tmp/committed-pnpm-lock.yaml pnpm-lock.yaml \
- && pnpm install --frozen-lockfile --prod --filter-prod "@langwatch/platform-api..." --filter-prod "@langwatch/worker..." --filter-prod "@langwatch/tasks..." --filter-prod "@langwatch/backend..."
+ && pnpm install --frozen-lockfile --prod --filter-prod "@langwatch/platform-api..." --filter-prod "@langwatch/worker..." --filter-prod "@langwatch/scenario-child..." --filter-prod "@langwatch/tasks..." --filter-prod "@langwatch/backend..."
 
 # What no process runs, removed before the runtime stage copies the trees: the module halves the
 # browser loads (the api serves the built bundle), tests, specs, ADRs, declarations, source maps
