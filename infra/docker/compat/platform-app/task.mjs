@@ -67,7 +67,7 @@ if (target.outFlagToEnv) {
   const at = args.indexOf("--out");
   const joined = args.find((arg) => arg.startsWith("--out="));
   const outDir = at >= 0 ? args[at + 1] : joined?.slice("--out=".length);
-  if (!outDir) {
+  if (!outDir || outDir.startsWith("-")) {
     console.error(`"${name}" needs --out <dir>.`);
     process.exit(2);
   }

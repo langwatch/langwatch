@@ -69,13 +69,17 @@ describe("given the image's compat task script at the previous release's path", 
     });
   });
 
-  describe("when --out is missing", () => {
+  describe("when --out is missing or has no folder after it", () => {
     /** @scenario "An old Helm chart's LangWatchQL render task still runs from the previous path" */
-    it("exits 2 and names the flag", () => {
-      const result = runOldTask({ root, args: ["renderLwqlAccessConfig"] });
+    it("exits 2, names the flag and runs nothing", () => {
+      const cases = [[], ["--out"], ["--out", "--force"], ["--out="], ["--out=-x"]];
+      for (const flags of cases) {
+        const result = runOldTask({ root, args: ["renderLwqlAccessConfig", ...flags] });
 
-      expect(result.status).toBe(2);
-      expect(result.stderr).toContain("--out <dir>");
+        expect(result.status, flags.join(" ")).toBe(2);
+        expect(result.stderr).toContain("--out <dir>");
+        expect(result.stdout).toBe("");
+      }
     });
   });
 });
