@@ -22,6 +22,7 @@ import {
   SCENARIO_RESOURCE_CLASSES,
   type ScenarioResourceClass,
 } from "./features/execution/scenario-resource-class.ts";
+import { voiceRunsMaxConcurrent } from "./voice/voice-limits.ts";
 
 const trimmedOptional = z
   .string()
@@ -111,6 +112,11 @@ export const scenarioConfig = Config.define((c) => ({
   generateTimeoutMs: c.env("SCENARIO_GENERATE_TIMEOUT_MS", generateTimeoutMs),
   /** The browser call's length cap in seconds; unusable values fall back to the default. */
   voiceCallMaxSeconds: c.env("VOICE_CALL_MAX_SECONDS", passthrough),
+  /** Voice runs one project may hold on this worker at once (default 2); the rest wait queued. */
+  voiceRunsMaxConcurrent: c.env(
+    "VOICE_RUNS_MAX_CONCURRENT",
+    passthrough.transform((raw) => voiceRunsMaxConcurrent({ VOICE_RUNS_MAX_CONCURRENT: raw })),
+  ),
   /** Dev only: a loopback voice stand-in's signed URL passes the check. */
   allowLoopbackVoiceProviders,
   blockLocalHttpCalls,

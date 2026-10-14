@@ -7,9 +7,13 @@ import { z } from "zod";
 
 const blankIsUnset = (value: unknown) => (value === "" ? undefined : value);
 
+/** A written switch reads as the previous release read it: only `1` or `true`, any case, is on. */
+const ON_SPELLING = /^(1|true)$/i;
+
 /**
- * Browser tracing (ADR-058) is on unless `RUM_ENABLED=false`. It exports to rum's collector, else
- * the deprecated `OTEL_EXPORTER_OTLP_*` (warned at boot); with neither the door refuses.
+ * Browser tracing (ADR-058) is off unless switched on, as the previous release had it. It exports
+ * to rum's collector, else the deprecated `OTEL_EXPORTER_OTLP_*` (warned at boot); with neither
+ * the door refuses.
  */
 export const rumConfig = Config.define((c) => ({
   enabled: c.env(
@@ -17,7 +21,7 @@ export const rumConfig = Config.define((c) => ({
     z
       .string()
       .optional()
-      .transform((value) => value !== "false"),
+      .transform((value) => value !== undefined && ON_SPELLING.test(value)),
   ),
   sampleRatio: c.env(
     "RUM_SAMPLE_RATIO",
@@ -49,7 +53,7 @@ export const rumWebConfigSchema: RumWebConfigSchema = rumWebConfigSchemaDefiniti
 
 export type RumWebConfig = z.infer<typeof rumWebConfigSchema>;
 
-/** Tracing is on unless switched off, and only while a collector would receive it. */
+/** Tracing is on only when switched on, and only while a collector would receive it. */
 export const rumBrowserConfig = defineBrowserConfig({
   schema: rumWebConfigSchema,
   project: (config: RumConfig) => ({
