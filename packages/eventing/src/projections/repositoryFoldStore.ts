@@ -83,6 +83,7 @@ export class RepositoryFoldStore<TData> implements FoldProjectionStore<TData> {
   async get(aggregateId: string, context: ProjectionStoreContext): Promise<FoldStateRead<TData>> {
     const projection = await this.repo.findProjection(aggregateId, {
       tenantId: context.tenantId,
+      ...(context.readWindow ? { readWindow: context.readWindow } : {}),
     });
     if (!projection) return { kind: "empty" };
 

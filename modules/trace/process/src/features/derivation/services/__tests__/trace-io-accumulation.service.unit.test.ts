@@ -3,7 +3,11 @@
  * semantic matches beat fallbacks. No payload parsing, rules in isolation.
  */
 
-import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract";
+import {
+  RESERVED_INPUT_SPAN_START_MS,
+  type NormalizedSpan,
+  type TraceSummaryData,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -326,6 +330,76 @@ describe("TraceIOAccumulationService", () => {
 
         expect(result.inputMediaRefs).toBe(JSON.stringify([drawing, picture]));
       });
+    });
+  });
+});
+
+describe("TraceIOAccumulationService: top-most span input", () => {
+  /** Folds spans in arrival order, carrying the persisted attribute forward. */
+  function foldInputs(folds: { span: NormalizedSpan; text: string }[]): string | null {
+    let current = state();
+    for (const { span: folded, text } of folds) {
+      const result = accumulator({ input: { rich: value(text) } }).accumulateIO({
+        state: current,
+        span: folded,
+      });
+      const attributes = { ...current.attributes };
+      if (result.inputSpanStartTimeMs === null) {
+        delete attributes[RESERVED_INPUT_SPAN_START_MS];
+      } else {
+        attributes[RESERVED_INPUT_SPAN_START_MS] = String(result.inputSpanStartTimeMs);
+      }
+      current = { ...current, computedInput: result.computedInput, attributes };
+    }
+    return current.computedInput;
+  }
+
+  // The turn's own parent was never exported, so no span is a root.
+  const turn = span({ spanId: "turn", parentSpanId: "never-exported", startTimeUnixMs: 100 });
+  const chain = span({ spanId: "chain", parentSpanId: "turn", startTimeUnixMs: 150 });
+
+  describe("given no span in the trace has a null parent", () => {
+    /** @scenario "Input comes from the top-most span when no root span is present" */
+    it("takes the input of the earlier-starting parent folded after its child", () => {
+      expect(
+        foldInputs([
+          { span: chain, text: "internal prompt" },
+          { span: turn, text: "continue" },
+        ]),
+      ).toBe("continue");
+    });
+
+    /** @scenario "A later-starting span does not replace the top-most span's input" */
+    it("keeps the top-most input when a later-starting child folds after it", () => {
+      expect(
+        foldInputs([
+          { span: turn, text: "continue" },
+          { span: chain, text: "internal prompt" },
+        ]),
+      ).toBe("continue");
+    });
+  });
+
+  describe("given a root span's input has been folded", () => {
+    /** @scenario "A root span's input is never replaced by a non-root span" */
+    it("keeps the root input when an earlier-starting non-root span folds", () => {
+      expect(
+        foldInputs([
+          { span: span({ parentSpanId: null, startTimeUnixMs: 500 }), text: "root input" },
+          { span: turn, text: "continue" },
+        ]),
+      ).toBe("root input");
+    });
+  });
+
+  describe("given a summary folded before the start time was recorded", () => {
+    it("keeps its input until refolded", () => {
+      const result = accumulator({ input: { rich: value("later") } }).accumulateIO({
+        state: state({ computedInput: "old" }),
+        span: turn,
+      });
+
+      expect(result.computedInput).toBe("old");
     });
   });
 });
