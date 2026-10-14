@@ -179,6 +179,9 @@ func routeIdentityProvider(env map[string]string, stores Stores, profile Profile
 	idp := stores.IDPIssuer()
 	maps.Copy(env, map[string]string{"NEXTAUTH_PROVIDER": "oidc", "OIDC_ISSUER": idp + "/t/" + ssoTenant, "OIDC_CLIENT_ID": "langwatch-upgradelab",
 		"OIDC_CLIENT_SECRET": "idpsim-accepts-any-secret-for-an-unregistered-client", "LOCAL_PASSWORDS_ENABLED": "on", "SSO_TRUSTED_IDP_ORIGINS": idp})
+	if stores.IDPCA != "" {
+		env["NODE_EXTRA_CA_CERTS"] = stores.IDPCA // the issuer is https behind the cell's own CA, for both releases
+	}
 	// AUTH_PROVIDER (common.env's email) outranks NEXTAUTH_PROVIDER on both releases; the operator set only the latter.
 	delete(env, "AUTH_PROVIDER")
 	if profile.LegacySSO {
