@@ -274,7 +274,7 @@ describe("Feature: open streams are kept alive", () => {
     /** @scenario "An open stream is kept alive through idle-timing proxies" */
     it("receives a keepalive comment while nothing else is sent", async () => {
       vi.useFakeTimers({ toFake: ["setInterval"] });
-      const { replica } = deployment();
+      const { records, replica } = deployment();
       const { url } = await replica();
       const sessionId = await openSession(url, PROJECT_KEY);
       const abort = new AbortController();
@@ -287,6 +287,7 @@ describe("Feature: open streams are kept alive", () => {
         signal: abort.signal,
       });
       const reader = stream.body!.getReader();
+      const touched = vi.spyOn(records, "touch");
 
       vi.advanceTimersByTime(20_000);
       const { value } = await reader.read();
@@ -294,6 +295,8 @@ describe("Feature: open streams are kept alive", () => {
 
       expect(stream.status).toBe(200);
       expect(new TextDecoder().decode(value)).toContain(": keepalive");
+      // A held stream keeps its session counting against the key's session limit.
+      expect(touched).toHaveBeenCalledWith({ sessionId, apiKey: PROJECT_KEY });
     });
   });
 });

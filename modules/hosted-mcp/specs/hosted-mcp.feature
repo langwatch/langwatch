@@ -110,3 +110,4 @@ Feature: Hosted MCP answers main's root paths on the api process
     Given a client holds the server's event stream open
     When nothing else is sent for 20 seconds
     Then the stream carries a keepalive comment
+    And the session keeps counting against its key's session limit

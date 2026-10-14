@@ -229,12 +229,14 @@ export class McpSessionService {
   }
 
   /**
-   * Writes a comment on every open stream so idle-timing proxies keep it, and keeps a session with
-   * an open stream from being reaped as idle.
+   * Writes a comment on every open stream so idle-timing proxies keep it. A session with an open
+   * stream is active: it is not reaped as idle and keeps counting against its key's session limit.
    */
   pingOpenStreams(): void {
-    for (const session of this.streamable.values()) {
-      if (writeToOpenStreams(session.transport, KEEPALIVE_COMMENT) > 0) this.markActive(session);
+    for (const [sessionId, session] of this.streamable) {
+      if (writeToOpenStreams(session.transport, KEEPALIVE_COMMENT) === 0) continue;
+      this.markActive(session);
+      void this.touchRecord({ sessionId, apiKey: session.apiKey });
     }
   }
 
