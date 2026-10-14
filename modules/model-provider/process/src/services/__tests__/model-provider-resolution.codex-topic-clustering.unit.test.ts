@@ -10,6 +10,7 @@ import { ModelProviderResolutionService } from "../model-provider-resolution.ser
 const CODEX_MODEL = "openai_codex/gpt-5.6-terra";
 const CLUSTERING = "analytics.topic_clustering_llm";
 const GENERATOR = "scenarios.generator";
+const EMBEDDINGS = "analytics.topic_clustering_embeddings";
 
 const feature = (key: string, role: string) => ({
   key,
@@ -18,7 +19,11 @@ const feature = (key: string, role: string) => ({
   description: `the ${key} feature`,
 });
 
-const config = (scopeType: "PROJECT" | "ORGANIZATION", scopeId: string, values: Record<string, string>) => ({
+const config = (
+  scopeType: "PROJECT" | "ORGANIZATION",
+  scopeId: string,
+  values: Record<string, string>,
+) => ({
   id: `config-${scopeType}`,
   config: values,
   scopes: [{ scopeType, scopeId }],
@@ -30,7 +35,11 @@ function resolve(featureKey: string, configs: ReturnType<typeof config>[]) {
   return ModelProviderResolutionService.create({
     defaults: { findForOrganization: async () => configs, findForProject: async () => configs },
     catalog: {
-      defaultFeatures: () => [feature(CLUSTERING, "FAST"), feature(GENERATOR, "FAST")],
+      defaultFeatures: () => [
+        feature(CLUSTERING, "FAST"),
+        feature(GENERATOR, "FAST"),
+        feature(EMBEDDINGS, "EMBEDDINGS"),
+      ],
     },
     scopes: {
       getProjectContext: async () => ({ teamId: "team-1", organizationId: "organization-1" }),
@@ -47,7 +56,11 @@ describe("ModelProviderResolutionService.resolve for a codex FAST default", () =
         config("PROJECT", "project-1", { FAST: CODEX_MODEL }),
         config("ORGANIZATION", "organization-1", { FAST: "openai/gpt-5-mini" }),
       ]),
-    ).resolves.toMatchObject({ model: "openai/gpt-5-mini", source: "role_default", scope: "organization" });
+    ).resolves.toMatchObject({
+      model: "openai/gpt-5-mini",
+      source: "role_default",
+      scope: "organization",
+    });
   });
 
   /** @scenario "A codex topic clustering override is skipped" */
@@ -78,5 +91,12 @@ describe("ModelProviderResolutionService.resolve for a codex FAST default", () =
     await expect(
       resolve(GENERATOR, [config("PROJECT", "project-1", { FAST: CODEX_MODEL })]),
     ).resolves.toMatchObject({ model: CODEX_MODEL, source: "role_default", scope: "project" });
+  });
+
+  /** @scenario "Embeddings never resolve a codex model" */
+  it("raises ModelRestrictedForFeatureError for an EMBEDDINGS codex value", async () => {
+    await expect(
+      resolve(EMBEDDINGS, [config("PROJECT", "project-1", { EMBEDDINGS: CODEX_MODEL })]),
+    ).rejects.toBeInstanceOf(ModelRestrictedForFeatureError);
   });
 });

@@ -63,8 +63,8 @@ vi.mock("../../../behavior/topic-api.ts", () => ({
 }));
 
 import { FakeTopicHost, renderWithTopicHost } from "../../../testing.tsx";
-import TopicClusteringScreen from "../topic-clustering.screen.tsx";
 import { MODEL_PROVIDERS_HREF, MODEL_PROVIDERS_LINK_LABEL } from "../topic-clustering-copy.ts";
+import TopicClusteringScreen from "../topic-clustering.screen.tsx";
 
 const settledStatus = (overrides: Record<string, unknown>) => ({
   isRunInFlight: false,
@@ -140,10 +140,12 @@ describe("given the last run failed because the only configured model is a restr
 
     renderWithTopicHost(<TopicClusteringScreen />);
 
-    expect(screen.getByText("The topic clustering model is not allowed for this feature")).toBeTruthy();
-    expect(screen.getByRole("link", { name: MODEL_PROVIDERS_LINK_LABEL }).getAttribute("href")).toBe(
-      MODEL_PROVIDERS_HREF,
-    );
+    expect(
+      screen.getByText("The topic clustering model is not allowed for this feature"),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: MODEL_PROVIDERS_LINK_LABEL }).getAttribute("href"),
+    ).toBe(MODEL_PROVIDERS_HREF);
   });
 
   /** @scenario "The settings page shows guidance and a link for a restricted model failure" */
@@ -152,9 +154,9 @@ describe("given the last run failed because the only configured model is a restr
 
     renderWithTopicHost(<TopicClusteringScreen />);
 
-    expect(screen.getByRole("link", { name: MODEL_PROVIDERS_LINK_LABEL }).getAttribute("href")).toBe(
-      MODEL_PROVIDERS_HREF,
-    );
+    expect(
+      screen.getByRole("link", { name: MODEL_PROVIDERS_LINK_LABEL }).getAttribute("href"),
+    ).toBe(MODEL_PROVIDERS_HREF);
   });
 });
 

@@ -106,12 +106,9 @@ export abstract class ModelProviderCatalog {
     return getStaticModelCostRates();
   }
   /**
-   * Drops unknown, non-string and empty entries and rejects restricted (codex)
-   * models loudly: a save that silently loses a key would read as "worked".
-   * Only keys being WRITTEN are checked: a value equal to the one already
-   * `stored` is passed back unchanged by the drawer and may predate a tightened
-   * restriction. Rejecting it would lock the whole config, and resolution
-   * already skips such a stored value at runtime.
+   * Rejects restricted (codex) models loudly. Only keys being WRITTEN are
+   * checked: a value equal to the `stored` one may predate the restriction, and
+   * resolution already skips it at runtime; rejecting it would lock the config.
    */
   sanitizeDefaultConfig(
     input: Record<string, unknown>,

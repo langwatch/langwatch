@@ -17,9 +17,7 @@ describe("topic-clustering-copy", () => {
     /** @scenario "A restricted model failure is the customer's to fix" */
     it("has named guidance for model_restricted", () => {
       const guidance = CLUSTERING_FAILURE_GUIDANCE.model_restricted;
-      expect(guidance?.title).toBe(
-        "The topic clustering model is not allowed for this feature",
-      );
+      expect(guidance?.title).toBe("The topic clustering model is not allowed for this feature");
       expect(guidance?.description).toContain("Codex");
     });
 
@@ -36,14 +34,12 @@ describe("topic-clustering-copy", () => {
         subtopicsCount: 0,
       };
 
-      expect(runDetail(run)).toBe(
-        "The topic clustering model is not allowed for this feature",
-      );
+      expect(runDetail(run)).toBe("The topic clustering model is not allowed for this feature");
       expect(showsModelProvidersLink(run)).toBe(true);
     });
   });
 
-  describe("failureGuidance", () => {
+  describe("when guidance is asked for a failed run", () => {
     describe("given an actionable failure with a known code", () => {
       it("returns the guidance entry for that code", () => {
         expect(

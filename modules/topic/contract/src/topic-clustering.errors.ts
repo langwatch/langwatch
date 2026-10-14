@@ -11,10 +11,9 @@ export const CLUSTERING_ERROR_CODES = {
    */
   MODEL_NOT_CONFIGURED: "model_not_configured",
   /**
-   * Something IS configured but the resolver had to skip it: a terms-restricted
-   * codex model cannot execute topic clustering (it runs through langevals,
-   * outside the codex gateway). The fix is choosing another model, so this is
-   * distinct from MODEL_NOT_CONFIGURED.
+   * A model IS configured but the resolver had to skip it: a terms-restricted
+   * codex model cannot run topic clustering. The fix is another model, so this
+   * is distinct from MODEL_NOT_CONFIGURED.
    */
   MODEL_RESTRICTED: "model_restricted",
   /**

@@ -5,14 +5,9 @@ import type {
 } from "@langwatch/topic-contract";
 
 /**
- * Customer-facing copy and per-run detail for the topic-clustering screen.
- * Kept apart from the component so the wording and the code→guidance mapping
- * can be unit-tested without rendering.
- *
- * The classifier's code is the ONLY thing the server sends about a failure —
- * never the provider's response body, which is a langevals/provider payload
- * (tracebacks, internal hostnames, echoed key prefixes) and not something to
- * put in front of a customer.
+ * Customer-facing copy for the topic-clustering screen, kept apart so it is
+ * unit-testable. The classifier's code is the ONLY thing the server sends about
+ * a failure, never the provider's response body.
  */
 
 /** The route to the model-providers settings page. */
@@ -124,10 +119,9 @@ export function runDetail(run: {
 }
 
 /**
- * The named guidance for a failed run, or null when there is none to show: a
- * failure that is not the customer's to fix, or a code we have no copy for.
- * The one place both the status card and the run-history link consult, so the
- * "actionable AND known code" rule lives once.
+ * The named guidance for a failed run, or null: not the customer's to fix, or
+ * no copy for the code. Both the status card and the history link consult it,
+ * so the "actionable AND known code" rule lives once.
  */
 export function failureGuidance({
   errorCode,

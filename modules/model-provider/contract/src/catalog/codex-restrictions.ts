@@ -12,26 +12,18 @@ export const LANGY_CHAT_FEATURE_KEY = "langy.chat";
 export const CONNECTION_TEST_FEATURE_KEY = "model_provider.connection_test";
 
 /**
- * FAST features a codex default must NOT license, even though they sit in the
- * FAST tier.
- *
- * Topic clustering executes through langevals/litellm, whose codex backstop
- * refuses codex models outright; codex's only execution road is the AI gateway
- * Responses endpoint, which clustering never uses. Licensing the model at
- * RESOLUTION while refusing it at EXECUTION would fail late with a
- * customer-hostile message. Excluding it here makes the cascade resolver skip
- * the codex value and keep walking the scope chain, raising
- * ModelRestrictedForFeatureError when no other configured value exists.
+ * FAST features a codex default must NOT license. Topic clustering runs through
+ * langevals/litellm, which refuses codex at execution, so the resolver skips the
+ * codex value and keeps walking the scope chain instead of failing late.
  */
 export const CODEX_EXCLUDED_FAST_FEATURE_KEYS: readonly string[] = [
   "analytics.topic_clustering_llm",
 ];
 
 /**
- * The rule, not a hand-kept list: Langy plus every FAST-role assist, minus the
- * FAST features codex cannot execute (CODEX_EXCLUDED_FAST_FEATURE_KEYS) — the
- * fast tier IS the "light AI assists" the codex terms cover, so a new fast
- * feature is codex-allowed by construction. A test pins the expansion.
+ * The rule, not a hand-kept list: Langy plus every FAST-role assist except
+ * CODEX_EXCLUDED_FAST_FEATURE_KEYS, so a new fast feature is codex-allowed by
+ * construction. A test pins the expansion.
  */
 export const CODEX_ALLOWED_FEATURE_KEYS: readonly string[] = [
   LANGY_CHAT_FEATURE_KEY,
@@ -76,13 +68,9 @@ export function isModelAllowedForFeature({
 }
 
 /**
- * Whether a codex model may be SAVED as a role default: LANGY and FAST (the
- * Codex connect flows write FAST=codex on purpose). DEFAULT and EMBEDDINGS
- * carry general inference and stay closed.
- *
- * FAST is a role-wide "yes" even though a few FAST features cannot run codex
- * (CODEX_EXCLUDED_FAST_FEATURE_KEYS): the resolver skips the codex value
- * per-feature via `isModelAllowedForFeature` instead of closing the role.
+ * Whether a codex model may be SAVED as a role default: LANGY and FAST (Codex
+ * connect writes FAST=codex on purpose). FAST features codex cannot run are
+ * skipped per-feature by the resolver, not by closing the role.
  */
 export function isModelAllowedAsRoleDefault(modelId: string, role: ModelRole): boolean {
   if (!isCodexModel(modelId)) return true;

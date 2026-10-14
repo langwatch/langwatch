@@ -1,17 +1,19 @@
 /**
  * Save-time Codex refusal: a new Codex value outside the licensed surfaces is
- * rejected, while a Codex value already stored for a key stays savable when the
- * customer changes a different key (resolution skips it at runtime).
+ * rejected; one already stored for a key stays savable when another key changes.
  *
  * @see specs/model-providers/codex-account-provider.feature
  * @see modules/topic/specs/model-resolution.feature
  */
-import { CODEX_DEFAULT_MODEL, ModelDefaultValidationError } from "@langwatch/model-provider-contract";
+import {
+  CODEX_DEFAULT_MODEL,
+  ModelDefaultValidationError,
+} from "@langwatch/model-provider-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { TestModelProviderCatalog } from "../../../../__tests__/support/model-provider-integration.support.ts";
 import { MemoryModelDefaultRepository } from "../../../../repositories/memory/memory.model-default.repository.ts";
 import { MemoryModelProviderDatabase } from "../../../../repositories/memory/memory.model-provider.database.ts";
-import { TestModelProviderCatalog } from "../../../../__tests__/support/model-provider-integration.support.ts";
 import { ModelProviderDefaultsWriteService } from "../model-provider-defaults-write.service.ts";
 
 const TOPIC_KEY = "analytics.topic_clustering_llm";
@@ -23,7 +25,9 @@ describe("ModelProviderDefaultsWriteService codex refusal", () => {
   let writer: ModelProviderDefaultsWriteService;
 
   beforeEach(() => {
-    defaults = MemoryModelDefaultRepository.create({ database: MemoryModelProviderDatabase.create() });
+    defaults = MemoryModelDefaultRepository.create({
+      database: MemoryModelProviderDatabase.create(),
+    });
     writer = ModelProviderDefaultsWriteService.create({
       defaults,
       catalog: new TestModelProviderCatalog(),
