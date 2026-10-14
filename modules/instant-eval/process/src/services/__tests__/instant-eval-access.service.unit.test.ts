@@ -324,6 +324,24 @@ describe("given a self-hosted install that judges through LangWatch, with the re
     });
   });
 
+  describe("when the license does not name them and the release flag is on", () => {
+    /** @scenario "The release flag does not release a self-hosted install without a license" */
+    it("may not judge, without reading the flag or the organization's switch", async () => {
+      const access = InstantEvalAccessService.create({
+        flags: LOUD_FLAGS,
+        projects,
+        judgesThroughConnect: true,
+        optIns: LOUD_OPT_INS,
+        isJudgeConfigured: () => true,
+        hostedPlans: null,
+        judge: { isAvailableForOrganization: async () => false },
+      });
+
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(false);
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(false);
+    });
+  });
+
   describe("when the license names them but an admin switched them off", () => {
     /** @scenario "An admin who switched hosted judging off keeps it off" */
     it("may not judge", async () => {
@@ -343,10 +361,10 @@ describe("given a self-hosted install that judges through LangWatch, with the re
   });
 });
 
-describe("given a self-hosted install with judging turned off, with the release flag off", () => {
+describe("given an install that does not judge through LangWatch, with the release flag off", () => {
   describe("when the project asks whether it may judge", () => {
-    /** @scenario "An install with judging turned off still waits for the release flag" */
-    it("is not released by the license", async () => {
+    /** @scenario "An install that does not judge through LangWatch waits for the release flag" */
+    it("is not released, and the license is not read", async () => {
       const access = InstantEvalAccessService.create({
         flags: { isEnabled: async () => false },
         projects: { findOrganizationId: async () => "organization-1" },
