@@ -147,6 +147,7 @@ export const reads = {
     "infra/clickhouse-serverless/**/*",
     "infra/docker/Dockerfile.langyagent",
     "infra/docker/Dockerfile",
+    "infra/docker/compat/**/*",
     "docs/integration/**/*",
     "docs/scripts/**/*",
     "docs/snippets/**/*",

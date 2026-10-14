@@ -24,7 +24,7 @@ function prismaLoggerLevel(level: Prisma.LogLevel): "error" | "warn" | "info" | 
   return level === "query" ? "debug" : level;
 }
 
-const SCHEMA_BEHIND_CODE = /P2021|P2022|42P01|42703/;
+const SCHEMA_BEHIND_CODE = /\b(?:P2021|P2022|42P01|42703)\b/;
 const SCHEMA_BEHIND_SUBJECT = /\b(?:table|column|relation)\b/i;
 
 /** P2021/P2022, 42P01/42703 and Postgres wording: the schema is behind mid-upgrade, as expected. */

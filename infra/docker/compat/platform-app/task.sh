@@ -26,4 +26,4 @@ case "$old" in
   *) new="$old" ;;
 esac
 
-cd "${LANGWATCH_TASKS_DIR:-/app/apps/tasks}" && exec pnpm --silent task $new "$@"
+cd "${LANGWATCH_TASKS_DIR:-/app/apps/tasks}" && exec pnpm --silent task "$new" "$@"
