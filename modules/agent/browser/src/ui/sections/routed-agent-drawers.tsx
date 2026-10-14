@@ -26,6 +26,7 @@ import { useRoutedDrawer } from "../../behavior/use-routed-drawer.ts";
 import { useRoutedHttpAgent } from "../../behavior/use-routed-http-agent.ts";
 import { useRoutedWorkflowAgent } from "../../behavior/use-routed-workflow-agent.ts";
 import { useWorkflowTargetMapping } from "../../behavior/use-workflow-target-mapping.ts";
+import { outputsNamedAsOutputs } from "../../model/scenario-output-field.ts";
 import { getRandomWorkflowIcon } from "../../model/workflow/random-workflow-icon.ts";
 import { ScenarioMappingSection } from "../blocks/scenario-mapping-section.tsx";
 import {
@@ -196,16 +197,30 @@ export function RoutedAgentCodeEditorDrawer({ agentId, onSave }: AgentEditorDraw
           {...(code.options.projectId ? { projectId: code.options.projectId } : {})}
         />
       )}
-      renderInputs={() => null}
-      renderOutputs={() => null}
-      renderMappings={() => null}
+      renderInputs={({ inputs, onChange }) => (
+        <VariablesSection
+          title="Inputs"
+          variables={inputs}
+          onChange={onChange}
+          showMappings={false}
+          canAddRemove
+        />
+      )}
+      renderOutputs={({ outputs, onChange }) => (
+        <VariablesSection
+          title="Outputs"
+          variables={outputs}
+          onChange={(next) => onChange(outputsNamedAsOutputs({ previous: outputs, next }))}
+          showMappings={false}
+          canAddRemove
+        />
+      )}
+      renderMappings={(section) => <ScenarioMappingSection {...section} />}
       renderTestPanel={(panel) => <AgentTestPanel {...panel} />}
     />
   );
 }
 
-// ponytail: the workflow editor drawer still draws no mapping editor (saved mappings keep their
-// defaults); the target drawer below renders the design-system mapping section.
 export function RoutedAgentWorkflowEditorDrawer({ agentId, onSave }: AgentEditorDrawerProps) {
   const { close, goBack } = useRoutedDrawer();
   const workflow = useRoutedWorkflowAgent({ agentId, close, ...(onSave ? { onSave } : {}) });
@@ -213,17 +228,21 @@ export function RoutedAgentWorkflowEditorDrawer({ agentId, onSave }: AgentEditor
     <AgentWorkflowEditorDrawer
       {...workflow.options}
       {...(goBack ? { onGoBack: goBack } : {})}
-      renderMappings={() => null}
+      {...(workflow.workflow ? { workflowCard: <LinkedWorkflowCard workflow={workflow} /> } : {})}
+      renderMappings={(section) => <ScenarioMappingSection {...section} />}
     />
   );
 }
 
-export function RoutedAgentWorkflowTargetEditorDrawer({ agentId }: { agentId?: string }) {
-  const { close, goBack } = useRoutedDrawer();
-  const workflow = useRoutedWorkflowAgent({ agentId, close });
-  const mapping = useWorkflowTargetMapping();
+/** The linked workflow's card, opening the studio when the workflow has an address. */
+function LinkedWorkflowCard({
+  workflow,
+}: {
+  workflow: Pick<ReturnType<typeof useRoutedWorkflowAgent>, "workflow" | "editorHref">;
+}) {
   const linked = workflow.workflow;
-  const card = linked && (
+  if (!linked) return null;
+  const card = (
     <WorkflowCardDisplay
       name={linked.name}
       icon={linked.icon}
@@ -232,20 +251,25 @@ export function RoutedAgentWorkflowTargetEditorDrawer({ agentId }: { agentId?: s
       action={workflow.editorHref ? <ExternalLink size={16} /> : void 0}
     />
   );
+  return workflow.editorHref ? (
+    <Link href={workflow.editorHref} isExternal data-testid="open-workflow-link">
+      {card}
+    </Link>
+  ) : (
+    card
+  );
+}
+
+export function RoutedAgentWorkflowTargetEditorDrawer({ agentId }: { agentId?: string }) {
+  const { close, goBack } = useRoutedDrawer();
+  const workflow = useRoutedWorkflowAgent({ agentId, close });
+  const mapping = useWorkflowTargetMapping();
   return (
     <AgentWorkflowTargetEditorDrawer
       open
       isLoading={workflow.options.isLoading}
       hasLookupFailed={workflow.hasLookupFailed}
-      workflowCard={
-        workflow.editorHref ? (
-          <Link href={workflow.editorHref} isExternal data-testid="open-workflow-link">
-            {card}
-          </Link>
-        ) : (
-          card
-        )
-      }
+      {...(workflow.workflow ? { workflowCard: <LinkedWorkflowCard workflow={workflow} /> } : {})}
       mappings={
         <VariablesSection
           title="Input Variables"

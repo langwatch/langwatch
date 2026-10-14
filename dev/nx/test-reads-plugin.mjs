@@ -32,6 +32,7 @@ export const reads = {
     "modules/dashboard/process/src/**/*",
     "modules/topic/process/src/**/*",
   ],
+  "@langwatch/scenario-process": ["infra/docker/Dockerfile"],
   "@langwatch/stored-object-process": [
     "modules/stored-object/**/*",
     "modules/scenario/process/src/transport/scenario-event.rest.ts",

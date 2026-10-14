@@ -162,6 +162,11 @@ import {
 import { AutomationService, type AutomationLogger } from "../services/automation.service.ts";
 import { DatasetTraceMapperService } from "../services/dataset-trace-mapper.service.ts";
 import { TriggerFilterValidationService } from "../services/trigger-filter-validation.service.ts";
+import {
+  TriggerJsonTextUnwrapService,
+  type TriggerJsonTextCounts,
+  type TriggerJsonTextUnwrapInput,
+} from "../services/trigger-json-text-unwrap.service.ts";
 import { TriggerLatestEvaluationService } from "../services/trigger-latest-evaluation.service.ts";
 import {
   HmacUnsubscribeTokenAdapter,
@@ -499,6 +504,7 @@ export class AutomationModule implements AutomationApi {
         triggers,
         slackConnections,
       });
+      automation.#triggerJsonText = TriggerJsonTextUnwrapService.create({ triggers });
       return automation;
     });
   }
@@ -830,6 +836,7 @@ export class AutomationModule implements AutomationApi {
   readonly #triggerMatches: AutomationTriggerMatchDispatcherService;
   readonly #reportSchedules: ReportScheduleService;
   #slackClaims: AutomationSlackClaimReconcileService | undefined;
+  #triggerJsonText: TriggerJsonTextUnwrapService | undefined;
   #settlement: AutomationSettlement | undefined;
   #reportDispatcher: ReportDispatcher | undefined;
   #tenantRetention: RetentionPolicyResolver | undefined;
@@ -894,6 +901,17 @@ export class AutomationModule implements AutomationApi {
       );
     }
     return this.#slackClaims.reconcile(input);
+  }
+
+  /** Rewrites trigger filters and action params an earlier release stored as JSON text. */
+  unwrapTriggerJsonText(input: TriggerJsonTextUnwrapInput): Promise<TriggerJsonTextCounts> {
+    if (!this.#triggerJsonText) {
+      throw new Error(
+        "This AutomationModule was composed from already-built services, so it holds no trigger " +
+          "JSON-text unwrap: compose it through AutomationModule.create to run that step.",
+      );
+    }
+    return this.#triggerJsonText.unwrap(input);
   }
 
   // -- reads -----------------------------------------------------------------
