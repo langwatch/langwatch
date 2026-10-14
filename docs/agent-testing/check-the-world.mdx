@@ -118,6 +118,8 @@ The span is a tool span inside the agent's trace, so the judge reads it with the
 | `refund_charge` | The second charge, 49.95, approved |
 | `state_of_world` (after) | `{"refund_count": 1, "refund_total": 49.95, "original_charge_status": "captured"}` |
 
+The trace tree can list the second `state_of_world` above `invoke_agent`. The timing bar shows the true order.
+
 The judge cited the span in its reasoning (shortened):
 
 ```text
@@ -136,11 +138,13 @@ def refund_total(thread_id: str) -> float:
     return round(sum(r.amount for r in payments.refunds(namespace=thread_id)), 2)
 ```
 
-Call it after the turn, next to `state_of_world`. Then attach an Exact Match evaluator to the [test suite](/agent-testing/evaluators) or the run plan:
+Call it after the turn, next to `state_of_world`. Then attach an Exact Match evaluator to the [test suite](/agent-testing/evaluators):
 
-1. Run the scenario once first. The tool calls picker lists only spans that a past run produced, so `refund_total` is not there before that.
+1. Run the scenario once first. The tool calls picker lists every span name the project has seen, not only tool spans. A span name shows only after a run has produced it, so `refund_total` is not there before that.
 2. Map `output` to source **Trace**, tool call `refund_total`, `output`.
-3. Set `expected_output` to the literal `49.95`.
+3. Set `expected_output` to the literal `49.95`. Type `49.95`, then click **Use "49.95" as value**.
+
+The run plan editor lists no tool names. On a run plan, set this mapping through the API.
 
 When you attach the evaluator, `output` defaults to the agent's last message. Change it to the tool call, or the check compares the wrong text.
 
@@ -171,6 +175,7 @@ To compare the whole `state_of_world` object instead, turn `remove_punctuation` 
 - **Keep the facts short and flat.** The judge reads a digest of the trace. A large trace becomes a structure-only tree that the judge has to expand, and a repeated long string is shown once. A few scalar facts read the same at any trace size.
 - **Clean up with a sweeper.** There is no teardown hook at the end of a run. Delete test data older than a few hours with a scheduled job, and find it by the test flag.
 - **Seed in development or staging only.** Never seed test data in production.
+- **Self-hosted: run langevals.** Exact Match runs in langevals. If langevals is not running, the evaluator errors and the run fails.
 - **Background work is not covered.** The span reports the state when the function returns. Work that continues after the call, such as a queued job, is not in it.
 
 ## Next steps
