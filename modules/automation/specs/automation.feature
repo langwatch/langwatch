@@ -336,6 +336,63 @@ Feature: Automation ownership
     When it runs again from its checkpoint
     Then it starts after the last claim it finished and pages the rest by cursor
 
+  # An earlier release stored Trigger.filters and Trigger.actionParams as JSON text inside the
+  # jsonb column. Reads unwrap that text on the fly; the background step
+  # "automation:unwrap-trigger-json-text" rewrites the rows once older images stop serving.
+
+  @unit
+  Scenario: A trigger whose filters or action params are stored as JSON text reads as the object
+    Given a trigger row whose filters and action params hold a JSON object as JSON text
+    When the trigger is read
+    Then it carries the objects that text encodes
+    And text that is not a JSON object reads as an empty object
+
+  @unit @integration
+  Scenario: The JSON-text step unwraps text that encodes a JSON object
+    Given triggers whose filters or action params hold a JSON object as JSON text
+    When the background step "automation:unwrap-trigger-json-text" runs
+    Then those columns hold the objects, with numbers as precise as they were written
+    And the triggers' last-updated time is unchanged
+
+  @unit
+  Scenario: The JSON-text step leaves text that is not a JSON object
+    Given a trigger whose filters hold JSON text for an array, and one whose text does not parse
+    When the JSON-text step runs
+    Then both columns keep their text and are counted as left alone
+    And a column already holding an object is not touched
+
+  @unit
+  Scenario: Running the JSON-text step twice unwraps nothing the second time
+    Given the JSON-text step has run
+    When it runs again
+    Then it reports nothing unwrapped
+
+  @unit
+  Scenario: The JSON-text step's dry run writes nothing
+    Given a trigger whose filters hold a JSON object as JSON text
+    When the JSON-text step runs as a dry run
+    Then the column keeps its text, no checkpoint is saved, and the report counts it as one to unwrap
+
+  @unit
+  Scenario: The JSON-text step works in pages and resumes after the last page it finished
+    Given more triggers with JSON text than one page holds
+    When the JSON-text step runs
+    Then it saves a checkpoint after each page
+    And a run from a saved checkpoint starts after that page's last trigger
+
+  @unit @integration
+  Scenario: The JSON-text step leaves a row another writer changed
+    Given the step read a trigger's JSON text
+    And another writer saved that column before the step wrote it
+    When the step writes
+    Then the other writer's value stays and the column is counted as changed
+
+  @unit @integration
+  Scenario: The JSON-text step leaves text the database cannot store as an object
+    Given a trigger whose JSON text parses but holds a NUL escape Postgres jsonb refuses
+    When the JSON-text step runs
+    Then the column keeps its text, the step goes on, and the column is counted as unparseable
+
   @unit
   Scenario: The Slack channel picker lists a bot connection's channels
     Given a process composed with a Slack transport
