@@ -36,14 +36,15 @@ export class PrismaProjectTenantSourceRepository implements ProjectTenantSourceR
   async getOrganizationId(projectId: string): Promise<string> {
     const project = await this.#prisma.project.findUniqueOrThrow({
       where: { id: projectId },
-      select: { team: { select: { organizationId: true } } },
+      select: { teamId: true },
     });
-
     // `relationMode = "prisma"` carries no foreign key, so a project can outlive its team.
-    if (!project.team) {
-      throw new ProjectHasNoOrganizationError(projectId);
-    }
-    return project.team.organizationId;
+    const team = await this.#prisma.team.findUnique({
+      where: { id: project.teamId },
+      select: { organizationId: true },
+    });
+    if (!team) throw new ProjectHasNoOrganizationError(projectId);
+    return team.organizationId;
   }
 
   async findOrganizationIds({
@@ -54,11 +55,17 @@ export class PrismaProjectTenantSourceRepository implements ProjectTenantSourceR
     if (projectIds.length === 0) return [];
     const projects = await this.#prisma.project.findMany({
       where: { id: { in: [...projectIds] } },
-      select: { id: true, team: { select: { organizationId: true } } },
+      select: { id: true, teamId: true },
     });
+    const teams = await this.#prisma.team.findMany({
+      where: { id: { in: [...new Set(projects.map((project) => project.teamId))] } },
+      select: { id: true, organizationId: true },
+    });
+    const organizationByTeam = new Map(teams.map((team) => [team.id, team.organizationId]));
     // An orphan (its team row is gone) has no organization, like an unknown project: left out.
-    return projects.flatMap((project) =>
-      project.team ? [{ projectId: project.id, organizationId: project.team.organizationId }] : [],
-    );
+    return projects.flatMap((project) => {
+      const organizationId = organizationByTeam.get(project.teamId);
+      return organizationId === undefined ? [] : [{ projectId: project.id, organizationId }];
+    });
   }
 }

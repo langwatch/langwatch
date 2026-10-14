@@ -5,12 +5,14 @@ import { SystemMigrationPassCohortService } from "../system-migration-pass-cohor
 
 describe("a project cohort admitted through its owning organization", () => {
   const owners: Record<string, string> = { project_ok: "org_1" };
+  const lookups: string[] = [];
   const projectTenants = {
     findOrganizationIds: async ({ projectIds }: { projectIds: readonly string[] }) =>
       projectIds.flatMap((projectId) =>
         owners[projectId] ? [{ projectId, organizationId: owners[projectId] }] : [],
       ),
     getOrganizationId: async (projectId: string) => {
+      lookups.push(projectId);
       const organizationId = owners[projectId];
       if (!organizationId) throw new ProjectHasNoOrganizationError(projectId);
       return organizationId;
@@ -35,5 +37,11 @@ describe("a project cohort admitted through its owning organization", () => {
     await expect(cohort({ tenantId: "project_other_orphan", migrationName: "m" })).resolves.toBe(
       false,
     );
+  });
+
+  it("reads an orphan once per pass, however many migrations ask", async () => {
+    await cohort({ tenantId: "project_repeat_orphan", migrationName: "m1" });
+    await cohort({ tenantId: "project_repeat_orphan", migrationName: "m2" });
+    expect(lookups.filter((id) => id === "project_repeat_orphan")).toHaveLength(1);
   });
 });

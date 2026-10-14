@@ -57,6 +57,7 @@ export class SystemMigrationPassCohortService {
   }): MigrationCohort {
     const projects = this.options.repositories.projectTenants;
     const owners = new Map<string, string>();
+    const orphans = new Set<string>();
     const prepare = async ({ tenantIds }: { tenantIds: readonly string[] }): Promise<void> => {
       const unknown = tenantIds.filter((projectId) => !owners.has(projectId));
       if (unknown.length === 0) return;
@@ -73,12 +74,14 @@ export class SystemMigrationPassCohortService {
       tenantId: string;
       migrationName: string;
     }) => {
+      if (orphans.has(tenantId)) return false;
       let organizationId = owners.get(tenantId);
       if (organizationId === undefined) {
         try {
           organizationId = await projects.getOrganizationId(tenantId);
         } catch (error) {
           if (!(error instanceof ProjectHasNoOrganizationError)) throw error;
+          orphans.add(tenantId);
           // An orphan project (no team, so no organization) belongs to no enrolled cohort.
           logger.warn(
             { projectId: tenantId, migrationName },

@@ -1,32 +1,42 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it } from "vitest";
 
 import { ProjectHasNoOrganizationError } from "../../tenant-source.repository.ts";
 import { PrismaProjectTenantSourceRepository } from "../prisma.project-tenant-source.repository.ts";
 
-type ProjectRow = { id: string; team: { organizationId: string } | null };
+type ProjectRow = { id: string; teamId: string };
+type TeamRow = { id: string; organizationId: string };
 
-function repositoryOver(rows: ProjectRow[]) {
-  const prisma = {
+function repositoryOver({ projects, teams }: { projects: ProjectRow[]; teams: TeamRow[] }) {
+  const prisma = prismaDouble({
     project: {
       findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
-        rows.filter((row) => where.id.in.includes(row.id)),
+        projects.filter((row) => where.id.in.includes(row.id)),
       findUniqueOrThrow: async ({ where }: { where: { id: string } }) => {
-        const row = rows.find((one) => one.id === where.id);
+        const row = projects.find((one) => one.id === where.id);
         if (!row) throw new Error("not found");
         return row;
       },
     },
-  } as unknown as PrismaClient;
+    team: {
+      findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
+        teams.filter((row) => where.id.in.includes(row.id)),
+      findUnique: async ({ where }: { where: { id: string } }) =>
+        teams.find((one) => one.id === where.id) ?? null,
+    },
+  });
   return PrismaProjectTenantSourceRepository.create(prisma);
 }
 
 describe("the project tenant source", () => {
   describe("when a project's team row is gone", () => {
-    const rows: ProjectRow[] = [
-      { id: "project_ok", team: { organizationId: "org_1" } },
-      { id: "project_orphan", team: null },
-    ];
+    const rows = {
+      projects: [
+        { id: "project_ok", teamId: "team_1" },
+        { id: "project_orphan", teamId: "team_gone" },
+      ],
+      teams: [{ id: "team_1", organizationId: "org_1" }],
+    };
 
     it("leaves the orphan out of the owning organizations instead of crashing", async () => {
       await expect(
