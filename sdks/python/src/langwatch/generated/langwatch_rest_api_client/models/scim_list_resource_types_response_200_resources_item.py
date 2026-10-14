@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
-
-from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.scim_list_resource_types_response_200_resources_item_meta import (
@@ -21,26 +18,23 @@ T = TypeVar("T", bound="ScimListResourceTypesResponse200ResourcesItem")
 class ScimListResourceTypesResponse200ResourcesItem:
     """
     Attributes:
-        schemas (list[str] | Unset): The SCIM schema URNs this resource conforms to.
-        id (str | Unset):
-        name (str | Unset):
-        endpoint (str | Unset):
-        schema (str | Unset): The URN of the schema this resource type is defined by.
-        meta (ScimListResourceTypesResponse200ResourcesItemMeta | Unset):
+        schemas (list[Literal['urn:ietf:params:scim:schemas:core:2.0:ResourceType']]):
+        id (str):
+        name (str):
+        endpoint (str):
+        schema (str):
+        meta (ScimListResourceTypesResponse200ResourcesItemMeta):
     """
 
-    schemas: list[str] | Unset = UNSET
-    id: str | Unset = UNSET
-    name: str | Unset = UNSET
-    endpoint: str | Unset = UNSET
-    schema: str | Unset = UNSET
-    meta: ScimListResourceTypesResponse200ResourcesItemMeta | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    schemas: list[Literal["urn:ietf:params:scim:schemas:core:2.0:ResourceType"]]
+    id: str
+    name: str
+    endpoint: str
+    schema: str
+    meta: ScimListResourceTypesResponse200ResourcesItemMeta
 
     def to_dict(self) -> dict[str, Any]:
-        schemas: list[str] | Unset = UNSET
-        if not isinstance(self.schemas, Unset):
-            schemas = self.schemas
+        schemas = self.schemas
 
         id = self.id
 
@@ -50,25 +44,20 @@ class ScimListResourceTypesResponse200ResourcesItem:
 
         schema = self.schema
 
-        meta: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.meta, Unset):
-            meta = self.meta.to_dict()
+        meta = self.meta.to_dict()
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if schemas is not UNSET:
-            field_dict["schemas"] = schemas
-        if id is not UNSET:
-            field_dict["id"] = id
-        if name is not UNSET:
-            field_dict["name"] = name
-        if endpoint is not UNSET:
-            field_dict["endpoint"] = endpoint
-        if schema is not UNSET:
-            field_dict["schema"] = schema
-        if meta is not UNSET:
-            field_dict["meta"] = meta
+
+        field_dict.update(
+            {
+                "schemas": schemas,
+                "id": id,
+                "name": name,
+                "endpoint": endpoint,
+                "schema": schema,
+                "meta": meta,
+            }
+        )
 
         return field_dict
 
@@ -79,22 +68,25 @@ class ScimListResourceTypesResponse200ResourcesItem:
         )
 
         d = dict(src_dict)
-        schemas = cast(list[str], d.pop("schemas", UNSET))
+        schemas = []
+        _schemas = d.pop("schemas")
+        for schemas_item_data in _schemas:
+            schemas_item = cast(Literal["urn:ietf:params:scim:schemas:core:2.0:ResourceType"], schemas_item_data)
+            if schemas_item != "urn:ietf:params:scim:schemas:core:2.0:ResourceType":
+                raise ValueError(
+                    f"schemas_item must match const 'urn:ietf:params:scim:schemas:core:2.0:ResourceType', got '{schemas_item}'"
+                )
+            schemas.append(schemas_item)
 
-        id = d.pop("id", UNSET)
+        id = d.pop("id")
 
-        name = d.pop("name", UNSET)
+        name = d.pop("name")
 
-        endpoint = d.pop("endpoint", UNSET)
+        endpoint = d.pop("endpoint")
 
-        schema = d.pop("schema", UNSET)
+        schema = d.pop("schema")
 
-        _meta = d.pop("meta", UNSET)
-        meta: ScimListResourceTypesResponse200ResourcesItemMeta | Unset
-        if isinstance(_meta, Unset):
-            meta = UNSET
-        else:
-            meta = ScimListResourceTypesResponse200ResourcesItemMeta.from_dict(_meta)
+        meta = ScimListResourceTypesResponse200ResourcesItemMeta.from_dict(d.pop("meta"))
 
         scim_list_resource_types_response_200_resources_item = cls(
             schemas=schemas,
@@ -105,21 +97,4 @@ class ScimListResourceTypesResponse200ResourcesItem:
             meta=meta,
         )
 
-        scim_list_resource_types_response_200_resources_item.additional_properties = d
         return scim_list_resource_types_response_200_resources_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

@@ -1,16 +1,7 @@
 /**
  * The tool calls a conversation's history carries, in order, as settled
- * calls in the shape the turn's own log reports them.
- *
- * The history holds them in two shapes. On a live worker they are pi's
- * messages: an assistant `toolCall` block and the `toolResult` message that
- * answers it by id. On a fresh worker the conversation arrives folded into
- * the first user message as the digest lines of its seed, one message per
- * line (digest.ts renders them): `assistant: [tool call: say {...}]`, then
- * `toolResult(say): Said.` with the result's body on that line and the ones
- * after it, up to the next label. A call is paired with the next result of
- * its name. A seed folded into a seed still renders one line per message,
- * so one reading covers both shapes.
+ * calls: pi's live `toolCall`/`toolResult` messages, or a fresh worker's
+ * folded digest lines, paired by name in call order.
  */
 import type { SettledCall } from "./tools/turn-context.js";
 
@@ -23,7 +14,9 @@ function textOf(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
-    .map((block) => (typeof block === "object" && block !== null ? (block as { text?: unknown }).text : undefined))
+    .map((block) =>
+      typeof block === "object" && block !== null ? (block as { text?: unknown }).text : undefined,
+    )
     .filter((text): text is string => typeof text === "string")
     .join("\n");
 }
@@ -59,12 +52,17 @@ class HistoryCalls {
     const index = this.byId.get(String(message.toolCallId));
     const call = index === undefined ? undefined : this.calls[index];
     if (index === undefined || !call) return;
-    this.calls[index] = { ...call, isError: message.isError === true, output: textOf(message.content) };
+    this.calls[index] = {
+      ...call,
+      isError: message.isError === true,
+      output: textOf(message.content),
+    };
   }
 
   private flush(): void {
     const call = this.result && this.calls[this.result.index];
-    if (this.result && call) this.calls[this.result.index] = { ...call, output: this.result.body.join("\n") };
+    if (this.result && call)
+      this.calls[this.result.index] = { ...call, output: this.result.body.join("\n") };
     this.result = undefined;
   }
 
@@ -78,7 +76,15 @@ class HistoryCalls {
     this.byName.set(name, waiting);
   }
 
-  private digestResult({ name, error, body }: { name: string; error: boolean; body: string }): void {
+  private digestResult({
+    name,
+    error,
+    body,
+  }: {
+    name: string;
+    error: boolean;
+    body: string;
+  }): void {
     const index = this.byName.get(name.toLowerCase())?.shift();
     const call = index === undefined ? undefined : this.calls[index];
     if (index === undefined || !call) return;
@@ -112,11 +118,35 @@ class HistoryCalls {
   }
 }
 
+/** One content-array message's blocks: structured tool calls and digest text alike. */
+function readContentBlocks(history: HistoryCalls, content: readonly unknown[]): void {
+  for (const raw of content) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const block = raw as {
+      type?: unknown;
+      id?: unknown;
+      name?: unknown;
+      arguments?: unknown;
+      text?: unknown;
+    };
+    if (block.type === "toolCall" && typeof block.name === "string") {
+      history.structuredCall({ id: block.id, name: block.name, arguments: block.arguments });
+    } else if (block.type === "text" && typeof block.text === "string") {
+      history.digestText(block.text);
+    }
+  }
+}
+
 export function callsInHistory(messages: readonly unknown[]): SettledCall[] {
   const history = new HistoryCalls();
   for (const raw of messages) {
     if (typeof raw !== "object" || raw === null) continue;
-    const message = raw as { role?: unknown; toolCallId?: unknown; content?: unknown; isError?: unknown };
+    const message = raw as {
+      role?: unknown;
+      toolCallId?: unknown;
+      content?: unknown;
+      isError?: unknown;
+    };
     if (message.role === "toolResult") {
       history.structuredResult(message);
       continue;
@@ -126,15 +156,7 @@ export function callsInHistory(messages: readonly unknown[]): SettledCall[] {
       continue;
     }
     if (!Array.isArray(message.content)) continue;
-    for (const raw of message.content) {
-      if (typeof raw !== "object" || raw === null) continue;
-      const block = raw as { type?: unknown; id?: unknown; name?: unknown; arguments?: unknown; text?: unknown };
-      if (block.type === "toolCall" && typeof block.name === "string") {
-        history.structuredCall({ id: block.id, name: block.name, arguments: block.arguments });
-      } else if (block.type === "text" && typeof block.text === "string") {
-        history.digestText(block.text);
-      }
-    }
+    readContentBlocks(history, message.content);
   }
   return history.calls;
 }

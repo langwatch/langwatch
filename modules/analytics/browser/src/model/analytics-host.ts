@@ -1,0 +1,149 @@
+/**
+ * What analytics screens ask of their host app. No `pathname` — only two
+ * screens still read the address. `setQuery` REPLACES the query rather than
+ * merging, since a write here often means certain keys are now gone.
+ */
+
+import { createContext, useContext } from "react";
+
+/** The project every analytics read is scoped to. */
+export type AnalyticsHostProject = {
+  id: string;
+  slug: string;
+  name: string;
+  /**
+   * Whether anything has ever been ingested. The overview page leads with
+   * a setup prompt until it has — the one thing on these pages that is
+   * about the project rather than the range.
+   */
+  hasFirstMessage: boolean;
+  /** The project's kind (`application`, `aggregate`, ...), when the host has read it. */
+  kind?: string;
+  /** Whether it is a person's own project, where Langy's conversations are the data. */
+  isPersonal?: boolean;
+};
+
+/** The path parameters and query string a screen was opened with. */
+export type AnalyticsRouteReading = {
+  /** The `:id` style segments the matched route captured. */
+  params: Readonly<Record<string, string | undefined>>;
+  /** The query string, single-valued — the last write of a repeated key wins. */
+  query: Readonly<Record<string, string | undefined>>;
+};
+
+/**
+ * A short confirmation of something the reader just did: the shared
+ * feedback capability's shape, unwidened — title, optional description,
+ * no action, since nothing this family confirms needs a button.
+ */
+export type AnalyticsSuccessNotice = {
+  title: string;
+  description?: string;
+  id?: string;
+};
+
+/**
+ * A failure, as a screen knows it: the raw `error` travels, never a
+ * composed sentence — words are resolved from its `code` by the host's
+ * presentation registry (#5984). `fallbackTitle` names the failed action.
+ */
+export type AnalyticsFailureNotice = {
+  error: unknown;
+  fallbackTitle: string;
+  id?: string;
+};
+
+/**
+ * Automation authoring: `graphId` prefills one saved graph, `automationId` edits the alert it
+ * already has; neither opens it over the current filters, as main's filter sidebar did.
+ */
+export type AnalyticsAlertAuthoring = {
+  graphId?: string;
+  automationId?: string;
+  seriesName?: string;
+};
+
+/** One reference riding with a question to Langy, as self-describing text the agent reads. */
+export type AnalyticsLangyContext = { kind: "dashboard"; ref: string; label: string };
+
+/** What a Langy draft is about: a board, and a widget on it when the draft names one. */
+export type AnalyticsLangyDraftAbout = { ref: string; itemRef?: string };
+
+/** A question for Langy and what it is asked about. */
+export type AnalyticsLangyAskRequest = {
+  /** A question to send outright; absent when only a draft is handed over. */
+  question?: string;
+  /** A prompt seeded into the composer for the reader to send; never sent for them. */
+  draft?: string;
+  /** What the draft is about; left unsent, it is dropped once that leaves the screen. */
+  about?: AnalyticsLangyDraftAbout;
+  context: readonly AnalyticsLangyContext[];
+};
+
+/** The release flags an Analytics screen reads; the mount answers each one. */
+export type AnalyticsReleaseFlag = "release_dashboards" | "release_langy_enabled";
+
+export abstract class AnalyticsHostApi {
+  /** The project in scope, or undefined before one resolves. */
+  abstract project(): AnalyticsHostProject | undefined;
+
+  /** The organization the project sits in, for reads scoped above a project. */
+  abstract organizationId(): string | undefined;
+
+  /** That organization's name, as a sentence about the whole organization says it. */
+  abstract organizationName(): string | undefined;
+
+  /** The signed-in member's id, or undefined before the session has one. */
+  abstract userId(): string | undefined;
+
+  abstract hasPermission(permission: string): boolean;
+
+  /**
+   * Whether the grants have arrived: before then `hasPermission` answers
+   * `false` for everything.
+   */
+  abstract isSettled(): boolean;
+
+  /** On, off, or `undefined` while the flag has not answered yet. */
+  abstract featureFlag(flag: AnalyticsReleaseFlag): boolean | undefined;
+
+  abstract route(): AnalyticsRouteReading;
+
+  /** Replaces the WHOLE query, so a screen can remove a key as well as set one. */
+  abstract setQuery(
+    next: Readonly<Record<string, string | undefined>>,
+    options?: { replace?: boolean },
+  ): void;
+
+  /** Sends the reader somewhere else; `replace` leaves no history entry to come back to. */
+  abstract navigate(to: string, options?: { replace?: boolean }): void;
+
+  /** Opens automation's drawer, which owns alert authoring; analytics never renders it. */
+  abstract openAutomationDrawer(request: AnalyticsAlertAuthoring): void;
+
+  abstract succeeded(notice: AnalyticsSuccessNotice): void;
+
+  abstract failed(failure: AnalyticsFailureNotice): void;
+
+  /**
+   * Hands a question, and what it is about, to Langy. An application without
+   * Langy does nothing with it, which is why a screen never reaches Langy itself.
+   */
+  abstract askLangy(request: AnalyticsLangyAskRequest): void;
+
+  /** Tells Langy which board (and widget) is on screen; null once none is. */
+  abstract showLangy(about: AnalyticsLangyDraftAbout | null): void;
+}
+
+const AnalyticsHostContext = createContext<AnalyticsHostApi | undefined>(void 0);
+
+export const AnalyticsHostProvider = AnalyticsHostContext.Provider;
+
+/** The host the composing application mounted above this screen. */
+export function useAnalyticsHost(): AnalyticsHostApi {
+  const host = useContext(AnalyticsHostContext);
+  if (!host) {
+    throw new Error("The analytics screens must be mounted inside an AnalyticsHostProvider.");
+  }
+  return host;
+}

@@ -82,6 +82,14 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       Then the command ends with "Could not sign you in, so this folder is not shared. Run `langwatch login --device`, then run `langwatch langy --share-control` again."
       And no request list is read
 
+    @unit
+    Scenario: A sign-in refused for an untrusted certificate names the certificate fix
+      Given no device session on this machine
+      And the device login fails because the server's TLS certificate is not trusted
+      When I run "langwatch langy --share-control"
+      Then the command ends with the certificate error and NODE_EXTRA_CA_CERTS=~/.portless/ca.pem
+      And it does not ask me to run a second command
+
     # LANGWATCH_ENDPOINT decides which LangWatch a command talks to, and a
     # folder's .env can set it. My login key opens everything I can reach, so
     # it goes to the address that issued it and to no other, whoever wrote

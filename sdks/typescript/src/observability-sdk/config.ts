@@ -1,43 +1,17 @@
 import { type Logger, NoOpLogger } from "../logger/index.js";
-import {
-  type DataCaptureMode,
-  type DataCaptureOptions,
-} from "./features/data-capture/types.js";
+import { type DataCaptureMode, type DataCaptureOptions } from "./features/data-capture/types.js";
 import { validateDataCaptureMode } from "./features/data-capture/utils.js";
 
 /**
  * @module observability/config
- * @description
- * Provides configuration management for the LangWatch Observability SDK, including logger and data capture settings.
- *
- * @remarks
- * This module allows you to initialize, retrieve, and reset the global observability configuration. It also provides utilities for determining data capture behavior based on context and configuration.
- *
- * @see {@link ObservabilityConfig}
- * @see {@link initializeObservabilitySdkConfig}
- * @see {@link getObservabilitySdkConfig}
- * @see {@link resetObservabilitySdkConfig}
- * @see {@link getDataCaptureMode}
- * @see {@link shouldCaptureInput}
- * @see {@link shouldCaptureOutput}
+ * Configuration management for the LangWatch Observability SDK: logger and
+ * data capture settings, plus utilities to derive capture behavior from them.
  */
+
 /**
  * Configuration options for the LangWatch Observability SDK.
- *
  * @property logger - The logger instance to use for SDK logging.
- * @property dataCapture - Configuration for automatic data capture. Can be a string, function, or object.
- *
- * @example
- * ```ts
- * import { ObservabilityConfig, initializeObservabilitySdkConfig } from "@langwatch/observability";
- *
- * const config: ObservabilityConfig = {
- *   logger: new ConsoleLogger(),
- *   dataCapture: "all",
- * };
- *
- * initializeObservabilitySdkConfig(config);
- * ```
+ * @property dataCapture - Config for automatic data capture (string, function, or object).
  */
 export interface ObservabilityConfig {
   /**
@@ -61,35 +35,18 @@ export interface ObservabilityConfig {
 let observabilitySdkConfig: ObservabilityConfig | null = null;
 
 /**
- * Initializes the global observability SDK configuration.
+ * Initializes the global observability SDK configuration. Intentionally
+ * overwrites any existing config, by design, so tests can re-initialize.
  *
  * @param config - The configuration object to use.
- *
- * @remarks
- * This function should be called once at application startup, before using any observability features.
- *
- * @warning
- * Calling this function will intentionally overwrite any existing configuration. This is by design to allow re-initialization in dynamic or testing environments. If you call this function multiple times, the most recent configuration will take effect.
- *
- * @example
- * ```ts
- * initializeObservabilitySdkConfig({ logger: new ConsoleLogger() });
- * ```
  */
 export function initializeObservabilitySdkConfig(config: ObservabilityConfig) {
   observabilitySdkConfig = config;
 }
 
 /**
- * Resets the global observability SDK configuration to its initial state (`null`).
- *
- * @remarks
- * Useful for testing or re-initializing the SDK in dynamic environments.
- *
- * @example
- * ```ts
- * resetObservabilitySdkConfig();
- * ```
+ * Resets the global observability SDK configuration to its initial state
+ * (`null`). Useful for testing or re-initializing dynamically.
  */
 export function resetObservabilitySdkConfig() {
   observabilitySdkConfig = null;
@@ -97,17 +54,8 @@ export function resetObservabilitySdkConfig() {
 
 /**
  * Retrieves the current observability SDK configuration.
- *
- * @param options - Optional settings.
- * @param options.throwOnUninitialized - If true, throws an error if the config is not initialized. Defaults to `false` unless `NODE_ENV` is `development`.
+ * @param options.throwOnUninitialized - Throws when uninitialized, defaulting to development mode.
  * @returns The current {@link ObservabilityConfig}.
- *
- * @throws {Error} If the config is uninitialized and `throwOnUninitialized` is true or in development mode.
- *
- * @example
- * ```ts
- * const config = getObservabilitySdkConfig();
- * ```
  */
 export function getObservabilitySdkConfig(options?: {
   throwOnUninitialized?: boolean;
@@ -116,8 +64,7 @@ export function getObservabilitySdkConfig(options?: {
     const message =
       "[LangWatch Observability SDK] Please call setupObservability() before using the Observability SDK";
 
-    const shouldThrow =
-      options?.throwOnUninitialized ?? process.env.NODE_ENV === "development";
+    const shouldThrow = options?.throwOnUninitialized ?? process.env.NODE_ENV === "development";
     if (shouldThrow) {
       throw new Error(message);
     }
@@ -132,31 +79,16 @@ export function getObservabilitySdkConfig(options?: {
 
 /**
  * Gets the logger instance from the current observability SDK configuration.
- *
  * @returns The configured {@link Logger} instance.
- *
- * @example
- * ```ts
- * const logger = getObservabilitySdkLogger();
- * logger.info("Observability initialized");
- * ```
  */
 export function getObservabilitySdkLogger(): Logger {
   return getObservabilitySdkConfig().logger;
 }
 
 /**
- * Determines the effective data capture mode.
- *
+ * Determines the effective data capture mode from config (string, function,
+ * or object), defaulting to "all" when unspecified.
  * @returns The resolved {@link DataCaptureMode} ("all", "input", or "output").
- *
- * @remarks
- * The mode is determined by the configuration, which can be a string, function, or object. Defaults to "all" if not specified.
- *
- * @example
- * ```ts
- * const mode = getDataCaptureMode();
- * ```
  */
 export function getDataCaptureMode(): DataCaptureMode {
   // A passive read on the tracing path: code that only asks "may I record
@@ -175,7 +107,6 @@ export function getDataCaptureMode(): DataCaptureMode {
       return config.dataCapture;
     }
 
-
     getObservabilitySdkLogger().warn(
       `Invalid data capture mode: ${config.dataCapture}. Using default: "all"`,
     );
@@ -183,7 +114,11 @@ export function getDataCaptureMode(): DataCaptureMode {
     return "all";
   }
 
-  if (typeof config.dataCapture === "object" && config.dataCapture.mode &&validateDataCaptureMode(config.dataCapture.mode)) {
+  if (
+    typeof config.dataCapture === "object" &&
+    config.dataCapture.mode &&
+    validateDataCaptureMode(config.dataCapture.mode)
+  ) {
     return config.dataCapture.mode;
   }
 
@@ -192,15 +127,7 @@ export function getDataCaptureMode(): DataCaptureMode {
 
 /**
  * Determines if input data should be captured.
- *
  * @returns `true` if input should be captured, otherwise `false`.
- *
- * @example
- * ```ts
- * if (shouldCaptureInput()) {
- *   // Capture input
- * }
- * ```
  */
 export function shouldCaptureInput(): boolean {
   const mode = getDataCaptureMode();
@@ -209,15 +136,7 @@ export function shouldCaptureInput(): boolean {
 
 /**
  * Determines if output data should be captured.
- *
  * @returns `true` if output should be captured, otherwise `false`.
- *
- * @example
- * ```ts
- * if (shouldCaptureOutput()) {
- *   // Capture output
- * }
- * ```
  */
 export function shouldCaptureOutput(): boolean {
   const mode = getDataCaptureMode();

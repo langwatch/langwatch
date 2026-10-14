@@ -1,15 +1,14 @@
 import { describe, it, expect } from "vitest";
+
+import type { MaterializedPrompt } from "../../types";
+import { PromptConverter } from "../promptConverter";
 import {
   outputsToResponseFormat,
   responseFormatToOutputs,
   type CliOutput,
 } from "../responseFormat";
-import { PromptConverter } from "../promptConverter";
-import type { MaterializedPrompt } from "../../types";
 
-const materialized = (
-  overrides: Partial<MaterializedPrompt>,
-): MaterializedPrompt => ({
+const materialized = (overrides: Partial<MaterializedPrompt>): MaterializedPrompt => ({
   id: "p1",
   name: "category-classifier",
   version: 3,
@@ -43,9 +42,7 @@ describe("prompt sync fidelity — response_format round-trip", () => {
 
     /** @scenario Pulling a prompt with a JSON-schema output reconstructs response_format */
     it("reconstructs the response_format block on materialize", () => {
-      const yaml = PromptConverter.fromMaterializedToYaml(
-        materialized({ outputs }),
-      );
+      const yaml = PromptConverter.fromMaterializedToYaml(materialized({ outputs }));
 
       expect(yaml.response_format).toEqual({
         name: "picnic_category",
@@ -64,9 +61,7 @@ describe("prompt sync fidelity — response_format round-trip", () => {
 
     /** @scenario Pulling a prompt with flat structured-output fields synthesizes a single-level JSON schema */
     it("synthesizes a single-level object JSON schema", () => {
-      const yaml = PromptConverter.fromMaterializedToYaml(
-        materialized({ outputs }),
-      );
+      const yaml = PromptConverter.fromMaterializedToYaml(materialized({ outputs }));
 
       expect(yaml.response_format?.schema).toEqual({
         type: "object",

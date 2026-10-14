@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -6,16 +6,14 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_experiments_runs_response_200 import GetApiExperimentsRunsResponse200
 from ...models.get_api_experiments_runs_response_400 import GetApiExperimentsRunsResponse400
-from ...models.get_api_experiments_runs_response_401 import GetApiExperimentsRunsResponse401
-from ...models.get_api_experiments_runs_response_404 import GetApiExperimentsRunsResponse404
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
-    experiment_slug: str,
-    page: int | Unset = 1,
-    page_size: int | Unset = 50,
+    experiment_slug: str | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
@@ -30,7 +28,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/experiments/runs",
+        "url": "/api/v1/experiments/runs",
         "params": params,
     }
 
@@ -39,13 +37,7 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiExperimentsRunsResponse200
-    | GetApiExperimentsRunsResponse400
-    | GetApiExperimentsRunsResponse401
-    | GetApiExperimentsRunsResponse404
-    | None
-):
+) -> Any | GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400 | None:
     if response.status_code == 200:
         response_200 = GetApiExperimentsRunsResponse200.from_dict(response.json())
 
@@ -57,13 +49,11 @@ def _parse_response(
         return response_400
 
     if response.status_code == 401:
-        response_401 = GetApiExperimentsRunsResponse401.from_dict(response.json())
-
+        response_401 = cast(Any, None)
         return response_401
 
     if response.status_code == 404:
-        response_404 = GetApiExperimentsRunsResponse404.from_dict(response.json())
-
+        response_404 = cast(Any, None)
         return response_404
 
     if client.raise_on_unexpected_status:
@@ -74,12 +64,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    GetApiExperimentsRunsResponse200
-    | GetApiExperimentsRunsResponse400
-    | GetApiExperimentsRunsResponse401
-    | GetApiExperimentsRunsResponse404
-]:
+) -> Response[Any | GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -94,30 +79,25 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    experiment_slug: str,
-    page: int | Unset = 1,
-    page_size: int | Unset = 50,
-) -> Response[
-    GetApiExperimentsRunsResponse200
-    | GetApiExperimentsRunsResponse400
-    | GetApiExperimentsRunsResponse401
-    | GetApiExperimentsRunsResponse404
-]:
+    experiment_slug: str | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
+) -> Response[Any | GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400]:
     """List runs of an experiment
 
      Runs recorded for one experiment, newest first. Page through them with `page` and `pageSize`.
 
     Args:
-        experiment_slug (str):
-        page (int | Unset):  Default: 1.
-        page_size (int | Unset):  Default: 50.
+        experiment_slug (str | Unset):
+        page (int | Unset):
+        page_size (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400 | GetApiExperimentsRunsResponse401 | GetApiExperimentsRunsResponse404]
+        Response[Any | GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -136,31 +116,25 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    experiment_slug: str,
-    page: int | Unset = 1,
-    page_size: int | Unset = 50,
-) -> (
-    GetApiExperimentsRunsResponse200
-    | GetApiExperimentsRunsResponse400
-    | GetApiExperimentsRunsResponse401
-    | GetApiExperimentsRunsResponse404
-    | None
-):
+    experiment_slug: str | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
+) -> Any | GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400 | None:
     """List runs of an experiment
 
      Runs recorded for one experiment, newest first. Page through them with `page` and `pageSize`.
 
     Args:
-        experiment_slug (str):
-        page (int | Unset):  Default: 1.
-        page_size (int | Unset):  Default: 50.
+        experiment_slug (str | Unset):
+        page (int | Unset):
+        page_size (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400 | GetApiExperimentsRunsResponse401 | GetApiExperimentsRunsResponse404
+        Any | GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400
     """
 
     return sync_detailed(
@@ -174,30 +148,25 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    experiment_slug: str,
-    page: int | Unset = 1,
-    page_size: int | Unset = 50,
-) -> Response[
-    GetApiExperimentsRunsResponse200
-    | GetApiExperimentsRunsResponse400
-    | GetApiExperimentsRunsResponse401
-    | GetApiExperimentsRunsResponse404
-]:
+    experiment_slug: str | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
+) -> Response[Any | GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400]:
     """List runs of an experiment
 
      Runs recorded for one experiment, newest first. Page through them with `page` and `pageSize`.
 
     Args:
-        experiment_slug (str):
-        page (int | Unset):  Default: 1.
-        page_size (int | Unset):  Default: 50.
+        experiment_slug (str | Unset):
+        page (int | Unset):
+        page_size (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400 | GetApiExperimentsRunsResponse401 | GetApiExperimentsRunsResponse404]
+        Response[Any | GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -214,31 +183,25 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    experiment_slug: str,
-    page: int | Unset = 1,
-    page_size: int | Unset = 50,
-) -> (
-    GetApiExperimentsRunsResponse200
-    | GetApiExperimentsRunsResponse400
-    | GetApiExperimentsRunsResponse401
-    | GetApiExperimentsRunsResponse404
-    | None
-):
+    experiment_slug: str | Unset = UNSET,
+    page: int | Unset = UNSET,
+    page_size: int | Unset = UNSET,
+) -> Any | GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400 | None:
     """List runs of an experiment
 
      Runs recorded for one experiment, newest first. Page through them with `page` and `pageSize`.
 
     Args:
-        experiment_slug (str):
-        page (int | Unset):  Default: 1.
-        page_size (int | Unset):  Default: 50.
+        experiment_slug (str | Unset):
+        page (int | Unset):
+        page_size (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400 | GetApiExperimentsRunsResponse401 | GetApiExperimentsRunsResponse404
+        Any | GetApiExperimentsRunsResponse200 | GetApiExperimentsRunsResponse400
     """
 
     return (

@@ -1,11 +1,11 @@
 import chalk from "chalk";
+
 import { TeamsApiService } from "@/client-sdk/services/teams/teams-api.service";
+
 import type { CommandResult } from "../../utils/output";
 import { asDate, printFacts, runManagement } from "../management/_shared";
 
-export const getTeamCommand = async (
-  id: string,
-): Promise<CommandResult | void> =>
+export const getTeamCommand = async (id: string): Promise<CommandResult | void> =>
   runManagement({
     action: "fetch team",
     pending: `Fetching team "${id}"...`,

@@ -18,15 +18,36 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/transport/rpc"
 )
 
+// startupFields is what the manager is running with, said once at boot.
+//
+// Which harness runs a turn, where the per-conversation worker comes from and
+// whether the ADR-033 per-worker UID sandbox is active were previously only
+// answerable by reading this package: a local manager with the sandbox off and
+// one with it on log the same line, and a manager whose worker binary does not
+// exist logs nothing at all until a turn dies inside the pool. The harness is a
+// constant because pi is the only one the manager can spawn.
+func startupFields(cfg Config) []zap.Field {
+	isolation := "uid-sandbox"
+	if cfg.UnsafeDevDisableIsolation {
+		isolation = "disabled"
+	}
+	return []zap.Field{
+		zap.String("addr", cfg.Server.Addr),
+		zap.Int("max_workers", cfg.MaxWorkers),
+		zap.String("environment", cfg.Environment),
+		zap.String("harness", "pi"),
+		zap.String("isolation", isolation),
+		zap.String("worker_binary", cfg.PiWorkerBinaryPath),
+		zap.String("sessions_root", cfg.SessionsRoot),
+	}
+}
+
 // Serve wires the app into HTTP transport and pkg/lifecycle management,
 // blocking until shutdown. Services stop in reverse registration order, so the
 // HTTP listener stops accepting first, then the worker pool drains (killing
 // each worker subprocess), then OTel flushes.
 func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) error {
-	deps.Logger.Info("langyagent_starting",
-		zap.String("addr", cfg.Server.Addr),
-		zap.Int("max_workers", cfg.MaxWorkers),
-	)
+	deps.Logger.Info("langyagent_starting", startupFields(cfg)...)
 
 	info := contexts.MustGetServiceInfo(ctx)
 	handler := rpc.NewRouter(rpc.RouterDeps{

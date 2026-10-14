@@ -177,7 +177,7 @@ class LiteLLMPatch:
         for delta in deltas:
             if hasattr(delta, "usage") and delta.usage is not None:  # type: ignore
                 usage = delta.usage  # type: ignore
-            for choice in delta.choices:
+            for choice in delta.choices or []:
                 choice = cast(StreamingChoices, choice)
                 index = choice.index
                 delta = choice.delta
@@ -279,7 +279,7 @@ class LiteLLMPatch:
                         )
                     ],
                 )
-                for output in response.choices
+                for output in response.choices or []
             ],
             metrics=SpanMetrics(
                 prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
