@@ -519,6 +519,7 @@ export class AuthModule implements AuthApiContract {
       refreshTokenTtlSeconds: config.cliRefreshTokenTtlSeconds,
       store: repositories.cliSessions,
       settlements: channels.cliSettlements,
+      rotations: repositories.cliRotations,
     });
 
     const cliDeviceDirectory = CliDeviceDirectoryService.create({
