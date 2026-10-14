@@ -237,6 +237,29 @@ describe("given nothing has resolved yet", () => {
   });
 });
 
+describe("given a page that needs a session and nobody signed in yet", () => {
+  /** @scenario "A page that needs a session asks for the scope graph only once someone is signed in" */
+  it.each([
+    ["has not answered", { status: "loading", user: null } satisfies UiSessionReading],
+    ["answered that nobody is signed in", SIGNED_OUT],
+  ])("does not ask for the scope graph while the session %s", async (_, session) => {
+    const { transport, callsTo } = recordingTransport();
+
+    renderScope({ path: "/acme-app/traces", transport, session });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+
+    expect(callsTo(UI_ORGANIZATIONS_PROCEDURE)).toHaveLength(0);
+  });
+
+  it("asks for it once the session names a reader", async () => {
+    const { transport, callsTo } = recordingTransport();
+
+    renderScope({ path: "/acme-app/traces", transport, session: SIGNED_IN });
+
+    await waitFor(() => expect(callsTo(UI_ORGANIZATIONS_PROCEDURE)).toHaveLength(1));
+  });
+});
+
 describe("given a signed-in viewer with an active project opens a share link", () => {
   const rememberViewersProject = () => {
     window.localStorage.setItem(UI_SELECTED_TEAM_ID_KEY, JSON.stringify("team-shared"));

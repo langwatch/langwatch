@@ -430,6 +430,8 @@ describe("Prisma table ownership lint", () => {
       ["AnnotationScore", "annotation", ["trace"]],
     ]);
     expect(writes.map((item) => [item.reader, item.file.split("/").at(-1)])).toEqual([
+      ["user", "prisma.user-data-erase.repository.ts"],
+      ["user", "prisma.user-data-erase.repository.ts"],
       ["authz", "prisma.authz-admission.repository.ts"],
       ["authz", "prisma.authz-ledger-read.repository.ts"],
       ["billing", "prisma.billing-account-facts.repository.ts"],

@@ -5,6 +5,7 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
+import { listedTraceKey } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -294,6 +295,8 @@ describe.skipIf(!clickHouseConfigured)(
     // so what it must get right is the grouping, the batching and the trim.
     describe("when rolling up events for a page of traces", () => {
       const rollupTenantId = `test-event-rollups-${nanoid()}`;
+      /** Rollups are keyed by project and trace, so two projects' same trace id never merge. */
+      const keyOf = (traceId: string) => listedTraceKey({ projectId: rollupTenantId, traceId });
       const feedbackTraceId = `trace-feedback-${nanoid()}`;
       const chattyTraceId = `trace-chatty-${nanoid()}`;
       const quietTraceId = `trace-quiet-${nanoid()}`;
@@ -415,7 +418,7 @@ describe.skipIf(!clickHouseConfigured)(
           timeRange,
         });
 
-        expect(rollups[feedbackTraceId]).toEqual({
+        expect(rollups[keyOf(feedbackTraceId)]).toEqual({
           names: [
             {
               name: "thumbs_up_down",
@@ -437,7 +440,7 @@ describe.skipIf(!clickHouseConfigured)(
           timeRange,
         });
 
-        expect(rollups[chattyTraceId]).toEqual({
+        expect(rollups[keyOf(chattyTraceId)]).toEqual({
           names: [
             {
               name: "gen_ai.request.attempt",
@@ -453,7 +456,7 @@ describe.skipIf(!clickHouseConfigured)(
       });
 
       /** @scenario Events are shown for the traces currently on screen */
-      it("answers a whole page in one call, keyed by trace id", async () => {
+      it("answers a whole page in one call, keyed by project and trace id", async () => {
         const rollups = await repo.findTraceEventRollupsByTraceIds({
           authorization: ownProof({ projectId: rollupTenantId }),
           traceIds: [feedbackTraceId, chattyTraceId, quietTraceId],
@@ -461,7 +464,7 @@ describe.skipIf(!clickHouseConfigured)(
         });
 
         expect(Object.keys(rollups).toSorted()).toEqual(
-          [feedbackTraceId, chattyTraceId].toSorted(),
+          [keyOf(feedbackTraceId), keyOf(chattyTraceId)].toSorted(),
         );
       });
 
@@ -473,7 +476,7 @@ describe.skipIf(!clickHouseConfigured)(
           timeRange,
         });
 
-        expect(rollups[quietTraceId]).toBeUndefined();
+        expect(rollups[keyOf(quietTraceId)]).toBeUndefined();
       });
 
       /** @scenario A trace with a very large number of events stays bounded */
@@ -484,7 +487,7 @@ describe.skipIf(!clickHouseConfigured)(
           timeRange,
         });
 
-        const rollup = rollups[noisyTraceId]!;
+        const rollup = rollups[keyOf(noisyTraceId)]!;
         expect(rollup.names).toHaveLength(MAX_EVENT_NAMES_PER_TRACE);
         expect(rollup.distinctCount).toBe(MAX_EVENT_NAMES_PER_TRACE + 5);
         expect(rollup.totalCount).toBe(MAX_EVENT_NAMES_PER_TRACE + 5);
@@ -502,7 +505,7 @@ describe.skipIf(!clickHouseConfigured)(
 
         // Both tenants recorded against this id, so the read returning nothing
         // would pass a "does not contain" check without proving anything.
-        expect(rollups[otherTenantTraceId]).toEqual({
+        expect(rollups[keyOf(otherTenantTraceId)]).toEqual({
           names: [
             {
               name: "thumbs_up_down",

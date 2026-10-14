@@ -63,6 +63,7 @@ function bothDoors({
     scope: { tier: "project" as const, id: "project-1" },
   };
   const hono = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: { authenticate: () => caller, identify: () => caller },
   }).mount(savedWorkbenchChartRest.router(), {

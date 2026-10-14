@@ -1252,12 +1252,19 @@ test_install_minimal() {
     -f "${CHART_DIR}/tests/values-e2e.yaml"
   pass "helm install (minimal + nodeport)"
 
-  # The chart refuses workers.enabled=false (the workers run the upgrade), so
-  # values-e2e.yaml keeps the Deployment at replicaCount 0.
+  # values-e2e.yaml sets workers.enabled=false: the worker runs as a sidecar in
+  # each app pod (it runs the upgrade the app waits on), with no Deployment of its own.
   if kc get deployment "${RELEASE}-workers" &>/dev/null; then
-    pass "Workers Deployment present (replicaCount=0 via values-e2e)"
+    fail "a Workers Deployment exists although workers.enabled=false"
   else
-    fail "the Workers Deployment is missing"
+    pass "no Workers Deployment (workers.enabled=false)"
+  fi
+  local app_containers
+  app_containers=$(kc get deployment "${RELEASE}-app" -o jsonpath='{.spec.template.spec.containers[*].name}')
+  if [[ " ${app_containers} " == *" ${RELEASE}-workers "* ]]; then
+    pass "the app pod carries the worker sidecar"
+  else
+    fail "the app pod has no worker sidecar (containers: ${app_containers})"
   fi
 
   # ClickHouse should be a single pod

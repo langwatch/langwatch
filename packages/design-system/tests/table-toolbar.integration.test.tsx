@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -154,6 +154,7 @@ describe("SelectionActionBar", () => {
       within(screen.getByRole("group")).getByRole("button", { name: "Clear selection" }),
     );
     expect(onClear).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("checkbox", { name: "Select all" })).toHaveFocus();
+    // Focus lands a frame later, once the cleared header has rebuilt.
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Select all" })).toHaveFocus());
   });
 });

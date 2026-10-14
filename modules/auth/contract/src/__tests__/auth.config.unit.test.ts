@@ -34,10 +34,23 @@ describe("auth server configuration", () => {
     });
   });
 
-  describe("given the passkey switch is written a way nothing reads", () => {
-    /** @scenario "An unreadable switch is refused instead of read as off" */
-    it("refuses the boot rather than leaving the surface quietly off", () => {
-      expect(() => read({ PASSKEYS_ENABLED: "true" })).toThrow(ConfigParseError);
+  describe("given a switch written outside on and off", () => {
+    /** @scenario "A switch the previous release compared to one word reads any other value as it did" */
+    it("offers passkeys unless off, and opens two-step enrolment only on on", () => {
+      expect(read({ PASSKEYS_ENABLED: "true" }).passkeysEnabled).toBe(true);
+      expect(read({ PASSKEYS_ENABLED: "OFF" }).passkeysEnabled).toBe(true);
+      expect(read({ MFA_ENROLLMENT_OPEN: "yes" }).mfaEnrollmentOpen).toBe(false);
+      expect(read({ MFA_ENROLLMENT_OPEN: "true" }).mfaEnrollmentOpen).toBe(false);
+    });
+  });
+
+  describe("given the two-step switch written the way the previous release read it", () => {
+    /** @scenario "A switch the previous release spelled on and off reads the same way" */
+    it('opens enrolment on "on" and keeps it closed on "off", blank or unset', () => {
+      expect(read({ MFA_ENROLLMENT_OPEN: "on" }).mfaEnrollmentOpen).toBe(true);
+      expect(read({ MFA_ENROLLMENT_OPEN: "off" }).mfaEnrollmentOpen).toBe(false);
+      expect(read({ MFA_ENROLLMENT_OPEN: "" }).mfaEnrollmentOpen).toBe(false);
+      expect(read({}).mfaEnrollmentOpen).toBe(false);
     });
   });
 

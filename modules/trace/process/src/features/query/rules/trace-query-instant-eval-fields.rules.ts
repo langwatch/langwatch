@@ -15,7 +15,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import { META_FIELD_DEFS } from "./trace-query-meta-fields.rules.ts";
-import { instantEvalJudgmentsSubquery } from "./trace-query-subquery.rules.ts";
+import { instantEvalJudgmentsSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
 import {
   extractStringValue,
   nextParam,
@@ -63,7 +63,7 @@ function compileRun({
   ctx.params[fromParam] = run.writtenFrom;
   ctx.params[untilParam] = run.writtenUntil;
 
-  return wrap(
+  return wrapMembership(
     instantEvalJudgmentsSubquery({
       by: run.target === "threads" ? "conversation" : "trace",
       runParam,

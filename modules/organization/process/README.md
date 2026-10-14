@@ -6,7 +6,7 @@ The server half of [organization](../README.md). Organisations and who is in the
 
 ## Installation
 
-`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withMigrations(…).withTasks(…)`, `src/organization.module.ts:30`.
+`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withMigrations(…)`, `src/organization.module.ts:29`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -2285,14 +2285,6 @@ Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedE
 | Kind    | Name                     | Handles | Declared at                              |
 | ------- | ------------------------ | ------- | ---------------------------------------- |
 | command | `recordSeatLimitReached` | –       | `src/eventing/seat-limit.pipeline.ts:23` |
-
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                                     | Class                                     | Declared at                                                   |
-| ---------------------------------------- | ----------------------------------------- | ------------------------------------------------------------- |
-| `backfill-organization-presence-setting` | `OrganizationPresenceSettingBackfillTask` | `src/tasks/organization-presence-setting-backfill.task.ts:15` |
 
 ## Configuration
 

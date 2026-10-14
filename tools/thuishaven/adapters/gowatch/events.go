@@ -26,6 +26,7 @@ type Events struct {
 	tree     *Tree
 	fsw      *fsnotify.Watcher
 	tops     map[string]bool // the tree's paths, absolute
+	mu       sync.Mutex      // guards dirs: forward edits it while WatchCount reads it
 	dirs     map[string]bool // the descended directories being watched
 	wake     chan struct{}
 	lost     chan struct{}
@@ -59,7 +60,11 @@ func (t *Tree) WatchEvents(log func(string)) (*Events, error) {
 func (e *Events) Close() { _ = e.fsw.Close() }
 
 // WatchCount is the number of directories under watch.
-func (e *Events) WatchCount() int { return len(e.dirs) }
+func (e *Events) WatchCount() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return len(e.dirs)
+}
 
 // addTop watches a directory path's whole tree, else the parent of a file path
 // (or of a missing one), so its appearing, changing and going are all seen.
@@ -116,7 +121,10 @@ func (e *Events) forward() {
 
 // handle wakes the loop for an event that can move the Tree's hash.
 func (e *Events) handle(ev fsnotify.Event) {
-	if e.matters(ev) {
+	e.mu.Lock()
+	matters := e.matters(ev)
+	e.mu.Unlock()
+	if matters {
 		e.signal()
 	}
 }

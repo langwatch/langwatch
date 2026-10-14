@@ -6,7 +6,6 @@
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { narrowAuthorization } from "@langwatch/authorization";
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -17,6 +16,7 @@ import {
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
 import { EvaluationRunClickHouseWriteRepository } from "../evaluation-run-write.repository.ts";
+import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
 
 const TENANT = "tenant_by_trace";
 const TRACE_ID = "trace_by_trace_1";
@@ -96,7 +96,7 @@ describe("given a trace whose evaluation runs are stored", () => {
     const resolveClient = async () => client as never;
     const writes = EvaluationRunClickHouseWriteRepository.create({ resolveClient });
     reads = EvaluationRunClickHouseReadRepository.create({
-      clickhouse: new AuthorizedClickHouse({ resolveClient }),
+      clickhouse: authorizedClickHouseFor(client),
     });
     const runs = [
       evaluationRun({}),

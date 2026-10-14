@@ -204,7 +204,7 @@ describe("given the stored-object module installed over memory stores", () => {
       expiresAt: "2999-01-01T00:00:00.000Z",
     });
     const contentPath = (sig: string) =>
-      `/api/stored-objects/${OBJECT_ID}/content?${new URLSearchParams({ sig })}`;
+      `/api/stored-objects/${OBJECT_ID}/content?${new URLSearchParams({ sig }).toString()}`;
 
     /** @scenario "the installed module on memory stores refuses a signature written by hand" */
     it("answers 401 and serves nothing", async () => {

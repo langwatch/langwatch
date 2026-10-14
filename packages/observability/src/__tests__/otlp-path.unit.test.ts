@@ -1,6 +1,30 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { canonicalOtlpPath } from "../request/otlp-path.ts";
+import {
+  canonicalOtlpPath,
+  OTLP_CORRECTED_PATH_HEADER,
+  readCorrectedPath,
+  stampCorrectedPath,
+} from "../request/otlp-path.ts";
+
+// Hoisted above the import, so a secret minted on load is counted; read before any test
+// runs, since mock calls are cleared between tests.
+const mintedSecret = vi.hoisted(() => vi.spyOn(globalThis.crypto, "randomUUID"));
+const secretsMintedOnLoad = mintedSecret.mock.calls.length;
+
+describe("the corrected-path marker", () => {
+  /** @scenario "The marker's secret is minted on first use, not on load" */
+  it("mints no secret on load, and a path stamped later still reads back as corrected", () => {
+    expect(secretsMintedOnLoad).toBe(0);
+
+    const headers = new Headers();
+    stampCorrectedPath({ headers, originalPath: "/api/otel/v1/traces/v1/logs" });
+
+    expect(readCorrectedPath(headers.get(OTLP_CORRECTED_PATH_HEADER) ?? void 0)).toBe(
+      "/api/otel/v1/traces/v1/logs",
+    );
+  });
+});
 
 describe("canonicalOtlpPath", () => {
   describe("given a base endpoint that already named a signal", () => {
