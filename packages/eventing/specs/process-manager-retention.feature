@@ -95,6 +95,20 @@ Feature: Process-manager inbox and outbox rows are reaped on a schedule
       Then the instance row is untouched
       And its revision is unchanged
 
+  Rule: The sweep finds expired rows through an index, never a table scan
+
+    # Every sweep batch picks expired rows by age. Without an index on that age,
+    # each batch reads the whole table from disk. These indexes were once an
+    # operator step in the purge runbook. Nobody ran it, and on 2026-10-14 the
+    # hourly sweep plus an outbox autovacuum hit the production volume's IOPS
+    # ceiling. A migration now ships them, so no install depends on a manual step.
+    @integration
+    Scenario: Each sweep delete finds its expired rows through an index
+      Given a database upgraded to the current schema
+      When the planner plans the dispatched outbox and consumed inbox deletes
+      Then each plan reads its table's age index
+      And neither plan scans the whole table
+
   Rule: One wake is bounded so the sweep cannot monopolise the database
 
     @unit
