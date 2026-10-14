@@ -68,6 +68,16 @@ describe("seeding a scenario's own account", () => {
       expect(readDotenv).not.toHaveBeenCalled();
     });
 
+    it("takes a haven hostname under .localhost as this machine", () => {
+      expect(
+        resolveSeedDatabaseUrl({
+          appBase: "https://app.my-stack.langwatch.localhost",
+          env: { DATABASE_URL: LOCAL_DB },
+          readDotenv: () => undefined,
+        }),
+      ).toBe(LOCAL_DB);
+    });
+
     it("falls back to the app's own .env", () => {
       expect(
         resolveSeedDatabaseUrl({

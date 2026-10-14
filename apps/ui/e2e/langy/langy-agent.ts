@@ -358,7 +358,7 @@ function parseTurnStreamFrame({
     if (!payload) continue;
     let entry: any;
     try {
-      entry = JSON.parse(payload).json;
+      entry = JSON.parse(payload);
     } catch {
       continue;
     }
@@ -398,9 +398,9 @@ async function streamTurnText({
   /** The browser leg's entry point, fired synchronously (README.md "langy-agent.ts"). */
   onUiAction?: (entry: UiActionEntry) => void;
 }): Promise<TurnText> {
-  const input = encodeURIComponent(JSON.stringify({ json: params }));
+  const input = encodeURIComponent(JSON.stringify(params));
   const res = await fetch(`${APP_BASE}/api/sse/langy.onTurnStream?input=${input}`, {
-    headers: { Cookie: cookie, Accept: "text/event-stream" },
+    headers: { Cookie: cookie, Accept: "text/event-stream", Origin: APP_BASE },
     // How long a single turn may take (README.md "langy-agent.ts").
     signal: AbortSignal.timeout(TURN_STREAM_TIMEOUT_MS),
   });

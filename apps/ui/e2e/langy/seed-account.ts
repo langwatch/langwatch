@@ -18,6 +18,10 @@ const APP_DOTENV = path.resolve(__dirname, "../../../..", ".env");
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
+/** `.localhost` names are loopback by RFC 6761: haven serves each stack under one. */
+const isLoopback = (host: string | null): host is string =>
+  host !== null && (LOOPBACK_HOSTS.has(host) || host.endsWith(".localhost"));
+
 const hostOf = (address: string): string | null => {
   try {
     return new URL(address).hostname.toLowerCase();
@@ -55,7 +59,7 @@ export function resolveSeedDatabaseUrl({
   readDotenv: () => string | undefined;
 }): string {
   const appHost = hostOf(appBase);
-  if (!appHost || !LOOPBACK_HOSTS.has(appHost)) {
+  if (!isLoopback(appHost)) {
     throw new Error(
       `A scenario's own account is only seeded on a local stack, and the app under test is on ${hostForError(appHost)}.`,
     );
@@ -68,7 +72,7 @@ export function resolveSeedDatabaseUrl({
     );
   }
   const databaseHost = hostOf(databaseUrl);
-  if (!databaseHost || !LOOPBACK_HOSTS.has(databaseHost)) {
+  if (!isLoopback(databaseHost)) {
     throw new Error(
       `A scenario's own account is only seeded in a database on this machine, and DATABASE_URL points at ${hostForError(databaseHost)}.`,
     );
