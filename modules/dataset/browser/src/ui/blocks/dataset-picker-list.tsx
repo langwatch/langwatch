@@ -1,6 +1,5 @@
 import type { WireOf } from "@langwatch/api/web";
-import { datasetDisplayRecordCount } from "@langwatch/dataset-contract";
-import type { DatasetColumns, DatasetWire } from "@langwatch/dataset-contract";
+import type { DatasetColumns, DatasetSummaryWire } from "@langwatch/dataset-contract";
 /**
  * Searchable list of the project's datasets: shared by the Choose Dataset
  * drawer (evaluations workbench) and the workflow dataset node. Renders
@@ -27,12 +26,15 @@ export type DatasetPickerSelection = {
 
 export function DatasetPickerList({
   datasets,
+  recordCounts,
   isLoading = false,
   isError = false,
   onSelect,
 }: {
   /** Gate the datasets query (e.g. only when the hosting dialog is open). */
-  datasets: WireOf<DatasetWire>[] | undefined;
+  datasets: WireOf<DatasetSummaryWire>[] | undefined;
+  /** Each dataset's entry count; a missing one is still being counted. */
+  recordCounts: ReadonlyMap<string, number>;
   isLoading?: boolean;
   isError?: boolean;
   onSelect: (dataset: DatasetPickerSelection) => void;
@@ -83,7 +85,7 @@ export function DatasetPickerList({
               key={dataset.id}
               name={dataset.name}
               columnCount={(dataset.columnTypes as DatasetColumns).length}
-              entryCount={datasetDisplayRecordCount(dataset)}
+              entryCount={recordCounts.get(dataset.id)}
               updatedAt={dataset.updatedAt}
               onClick={() =>
                 onSelect({
@@ -138,7 +140,7 @@ function DatasetCard({
 }: {
   name: string;
   columnCount: number;
-  entryCount: number;
+  entryCount: number | undefined;
   updatedAt: string;
   onClick: () => void;
 }) {
@@ -166,7 +168,7 @@ function DatasetCard({
             {name}
           </Text>
           <HStack gap={2} fontSize="xs" color="fg.muted">
-            <Text>{entryCount} entries</Text>
+            <Text>{entryCount === undefined ? "… entries" : `${entryCount} entries`}</Text>
             <Text>•</Text>
             <Text>{columnCount} columns</Text>
             <Text>•</Text>

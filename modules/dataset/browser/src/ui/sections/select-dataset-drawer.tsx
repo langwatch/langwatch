@@ -8,6 +8,7 @@ import type { UiSelectDatasetDrawerProps } from "@langwatch/dataset-client";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Database } from "lucide-react";
 
+import { useDatasetRecordCounts } from "../../behavior/use-dataset-record-counts.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { DatasetPickerList } from "../blocks/dataset-picker-list.tsx";
 
@@ -31,6 +32,7 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
     { projectId: projectId ?? "" },
     { enabled: isOpen && !!projectId },
   );
+  const recordCounts = useDatasetRecordCounts({ projectId, datasets: datasets.data });
 
   return (
     <Drawer
@@ -45,6 +47,7 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
     >
       <DatasetPickerList
         datasets={datasets.data}
+        recordCounts={recordCounts}
         isLoading={datasets.isLoading}
         isError={datasets.isError}
         onSelect={(dataset) => {

@@ -71,6 +71,37 @@ Feature: Datasets list page
     When I open my datasets page
     Then every row shows that dataset's own entry count
 
+  # Entry counts are a second read, asked once the list has arrived, so a slow
+  # count never holds the list up.
+
+  @integration
+  Scenario: The list shows before entry counts arrive
+    Given my datasets have loaded
+    And their entry counts are still being counted
+    When I open my datasets page
+    Then I see one row per dataset
+    And each row's entry count shows a muted placeholder
+
+  @integration
+  Scenario: Entry counts arrive after the list
+    Given my datasets are listed
+    When their entry counts arrive
+    Then each row shows that dataset's own entry count
+
+  @unit
+  Scenario: Datasets kept in object storage never have their entries counted
+    Given my project mixes datasets stored in the entries table with datasets stored in object storage
+    When their entry counts are asked for
+    Then only the datasets stored in the entries table are counted, in one read
+    And the others answer from their stored count
+
+  @unit
+  Scenario: An entry count refreshes after records are added
+    Given a dataset's entries have been counted
+    When I add records to it
+    And its entry count is asked for again
+    Then I see the new count
+
   @integration
   Scenario: The list loads while I wait, and tells me it is loading
     Given my datasets are still being fetched

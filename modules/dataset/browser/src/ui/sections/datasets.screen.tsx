@@ -9,7 +9,6 @@ import { datasetClient } from "@langwatch/dataset-client";
 import {
   type DatasetColumns,
   datasetColumnsSchema,
-  datasetDisplayRecordCount,
   type DatasetSummaryWire,
 } from "@langwatch/dataset-contract";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
@@ -31,6 +30,7 @@ import { type ReactNode, useMemo, useState } from "react";
 
 import { datasetApi } from "../../behavior/dataset-api.ts";
 import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
+import { useDatasetRecordCounts } from "../../behavior/use-dataset-record-counts.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { DeleteDatasetDialog } from "../../ui/blocks/delete-dataset-dialog.tsx";
 import { AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer.tsx";
@@ -102,6 +102,7 @@ function DatasetTable({
   onCopy,
   onDelete,
   onEdit,
+  recordCounts,
   slug,
 }: {
   columnsOf: (dataset: DatasetRow) => DatasetColumns;
@@ -111,6 +112,8 @@ function DatasetTable({
   onCopy: (target: { datasetId: string; datasetName: string }) => void;
   onDelete: (target: { id: string; name: string }) => void;
   onEdit: (dataset: DatasetRow) => void;
+  /** Each dataset's entry count; a missing one is still being counted. */
+  recordCounts: ReadonlyMap<string, number>;
   slug: string | undefined;
 }) {
   return (
@@ -153,7 +156,9 @@ function DatasetTable({
                 ))}
               </HStack>
             </ListTable.Cell>
-            <ListTable.Cell numeric>{datasetDisplayRecordCount(dataset)}</ListTable.Cell>
+            <ListTable.Cell numeric>
+              <RecordCount count={recordCounts.get(dataset.id)} />
+            </ListTable.Cell>
             <ListTable.Cell tone="muted">
               <FormattedDate
                 value={readableDate(dataset.updatedAt ?? dataset.createdAt).getTime()}
@@ -173,6 +178,17 @@ function DatasetTable({
         ))}
       </ListTable.Body>
     </ListTable>
+  );
+}
+
+/** The entry count, or a muted placeholder while it is still being counted. */
+function RecordCount({ count }: { count: number | undefined }) {
+  if (count !== undefined) return <>{count}</>;
+
+  return (
+    <Text as="span" color="fg.muted" aria-label="Counting entries">
+      …
+    </Text>
   );
 }
 
@@ -263,6 +279,7 @@ export default function DatasetsScreen() {
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
+  const recordCounts = useDatasetRecordCounts({ projectId: project?.id, datasets: datasets.data });
 
   /**
    * `columnTypes` is persisted JSON and older or CLI-created rows can carry an
@@ -417,6 +434,7 @@ export default function DatasetsScreen() {
             isLiteMember={isLiteMember}
             onCopy={setCopyDataset}
             onDelete={setDatasetToDelete}
+            recordCounts={recordCounts}
             onEdit={(dataset) => {
               setEditDataset({
                 datasetId: dataset.id,
