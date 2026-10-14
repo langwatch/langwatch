@@ -243,12 +243,7 @@ export const estimateModelCost = (
   const inputImageTokens = Math.max(0, coerceToNumber(attrs[ATTR.inputImageTokens]) ?? 0);
   const outputImageTokens = Math.max(0, coerceToNumber(attrs[ATTR.outputImageTokens]) ?? 0);
 
-  const responseModel = attrs[ATTR.responseModel];
-  const requestModel = attrs[ATTR.requestModel];
-  const resolvedModel =
-    parsed.model ??
-    (typeof responseModel === "string" ? responseModel : undefined) ??
-    (typeof requestModel === "string" ? requestModel : undefined);
+  const resolvedModel = pricedModelName(parsed);
 
   const customInputRate = coerceToNumber(attrs[ATTR.customInputRate]);
   const customOutputRate = coerceToNumber(attrs[ATTR.customOutputRate]);
@@ -303,18 +298,7 @@ export const estimateModelCost = (
   const explicitCost = coerceToNumber(attrs[ATTR.explicitCost]);
   if (explicitCost !== null && explicitCost > 0) return explicitCost;
 
-  const hasUsage =
-    inputTokens > 0 ||
-    outputTokens > 0 ||
-    cacheReadTokens > 0 ||
-    cacheCreationTokens > 0 ||
-    cacheCreation1hTokens > 0 ||
-    inputCharacters > 0 ||
-    audioSeconds > 0 ||
-    inputAudioTokens > 0 ||
-    outputAudioTokens > 0 ||
-    inputImageTokens > 0 ||
-    outputImageTokens > 0;
+  const hasUsage = hasCostableUsage(parsed);
   const matched =
     resolvedModel && hasUsage ? findMatchingModelCost(resolvedModel, staticCosts)[0] : undefined;
   const computed = matched
@@ -338,6 +322,65 @@ export const estimateModelCost = (
   if (attrs[ATTR.spanType] === "guardrail") return guardrailReportedCost(attrs[ATTR.output]);
 
   return 0;
+};
+
+/**
+ * The model a span is priced as: the caller's, then the response model, then the request model.
+ * The empty string when the span names none.
+ */
+function pricedModelName(parsed: ModelCostEstimateInput): string {
+  const responseModel = parsed.attrs[ATTR.responseModel];
+  const requestModel = parsed.attrs[ATTR.requestModel];
+  return (
+    parsed.model ??
+    (typeof responseModel === "string" ? responseModel : undefined) ??
+    (typeof requestModel === "string" ? requestModel : undefined) ??
+    ""
+  );
+}
+
+/** Whether the span reports any quantity a rate could price. */
+function hasCostableUsage(parsed: ModelCostEstimateInput): boolean {
+  const quantity = (key: string): number => coerceToNumber(parsed.attrs[key]) ?? 0;
+  return (
+    (parsed.promptTokens ?? 0) > 0 ||
+    (parsed.completionTokens ?? 0) > 0 ||
+    [
+      ATTR.cacheReadTokens,
+      ATTR.cacheCreationTokens,
+      ATTR.cacheCreation1hTokens,
+      ATTR.inputCharacters,
+      ATTR.audioSeconds,
+      ATTR.inputAudioTokens,
+      ATTR.outputAudioTokens,
+      ATTR.inputImageTokens,
+      ATTR.outputImageTokens,
+    ].some((key) => quantity(key) > 0)
+  );
+}
+
+/**
+ * Whether a span used a model that no rule of {@link estimateModelCost} prices: it reports usage,
+ * carries no custom rate and no explicit cost, and its model matches no catalogue rate. A model
+ * priced at zero (a free override or a free catalogue entry) is priced, so it is not counted.
+ */
+export const isModelCostUnpriced = ({
+  input,
+  staticCosts,
+}: {
+  input: ModelCostEstimateInput;
+  staticCosts: readonly ModelCostRate[];
+}): boolean => {
+  const parsed = modelCostEstimateInputSchema.parse(input);
+  if (!hasCostableUsage(parsed)) return false;
+  const hasCustomRate = [ATTR.customInputRate, ATTR.customOutputRate].some(
+    (key) => coerceToNumber(parsed.attrs[key]) !== null,
+  );
+  if (hasCustomRate) return false;
+  const explicitCost = coerceToNumber(parsed.attrs[ATTR.explicitCost]);
+  if (explicitCost !== null && explicitCost > 0) return false;
+  const model = pricedModelName(parsed);
+  return model === "" || findMatchingModelCost(model, staticCosts).length === 0;
 };
 
 function guardrailReportedCost(output: unknown): number {

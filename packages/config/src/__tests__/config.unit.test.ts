@@ -5,7 +5,10 @@ import { ConfigCollisionError, ConfigParseError } from "../config.errors.ts";
 import { Config, parseProcessConfig } from "../config.ts";
 import {
   langevalsStagingTtlSeconds,
+  localPasswords,
+  mfaEnrollmentOpen,
   nlpServiceUrl,
+  passkeysEnabled,
   publicBaseUrl,
   slackApiBase,
   slackWebhookBase,
@@ -74,6 +77,37 @@ describe("parseProcessConfig", () => {
     const refusals = refusalsOf(() => parseProcessConfig({ owners: [strict], environment: {} }));
     expect(refusals.some((line) => line.startsWith("strict.one ← STRICT_ONE"))).toBe(true);
     expect(refusals.some((line) => line.startsWith("strict.nested.two ← STRICT_TWO"))).toBe(true);
+  });
+
+  /** @scenario "A blank value on an optional leaf reads as unset" */
+  it("reads a blank optional leaf as unset and still refuses a blank required one", () => {
+    const blanks = {
+      name: "blanks",
+      config: Config.define((c) => ({
+        provider: c.env("BLANK_PROVIDER", z.enum(["email", "auth0"]).optional()),
+        days: c.env("BLANK_DAYS", z.coerce.number().int().positive().default(49)),
+        base: c.env("BLANK_BASE", z.string().url().default("https://slack.com/api")),
+        name: c.env("BLANK_NAME", z.string().optional()),
+      })),
+    } as const;
+    const config = parseProcessConfig({
+      owners: [blanks],
+      environment: { BLANK_PROVIDER: "", BLANK_DAYS: "", BLANK_BASE: "", BLANK_NAME: "" },
+    });
+    expect(config.blanks).toEqual({
+      provider: undefined,
+      days: 49,
+      base: "https://slack.com/api",
+      name: undefined,
+    });
+
+    const required = {
+      name: "required",
+      config: Config.define((c) => ({ url: c.env("BLANK_REQUIRED", z.string().url()) })),
+    } as const;
+    expect(() =>
+      parseProcessConfig({ owners: [required], environment: { BLANK_REQUIRED: "" } }),
+    ).toThrow(ConfigParseError);
   });
 
   /** @scenario "Two meanings for one variable still refuse" */
@@ -156,6 +190,30 @@ describe("parseProcessConfig", () => {
       expect(read({ LANGWATCH_NLP_SERVICE: " http://nlp.langwatch.test " })).toBe(
         "http://nlp.langwatch.test",
       );
+    });
+  });
+
+  describe("given an owner holding the sign-in capability switches", () => {
+    const auth = {
+      name: "auth",
+      config: Config.define(() => ({ passkeysEnabled, mfaEnrollmentOpen, localPasswords })),
+    } as const;
+    const read = (environment: Record<string, string | undefined>) =>
+      parseProcessConfig({ owners: [auth], environment }).auth;
+
+    /** @scenario "A switch the previous release compared to one word reads any other value as it did" */
+    it("reads only on as on for the opt-in switches and only off as off for passkeys", () => {
+      expect(read({})).toEqual({
+        passkeysEnabled: true,
+        mfaEnrollmentOpen: false,
+        localPasswords: false,
+      });
+      expect(
+        read({ PASSKEYS_ENABLED: "off", MFA_ENROLLMENT_OPEN: "on", LOCAL_PASSWORDS_ENABLED: "on" }),
+      ).toEqual({ passkeysEnabled: false, mfaEnrollmentOpen: true, localPasswords: true });
+      expect(
+        read({ PASSKEYS_ENABLED: "no", MFA_ENROLLMENT_OPEN: "1", LOCAL_PASSWORDS_ENABLED: "true" }),
+      ).toEqual({ passkeysEnabled: true, mfaEnrollmentOpen: false, localPasswords: false });
     });
   });
 

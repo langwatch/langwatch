@@ -23,3 +23,16 @@ Feature: Process members refuse what a process did not give them
     Given a process builds its stores from config
     When boot reads the member source
     Then the source states the live tier, so boot never assumes one
+
+  @unit
+  Scenario: Cluster endpoints open a cluster Redis, as the previous release did
+    Given a deployment that sets REDIS_CLUSTER_ENDPOINTS and no REDIS_URL
+    When the process stores are opened
+    Then the redis member is a cluster client over those endpoints
+    And a leftover REDIS_URL beside them is not read
+
+  @unit
+  Scenario: An event-log row with no tenant policy keeps the previous release's default
+    Given a deployment that does not set DEFAULT_RETENTION_DAYS
+    When the stores configuration is parsed
+    Then an event-log row with no tenant policy is stamped 49 days, as the previous release stamped it

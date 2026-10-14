@@ -280,13 +280,18 @@ export const FEATURE_FLAGS = [
       "Lets the agent drive the open page through typed UI actions (spec: specs/langy/langy-ui-actions.feature): `langwatch ui call` dispatches a manifest-validated action over the turn's live stream, the attached page claims and executes it, and the result returns to the agent in the same call. Off = the dispatch surface 404s like it was never deployed and the panel ignores `ui` stream entries; the rollback position loses live page control and nothing else. Managed only from the internal flag store (/ops/feature-flags).",
   },
   {
-    key: "release_custom_chart_playground",
-    scope: "SYSTEM",
+    key: "release_dashboards",
+    scope: "PRODUCT",
     defaultValue: false,
-    envOverridable: false,
-    family: "Custom Chart Playground",
     description:
-      "Opens the custom-chart-playground page, its playground-widget REST routes, and the Langy skill that drives them, outside local development — otherwise all three are dev-only unconditionally. Default off, so the surface stays dev-only until someone is explicitly opted in. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_custom_chart_playground.",
+      "Opens the Dashboards area (/[project]/dashboards): the Agent Flight Deck and the member's own boards, as a product in the product switcher and saved-dashboards list (spec: modules/dashboard/specs/dashboards-v1.feature). With release_lwql_workbench also on, members build and edit widgets on boards. While it is on, Langy offers its dashboard-widgets skill instead of lwql-charts. Default off; while off the area answers not-found and the sidebar shows no entry. Legacy analytics is untouched either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards.",
+  },
+  {
+    key: "release_insights",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Opens the Insights inbox (/[project]/insights): each person's own saved insights for the project, which only they read, in Inbox, Stale and Archived folders, the sidebar entry with its unread count, the topbar bell, and 'Save as insight' under a Langy answer (spec: modules/insight/specs/insight-inbox.feature). Default off; while off the page answers not-found, the chrome shows nothing and every insights procedure refuses with insights_not_enabled. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_insights.",
   },
   {
     key: "release_ui_comparison_leaderboard_enabled",

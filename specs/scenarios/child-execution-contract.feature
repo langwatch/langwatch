@@ -19,7 +19,8 @@ Feature: Scenario child execution contract stays private to the child
   Scenario: The shared field mapping schema carries no framework dependency
     Given the shared field mapping module
     When its imports are inspected
-    Then it imports zod and nothing else
+    Then zod is its only import that runs
+    And any other import is for types only, so it is gone once compiled
 
   # ---------------------------------------------------------------------------
   # Both sides still agree on the shape

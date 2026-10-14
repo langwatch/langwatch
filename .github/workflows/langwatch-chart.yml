@@ -110,6 +110,10 @@ jobs:
     # Skipped for a label event other than `ci:full`, like every job here.
     if: github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full'
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     defaults:
       run:
         working-directory: charts/langwatch
@@ -339,6 +343,10 @@ jobs:
        || contains(github.event.pull_request.labels.*.name, 'ci:full'))
       && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
