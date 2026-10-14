@@ -80,17 +80,17 @@ storagesim, idpsim).
 
 Every console action has a verb (`--json` on reads, non-zero exit on failure, `--stack <slug>`):
 
-| Sim       | Verbs                                                                                                                     |
-| --------- | ------------------------------------------------------------------------------------------------------------------------- |
-| mail      | `haven sim mail address\|status\|list\|get <id>\|links <id>\|wait\|delete <id>\|clear`                                    |
-| llm       | `haven sim llm status\|list [--model <text>] [--failed]\|get <id>\|clear\|fault <status>\|config --seed`                  |
-| analytics | `haven sim analytics status\|list\|record <id>\|clear\|wait --event`                                                      |
-| storage   | `haven sim storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|presign\|delete\|clear [bucket]\|seed\|list` |
-| voice     | `haven sim voice status\|list\|get <id>\|clear`                                                                           |
-| telemetry | `haven sim telemetry send\|load\|fuzz\|status\|stop`                                                                      |
-| outbound  | `haven sim outbound status\|list\|deliveries\|wait --channel\|fault add\|list\|clear\|receiver set\|urls\|clear`          |
-| payment   | `haven sim payment status\|list\|usage\|advance --seconds\|fault --customer\|deliver --ids\|hold\|release\|clear`         |
-| lambda    | `haven sim lambda status\|list\|get <id>\|clear\|fault <kind>`                                                            |
-| github    | `haven sim github status\|list\|pulls\|calls\|deliveries\|install\|pr\|app\|deliver\|fault\|clear\|reset`                 |
+| Sim       | Verbs                                                                                                                                      |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| mail      | `haven sim mail address\|status\|list\|get <id>\|links <id>\|wait\|delete <id>\|clear`                                                     |
+| llm       | `haven sim llm status\|list [--model <text>] [--failed]\|get <id>\|clear\|fault <status>\|config --seed`                                   |
+| analytics | `haven sim analytics status\|list\|record <id>\|clear\|wait --event`                                                                       |
+| storage   | `haven sim storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|presign\|delete\|clear [bucket]\|seed\|list`                  |
+| voice     | `haven sim voice status\|list\|get <id>\|clear`                                                                                            |
+| telemetry | `haven sim telemetry send\|load\|fuzz\|status\|stop`                                                                                       |
+| outbound  | `haven sim outbound status\|list\|deliveries\|wait --channel\|fault add\|list\|clear\|receiver set\|urls\|clear`                           |
+| payment   | `haven sim payment status\|list\|usage\|advance --seconds\|fault --customer\|deliver --ids\|hold\|release\|clear`                          |
+| lambda    | `haven sim lambda status\|list\|get <id>\|clear\|fault <kind>`                                                                             |
+| github    | `haven sim github status\|list\|pulls\|calls\|deliveries\|install\|pr\|app\|deliver\|fault\|clear\|reset`                                  |
 | mcp       | `haven sim mcp status\|list\|get <id>\|connect\|stream\|refresh\|double-refresh\|reconnect\|idle\|soak\|oauth\|grant\|forget\|stop\|clear` |
-| idp       | `haven sim idp list\|get\|apps add\|populate\|churn\|scim ...\|signin\|clear` (full list: `haven sim --json`)             |
+| idp       | `haven sim idp list\|get\|apps add\|populate\|churn\|scim ...\|signin\|clear` (full list: `haven sim --json`)                              |
