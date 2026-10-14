@@ -1164,19 +1164,10 @@ test_metrics_secret_key() {
   # CreateContainerConfigError. The namespace teardown reclaims it.
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SUITE: upgrade across the Deployment-strategy boundary
-#
-# Reproduces the actual customer upgrade path: app/workers were running from
-# the two earlier upgrades with NO strategy key rendered (the pre-#5083 chart
-# never set one, so the live Deployments carry only the
-# k8s-API-server-defaulted RollingUpdate). deploy_metrics_secret_and_local_fs
-# enables the local-FS stored-objects backend for the FIRST time, which is
-# exactly when the Deployment strategy flips to the kill-then-start
-# RollingUpdate override; its `set -e` helm call failing is the regression.
-# A regression here means `helm upgrade` breaks for every existing
-# self-hosted install.
-# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: upgrade across the Deployment-strategy boundary. The earlier upgrades left app/workers
+# with no strategy key; deploy_metrics_secret_and_local_fs first enables local-FS stored objects,
+# which flips the strategy to kill-then-start. Its helm upgrade failing breaks every self-hosted
+# install that upgrades.
 test_upgrade_strategy_boundary() {
   sep; info "Suite: upgrade across the Deployment-strategy boundary"
   pass "helm upgrade succeeded across the strategy boundary (deploy_metrics_secret_and_local_fs)"
