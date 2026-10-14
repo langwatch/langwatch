@@ -1,4 +1,4 @@
-# Search tools (rg, fd, ag, ugrep) skip these: the linguist-generated paths in .gitattributes.
+# ripgrep skips these: the linguist-generated paths in .gitattributes. Not .ignore: Nx reads that and loses the lockfile.
 # Regenerate the list below: awk '/linguist-(generated|vendored)/{print $1}' .gitattributes
 # Search them anyway: rg --no-ignore-dot
 **/package-lock.json

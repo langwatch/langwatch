@@ -34,7 +34,7 @@ need every caller of a Go symbol, exactly? ──▶ gopls references file.go:li
 ```
 
 - **ripgrep first.** It needs nothing and never misses a literal match in the files it searches
-  (everything not excluded by `.gitignore` or `.ignore`; see below). Never `grep -r`.
+  (everything not excluded by `.gitignore` or `.rgignore`; see below). Never `grep -r`.
   Give `rg` an explicit path: with no path and no terminal it reads stdin and hangs.
 - **sgrep only when the index is ready.** A query against a missing or half-built index is
   wrong or empty, so the helper refuses (exit 3) and you use `rg`. sgrep answers roughly half
@@ -43,10 +43,10 @@ need every caller of a Go symbol, exactly? ──▶ gopls references file.go:li
 - **Exact references:** `gopls references` for Go. For TypeScript renames and moves, tslsp is
   still the tool (`rename`, `rename_file`); its read commands time out on this monorepo.
 - sgrep skips tests, generated and vendored files itself; pass `-t` to include tests.
-- `rg` skips the generated files listed in the root `.ignore` (lockfiles, snapshots, generated
+- `rg` skips the generated files listed in the root `.rgignore` (lockfiles, snapshots, generated
   clients and READMEs). Searching for something that only lives there, such as a handled-error
   code in `codes.generated.ts`? Add `--no-ignore-dot`. After adding a `linguist-generated` line
-  to `.gitattributes`, regenerate `.ignore` with the command in its header.
+  to `.gitattributes`, regenerate `.rgignore` with the command in its header.
 
 ## The helper
 
