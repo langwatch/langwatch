@@ -34857,7 +34857,7 @@ Set this mapping by hand. The platform never infers a tool call mapping.
 
 - The last `state_of_world` call wins, by start time. That is the state after the last turn.
 - The output arrives as JSON text.
-- Exact Match compares two numbers as numbers. It does not compare objects: it compares the JSON as text, so the order of the keys and the spacing must match. To compare one fact, emit a span with that one fact, or use the judge.
+- Exact Match compares two numbers as numbers. It does not compare objects: with its default settings it strips punctuation and spacing and compares the rest as text, so the keys must come in the same order. To compare one fact, emit a span with that one fact, or use the judge.
 
 ## Caveats
 
