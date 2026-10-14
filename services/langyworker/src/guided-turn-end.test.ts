@@ -691,9 +691,18 @@ describe("the guided turn end guard", () => {
 
   describe("when the turn hands the setup back for another folder", () => {
     /** @scenario "A folder with no LLM agent gets a question, never a stop" */
-    it("reads the another-folder line as an ending, and a written starter agent's framework line as said", () => {
+    it("ends the turn on the no-agent question card or on the another-folder line as its last words", () => {
+      const asked = [shell("ls"), say("I read acme-pocket and found no LLM agent."), question()];
+      expect(guidedTurnEnding(asked)).toBe("card");
+      expect(decideGuidedContinuation({ calls: asked, guided: true, continuations: 0 }).kind).toBe(
+        "leave",
+      );
       expect(guidedTurnEnding([say(ANOTHER_FOLDER_LINE)])).toBe("handover");
+      expect(guidedTurnEnding([say(`Got it. ${ANOTHER_FOLDER_LINE}`)])).toBe("handover");
       expect(guidedTurnEnding([say(ANOTHER_FOLDER_LINE), say("Anything else?")])).toBe("bare");
+      expect(guidedTurnEnding([say(`${ANOTHER_FOLDER_LINE} Let me start the setup now.`)])).toBe(
+        "bare",
+      );
       expect(
         decideGuidedContinuation({
           calls: [shell("git status"), say(ANOTHER_FOLDER_LINE)],
