@@ -686,6 +686,7 @@ Feature: Langy guides the first setup after sign-up
       And the options are "Write a starter agent for me" and "I'll connect another folder", plain answers with no ref
       And the first option writes a small agent in a folder of its own, on the langy branch, and step 2 goes on against it
       And a starter agent whose provider key is missing from the env file gets a question naming the key, never a start that cannot answer
+      And a "Done" with the key still missing asks the same question again and ends the turn on its card
       And the second ends the turn saying how to connect the folder that holds the agent
 
     # Notifications promised "I'll let you know when your project is ready"

@@ -1011,6 +1011,9 @@ describe("the guided-onboarding skill", () => {
       );
       expect(section).toContain(VERBATIM_LINES["the starter key question"]);
       expect(section).toContain("You never write the key and never ask for its value.");
+      expect(section).toContain(
+        "with it still missing, ask the same question again and end the turn on its card. The starter agent never starts without the key.",
+      );
       const another = section.indexOf('On "I\'ll connect another folder"');
       expect(another).toBeGreaterThan(-1);
       expect(section.indexOf(VERBATIM_LINES["the another-folder line"], another)).toBeGreaterThan(

@@ -52,14 +52,17 @@ const FRAMEWORK_LINE_PATTERN = /^I (?:found|wrote) an? .+ agent in .+\.$/;
 export const ANOTHER_FOLDER_LINE =
   "Run the same share command in the folder that holds your agent, and send me a message once it is connected: I'll start the setup there.";
 
-/** How every continuation opens: the model reads it as a user message, and the person sent nothing. */
+/**
+ * How every continuation opens: the model reads it as a user message, and the
+ * person sent nothing.
+ */
 export const CONTINUATION_NOTE_OPENER = "LangWatch note: the person sent nothing.";
 
 /** How every continuation ends: the way out for a path that cannot go on. */
 export const CONTINUATION_DEAD_END_LINE =
   'When the path cannot go on, ask the matching question of "When a step fails" in the guided onboarding skill and end the turn on its card. Never reply to this note.';
 
-/** The prompt the runner sends for a continuation: the guard's message between the two fixed lines. */
+/** The runner's continuation prompt: the guard's message between the two fixed lines. */
 export function continuationPrompt(message: string): string {
   return `${CONTINUATION_NOTE_OPENER} ${message} ${CONTINUATION_DEAD_END_LINE}`;
 }
@@ -302,12 +305,12 @@ export function guidedTurnEnding(calls: readonly TurnCall[]): GuidedTurnEnder {
   if (!last) return "bare";
   if (CARD_TOOL_NAMES.has(last.name)) return "card";
   if (last.name !== SAY_TOOL_NAME) return "bare";
+  // The handover line ends the turn only as its last line.
+  const handsOver = sayTexts([last]).some((text) => text.includes(ANOTHER_FOLDER_LINE));
+  if (handsOver) return "handover";
   // The lines at the end are read against the last call that was not a line.
   let index = meaningful.length - 2;
   while (index >= 0 && meaningful[index]?.name === SAY_TOOL_NAME) index--;
-  if (sayTexts(meaningful.slice(index + 1)).some((text) => text.includes(ANOTHER_FOLDER_LINE))) {
-    return "handover";
-  }
   const anchor = meaningful[index];
   if (!anchor) return "bare";
   if (failed(anchor)) return "failed_step";

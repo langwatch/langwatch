@@ -693,6 +693,8 @@ describe("the guided turn end guard", () => {
     /** @scenario "A folder with no LLM agent gets a question, never a stop" */
     it("reads the another-folder line as an ending, and a written starter agent's framework line as said", () => {
       expect(guidedTurnEnding([say(ANOTHER_FOLDER_LINE)])).toBe("handover");
+      // Only as the last line: a line said after it leaves the turn bare.
+      expect(guidedTurnEnding([say(ANOTHER_FOLDER_LINE), say("Anything else?")])).toBe("bare");
       expect(
         decideGuidedContinuation({
           calls: [shell("git status"), say(ANOTHER_FOLDER_LINE)],
