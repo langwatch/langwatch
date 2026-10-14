@@ -69,21 +69,11 @@ func (p *sseParser) line(line string) (sseEvent, bool) {
 
 // readSSE calls each with every event (and comment) until it answers false or the stream ends.
 func readSSE(r io.Reader, each func(sseEvent) bool) error {
-	br := bufio.NewReaderSize(r, 64<<10)
-	var p sseParser
-	pending := 0
+	sr := &sseReader{br: bufio.NewReaderSize(r, 64<<10)}
 	for {
-		line, err := readLine(br, maxSSEEvent-pending)
-		if errors.Is(err, errLineTooLong) {
-			return fmt.Errorf("an event-stream event is longer than %d bytes", maxSSEEvent)
-		}
-		pending += len(line)
-		ev, ok := p.line(strings.TrimRight(line, "\r\n"))
-		if ok {
-			pending = 0
-			if !each(ev) {
-				return nil
-			}
+		ev, ok, err := sr.next()
+		if ok && !each(ev) {
+			return nil
 		}
 		if errors.Is(err, io.EOF) {
 			return nil
@@ -92,6 +82,27 @@ func readSSE(r io.Reader, each func(sseEvent) bool) error {
 			return err
 		}
 	}
+}
+
+// sseReader reads lines into events, counting the bytes of the event still open.
+type sseReader struct {
+	br      *bufio.Reader
+	p       sseParser
+	pending int
+}
+
+// next reads one line and answers the event it completed, if it completed one.
+func (sr *sseReader) next() (sseEvent, bool, error) {
+	line, err := readLine(sr.br, maxSSEEvent-sr.pending)
+	if errors.Is(err, errLineTooLong) {
+		return sseEvent{}, false, fmt.Errorf("an event-stream event is longer than %d bytes", maxSSEEvent)
+	}
+	sr.pending += len(line)
+	ev, ok := sr.p.line(strings.TrimRight(line, "\r\n"))
+	if ok {
+		sr.pending = 0
+	}
+	return ev, ok, err
 }
 
 var errLineTooLong = errors.New("the line is too long")
