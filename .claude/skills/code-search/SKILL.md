@@ -22,7 +22,8 @@ Measured on this repository, 2026-10-14 (busy host, so times are rough):
 ## Which tool
 
 ```
-know the word (name, string, error code)?  ── yes ──▶ rg -n -w <word> <dir>
+know the identifier?            ── yes ──▶ rg -n -w <identifier> <dir>
+know a literal string or code?  ── yes ──▶ rg -n -F '<string>' <dir>
         │ no
         ▼
 sgrep.sh status <dir>  ── ready ──▶ sgrep.sh query <dir> "<question>"
