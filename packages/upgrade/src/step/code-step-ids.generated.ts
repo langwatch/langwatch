@@ -9,6 +9,7 @@ export type CodeStepId =
   | "automation:reconcile-report-schedules"
   | "automation:reconcile-report-schedules-after-rollout"
   | "automation:reconcile-slack-claims"
+  | "automation:unwrap-trigger-json-text"
   | "billing:record-usage-billing-catch-up"
   | "billing:fill-seat-change-organizations"
   | "data-retention:keep-control-plane-events-forever"
