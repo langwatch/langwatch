@@ -85,6 +85,14 @@ describe("mcpSetupSteps", () => {
       expect(stepsText(steps)).toContain('"Authorization": "Bearer YOUR_API_KEY"');
     });
 
+    it("has VS Code prompt for the key instead of writing it into the workspace file", () => {
+      const steps = mcpSetupSteps({ client: "vscode", method: "api-key", appBaseUrl: BASE });
+
+      expect(stepsText(steps)).toContain('"password": true');
+      expect(stepsText(steps)).toContain('"Authorization": "Bearer ${input:langwatch-api-key}"');
+      expect(stepsText(steps)).not.toContain("YOUR_API_KEY");
+    });
+
     it("tells a ChatGPT user its connectors take OAuth only", () => {
       const steps = mcpSetupSteps({ client: "chatgpt", method: "api-key", appBaseUrl: BASE });
 

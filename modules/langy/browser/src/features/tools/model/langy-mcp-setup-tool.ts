@@ -13,7 +13,10 @@ export const LANGWATCH_MCP_DOCS_URL = "https://langwatch.ai/docs/integration/mcp
 /** Where a person creates the personal API key the key method sends. */
 export const LANGWATCH_API_KEYS_PATH = "/settings/api-keys";
 
-/** What stands in for the key in every snippet the card shows. */
+/** The VS Code input that prompts for the key, so it stays out of the workspace file. */
+const VSCODE_API_KEY_INPUT = "langwatch-api-key";
+
+/** What stands in for the key in every snippet the card shows, bar VS Code's prompt. */
 export const MCP_API_KEY_PLACEHOLDER = "YOUR_API_KEY";
 
 export const MCP_SETUP_CLIENTS = [
@@ -138,7 +141,7 @@ function oauthSteps({ client, url }: { client: McpSetupClient; url: string }): M
     case "chatgpt":
       return [
         {
-          text: "In ChatGPT, turn on developer mode, then add a custom MCP server in the apps settings.",
+          text: "In ChatGPT, turn on developer mode, then add a custom MCP server in the apps settings. In a Business, Enterprise or Edu workspace an admin has to allow developer mode first; on Business only admins and owners can add one.",
         },
         { text: "Paste the URL above, choose OAuth as the authentication and click Connect." },
         SIGN_IN_STEP,
@@ -223,9 +226,23 @@ function apiKeySteps({
       return [
         createKey,
         {
-          text: "Add this to .vscode/mcp.json:",
+          text: "Add this to .vscode/mcp.json. VS Code asks for the key once and keeps it in its secret storage, so the key never lands in the file:",
           code: json({
-            servers: { langwatch: { type: "http", url, headers: { Authorization: bearer } } },
+            inputs: [
+              {
+                type: "promptString",
+                id: VSCODE_API_KEY_INPUT,
+                description: "LangWatch API key",
+                password: true,
+              },
+            ],
+            servers: {
+              langwatch: {
+                type: "http",
+                url,
+                headers: { Authorization: `Bearer \${input:${VSCODE_API_KEY_INPUT}}` },
+              },
+            },
           }),
         },
       ];
