@@ -158,7 +158,6 @@ describe("InstanceAdminService writes on an operator's account", () => {
     });
   }
 
-  /** @scenario "The Back office does not edit an operator's account" */
   it.each<[string, Record<string, unknown>]>([
     ["an edit", { name: "Renamed" }],
     ["an email change", { email: "elsewhere@example.com" }],
