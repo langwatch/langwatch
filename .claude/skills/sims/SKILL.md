@@ -10,8 +10,10 @@ Start here: `haven sim --json` lists every simulator with whether it runs in thi
 console URL, the `haven up +<name>` it needs if off, its verbs (read from haven's own command
 table) and its skill path. `--stack <slug>` reads another worktree's stack.
 
-Twelve Go simulators stand in for outside services so a stack runs offline, deterministically
-and for free. Code is `services/sims/<name>` and each console is one surface of the React app
+Eleven Go simulators stand in for outside services so a stack runs offline, deterministically
+and for free. The twelfth, `mcpsim`, is the other way round: it plays the MCP clients against
+the stack's own hosted MCP endpoint, and its default tool call (`fetch_langwatch_docs`) reaches
+the internet, so it is not an offline test. Code is `services/sims/<name>` and each console is one surface of the React app
 `apps/sims` (`apps/sims/src/<surface>`, e.g. `llm`, `mail`), built by Vite and embedded in the Go
 package (ADR-160,
 `dev/docs/adr/160-internal-consoles-are-go-served-react.md`).
