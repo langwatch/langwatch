@@ -32,10 +32,9 @@ export function isStoredObjectDeliveryAudience(
 }
 
 /**
- * Every purpose the previous release wrote to the ClickHouse `stored_objects` index:
- * scenario media, trace media, offloaded evaluation inputs, dataset cell attachments
- * and user avatars. Each maps to the audience its reads were gated behind before the
- * refactor (avatars were readable by any authenticated project viewer).
+ * Every purpose the previous release wrote to the ClickHouse `stored_objects` index,
+ * mapped to the audience its reads were gated behind before the refactor
+ * (avatars were readable by any authenticated project viewer).
  */
 export const LEGACY_PURPOSE_AUDIENCE = {
   scenario_event: "scenarios:view",
