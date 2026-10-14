@@ -646,7 +646,7 @@ describe("given a CLI starting a device login", () => {
 
     describe("when one refresh token is presented twice at once", () => {
       /** @scenario A refresh token buys one rotation, even when presented twice at once */
-      it("rotates once and refuses the second presentation as spent", async () => {
+      it("rotates once and answers both presentations the same pair", async () => {
         const world = deviceFlowWorld();
         world.project = liveProject();
         const { api, grant } = await approvedProjectKeyGrant(world);
@@ -659,9 +659,13 @@ describe("given a CLI starting a device login", () => {
           api.post("/api/auth/cli/refresh", { refresh_token }),
         ]);
 
-        expect(answers.map((answer) => answer.status).toSorted((a, b) => a - b)).toEqual([
-          200, 401,
-        ]);
+        expect(answers.map((answer) => answer.status)).toEqual([200, 200]);
+        const [first, second] = (await Promise.all(answers.map((answer) => answer.json()))) as {
+          access_token: string;
+          refresh_token: string;
+        }[];
+        expect(second).toEqual(first);
+        expect(first?.refresh_token).not.toBe(refresh_token);
       });
     });
 
@@ -718,9 +722,10 @@ describe("given a CLI starting a device login", () => {
 
         expect(rotated.accessToken).toMatch(/^lw_at_/);
         expect(rotated.refreshToken).not.toBe(issued.refreshToken);
+        // A retry inside the replay window is answered the same pair, never a second one.
         await expect(
           world.flow.rotateSession({ refreshToken: issued.refreshToken }),
-        ).rejects.toMatchObject({ refusal: { error: "invalid_grant" } });
+        ).resolves.toEqual(rotated);
         await expect(
           world.flow.rotateSession({ refreshToken: "lw_rt_never_issued" }),
         ).rejects.toMatchObject({ refusal: { error: "invalid_grant" } });

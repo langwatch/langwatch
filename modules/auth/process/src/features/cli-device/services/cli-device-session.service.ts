@@ -24,6 +24,7 @@ import {
   EXCHANGE_CLAIM_SECONDS,
   MIN_POLL_INTERVAL_SECONDS,
   POLL_RATE_LIMIT_SECONDS,
+  ROTATION_REPLAY_SECONDS,
   decodeCliSession,
   deviceCodeKey,
   exchangeClaimKey,
@@ -31,7 +32,10 @@ import {
   familyIndexKey,
   generateUserCode,
   isRecordNotFound,
+  openRotation,
   pollRateKey,
+  rotationReplayKey,
+  sealRotation,
   userCodeKey,
   type CliAccessTokenRecord,
   type CliClientInfo,
@@ -39,6 +43,7 @@ import {
   type CliDeviceCodeRecord,
   type CliMintedSession,
   type CliRefreshTokenRecord,
+  type CliRememberedRotation,
 } from "../rules/cli-device-session.rules.ts";
 import { CliDeviceTokenRecordsService } from "./cli-device-token-records.service.ts";
 
@@ -51,6 +56,14 @@ export {
   type CliMintedSession,
   type CliRefreshTokenRecord,
 };
+
+/** The refusal a refresh token the store no longer honours answers; the CLI wipes local state. */
+function spentRefreshToken(): CliDeviceFlowRefusedError {
+  return new CliDeviceFlowRefusedError({
+    refusal: { error: "invalid_grant", error_description: "Refresh token is invalid or revoked" },
+    httpStatus: 401,
+  });
+}
 
 /** Everything the device grant stores, over one process's substrate. */
 export class CliDeviceSessionService {
@@ -212,6 +225,35 @@ export class CliDeviceSessionService {
   /** Releases a rotation claim that minted nothing, so the token can be presented again. */
   releaseRotationClaim(refreshToken: string): Promise<void> {
     return this.store.delete(`lwcli:refresh-claim:${refreshToken}`);
+  }
+
+  /**
+   * Remembers the pair a rotation minted, sealed under the token it spent, so a retry of that
+   * token inside the replay window is answered the same pair. Lapses on its own.
+   */
+  rememberRotation(input: { refreshToken: string; rotated: CliRememberedRotation }): Promise<void> {
+    return this.store.set({
+      key: rotationReplayKey(input.refreshToken),
+      value: sealRotation(input),
+      ttlSeconds: ROTATION_REPLAY_SECONDS,
+    });
+  }
+
+  /**
+   * The pair this spent token's rotation minted, while the replay window holds it. None held,
+   * or one this token cannot open, refuses as `invalid_grant`, as a spent token always has.
+   */
+  async getRememberedRotation(refreshToken: string): Promise<CliRememberedRotation> {
+    const sealed = await this.store.get(rotationReplayKey(refreshToken)).catch((error: unknown) => {
+      if (isRecordNotFound(error)) throw spentRefreshToken();
+      throw error;
+    });
+
+    try {
+      return openRotation({ refreshToken, sealed });
+    } catch {
+      throw spentRefreshToken();
+    }
   }
 
   /**
@@ -393,15 +435,7 @@ export class CliDeviceSessionService {
       throw error;
     });
     const record = raw === undefined ? null : decodeCliSession<CliRefreshTokenRecord>(raw);
-    if (!record) {
-      throw new CliDeviceFlowRefusedError({
-        refusal: {
-          error: "invalid_grant",
-          error_description: "Refresh token is invalid or revoked",
-        },
-        httpStatus: 401,
-      });
-    }
+    if (!record) throw spentRefreshToken();
 
     return record;
   }

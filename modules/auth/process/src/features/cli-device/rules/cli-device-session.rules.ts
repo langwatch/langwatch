@@ -4,7 +4,7 @@
  * @see modules/auth/specs/cli-device-flow.feature
  */
 
-import { randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
 
 import type { CliKeySelection } from "@langwatch/api-key-contract";
 import type { CliTokenRecordEntry } from "@langwatch/auth-contract";
@@ -29,6 +29,13 @@ export const POLL_RATE_LIMIT_SECONDS = 4;
  * redemption, but short enough to free the code early if release is skipped.
  */
 export const EXCHANGE_CLAIM_SECONDS = 30;
+/**
+ * How long a rotated refresh token still answers the pair its rotation minted: a retry after a
+ * lost response, or a second window of the same client, gets that pair rather than a sign-in.
+ */
+export const ROTATION_REPLAY_SECONDS = 60;
+/** How long a presentation waits for the pair a concurrent rotation of the same token mints. */
+export const ROTATION_REPLAY_WAIT_MS = 5000;
 /**
  * Default refresh-token lifetime.
  */
@@ -151,6 +158,10 @@ export type CliMintedSession = Readonly<{
   refreshTtlSeconds: number;
 }>;
 
+/** A rotation's pair as its old refresh token can replay it, with the project it is capped at. */
+export type CliRememberedRotation = CliMintedSession &
+  Readonly<{ project?: Readonly<{ id: string; slug: string; name: string }> }>;
+
 /**
  * The one grammar for a CLI bearer access token.
  */
@@ -192,6 +203,51 @@ export function pollRateKey(deviceCode: string): string {
  */
 export function exchangeClaimKey(deviceCode: string): string {
   return `${DEVICE_CODE_PREFIX}claim:${deviceCode}`;
+}
+
+/** Where a rotation's pair is remembered: a digest of the spent token, never the token itself. */
+export function rotationReplayKey(refreshToken: string): string {
+  return `lwcli:refresh-replay:${createHash("sha256").update(refreshToken).digest("hex")}`;
+}
+
+/** The key a remembered pair is sealed under: derived from the spent token, which is not stored. */
+function rotationReplayCipherKey(refreshToken: string): Buffer {
+  return Buffer.from(hkdfSync("sha256", refreshToken, "", "lw-cli-rotation-replay", 32));
+}
+
+/** Seals a rotation's pair so only a presentation of the spent token it rotated can open it. */
+export function sealRotation({
+  refreshToken,
+  rotated,
+}: {
+  refreshToken: string;
+  rotated: CliRememberedRotation;
+}): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", rotationReplayCipherKey(refreshToken), iv);
+  const sealed = Buffer.concat([cipher.update(JSON.stringify(rotated), "utf8"), cipher.final()]);
+
+  return [iv, cipher.getAuthTag(), sealed].map((part) => part.toString("base64url")).join(".");
+}
+
+/** The pair a sealed rotation holds; throws when this token cannot open it. */
+export function openRotation({
+  refreshToken,
+  sealed,
+}: {
+  refreshToken: string;
+  sealed: string;
+}): CliRememberedRotation {
+  const [iv = "", tag = "", body = ""] = sealed.split(".");
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    rotationReplayCipherKey(refreshToken),
+    Buffer.from(iv, "base64url"),
+  );
+  decipher.setAuthTag(Buffer.from(tag, "base64url"));
+  const opened = Buffer.concat([decipher.update(Buffer.from(body, "base64url")), decipher.final()]);
+
+  return JSON.parse(opened.toString("utf8")) as CliRememberedRotation;
 }
 
 /** The token keys of the children forked from one session family. */

@@ -17,6 +17,7 @@ import {
   answer,
   type CliDeviceFlowAnswer,
 } from "../rules/cli-device-flow.rules.ts";
+import { ROTATION_REPLAY_WAIT_MS } from "../rules/cli-device-session.rules.ts";
 import type { AuthDirectoryProject } from "./cli-device-directory.service.ts";
 import type { CliDeviceFlowCollaborators } from "./cli-device-flow.service.ts";
 import { type CliRefreshTokenRecord, type CliMintedSession } from "./cli-device-session.service.ts";
@@ -69,7 +70,7 @@ export type CliRotatedSession = CliMintedSession &
 /** One rotation of a refresh token, for the CLI's `/refresh` and for any peer holding a pair. */
 async function rotateRefreshToken({
   flow,
-  refreshToken: refresh_token,
+  refreshToken,
   projectRef,
 }: {
   flow: CliDeviceFlowCollaborators;
@@ -77,20 +78,101 @@ async function rotateRefreshToken({
   /** A project id or slug to re-scope the rotated pair to; the person's access is checked. */
   projectRef?: string | undefined;
 }): Promise<CliRotatedSession> {
-  const record = await flow.sessions().getRefreshToken(refresh_token);
+  let pauseMs = 50;
+  for (
+    let waitedMs = 0;
+    waitedMs < ROTATION_REPLAY_WAIT_MS;
+    waitedMs += pauseMs, pauseMs = Math.min(pauseMs * 2, 500)
+  ) {
+    const attempt = await attemptRotation({ flow, refreshToken, projectRef });
+    if (attempt.outcome === "answered") return attempt.rotated;
 
-  // One rotation per token: a concurrent second presentation is refused as spent.
-  if (!(await flow.sessions().claimRotation(refresh_token))) {
-    throw refused("invalid_grant", "Refresh token is invalid or revoked", 401);
+    // Another presentation holds this token's one rotation: wait for the pair it mints.
+    await new Promise((resolve) => setTimeout(resolve, pauseMs));
   }
 
+  return getReplayedRotation({ flow, refreshToken, projectRef });
+}
+
+/** What one try at a rotation came to: an answer, or another presentation still rotating. */
+type RotationAttempt =
+  | Readonly<{ outcome: "answered"; rotated: CliRotatedSession }>
+  | Readonly<{ outcome: "contended" }>;
+
+/** Rotates a live token, or replays a spent one's rotation; contended while another rotates it. */
+async function attemptRotation({
+  flow,
+  refreshToken: refresh_token,
+  projectRef,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  refreshToken: string;
+  projectRef: string | undefined;
+}): Promise<RotationAttempt> {
+  const record = await flow
+    .sessions()
+    .getRefreshToken(refresh_token)
+    .catch((error: unknown) => {
+      if (error instanceof CliDeviceFlowRefusedError) return undefined;
+      throw error;
+    });
+
+  // A spent token answers only the pair its own rotation minted, inside the replay window.
+  if (record === undefined) {
+    const rotated = await getReplayedRotation({ flow, refreshToken: refresh_token, projectRef });
+
+    return { outcome: "answered", rotated };
+  }
+
+  // One rotation per token: a concurrent second presentation waits for its pair.
+  if (!(await flow.sessions().claimRotation(refresh_token))) return { outcome: "contended" };
+
   try {
-    return await rotateClaimed({ flow, refreshToken: refresh_token, record, projectRef });
+    const rotated = await rotateClaimed({ flow, refreshToken: refresh_token, record, projectRef });
+
+    return { outcome: "answered", rotated };
   } catch (error) {
     // Any failure hands the claim back: a dropped token stays dropped, a live one stays usable.
     await flow.sessions().releaseRotationClaim(refresh_token);
     throw error;
   }
+}
+
+/**
+ * The pair a spent token's rotation minted, while in its window, asked for the same project,
+ * and its session still live: a logout, revocation or offboarding since then refuses it.
+ */
+async function getReplayedRotation({
+  flow,
+  refreshToken,
+  projectRef,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  refreshToken: string;
+  projectRef: string | undefined;
+}): Promise<CliRotatedSession> {
+  const remembered = await flow.sessions().getRememberedRotation(refreshToken);
+  const { project } = remembered;
+  if (projectRef !== undefined && projectRef !== project?.id && projectRef !== project?.slug) {
+    throw refused("invalid_grant", "Refresh token is invalid or revoked", 401);
+  }
+
+  // The pair's own refresh token is the session's liveness: logout and revocation drop it.
+  const record = await flow.sessions().getRefreshToken(remembered.refreshToken);
+  const live =
+    nowInstant().epochMilliseconds <= record.expires_at &&
+    (await flow.directory().hasActiveMembership({
+      userId: record.user_id,
+      organizationId: record.organization_id,
+    }));
+  if (!live) throw refused("invalid_grant", "Refresh token is invalid or revoked", 401);
+
+  logger.info(
+    { userId: record.user_id, organizationId: record.organization_id },
+    "answering a repeated refresh with the pair its rotation minted",
+  );
+
+  return remembered;
 }
 
 /** The rotation a held claim buys: re-proves the session, then rotates or forks it. */
@@ -289,9 +371,13 @@ async function rotateClaimed({
 
   await extendKeyExpiry({ flow, record, sessionAnchorMs, maxDurationDays });
 
+  // Remembered before the drop, so a retry never finds the token gone and its pair not yet kept.
+  // A fork is never remembered: it leaves the parent live, so a retry simply forks again.
+  const answered = project ? { ...rotated, project } : rotated;
+  await flow.sessions().rememberRotation({ refreshToken: refresh_token, rotated: answered });
   await flow.sessions().dropRefreshToken(refresh_token);
 
-  return project ? { ...rotated, project } : rotated;
+  return answered;
 }
 
 /** The project a rotation re-scopes to, refused unless the person can view it. */
