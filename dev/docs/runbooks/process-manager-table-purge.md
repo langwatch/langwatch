@@ -242,6 +242,18 @@ DROP INDEX CONCURRENTLY IF EXISTS "<name>";
 
 Run it outside an explicit transaction, then run the build again.
 
+`pnpm task upgrade` makes the same check before it applies the migration. An
+invalid index, or one of a different shape under either name, stops the run
+with a message naming it (`packages/upgrade/src/stepping/prebuilt-indexes.ts`).
+
+To roll the indexes back, drop them the same way. The sweep keeps working
+without them; it reads the whole table again on every batch:
+
+```sql
+DROP INDEX CONCURRENTLY IF EXISTS "ProcessManagerOutbox_dispatchedAt_idx";
+DROP INDEX CONCURRENTLY IF EXISTS "ProcessManagerInbox_consumedAt_idx";
+```
+
 ## After the deploy
 
 The `processRetentionSweep` process manager takes over on an hourly schedule and
