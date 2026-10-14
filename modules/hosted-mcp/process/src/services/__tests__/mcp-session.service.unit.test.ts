@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @see modules/hosted-mcp/specs/hosted-mcp.feature
  */
-import type { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryMcpSessionRepository } from "../../repositories/memory/memory.mcp-session.repository.ts";
@@ -15,8 +15,8 @@ function heldSession({ expiresAt }: { expiresAt?: number }) {
     records: MemoryMcpSessionRepository.create(),
     sessionTools: undefined,
   });
-  const close = vi.fn(() => Promise.resolve());
-  const transport = { close } as unknown as StreamableHTTPServerTransport;
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => "s-1" });
+  const close = vi.spyOn(transport, "close");
   const session = sessions.openSession({
     transport,
     apiKey: "key-a",

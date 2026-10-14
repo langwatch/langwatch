@@ -40,7 +40,7 @@ type McpOpenSession<T> = {
   projectId: string | undefined;
   userId: string | undefined;
   lastActivityAt: number;
-  /** When the session ends (epoch ms); a local copy past it is dropped and its next request 404s. */
+  /** When the session ends (epoch ms); a copy past it is dropped and its next request 404s. */
   expiresAt: number;
 };
 
