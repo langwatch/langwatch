@@ -1,6 +1,6 @@
 ---
 name: sims
-description: "Map of LangWatch's local simulators and how they run: llmsim, mailsim, storagesim, analyticssim, idpsim, voicesim, outboundsim, paymentsim, telemetrysim and lambdasim, the haven sim lane, the single Go mono-binary (`service combined`), the ADR-160 consoles and load runs. Use when someone says 'haven sims', 'which simulators are there', 'sims', 'run it locally at scale', 'load test the sims', 'haven up +llm', 'the sims lane', 'where is the sim console', 'add a simulator', or does not know which sim to use."
+description: "Map of LangWatch's local simulators and how they run: llmsim, mailsim, storagesim, analyticssim, idpsim, voicesim, outboundsim, paymentsim, telemetrysim, lambdasim and mcpsim, the haven sim lane, the single Go mono-binary (`service combined`), the ADR-160 consoles and load runs. Use when someone says 'haven sims', 'which simulators are there', 'sims', 'run it locally at scale', 'load test the sims', 'haven up +llm', 'the sims lane', 'where is the sim console', 'add a simulator', 'mcpsim', or does not know which sim to use."
 user-invocable: true
 ---
 
@@ -10,7 +10,7 @@ Start here: `haven sim --json` lists every simulator with whether it runs in thi
 console URL, the `haven up +<name>` it needs if off, its verbs (read from haven's own command
 table) and its skill path. `--stack <slug>` reads another worktree's stack.
 
-Eleven Go simulators stand in for outside services so a stack runs offline, deterministically
+Twelve Go simulators stand in for outside services so a stack runs offline, deterministically
 and for free. Code is `services/sims/<name>` and each console is one surface of the React app
 `apps/sims` (`apps/sims/src/<surface>`, e.g. `llm`, `mail`), built by Vite and embedded in the Go
 package (ADR-160,
@@ -29,12 +29,13 @@ package (ADR-160,
 | `paymentsim`   | Stripe (API, signed webhooks, meters)               | default      | `paymentsim`                               | `PAYMENTSIM_CATALOG`   |
 | `lambdasim`    | AWS Lambda + CloudWatch Logs (NLP Lambda fleet)     | `+lambda`    | [`lambdasim`](../lambdasim/SKILL.md)       | none                   |
 | `githubsim`    | GitHub App, API, pull requests, signed webhooks     | `+github`    | [`githubsim`](../githubsim/SKILL.md)       | `GITHUBSIM_SEED`       |
+| `mcpsim`       | MCP clients (Claude Desktop, Claude Code, Cursor)   | `+mcp`       | [`mcpsim`](../mcpsim/SKILL.md)             | none                   |
 
 Passkeys, security keys, U2F tokens and TOTP codes are emulated in the browser, not by a Go
 sim: [`mfasim`](../mfasim/SKILL.md) (`haven browser mfa`, on a `haven browser` lane).
 
 Each has a console at `<name>.<slug>.langwatch.localhost` (names: `llm`, `mail`, `storage`,
-`analytics`, `idp`, `voice`, `outbound`, `telemetry`, `lambda`) and logs via `haven logs <name>`. `haven up +llm +analytics`
+`analytics`, `idp`, `voice`, `outbound`, `telemetry`, `lambda`, `github`, `mcp`) and logs via `haven logs <name>`. `haven up +llm +analytics`
 selects (sticky); `-mail` deselects. haven sets every `*_SEED=1`. Two shared console packages,
 `@langwatch/design-system-internal` and `@langwatch/sim-console`, draw all of them; no
 Chakra, no product design system.
@@ -51,7 +52,7 @@ Chakra, no product design system.
   `haven logs <name>` reads each sim either way.
 - A checkout whose mono-binary has no `combined` subcommand, or a monolith build, runs
   haven's bundled copy of each sim as one lane each (`haven simulator <name>`, hidden).
-- Without haven: `make service svc=combined args="mailsim storagesim llmsim analyticssim voicesim idpsim telemetrysim outboundsim paymentsim lambdasim githubsim"`,
+- Without haven: `make service svc=combined args="mailsim storagesim llmsim analyticssim voicesim idpsim telemetrysim outboundsim paymentsim lambdasim githubsim mcpsim"`,
   or one sim: `make service svc=<name>`. `make service-watch svc=<name>` adds air reload.
   `make service` builds the console bundle first; a binary without it serves a one-line
   page naming the build command.
@@ -89,4 +90,5 @@ Every console action has a verb (`--json` on reads, non-zero exit on failure, `-
 | payment   | `haven sim payment status\|list\|usage\|advance --seconds\|fault --customer\|deliver --ids\|hold\|release\|clear`         |
 | lambda    | `haven sim lambda status\|list\|get <id>\|clear\|fault <kind>`                                                            |
 | github    | `haven sim github status\|list\|pulls\|calls\|deliveries\|install\|pr\|app\|deliver\|fault\|clear\|reset`                 |
+| mcp       | `haven sim mcp status\|list\|get <id>\|connect\|stream\|refresh\|double-refresh\|reconnect\|idle\|soak\|oauth\|grant\|forget\|stop\|clear` |
 | idp       | `haven sim idp list\|get\|apps add\|populate\|churn\|scim ...\|signin\|clear` (full list: `haven sim --json`)             |

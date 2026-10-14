@@ -4,12 +4,12 @@ package main
 
 import "testing"
 
-const wantCombined = "aigateway,nlpgo,idpsim,mailsim,storagesim,voicesim,llmsim,analyticssim,telemetrysim,outboundsim,paymentsim,lambdasim,githubsim"
+const wantCombined = "aigateway,nlpgo,idpsim,mailsim,storagesim,voicesim,llmsim,analyticssim,telemetrysim,outboundsim,paymentsim,lambdasim,githubsim,mcpsim"
 
 // @scenario "A dev build hosts the simulators in the combined process"
 // @scenario "A dev build hosts paymentsim in the combined process"
 func TestDevBuildHostsTheSimulators(t *testing.T) {
-	for _, name := range []string{"idpsim", "mailsim", "storagesim", "voicesim", "llmsim", "analyticssim", "telemetrysim", "outboundsim", "paymentsim", "lambdasim", "githubsim"} {
+	for _, name := range []string{"idpsim", "mailsim", "storagesim", "voicesim", "llmsim", "analyticssim", "telemetrysim", "outboundsim", "paymentsim", "lambdasim", "githubsim", "mcpsim"} {
 		if _, ok := services[name]; !ok {
 			t.Errorf("a dev build does not dispatch %q on its own", name)
 		}
