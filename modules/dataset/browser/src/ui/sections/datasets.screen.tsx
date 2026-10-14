@@ -14,7 +14,11 @@ import {
 } from "@langwatch/dataset-contract";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { MoreVerticalIcon } from "@langwatch/design-system/icons";
-import { ListPage, type ListPageState } from "@langwatch/design-system/list-page";
+import {
+  ListPage,
+  type ListPageErrorConfig,
+  type ListPageState,
+} from "@langwatch/design-system/list-page";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -348,6 +352,17 @@ export default function DatasetsScreen() {
     total: datasets.data?.length,
     shown: filteredDatasets?.length,
   });
+  const loadError: ListPageErrorConfig = {
+    title: "Couldn't load the datasets",
+    description: "Try again, or read how datasets work.",
+    onRetry: () => void datasets.refetch(),
+    next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
+  };
+  // ListPage draws any error it is given over loaded rows, so only a failed read passes one.
+  const stateProps =
+    listState === "error"
+      ? { state: listState, error: loadError }
+      : { state: listState, ...(datasets.isError ? { error: loadError } : {}) };
 
   return (
     <>
@@ -365,7 +380,7 @@ export default function DatasetsScreen() {
             </UploadOrCreateDatasetMenu>
           )
         }
-        state={listState}
+        {...stateProps}
         toolbar={
           projectIsAggregate
             ? undefined
@@ -378,17 +393,6 @@ export default function DatasetsScreen() {
                   testId: "datasets-search",
                 },
               }
-        }
-        // Only a failed read passes it: with rows on screen, ListPage draws any error it is given.
-        error={
-          datasets.isError
-            ? {
-                title: "Couldn't load the datasets",
-                description: "Try again, or read how datasets work.",
-                onRetry: () => void datasets.refetch(),
-                next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
-              }
-            : undefined
         }
         empty={{
           title: "No datasets yet",

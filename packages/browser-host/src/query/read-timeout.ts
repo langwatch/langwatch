@@ -19,15 +19,25 @@ export class ReadTimeoutError extends Error {
   }
 }
 
-/** Aborts when either the caller's signal or the time limit does. */
-function eitherSignal(signal: AbortSignal | null | undefined, timeoutMs: number): AbortSignal {
+/**
+ * A signal that aborts when either the caller's does or the time limit runs out, and `release`,
+ * which drops the timer and the listener on the caller's signal once the read has settled: a
+ * long-lived caller signal must not collect one listener per read.
+ */
+function eitherSignal(
+  signal: AbortSignal | null | undefined,
+  timeoutMs: number,
+): { signal: AbortSignal; release: () => void } {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new ReadTimeoutError(timeoutMs)), timeoutMs);
-  controller.signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
-  if (!signal) return controller.signal;
-  if (signal.aborted) controller.abort(signal.reason);
-  else signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
-  return controller.signal;
+  const follow = () => controller.abort(signal?.reason);
+  if (signal?.aborted) follow();
+  else signal?.addEventListener("abort", follow, { once: true });
+  const release = () => {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", follow);
+  };
+  return { signal: controller.signal, release };
 }
 
 /**
@@ -44,8 +54,11 @@ export function readTimeoutFetch({
 } = {}): typeof globalThis.fetch {
   return (input, init) => {
     const send = fetch ?? globalThis.fetch;
-    const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+    const request = input instanceof Request ? input : undefined;
+    const method = (init?.method ?? request?.method ?? "GET").toUpperCase();
     if (method !== "GET") return send(input, init);
-    return send(input, { ...init, signal: eitherSignal(init?.signal, timeoutMs) });
+    // An explicit `init.signal` replaces the Request's own, so the Request's is carried over.
+    const limited = eitherSignal(init?.signal ?? request?.signal, timeoutMs);
+    return send(input, { ...init, signal: limited.signal }).finally(limited.release);
   };
 }
