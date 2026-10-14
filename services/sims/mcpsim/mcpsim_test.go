@@ -476,6 +476,16 @@ func TestReadSSEAnswerSkipsOtherMessages(t *testing.T) {
 	if _, err := readSSEAnswer(strings.NewReader(unended), int64(7)); err == nil || !strings.Contains(err.Error(), "longer than") {
 		t.Errorf("an event that never ends read as %v", err)
 	}
+	// Comments between data lines do not reset the open event's count.
+	interleaved := strings.Repeat("data: "+strings.Repeat("x", 1000)+"\n: ping\n", maxSSEEvent/1000)
+	if _, err := readSSEAnswer(strings.NewReader(interleaved), int64(7)); err == nil || !strings.Contains(err.Error(), "longer than") {
+		t.Errorf("an event padded with comments read as %v", err)
+	}
+	// Blank lines with no event open never add up to an over-long event.
+	blanks := strings.Repeat("\n", maxSSEEvent+10) + "data: {\"jsonrpc\":\"2.0\",\"id\":7,\"result\":{}}\n\n"
+	if m, err := readSSEAnswer(strings.NewReader(blanks), int64(7)); err != nil || m == nil {
+		t.Errorf("an answer after many blank lines read as %v %v", m, err)
+	}
 }
 
 // @scenario "Authorization-server metadata is looked up at the issuer's well-known address"

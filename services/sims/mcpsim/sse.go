@@ -84,7 +84,8 @@ func readSSE(r io.Reader, each func(sseEvent) bool) error {
 	}
 }
 
-// sseReader reads lines into events, counting the bytes of the event still open.
+// sseReader reads lines into events, counting the bytes of the event still open: its data and
+// event lines. A comment never closes the event, and a blank line ends or discards it.
 type sseReader struct {
 	br      *bufio.Reader
 	p       sseParser
@@ -97,11 +98,14 @@ func (sr *sseReader) next() (sseEvent, bool, error) {
 	if errors.Is(err, errLineTooLong) {
 		return sseEvent{}, false, fmt.Errorf("an event-stream event is longer than %d bytes", maxSSEEvent)
 	}
-	sr.pending += len(line)
-	ev, ok := sr.p.line(strings.TrimRight(line, "\r\n"))
-	if ok {
+	trimmed := strings.TrimRight(line, "\r\n")
+	switch {
+	case trimmed == "":
 		sr.pending = 0
+	case !strings.HasPrefix(trimmed, ":"):
+		sr.pending += len(line)
 	}
+	ev, ok := sr.p.line(trimmed)
 	return ev, ok, err
 }
 
