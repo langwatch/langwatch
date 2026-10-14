@@ -60,6 +60,7 @@ const startIdentityProvider = async ({
   issuedAtOffsetSeconds = 0,
   expiresInSeconds = 300,
   notBeforeOffsetSeconds,
+  endSessionEndpoint,
 }: {
   port: number;
   publishJwks: boolean;
@@ -67,6 +68,7 @@ const startIdentityProvider = async ({
   issuedAtOffsetSeconds?: number;
   expiresInSeconds?: number;
   notBeforeOffsetSeconds?: number;
+  endSessionEndpoint?: string;
 }) => {
   const published = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const unpublished: KeyObject = generateKeyPairSync("rsa", {
@@ -83,6 +85,7 @@ const startIdentityProvider = async ({
         authorization_endpoint: `${issuer}/authorize`,
         token_endpoint: `${issuer}/token`,
         userinfo_endpoint: `${issuer}/userinfo`,
+        ...(endSessionEndpoint ? { end_session_endpoint: endSessionEndpoint } : {}),
         ...(publishJwks ? { jwks_uri: `${issuer}/jwks` } : {}),
         id_token_signing_alg_values_supported: ["RS256"],
       });
@@ -334,5 +337,27 @@ describe("given Okta signs its ID tokens with the key its JWKS publishes", () =>
 
     expect(error).toBeNull();
     expect(db.session ?? []).toHaveLength(1);
+  });
+});
+
+describe("given Okta's discovery document advertises its own sign-out page", () => {
+  /** @scenario "Signing out of a single sign-on session ends only the LangWatch session" */
+  it("mounts Okta without a provider sign-out url, so sign-out stays on LangWatch", async () => {
+    const port = await closedPort();
+    await startIdentityProvider({
+      port,
+      publishJwks: true,
+      endSessionEndpoint: `http://127.0.0.1:${port}/oidc/logout`,
+    });
+    const { auth } = buildAuth({ issuerPort: port });
+
+    const context = await auth.$context;
+    const okta = context.socialProviders.find((provider) => provider.id === "okta");
+    expect(okta).toBeDefined();
+    const endSessionUrl = await okta?.createEndSessionURL?.({
+      idToken: "id-token",
+      postLogoutRedirectURI: `${BASE_URL}/auth/signin`,
+    });
+    expect(endSessionUrl ?? null).toBeNull();
   });
 });
