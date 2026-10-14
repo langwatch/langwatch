@@ -109,9 +109,10 @@ describe("Feature: MCP streamable transport across replicas", () => {
             },
             signal: abort.signal,
           });
-          await resumed.text();
+          const body: unknown = await resumed.json();
 
           expect(resumed.status).toBe(401);
+          expect(body).toMatchObject({ code: "mcp_authorization_required" });
         } finally {
           abort.abort();
         }
@@ -138,10 +139,11 @@ describe("Feature: MCP streamable transport across replicas", () => {
             },
             signal: abort.signal,
           });
-          await resumed.text();
+          const body: unknown = await resumed.json();
 
           // A valid key for another project learns nothing about the session.
           expect(resumed.status).toBe(404);
+          expect(body).toMatchObject({ code: "mcp_session_not_found" });
         } finally {
           abort.abort();
         }

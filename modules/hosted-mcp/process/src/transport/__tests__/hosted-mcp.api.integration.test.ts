@@ -54,6 +54,7 @@ const mockRedis = {
   set: vi.fn(),
   del: vi.fn(),
   expire: vi.fn(),
+  ttl: vi.fn(),
   sadd: vi.fn(),
   srem: vi.fn(),
   smembers: vi.fn(),
@@ -430,6 +431,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       // is not matched as an MCP route. In production, start.ts checks
       // isMcpRoute() first and falls through to Next.js.
       expect(res.status).toBe(404);
+      expect(res.json().code).toBe("mcp_route_not_found");
     });
   });
 
@@ -878,6 +880,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
         expect(res.status).toBe(404);
         expect(res.contentType).toContain("application/json");
+        expect(res.body.code).toBe("mcp_metadata_unpublished");
       });
     });
 
@@ -888,6 +891,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
         expect(res.status).toBe(404);
         expect(res.contentType).toContain("application/json");
+        expect(res.body.code).toBe("mcp_metadata_unpublished");
       });
     });
   });
@@ -994,6 +998,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.status).toBe(401);
+      expect(res.json().code).toBe("mcp_invalid_api_key");
     });
   });
 
@@ -1080,7 +1085,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         });
 
         expect(res.status).toBe(401);
-        expect(res.json().error).toBe("mcp_grant_revoked");
+        expect(res.json().code).toBe("mcp_grant_revoked");
       });
     });
 
@@ -1199,6 +1204,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       expect(res.status).toBe(401);
       expect(res.headers["www-authenticate"]).toContain("resource_metadata");
+      expect(res.json().code).toBe("mcp_invalid_token");
     });
   });
 
@@ -1242,6 +1248,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(adopted.status).toBe(200);
       // A valid token for someone else learns nothing and is not sent to sign in again.
       expect(refused.status).toBe(404);
+      expect(refused.json().code).toBe("mcp_session_not_found");
     });
   });
 
@@ -1264,6 +1271,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       expect(res.status).toBe(401);
       expect(res.headers["www-authenticate"]).toContain("resource_metadata");
+      expect(res.json().code).toBe("mcp_invalid_api_key");
     });
   });
 
@@ -1387,6 +1395,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.status).toBe(401);
+      expect(res.json().code).toBe("mcp_authorization_required");
     });
 
     it("returns 401 on GET", async () => {
@@ -1435,6 +1444,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.status).toBe(401);
+      expect(res.json().code).toBe("mcp_invalid_token");
     });
   });
 
@@ -1906,6 +1916,27 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.status).toBe(404);
+      expect(res.json().code).toBe("mcp_route_not_found");
+    });
+  });
+
+  describe("when a request is malformed for the endpoint", () => {
+    it("answers a non-initialize request with no session id as 400 mcp_session_id_required", async () => {
+      const res = await sendRequest({
+        server,
+        body: { jsonrpc: "2.0", id: 2, method: "tools/list" },
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.json().code).toBe("mcp_session_id_required");
+    });
+
+    it("answers a method the route does not serve as 405 mcp_method_not_allowed", async () => {
+      const res = await sendRequest({ server, method: "PUT", path: "/mcp" });
+
+      expect(res.status).toBe(405);
+      expect(res.json().code).toBe("mcp_method_not_allowed");
     });
   });
 });

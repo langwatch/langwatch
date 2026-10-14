@@ -1,8 +1,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { MediaTypeMalformedRequestError, PayloadTooLargeError, retryAfterOf } from "@langwatch/api";
+import { canonicalErrorAnswer } from "@langwatch/api/rest";
+
 const MAX_BODY_BYTES = 10_485_760;
 
 const BODY_TOO_LARGE = "Request body too large";
+
+const UNAUTHORIZED = 401;
 
 /** A body read: the text, or a refusal already sent to the caller, who must stop. */
 type McpBodyRead = Readonly<{ kind: "read"; body: string }> | Readonly<{ kind: "answered" }>;
@@ -11,7 +16,7 @@ type McpBodyRead = Readonly<{ kind: "read"; body: string }> | Readonly<{ kind: "
 type McpJsonBodyRead = Readonly<{ kind: "read"; body: unknown }> | Readonly<{ kind: "answered" }>;
 
 /**
- * The raw Node exchange this endpoint answers on: bodies in, JSON and protocol refusals out,
+ * The raw Node exchange this endpoint answers on: bodies in, JSON and handled refusals out,
  * and the identifiers each request's access log line carries.
  */
 export class McpHttpService {
@@ -63,16 +68,28 @@ export class McpHttpService {
     res.end(body);
   }
 
-  /** Points the client at the protected-resource document, where its OAuth flow starts. */
-  send401(res: ServerResponse, error: string): void {
-    res.setHeader(
-      "WWW-Authenticate",
-      `Bearer resource_metadata="${this.#baseHost}/.well-known/oauth-protected-resource"`,
-    );
-    this.sendJson(res, 401, { error });
+  /**
+   * Every refusal this endpoint answers: the REST layer's canonical envelope, `Retry-After` from a
+   * refusal's wait, and on a 401 the protected-resource document where the client's OAuth starts.
+   */
+  async sendHandled(res: ServerResponse, error: unknown): Promise<void> {
+    const answer = canonicalErrorAnswer(error);
+    const body = await answer.text();
+    const headers: Record<string, string | number> = {
+      ...Object.fromEntries(answer.headers),
+      "Content-Length": Buffer.byteLength(body),
+    };
+    const retryAfter = retryAfterOf(error);
+    if (retryAfter !== undefined) headers["Retry-After"] = retryAfter;
+    if (answer.status === UNAUTHORIZED) {
+      headers["WWW-Authenticate"] =
+        `Bearer resource_metadata="${this.#baseHost}/.well-known/oauth-protected-resource"`;
+    }
+    res.writeHead(answer.status, headers);
+    res.end(body);
   }
 
-  /** RFC 6749 §5.2's shape: a bare error string reads to clients as a protocol failure. */
+  /** RFC 6749 §5.2's shape: OAuth clients parse it, so the OAuth endpoints keep it. */
   sendRateLimited(res: ServerResponse, retryAfterSeconds = 60): void {
     res.setHeader("Retry-After", String(retryAfterSeconds));
     this.sendJson(res, 429, {
@@ -81,22 +98,12 @@ export class McpHttpService {
     });
   }
 
-  /** A store the request needs is down: worth a retry, and never a reason to sign in again. */
-  sendUnavailable(res: ServerResponse, retryAfterSeconds = 5): void {
-    res.setHeader("Retry-After", String(retryAfterSeconds));
-    this.sendJson(res, 503, { error: "Temporarily unavailable, retry shortly" });
-  }
-
-  sendMethodNotAllowed(res: ServerResponse): void {
-    this.sendJson(res, 405, { error: "Method not allowed" });
-  }
-
   async readRawBody(req: IncomingMessage, res: ServerResponse): Promise<McpBodyRead> {
     try {
       return { kind: "read", body: await readBody(req) };
     } catch (err) {
       if (err instanceof Error && err.message === BODY_TOO_LARGE) {
-        this.sendJson(res, 413, { error: BODY_TOO_LARGE });
+        await this.sendHandled(res, new PayloadTooLargeError());
         return { kind: "answered" };
       }
       throw err;
@@ -110,7 +117,9 @@ export class McpHttpService {
       const body: unknown = JSON.parse(raw.body);
       return { kind: "read", body };
     } catch {
-      this.sendJson(res, 400, { error: "Invalid JSON body" });
+      const received = req.headers["content-type"] ?? null;
+      const refusal = { received, expected: "application/json" };
+      await this.sendHandled(res, new MediaTypeMalformedRequestError(refusal));
       return { kind: "answered" };
     }
   }

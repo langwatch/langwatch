@@ -1,6 +1,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { HandledError } from "@langwatch/handled-error";
+import {
+  McpAuthorizationRequiredError,
+  McpGrantRevokedError,
+  McpInvalidApiKeyError,
+  McpInvalidTokenError,
+  McpStoreUnavailableError,
+} from "@langwatch/hosted-mcp-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -23,9 +30,6 @@ const logger = createLogger("langwatch:mcp");
  * session in minutes.
  */
 const GRANT_RECHECK_INTERVAL_MS = 5 * 60 * 1000;
-
-/** The refusal a caller whose minting grant is gone reads on the wire. */
-const GRANT_REVOKED_CODE = "mcp_grant_revoked";
 
 /** The access tokens auth mints for a person; anything else is read as a project key. */
 const ACCESS_TOKEN_PREFIX = "lw_at_";
@@ -115,16 +119,16 @@ export class McpCallerAuthService {
   }
 
   /** Answers a bearer that did not resolve: 503 while a store is down, else a counted 401. */
-  answerUnresolved(
+  async answerUnresolved(
     req: IncomingMessage,
     res: ServerResponse,
     input: { token: string; caller: Exclude<McpCallerLookup, { kind: "resolved" }> },
-  ): void {
+  ): Promise<void> {
     if (input.caller.kind === "unavailable") {
-      this.#collaborators.http.sendUnavailable(res);
+      await this.#collaborators.http.sendHandled(res, new McpStoreUnavailableError());
       return;
     }
-    this.refuseBearer(req, res, input.token);
+    await this.refuseBearer(req, res, input.token);
   }
 
   /**
@@ -140,11 +144,11 @@ export class McpCallerAuthService {
   }
 
   /** Tracks the failure and refuses with the reason the client can act on. */
-  refuseBearer(req: IncomingMessage, res: ServerResponse, token: string): void {
+  async refuseBearer(req: IncomingMessage, res: ServerResponse, token: string): Promise<void> {
     this.#authFailures.track(this.clientIpOf(req));
-    this.#collaborators.http.send401(
+    await this.#collaborators.http.sendHandled(
       res,
-      this.isGrantRevoked(token) ? GRANT_REVOKED_CODE : "Invalid or expired token",
+      this.isGrantRevoked(token) ? new McpGrantRevokedError() : new McpInvalidTokenError(),
     );
   }
 
@@ -158,13 +162,13 @@ export class McpCallerAuthService {
     const { http } = this.#collaborators;
     const token = this.extractBearer(req);
     if (!token) {
-      http.send401(res, "Authorization required");
+      await http.sendHandled(res, new McpAuthorizationRequiredError());
       return { kind: "answered" };
     }
 
     const caller = await this.resolveCaller(token);
     if (caller.kind !== "resolved") {
-      this.answerUnresolved(req, res, { token, caller });
+      await this.answerUnresolved(req, res, { token, caller });
       return { kind: "answered" };
     }
 
@@ -172,12 +176,12 @@ export class McpCallerAuthService {
       ? ({ kind: "live", project: { id: caller.projectId } } as const)
       : await this.#validateApiKey(caller.apiKey);
     if (lookup.kind === "unavailable") {
-      http.sendUnavailable(res);
+      await http.sendHandled(res, new McpStoreUnavailableError());
       return { kind: "answered" };
     }
     if (lookup.kind === "unknown") {
       this.#authFailures.track(this.clientIpOf(req));
-      http.send401(res, "Invalid API key");
+      await http.sendHandled(res, new McpInvalidApiKeyError());
       return { kind: "answered" };
     }
     const projectId = lookup.project.id;
@@ -193,7 +197,7 @@ export class McpCallerAuthService {
    */
   async projectIdOf(apiKey: string): Promise<string | undefined> {
     const lookup = await this.#validateApiKey(apiKey);
-    if (lookup.kind === "unavailable") throw new Error("The project store is unavailable");
+    if (lookup.kind === "unavailable") throw new McpStoreUnavailableError();
     return lookup.kind === "live" ? lookup.project.id : undefined;
   }
 

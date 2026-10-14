@@ -1,5 +1,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { RateLimitedError } from "@langwatch/api";
+import {
+  McpAuthorizationRequiredError,
+  McpSessionIdRequiredError,
+  McpSessionLimitReachedError,
+  McpSessionNotFoundError,
+  McpStoreUnavailableError,
+} from "@langwatch/hosted-mcp-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -71,9 +79,7 @@ export class McpStreamableTransportService {
         await this.#openSession({ req, res, body: read.body });
         return;
       }
-      http.sendJson(res, 400, {
-        error: "Invalid request — no session ID or not an initialize request",
-      });
+      await http.sendHandled(res, new McpSessionIdRequiredError());
       return;
     }
 
@@ -94,9 +100,7 @@ export class McpStreamableTransportService {
   async handleGet(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const sessionId = extractSessionIdHeader(req.headers["mcp-session-id"]);
     if (!sessionId) {
-      this.#collaborators.http.sendJson(res, 400, {
-        error: "Invalid request — no valid session ID",
-      });
+      await this.#collaborators.http.sendHandled(res, new McpSessionIdRequiredError());
       return;
     }
 
@@ -114,7 +118,7 @@ export class McpStreamableTransportService {
     const { http, sessions } = this.#collaborators;
     const sessionId = extractSessionIdHeader(req.headers["mcp-session-id"]);
     if (!sessionId) {
-      this.#sendSessionNotFound(res);
+      await this.#sendSessionNotFound(res);
       return;
     }
 
@@ -145,12 +149,12 @@ export class McpStreamableTransportService {
     const { http, auth, sessions } = this.#collaborators;
     const token = auth.extractBearer(input.req);
     if (!token) {
-      http.send401(input.res, "Authorization header required");
+      await http.sendHandled(input.res, new McpAuthorizationRequiredError());
       return { kind: "answered" };
     }
     const caller = await auth.resolveCaller(token);
     if (caller.kind !== "resolved") {
-      auth.answerUnresolved(input.req, input.res, { token, caller });
+      await auth.answerUnresolved(input.req, input.res, { token, caller });
       return { kind: "answered" };
     }
 
@@ -164,7 +168,7 @@ export class McpStreamableTransportService {
       return { ...rebuilt, token, caller };
     } catch (err) {
       logger.error({ error: err }, "MCP session recovery failed");
-      http.sendUnavailable(input.res);
+      await http.sendHandled(input.res, new McpStoreUnavailableError());
       return { kind: "answered" };
     }
   }
@@ -225,7 +229,7 @@ export class McpStreamableTransportService {
     const { http, auth, sessions } = this.#collaborators;
     // Failed auth is counted inside authenticate; here it is only checked.
     if (auth.isAuthFailureBlocked(input.req)) {
-      http.sendJson(input.res, 429, { error: "Too many requests" });
+      await http.sendHandled(input.res, new RateLimitedError());
       return;
     }
 
@@ -237,9 +241,10 @@ export class McpStreamableTransportService {
     const userId = caller.kind === "resolved" ? caller.userId : undefined;
 
     if (await sessions.isAtSessionLimit(apiKey)) {
-      http.sendJson(input.res, 429, {
-        error: `Too many concurrent sessions (max ${MAX_SESSIONS_PER_KEY})`,
-      });
+      await http.sendHandled(
+        input.res,
+        new McpSessionLimitReachedError({ maxSessions: MAX_SESSIONS_PER_KEY }),
+      );
       return;
     }
 
@@ -297,7 +302,13 @@ export class McpStreamableTransportService {
 
     // A record written before records carried the person learns it from its own token.
     const userId = record.userId ?? (sameKey ? caller.userId : undefined);
-    const session = sessions.openSession({ transport, apiKey: record.apiKey, projectId, userId });
+    const session = sessions.openSession({
+      transport,
+      apiKey: record.apiKey,
+      projectId,
+      userId,
+      expiresAt: record.expiresAt,
+    });
     sessions.streamable.set(sessionId, session);
     transport.onclose = () => this.#forgetLocalCopy(transport);
 
@@ -322,18 +333,18 @@ export class McpStreamableTransportService {
     const { auth, http } = this.#collaborators;
     const live = await auth.credentialIsLive(input.caller);
     if (live === "unavailable") {
-      http.sendUnavailable(input.res);
+      await http.sendHandled(input.res, new McpStoreUnavailableError());
       return;
     }
     if (!live) {
-      auth.refuseBearer(input.req, input.res, input.caller.apiKey);
+      await auth.refuseBearer(input.req, input.res, input.caller.apiKey);
       return;
     }
-    this.#sendSessionNotFound(input.res);
+    await this.#sendSessionNotFound(input.res);
   }
 
-  #sendSessionNotFound(res: ServerResponse): void {
+  async #sendSessionNotFound(res: ServerResponse): Promise<void> {
     this.#collaborators.http.noteLogFields(res, { sessionOutcome: "missing" });
-    this.#collaborators.http.sendJson(res, 404, { error: "Session not found" });
+    await this.#collaborators.http.sendHandled(res, new McpSessionNotFoundError());
   }
 }

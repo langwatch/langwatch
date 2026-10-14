@@ -115,8 +115,15 @@ async function post(input: {
     },
     body: JSON.stringify(input.body),
   });
-  await response.text();
-  return response;
+  // Read in full so the stream closes; the copy keeps the body for a refusal's code.
+  const text = await response.text();
+  return new Response(text, { status: response.status, headers: response.headers });
+}
+
+/** The stable code a refusal's canonical envelope carries. */
+async function codeOf(response: Response): Promise<unknown> {
+  const body: unknown = await response.json();
+  return typeof body === "object" && body !== null && "code" in body ? body.code : undefined;
 }
 
 async function openSession(url: string, token: string): Promise<string> {
@@ -201,6 +208,7 @@ describe("Feature: an MCP session outlives the replica that opened it", () => {
 
       expect(ended.status).toBe(200);
       expect(after.status).toBe(404);
+      expect(await codeOf(after)).toBe("mcp_session_not_found");
     });
   });
 });
@@ -216,6 +224,7 @@ describe("Feature: a lost session is not a sign-in failure", () => {
 
       expect(response.status).toBe(404);
       expect(response.headers.get("www-authenticate")).toBeNull();
+      expect(await codeOf(response)).toBe("mcp_session_not_found");
     });
 
     it("serves a fresh initialize sent under the lost id", async () => {
@@ -240,6 +249,7 @@ describe("Feature: a lost session is not a sign-in failure", () => {
 
       expect(response.status).toBe(401);
       expect(response.headers.get("www-authenticate")).toContain("resource_metadata");
+      expect(await codeOf(response)).toBe("mcp_invalid_token");
     });
   });
 
@@ -255,6 +265,7 @@ describe("Feature: a lost session is not a sign-in failure", () => {
 
       expect(response.status).toBe(503);
       expect(response.headers.get("retry-after")).toBe("5");
+      expect(await codeOf(response)).toBe("mcp_store_unavailable");
     });
 
     it("answers 503 to a project key that cannot be looked up", async () => {
@@ -265,6 +276,8 @@ describe("Feature: a lost session is not a sign-in failure", () => {
       const response = await post({ url, token: PROJECT_KEY, body: initialize });
 
       expect(response.status).toBe(503);
+      expect(response.headers.get("retry-after")).toBe("5");
+      expect(await codeOf(response)).toBe("mcp_store_unavailable");
     });
   });
 });

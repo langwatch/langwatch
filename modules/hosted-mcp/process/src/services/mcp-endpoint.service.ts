@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { registerRoutePolicy } from "@langwatch/api";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import { McpMethodNotAllowedError, McpRouteNotFoundError } from "@langwatch/hosted-mcp-contract";
 import { initConfig, tryGetConfig } from "@langwatch/mcp-server/config";
 import { classifyClient, createLogger, endpointClassOf } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -145,9 +146,9 @@ export class McpEndpointService implements McpHandler {
       return;
     }
 
-    this.#dispatch({ req, res, pathname, method }).catch((err: unknown) => {
+    this.#dispatch({ req, res, pathname, method }).catch(async (err: unknown) => {
       logger.error({ error: err, url: req.url }, "MCP handler error");
-      if (!res.headersSent) this.#http.sendJson(res, 500, { error: "Internal server error" });
+      if (!res.headersSent) await this.#http.sendHandled(res, err);
     });
   };
 
@@ -176,16 +177,16 @@ export class McpEndpointService implements McpHandler {
   }): Promise<void> {
     const { req, res, pathname, method } = input;
     // RFC 9728 path-suffixed discovery, tried before the bare form by every current MCP client.
-    if (this.#serveMetadataSubtree({ res, pathname, method })) return;
+    if (await this.#serveMetadataSubtree({ res, pathname, method })) return;
 
     const verbs = this.#routes.get(pathname);
     if (!verbs) {
-      this.#http.sendJson(res, 404, { error: "Not found" });
+      await this.#http.sendHandled(res, new McpRouteNotFoundError());
       return;
     }
     const handle = "anyMethod" in verbs ? verbs.anyMethod : verbs.byMethod.get(method);
     if (!handle) {
-      this.#http.sendMethodNotAllowed(res);
+      await this.#http.sendHandled(res, new McpMethodNotAllowedError());
       return;
     }
     await handle(req, res);
@@ -231,13 +232,17 @@ export class McpEndpointService implements McpHandler {
   }
 
   /** Whether the request belonged to a path-suffixed discovery subtree and has been answered. */
-  #serveMetadataSubtree(input: { res: ServerResponse; pathname: string; method: string }): boolean {
+  async #serveMetadataSubtree(input: {
+    res: ServerResponse;
+    pathname: string;
+    method: string;
+  }): Promise<boolean> {
     const path = classifyMetadataSubtreePath(input.pathname);
     if (path.kind === "outside") return false;
     if (input.method !== "GET") {
-      this.#http.sendMethodNotAllowed(input.res);
+      await this.#http.sendHandled(input.res, new McpMethodNotAllowedError());
     } else if (path.kind === "unpublished") {
-      this.#oauth.handleUnpublishedMetadata(input.res);
+      await this.#oauth.handleUnpublishedMetadata(input.res);
     } else if (path.kind === "protected-resource") {
       this.#oauth.handleProtectedResourceMetadata(input.res, path.resourceSuffix);
     } else {
