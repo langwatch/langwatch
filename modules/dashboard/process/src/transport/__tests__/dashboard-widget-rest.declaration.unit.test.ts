@@ -80,5 +80,18 @@ describe("given the dashboard widget REST family", () => {
 
       expect(create?.input?.validate({ name: "widget", code: "x", queries: [] })).toBe(true);
     });
+
+    /** @scenario "The widget PATCH accepts any one field and keeps the rest" */
+    it("accepts a PATCH naming any one field and refuses one naming none", () => {
+      const patch = declaration.routes.find(
+        (route) =>
+          route.operation === "patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId",
+      );
+
+      expect(patch?.input?.validate({ code: "x" })).toBe(true);
+      expect(patch?.input?.validate({ description: "Errors per day" })).toBe(true);
+      expect(patch?.input?.validate({ source: { kind: "code" } })).toBe(true);
+      expect(patch?.input?.validate({})).toBe(false);
+    });
   });
 });

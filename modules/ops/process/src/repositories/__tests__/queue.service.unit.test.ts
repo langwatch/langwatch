@@ -824,7 +824,7 @@ describe("QueueService", () => {
     });
   });
 
-  describe("unblockAll() given the queue name as the Ops UI shows it", () => {
+  describe("when unblockAll() is given the queue name as the Ops UI shows it", () => {
     it("unblocks the braced registered queue", async () => {
       const repo = createMockRepo({
         discoverQueueNames: vi.fn().mockResolvedValue(["{event-sourcing/jobs}"]),

@@ -1,9 +1,18 @@
 import type { CustomGraph, CustomGraphNameRef } from "@langwatch/automation-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { CustomGraphRepository } from "../custom-graph.repository.ts";
 
 const BUILDER_CHART_KIND = "builder";
+
+/**
+ * Automation runs with no member identity, so a graph placed on an Only me board is not there
+ * for it: the answer a project credential gets (dashboards-v2.feature AC171). A teammate could
+ * otherwise attach a report or an alert to such a graph and be sent its title and its chart.
+ */
+export const GRAPH_AUTOMATION_REACHES = {
+  OR: [{ dashboardId: null }, { dashboard: { scope: { not: "PRIVATE" } } }],
+} satisfies Prisma.CustomGraphWhereInput;
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -26,6 +35,7 @@ export class PrismaCustomGraphRepository extends CustomGraphRepository {
         id: input.customGraphId,
         projectId: input.projectId,
         kind: BUILDER_CHART_KIND,
+        ...GRAPH_AUTOMATION_REACHES,
       },
     })) as CustomGraph | null;
   }
@@ -36,6 +46,7 @@ export class PrismaCustomGraphRepository extends CustomGraphRepository {
         id: input.customGraphId,
         projectId: input.projectId,
         kind: BUILDER_CHART_KIND,
+        ...GRAPH_AUTOMATION_REACHES,
       },
       select: { id: true },
     });
@@ -51,6 +62,7 @@ export class PrismaCustomGraphRepository extends CustomGraphRepository {
         dashboardId: input.dashboardId,
         projectId: input.projectId,
         kind: BUILDER_CHART_KIND,
+        ...GRAPH_AUTOMATION_REACHES,
       },
       orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
     })) as CustomGraph[];
@@ -65,6 +77,7 @@ export class PrismaCustomGraphRepository extends CustomGraphRepository {
         id: { in: input.customGraphIds },
         projectId: input.projectId,
         kind: BUILDER_CHART_KIND,
+        ...GRAPH_AUTOMATION_REACHES,
       },
       select: { id: true, name: true },
     })) as CustomGraphNameRef[];

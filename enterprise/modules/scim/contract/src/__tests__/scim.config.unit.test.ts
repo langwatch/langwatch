@@ -20,4 +20,23 @@ describe("scim server configuration", () => {
       expect(read({ SCIM_V2_GRANTS: "true" }).provenOffboarding).toBe(true);
     });
   });
+
+  describe("given the switch spelled the way the previous release read it", () => {
+    /** @scenario "A switch the previous release spelled on and off reads the same way" */
+    it("reads on as the proven path and off as the previous write path", () => {
+      expect(read({ SCIM_V2_GRANTS: "on" }).provenOffboarding).toBe(true);
+      expect(read({ SCIM_V2_GRANTS: "off" }).provenOffboarding).toBe(false);
+      expect(read({ SCIM_V2_GRANTS: "false" }).provenOffboarding).toBe(false);
+    });
+  });
+
+  describe("given the switch written outside on, off and the boolean spellings", () => {
+    /** @scenario "A switch the previous release compared to one word reads any other value as it did" */
+    it("keeps the boolean spellings and reads any other value as the previous write path", () => {
+      expect(read({ SCIM_V2_GRANTS: "1" }).provenOffboarding).toBe(true);
+      expect(read({ SCIM_V2_GRANTS: "0" }).provenOffboarding).toBe(false);
+      expect(read({ SCIM_V2_GRANTS: "yes" }).provenOffboarding).toBe(false);
+      expect(read({ SCIM_V2_GRANTS: "ON" }).provenOffboarding).toBe(false);
+    });
+  });
 });

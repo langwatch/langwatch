@@ -132,11 +132,17 @@ export class ProjectsApiService {
     if (options?.page) params.set("page", String(options.page));
     if (options?.limit) params.set("limit", String(options.limit));
     const qs = params.toString();
-    return this.request<PaginatedProjects>("list projects", `/api/v1/projects${qs ? `?${qs}` : ""}`);
+    return this.request<PaginatedProjects>(
+      "list projects",
+      `/api/v1/projects${qs ? `?${qs}` : ""}`,
+    );
   }
 
   async get(id: string): Promise<Project> {
-    return this.request<Project>(`get project "${id}"`, `/api/v1/projects/${encodeURIComponent(id)}`);
+    return this.request<Project>(
+      `get project "${id}"`,
+      `/api/v1/projects/${encodeURIComponent(id)}`,
+    );
   }
 
   /**

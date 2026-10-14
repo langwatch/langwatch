@@ -5,7 +5,11 @@
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
-import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import {
+  installTestColourVariables,
+  renderWithDesignSystem,
+  type TestColourVariables,
+} from "@langwatch/design-system/testing";
 import { cleanup } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -217,11 +221,19 @@ function expectedOutcome(entry: CorpusEntry): CorpusOutcome {
     : `${entry.name} refused=true status=idle`;
 }
 
+// The themed chart reads the colour variables on its first render, so they are
+// declared before each test mounts it (as the evaluator suites do).
+let colours: TestColourVariables | undefined;
+
 beforeEach(async () => {
   await page.viewport(1024, 768);
+  colours = installTestColourVariables();
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  colours?.dispose();
+});
 
 describe("the LangWatchQL chart surface with the browser's network recorded", () => {
   describe("given the whole specification corpus", () => {

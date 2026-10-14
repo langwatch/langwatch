@@ -33,21 +33,16 @@ export const reads = {
     "modules/topic/process/src/**/*",
   ],
   "@langwatch/stored-object-process": [
-    "modules/**/*",
-    "enterprise/modules/**/*",
+    "modules/stored-object/**/*",
+    "modules/scenario/process/src/transport/scenario-event.rest.ts",
+    "modules/scenario/process/src/services/scenario-event.service.ts",
     "apps/*/package.json",
-    "apps/tasks/**/*",
-    "apps/worker/**/*",
     "charts/langwatch/**/*",
     "docs/self-hosting/**/*",
     "packages/clickhouse-migrations/migrations/00023_create_stored_objects.sql",
     ".env.example",
   ],
-  "@langwatch/authz-process": ["modules/**/*", "enterprise/modules/**/*"],
   "@langwatch/workflow-process": [
-    "modules/*/{process,contract}/**/*",
-    "enterprise/modules/*/{process,contract}/**/*",
-    "apps/{api,worker,tasks}/**/*",
     "sdks/go/**/*",
     "services/nlpgo/**/*",
     "pkg/**/*",
@@ -59,11 +54,12 @@ export const reads = {
   "@langwatch/internal-slack": ["modules/automation/**/*", ".oxlintrc.native.jsonc"],
   "@langwatch/identity-process": ["modules/auth/**/*"],
   "@langwatch/clickhouse-client": ["packages/clickhouse-migrations/**/*"],
-  "@langwatch/upgrade": ["packages/clickhouse-migrations/**/*"],
+  "@langwatch/upgrade": ["packages/clickhouse-migrations/**/*", "apps/tasks/**/*"],
   "@langwatch/evaluator-contract": [
     "skills/**/*",
     "feature-map.json",
     "services/langyagent/internal/assets/AGENTS.md",
+    "pnpm-workspace.yaml",
   ],
   "@langwatch/skills": ["services/langyagent/**/*", "docs/**/*", "feature-map.json"],
   langwatch: [
@@ -84,30 +80,24 @@ export const reads = {
   "@langwatch/webhook-process": ["specs/webhooks/**/*"],
   "@langwatch/egress": ["pkg/ssrf/testdata/**/*", "go.work"],
   "@langwatch/langy-browser": ["services/langyagent/**/*", "infra/docker/Dockerfile.langyagent"],
-  "@langwatch/langy-contract": ["services/langyagent/**/*"],
+  "@langwatch/langy-contract": ["services/langyagent/**/*", "pnpm-workspace.yaml"],
+  "@langwatch/insight-process": [
+    "services/langyagent/internal/assets/skills/daily-insights/SKILL.md",
+    "pnpm-workspace.yaml",
+  ],
   "@langwatch/enterprise-billing-process": ["docs/pricing/**/*", "docs/pricing.mdx"],
   "@langwatch/trace-process": [
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts",
     "modules/scenario/process/src/repositories/clickhouse/simulation-clickhouse.repository.ts",
     "modules/experiment/process/src/repositories/clickhouse/clickhouse.experiment-run.repository.ts",
+    "pnpm-workspace.yaml",
   ],
   "@langwatch/annotation-process": [
     "modules/annotation/browser/src/behavior/annotation-api.ts",
     "modules/annotation/browser/src/behavior/annotation-scores-api.ts",
     "modules/catalogue.json",
   ],
-  "@langwatch/design-system": [
-    "apps/ui/src/**/*",
-    "packages/**/*",
-    "modules/**/*",
-    "enterprise/modules/**/*",
-  ],
-  "@langwatch/entitlement-process": [
-    "modules/**/*",
-    "enterprise/modules/**/*",
-    "docs/pricing.mdx",
-    "docs/pricing/billable-events.mdx",
-  ],
+  "@langwatch/entitlement-process": ["docs/pricing.mdx", "docs/pricing/billable-events.mdx"],
   "@langwatch/group-queue": ["apps/*/package.json"],
   "@langwatch/process": ["charts/langwatch/**/*"],
   "@langwatch/automation-contract": ["modules/automation/**/*"],
@@ -120,6 +110,10 @@ export const reads = {
     "apps/ui/src/shell/route-patterns.generated.json",
   ],
   "@langwatch/onboarding-browser": ["apps/ui/src/shell/route-patterns.generated.json"],
+  "@langwatch/analytics-browser": [
+    "apps/ui/public/images/dashboards/templates/**/*",
+    "pnpm-workspace.yaml",
+  ],
   "@langwatch/webhook-verify": ["specs/webhooks/signature-vectors.json"],
   "@langwatch/oxlint-rules": [
     ".oxlintrc.jsonc",
@@ -177,6 +171,7 @@ export const reads = {
     "pyproject.toml",
     "uv.lock",
     "tsconfig*.json",
+    "pnpm-workspace.yaml",
   ],
   // The pack tests read each workspace member's manifest and tsconfigs.
   "@langwatch/server": [
@@ -198,9 +193,16 @@ export const reads = {
     "dev/tsconfig*.json",
     "package.json",
     "tsconfig*.json",
+    ".github/workflows/**/*",
+    "nx.json",
+    "pnpm-workspace.yaml",
+    "tools/seedgen/runner/package.json",
   ],
   "@langwatch/user-browser": ["docs/coding-agents/explore-your-usage-with-your-own-agent.mdx"],
   "@langwatch/gateway-contract": [".env.example"],
+  "@langwatch/analytics-contract": ["dev/scripts/build-charts-lib.mjs"],
+  "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/image/code-steps.json"],
+  "@langwatch/seedgen-runner": ["tools/seedgen/**/*"],
 };
 
 const members = memberPatterns(new URL("../..", import.meta.url).pathname);

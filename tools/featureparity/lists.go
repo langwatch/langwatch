@@ -243,7 +243,6 @@ var (
 		"specs/langy/langy-context-awareness.feature",
 		"specs/langy/langy-empty-state-suggestions.feature",
 		"specs/langy/langy-panel-fold-motion.feature",
-		"specs/langy/langy-peek-dock.feature",
 		"specs/langy/langy-selfhost-install.feature",
 		"specs/langy/langy-session-key-lifecycle.feature",
 		"specs/langy/langy-shutdown-handoff.feature",
@@ -388,6 +387,7 @@ var (
 		"specs/workflows/studio-usage-limits.feature",
 	}
 	legacyPartial = []string{
+		"specs/langy/langy-peek-dock.feature",
 		"specs/traces-v2/grouping-engine.feature",
 		"specs/traces-v2/metrics.feature",
 		"specs/features/analytics-cli.feature",

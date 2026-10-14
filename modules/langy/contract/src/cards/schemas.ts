@@ -169,6 +169,49 @@ export const choicesCardFields = {
   bare: z.boolean().optional(),
 } as const;
 
+/** Langy's verdict on a finding: it got worse, it is worth a look, or it got better. */
+export const INSIGHTS_CARD_TONES = ["bad", "watch", "good"] as const;
+
+/** A card lists more findings than a run files, never an unbounded list. */
+export const INSIGHTS_CARD_MAX_FINDINGS = 50;
+
+/**
+ * One finding: a headline, a few paragraphs and a verdict, with the widget and the stored
+ * query it came from. `key` names what was found; `renews` names the insight it repeats.
+ */
+export const insightsCardFindingFields = {
+  title: z.string().trim().min(1).max(200),
+  body: z.string().trim().min(1).max(20_000),
+  tone: z.enum(INSIGHTS_CARD_TONES),
+  topic: z.string().trim().min(1).max(40).optional(),
+  validDays: z.number().int().min(1).max(90).optional(),
+  widgetId: z.string().min(1).max(200).optional(),
+  widgetName: z.string().trim().min(1).max(200).optional(),
+  lwql: z.string().trim().min(1).max(20_000).optional(),
+  key: z.string().trim().min(1).max(200).optional(),
+  renews: z.string().min(1).max(200).optional(),
+} as const;
+
+/**
+ * `insights` — what Langy found on one board over one fixed window. The board and the window
+ * are pointers a reader may keep with a finding; an empty list says nothing is worth reporting.
+ */
+export const insightsCardFields = {
+  title: z.string().optional(),
+  board: z
+    .strictObject({ id: z.string().min(1).max(200), name: z.string().trim().min(1).max(200) })
+    .optional(),
+  /** Epoch milliseconds, half-open `[start, end)`, and the step the queries were read with. */
+  window: z
+    .strictObject({
+      start: z.number().int().nonnegative(),
+      end: z.number().int().positive(),
+      granularitySeconds: z.number().int().positive(),
+    })
+    .optional(),
+  findings: z.array(z.strictObject(insightsCardFindingFields)).max(INSIGHTS_CARD_MAX_FINDINGS),
+} as const;
+
 /**
  * Plotted timeseries: named series over time with optional comparison. Not
  * derived from payload shape—the command that knows the question shapes this
@@ -397,6 +440,7 @@ export const CARD_KINDS = [
   "resourceRemoved",
   "table",
   "stats",
+  "insights",
   "choices",
 ] as const;
 
@@ -431,13 +475,16 @@ export const CARD_SHAPE = {
   timeseries: "presentation",
   table: "presentation",
   stats: "presentation",
+  // Findings are Langy's own words about what it read: the card draws them and asserts no
+  // record, so a model may write one. Whoever files a finding checks it first.
+  insights: "presentation",
   choices: "presentation",
 } as const satisfies Record<CardKind, CardShape>;
 
 /**
  * The kinds a MEASURED result can be stamped with — the cards a CLI command
- * produces. `table`, `stats` and `choices` are absent because no command emits
- * one; they reach the panel through the derived channel only.
+ * produces. `table`, `stats`, `insights` and `choices` are absent because no command
+ * emits one; they reach the panel through the derived channel only.
  */
 export const MEASURED_CARD_KINDS = [
   "traces",

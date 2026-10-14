@@ -123,9 +123,15 @@ const sliceInput = (
   Object.fromEntries(
     Object.entries(slice).map(([key, node]) => [
       key,
-      node instanceof ConfigLeaf ? environment[node.env] : sliceInput(node, environment),
+      node instanceof ConfigLeaf
+        ? leafInput(node, environment[node.env])
+        : sliceInput(node, environment),
     ]),
   );
+
+/** A blank value on an optional leaf means unset, so a templated `KEY=` line boots as before. */
+const leafInput = (leaf: ConfigLeaf, value: string | undefined): string | undefined =>
+  value === "" && leaf.schema.validate(undefined) ? undefined : value;
 
 function refuseCrossClaims(
   owners: readonly ConfigOwner[],

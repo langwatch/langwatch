@@ -649,10 +649,10 @@ translateLegacyFilters(input: { filters: Readonly<Record<string, unknown>>; wind
 
 #### `compileExplorerTraceFilter`
 
-The Explorer's own filter: the query compiled, hidden origins left out unless the query (or `originNamed`) names one; `dateField` refuses a span/event clause on the `updated` axis.
+The Explorer's own filter: the query compiled, hidden origins left out unless the query (or `originNamed`) names one or the project is personal; `dateField` refuses a span/event clause on the `updated` axis.
 
 ```typescript
-compileExplorerTraceFilter(input: { query: string; tenantId: string; timeRange: { from: number; to: number }; evalRuns?: readonly ResolvedInstantEvalRun[]; originNamed?: boolean; dateField?: TraceDateField; protections?: Protections; }): { sql: string; params: Record<string, unknown> };
+compileExplorerTraceFilter(input: { query: string; tenantId: string; timeRange: { from: number; to: number }; evalRuns?: readonly ResolvedInstantEvalRun[]; originNamed?: boolean; dateField?: TraceDateField; protections?: Protections; }): Promise<{ sql: string; params: Record<string, unknown> }>;
 ```
 
 #### `compileLangWatchQLTraceFilter`

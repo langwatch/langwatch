@@ -167,15 +167,15 @@ Use this when the user wants rewritten code.
 | `<img>`                  | `Image` (preserve `alt`)                    |
 | `<input>`, `<select>`    | `Input`, `NativeSelect` inside `Field.Root` |
 
-| CSS                      | Chakra style prop             |
-| ------------------------ | ----------------------------- |
-| `display: flex`          | `Flex` or `display="flex"`    |
-| `flex-direction: column` | `Stack` or `flexDir="column"` |
-| `gap: 16px`              | `gap={4}` (1 unit = 4px)      |
-| `padding: 16px 24px`     | `py={4} px={6}`               |
+| CSS                      | Chakra style prop                                                            |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| `display: flex`          | `Flex` or `display="flex"`                                                   |
+| `flex-direction: column` | `Stack` or `flexDir="column"`                                                |
+| `gap: 16px`              | `gap={4}` (1 unit = 4px)                                                     |
+| `padding: 16px 24px`     | `py={4} px={6}`                                                              |
 | `border-radius: 8px`     | the matching radius token in the active system (md is 0.375rem), not a guess |
-| `color: #6b7280`         | `color="fg.muted"`            |
-| `background: #f9fafb`    | `bg="bg.subtle"`              |
+| `color: #6b7280`         | `color="fg.muted"`                                                           |
+| `background: #f9fafb`    | `bg="bg.subtle"`                                                             |
 
 **From Tailwind CSS**
 

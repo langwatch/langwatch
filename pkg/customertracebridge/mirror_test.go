@@ -89,6 +89,17 @@ func attrValue(a *commonpb.KeyValue) string {
 // given mirror config, and flushes.
 func emitOne(t *testing.T, mirror MirrorConfig, params aitrace.Params) *capturingIngest {
 	t.Helper()
+	return emitOneIn(t, mirror, params, func(ctx context.Context) context.Context { return ctx })
+}
+
+// emitOneIn is emitOne with the request context shaped as a gateway middleware would.
+func emitOneIn(
+	t *testing.T,
+	mirror MirrorConfig,
+	params aitrace.Params,
+	shape func(context.Context) context.Context,
+) *capturingIngest {
+	t.Helper()
 	ingest := startCapturingIngest(t)
 
 	registry := NewRegistry()
@@ -116,7 +127,7 @@ func emitOne(t *testing.T, mirror MirrorConfig, params aitrace.Params) *capturin
 	// as an unjoinable duplicate instead of exporting it (the Langy drop
 	// guard), which is its own test, not this fixture's subject.
 	ctx = WithTraceParent(ctx, "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
-	spanCtx, _ := e.BeginSpan(ctx, "proj-customer", aitrace.RequestTypeChat)
+	spanCtx, _ := e.BeginSpan(shape(ctx), "proj-customer", aitrace.RequestTypeChat)
 	e.EndSpan(spanCtx, params)
 	require.NoError(t, e.tp.ForceFlush(context.Background()))
 	return ingest

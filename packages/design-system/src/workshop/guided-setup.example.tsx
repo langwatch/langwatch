@@ -22,6 +22,7 @@ import { ResourceRow } from "@langwatch/design-system/resource-row";
 import { SettingsField, SettingsFieldGroup } from "@langwatch/design-system/settings-field";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { useProductAccent } from "@langwatch/design-system/use-product-accent";
+import { Temporal } from "@langwatch/time";
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 
 const STEPS = [
@@ -996,7 +997,7 @@ const FIRE_ROWS: [string, number, string][] = [
 
 export const FIRES: Fire[] = FIRE_ROWS.map(([firedAt, seconds, traceId], index) => ({
   id: `fire-${index + 1}`,
-  firedAt: Date.parse(firedAt),
+  firedAt: Temporal.Instant.from(firedAt).epochMilliseconds,
   seconds,
   traceId,
 }));
