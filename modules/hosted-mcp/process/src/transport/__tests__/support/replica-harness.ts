@@ -2,7 +2,6 @@
  * Two hosted MCP replicas sharing one Redis, for the cross-replica suites, kept
  * apart from the scenarios so those read as behaviour rather than as plumbing.
  */
-import { createHash } from "node:crypto";
 import { createServer, type Server, type IncomingMessage } from "node:http";
 
 import { type Cluster, Redis } from "ioredis";
@@ -10,6 +9,7 @@ import { type Cluster, Redis } from "ioredis";
 import { HostedMcpModule } from "../../../app/hosted-mcp.app.ts";
 import { LiveHostedMcpRepositories } from "../../../repositories/live/live.hosted-mcp.repositories.ts";
 import type { McpSessionCipher } from "../../../repositories/mcp-session.repository.ts";
+import { RedisMcpSessionRepository } from "../../../repositories/redis/redis.mcp-session.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../../services/authz-mcp-session-grant.service.ts";
 import type { HeaderMcpClientAddressService } from "../../../services/header-mcp-client-address.service.ts";
 import type { McpHandler } from "../../../services/mcp-endpoint.service.ts";
@@ -20,7 +20,6 @@ import type {
 import { FakeCliSessions } from "./fake-cli-sessions.ts";
 
 export const SESSION_PREFIX = "mcp:session:";
-export const SESSION_SET_PREFIX = "mcp:sessions_by_key:";
 
 /**
  * The Redis these suites talk to. Opened by the suite, so the suite closes it.
@@ -72,18 +71,8 @@ class HarnessClientAddress implements Pick<HeaderMcpClientAddressService, "clien
 }
 
 /**
- * Names the Redis set that holds one project's session ids.
- * The digest namespaces a bucket of session ids rather than protecting the
- * key, and the production side derives it the same way.
- */
-function sessionSetKey({ setPrefix, apiKey }: { setPrefix: string; apiKey: string }): string {
-  const digest = createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
-  return `${setPrefix}${digest}`;
-}
-
-/**
- * Drops every session record a key owns. Records outlive
- * the process that wrote them, so a suite that leaves them behind spends the
+ * Ends every session a key recorded, through the repository so the key layout stays production's.
+ * Records outlive the process that wrote them, so a suite that leaves them behind spends the
  * project's concurrent-session budget on its own debris.
  */
 export async function clearRecordedSessions({
@@ -93,11 +82,14 @@ export async function clearRecordedSessions({
   redis: Redis | Cluster;
   apiKey: string;
 }): Promise<void> {
-  const setKey = sessionSetKey({ setPrefix: SESSION_SET_PREFIX, apiKey });
-  for (const id of await redis.smembers(setKey)) {
-    await redis.del(`${SESSION_PREFIX}${id}`);
+  const records = RedisMcpSessionRepository.create({ redis, cipher: new HarnessCipher() });
+  for (const recordKey of await redis.keys(`${SESSION_PREFIX}*`)) {
+    const sessionId = recordKey.slice(SESSION_PREFIX.length);
+    const record = await records.getRecord({ sessionId }).catch(() => undefined);
+    if (record?.kind === "found" && record.apiKey === apiKey) {
+      await records.remove({ sessionId, apiKey });
+    }
   }
-  await redis.del(setKey);
 }
 
 export interface ReplicaPair {
@@ -161,7 +153,10 @@ export async function startReplicaPair({
     async stop() {
       for (const handler of handlers) await handler.closeAllSessions();
       for (const server of servers) {
-        await new Promise<void>((resolve) => server.close(() => resolve()));
+        const closing = new Promise<void>((resolve) => server.close(() => resolve()));
+        // An open GET stream is an active request, which close() alone would wait out.
+        server.closeAllConnections();
+        await closing;
       }
       for (const apiKey of apiKeys) {
         await clearRecordedSessions({ redis, apiKey });
