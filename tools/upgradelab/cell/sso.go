@@ -108,8 +108,10 @@ func (cell *run) startIdentityProvider(ctx context.Context) error {
 	if cell.profile.LegacySSO {
 		tenants = samlTenant
 	}
-	if err := cell.startIdentityProxy(); err != nil {
-		return fmt.Errorf("TLS proxy: %w", err)
+	if cell.profile.LegacySSO {
+		if err := cell.startIdentityProxy(); err != nil {
+			return fmt.Errorf("TLS proxy: %w", err)
+		}
 	}
 	proc, err := Start(ProcSpec{Name: "idpsim", Dir: cell.options.RunDir, Log: cell.logPath("idpsim"), Args: []string{binary, "idpsim"},
 		Env: Env(map[string]string{"PATH": os.Getenv("PATH"), "HOME": os.Getenv("HOME"), "SERVER_ADDR": "127.0.0.1:" + itoa(cell.stores.IDP),

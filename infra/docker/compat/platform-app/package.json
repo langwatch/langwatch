@@ -11,7 +11,7 @@
     "prisma:migrate": "echo 'langwatch: \"/app/platform/app pnpm run prisma:migrate\" is deprecated; use cd /app/apps/tasks && pnpm --silent task upgrade' >&2; cd /app/apps/tasks && exec pnpm --silent task upgrade",
     "clickhouse:migrate": "echo 'langwatch: \"/app/platform/app pnpm run clickhouse:migrate\" is deprecated; use cd /app/apps/tasks && pnpm --silent task upgrade' >&2; cd /app/apps/tasks && exec pnpm --silent task upgrade",
     "lwql:provision": "echo 'langwatch: \"/app/platform/app pnpm run lwql:provision\" is deprecated; use cd /app/apps/tasks && pnpm --silent task lwql-provision' >&2; cd /app/apps/tasks && exec pnpm --silent task lwql-provision",
-    "task": "echo 'langwatch: \"/app/platform/app pnpm run task <name>\" is deprecated; use cd /app/apps/tasks && pnpm --silent task <name>' >&2; cd /app/apps/tasks && exec pnpm --silent task \"$@\"",
+    "task": "echo 'langwatch: \"/app/platform/app pnpm run task <name>\" is deprecated; use cd /app/apps/tasks && pnpm --silent task <name>' >&2; cd /app/apps/tasks && exec pnpm --silent task",
     "prisma:seed": "echo 'langwatch: \"/app/platform/app pnpm prisma:seed\" is deprecated and has no equivalent in this image: the seed is a development tool and is not shipped' >&2; exit 1",
     "task:backfill-datasets-s3": "echo 'langwatch: \"/app/platform/app pnpm run task:backfill-datasets-s3\" is deprecated and has no equivalent in this image: the backfill ran in the upgrade and no longer exists as a task' >&2; exit 1",
     "task:migrate-object-storage": "echo 'langwatch: \"/app/platform/app pnpm run task:migrate-object-storage\" is deprecated and has no equivalent in this image: the storage move runs as an upgrade step' >&2; exit 1"

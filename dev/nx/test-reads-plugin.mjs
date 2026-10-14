@@ -190,6 +190,7 @@ export const reads = {
     "dev/dogfood/acme-support/typescript/package.json",
     "dev/scripts/**/*",
     "dev/tests/*/package.json",
+    "infra/docker/compat/platform-app/package.json",
     "dev/tsconfig*.json",
     "package.json",
     "tsconfig*.json",

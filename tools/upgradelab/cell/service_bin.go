@@ -2,7 +2,9 @@ package cell
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +19,8 @@ func (cell *run) ensureServiceBinary(ctx context.Context, path string) error {
 	}
 	if _, err := os.Stat(path); err == nil {
 		return nil
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
 	}
 	cwd, _ := os.Getwd()
 	for _, root := range []string{cell.options.HeadDir, filepath.Join(cwd, "..", ".."), cwd} {

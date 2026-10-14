@@ -17,10 +17,12 @@ describe("image compatibility start paths", () => {
     "prisma:migrate": "cd /app/apps/tasks && exec pnpm --silent task upgrade",
     "clickhouse:migrate": "cd /app/apps/tasks && exec pnpm --silent task upgrade",
     "lwql:provision": "cd /app/apps/tasks && exec pnpm --silent task lwql-provision",
-    task: 'cd /app/apps/tasks && exec pnpm --silent task "$@"',
+    // pnpm appends the caller's arguments to this script, so they land after `task`.
+    task: "cd /app/apps/tasks && exec pnpm --silent task",
   };
 
   for (const [name, target] of Object.entries(mapped)) {
+    /** @scenario The old start paths still work with a deprecation warning */
     it(`${name} warns on stderr and runs the new command`, () => {
       expect(scripts[name]).toMatch(/^echo 'langwatch: .* is deprecated; use .*' >&2; /);
       expect(scripts[name]?.endsWith(`; ${target}`)).toBe(true);
