@@ -86,7 +86,8 @@ export function runAggregateReconcile(
 ): IntentExecutor<AggregateReconcileIntent> {
   return async ({ aggregateProjectId }) => {
     const { failed } = await reconciler.reconcile({ aggregateProjectId });
-    if (failed.length > 0) throw new AggregateReconcileIncompleteError({ aggregateProjectId, failed });
+    if (failed.length > 0)
+      throw new AggregateReconcileIncompleteError({ aggregateProjectId, failed });
   };
 }
 
