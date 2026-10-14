@@ -54,12 +54,17 @@ const UNTICKED = /^[ \t]*[-*][ \t]+\[ \]/;
 /** A fence line: its marker, then the rest. A closing fence has only spaces after it. */
 const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 
+/** An HTML comment; an unclosed one hides the rest of the body, as GitHub renders it. */
+const COMMENT = /<!--[\s\S]*?(?:-->|$)/g;
+
+const withoutComments = (text: string): string => {
+  const stripped = text.replace(COMMENT, "");
+  return stripped === text ? text : withoutComments(stripped);
+};
+
 /** The body as a reader sees it: no HTML comments, no fenced code examples. */
 const visibleLines = (body: string): string[] => {
-  const lines = body
-    .replace(/\r\n?/g, "\n")
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .split("\n");
+  const lines = withoutComments(body.replace(/\r\n?/g, "\n")).split("\n");
   const visible: string[] = [];
   let fence: string | undefined;
   for (const line of lines) {
