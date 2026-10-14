@@ -51,6 +51,12 @@ Feature: The application recovers from files a lossy link dropped while it boots
       And it does not reload by itself
 
     @unit
+    Scenario: Giving up clears the loading screen's progress note
+      Given the loading screen says "Connected. Opening LangWatch…"
+      When the page gives up and says "Could not load. Check your connection."
+      Then the loading screen no longer says it is connected
+
+    @unit
     Scenario: Without storage for the counter the page asks instead of reloading
       Given the browser refuses session storage
       When a file fails before the first page shows

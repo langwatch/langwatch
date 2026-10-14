@@ -155,7 +155,6 @@ describe("<ReportsContent/> Add chart", () => {
     [["release_dashboards", "release_lwql_workbench"], true],
     [["release_dashboards"], false],
     [["release_lwql_workbench"], false],
-    [["release_custom_chart_playground"], false],
   ])("with %j on, opens the widget drawer: %s", (on, opensDrawer) => {
     projectRef.current = { id: "proj-1", slug: "proj", kind: "application" };
     flagsOnRef.current = new Set(on);

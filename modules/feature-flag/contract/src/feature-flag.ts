@@ -280,15 +280,6 @@ export const FEATURE_FLAGS = [
       "Lets the agent drive the open page through typed UI actions (spec: specs/langy/langy-ui-actions.feature): `langwatch ui call` dispatches a manifest-validated action over the turn's live stream, the attached page claims and executes it, and the result returns to the agent in the same call. Off = the dispatch surface 404s like it was never deployed and the panel ignores `ui` stream entries; the rollback position loses live page control and nothing else. Managed only from the internal flag store (/ops/feature-flags).",
   },
   {
-    key: "release_custom_chart_playground",
-    scope: "SYSTEM",
-    defaultValue: false,
-    envOverridable: false,
-    family: "Custom Chart Playground",
-    description:
-      "Gates nothing: dashboard widgets everywhere, their REST routes and Langy's dashboard-widgets skill follow release_dashboards and release_lwql_workbench. Kept registered until it is removed. Default off. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_custom_chart_playground.",
-  },
-  {
     key: "release_dashboards",
     scope: "PRODUCT",
     defaultValue: false,

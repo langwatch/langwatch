@@ -142,26 +142,6 @@ function composerGutter({ hero, floating }: { hero: boolean; floating: boolean }
   return floating ? 3 : 3.5;
 }
 
-/** The focus an `askLangy` handoff asks for: honoured on mount or on change, then consumed once. */
-function useComposerFocusRequest({
-  hero,
-  textareaRef,
-}: {
-  hero: boolean;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-}) {
-  const composerFocusRequested = useLangyStore((s) => s.composerFocusRequested);
-  const consumeComposerFocus = useLangyStore((s) => s.consumeComposerFocus);
-  useEffect(() => {
-    if (!composerFocusRequested || hero) return;
-    const frame = requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-      consumeComposerFocus();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [composerFocusRequested, hero, consumeComposerFocus, textareaRef]);
-}
-
 /** The bottom rail: the per-send model picker and the `#` and `/` palette buttons. */
 function ComposerRail({
   hero,

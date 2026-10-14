@@ -540,7 +540,7 @@ describe("a member's board", () => {
         expect(pickerSearch()).toHaveValue("");
         const all = chip({ row: "Categories", name: "All" });
         expect(all).toHaveAttribute("aria-pressed", "true");
-        expect(all).toHaveTextContent(chipText({ name: "All", count: TOTAL }));
+        expect(all.textContent).toMatch(chipText({ name: "All", count: TOTAL }));
         expect(chip({ row: "Categories", name: "Grow" })).toBeInTheDocument();
         const types = within(screen.getByRole("group", { name: "Agent types" }));
         expect(types.getByRole("button", { name: /^Voice agent\s*\d+$/ })).toBeInTheDocument();
@@ -572,7 +572,7 @@ describe("a member's board", () => {
         const protect = PICKER_QUESTIONS.filter(({ trunk }) => trunk === "Protect");
 
         await screen.findByRole("dialog");
-        expect(chip({ row: "Categories", name: "Protect" })).toHaveTextContent(
+        expect(chip({ row: "Categories", name: "Protect" }).textContent).toMatch(
           chipText({ name: "Protect", count: protect.length }),
         );
         await user.click(chip({ row: "Categories", name: "Protect" }));
@@ -586,7 +586,7 @@ describe("a member's board", () => {
         expect(regions.every((region) => region.getAttribute("data-trunk") === "Protect")).toBe(
           true,
         );
-        expect(chip({ row: "Categories", name: "All" })).toHaveTextContent(
+        expect(chip({ row: "Categories", name: "All" }).textContent).toMatch(
           chipText({ name: "All", count: TOTAL }),
         );
 

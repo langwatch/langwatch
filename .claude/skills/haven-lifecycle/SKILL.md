@@ -50,7 +50,7 @@ worker are one process: see `dev-runtime`. The `go` lane also hosts the simulato
 deprecated alias). The Go lane rebuilds and swaps its child on a Go change
 only under `--watch` or `--hmr`, and `LANGWATCH_GO_WATCH=0` keeps it off; `haven logs <sim>` still reads
 each one. Langy stays its own lane. On the host tier its `langwatch`/`lw` run this checkout's built CLI
-(`sdks/typescript/dist/cli`, shims in `.bin/langwatch-cli`), built on `haven up` when missing.
+(the SDK's built CLI, shims in `.bin/langwatch-cli`), built on `haven up` when missing.
 
 ```bash
 haven restart api                 # restart the whole lane

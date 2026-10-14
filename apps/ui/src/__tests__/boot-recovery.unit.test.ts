@@ -115,6 +115,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   document.head.innerHTML = "";
+  document.body.innerHTML = "";
   status()?.remove();
 });
 
@@ -227,6 +228,24 @@ describe("given earlier reloads", () => {
       expect(statusText()).toContain("Could not load. Check your connection.");
       expect(status()?.querySelector("button")?.textContent).toBe("Try again");
       expect(page.saved()).toBeNull();
+    });
+  });
+
+  describe("when it gives up while the loading screen says it is connected", () => {
+    /** @scenario "Giving up clears the loading screen's progress note" */
+    it("takes the connected note off the loading screen", () => {
+      // The boot splash's note (apps/ui/vite/boot-splash.ts), as its health probe left it.
+      document.body.insertAdjacentHTML(
+        "beforeend",
+        '<p id="lw-boot-note" role="status">Connected. Opening LangWatch…</p>',
+      );
+      const page = bootPage({ saved: "6,6" });
+
+      page.chunkFailed();
+
+      expect(document.getElementById("lw-boot-note")).toBeNull();
+      expect(document.body.textContent).not.toContain("Connected");
+      expect(statusText()).toContain("Could not load. Check your connection.");
     });
   });
 

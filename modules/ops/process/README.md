@@ -2507,13 +2507,13 @@ Declared at `src/eventing/ops-storage-stats.pipeline.ts:27`.
 
 ### Pipeline `ops_system_migrations` (aggregate `system_migration_pass`)
 
-Declared at `src/eventing/ops-system-migrations.pipeline.ts:65`. Events: `systemMigrationPassRequestedEventSchema`, `tenantMigrationRolledBackEventSchema`.
+Declared at `src/eventing/ops-system-migrations.pipeline.ts:66`. Events: `systemMigrationPassRequestedEventSchema`, `tenantMigrationRolledBackEventSchema`.
 
-| Kind            | Name                              | Handles                                                                                      | Declared at                                         |
-| --------------- | --------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| command         | `requestSystemMigrationPass`      | –                                                                                            | `src/eventing/ops-system-migrations.pipeline.ts:70` |
-| command         | `recordTenantMigrationRolledBack` | –                                                                                            | `src/eventing/ops-system-migrations.pipeline.ts:71` |
-| process manager | `systemMigrationPass`             | every 1 h (`SYSTEM_MIGRATION_REDRIVE_INTERVAL_MS = 60 * 60_000`); intents `runPass` (outbox) | `src/eventing/ops-system-migrations.pipeline.ts:72` |
+| Kind            | Name                              | Handles                                                                       | Declared at                                         |
+| --------------- | --------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------- |
+| command         | `requestSystemMigrationPass`      | –                                                                             | `src/eventing/ops-system-migrations.pipeline.ts:71` |
+| command         | `recordTenantMigrationRolledBack` | –                                                                             | `src/eventing/ops-system-migrations.pipeline.ts:72` |
+| process manager | `systemMigrationPass`             | every 1 min (`SYSTEM_MIGRATION_WAKE_INTERVAL_MS`); intents `runPass` (outbox) | `src/eventing/ops-system-migrations.pipeline.ts:73` |
 
 ### Pipeline `ops_usage_report` (aggregate `global`)
 
