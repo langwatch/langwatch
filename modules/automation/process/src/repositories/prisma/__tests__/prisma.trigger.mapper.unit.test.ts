@@ -1,6 +1,7 @@
 /**
  * Rows written by the previous release hold `filters` / `actionParams` as
  * JSON-encoded strings inside the jsonb column. The mapper unwraps them.
+ * Spec: modules/automation/specs/automation.feature (trigger JSON text)
  */
 import { describe, expect, it } from "vitest";
 
@@ -39,6 +40,7 @@ const row = (overrides: Record<string, unknown>) => ({ ...baseRow, ...overrides 
 
 describe("mapTriggerRow", () => {
   describe("given filters stored as a JSON-encoded string", () => {
+    /** @scenario "A trigger whose filters or action params are stored as JSON text reads as the object" */
     it("unwraps an object string", () => {
       const trigger = mapTriggerRow(row({ filters: '{"topics":["a"]}' }));
       expect(trigger.filters).toEqual({ topics: ["a"] });
@@ -48,6 +50,7 @@ describe("mapTriggerRow", () => {
       expect(mapTriggerRow(row({ filters: "{}" })).filters).toEqual({});
     });
 
+    /** @scenario "A trigger whose filters or action params are stored as JSON text reads as the object" */
     it.each(["not json", "[1,2]", "42", "null", '"x"', ""])(
       "falls back to {} for %j without throwing",
       (filters) => {

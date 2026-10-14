@@ -40,7 +40,10 @@ export function mapTriggerRow(row: unknown): Trigger {
   const value = row as Record<string, unknown>;
   return triggerSchema.parse({
     ...value,
-    actionParams: normaliseJsonObject(value.actionParams, { column: "actionParams", triggerId: value.id }),
+    actionParams: normaliseJsonObject(value.actionParams, {
+      column: "actionParams",
+      triggerId: value.id,
+    }),
     filters: normaliseJsonObject(value.filters, { column: "filters", triggerId: value.id }),
     filterQuery: value.filterQuery ?? null,
     pausedReason: value.pausedReason ?? null,
