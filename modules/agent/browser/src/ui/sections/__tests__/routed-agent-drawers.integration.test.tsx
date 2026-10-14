@@ -4,6 +4,7 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { generateUniqueIdentifier } from "@langwatch/design-system/variable-mapping";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
@@ -129,7 +130,8 @@ vi.mock("../../../behavior/lent-setup-with-agent-button.tsx", () => ({
 
 /**
  * Prompt's lent outputs editor, reduced to its contract: typed rows retyped through onChange, and
- * an add that names the row `output_1` and gives a JSON schema output its default schema.
+ * an add that names the row as the real editor does (first free `output`, `output_1`, ...)
+ * and gives a JSON schema output its default schema.
  */
 vi.mock("../../../behavior/lent-outputs-section.tsx", () => ({
   OutputsSection: ({
@@ -182,7 +184,10 @@ vi.mock("../../../behavior/lent-outputs-section.tsx", () => ({
           onChange([
             ...outputs,
             {
-              identifier: "output_1",
+              identifier: generateUniqueIdentifier({
+                baseName: "output",
+                existingIdentifiers: outputs.map((row) => row.identifier),
+              }),
               type: event.target.value,
               ...(event.target.value === "json_schema"
                 ? { json_schema: { type: "object", properties: { result: { type: "string" } } } }
@@ -717,7 +722,7 @@ describe("the code agent editor's outputs", () => {
     const saved = calls.agentUpdated[0] as { config: typeof storedCodeAgent.config };
     expect(saved.config.outputs).toEqual([
       ...storedCodeAgent.config.outputs,
-      { identifier: "output_1", type: "json_schema", json_schema: schema },
+      { identifier: "output", type: "json_schema", json_schema: schema },
     ]);
 
     unmount();
@@ -725,7 +730,7 @@ describe("the code agent editor's outputs", () => {
     fetched.agent = { ...storedCodeAgent, config: saved.config };
     render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
 
-    expect(screen.getByLabelText("Type of output_1")).toHaveProperty("value", "json_schema");
+    expect(screen.getByLabelText("Type of output")).toHaveProperty("value", "json_schema");
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
     expect(calls.agentUpdated).toEqual([
       expect.objectContaining({
