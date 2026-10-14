@@ -242,9 +242,18 @@ DROP INDEX CONCURRENTLY IF EXISTS "<name>";
 
 Run it outside an explicit transaction, then run the build again.
 
-`pnpm task upgrade` makes the same check before it applies the migration. An
-invalid index, or one of a different shape under either name, stops the run
-with a message naming it (`packages/upgrade/src/stepping/prebuilt-indexes.ts`).
+`pnpm task upgrade` makes a similar check before it applies the migration. An
+invalid index under either name, or one on other columns, stops the run with a
+message naming it (`packages/upgrade/src/stepping/prebuilt-indexes.ts`). It
+checks only that the outbox index has a `WHERE` clause, not what the clause
+says. So a pre-built outbox index with the wrong predicate passes, and the
+sweep cannot use it. After a pre-build, confirm the predicate:
+
+```sql
+SELECT indexdef FROM pg_indexes
+WHERE indexname = 'ProcessManagerOutbox_dispatchedAt_idx';
+-- expect: ... WHERE (status = 'dispatched'::"ProcessManagerOutboxStatus")
+```
 
 To roll the indexes back, drop them the same way. The sweep keeps working
 without them; it reads the whole table again on every batch:

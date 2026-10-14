@@ -8,7 +8,7 @@ import {
   PrismaQueryGuard,
   skipTenantCheck,
 } from "@langwatch/prisma-client";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { createTestLogger } from "@langwatch/test-harness";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
@@ -22,7 +22,11 @@ import type {
   NewOutboxMessage,
   ProcessCommit,
 } from "../../../../process-manager/stores/processStore.types.ts";
-import { PrismaProcessStore } from "../prisma-process-store.ts";
+import {
+  consumedInboxSweepDelete,
+  dispatchedOutboxSweepDelete,
+  PrismaProcessStore,
+} from "../prisma-process-store.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -1455,7 +1459,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
     // transaction that rolls back.
     describe("when the planner plans each sweep delete", () => {
       const liveRows = 5_000;
-      const cutoff = "2000-01-01T00:00:00Z";
+      const before = Date.UTC(2000, 0, 1);
 
       async function planOf({
         seed,
@@ -1464,7 +1468,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
       }: {
         seed: string;
         table: string;
-        statement: string;
+        statement: Prisma.Sql;
       }): Promise<string> {
         let plan = "";
         const rollback = new Error("roll back the planner fixture");
@@ -1472,8 +1476,8 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
           .$transaction(async (tx) => {
             await tx.$executeRawUnsafe(seed);
             await tx.$executeRawUnsafe(`ANALYZE "${table}"`);
-            const rows = await tx.$queryRawUnsafe<{ "QUERY PLAN": string }[]>(
-              `EXPLAIN ${statement}`,
+            const rows = await tx.$queryRaw<{ "QUERY PLAN": string }[]>(
+              Prisma.sql`EXPLAIN ${statement}`,
             );
             plan = rows.map((row) => row["QUERY PLAN"]).join("\n");
             throw rollback;
@@ -1495,14 +1499,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
             SELECT 'planner-' || n, '${processName}', 'project-1', 'key-' || n, 'tenant-1',
               'message-' || n, 'intent', '{}', '{}', 'dispatched', now(), now(), now(), now()
             FROM generate_series(1, ${liveRows}) AS n`,
-          statement: `
-            DELETE FROM "ProcessManagerOutbox"
-            WHERE "id" IN (
-              SELECT "id" FROM "ProcessManagerOutbox"
-              WHERE "status" = 'dispatched'::"ProcessManagerOutboxStatus"
-                AND "dispatchedAt" < '${cutoff}'
-              LIMIT 5000
-            )`,
+          statement: dispatchedOutboxSweepDelete({ before, limit: 5_000 }),
         });
 
         expect(plan).toContain("ProcessManagerOutbox_dispatchedAt_idx");
@@ -1519,13 +1516,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
             SELECT 'planner-' || n, '${processName}', 'project-1', 'key-' || n, 'tenant-1',
               'event-' || n, now()
             FROM generate_series(1, ${liveRows}) AS n`,
-          statement: `
-            DELETE FROM "ProcessManagerInbox"
-            WHERE "id" IN (
-              SELECT "id" FROM "ProcessManagerInbox"
-              WHERE "consumedAt" < '${cutoff}'
-              LIMIT 5000
-            )`,
+          statement: consumedInboxSweepDelete({ before, limit: 5_000 }),
         });
 
         expect(plan).toContain("ProcessManagerInbox_consumedAt_idx");
