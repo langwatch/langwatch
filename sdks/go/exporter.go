@@ -2,11 +2,14 @@ package langwatch
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"net/url"
 	"os"
 
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/langwatch/langwatch/sdks/go/internal/otlpjson"
 )
 
 const (
@@ -16,8 +19,15 @@ const (
 	TracesPath = "/api/otel/v1/traces"
 )
 
+// ErrNilTransportExporter is returned by NewExporter when a custom
+// ExporterTransport returns neither an exporter nor an error.
+var ErrNilTransportExporter = errors.New("langwatch: ExporterTransport returned a nil exporter")
+
 // LangWatchExporter exports spans to LangWatch with optional filtering.
-// It wraps an OTLP trace exporter with auto-configuration and filter support.
+// It wraps an OTLP/HTTP trace exporter with auto-configuration and filter
+// support. By default spans are sent as gzipped OTLP/JSON by an exporter
+// built on the standard library, so the root package links neither gRPC nor
+// the generated OTLP protobuf packages; see WithTransport to swap it.
 type LangWatchExporter struct {
 	*FilteringExporter
 }
@@ -29,7 +39,18 @@ type exporterConfig struct {
 	endpoint    string
 	filters     []Filter
 	dataCapture dataCaptureConfig
+
+	httpClient         *http.Client
+	disableCompression bool
+	transport          ExporterTransport
 }
+
+// ExporterTransport builds the span exporter that carries spans to LangWatch,
+// given the traces URL (endpoint + TracesPath) and the auth and SDK headers.
+// Its result is wrapped with the filters and data-capture policy. The default
+// posts gzipped OTLP/JSON; the separate .../sdks/go/exporter/otlp module
+// provides one built on otlptracehttp (OTLP/protobuf).
+type ExporterTransport func(ctx context.Context, endpointURL string, headers map[string]string) (sdktrace.SpanExporter, error)
 
 // ExporterOption configures the LangWatchExporter.
 type ExporterOption func(*exporterConfig)
@@ -89,6 +110,31 @@ func WithFilters(filters ...Filter) ExporterOption {
 	}
 }
 
+// WithTransport replaces the transport that sends spans to LangWatch. With a
+// custom transport, WithHTTPClient and WithCompression have no effect.
+func WithTransport(transport ExporterTransport) ExporterOption {
+	return func(c *exporterConfig) {
+		c.transport = transport
+	}
+}
+
+// WithHTTPClient sets the HTTP client the default transport sends with, e.g.
+// to set a proxy, TLS configuration or a per-request timeout. If not set, a
+// client with a 10 second timeout is used.
+func WithHTTPClient(client *http.Client) ExporterOption {
+	return func(c *exporterConfig) {
+		c.httpClient = client
+	}
+}
+
+// WithCompression turns gzip compression of the default transport's request
+// bodies on or off. It is on by default.
+func WithCompression(enabled bool) ExporterOption {
+	return func(c *exporterConfig) {
+		c.disableCompression = !enabled
+	}
+}
+
 // resolveConfig applies options and environment fallbacks.
 func resolveConfig(opts ...ExporterOption) *exporterConfig {
 	cfg := &exporterConfig{
@@ -116,9 +162,10 @@ func buildHeaders(apiKey, projectID string) map[string]string {
 	return headers
 }
 
-// NewExporter creates a LangWatch exporter with auto-configuration.
-// It reads LANGWATCH_API_KEY and LANGWATCH_ENDPOINT from environment variables
-// if not provided via options.
+// NewExporter creates a LangWatch exporter, reading LANGWATCH_API_KEY,
+// LANGWATCH_PROJECT_ID and LANGWATCH_ENDPOINT when options do not set them.
+// Spans go as gzipped OTLP/JSON to endpoint + TracesPath, retried as the
+// README describes. Wrap it in sdktrace.NewBatchSpanProcessor to batch spans.
 func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporter, error) {
 	cfg := resolveConfig(opts...)
 
@@ -126,17 +173,27 @@ func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporte
 	if err != nil {
 		return nil, err
 	}
+	headers := buildHeaders(cfg.apiKey, cfg.projectID)
 
-	otlpExporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpointURL(endpointURL),
-		otlptracehttp.WithHeaders(buildHeaders(cfg.apiKey, cfg.projectID)),
-	)
-	if err != nil {
-		return nil, err
+	var transport sdktrace.SpanExporter
+	if cfg.transport != nil {
+		if transport, err = cfg.transport(ctx, endpointURL, headers); err != nil {
+			return nil, err
+		}
+		if transport == nil {
+			return nil, ErrNilTransportExporter
+		}
+	} else {
+		transport = otlpjson.New(otlpjson.Config{
+			URL:                endpointURL,
+			Headers:            headers,
+			HTTPClient:         cfg.httpClient,
+			DisableCompression: cfg.disableCompression,
+		})
 	}
 
 	return &LangWatchExporter{
-		FilteringExporter: newFilteringExporter(otlpExporter, cfg.dataCapture, cfg.filters...),
+		FilteringExporter: newFilteringExporter(transport, cfg.dataCapture, cfg.filters...),
 	}, nil
 }
 
