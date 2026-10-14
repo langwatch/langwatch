@@ -281,6 +281,10 @@ const DEAD_COPY_BACKLOG = new Set<string>([
   // `modules/dataset/process`'s own search tests but declared nowhere. The copy
   // outlives a raiser that has to come back, not one that was renamed.
   "dataset_too_large_to_search",
+  // Not dead, waiting: the upgrade gate of ADR-173 raises these once it is built;
+  // #7536 wrote their copy ahead of it.
+  "below_lts_floor",
+  "image_below_ledger_floor",
   "cache_rule_not_found",
   "contested_credentials",
   "gateway_provider_bindings_gone",

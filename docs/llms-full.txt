@@ -41599,7 +41599,7 @@ data and read-only: you cannot move, edit or add anything on it, and LangWatch
 stores no copy.
 
 To change one, open its **⋮** menu in the sidebar and pick **Duplicate to
-edit**. That makes your own board named `<name> (copy)` with the template's
+edit**. That makes your own board, named after the template plus "(copy)", with the template's
 widgets and opens it. The board's header has no such button.
 
 ## Period and grain
@@ -59686,8 +59686,10 @@ langwatch chart run <chart-id> \
 
 ## Step 4: Place it on a dashboard
 
+**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board with its id in `ref`. Never pick one from `langwatch dashboard list` on your own.
+
 ```bash
-langwatch dashboard list -f json          # find or create the target
+langwatch dashboard list -f json          # the options for that question
 langwatch chart place <chart-id> --dashboard-id <dashboard-id> -f json
 ```
 
@@ -59892,6 +59894,8 @@ langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to 
 ```
 
 `pin` reassigns the widget to that dashboard, at the dashboard's next free row — edit it from the widget's menu on that board. See `langwatch dashboard list` for ids.
+
+**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board with its id in `ref`. Never pick one from `langwatch dashboard list` on your own.
 
 `update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
