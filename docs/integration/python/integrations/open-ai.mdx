@@ -28,7 +28,7 @@ uv add langwatch openai
 ## Usage
 
 <Info>
-  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable. The OpenAI client reads its own key from `OPENAI_API_KEY`. For a self-hosted LangWatch, also set `LANGWATCH_ENDPOINT` to your instance URL.
 </Info>
 
 Use `autotrack_openai_calls()` to automatically capture all OpenAI calls made with a specific client instance within a trace.

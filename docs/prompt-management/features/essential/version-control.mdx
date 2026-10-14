@@ -115,6 +115,10 @@ curl --request GET \
 </Tab>
 </Tabs>
 
+<Tip>
+  To fetch whichever version is live in an environment rather than a fixed version ID, tag versions (for example `production` or `staging`) and fetch by tag: `langwatch.prompts.get("customer-support-bot", { tag: "production" })`. See [Tags](/prompt-management/features/essential/tags).
+</Tip>
+
 ## CRUD Operations
 
 The SDK provides CRUD operations for managing prompts programmatically:
