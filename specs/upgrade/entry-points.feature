@@ -28,6 +28,13 @@ Feature: The worker runs the upgrade from every entry point; the api never migra
     And neither names a migration task
 
   @unit
+  Scenario: The old start paths still work with a deprecation warning
+    Given the image carries a package at /app/platform/app
+    When `pnpm start`, `start:workers`, `start:prepare:db`, `lwql:provision` or `task` runs there
+    Then it warns once on stderr and runs the new api, worker or upgrade command
+    And a script with no equivalent, such as `prisma:seed`, warns and exits non-zero
+
+  @unit
   Scenario: The one preparation script runs the upgrade and nothing else
     Given the api's preparation script
     When an entry point runs it

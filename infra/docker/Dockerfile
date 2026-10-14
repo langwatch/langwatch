@@ -327,6 +327,11 @@ RUN cd modules/trace/process && node ../../../dev/scripts/download-tiktoken-enco
 
 EXPOSE 5560
 
+# The previous image started from /app/platform/app (`pnpm start`, `pnpm run start:workers`,
+# `pnpm run start:prepare:db`). Those commands still work: each warns on stderr and runs the
+# new equivalent. Outside any workspace, so pnpm needs no install there.
+COPY infra/docker/compat/platform-app/package.json /app/platform/app/package.json
+
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
 

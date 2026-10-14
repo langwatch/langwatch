@@ -1,0 +1,19 @@
+{
+  "name": "langwatch-platform-app-compat",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Keeps the start commands of the image before the architecture merge working, with a deprecation warning. Copied to /app/platform/app by infra/docker/Dockerfile.",
+  "scripts": {
+    "start": "echo 'langwatch: \"/app/platform/app pnpm start\" is deprecated; use cd /app/apps/api && pnpm --silent run start' >&2; cd /app/apps/api && exec pnpm --silent run start",
+    "start:app": "echo 'langwatch: \"/app/platform/app pnpm run start:app\" is deprecated; use cd /app/apps/api && pnpm --silent run start' >&2; cd /app/apps/api && exec pnpm --silent run start",
+    "start:workers": "echo 'langwatch: \"/app/platform/app pnpm run start:workers\" is deprecated; use cd /app/apps/worker && pnpm --silent run start' >&2; cd /app/apps/worker && exec pnpm --silent run start",
+    "start:prepare:db": "echo 'langwatch: \"/app/platform/app pnpm run start:prepare:db\" is deprecated; use cd /app/apps/tasks && pnpm --silent task upgrade' >&2; cd /app/apps/tasks && exec pnpm --silent task upgrade",
+    "prisma:migrate": "echo 'langwatch: \"/app/platform/app pnpm run prisma:migrate\" is deprecated; use cd /app/apps/tasks && pnpm --silent task upgrade' >&2; cd /app/apps/tasks && exec pnpm --silent task upgrade",
+    "clickhouse:migrate": "echo 'langwatch: \"/app/platform/app pnpm run clickhouse:migrate\" is deprecated; use cd /app/apps/tasks && pnpm --silent task upgrade' >&2; cd /app/apps/tasks && exec pnpm --silent task upgrade",
+    "lwql:provision": "echo 'langwatch: \"/app/platform/app pnpm run lwql:provision\" is deprecated; use cd /app/apps/tasks && pnpm --silent task lwql-provision' >&2; cd /app/apps/tasks && exec pnpm --silent task lwql-provision",
+    "task": "echo 'langwatch: \"/app/platform/app pnpm run task <name>\" is deprecated; use cd /app/apps/tasks && pnpm --silent task <name>' >&2; cd /app/apps/tasks && exec pnpm --silent task \"$@\"",
+    "prisma:seed": "echo 'langwatch: \"/app/platform/app pnpm prisma:seed\" is deprecated and has no equivalent in this image: the seed is a development tool and is not shipped' >&2; exit 1",
+    "task:backfill-datasets-s3": "echo 'langwatch: \"/app/platform/app pnpm run task:backfill-datasets-s3\" is deprecated and has no equivalent in this image: the backfill ran in the upgrade and no longer exists as a task' >&2; exit 1",
+    "task:migrate-object-storage": "echo 'langwatch: \"/app/platform/app pnpm run task:migrate-object-storage\" is deprecated and has no equivalent in this image: the storage move runs as an upgrade step' >&2; exit 1"
+  }
+}
