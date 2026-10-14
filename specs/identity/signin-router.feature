@@ -306,13 +306,8 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And a provider env naming something unmountable still lands in email mode with the password offered
 
   # ── Auth0 serves only legacy SSO organizations on cloud ────────────────
-  #
-  # Passwords have moved over from Auth0 and the social providers sign in
-  # natively, so on cloud the Auth0 broker is a way in only for an
-  # organization still on legacy Auth0 SSO, whose people reach it by typing
-  # their address. The rail never draws the broker, nor a branded button for
-  # one of its social connections. A self-hosted install naming Auth0 keeps it
-  # as its door.
+  # On cloud the rail never draws the Auth0 broker or its social buttons; legacy
+  # SSO organizations reach it by typing their address. Self-hosted keeps it.
 
   @unit
   Scenario: Cloud never offers the Auth0 broker on the sign-in screen
@@ -336,6 +331,7 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When the sign-in page is requested on a self-hosted install
     Then the broker is offered ahead of the native social methods
     And a SaaS deployment never offers the broker, whatever its password setting
+    And a SaaS deployment that issues no passwords of its own and has no native social provider offers no password
     And no branded button for one of the broker's connections is offered anywhere
 
   # What of the ask survives on every deployment: the address was already

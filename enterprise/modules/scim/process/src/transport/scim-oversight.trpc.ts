@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The server half of `scimOversight.*`: the back office's directory-sync
- * oversight (ADR-122). The door asks the platform-operator grant (ops:manage at
- * the platform tier), never an org-scoped RBAC permission, so no org role may
- * widen who may re-drive a customer's deprovision; every refusal is a not-found.
+ * `scimOversight.*`, the back office's directory-sync oversight (ADR-122): the door asks
+ * ops:manage at the platform tier, never an org permission; every refusal is a not-found.
  * enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature
  */
 import {

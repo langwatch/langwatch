@@ -18,10 +18,8 @@ import {
 import { SsoApi, ssoConnectionTrpc, type SsoOperator } from "@langwatch/enterprise-sso-contract";
 
 /**
- * Who may reach the surface is the door's: the platform-operator grant (ops:manage at the
- * platform tier), never an org-scoped permission, so no org role widens who may attest a
- * domain. The door refuses ops:manage while impersonating, and answers every refusal
- * as a plain not-found.
+ * The door asks ops:manage at the platform tier, never an org permission, so no org role
+ * widens who may attest a domain; it refuses while impersonating, always as a not-found.
  */
 const OPERATOR_PERMISSION = "ops:manage";
 const OPERATOR_SCOPE = { at: "platform", refusal: "hidden" } as const;

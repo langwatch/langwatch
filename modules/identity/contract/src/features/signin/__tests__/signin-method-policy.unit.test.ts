@@ -321,5 +321,14 @@ describe("the instance sign-in method policy", () => {
 
       expect(await offeredIds()).toEqual(["google"]);
     });
+
+    /** @scenario "A deployment whose door is its named provider keeps offering it" */
+    it("offers no password on cloud when it issues none of its own and no social provider is set up", async () => {
+      selfHosted = false;
+      issuesOwnPasswords = false;
+      mountedSocial = [];
+
+      expect(await offeredIds()).toEqual([]);
+    });
   });
 });

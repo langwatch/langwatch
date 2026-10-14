@@ -1,7 +1,6 @@
 /**
  * @vitest-environment node
- * The checkup's install-wide write, over the real runtime: the door asks ops:manage at the
- * platform tier, so an organization manager is refused before the application runs.
+ * The checkup's install-wide write: an organization manager is refused ops:manage at the door.
  * Spec: modules/ops/specs/checkup-audience.feature
  */
 import {

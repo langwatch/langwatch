@@ -131,10 +131,10 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
     // time. It is appended, so the order the screen renders does not move.
     const passkeys = this.inputs.offersPasskeys() ? [PASSKEY_METHOD] : [];
 
-    // A deployment that federates AND issues its own passwords offers both:
-    // the federated method leads, and the password stands behind it (D09).
+    // Email mode (a typo or an unmountable provider lands there too) always offers the password;
+    // a federating deployment offers it behind its methods only when it issues its own (D09).
     const local =
-      federatedMethods.length === 0 || this.inputs.issuesOwnPasswords() ? LOCAL_METHOD_SET : [];
+      federated.length === 0 || this.inputs.issuesOwnPasswords() ? LOCAL_METHOD_SET : [];
 
     return {
       defaultMethods: [...federatedMethods, ...local, ...passkeys],

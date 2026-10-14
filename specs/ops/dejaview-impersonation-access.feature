@@ -3,18 +3,9 @@ Feature: Ops access (Deja View) while impersonating a user
   I want the ops tooling (Deja View) to stay available while I impersonate the customer
   So that I can inspect the customer's stored events in the context of their account
 
-  # =========================================================================
-  # What this covers
-  # =========================================================================
-  #
-  # Impersonation rewrites the session identity to the impersonated
-  # (customer) user, keeping the real admin as the session's impersonator.
-  # Ops access is granted per admin email, so before this feature the ops
-  # UI (Deja View) disappeared exactly when an admin was impersonating a
-  # customer to debug their traces. The impersonator's own grant now
-  # carries through the impersonation session, for reading only: ops:manage
-  # is not answered until the operator is signed in as themselves (Alex,
-  # 2026-10-14; bound in modules/ops/specs/admin.feature).
+  # While impersonating, the operator's own grant carries through for reading
+  # only; ops:manage waits until they sign in as themselves (Alex, 2026-10-14;
+  # bound in modules/ops/specs/admin.feature).
 
   Scenario: Admin impersonating a customer keeps ops access
     Given an admin is impersonating a customer user
