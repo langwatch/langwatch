@@ -17,6 +17,7 @@ const { countsQuery, datasetsQuery, mockDeleteMutate } = vi.hoisted(() => ({
   countsQuery: {
     current: { data: undefined } as {
       data: { datasetId: string; recordCount: number }[] | undefined;
+      isError?: boolean;
     },
     asked: [] as { input: unknown; options: unknown }[],
   },
@@ -142,6 +143,18 @@ describe("Datasets list screen", () => {
         expect(screen.getByText("offline evals")).toBeInTheDocument();
         expect(screen.getByText("production samples")).toBeInTheDocument();
         expect(screen.getAllByLabelText("Counting entries")).toHaveLength(2);
+      });
+    });
+
+    describe("given reading the entry counts failed", () => {
+      /** @scenario "A failed entry count read shows the counts as unavailable" */
+      it("shows each count as unavailable instead of loading", () => {
+        countsQuery.current = { data: undefined, isError: true };
+        renderWithDatasetHost(<DatasetsScreen />);
+
+        expect(screen.getByText("offline evals")).toBeInTheDocument();
+        expect(screen.getAllByLabelText("Entry count unavailable")).toHaveLength(2);
+        expect(screen.queryByLabelText("Counting entries")).not.toBeInTheDocument();
       });
     });
 

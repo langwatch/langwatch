@@ -29,10 +29,6 @@ function eitherSignal(
   timeoutMs: number,
 ): { signal: AbortSignal; release: () => void } {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new ReadTimeoutError(timeoutMs)), timeoutMs);
-  const follow = () => controller.abort(signal?.reason);
-  if (signal?.aborted) follow();
-  else signal?.addEventListener("abort", follow, { once: true });
   let released = false;
   const release = () => {
     if (released) return;
@@ -40,6 +36,16 @@ function eitherSignal(
     clearTimeout(timer);
     signal?.removeEventListener("abort", follow);
   };
+  const timer = setTimeout(() => {
+    controller.abort(new ReadTimeoutError(timeoutMs));
+    release();
+  }, timeoutMs);
+  const follow = () => {
+    controller.abort(signal?.reason);
+    release();
+  };
+  if (signal?.aborted) follow();
+  else signal?.addEventListener("abort", follow, { once: true });
   return { signal: controller.signal, release };
 }
 
@@ -74,7 +80,7 @@ export function readTimeoutFetch({
 
 /**
  * Headers can arrive long before the body, so the limit and the caller's cancel stay on until the
- * body ends, fails or is cancelled; each of those releases them.
+ * body ends, fails or is cancelled, or the read is aborted; each of those releases them.
  */
 function releasedWithBody({
   response,

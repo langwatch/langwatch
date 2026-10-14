@@ -80,7 +80,15 @@ Feature: Datasets list page
     And their entry counts are still being counted
     When I open my datasets page
     Then I see one row per dataset
-    And each row's entry count shows a muted placeholder
+    And each row's entry count shows a loading skeleton
+
+  @integration
+  Scenario: A failed entry count read shows the counts as unavailable
+    Given my datasets have loaded
+    And reading their entry counts failed
+    When I open my datasets page
+    Then I see one row per dataset
+    And each row's entry count shows as unavailable, not loading
 
   @integration
   Scenario: Entry counts arrive after the list

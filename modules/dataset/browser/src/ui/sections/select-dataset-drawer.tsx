@@ -32,7 +32,10 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
     { projectId: projectId ?? "" },
     { enabled: isOpen && !!projectId },
   );
-  const recordCounts = useDatasetRecordCounts({ projectId, datasets: datasets.data });
+  const { recordCounts, countsFailed } = useDatasetRecordCounts({
+    projectId,
+    datasets: datasets.data,
+  });
 
   return (
     <Drawer
@@ -48,6 +51,7 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
       <DatasetPickerList
         datasets={datasets.data}
         recordCounts={recordCounts}
+        countsFailed={countsFailed}
         isLoading={datasets.isLoading}
         isError={datasets.isError}
         onSelect={(dataset) => {

@@ -110,6 +110,7 @@ function DatasetTable({
   onDelete,
   onEdit,
   recordCounts,
+  countsFailed,
   slug,
 }: {
   columnsOf: (dataset: DatasetRow) => DatasetColumns;
@@ -121,6 +122,8 @@ function DatasetTable({
   onEdit: (dataset: DatasetRow) => void;
   /** Each dataset's entry count; a missing one is still being counted. */
   recordCounts: ReadonlyMap<string, number>;
+  /** The count read gave up: missing counts show as unavailable, not loading. */
+  countsFailed: boolean;
   slug: string | undefined;
 }) {
   return (
@@ -164,7 +167,7 @@ function DatasetTable({
               </HStack>
             </ListTable.Cell>
             <ListTable.Cell numeric>
-              <RecordCount count={recordCounts.get(dataset.id)} />
+              <RecordCount count={recordCounts.get(dataset.id)} failed={countsFailed} />
             </ListTable.Cell>
             <ListTable.Cell tone="muted">
               <FormattedDate
@@ -188,8 +191,15 @@ function DatasetTable({
   );
 }
 
-function RecordCount({ count }: { count: number | undefined }) {
+function RecordCount({ count, failed }: { count: number | undefined; failed: boolean }) {
   if (count !== undefined) return <>{count}</>;
+  if (failed) {
+    return (
+      <Text as="span" color="fg.muted" aria-label="Entry count unavailable">
+        —
+      </Text>
+    );
+  }
 
   return (
     <Skeleton
@@ -289,7 +299,10 @@ export default function DatasetsScreen() {
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
-  const recordCounts = useDatasetRecordCounts({ projectId: project?.id, datasets: datasets.data });
+  const { recordCounts, countsFailed } = useDatasetRecordCounts({
+    projectId: project?.id,
+    datasets: datasets.data,
+  });
 
   /**
    * `columnTypes` is persisted JSON and older or CLI-created rows can carry an
@@ -445,6 +458,7 @@ export default function DatasetsScreen() {
             onCopy={setCopyDataset}
             onDelete={setDatasetToDelete}
             recordCounts={recordCounts}
+            countsFailed={countsFailed}
             onEdit={(dataset) => {
               setEditDataset({
                 datasetId: dataset.id,

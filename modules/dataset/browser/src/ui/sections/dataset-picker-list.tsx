@@ -22,7 +22,7 @@ export function DatasetPickerList({
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id && enabled },
   );
-  const recordCounts = useDatasetRecordCounts({
+  const { recordCounts, countsFailed } = useDatasetRecordCounts({
     projectId: project?.id,
     datasets: datasetsQuery.data,
   });
@@ -31,6 +31,7 @@ export function DatasetPickerList({
     <DatasetPickerListView
       datasets={datasetsQuery.data}
       recordCounts={recordCounts}
+      countsFailed={countsFailed}
       isLoading={datasetsQuery.isLoading}
       isError={datasetsQuery.isError}
       onSelect={onSelect}

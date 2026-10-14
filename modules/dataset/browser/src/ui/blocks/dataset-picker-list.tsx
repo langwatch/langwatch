@@ -28,6 +28,7 @@ export type DatasetPickerSelection = {
 export function DatasetPickerList({
   datasets,
   recordCounts,
+  countsFailed = false,
   isLoading = false,
   isError = false,
   onSelect,
@@ -36,6 +37,8 @@ export function DatasetPickerList({
   datasets: WireOf<DatasetSummaryWire>[] | undefined;
   /** Each dataset's entry count; a missing one is still being counted. */
   recordCounts: ReadonlyMap<string, number>;
+  /** The count read gave up: missing counts show as unavailable, not loading. */
+  countsFailed?: boolean;
   isLoading?: boolean;
   isError?: boolean;
   onSelect: (dataset: DatasetPickerSelection) => void;
@@ -87,6 +90,7 @@ export function DatasetPickerList({
               name={dataset.name}
               columnCount={(dataset.columnTypes as DatasetColumns).length}
               entryCount={recordCounts.get(dataset.id)}
+              countFailed={countsFailed}
               updatedAt={dataset.updatedAt}
               onClick={() =>
                 onSelect({
@@ -136,12 +140,14 @@ function DatasetCard({
   name,
   columnCount,
   entryCount,
+  countFailed,
   updatedAt,
   onClick,
 }: {
   name: string;
   columnCount: number;
   entryCount: number | undefined;
+  countFailed: boolean;
   updatedAt: string;
   onClick: () => void;
 }) {
@@ -169,11 +175,7 @@ function DatasetCard({
             {name}
           </Text>
           <HStack gap={2} fontSize="xs" color="fg.muted">
-            {entryCount === undefined ? (
-              <Skeleton height="1em" width="4.5em" aria-label="Counting entries" />
-            ) : (
-              <Text>{entryCount} entries</Text>
-            )}
+            <EntryCount count={entryCount} failed={countFailed} />
             <Text>•</Text>
             <Text>{columnCount} columns</Text>
             <Text>•</Text>
@@ -183,4 +185,10 @@ function DatasetCard({
       </HStack>
     </chakra.button>
   );
+}
+
+function EntryCount({ count, failed }: { count: number | undefined; failed: boolean }) {
+  if (count !== undefined) return <Text>{count} entries</Text>;
+  if (failed) return <Text>Entry count unavailable</Text>;
+  return <Skeleton height="1em" width="4.5em" aria-label="Counting entries" />;
 }

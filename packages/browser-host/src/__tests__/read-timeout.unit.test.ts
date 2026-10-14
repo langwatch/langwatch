@@ -133,6 +133,22 @@ describe("readTimeoutFetch", () => {
     });
   });
 
+  describe("given a response whose body is never read", () => {
+    /** @scenario "A read with no answer gives up after 45 seconds" */
+    it("drops its listener on the page's signal when the limit runs out", async () => {
+      const page = new AbortController();
+      const added = vi.spyOn(page.signal, "addEventListener");
+      const removed = vi.spyOn(page.signal, "removeEventListener");
+      const send = readTimeoutFetch({ fetch: async () => new Response(new ReadableStream()) });
+
+      await send("/api/trpc/a", { signal: page.signal });
+      await vi.advanceTimersByTimeAsync(45_000);
+
+      expect(removed).toHaveBeenCalledTimes(added.mock.calls.length);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
   describe("given a write the API has not answered", () => {
     /** @scenario "A write is never given a time limit" */
     it("sends it untouched, with no time limit", async () => {
