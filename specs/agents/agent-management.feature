@@ -196,6 +196,19 @@ Feature: Agent management
     And the agents the AgentListDrawer lists are read again
     And the editor closes
 
+  @integration
+  Scenario: Edit config shows the stored inputs, outputs and mappings
+    Given a stored code agent with inputs, outputs and scenario mappings
+    When I open the AgentCodeEditorDrawer on it
+    Then the editor shows the agent's inputs and outputs
+    And it shows the scenario mappings with the chosen output field
+
+  @integration
+  Scenario: Saving an edited agent keeps the keys the editor does not show
+    Given the AgentCodeEditorDrawer is open on a stored code agent
+    When I save without changes
+    Then the stored inputs, outputs, mappings and timeout are saved back unchanged
+
   # ============================================================================
   # Agent type selector drawer
   # ============================================================================
