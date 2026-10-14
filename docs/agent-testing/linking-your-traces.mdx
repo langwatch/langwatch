@@ -70,6 +70,8 @@ Write the criterion about the action, in your system's own vocabulary, and the j
 
 A criterion that names an action your traces do not record cannot be verified. Instrument the action, or reword the criterion to something the conversation itself proves.
 
+A tool call span shows what the agent tried, not what changed. For an agent that writes data, report the data after each turn in a span of its own. See [Check the world, not the words](/agent-testing/check-the-world).
+
 ## Linked traces in code-first scenarios
 
 The Scenario SDKs fetch the agent's traces from LangWatch with a flag on the run or on the global configuration:
