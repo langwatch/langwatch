@@ -142,6 +142,17 @@ function isNavigableTarget(target: string): target is NavigableTarget {
   return (NAVIGABLE_TARGETS as readonly string[]).includes(target);
 }
 
+/** The page targets that take no params: each key names one fixed page of the project. */
+const PAGE_PATHS: Readonly<
+  Record<Exclude<NavigableTarget, "traces" | "trace">, (projectSlug: string) => string>
+> = {
+  scenarios: (projectSlug) => `/${projectSlug}/simulations/scenarios`,
+  onlineEvaluations: (projectSlug) => `/${projectSlug}/online-evaluations`,
+  annotations: (projectSlug) => `/${projectSlug}/annotations`,
+  gatewayVirtualKeys: () => "/gateway/virtual-keys",
+  codingSessions: (projectSlug) => `/${projectSlug}/sessions`,
+};
+
 export function useDashboardWidgetChartNavigate(
   projectSlug: string,
 ): (args: { target: string; params: Readonly<Record<string, unknown>> }) => void {
@@ -161,9 +172,12 @@ export function useDashboardWidgetChartNavigate(
         return;
       }
 
-      // target === "traces"
-      const fragment = buildTracesFragment(params);
-      host.navigate(`/${projectSlug}/traces#${fragment}`);
+      if (target === "traces") {
+        host.navigate(`/${projectSlug}/traces#${buildTracesFragment(params)}`);
+        return;
+      }
+
+      host.navigate(PAGE_PATHS[target](projectSlug));
     },
     [host, projectSlug],
   );

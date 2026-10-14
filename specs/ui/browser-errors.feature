@@ -4,8 +4,8 @@
 #   packages/react-rum/src/browserTracing.ts
 
 Feature: The browser reports its own errors to the backend through RUM
-  Browser tracing is on for every deployment unless RUM_ENABLED is "false" (and a
-  collector exists to receive it). While it runs, `console.error`, `window.onerror`
+  Browser tracing is off unless RUM_ENABLED is "true" or "1", as the previous release
+  had it, and a collector exists to receive it. While it runs, `console.error`, `window.onerror`
   and unhandled rejections leave the tab as `browser.error` spans on the session,
   through the same same-origin export as every other browser span (ADR-058).
 
@@ -13,10 +13,10 @@ Feature: The browser reports its own errors to the backend through RUM
   with query strings, fragments and credentials removed.
 
   @unit
-  Scenario: RUM is on by default
+  Scenario: RUM is off by default
     Given a deployment that names a collector and does not set RUM_ENABLED
     When rum projects its browser config
-    Then browser tracing is enabled with a sample ratio of 1
+    Then browser tracing is disabled
 
   @unit
   Scenario: A console error reaches the backend once per minute per message

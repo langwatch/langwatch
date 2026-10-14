@@ -1,8 +1,8 @@
 import { Menu } from "@langwatch/design-system/menu";
-import type { ReactNode } from "react";
 import type { ButtonProps } from "@langwatch/design-system/primitives";
 import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
 import { Check, ChevronsUpDown, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";

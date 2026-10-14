@@ -183,3 +183,59 @@ func TestAutomationsSkill_NeverTakesASlackSecret(t *testing.T) {
 		}
 	}
 }
+
+// A scheduled insights run names this skill in its brief and holds a read-only
+// key, so the skill has to be embedded, and what it teaches has to be a card in
+// the reply: no command, and so no permission, hands the findings back.
+//
+// @scenario "The daily-insights skill is embedded in the manager and hands findings back as a card"
+func TestDailyInsightsSkill_IsEmbeddedAndAnswersWithACard(t *testing.T) {
+	dest := t.TempDir()
+	if err := MaterializeSkills(dest); err != nil {
+		t.Fatalf("MaterializeSkills: %v", err)
+	}
+	body, err := os.ReadFile(filepath.Join(dest, "daily-insights", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read daily-insights skill: %v", err)
+	}
+	skill := string(body)
+	for _, want := range []string{
+		"name: daily-insights",
+		"internal: true",
+		"Only read. Do not create, change or delete anything",
+		"```langy-card",
+		`"kind": "insights"`,
+		"never a tool call",
+	} {
+		if !strings.Contains(skill, want) {
+			t.Errorf("the daily-insights skill lacks %q", want)
+		}
+	}
+}
+
+// QA on main found a chart placed on a board the user never named: the skills
+// only said where ids come from, so the model picked one off the list.
+//
+// @scenario "Langy places a chart on the dashboard in context and asks when none is"
+func TestChartSkills_PlaceOnTheDashboardInContextOrAsk(t *testing.T) {
+	dest := t.TempDir()
+	if err := MaterializeSkills(dest); err != nil {
+		t.Fatalf("MaterializeSkills: %v", err)
+	}
+	for _, name := range []string{"dashboard-widgets", "lwql-charts"} {
+		body, err := os.ReadFile(filepath.Join(dest, name, "SKILL.md"))
+		if err != nil {
+			t.Fatalf("read %s skill: %v", name, err)
+		}
+		skill := string(body)
+		for _, want := range []string{
+			"dashboard in the user's context",
+			"ask which board with the `question` tool",
+			"Never pick one from `langwatch dashboard list` on your own",
+		} {
+			if !strings.Contains(skill, want) {
+				t.Errorf("the %s skill lacks %q", name, want)
+			}
+		}
+	}
+}

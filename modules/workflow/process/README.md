@@ -421,11 +421,7 @@ interface Params {
 }
 // Body: workflowRunRestBodySchema, ../contract/src/workflow-rest.schemas.ts:111
 type Body = Record<string, unknown>;
-// Response: workflowRunAnswerSchema, ../contract/src/workflow.ts:49
-interface Response {
-  result?: Record<string, unknown> | null;
-  status: "idle" | "waiting" | "running" | "success" | "error" | "skipped";
-}
+type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:62
 ```
 
 #### `POST /api/workflows/:workflowId/run` · `postApiWorkflowsByWorkflowIdRun`
@@ -442,7 +438,7 @@ interface Params {
   workflowId: string;
 }
 type Body = z.infer<typeof workflowRunRestBodySchema>; // ../contract/src/workflow-rest.schemas.ts:111
-type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:49
+type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:62
 ```
 
 #### `POST /api/workflows/:workflowId/:versionId/run` · `postApiWorkflowsByWorkflowIdByVersionIdRun`
@@ -456,7 +452,7 @@ Answers at `/api/workflows/:workflowId/:versionId/run`, `/api/v1/workflows/:work
 ```typescript
 type Params = z.infer<typeof workflowRunRestVersionedParamsSchema>; // ../contract/src/workflow-rest.schemas.ts:130
 type Body = z.infer<typeof workflowRunRestBodySchema>; // ../contract/src/workflow-rest.schemas.ts:111
-type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:49
+type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:62
 ```
 
 ### `workflowStudioRest`
@@ -738,7 +734,7 @@ interface Input {
   projectId: string;
   workflowId: string;
 }
-type Output = z.infer<typeof workflowWithVersionSchema>; // ../contract/src/workflow.ts:136
+type Output = z.infer<typeof workflowWithVersionSchema>; // ../contract/src/workflow.ts:149
 
 // workflow.getVersions
 // Input: workflowApiGetVersionsInputSchema, ../contract/src/workflow.trpc-schemas.ts:55
@@ -755,15 +751,15 @@ interface Input {
   projectId: string;
   versionId: string;
 }
-type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:89
+type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:102
 
 // workflow.autosave
 type Input = z.infer<typeof workflowApiAutosaveInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:102
-type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:89
+type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:102
 
 // workflow.commitVersion
 type Input = z.infer<typeof workflowApiCommitVersionInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:114
-type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:89
+type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:102
 
 // workflow.publish
 // Input: workflowApiPublishInputSchema, ../contract/src/workflow.trpc-schemas.ts:125
@@ -772,11 +768,11 @@ interface Input {
   workflowId: string;
   versionId: string;
 }
-type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:71
+type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:84
 
 // workflow.unpublish
 type Input = z.infer<typeof workflowApiWorkflowInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:38
-type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:71
+type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:84
 
 // workflow.syncFromSource
 type Input = z.infer<typeof workflowApiWorkflowInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:38
@@ -813,7 +809,7 @@ type Output = z.infer<typeof workflowCascadeArchiveSchema>; // ../contract/src/w
 
 // workflow.archive
 type Input = z.infer<typeof workflowApiArchiveInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:148
-type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:71
+type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:84
 
 // workflow.generateCommitMessage
 type Input = z.infer<typeof workflowApiGenerateCommitMessageInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:159

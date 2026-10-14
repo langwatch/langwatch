@@ -50,7 +50,7 @@ describe("given a failure a screen hands over", () => {
         fallbackTitle: "Couldn't archive the source",
       });
 
-      expect(copy.title).toBe("You don't have permission to do this");
+      expect(copy.title).toBe("You don't have access to this");
       expect(copy.description).toBe('Ask an organization admin to grant you "PROJECT_DELETE".');
     });
 

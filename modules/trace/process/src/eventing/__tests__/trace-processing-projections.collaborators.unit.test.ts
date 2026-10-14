@@ -66,6 +66,7 @@ function recordedCollaborators() {
       calls.add("cost estimate");
       return costs.estimate(input);
     },
+    isUnpriced: costs.isUnpriced.bind(costs),
   };
   const spanNormalization: TraceSpanNormalization = {
     normalizeSpanReceived: (input) => {

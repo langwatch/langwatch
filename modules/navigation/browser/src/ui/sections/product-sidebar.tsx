@@ -6,6 +6,7 @@ import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
@@ -23,6 +24,7 @@ import {
   OPERATIONS_CONSOLE,
   type ProductId,
 } from "../../model/products.ts";
+import { dashboardsAreaAt, toProjectRoutePattern } from "../../model/project-nav-items.ts";
 import { QUIET_SIDEBAR_CHIP } from "../../model/quiet-chip-style.ts";
 import { resolveSettingsBackTarget } from "../../model/resolve-settings-back-target.ts";
 import {
@@ -281,9 +283,7 @@ function SectionItemsNav({
       showLabel={showExpanded}
       tourId={item.tourId}
       rightElement={
-        isPathUnder({ pathname: item.href, base: sectionPath }) ? undefined : (
-          <OutboundArrow />
-        )
+        isPathUnder({ pathname: item.href, base: sectionPath }) ? undefined : <OutboundArrow />
       }
     />
   );
@@ -307,6 +307,37 @@ function SectionItemsNav({
   );
 }
 
+/**
+ * The Dashboards sidebar body: only the saved-dashboards list analytics lends,
+ * with the board the address opens marked (dashboards-v1.feature).
+ */
+function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
+  const host = useNavigationHost();
+  const pattern = toProjectRoutePattern({
+    pathname: host.pathname(),
+    projectSlug: host.project()?.slug,
+  });
+  if (!showExpanded) return null;
+  return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
+}
+
+/**
+ * The member's starred dashboards in every other product's sidebar, for a member who can reach
+ * Dashboards; Dashboards lists its stars itself, and Settings is no product.
+ */
+function StarredDashboardsGroup({
+  surface,
+  showExpanded,
+}: {
+  surface: SidebarSurface;
+  showExpanded: boolean;
+}) {
+  const { reachableProducts } = useReachableProducts();
+  if (!showExpanded || surface === "dashboards" || surface === "settings") return null;
+  if (!reachableProducts.includes("dashboards")) return null;
+  return <StarredDashboards />;
+}
+
 function ProductSidebarBody({
   surface,
   showExpanded,
@@ -327,6 +358,9 @@ function ProductSidebarBody({
     return (
       <SectionItemsNav items={gatewayNavItems} sectionPath="/gateway" showExpanded={showExpanded} />
     );
+  }
+  if (surface === "dashboards") {
+    return <DashboardsSidebarBody showExpanded={showExpanded} />;
   }
   if (surface === "governance") {
     return (
@@ -430,6 +464,7 @@ export function SidebarContent({
           }}
         >
           <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
+          <StarredDashboardsGroup surface={surface} showExpanded={showExpanded} />
         </VStack>
         <ScrollEdgeFade edge="top" visible={scrollEdges.start} color="bg.page" />
         <ScrollEdgeFade edge="bottom" visible={scrollEdges.end} color="bg.page" />

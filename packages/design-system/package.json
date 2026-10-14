@@ -609,6 +609,7 @@
     "build:storybook": "storybook build",
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
+    "test:repo": "vitest run --config vitest.repo.config.ts",
     "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
@@ -667,7 +668,7 @@
   "nx": {
     "targets": {
       "build:storybook": {
-        "cache": true,
+        "cache": false,
         "dependsOn": [
           "^build"
         ],
@@ -675,12 +676,7 @@
           "production",
           "^production",
           "jsBuild",
-          "{projectRoot}/.storybook/**/*",
-          "{workspaceRoot}/apps/ui/public/**/*",
-          "{workspaceRoot}/apps/*/src/**/*.{ts,tsx}",
-          "{workspaceRoot}/modules/*/*/src/**/*.{ts,tsx}",
-          "{workspaceRoot}/enterprise/modules/*/*/src/**/*.{ts,tsx}",
-          "{workspaceRoot}/packages/*/src/**/*.{ts,tsx}"
+          "{projectRoot}/.storybook/**/*"
         ],
         "outputs": [
           "{projectRoot}/storybook-static"

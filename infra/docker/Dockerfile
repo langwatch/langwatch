@@ -63,7 +63,7 @@ RUN find . ! -type d ! -name package.json -delete && find . -depth -type d -empt
 # ── Stage 2: build ──────────────────────────────────────────────────
 FROM node:24-alpine AS builder
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
-RUN npm install -g pnpm@12.6.0
+RUN npm install -g pnpm@12.6.0 && npm cache clean --force
 
 # Install Goose migration tool (copied to runtime stage later)
 ARG GOOSE_SHA256_ARM64=dfafe0254b0058cabf016234a500df5ada1623ed034e9473cee9fe4ed07ca090
@@ -107,11 +107,12 @@ COPY apps/api/package.json ./apps/api/package.json
 COPY apps/ui/package.json ./apps/ui/package.json
 COPY apps/tasks/package.json ./apps/tasks/package.json
 COPY apps/scenario-child/package.json ./apps/scenario-child/package.json
-# Four filters: the four applications are four dependency subtrees and none is
-# a subset of another. apps/server and the SDK's e2e suites stay out. No
-# workspace member has an install lifecycle script, so no source is needed yet.
+# Five filters: the five applications are five dependency subtrees and none is
+# a subset of another (the scenario child's build needs its own esbuild). apps/server
+# and the SDK's e2e suites stay out. No workspace member has an install lifecycle
+# script, so no source is needed yet.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    CI=true pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
+    CI=true pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..." --filter "@langwatch/scenario-child..."
 
 # Source, after the install. The app imports the SDK and mcp/typescript as
 # workspace copies and builds them; the SDK's prebuild (copy-types.sh) reads
@@ -131,6 +132,7 @@ COPY apps/worker ./apps/worker
 COPY apps/api ./apps/api
 COPY apps/ui ./apps/ui
 COPY apps/tasks ./apps/tasks
+COPY apps/backend ./apps/backend
 COPY apps/scenario-child ./apps/scenario-child
 # What `start:prepare:files` and `ensure:built` read: the generator scripts (and
 # their Go binary, below).
@@ -145,8 +147,10 @@ COPY --from=devscripts /out/devscripts /app/.bin/devscripts/devscripts
 # `@langwatch/mcp-server`, whose dist the API needs at boot. Both are reached
 # through the api/worker filters, not the ui one. apps/api declares no `build`
 # of its own and runs from source through node; apps/worker declares none either
-# now — the pre-compiled scenario child is its own app, @langwatch/scenario-child,
-# reached through the worker filter's `...`. The worker runs from source, but the child is a fresh
+# now — the pre-compiled scenario child is its own app, @langwatch/scenario-child.
+# The worker does not depend on it, so the worker filter's `...` never reaches it and
+# it has its own filter (and its own --filter-prod below, for its external requires).
+# The worker runs from source, but the child is a fresh
 # process per simulation, so it is spawned as `node` on that bundle rather than
 # `pnpm exec` on a TypeScript tree (the --prod
 # install below drops it, so the bundle is the only supported path in an image).
@@ -186,49 +190,81 @@ RUN pnpm run ensure:ai-gateway-secrets && pnpm run generate:modules \
  && pnpm --filter @langwatch/langy-process run generate:setup-skill-bodies \
  && pnpm --filter "langwatch..." --filter "@langwatch/mcp-server..." --filter "@langwatch/ksuid..." --filter "@langwatch/mail..." run build \
  && NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -b --builders 16 modules/*/contract/tsconfig.build.json \
- && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build
+ && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/scenario-child..." run build
 
-# Remove dev dependencies — not needed at runtime, and on the order of a
-# gigabyte of vite, vitest and playwright. A filtered re-install with
-# --prod rather than `pnpm prune --prod`: prune takes no --filter, so in a
-# workspace it reasons about every project instead of the one subtree we
-# installed.
-#
-# CI=true is load-bearing. --prod purges the modules directory, and pnpm
-# refuses to do that without a TTY unless told it is non-interactive
-# (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY). Losing this silently would
-# leave a dev-dependency-laden production image; losing it loudly fails the
-# build here where the cause is obvious.
-# --ignore-scripts: this pass exists only to drop devDependencies, and a
-# lifecycle script that ran here could need a devDependency this very command
-# is removing. Nothing needs regenerating at this point; the dist was built in the step above, and
-# the Prisma client is regenerated explicitly after the prune below.
+# The production tree: every node_modules directory goes, then the three server roles (and the
+# backend that hosts two of them) are installed again with --prod. A fresh install, not a prune
+# of this one: `pnpm prune` has no --filter and reasons about every workspace member, which kept
+# the UI's ~130 MB of browser-only packages in the image, and a --prod pass over the dev install
+# left the devDependencies in the virtual store. @langwatch/ui is not installed here at all; its
+# bundle is already built, and nothing that runs imports it. The pnpm store mount holds every
+# package from the first install, so this one downloads nothing.
+# --filter-prod, not --filter: with --prod alone a filtered member's devDependencies are still
+# followed, which linked the test harness and the design system's tooling in.
+# CI=true: pnpm refuses to purge a modules directory without a TTY unless told it is non-interactive.
+RUN find . -name node_modules -type d -prune -exec rm -rf {} + \
+ && find apps/ui/dist/client -name '*.map' -delete
+# The image's own pnpmfile drops the peer dependencies that resolve to dev tools (see its header).
+# A hook only runs when pnpm resolves, so the lockfile is re-resolved first, keeping every locked
+# version, and then installed frozen: the install itself still takes only what that lockfile names.
+# pnpm_config_pnpmfile is how pnpm 12 takes a hook file; only these two commands set it.
+# The version check fails the build on any version the committed lockfile does not name.
+COPY infra/docker/image.pnpmfile.cjs /tmp/image.pnpmfile.cjs
+COPY infra/docker/check-locked-versions.mjs /tmp/check-locked-versions.mjs
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
+    export pnpm_config_pnpmfile=/tmp/image.pnpmfile.cjs CI=true \
+ && cp pnpm-lock.yaml /tmp/committed-pnpm-lock.yaml \
+ && pnpm install --lockfile-only \
+ && node /tmp/check-locked-versions.mjs /tmp/committed-pnpm-lock.yaml pnpm-lock.yaml \
+ && pnpm install --frozen-lockfile --prod --filter-prod "@langwatch/platform-api..." --filter-prod "@langwatch/worker..." --filter-prod "@langwatch/scenario-child..." --filter-prod "@langwatch/tasks..." --filter-prod "@langwatch/backend..."
 
-# ...and then actually reclaim the disk. The step above rewrites each member's
-# node_modules — the devDependency symlinks go — but it does NOT touch the
-# virtual store, and the store is what the runtime stage copies wholesale as
-# /app/node_modules. Measured on a scratch workspace: after
-# `pnpm install --prod`, `node_modules/.pnpm/<devdep>@<ver>` is still present;
-# after `pnpm prune --prod` it is gone. Without this line vite, vitest,
-# playwright and esbuild all ship in the production image, merely
-# unreferenced — roughly the gigabyte this step is supposed to remove.
-#
-# `prune` takes no --filter, which is why the install above is filtered and
-# this is not. That is fine here: the members outside the app's closure have
-# no node_modules in this image at all, so there is nothing for prune to get
-# wrong. No post-prune `prisma generate` anymore: @langwatch/prisma-client owns
-# generated first-party source that the build above inlines into the dist
-# bundles, so prune cannot drop it. The runtime stage still needs the `prisma`
-# CLI (a prod dep) for `migrate deploy` at boot.
-RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    CI=true pnpm prune --prod
+# What no process runs, removed before the runtime stage copies the trees: the module halves the
+# browser loads (the api serves the built bundle), tests, specs, ADRs, declarations, source maps
+# and the SDKs' sources and examples. Workspace packages nothing links to go too; the link check
+# fails the build if any link in the tree now points at nothing.
+COPY infra/docker/check-links.mjs /tmp/check-links.mjs
+RUN rm -rf modules/*/browser modules/*/client enterprise/modules/*/browser enterprise/modules/*/client \
+      packages/architecture-enforcer packages/oxlint-rules packages/design-system packages/design-system-internal \
+      packages/browser packages/browser-host packages/browser-types packages/sim-console packages/test-harness \
+      packages/vitest-config packages/webhook-verify packages/ksuid-python \
+ && find sdks/typescript mcp/typescript -mindepth 1 -maxdepth 1 ! -name dist ! -name node_modules ! -name package.json -exec rm -rf {} + \
+ && find apps packages modules enterprise -name node_modules -prune -o \
+      \( -type d \( -name __tests__ -o -name tests -o -name e2e -o -name specs -o -name adrs -o -name docs -o -name examples \) -o \
+         -type f \( -name '*.test.*' -o -name '*.spec.*' -o -name '*.feature' -o -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.tsbuildinfo' -o -name '*.md' \) \) \
+      -prune -exec rm -rf {} + \
+ && node /tmp/check-links.mjs /app
+
+# The installed packages' own weight: source maps, declarations, tests, docs and examples, and the
+# query compiler Prisma ships for every database it supports (this image talks to PostgreSQL only).
+RUN find node_modules/.pnpm -type d \( -name test -o -name tests -o -name __tests__ -o -name docs -o -name example -o -name examples \) -prune -exec rm -rf {} + \
+ && find node_modules/.pnpm -type f \( -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.md' \) -delete \
+ && find node_modules/.pnpm -type f -name 'query_compiler_*' ! -name '*postgresql*' -delete \
+ && node /tmp/check-links.mjs /app
+
+# The Prisma CLI is here for `prisma migrate deploy` (the upgrade runs it) and nothing else. Its
+# entry file requires Studio's data modules and the dev server's state module at load, so those two
+# packages stay; Studio's browser UI, the dev server's bundled database, the query-plan executor
+# and Studio's graph layout are only reached by the commands that use them. The links that
+# pointed at removed packages go with them, and the link check proves nothing else did.
+RUN rm -rf node_modules/.pnpm/@prisma+studio-core@*/node_modules/@prisma/studio-core/dist/ui \
+      node_modules/.pnpm/@prisma+studio-core@*/node_modules/@prisma/studio-core/dist/metafile-*.json \
+      node_modules/.pnpm/@prisma+dev@*/node_modules/@prisma/dev/dist/runtime-assets \
+      node_modules/.pnpm/@prisma+query-plan-executor@* node_modules/.pnpm/@electric-sql+pglite* node_modules/.pnpm/elkjs@* \
+ && find node_modules/.pnpm -type l \( -path '*/@prisma/query-plan-executor' -o -path '*/@electric-sql/pglite*' -o -path '*/node_modules/elkjs' \) -delete \
+ && node /tmp/check-links.mjs /app
+
+# ── Stage 2b: CDN assets ───────────────────────────────────────────
+# Not part of the runtime image: nothing reaches the default target through it.
+# publish-docker-ecr.yml builds this target with a local output to upload the
+# content-hashed files to the CDN bucket (ADR-086) from the builder layers it
+# just cached, without pulling the pushed image back.
+FROM scratch AS ui-assets
+COPY --from=builder /app/apps/ui/dist/client/assets /assets
 
 # ── Stage 3: runtime ───────────────────────────────────────────────
 FROM node:24-alpine
 RUN apk --no-cache add curl openssl bash
-RUN npm install -g pnpm@12.6.0
+RUN npm install -g pnpm@12.6.0 && npm cache clean --force
 
 COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
 # The scenario SDK opens a voice worker's quick tunnel with a bare `cloudflared` spawn, so the
@@ -295,13 +331,20 @@ COPY --from=builder /app/apps/tasks ./apps/tasks
 # Same: run from source through node. The boot command below runs both schema
 # migrations from here before anything serves.
 COPY --from=builder /app/apps/api ./apps/api
-# The browser half. Whole, not just dist/client: apps/api imports
-# `@langwatch/ui/public-config` as SOURCE to build the boot configuration it
-# injects into the HTML shell, so the package has to resolve at runtime as well
-# as its build output being on disk.
-COPY --from=builder /app/apps/ui ./apps/ui
+# The api and the worker in one Node process: what START_WORKERS=true starts (see start.sh).
+COPY --from=builder /app/apps/backend ./apps/backend
+# The browser half is its built bundle only: the api serves files from apps/ui/dist/client
+# (packages/process/src/transport/config-owner.ts) and imports nothing from @langwatch/ui.
+COPY --from=builder /app/apps/ui/dist/client ./apps/ui/dist/client
 COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 COPY --from=builder /app/feature-map.json ./feature-map.json
+
+# The default command: the api, or the api and worker in one process under START_WORKERS=true.
+COPY --chmod=755 infra/docker/start.sh /app/start.sh
+# DEPRECATED, kept for two releases: the previous release ran from /app/platform/app, and old
+# compose files and Helm charts still say `cd /app/platform/app && pnpm run start:workers`.
+# These scripts forward to /app/apps/*; delete this line with infra/docker/compat.
+COPY infra/docker/compat/platform-app ./platform/app
 
 ENV NODE_ENV=production
 # pnpm 11+ checks dependencies before every `pnpm run` and installs when they
@@ -310,8 +353,8 @@ ENV NODE_ENV=production
 # and would write into /app, which is read-only under the chart. The dependencies
 # were installed by the builder; every boot and task command is `pnpm run`.
 ENV pnpm_config_verify_deps_before_run=false
-# The api process listens on API_PORT (6560 unset); the image serves on 5560.
-ENV API_PORT=5560
+# The api listens on API_PORT, else PORT (the previous release's variable), else 5560: start.sh
+# resolves it, so none is pinned here and the HEALTHCHECK below follows the same order.
 
 # Prisma's version check to checkpoint.prisma.io would run during the
 # `prisma migrate deploy` every start does. LangWatch never uses it.
@@ -331,9 +374,11 @@ EXPOSE 5560
 SHELL ["/bin/bash", "-c"]
 
 # One image, three roles, chosen by working directory and command (no rebuild):
-#   api     (default) cd /app/apps/api    && pnpm --silent run start
+#   api     (default) /app/start.sh, which runs `pnpm --silent run start` in /app/apps/api
 #           REST, tRPC, SSE and the browser bundle from /app/apps/ui/dist/client.
-#           Probes on API_PORT: startup and liveness /api/health, readiness /readyz.
+#           Listens on API_PORT, else PORT, else 5560. With START_WORKERS=true it runs
+#           apps/backend instead: the api and the worker in one process.
+#           Probes on that port: startup and liveness /api/health, readiness /readyz.
 #   worker  cd /app/apps/worker && pnpm --silent run start
 #           Probes on WORKER_METRICS_PORT (2999): startup and liveness /healthz, readiness /readyz.
 #   task    cd /app/apps/tasks  && pnpm --silent task <name>   (e.g. `upgrade status`)
@@ -345,6 +390,6 @@ SHELL ["/bin/bash", "-c"]
 # dev/docs/runbooks/upgrade-on-deploy.md), so several workers are safe.
 # Docker's own check, for compose and `docker run`; Kubernetes uses the probes above.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40m --retries=3 \
-  CMD curl -fsS -o /dev/null "http://127.0.0.1:${API_PORT}/api/health" \
+  CMD curl -fsS -o /dev/null "http://127.0.0.1:${API_PORT:-${PORT:-5560}}/api/health" \
    || curl -fsS -o /dev/null "http://127.0.0.1:${WORKER_METRICS_PORT:-2999}/healthz"
-CMD cd /app/apps/api && pnpm --silent run start
+CMD ["/app/start.sh"]

@@ -57,8 +57,8 @@ Feature: Annotation records its facts
     Then annotation records no score fact
 
   @unit
-  Scenario: The annotation module declares its pipeline and no migration step
+  Scenario: The annotation module declares its pipeline and its one trace migration step
     Given the annotation process module
     When a process collects its eventing and its migration steps
     Then it registers annotation_lifecycle
-    And it declares no migration step
+    And its only migration step is annotation:record-trace-annotations

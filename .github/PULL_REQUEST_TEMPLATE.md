@@ -12,6 +12,16 @@ Closes #
 
 <!-- Only if the "what" isn't obvious. Explain the mechanism, trade-offs, or why you chose this approach over alternatives. Skip this section for straightforward changes. -->
 
+## Architecture
+
+- [ ] I read the sections of `dev/docs/ARCHITECTURE.md` this change touches, and it follows them.
+
+Sections read: <!-- e.g. §3.4, §10 -->
+
+### Needs a human look
+
+<!-- Anything unusual, outside the usual patterns, a rule bent, a new shape, or a judgement call a reviewer should check. Also: known limitations, follow-on work, edge cases you deliberately chose not to handle. Write "None" if nothing. -->
+
 ## Acceptance criteria
 
 Copy from the issue. Tick each. Link its scenario.
@@ -32,7 +42,3 @@ See `specs/README.md` for feature file binding.
 ## Test plan
 
 <!-- How did you verify this works? List the key test scenarios. For bug fixes: what regression test did you add, and does it fail without the fix? -->
-
-## Anything surprising?
-
-<!-- Optional. Call out: known limitations, follow-on work needed, things a reviewer should pay extra attention to, or edge cases you deliberately chose not to handle. Delete this section if there's nothing to flag. -->

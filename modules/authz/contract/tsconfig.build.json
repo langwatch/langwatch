@@ -24,9 +24,6 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/system-migrations/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/module/tsconfig.build.json"
     },
     {

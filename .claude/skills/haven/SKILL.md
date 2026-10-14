@@ -95,7 +95,7 @@ Every haven web console is a build served by Go; none runs Vite, Storybook dev o
 - `haven self install --build` builds the hub and every simulator console (nx tag `haven-console`); each
   simulator lane rebuilds its console through the nx cache on start. A console missing its build
   serves a page naming the build command.
-- The design-system lane rebuilds the Storybook only when `packages/design-system/storybook-static`
+- The design-system lane rebuilds the Storybook only when the design system's built Storybook
   is missing or older than its sources (about 10 s, 1.6 GB peak), then serves it at about 30 MB.
   `haven restart design-system` rebuilds after a change; `haven logs design-system` shows the build.
 - The stack home's Seed panel runs `haven db seed --size <tiny|small|medium|large> --persona <all|...>`

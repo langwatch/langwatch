@@ -79,7 +79,9 @@ describe("Dashboard saved-chart execution", () => {
     });
 
     expect(result).toMatchObject({ granularitySeconds: 3_600, coarsenedFromSeconds: 60 });
-    expect(executor.calls).toHaveLength(1);
+    // The statement, then its completeness report over the same tenants.
+    expect(executor.calls).toHaveLength(2);
+    expect(executor.calls[1]!.tenantCapability).toBe(executor.calls[0]!.tenantCapability);
     expect(executor.calls[0]!.sql).toContain("FROM analytics.traces");
     expect(executor.calls[0]!.parameters).toMatchObject({
       dashboard_context_granularity_seconds: 3_600,
