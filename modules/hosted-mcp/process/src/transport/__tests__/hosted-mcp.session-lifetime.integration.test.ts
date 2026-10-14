@@ -182,7 +182,7 @@ describe("Feature: an MCP session outlives the replica that opened it", () => {
 
   describe("given the client ended its session", () => {
     /** @scenario "Only the client ends a session" */
-    it("is gone on every replica", async () => {
+    it("is gone on a replica that holds no copy", async () => {
       const { replica } = deployment();
       const first = await replica();
       const second = await replica();

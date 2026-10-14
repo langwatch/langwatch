@@ -37,8 +37,7 @@ Feature: Hosted MCP answers main's root paths on the api process
   Scenario: A refreshed MCP token keeps working; an expired one asks to re-authorise
     Given a client holding an MCP access token and its refresh token
     When it redeems the refresh token
-    Then the new access token is served
-    And the spent refresh token is refused once its short retry window has passed
+    Then the new access token is served and the spent refresh token is refused
     And an expired access token is answered 401 with a WWW-Authenticate challenge
 
   @integration
@@ -85,7 +84,7 @@ Feature: Hosted MCP answers main's root paths on the api process
   @integration
   Scenario: Only the client ends a session
     Given a client ended its session with DELETE
-    When the session id is presented on any replica
+    When the session id is presented on a replica that holds no copy of it
     Then the response status is 404
 
   @integration

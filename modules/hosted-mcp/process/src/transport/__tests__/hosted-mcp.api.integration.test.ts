@@ -1896,6 +1896,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when a client posts to the retired SSE message endpoint", () => {
+    /** @scenario "The retired SSE message endpoint is no longer served" */
     it("answers 404, as for any path the endpoint does not serve", async () => {
       const res = await sendRequest({
         server,
