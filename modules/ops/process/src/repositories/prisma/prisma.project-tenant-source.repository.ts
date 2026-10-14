@@ -1,6 +1,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { ProjectTenantSourceRepository } from "../tenant-source.repository.ts";
+import {
+  ProjectHasNoOrganizationError,
+  type ProjectTenantSourceRepository,
+} from "../tenant-source.repository.ts";
 
 export class PrismaProjectTenantSourceRepository implements ProjectTenantSourceRepository {
   readonly #prisma: PrismaClient;
@@ -36,6 +39,10 @@ export class PrismaProjectTenantSourceRepository implements ProjectTenantSourceR
       select: { team: { select: { organizationId: true } } },
     });
 
+    // `relationMode = "prisma"` carries no foreign key, so a project can outlive its team.
+    if (!project.team) {
+      throw new ProjectHasNoOrganizationError(projectId);
+    }
     return project.team.organizationId;
   }
 
@@ -49,9 +56,9 @@ export class PrismaProjectTenantSourceRepository implements ProjectTenantSourceR
       where: { id: { in: [...projectIds] } },
       select: { id: true, team: { select: { organizationId: true } } },
     });
-    return projects.map((project) => ({
-      projectId: project.id,
-      organizationId: project.team.organizationId,
-    }));
+    // An orphan (its team row is gone) has no organization, like an unknown project: left out.
+    return projects.flatMap((project) =>
+      project.team ? [{ projectId: project.id, organizationId: project.team.organizationId }] : [],
+    );
   }
 }
