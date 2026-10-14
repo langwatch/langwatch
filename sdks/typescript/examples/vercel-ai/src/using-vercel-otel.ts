@@ -1,8 +1,9 @@
 import * as readline from "readline";
 
 import { openai } from "@ai-sdk/openai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 import { registerOTel } from "@vercel/otel";
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
 import cliMarkdown from "cli-markdown";
 import { getLangWatchTracer, LangWatchExporter } from "langwatch";
 
@@ -11,6 +12,9 @@ registerOTel({
   serviceName: "vercel-ai-sdk-example",
   traceExporter: new LangWatchExporter(),
 });
+
+// AI SDK 7 emits no OpenTelemetry spans until an integration is registered.
+registerTelemetry(new OpenTelemetry());
 
 const tracer = getLangWatchTracer("vercel-ai-sdk-example");
 
@@ -25,16 +29,13 @@ async function main() {
   console.log('🤖 AI Chatbot started! Type "quit" to exit.');
   console.log("---");
 
+  const instructions =
+    "You are a helpful assistant that can answer questions and help with tasks. You may use markdown to format your responses.";
+
   const conversationHistory: {
-    role: "user" | "assistant" | "system";
+    role: "user" | "assistant";
     content: string;
-  }[] = [
-    {
-      role: "system",
-      content:
-        "You are a helpful assistant that can answer questions and help with tasks. You may use markdown to format your responses.",
-    },
-  ];
+  }[] = [];
 
   while (true) {
     let finish = false;
@@ -73,8 +74,8 @@ async function main() {
 
           const result = await generateText({
             model: openai("gpt-5-mini"),
+            instructions,
             messages: conversationHistory,
-            experimental_telemetry: { isEnabled: true },
           });
 
           const aiResponse = result.text;

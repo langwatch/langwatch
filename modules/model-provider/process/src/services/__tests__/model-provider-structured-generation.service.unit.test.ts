@@ -66,7 +66,7 @@ describe("ModelProviderStructuredGenerationService", () => {
       expect.objectContaining({
         model,
         schema: resultSchema,
-        system: "You generate scenarios.",
+        instructions: "You generate scenarios.",
         prompt: "A refund request",
         maxRetries: 1,
         abortSignal: expect.any(AbortSignal),

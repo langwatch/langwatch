@@ -19,6 +19,7 @@ Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 - **async-processing-ui.md** - Poll/banner/read-gate pattern for a processing→ready/failed resource
 - **soft-delete-vs-archive.md** - When to archive vs hard-delete
 - **error-handling.md** - When to throw a HandledError, what to put on it, how the client renders it
+- **ai-sdk.md** - Vercel AI SDK 7: `instructions` not system messages, telemetry registration, and the breakages the typechecker cannot see
 - **logging-and-tracing.md** - Logging infrastructure and context propagation
 - **local-observability.md** - Local LGTM stack (Grafana/Loki/Tempo/Prometheus); querying logs/traces as an agent with `gcx`
 - **dogfooding-isolation.md** - Dogfooding the CLI against a local instance without rewriting the machine's global agent wiring
