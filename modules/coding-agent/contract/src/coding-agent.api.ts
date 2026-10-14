@@ -91,9 +91,8 @@ export interface CodingAgentApi {
    * proof so an aggregate's page spans its members (ADR-177).
    */
   listForProject(
-    input: CodingAgentSessionsListInput,
+    input: CodingAgentSessionsListInput & { authorization: Authorization },
     by: CodingAgentViewer,
-    authorization: Authorization,
   ): Promise<CodingAgentSessionListRow[]>;
   /** Queues one span's bounded session facts onto coding_agent_processing (ADR-056/069). */
   contributeSpanFacts(data: ContributeSpanFactsCommandData): Promise<void>;

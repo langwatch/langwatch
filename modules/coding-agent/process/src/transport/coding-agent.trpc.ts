@@ -46,7 +46,7 @@ export const codingAgentTrpcTransport: TrpcRouterDeclaration<
   .procedure("sessionsList")
   .withPermission(CODING_AGENT_PERMISSION)
   .handle(({ app, input, actor, authorization }) =>
-    app.listForProject({ projectId: input.projectId }, actor, authorization),
+    app.listForProject({ projectId: input.projectId, authorization }, actor),
   )
 
   .procedure("pullRequestUsage")
