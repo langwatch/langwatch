@@ -113787,6 +113787,44 @@
                         "error",
                         "skipped"
                       ]
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "nodes": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "total_cost": {
+                      "type": "number"
+                    },
+                    "duration_ms": {
+                      "type": "number"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "node_id": {
+                          "type": "string"
+                        },
+                        "traceback": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "message"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -113887,6 +113925,44 @@
                         "error",
                         "skipped"
                       ]
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "nodes": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "total_cost": {
+                      "type": "number"
+                    },
+                    "duration_ms": {
+                      "type": "number"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "node_id": {
+                          "type": "string"
+                        },
+                        "traceback": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "message"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -113978,6 +114054,44 @@
                         "error",
                         "skipped"
                       ]
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "nodes": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "total_cost": {
+                      "type": "number"
+                    },
+                    "duration_ms": {
+                      "type": "number"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "node_id": {
+                          "type": "string"
+                        },
+                        "traceback": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "message"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
