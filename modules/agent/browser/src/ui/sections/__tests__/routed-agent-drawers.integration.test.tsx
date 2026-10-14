@@ -20,6 +20,7 @@ const calls = vi.hoisted(() => ({
   navigate: [] as string[],
   workflowCreated: [] as unknown[],
   agentCreated: [] as unknown[],
+  agentUpdated: [] as unknown[],
   listInvalidated: [] as unknown[],
 }));
 
@@ -84,7 +85,10 @@ vi.mock("../../../behavior/agent-api.ts", () => {
           calls.agentCreated.push(input);
           return Promise.resolve({ id: "agent_new" });
         }),
-        update: mutation(() => Promise.resolve({})),
+        update: mutation((input) => {
+          calls.agentUpdated.push(input);
+          return Promise.resolve({});
+        }),
       },
       workflow: {
         getById: {
@@ -172,6 +176,7 @@ afterEach(() => {
   calls.navigate.length = 0;
   calls.workflowCreated.length = 0;
   calls.agentCreated.length = 0;
+  calls.agentUpdated.length = 0;
   calls.listInvalidated.length = 0;
 });
 
@@ -377,6 +382,156 @@ describe("the workflow agent editor opened by address", () => {
 
     expect(screen.getByText("Edit Workflow Agent")).toBeTruthy();
     expect(screen.getByTestId("agent-name-input")).toHaveProperty("value", "Workflow agent");
+  });
+});
+
+/** A code agent as the previous release stored it, every key it wrote. */
+const storedCodeAgent = {
+  id: "agent_code",
+  name: "Triage code",
+  type: "code",
+  workflowId: null,
+  config: {
+    name: "Code",
+    description: "Python code block",
+    parameters: [{ identifier: "code", type: "code", value: "class Code: ..." }],
+    inputs: [
+      { identifier: "question", type: "str" },
+      { identifier: "locale", type: "str" },
+    ],
+    outputs: [
+      { identifier: "answer", type: "str" },
+      { identifier: "confidence", type: "float" },
+    ],
+    scenarioMappings: { question: { type: "source", sourceId: "scenario", path: ["input"] } },
+    scenarioOutputField: "answer",
+    timeoutMs: 30_000,
+  },
+};
+
+describe("the code agent editor opened on a stored agent", () => {
+  /** @scenario "Edit config shows the stored inputs, outputs and mappings" */
+  it("shows the agent's inputs, outputs and scenario mappings", () => {
+    fetched.agent = storedCodeAgent;
+    render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
+
+    expect(screen.getByRole("heading", { name: "Edit Code Agent" })).toBeInTheDocument();
+    // The agent's own Inputs, then the scenario mapping's.
+    expect(screen.getAllByText("Inputs")).toHaveLength(2);
+    expect(screen.getByText("Outputs")).toBeInTheDocument();
+    for (const identifier of ["question", "locale", "answer", "confidence"]) {
+      expect(screen.getByTestId(`variable-name-${identifier}`).textContent).toBe(identifier);
+    }
+    expect(screen.getByText("Scenario Mappings")).toBeInTheDocument();
+    expect(screen.getByText("Output")).toBeInTheDocument();
+  });
+
+  /** @scenario "Saving an edited agent keeps the keys the editor does not show" */
+  it("saves the stored inputs, outputs, mappings and timeout back unchanged", async () => {
+    fetched.agent = storedCodeAgent;
+    render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(calls.agentUpdated).toEqual([
+      expect.objectContaining({
+        id: "agent_code",
+        name: "Triage code",
+        config: expect.objectContaining({
+          inputs: storedCodeAgent.config.inputs,
+          outputs: storedCodeAgent.config.outputs,
+          scenarioMappings: storedCodeAgent.config.scenarioMappings,
+          scenarioOutputField: "answer",
+          timeoutMs: 30_000,
+        }),
+      }),
+    ]);
+  });
+});
+
+/** An HTTP agent as the previous release stored it, every key it wrote. */
+const storedHttpAgent = {
+  id: "agent_http",
+  name: "Support endpoint",
+  type: "http",
+  workflowId: null,
+  config: {
+    url: "https://agent.test/chat",
+    method: "POST",
+    bodyTemplate: '{"q": "{{input}}"}',
+    outputPath: "$.answer",
+    description: "HTTP API endpoint",
+    name: "HTTP",
+    headers: [{ key: "X-Team", value: "support" }],
+    scenarioMappings: { input: { type: "source", sourceId: "scenario", path: ["input"] } },
+    timeoutMs: 20_000,
+    sessionPath: "$.session",
+    devTunnel: { previousUrl: "https://agent.test/chat" },
+    inputs: [{ identifier: "question", type: "str" }],
+  },
+};
+
+describe("the HTTP agent editor opened on a stored agent", () => {
+  it("shows the stored endpoint and saves every stored key back", async () => {
+    fetched.agent = storedHttpAgent;
+    render(<RoutedAgentHttpEditorDrawer agentId="agent_http" />, { wrapper });
+
+    expect(screen.getByTestId("url-input")).toHaveProperty("value", "https://agent.test/chat");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(calls.agentUpdated).toEqual([
+      expect.objectContaining({
+        id: "agent_http",
+        config: expect.objectContaining({
+          url: "https://agent.test/chat",
+          bodyTemplate: '{"q": "{{input}}"}',
+          outputPath: "$.answer",
+          headers: [{ key: "X-Team", value: "support" }],
+          sessionPath: "$.session",
+          timeoutMs: 20_000,
+          devTunnel: { previousUrl: "https://agent.test/chat" },
+          inputs: [{ identifier: "question", type: "str" }],
+        }),
+      }),
+    ]);
+  });
+});
+
+const workflowWithEnd = {
+  ...linkedWorkflow,
+  currentVersion: {
+    dsl: {
+      ...linkedWorkflow.currentVersion.dsl,
+      nodes: [
+        ...linkedWorkflow.currentVersion.dsl.nodes,
+        {
+          id: "end",
+          type: "end",
+          position: { x: 300, y: 0 },
+          data: { name: "End", inputs: [{ identifier: "reply", type: "str" }] },
+        },
+      ],
+    },
+  },
+};
+
+describe("the workflow agent editor opened on a stored agent", () => {
+  it("shows the linked workflow and maps scenario data into its inputs and output", () => {
+    fetched.agent = {
+      ...workflowAgent,
+      config: {
+        ...workflowAgent.config,
+        scenarioMappings: { question: { type: "source", sourceId: "scenario", path: ["input"] } },
+        scenarioOutputField: "reply",
+      },
+    };
+    fetched.workflow = workflowWithEnd;
+    render(<RoutedAgentWorkflowEditorDrawer agentId="agent_wf" />, { wrapper });
+
+    expect(screen.getByText("Linked Workflow")).toBeInTheDocument();
+    expect(screen.getByText("Support triage")).toBeInTheDocument();
+    expect(screen.getByText("Scenario Mappings")).toBeInTheDocument();
+    expect(screen.getByText("Output")).toBeInTheDocument();
   });
 });
 
