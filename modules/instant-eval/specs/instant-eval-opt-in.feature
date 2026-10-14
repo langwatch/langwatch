@@ -13,9 +13,10 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     organization admin, and is never offered a button the server would refuse;
   - an enterprise organization is offered a word with us instead, and is never switched on by a
     click;
-  - a self-hosted install that judges through LangWatch is released by its license: the customer
-    signed a license that names Instant Evals, which is the same agreement, and an organization
-    admin can still switch hosted judging off in Settings, Connect;
+  - a self-hosted install that judges through LangWatch is released by its license alone: the
+    customer signed a license that names Instant Evals, which is the same agreement, and an
+    organization admin can still switch hosted judging off in Settings, Connect; the operator's
+    release flag never releases it, so no install judges without a license that names them;
   - a self-hosted install that is not released is told why in its own terms: its license does
     not include Instant Evals, an admin switched them off, it is not connected to LangWatch, or it
     has judging turned off, since judging runs on LangWatch Cloud only, and its operator decides;
@@ -24,8 +25,8 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     sends its text to the judge without having agreed to it; an enterprise organization is released
     by the flag alone, which is how one that asked gets them, and a switch thrown before it was on
     an enterprise plan no longer counts;
-  - elsewhere the operator's release flag stays as it was, and the flag, the license, or the
-    organization's own switch makes a project judgeable.
+  - an install that does not judge through LangWatch, which has judging turned off or is a
+    development checkout with its own key, is released by the operator's release flag.
 
   Rule: The offer depends on the plan, the deployment, and whether the member may throw the switch
 
@@ -51,7 +52,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       When the popover asks what to offer
       Then it is offered a word with us, whatever the member may do
 
-  Rule: A self-hosted install is released by its license, and told why when it is not
+  Rule: A self-hosted install is released by its license alone, and told why when it is not
 
     @unit
     Scenario: A license that names Instant Evals releases them without the flag
@@ -68,10 +69,18 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Then it may not
 
     @unit
-    Scenario: An install with judging turned off still waits for the release flag
-      Given a self-hosted install with judging turned off, with the release flag off
+    Scenario: The release flag does not release a self-hosted install without a license
+      Given a self-hosted install that judges through LangWatch, with the release flag on
+      And the organization's license does not name Instant Evals
       When the project asks whether it may judge
-      Then the license is not what releases it
+      Then it may not, and neither the flag nor the organization's own switch is read
+
+    @unit
+    Scenario: A development checkout waits for the release flag
+      Given a development checkout that does not judge through LangWatch
+      When the project asks whether it may judge
+      Then it may when the release flag is on and may not when it is off
+      And the license is not read
 
     @unit
     Scenario: A self-hosted install is told why from its judge and its license, and the plan is not read
