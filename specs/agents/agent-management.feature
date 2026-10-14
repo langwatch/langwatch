@@ -209,6 +209,47 @@ Feature: Agent management
     When I save without changes
     Then the stored inputs, outputs, mappings and timeout are saved back unchanged
 
+  @integration
+  Scenario: Code agent outputs offer the code output types
+    Given the AgentCodeEditorDrawer is open on a code agent
+    When I open an output's type
+    Then I can pick Text, Number, Boolean, JSON Schema, Object, List or Image
+    And a type a stored output already has is offered too
+
+  @integration
+  Scenario: Adding a JSON schema output to a code agent saves it with its schema
+    Given the AgentCodeEditorDrawer is open on a code agent
+    When I add a JSON Schema output and save
+    Then the agent's config stores an output named output_1 of type JSON schema with its schema
+    And reopening the agent shows that output as a JSON schema output
+
+  @integration
+  Scenario: Changing a code agent output's type saves the new type
+    Given the AgentCodeEditorDrawer is open on a code agent with a described output
+    When I change that output's type and save
+    Then the agent's config stores the new type
+    And the output keeps its description
+
+  @integration
+  Scenario: A stored JSON schema output keeps its schema through a save
+    Given a code agent with a JSON schema output
+    When I open it in the AgentCodeEditorDrawer and save
+    Then the output is stored again with its type and its schema
+
+  @integration
+  Scenario: Mapping a dataset column to a code agent input in the workbench
+    Given an evaluation workbench opens the AgentCodeEditorDrawer on a code agent target
+    When I map one of the agent's inputs to a dataset column
+    Then the workbench stores the mapping at once
+
+  @integration
+  Scenario: HTTP agent editor shows the Variables tab in the workbench
+    Given an evaluation workbench opens the AgentHttpEditorDrawer on an HTTP agent target
+    Then the editor shows a Variables tab that maps its variables to the dataset
+    And it says at least one variable must be mapped until one is
+    When I map a variable to a dataset column
+    Then the workbench stores the mapping at once
+
   # ============================================================================
   # Agent type selector drawer
   # ============================================================================
