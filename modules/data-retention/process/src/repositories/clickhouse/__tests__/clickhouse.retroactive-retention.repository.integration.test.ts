@@ -16,7 +16,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseRetroactiveRetentionRepository } from "../clickhouse.retroactive-retention.repository.ts";
 
-const clickHouseUrl = process.env.LANGWATCH_TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
+const clickHouseUrl = serverUrl(
+  process.env.LANGWATCH_TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL,
+);
 const database = `test_data_retention_${generate("test").toString().toLowerCase()}`;
 const tenantId = `project-${generate("test").toString()}`;
 const otherTenantId = `project-${generate("test").toString()}`;
@@ -311,3 +313,11 @@ describe.skipIf(!clickHouseUrl)("Id index retention on live ClickHouse", () => {
     expect(await indexRetention("event_log_id_index", project)).toEqual([365]);
   });
 });
+
+/** The server alone: each suite makes its own scratch database; CI's URL names test_langwatch. */
+function serverUrl(configured: string | undefined): string | undefined {
+  if (configured === undefined) return undefined;
+  const url = new URL(configured);
+  url.pathname = "/";
+  return url.toString();
+}
