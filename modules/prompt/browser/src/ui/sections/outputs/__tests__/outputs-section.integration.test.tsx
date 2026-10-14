@@ -22,7 +22,7 @@ describe("OutputsSection", () => {
   describe("given the prompt has the default single output of type str", () => {
     describe("when I add an output from the section", () => {
       /** @scenario "Adding an output from the section enables structured outputs" */
-      it("appends the new output alongside the existing one", async () => {
+      it("appends the new output alongside the existing one, named after the outputs", async () => {
         const user = userEvent.setup();
         const { onChange } = renderSection([{ identifier: "output", type: "str" }]);
 
@@ -31,7 +31,7 @@ describe("OutputsSection", () => {
 
         expect(onChange).toHaveBeenCalledWith([
           { identifier: "output", type: "str" },
-          expect.objectContaining({ type: "str" }),
+          { identifier: "output_1", type: "str" },
         ]);
       });
     });

@@ -28,8 +28,8 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ ...drawer, openDrawer: vi.fn() }),
   getDrawerStack: () => stack.entries,
   getComplexProps: () => opener.props,
-  getFlowCallbacks: (name: string) =>
-    name === "agentWorkflowTargetEditor" && opener.onInputMappingsChange
+  getFlowCallbacks: () =>
+    opener.onInputMappingsChange
       ? { onInputMappingsChange: opener.onInputMappingsChange }
       : undefined,
 }));
@@ -124,6 +124,55 @@ vi.mock("../../../behavior/lent-setup-with-agent-button.tsx", () => ({
     <button type="button" data-testid="setup-with-agent" data-surface={surface}>
       Setup via Agent
     </button>
+  ),
+}));
+
+/** Prompt's lent outputs editor, reduced to its contract: typed rows, retyped through onChange. */
+vi.mock("../../../behavior/lent-outputs-section.tsx", () => ({
+  OutputsSection: ({
+    title,
+    outputs,
+    onChange,
+    availableTypes,
+  }: {
+    title: string;
+    outputs: { identifier: string; type: string; json_schema?: object }[];
+    onChange: (outputs: { identifier: string; type: string; json_schema?: object }[]) => void;
+    availableTypes: string[];
+  }) => (
+    <section aria-label={title}>
+      <span>{title}</span>
+      {outputs.map((output) => (
+        <label key={output.identifier}>
+          <span data-testid={`output-name-${output.identifier}`}>{output.identifier}</span>
+          <select
+            aria-label={`Type of ${output.identifier}`}
+            value={output.type}
+            onChange={(event) =>
+              onChange(
+                outputs.map((row) =>
+                  row.identifier === output.identifier
+                    ? {
+                        ...row,
+                        type: event.target.value,
+                        ...(event.target.value === "json_schema"
+                          ? { json_schema: { type: "object", properties: {} } }
+                          : {}),
+                      }
+                    : row,
+                ),
+              )
+            }
+          >
+            {availableTypes.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
+    </section>
   ),
 }));
 
@@ -419,8 +468,11 @@ describe("the code agent editor opened on a stored agent", () => {
     // The agent's own Inputs, then the scenario mapping's.
     expect(screen.getAllByText("Inputs")).toHaveLength(2);
     expect(screen.getByText("Outputs")).toBeInTheDocument();
-    for (const identifier of ["question", "locale", "answer", "confidence"]) {
+    for (const identifier of ["question", "locale"]) {
       expect(screen.getByTestId(`variable-name-${identifier}`).textContent).toBe(identifier);
+    }
+    for (const identifier of ["answer", "confidence"]) {
+      expect(screen.getByTestId(`output-name-${identifier}`).textContent).toBe(identifier);
     }
     expect(screen.getByText("Scenario Mappings")).toBeInTheDocument();
     expect(screen.getByText("Output")).toBeInTheDocument();
@@ -605,5 +657,161 @@ describe("the agent list drawer opened by address", () => {
     await userEvent.setup().click(screen.getByText("Code Processor"));
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "agent_1" }));
     expect(drawer.closeDrawer).toHaveBeenCalled();
+  });
+});
+
+describe("the code agent editor's outputs", () => {
+  /** @scenario "Code agent outputs offer the code output types" */
+  it("offers the code output types, as the previous release did", () => {
+    fetched.agent = storedCodeAgent;
+    render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
+
+    const options = within(screen.getByLabelText("Type of answer")).getAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual([
+      "str",
+      "float",
+      "bool",
+      "dict",
+      "list",
+      "image",
+    ]);
+  });
+
+  /** @scenario "Changing a code agent output's type saves the new type" */
+  it("saves an output's new type and keeps the output's other keys", async () => {
+    fetched.agent = {
+      ...storedCodeAgent,
+      config: {
+        ...storedCodeAgent.config,
+        outputs: [
+          { identifier: "answer", type: "str" },
+          { identifier: "confidence", type: "float", desc: "How sure it is" },
+        ],
+      },
+    };
+    render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText("Type of confidence"), "dict");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(calls.agentUpdated).toEqual([
+      expect.objectContaining({
+        config: expect.objectContaining({
+          outputs: [
+            { identifier: "answer", type: "str" },
+            { identifier: "confidence", type: "dict", desc: "How sure it is" },
+          ],
+        }),
+      }),
+    ]);
+  });
+
+  /** @scenario "A stored JSON schema output keeps its schema through a save" */
+  it("offers and saves back a stored JSON schema output with its schema", async () => {
+    const schema = {
+      type: "object",
+      properties: { label: { type: "string" } },
+      required: ["label"],
+    };
+    fetched.agent = {
+      ...storedCodeAgent,
+      config: {
+        ...storedCodeAgent.config,
+        outputs: [{ identifier: "verdict", type: "json_schema", json_schema: schema }],
+        scenarioOutputField: "verdict",
+      },
+    };
+    render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
+
+    const user = userEvent.setup();
+    expect(screen.getByLabelText("Type of verdict")).toHaveProperty("value", "json_schema");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(calls.agentUpdated).toEqual([
+      expect.objectContaining({
+        config: expect.objectContaining({
+          outputs: [{ identifier: "verdict", type: "json_schema", json_schema: schema }],
+        }),
+      }),
+    ]);
+  });
+
+  it("drops the schema when a JSON schema output is retyped", async () => {
+    fetched.agent = {
+      ...storedCodeAgent,
+      config: {
+        ...storedCodeAgent.config,
+        outputs: [{ identifier: "verdict", type: "json_schema", json_schema: { type: "object" } }],
+        scenarioOutputField: "verdict",
+      },
+    };
+    render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText("Type of verdict"), "str");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(calls.agentUpdated).toEqual([
+      expect.objectContaining({
+        config: expect.objectContaining({ outputs: [{ identifier: "verdict", type: "str" }] }),
+      }),
+    ]);
+  });
+});
+
+describe("the code agent editor opened from an evaluation workbench", () => {
+  /** @scenario "Mapping a dataset column to a code agent input in the workbench" */
+  it("maps its inputs to the workbench's dataset and writes a pick at once", async () => {
+    const saved: unknown[][] = [];
+    fetched.agent = storedCodeAgent;
+    opener.props = { availableSources: datasetSources, inputMappings: {} };
+    opener.onInputMappingsChange = (...args) => saved.push(args);
+    render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("mapping-input-question"));
+    await user.click(await screen.findByTestId("field-option-user_question"));
+
+    expect(saved).toEqual([
+      ["question", { type: "source", sourceId: "dataset_1", path: ["user_question"] }],
+    ]);
+  });
+
+  it("shows no dataset mapping outside a workbench", () => {
+    fetched.agent = storedCodeAgent;
+    render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
+
+    expect(screen.queryByTestId("mapping-input-question")).toBeNull();
+  });
+});
+
+describe("the HTTP agent editor opened from an evaluation workbench", () => {
+  /** @scenario "HTTP agent editor shows the Variables tab in the workbench" */
+  it("shows a Variables tab mapping its variables to the workbench's dataset", async () => {
+    const saved: unknown[][] = [];
+    fetched.agent = storedHttpAgent;
+    opener.props = { availableSources: datasetSources, inputMappings: {} };
+    opener.onInputMappingsChange = (...args) => saved.push(args);
+    render(<RoutedAgentHttpEditorDrawer agentId="agent_http" />, { wrapper });
+
+    expect(screen.getByText("Input Variables")).toBeInTheDocument();
+    expect(screen.getByTestId("at-least-one-mapping-error")).toBeInTheDocument();
+    const user = userEvent.setup();
+    const variablesTab = screen.getByRole("tabpanel", { name: "Variables" });
+    await user.click(within(variablesTab).getByTestId("mapping-input-input"));
+    await user.click(await screen.findByTestId("field-option-user_question"));
+
+    expect(saved).toEqual([
+      ["input", { type: "source", sourceId: "dataset_1", path: ["user_question"] }],
+    ]);
+    expect(screen.queryByTestId("at-least-one-mapping-error")).toBeNull();
+  });
+
+  it("shows no Variables tab outside a workbench", () => {
+    fetched.agent = storedHttpAgent;
+    render(<RoutedAgentHttpEditorDrawer agentId="agent_http" />, { wrapper });
+
+    expect(screen.queryByText("Input Variables")).toBeNull();
   });
 });
