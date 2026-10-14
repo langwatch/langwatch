@@ -178,7 +178,7 @@ func TestA503IsRetriedWithBackoff(t *testing.T) {
 		t.Errorf("%d 503 attempts recorded, want 2: %s", retries, stepLine(st))
 	}
 
-	// With no Retry-After the wait doubles from 250ms; a named one is honoured.
+	// With no Retry-After the wait doubles from 250ms; a named one is respected.
 	if a, b := backoff(exchange{}, 0), backoff(exchange{}, 1); a != 250*time.Millisecond || b != 500*time.Millisecond {
 		t.Errorf("backoff %s then %s, want 250ms then 500ms", a, b)
 	}
@@ -403,7 +403,7 @@ func TestSoakRunsConcurrentClientsAndCountsThem(t *testing.T) {
 	}
 }
 
-// @scenario "A run request the sim cannot honour is refused before it starts"
+// @scenario "A run request the sim cannot run is refused before it starts"
 func TestRequestsAreCheckedBeforeARunStarts(t *testing.T) {
 	f := newFakeLangWatch(t)
 	_, sim := simAt(t, f)

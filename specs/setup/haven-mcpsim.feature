@@ -141,7 +141,7 @@ Feature: mcpsim, a simulator of MCP clients against the hosted MCP endpoint
       When a run or an OAuth connect is posted as text/plain
       Then the sim answers 415 and starts no run
 
-    Scenario: A run request the sim cannot honour is refused before it starts
+    Scenario: A run request the sim cannot run is refused before it starts
       When a run names an unknown scenario, an OAuth-only scenario on the API key flow, the OAuth flow with no grant, an unknown transport, too many soak clients, or another endpoint with no key
       Then each answers 400 with the reason
       And no run starts
