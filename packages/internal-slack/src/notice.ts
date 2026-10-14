@@ -163,9 +163,34 @@ const footerBlock = (origin: NoticeOrigin): KnownBlock => ({
   ],
 });
 
+/** Clips before escaping, so a cut never splits an entity; a mrkdwn part that won't fit drops. */
+function clipMrkdwn({ text, limit }: { text: NoticeText; limit: number }): string {
+  const whole = toMrkdwn(text);
+  if (whole.length <= limit) return whole;
+  let out = "";
+  for (const part of parts(text)) {
+    const room = limit - 1 - out.length;
+    const rendered = typeof part === "string" ? escapeMrkdwn(part) : part.mrkdwn;
+    if (rendered.length <= room) {
+      out += rendered;
+      continue;
+    }
+    if (typeof part === "string") {
+      let kept = "";
+      for (const char of part) {
+        if (escapeMrkdwn(kept + char).length > room) break;
+        kept += char;
+      }
+      out += escapeMrkdwn(kept);
+    }
+    break;
+  }
+  return `${out}…`;
+}
+
 const cardText = ({ text, limit }: { text: NoticeText; limit: number }): MrkdwnElement => ({
   type: "mrkdwn",
-  text: clip({ text: toMrkdwn(text), limit }),
+  text: clipMrkdwn({ text, limit }),
 });
 
 /** The card look: one card block, then where and when it was sent. */
