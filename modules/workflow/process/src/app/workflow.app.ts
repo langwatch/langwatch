@@ -64,7 +64,6 @@ import {
   type WorkflowRunOrigin,
   type WorkflowRunPrincipal,
   type WorkflowSourceRow,
-  type WorkflowStudioSyncAnswer,
   type WorkflowVersion,
   type WorkflowVersionHistoryEntry,
   type WorkflowVersionHistoryMode,
@@ -707,7 +706,7 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     origin: WorkflowRunOrigin;
     causalityDepth?: number;
     parentTrace?: { traceId: string; parentSpanId: string };
-  }): Promise<WorkflowStudioSyncAnswer> {
+  }): Promise<WorkflowRunAnswer> {
     return this.#infrastructure.studioSync.execute(input);
   }
 

@@ -1,4 +1,4 @@
-/** A peer's synchronous Studio event reaches the project's engine and comes back parsed. */
+/** A peer's synchronous Studio event reaches the project's engine; a refusal is a handled error. */
 
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
@@ -12,7 +12,7 @@ import { WorkflowStudioSyncService } from "../workflow-studio-sync.service.ts";
 
 const event: StudioClientEvent = { type: "is_alive", payload: {} };
 
-function buildService(answer: { ok: boolean; status: number; statusText: string; text: string }) {
+function buildService(answer: { ok: boolean; status: number; statusText: string; body: unknown }) {
   const calls: WorkflowNlpDispatchInput[] = [];
   const runtime: WorkflowNlpRuntime = {
     dispatch: async (input): Promise<WorkflowNlpDispatchResponse> => {
@@ -21,8 +21,8 @@ function buildService(answer: { ok: boolean; status: number; statusText: string;
         ok: answer.ok,
         status: answer.status,
         statusText: answer.statusText,
-        json: () => Promise.reject(new Error("the service reads text")),
-        text: async () => answer.text,
+        json: async () => answer.body,
+        text: async () => JSON.stringify(answer.body),
       };
     },
   };
@@ -31,13 +31,13 @@ function buildService(answer: { ok: boolean; status: number; statusText: string;
 }
 
 describe("WorkflowStudioSyncService", () => {
-  describe("when the engine answers with JSON", () => {
-    it("dispatches to the project's engine and returns the parsed body", async () => {
+  describe("when the engine answers", () => {
+    it("dispatches to the project's engine and returns the parsed run answer", async () => {
       const { calls, service } = buildService({
         ok: true,
         status: 200,
         statusText: "OK",
-        text: '{"status":"success","result":{"passed":true}}',
+        body: { status: "success", result: { passed: true } },
       });
 
       const answer = await service.execute({
@@ -50,32 +50,22 @@ describe("WorkflowStudioSyncService", () => {
       expect(calls).toEqual([
         { projectId: "project_1", body: event, origin: "evaluation", causalityDepth: 2 },
       ]);
-      expect(answer).toEqual({
-        ok: true,
-        status: 200,
-        statusText: "OK",
-        body: { status: "success", result: { passed: true } },
-      });
+      expect(answer).toEqual({ status: "success", result: { passed: true } });
     });
   });
 
-  describe("when the engine answers with a non-JSON page", () => {
-    it("returns the page as text", async () => {
+  describe("when the engine refuses", () => {
+    it("throws workflow_execution_failed", async () => {
       const { service } = buildService({
-        ok: false,
-        status: 502,
-        statusText: "Bad Gateway",
-        text: "<html>bad gateway</html>",
-      });
-
-      const answer = await service.execute({ projectId: "project_1", event, origin: "evaluation" });
-
-      expect(answer).toEqual({
         ok: false,
         status: 502,
         statusText: "Bad Gateway",
         body: "<html>bad gateway</html>",
       });
+
+      await expect(
+        service.execute({ projectId: "project_1", event, origin: "evaluation" }),
+      ).rejects.toMatchObject({ code: "workflow_execution_failed" });
     });
   });
 });

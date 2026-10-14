@@ -1,40 +1,21 @@
 /** Customer code evaluator on NLP engine; dispatch uses Studio path for trace consistency. */
-import type { StudioClientEvent, WorkflowApi } from "@langwatch/workflow-contract";
-import { z } from "zod";
-
-const codeExecutionResponseBodySchema = z.object({
-  status: z.string(),
-  result: z.record(z.string(), z.unknown()).nullish(),
-  error: z
-    .object({
-      message: z.string().optional(),
-      traceback: z.string().optional(),
-    })
-    .optional(),
-});
+import type {
+  StudioClientEvent,
+  WorkflowApi,
+  WorkflowRunAnswer,
+} from "@langwatch/workflow-contract";
 
 /** The one workflow operation a code evaluator's run needs. */
 type EvaluatorStudioRunner = Pick<WorkflowApi, "executeStudioEventSync">;
 
-/** One run of a code evaluator, as the code service reads the answer. */
-type EvaluatorCodeExecutionResult = {
-  ok: boolean;
-  statusText: string;
-  body: {
-    result?: Record<string, unknown> | null;
-    status: string;
-    error?: { message?: string; traceback?: string };
-  };
-};
-
-/** Where a code evaluator's one-node graph runs. */
+/** Where a code evaluator's one-node graph runs; an engine refusal throws a handled error. */
 export interface EvaluatorCodeExecution {
   execute(input: {
     projectId: string;
     event: StudioClientEvent;
     causalityDepth: number;
     parentTrace?: { traceId: string; parentSpanId: string };
-  }): Promise<EvaluatorCodeExecutionResult>;
+  }): Promise<WorkflowRunAnswer>;
 }
 
 export class EvaluatorCodeExecutionService implements EvaluatorCodeExecution {
@@ -48,40 +29,18 @@ export class EvaluatorCodeExecutionService implements EvaluatorCodeExecution {
 
   private constructor(private readonly workflows: EvaluatorStudioRunner) {}
 
-  async execute(input: {
+  execute(input: {
     projectId: string;
     event: StudioClientEvent;
     causalityDepth: number;
     parentTrace?: { traceId: string; parentSpanId: string };
-  }): Promise<EvaluatorCodeExecutionResult> {
-    const response = await this.workflows.executeStudioEventSync({
+  }): Promise<WorkflowRunAnswer> {
+    return this.workflows.executeStudioEventSync({
       projectId: input.projectId,
       event: input.event,
       origin: "evaluation",
       causalityDepth: input.causalityDepth,
       ...(input.parentTrace ? { parentTrace: input.parentTrace } : {}),
     });
-
-    if (response.ok) {
-      return {
-        ok: true,
-        statusText: response.statusText,
-        body: codeExecutionResponseBodySchema.parse(response.body),
-      };
-    }
-
-    const refusal = codeExecutionResponseBodySchema.safeParse(response.body);
-    const error = refusal.success ? refusal.data.error : undefined;
-    return {
-      ok: false,
-      statusText: response.statusText,
-      body: {
-        status: "error",
-        error: {
-          message: error?.message ?? response.statusText,
-          ...(error?.traceback ? { traceback: error.traceback } : {}),
-        },
-      },
-    };
   }
 }

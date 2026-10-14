@@ -1,10 +1,15 @@
-import type {
-  StudioClientEvent,
-  WorkflowRunOrigin,
-  WorkflowStudioSyncAnswer,
+import { createLogger } from "@langwatch/observability";
+import {
+  workflowRunAnswerSchema,
+  WorkflowExecutionFailedError,
+  type StudioClientEvent,
+  type WorkflowRunAnswer,
+  type WorkflowRunOrigin,
 } from "@langwatch/workflow-contract";
 
 import type { WorkflowNlpRuntime } from "../app/workflow.app.ts";
+
+const logger = createLogger("langwatch:workflows:studio-sync");
 
 /** A peer's prepared Studio event run to completion on its project's own engine. */
 export class WorkflowStudioSyncService {
@@ -20,7 +25,7 @@ export class WorkflowStudioSyncService {
     origin: WorkflowRunOrigin;
     causalityDepth?: number;
     parentTrace?: { traceId: string; parentSpanId: string };
-  }): Promise<WorkflowStudioSyncAnswer> {
+  }): Promise<WorkflowRunAnswer> {
     const response = await this.options.runtime.dispatch({
       projectId: input.projectId,
       body: input.event,
@@ -28,21 +33,16 @@ export class WorkflowStudioSyncService {
       ...(input.causalityDepth === undefined ? {} : { causalityDepth: input.causalityDepth }),
       ...(input.parentTrace ? { parentTrace: input.parentTrace } : {}),
     });
+    if (!response.ok) {
+      const refusal = new Error(`The engine answered ${response.status} ${response.statusText}`);
+      logger.error(
+        { status: response.status, projectId: input.projectId, origin: input.origin },
+        "nlpgo execute_sync returned a non-OK response",
+      );
 
-    return {
-      ok: response.ok,
-      status: response.status,
-      statusText: response.statusText,
-      body: WorkflowStudioSyncService.parseBody(await response.text()),
-    };
-  }
-
-  /** A gateway's HTML error page stays text; the caller branches on `ok` first. */
-  private static parseBody(text: string): unknown {
-    try {
-      return JSON.parse(text);
-    } catch {
-      return text;
+      throw new WorkflowExecutionFailedError({ reasons: [refusal] });
     }
+
+    return workflowRunAnswerSchema.parse(await response.json());
   }
 }

@@ -45,14 +45,6 @@ export type WorkflowMappingFields = {
 
 export type WorkflowReference = { workflowId: string; projectId: string };
 
-/** The engine's answer to one synchronous Studio event: its status and parsed body. */
-export type WorkflowStudioSyncAnswer = Readonly<{
-  ok: boolean;
-  status: number;
-  statusText: string;
-  body: unknown;
-}>;
-
 /** Who a write is attributed to. */
 export type WorkflowCaller = Readonly<{ id: string }>;
 
@@ -241,8 +233,8 @@ export interface WorkflowApi {
     principal?: WorkflowRunPrincipal | undefined;
   }): Promise<StudioClientEvent>;
   /**
-   * One prepared Studio event run to completion on the project's engine. A JSON body comes
-   * back parsed; anything else, such as a gateway's error page, as text.
+   * One prepared Studio event run to completion on the project's engine. An engine refusal
+   * throws `WorkflowExecutionFailedError`; the run's own failure is in the answer's `error`.
    */
   executeStudioEventSync(input: {
     projectId: string;
@@ -250,7 +242,7 @@ export interface WorkflowApi {
     origin: WorkflowRunOrigin;
     causalityDepth?: number;
     parentTrace?: { traceId: string; parentSpanId: string };
-  }): Promise<WorkflowStudioSyncAnswer>;
+  }): Promise<WorkflowRunAnswer>;
   /** The evaluator-fields shape a peer's guard and run read off this workflow. */
   getFields(input: { workflowId: string; projectId: string }): Promise<WorkflowEvaluatorFields>;
   prepareStudioDsl(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow>;
