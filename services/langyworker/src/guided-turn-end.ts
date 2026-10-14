@@ -305,7 +305,6 @@ export function guidedTurnEnding(calls: readonly TurnCall[]): GuidedTurnEnder {
   if (!last) return "bare";
   if (CARD_TOOL_NAMES.has(last.name)) return "card";
   if (last.name !== SAY_TOOL_NAME) return "bare";
-  // The handover line ends the turn only as its last line.
   const handsOver = sayTexts([last]).some((text) => text.includes(ANOTHER_FOLDER_LINE));
   if (handsOver) return "handover";
   // The lines at the end are read against the last call that was not a line.
