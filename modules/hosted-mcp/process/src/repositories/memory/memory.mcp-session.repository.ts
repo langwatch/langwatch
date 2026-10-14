@@ -1,18 +1,18 @@
-import {
-  McpSessionRepository,
-  type McpSessionRecordLookup,
-  type McpSessionTransport,
-} from "../mcp-session.repository.ts";
+import { nowInstant } from "@langwatch/time";
+
+import { McpSessionRepository, type McpSessionRecordLookup } from "../mcp-session.repository.ts";
 
 type MemoryRecord = {
-  transport: McpSessionTransport;
   apiKey: string;
   projectId: string | undefined;
+  userId: string | undefined;
 };
 
 /** Session records held in this process, keys in plaintext: one replica, every record its own. */
 export class MemoryMcpSessionRepository extends McpSessionRepository {
   readonly #records = new Map<string, MemoryRecord>();
+  /** Last activity per key, then per session id, as the Redis tier's sorted sets hold it. */
+  readonly #activity = new Map<string, Map<string, number>>();
 
   private constructor() {
     super();
@@ -27,45 +27,52 @@ export class MemoryMcpSessionRepository extends McpSessionRepository {
   }
 
   store(input: {
-    transport: McpSessionTransport;
     sessionId: string;
     apiKey: string;
     projectId?: string;
+    userId?: string;
   }): Promise<void> {
-    this.#records.set(`${input.transport}:${input.sessionId}`, {
-      transport: input.transport,
+    this.#records.set(input.sessionId, {
       apiKey: input.apiKey,
       projectId: input.projectId,
+      userId: input.userId,
     });
+    this.#markActive(input);
     return Promise.resolve();
   }
 
-  touch(): Promise<void> {
+  touch(input: { sessionId: string; apiKey: string }): Promise<void> {
+    if (this.#records.has(input.sessionId)) this.#markActive(input);
     return Promise.resolve();
   }
 
-  getRecord(input: {
-    transport: McpSessionTransport;
-    sessionId: string;
-  }): Promise<McpSessionRecordLookup> {
-    const record = this.#records.get(`${input.transport}:${input.sessionId}`);
-    return Promise.resolve(
-      record
-        ? { kind: "found", apiKey: record.apiKey, projectId: record.projectId }
-        : { kind: "missing" },
-    );
+  getRecord(input: { sessionId: string }): Promise<McpSessionRecordLookup> {
+    const record = this.#records.get(input.sessionId);
+    return Promise.resolve(record ? { kind: "found", ...record } : { kind: "missing" });
   }
 
-  remove(input: { transport: McpSessionTransport; sessionId: string }): Promise<void> {
-    this.#records.delete(`${input.transport}:${input.sessionId}`);
+  remove(input: { sessionId: string; apiKey?: string }): Promise<void> {
+    this.#records.delete(input.sessionId);
+    if (input.apiKey !== undefined) this.#activity.get(input.apiKey)?.delete(input.sessionId);
     return Promise.resolve();
   }
 
-  countLive({ apiKey }: { apiKey: string }): Promise<number> {
+  forgetKey(input: { sessionId: string; apiKey: string }): Promise<void> {
+    this.#activity.get(input.apiKey)?.delete(input.sessionId);
+    return Promise.resolve();
+  }
+
+  countActive({ apiKey, since }: { apiKey: string; since: number }): Promise<number> {
     let count = 0;
-    for (const record of this.#records.values()) {
-      if (record.apiKey === apiKey) count++;
+    for (const at of this.#activity.get(apiKey)?.values() ?? []) {
+      if (at >= since) count++;
     }
     return Promise.resolve(count);
+  }
+
+  #markActive(input: { sessionId: string; apiKey: string }): void {
+    const byId = this.#activity.get(input.apiKey) ?? new Map<string, number>();
+    byId.set(input.sessionId, nowInstant().epochMilliseconds);
+    this.#activity.set(input.apiKey, byId);
   }
 }

@@ -81,6 +81,12 @@ export class McpHttpService {
     });
   }
 
+  /** A store the request needs is down: worth a retry, and never a reason to sign in again. */
+  sendUnavailable(res: ServerResponse, retryAfterSeconds = 5): void {
+    res.setHeader("Retry-After", String(retryAfterSeconds));
+    this.sendJson(res, 503, { error: "Temporarily unavailable, retry shortly" });
+  }
+
   sendMethodNotAllowed(res: ServerResponse): void {
     this.sendJson(res, 405, { error: "Method not allowed" });
   }

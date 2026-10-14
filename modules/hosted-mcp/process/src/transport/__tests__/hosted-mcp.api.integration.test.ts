@@ -301,8 +301,9 @@ async function sendRequest({
   if (body && !fetchHeaders["content-type"]) {
     fetchHeaders["content-type"] = "application/json";
   }
-  // MCP Streamable HTTP requires Accept header for POST/GET on /mcp
-  if (path === "/mcp" && (method === "POST" || method === "GET") && !fetchHeaders.accept) {
+  // MCP Streamable HTTP requires Accept header for POST/GET on /mcp (and its /sse alias)
+  const streamablePath = path === "/mcp" || path === "/sse";
+  if (streamablePath && (method === "POST" || method === "GET") && !fetchHeaders.accept) {
     fetchHeaders.accept = "text/event-stream, application/json";
   }
 
@@ -1203,7 +1204,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
   describe("when a client refreshes while its MCP session is open", () => {
     /** @scenario "An open MCP session adopts the refreshed token of the same person and project" */
-    it("serves the session under the refreshed token and refuses another person's", async () => {
+    it("serves the session under the refreshed token and hides it from another person", async () => {
       const first = await exchangeCode();
       const opened = await sendRequest({
         server,
@@ -1239,7 +1240,8 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(adopted.status).toBe(200);
-      expect(refused.status).toBe(401);
+      // A valid token for someone else learns nothing and is not sent to sign in again.
+      expect(refused.status).toBe(404);
     });
   });
 
@@ -1848,99 +1850,61 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
   });
 
-  // --- SSE Transport Tool Execution ---
+  // --- /sse, the retired SSE transport's URL ---
 
-  describe("when a tool is called via the SSE transport", () => {
-    it("propagates the API key to search_traces", async () => {
+  describe("when a client still configured with /sse connects", () => {
+    /** @scenario "A client configured with the retired /sse URL is served Streamable HTTP" */
+    it("opens a Streamable HTTP session there and calls a tool on it", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
+      const authorization = `Bearer ${VALID_API_KEY}`;
 
-      const addr = server.address();
-      const port = typeof addr === "object" && addr ? addr.port : 0;
-      const baseUrl = `http://127.0.0.1:${port}`;
+      const initRes = await sendRequest({
+        server,
+        path: "/sse",
+        body: mcpInitializeBody(),
+        headers: { authorization },
+      });
+      expect(initRes.status).toBe(200);
+      const sessionId = initRes.headers["mcp-session-id"]!;
+      expect(sessionId).toBeTruthy();
 
-      // 1. Connect via SSE — GET /sse with Bearer token
-      // Use AbortController since SSE is a long-lived stream
-      const abortController = new AbortController();
-      const sseChunks: string[] = [];
+      await sendRequest({
+        server,
+        path: "/sse",
+        body: { jsonrpc: "2.0", method: "notifications/initialized" },
+        headers: { authorization, "mcp-session-id": sessionId },
+      });
 
-      const ssePromise = fetch(`${baseUrl}/sse`, {
-        method: "GET",
+      const listRes = await sendRequest({
+        server,
+        path: "/sse",
+        body: { jsonrpc: "2.0", id: 7, method: "tools/list" },
+        headers: { authorization, "mcp-session-id": sessionId },
+      });
+      expect(listRes.status).toBe(200);
+      const result = listRes.json().result as { tools: unknown[] };
+      expect(result.tools.length).toBeGreaterThan(0);
+
+      const closeRes = await sendRequest({
+        server,
+        method: "DELETE",
+        path: "/sse",
+        headers: { authorization, "mcp-session-id": sessionId },
+      });
+      expect(closeRes.status).toBe(200);
+    });
+  });
+
+  describe("when a client posts to the retired SSE message endpoint", () => {
+    it("answers 404, as for any path the endpoint does not serve", async () => {
+      const res = await sendRequest({
+        server,
+        path: "/messages?sessionId=anything",
+        body: mcpInitializeBody(),
         headers: { authorization: `Bearer ${VALID_API_KEY}` },
-        signal: abortController.signal,
-      }).then(async (res) => {
-        expect(res.status).toBe(200);
-        const reader = res.body!.getReader();
-        const decoder = new TextDecoder();
-        // Read chunks until we have the endpoint event
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          sseChunks.push(decoder.decode(value, { stream: true }));
-          const joined = sseChunks.join("");
-          if (joined.includes("event: endpoint")) break;
-        }
       });
 
-      // Wait for the endpoint event
-      await ssePromise;
-
-      // Parse SSE stream to get the endpoint event with session URL
-      const sseBody = sseChunks.join("");
-      const endpointMatch = sseBody.match(/event:\s*endpoint\ndata:\s*(.+)/);
-      expect(endpointMatch).toBeTruthy();
-
-      const messagesPath = endpointMatch![1]!.trim();
-      expect(messagesPath).toContain("sessionId=");
-
-      // 2. Send initialize request via POST /messages
-      const initRes = await fetch(`${baseUrl}${messagesPath}`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${VALID_API_KEY}`,
-        },
-        body: JSON.stringify(mcpInitializeBody()),
-      });
-      expect(initRes.status).toBe(202);
-
-      // 3. Send initialized notification
-      await fetch(`${baseUrl}${messagesPath}`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${VALID_API_KEY}`,
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          method: "notifications/initialized",
-        }),
-      });
-
-      // 4. Call search_traces via SSE transport
-      const toolRes = await fetch(`${baseUrl}${messagesPath}`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${VALID_API_KEY}`,
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 7,
-          method: "tools/call",
-          params: { name: "search_traces", arguments: {} },
-        }),
-      });
-      expect(toolRes.status).toBe(202);
-
-      // Wait for the tool to execute (response goes through SSE stream)
-      await new Promise((done) => setTimeout(done, 2000));
-
-      // Verify the server is still healthy (tool didn't crash it)
-      const healthRes = await fetch(`${baseUrl}/mcp/health`);
-      expect(healthRes.status).toBe(200);
-
-      // Clean up the SSE connection
-      abortController.abort();
+      expect(res.status).toBe(404);
     });
   });
 });

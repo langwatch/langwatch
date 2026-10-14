@@ -8,7 +8,6 @@ import { nowInstant } from "@langwatch/time";
 
 import type { McpOAuthClientRepository } from "../repositories/mcp-oauth-client.repository.ts";
 import type { McpOAuthTokenRepository } from "../repositories/mcp-oauth-token.repository.ts";
-import type { McpSessionRelayRepository } from "../repositories/mcp-session-relay.repository.ts";
 import type { McpSessionRepository } from "../repositories/mcp-session.repository.ts";
 import {
   AUTHORIZATION_SERVER_METADATA_PATH,
@@ -24,7 +23,6 @@ import { McpHttpService } from "./mcp-http.service.ts";
 import { McpOAuthEndpointService } from "./mcp-oauth-endpoint.service.ts";
 import { type McpCliSessions, McpOAuthTokenService } from "./mcp-oauth-token.service.ts";
 import { McpSessionService } from "./mcp-session.service.ts";
-import { McpSseTransportService } from "./mcp-sse-transport.service.ts";
 import { McpStreamableTransportService } from "./mcp-streamable-transport.service.ts";
 import type { ProjectMcpProjectLookupService } from "./project-mcp-project-lookup.service.ts";
 
@@ -32,21 +30,25 @@ const logger = createLogger("langwatch:mcp");
 
 const REAPER_INTERVAL_MS = 60 * 1000;
 
+/** Under the shortest idle timeout a proxy in front of us is likely to use (ALB and nginx: 60s). */
+const KEEPALIVE_INTERVAL_MS = 20 * 1000;
+
 /** The long-lived MCP HTTP surface one process mounts on its raw Node listener. */
 export interface McpHandler {
   handleRequest: (req: IncomingMessage, res: ServerResponse) => void;
   isMcpRoute: (pathname: string) => boolean;
+  /** Whether this replica holds a live copy of the session (for testing). */
+  holdsSession: (sessionId: string) => boolean;
   /** Clear the in-memory OAuth token cache (for testing). */
   clearTokenCache: () => void;
   /** Clear the in-memory OAuth/auth-failure rate limiter state (for testing). */
   clearRateLimiters: () => void;
-  /** Close all active sessions and release their records (graceful shutdown). */
+  /** Close this replica's copies at shutdown; the records stay so another replica takes over. */
   closeAllSessions: () => Promise<void>;
 }
 
 type McpEndpointCollaborators = Readonly<{
   sessionRecords: McpSessionRepository;
-  relay: McpSessionRelayRepository;
   oauthTokenRecords: McpOAuthTokenRepository;
   oauthClients: McpOAuthClientRepository;
   projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
@@ -66,7 +68,7 @@ type RouteVerbs =
   | Readonly<{ byMethod: ReadonlyMap<string, RouteHandler> }>;
 
 /**
- * The hosted MCP endpoint: the Streamable HTTP and SSE transports, OAuth discovery, registration
+ * The hosted MCP endpoint: the Streamable HTTP transport, OAuth discovery, registration
  * and token exchange, CORS, the access log, and the reaper that bounds abandoned state.
  */
 export class McpEndpointService implements McpHandler {
@@ -77,6 +79,7 @@ export class McpEndpointService implements McpHandler {
   readonly #oauth: McpOAuthEndpointService;
   readonly #routes: ReadonlyMap<string, RouteVerbs>;
   readonly #reaper: ReturnType<typeof setInterval>;
+  readonly #keepalive: ReturnType<typeof setInterval>;
 
   private constructor(collaborators: McpEndpointCollaborators) {
     const http = McpHttpService.create({ baseHost: collaborators.baseHost });
@@ -92,7 +95,6 @@ export class McpEndpointService implements McpHandler {
     this.#auth = auth;
     this.#sessions = McpSessionService.create({
       records: collaborators.sessionRecords,
-      relay: collaborators.relay,
       sessionTools: collaborators.sessionTools,
     });
     this.#oauth = McpOAuthEndpointService.create({
@@ -101,13 +103,14 @@ export class McpEndpointService implements McpHandler {
       oauthTokens: this.#oauthTokens,
       clients: collaborators.oauthClients,
     });
-    this.#routes = this.#routeTable({
-      streamable: McpStreamableTransportService.create({ http, auth, sessions: this.#sessions }),
-      sse: McpSseTransportService.create({ http, auth, sessions: this.#sessions }),
-    });
+    this.#routes = this.#routeTable(
+      McpStreamableTransportService.create({ http, auth, sessions: this.#sessions }),
+    );
     this.#reaper = setInterval(() => this.#reap(), REAPER_INTERVAL_MS);
-    // The process may exit while the reaper is still scheduled.
+    this.#keepalive = setInterval(() => this.#sessions.pingOpenStreams(), KEEPALIVE_INTERVAL_MS);
+    // The process may exit while either timer is still scheduled.
     this.#reaper.unref();
+    this.#keepalive.unref();
   }
 
   /** Composed means mounted, and mounted means the route-policy audit should see it. */
@@ -148,6 +151,8 @@ export class McpEndpointService implements McpHandler {
     });
   };
 
+  holdsSession = (sessionId: string): boolean => this.#sessions.streamable.has(sessionId);
+
   clearTokenCache = (): void => {
     this.#auth.clearGrantChecks();
   };
@@ -159,6 +164,7 @@ export class McpEndpointService implements McpHandler {
 
   closeAllSessions = async (): Promise<void> => {
     clearInterval(this.#reaper);
+    clearInterval(this.#keepalive);
     await this.#sessions.closeAll();
   };
 
@@ -185,16 +191,18 @@ export class McpEndpointService implements McpHandler {
     await handle(req, res);
   }
 
-  #routeTable(transports: {
-    streamable: McpStreamableTransportService;
-    sse: McpSseTransportService;
-  }): ReadonlyMap<string, RouteVerbs> {
+  #routeTable(streamable: McpStreamableTransportService): ReadonlyMap<string, RouteVerbs> {
     const oauth = this.#oauth;
-    const { streamable, sse } = transports;
     const only = (method: string, handler: RouteHandler): RouteVerbs => ({
       byMethod: new Map([[method, handler]]),
     });
-    const sseMessage = only("POST", (req, res) => sse.handleMessage(req, res));
+    const streamableVerbs: RouteVerbs = {
+      byMethod: new Map<string, RouteHandler>([
+        ["POST", (req, res) => streamable.handlePost(req, res)],
+        ["GET", (req, res) => streamable.handleGet(req, res)],
+        ["DELETE", (req, res) => streamable.handleDelete(req, res)],
+      ]),
+    };
     return new Map<string, RouteVerbs>([
       [
         "/mcp/health",
@@ -215,19 +223,10 @@ export class McpEndpointService implements McpHandler {
       ],
       ["/oauth/register", only("POST", (req, res) => oauth.handleRegister(req, res))],
       ["/oauth/token", only("POST", (req, res) => oauth.handleToken(req, res))],
-      [
-        "/mcp",
-        {
-          byMethod: new Map<string, RouteHandler>([
-            ["POST", (req, res) => streamable.handlePost(req, res)],
-            ["GET", (req, res) => streamable.handleGet(req, res)],
-            ["DELETE", (req, res) => streamable.handleDelete(req, res)],
-          ]),
-        },
-      ],
-      ["/sse", only("GET", (req, res) => sse.handleConnect(req, res))],
-      ["/messages", sseMessage],
-      ["/sse/messages", sseMessage],
+      ["/mcp", streamableVerbs],
+      // The SSE transport is retired; a client still configured with its URL is served the
+      // Streamable HTTP transport there.
+      ["/sse", streamableVerbs],
     ]);
   }
 
