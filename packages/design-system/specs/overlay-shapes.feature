@@ -192,6 +192,13 @@ Feature: Drawer and dialog shapes
     Then the drawer is modal and closing it returns focus to the dialog's control once
     And a part-built drawer returns focus to its trigger as well
 
+  @integration @browser
+  Scenario: A routed drawer closing over a dialog that re-renders hands focus back without an error
+    Given an open modal dialog and a routed drawer opened from inside it
+    When a pick in the drawer updates the dialog and unmounts the drawer in one render
+    Then no focus trap error is raised
+    And focus is back inside the dialog
+
   @integration
   Scenario: A routed drawer stack hands the page opener to its last drawer
     Given a page button that opens a routed drawer which opens another
