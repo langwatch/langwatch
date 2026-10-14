@@ -100,7 +100,10 @@ export function AppHeaderUserMenu() {
               {host.opsAccess().hasAccess && (
                 <Menu.Item value="admin" asChild>
                   <NavigationLink href={OPERATIONS_CONSOLE.href}>
-                    {OPERATIONS_CONSOLE.label}
+                    <HStack gap={2}>
+                      <OPERATIONS_CONSOLE.icon size={14} aria-hidden="true" />
+                      <span>{OPERATIONS_CONSOLE.label}</span>
+                    </HStack>
                   </NavigationLink>
                 </Menu.Item>
               )}
