@@ -2,12 +2,13 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";
 import { FilesystemDatasetSingleFileRepository } from "../../repositories/filesystem/filesystem.dataset-single-file.repository.ts";
+import { MemoryDatasetContentRepository } from "../../repositories/memory/memory.dataset-content.repository.ts";
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
-import { createDatasetTestApp } from "./dataset.fixture.ts";
+import { createDatasetTestApp, createDatasetTestEntitlementWith } from "./dataset.fixture.ts";
 
 const projectId = "project_single";
 
@@ -35,6 +36,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await fs.rm(root, { recursive: true, force: true });
 });
 
@@ -72,7 +74,7 @@ async function setup(storage: Storage, file: unknown[] | "none" = previousReleas
       projectId,
       datasetId: dataset.id,
     });
-    if (found.outcome === "missing") throw new Error("no single file");
+    if (found.outcome !== "found") throw new Error("no single file");
     return JSON.parse(found.text);
   };
   return { app, repositories, datasetId: dataset.id, stored };
@@ -123,6 +125,41 @@ describe.each(storages)("a single-file dataset in $name", (storage) => {
 
       expect(page.datasetRecords.map((record) => record.id)).toEqual(["rec_3"]);
       expect(page.count).toBe(1);
+    });
+
+    /** @scenario "Searching a single-file dataset larger than one search may read is refused" */
+    it("refuses a search when the file is larger than the whole-read limit", async () => {
+      const { repositories, datasetId } = await setup(storage);
+      const app = createDatasetTestApp({
+        repositories,
+        dependencies: { entitlement: createDatasetTestEntitlementWith({ wholeReadBytes: 64 }) },
+      });
+
+      await expect(
+        app.getDatasetPage({ slugOrId: datasetId, projectId, page: 1, limit: 10, search: "x" }),
+      ).rejects.toMatchObject({ code: "dataset_too_large_to_search" });
+    });
+
+    /** @scenario "A single-file record stored without an id keeps one id" */
+    it("gives a record stored without an id one id, kept in the file", async () => {
+      const { app, datasetId, stored } = await setup(storage, [
+        { entry: { question: "Stored without an id" } },
+        ...previousReleaseFile,
+      ]);
+
+      const first = await app.getDatasetHead({ slugOrId: datasetId, projectId });
+      const second = await app.getDatasetHead({ slugOrId: datasetId, projectId });
+      const shown = first.records[0]?.id;
+      expect(shown).toEqual(expect.any(String));
+      expect(second.records[0]?.id).toBe(shown);
+      expect((await stored())[0]).toMatchObject({ id: shown });
+
+      await app.deleteRecords({ slugOrId: datasetId, projectId, recordIds: [shown ?? ""] });
+      expect((await stored()).map((record: { id: string }) => record.id)).toEqual([
+        "rec_1",
+        "rec_2",
+        "rec_3",
+      ]);
     });
   });
 
@@ -214,6 +251,21 @@ describe.each(storages)("a single-file dataset in $name", (storage) => {
       expect(row.s3RecordCount).toBe(5);
       expect(row.contentLayout).toBe("postgres");
       expect(await repositories.records.count({ datasetId, projectId })).toBe(0);
+    });
+
+    /** @scenario "A failed count update leaves the single file as it was" */
+    it("leaves the file as it was when recording the count fails", async () => {
+      const { app, repositories, datasetId, stored } = await setup(storage);
+      vi.spyOn(MemoryDatasetContentRepository.prototype, "update").mockRejectedValueOnce(
+        new Error("count update failed"),
+      );
+
+      await expect(
+        app.batchCreateRecords({ slugOrId: datasetId, projectId, entries: [{ question: "x" }] }),
+      ).rejects.toThrow("count update failed");
+      expect(await stored()).toEqual(previousReleaseFile);
+      const row = await repositories.content.getOne({ id: datasetId, projectId });
+      expect(row.s3RecordCount).toBe(3);
     });
 
     /** @scenario "Deleting ids a single-file dataset does not hold is refused" */

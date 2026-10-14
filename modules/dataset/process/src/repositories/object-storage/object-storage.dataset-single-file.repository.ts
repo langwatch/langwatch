@@ -3,6 +3,7 @@ import type { ObjectStorage, StoredObjectAddress } from "@langwatch/process-stor
 import { singleFileKey } from "../../rules/dataset-single-file.rules.ts";
 import type {
   DatasetSingleFile,
+  DatasetSingleFileRead,
   DatasetSingleFileRepository,
 } from "../dataset-single-file.repository.ts";
 
@@ -16,7 +17,7 @@ export class ObjectStorageDatasetSingleFileRepository implements DatasetSingleFi
 
   private constructor(private readonly objects: ObjectStorage) {}
 
-  async getSingleFile(input: { datasetId: string; projectId: string }): Promise<DatasetSingleFile> {
+  async getSingleFile(input: DatasetSingleFileRead): Promise<DatasetSingleFile> {
     let body: AsyncIterable<Uint8Array>;
     try {
       body = await this.objects.read(addressOf(input));
@@ -28,7 +29,14 @@ export class ObjectStorageDatasetSingleFileRepository implements DatasetSingleFi
     }
     const decoder = new TextDecoder();
     let text = "";
-    for await (const part of body) text += decoder.decode(part, { stream: true });
+    let bytes = 0;
+    for await (const part of body) {
+      bytes += part.byteLength;
+      if (input.maxBytes !== undefined && bytes > input.maxBytes) {
+        return { outcome: "too_large", sizeBytes: bytes };
+      }
+      text += decoder.decode(part, { stream: true });
+    }
     return { outcome: "found", text: text + decoder.decode() };
   }
 

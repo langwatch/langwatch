@@ -4,6 +4,7 @@ import path from "node:path";
 import { assertNoTraversal } from "../../rules/dataset-chunking.rules.ts";
 import type {
   DatasetSingleFile,
+  DatasetSingleFileRead,
   DatasetSingleFileRepository,
 } from "../dataset-single-file.repository.ts";
 
@@ -20,9 +21,14 @@ export class FilesystemDatasetSingleFileRepository implements DatasetSingleFileR
 
   private constructor(private readonly root: string) {}
 
-  async getSingleFile(input: { datasetId: string; projectId: string }): Promise<DatasetSingleFile> {
+  async getSingleFile(input: DatasetSingleFileRead): Promise<DatasetSingleFile> {
+    const file = this.pathOf(input);
     try {
-      return { outcome: "found", text: await fs.readFile(this.pathOf(input), "utf8") };
+      if (input.maxBytes !== undefined) {
+        const { size } = await fs.stat(file);
+        if (size > input.maxBytes) return { outcome: "too_large", sizeBytes: size };
+      }
+      return { outcome: "found", text: await fs.readFile(file, "utf8") };
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") {
         return { outcome: "missing" };
@@ -38,7 +44,16 @@ export class FilesystemDatasetSingleFileRepository implements DatasetSingleFileR
   }): Promise<void> {
     const file = this.pathOf(input);
     await fs.mkdir(path.dirname(file), { recursive: true });
-    await fs.writeFile(file, input.text, "utf8");
+    // A crash mid-write must never truncate the file: write beside it, then rename over it.
+    // Writers hold the dataset's lock, so one temporary name per dataset is enough.
+    const written = `${file}.writing`;
+    try {
+      await fs.writeFile(written, input.text, "utf8");
+      await fs.rename(written, file);
+    } catch (error) {
+      await fs.rm(written, { force: true });
+      throw error;
+    }
   }
 
   private pathOf(input: { datasetId: string; projectId: string }): string {

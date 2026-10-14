@@ -20,6 +20,13 @@ Feature: Single-file datasets keep working where the previous release kept them
       Then it uses the file at <path>/<project>/<dataset>
       And an id that climbs out of that directory is refused
 
+    @unit
+    Scenario: A single file on local disk is replaced whole, never left half written
+      Given a single-file dataset on local disk
+      When the dataset module rewrites it
+      Then the new contents are written beside it and moved over it in one step
+      And no partial or temporary file is left behind
+
   Rule: Records are read from the file
 
     @unit
@@ -34,6 +41,19 @@ Feature: Single-file datasets keep working where the previous release kept them
       Given a single-file dataset holding three records
       When a caller searches for text one record holds
       Then the page holds only that record and counts one match
+
+    @unit
+    Scenario: Searching a single-file dataset larger than one search may read is refused
+      Given a single-file dataset whose file is larger than the organization's whole-read limit
+      When a caller searches it
+      Then the search is refused as too large to search, without the file being read whole
+
+    @unit
+    Scenario: A single-file record stored without an id keeps one id
+      Given a single-file dataset holding a record stored without an id
+      When a caller reads the dataset twice
+      Then the record shows the same id both times, written into the file
+      And deleting that id removes the record
 
     @unit
     Scenario: A single-file dataset whose file is missing reads as empty
@@ -58,6 +78,13 @@ Feature: Single-file datasets keep working where the previous release kept them
       Then the file holds the result in the previous release's record shape
       And the dataset's recorded count matches the file
       And the dataset stays on its single file with nothing in the record table
+
+    @unit
+    Scenario: A failed count update leaves the single file as it was
+      Given a single-file dataset holding three records
+      When a caller adds a record and recording the dataset's count fails
+      Then the operation fails
+      And the file still holds the three records
 
     @unit
     Scenario: Deleting ids a single-file dataset does not hold is refused

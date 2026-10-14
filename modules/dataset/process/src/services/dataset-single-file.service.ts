@@ -24,7 +24,11 @@ import { nowInstant } from "@langwatch/time";
 import type { DatasetContent } from "../app/dataset.app.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { DatasetSingleFileRepository } from "../repositories/dataset-single-file.repository.ts";
-import { matchesDatasetSearch, type DatasetSearchCaps } from "../rules/dataset-search.rules.ts";
+import {
+  matchesDatasetSearch,
+  refuseSearchScan,
+  type DatasetSearchCaps,
+} from "../rules/dataset-search.rules.ts";
 import {
   limitDatasetRecordsByBytes,
   sanitizedEntry,
@@ -95,13 +99,8 @@ export class DatasetSingleFileService implements Omit<
     search: string;
     caps: DatasetSearchCaps;
   }): Promise<DatasetRecordPage> {
-    const records = await this.readRecords(input.dataset);
-    if (records.length > input.caps.maxRows) {
-      throw new DatasetTooLargeToSearchError({
-        rowCount: records.length,
-        maxRows: input.caps.maxRows,
-      });
-    }
+    const records = await this.readRecords(input.dataset, input.caps.maxBytes);
+    refuseSearchScan(records.length, 0, input.caps);
     const matches = records.filter((record) =>
       matchesDatasetSearch({ entry: record.entry, search: input.search }),
     );
@@ -216,7 +215,11 @@ export class DatasetSingleFileService implements Omit<
     return { count };
   }
 
-  /** Read, change and write the whole file under the dataset's lock, then record its count. */
+  /**
+   * Read, change and write the whole file under the dataset's lock. The count is recorded
+   * first: a failed count update leaves the file untouched, and a failed file write rolls
+   * the count back with the lock's transaction.
+   */
   private rewrite<T>(
     dataset: DatasetRef,
     change: (
@@ -227,25 +230,41 @@ export class DatasetSingleFileService implements Omit<
     const key = keyOf(dataset);
     return this.datasets.withDatasetLock(dataset.id, async (locked) => {
       const changed = change(await this.readStored(key), nowInstant().toString());
-      await this.files.putSingleFile({ ...key, text: JSON.stringify(changed.records) });
       await locked.update({
         id: dataset.id,
         projectId: dataset.projectId,
         data: { s3RecordCount: changed.records.length },
       });
+      await this.files.putSingleFile({ ...key, text: JSON.stringify(changed.records) });
       return changed.answer;
     });
   }
 
-  private async readRecords(dataset: Dataset): Promise<DatasetRecord[]> {
-    const stored = await this.readStored(keyOf(dataset));
+  /** Records shown to a caller; one stored without an id is given one, written once. */
+  private async readRecords(dataset: Dataset, maxBytes?: number): Promise<DatasetRecord[]> {
+    let stored = await this.readStored(keyOf(dataset), maxBytes);
+    if (stored.some((record) => record.id === undefined)) {
+      stored = await this.rewrite(dataset, (records) => {
+        const identified = records.map((record) => ({
+          ...record,
+          id: record.id ?? this.generateId(),
+        }));
+        return { records: identified, answer: identified };
+      });
+    }
     return stored.map((record) => this.toDatasetRecord(record, dataset));
   }
 
   /** A missing file reads as an empty dataset, as the previous release read it. */
-  private async readStored(key: DatasetKey): Promise<SingleFileRecord[]> {
-    const file = await this.files.getSingleFile(key);
+  private async readStored(key: DatasetKey, maxBytes?: number): Promise<SingleFileRecord[]> {
+    const file = await this.files.getSingleFile({ ...key, maxBytes });
     if (file.outcome === "missing") return [];
+    if (file.outcome === "too_large") {
+      throw new DatasetTooLargeToSearchError({
+        sizeBytes: file.sizeBytes,
+        maxBytes: maxBytes ?? 0,
+      });
+    }
     const parsed = parseSingleFileRecords(file.text);
     if (parsed.outcome === "unreadable") {
       throw new Error(`Single-file dataset ${key.datasetId} is not a JSON array of records`);
@@ -258,7 +277,7 @@ export class DatasetSingleFileService implements Omit<
     dataset: Dataset,
   ): DatasetRecord {
     return datasetRecordSchema.parse({
-      id: record.id ?? this.generateId(),
+      id: record.id,
       entry: record.entry,
       datasetId: dataset.id,
       projectId: dataset.projectId,

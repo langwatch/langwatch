@@ -168,41 +168,21 @@ export class DatasetRecordService {
       projectId: parsed.projectId,
     });
     this.deps.assertReady(dataset);
-    const search = normalizeDatasetSearch(parsed.search);
-    if (search) {
-      const matches = await this.search.searchRecords({ dataset, input: parsed, search });
-      return {
-        id: dataset.id,
-        name: dataset.name,
-        columnTypes: dataset.columnTypes,
-        datasetRecords: matches.data,
-        count: matches.pagination.total,
-        page: matches.pagination.page,
-        limit: matches.pagination.limit,
-        totalPages: matches.pagination.totalPages,
-      };
-    }
     const content = this.contentOf(dataset);
-    if (content) {
+    if (content && !normalizeDatasetSearch(parsed.search)) {
       return content.getDatasetPage({ dataset, input: parsed });
     }
-
-    const page = await this.options.records.listAll({
-      datasetId: dataset.id,
-      projectId: parsed.projectId,
-      page: parsed.page ?? 1,
-      limit: parsed.limit ?? 50,
-    });
+    const page = await this.readRecordsPage(parsed, dataset);
 
     return {
       id: dataset.id,
       name: dataset.name,
       columnTypes: dataset.columnTypes,
-      datasetRecords: page.records,
-      count: page.total,
-      page: parsed.page ?? 1,
-      limit: parsed.limit ?? 50,
-      totalPages: page.total === 0 ? 0 : Math.ceil(page.total / (parsed.limit ?? 50)),
+      datasetRecords: page.data,
+      count: page.pagination.total,
+      page: page.pagination.page,
+      limit: page.pagination.limit,
+      totalPages: page.pagination.totalPages,
     };
   }
 
