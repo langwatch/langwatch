@@ -5,7 +5,12 @@
  * a plain not-found, so a cross-customer surface does not confirm itself to a
  * prober. enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature
  */
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import {
+  createTrpcRuntime,
+  type TrpcProcedureFactory,
+  type TrpcRouterMount,
+  type TrpcRuntimeMembers,
+} from "@langwatch/api/trpc";
 import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
@@ -29,6 +34,9 @@ function testPorts(): TrpcRuntimeMembers<TestContext> {
         getDecision: async () => ({ permitted: false, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: false, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
+        getPlatformDecision: async ({ userId, permission }) => ({
+          permitted: permission === "ops:manage" && userId === OPERATOR,
+        }),
       }),
     },
     denials: {
@@ -42,6 +50,25 @@ function testPorts(): TrpcRuntimeMembers<TestContext> {
       translate: () => undefined,
     },
   };
+}
+
+/** Every procedure the declaration binds, with the access it asked of the door. */
+function boundAccess(): Record<string, string> {
+  const declared: Record<string, string> = {};
+  const runtime: TrpcProcedureFactory<object> = {
+    procedure: ({ procedure, access }) => {
+      declared[procedure] =
+        access.kind === "permission-platform"
+          ? `${access.kind}:${access.permission}:${access.refusal}`
+          : access.kind;
+      return {};
+    },
+    router: (record) => record,
+  };
+  (scimOversightTrpcTransport as { router: TrpcRouterMount<never, never> }).router(runtime, () => {
+    throw new Error("the wire table never resolves an application");
+  });
+  return declared;
 }
 
 function mount(userId: string) {
@@ -74,6 +101,16 @@ function mount(userId: string) {
 }
 
 describe("the admin directory sync surface", () => {
+  describe("given the route declaration", () => {
+    /** @scenario "The surface is refused without platform operator access" */
+    it("asks ops:manage at the platform tier of the door on every procedure and hides the surface", () => {
+      const declared = Object.values(boundAccess());
+
+      expect(declared).toHaveLength(4);
+      expect(new Set(declared)).toEqual(new Set(["permission-platform:ops:manage:hidden"]));
+    });
+  });
+
   describe("given a signed-in user who is not a platform operator", () => {
     /** @scenario "The surface is refused without platform operator access" */
     it("refuses every procedure with a plain not-found and runs nothing", async () => {
