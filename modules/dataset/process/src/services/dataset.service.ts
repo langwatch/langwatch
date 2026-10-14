@@ -49,6 +49,7 @@ import type { DatasetInlineAttachmentService } from "./dataset-inline-attachment
 import { DatasetNamingService } from "./dataset-naming.service.ts";
 import { DatasetRecordService } from "./dataset-record.service.ts";
 import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
+import type { DatasetSingleFileService } from "./dataset-single-file.service.ts";
 import { DatasetUpsertService } from "./dataset-upsert.service.ts";
 
 export type DatasetServiceOptions = {
@@ -57,6 +58,8 @@ export type DatasetServiceOptions = {
   uploads?: DatasetUpload;
   queue?: DatasetNormalizeQueue;
   content?: DatasetContent;
+  /** The previous release's single-file datasets, served where that release kept them. */
+  singleFile?: DatasetSingleFileService;
   generateId?: () => string;
   /** The tier-aware batch bound the record writes refuse above. */
   requestBounds: DatasetRequestBoundsService;
