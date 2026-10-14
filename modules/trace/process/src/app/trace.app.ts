@@ -2556,7 +2556,7 @@ export class TraceModule implements TraceApi, CollectorApp {
    * unless the query (or `originNamed`) names one. `dateField` refuses a
    * span/event clause on the `updated` axis rather than dropping rows silently.
    */
-  compileExplorerTraceFilter(input: {
+  async compileExplorerTraceFilter(input: {
     query: string;
     tenantId: string;
     timeRange: { from: number; to: number };
@@ -2564,7 +2564,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     originNamed?: boolean;
     dateField?: TraceDateField;
     protections?: Protections;
-  }): { sql: string; params: Record<string, unknown> } {
+  }): Promise<{ sql: string; params: Record<string, unknown> }> {
     const compiled = this.translateTraceFilter(input);
 
     if (input.dateField === "updated" && compiled?.sql.includes("stored_spans")) {
@@ -2575,12 +2575,21 @@ export class TraceModule implements TraceApi, CollectorApp {
       );
     }
 
-    const hiddenOrigins = input.originNamed ? [] : explorerHiddenOrigins(input.query);
+    const hiddenOrigins = input.originNamed
+      ? []
+      : await this.#explorerHiddenOrigins({ projectId: input.tenantId, query: input.query });
 
     return andFilterConditions([
       ...(compiled ? [compiled] : []),
       ...findHiddenOriginConditions({ hiddenOrigins }),
     ]);
+  }
+
+  /** Langy's turns are the owner's own traffic in a personal project, so it hides nothing. */
+  async #explorerHiddenOrigins(input: { projectId: string; query: string }): Promise<string[]> {
+    const project = await this.#dependencies.projects.findById(input.projectId);
+
+    return explorerHiddenOrigins(input.query, { personalProject: project?.isPersonal === true });
   }
 
   /** The trace ids a filter selects, newest first and capped. */
@@ -2594,7 +2603,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     const refs = await this.#dependencies.traces.list.getTraceRefs({
       authorization: input.authorization,
       timeRange: input.window,
-      filterWhere: this.compileExplorerTraceFilter({
+      filterWhere: await this.compileExplorerTraceFilter({
         query: input.filter,
         tenantId: input.projectId,
         timeRange: input.window,
@@ -2656,7 +2665,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     input: TraceSessionGroupsInput & { protections: Protections; authorization: Authorization },
   ): Promise<TracesSessionsPage> {
     const { protections } = input;
-    const filterWhere = this.compileExplorerTraceFilter({
+    const filterWhere = await this.compileExplorerTraceFilter({
       query: input.query ?? "",
       tenantId: input.projectId,
       timeRange: input.timeRange,
@@ -2714,7 +2723,12 @@ export class TraceModule implements TraceApi, CollectorApp {
           ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
           ...(input.protections ? { protections: input.protections } : {}),
         }) ?? undefined,
-      hide: explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(input.query) }),
+      hide: explorerOriginExclusion({
+        hiddenOrigins: await this.#explorerHiddenOrigins({
+          projectId: input.projectId,
+          query: input.query,
+        }),
+      }),
     });
 
     const facets = await this.#dependencies.traces.list.getFacets({

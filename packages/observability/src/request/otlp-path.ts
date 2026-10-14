@@ -55,8 +55,17 @@ export function canonicalOtlpPath(pathname: string): string | null {
 /** Carries the path a corrected OTLP request was sent to. */
 export const OTLP_CORRECTED_PATH_HEADER = "x-langwatch-otlp-corrected-path";
 
-/** A per-process secret prefixes the marker, so a receiver tells our rewrite from a forgery. */
-const CORRECTION_SECRET = crypto.randomUUID();
+let correctionSecret: string | undefined;
+
+/**
+ * A per-process secret prefixes the marker, so a receiver tells our rewrite from a forgery.
+ * Minted on first use, not on load: the browser bundle reaches this module, and a page
+ * over plain http has no `crypto.randomUUID`.
+ */
+function theCorrectionSecret(): string {
+  correctionSecret ??= crypto.randomUUID();
+  return correctionSecret;
+}
 
 export function stampCorrectedPath({
   headers,
@@ -65,7 +74,7 @@ export function stampCorrectedPath({
   headers: Headers;
   originalPath: string;
 }): void {
-  headers.set(OTLP_CORRECTED_PATH_HEADER, `${CORRECTION_SECRET} ${originalPath}`);
+  headers.set(OTLP_CORRECTED_PATH_HEADER, `${theCorrectionSecret()} ${originalPath}`);
 }
 
 /** The path the exporter actually used, or null if this was not our rewrite. */
@@ -73,6 +82,6 @@ export function readCorrectedPath(value: string | undefined): string | null {
   if (!value) return null;
   const separator = value.indexOf(" ");
   if (separator === -1) return null;
-  if (value.slice(0, separator) !== CORRECTION_SECRET) return null;
+  if (value.slice(0, separator) !== theCorrectionSecret()) return null;
   return value.slice(separator + 1) || null;
 }

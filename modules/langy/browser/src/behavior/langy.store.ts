@@ -128,6 +128,10 @@ interface LangyState extends TurnPhaseState, LangySliceSurface {
   requestComposerFocus: () => void;
   /** The composer has taken the requested focus — clear it so it fires once. */
   consumeComposerFocus: () => void;
+  /** Counts the panel's finished open transitions: a hidden composer can take focus after one. */
+  panelShownCount: number;
+  /** The panel finished its open transition and can be focused. */
+  markPanelShown: () => void;
 
   // Layout mode (Floating / Sidebar) — user-picked, persisted
   setPanelMode: (mode: LangyPanelMode) => void;
@@ -229,6 +233,8 @@ interface LangyState extends TurnPhaseState, LangySliceSurface {
    */
   followCodingDefaultChange: (change: { nextDefault: string }) => void;
 
+  /** Chips the user removed, by id, so a chip that attaches itself stays removed. */
+  dismissedChipIds: Set<string>;
   resetChosenChips: () => void;
 
   /**
@@ -469,17 +475,25 @@ function followedConversationModel(
 }
 
 function withChipChosen(state: LangyState, id: string): Partial<LangyState> {
-  if (state.chosenChipIds.has(id)) return state;
-  const next = new Set(state.chosenChipIds);
-  next.add(id);
-  return { chosenChipIds: next };
+  if (state.chosenChipIds.has(id) && !state.dismissedChipIds.has(id)) return state;
+  return {
+    chosenChipIds: new Set(state.chosenChipIds).add(id),
+    dismissedChipIds: setWithout(state.dismissedChipIds, id),
+  };
 }
 
 function withChipDismissed(state: LangyState, id: string): Partial<LangyState> {
-  if (!state.chosenChipIds.has(id)) return state;
-  const next = new Set(state.chosenChipIds);
+  if (!state.chosenChipIds.has(id) && state.dismissedChipIds.has(id)) return state;
+  return {
+    chosenChipIds: setWithout(state.chosenChipIds, id),
+    dismissedChipIds: new Set(state.dismissedChipIds).add(id),
+  };
+}
+
+function setWithout(ids: Set<string>, id: string): Set<string> {
+  const next = new Set(ids);
   next.delete(id);
-  return { chosenChipIds: next };
+  return next;
 }
 
 function withContextAttached(state: LangyState, item: LangyAttachedContext): Partial<LangyState> {
@@ -740,6 +754,8 @@ export const useLangyStore = defineSlice<LangyState>({
     composerFocusRequested: false,
     requestComposerFocus: () => set({ composerFocusRequested: true }),
     consumeComposerFocus: () => set({ composerFocusRequested: false }),
+    panelShownCount: 0,
+    markPanelShown: () => set((state) => ({ panelShownCount: state.panelShownCount + 1 })),
 
     // Sidebar by default: docked inside the app shell as a second content
     // card, working alongside the page. Floating stays one toggle away in
@@ -807,6 +823,7 @@ export const useLangyStore = defineSlice<LangyState>({
         isModelPickedByUser: false,
         modelSeededForConversationId: null,
         chosenChipIds: new Set<string>(),
+        dismissedChipIds: new Set<string>(),
         // The targets the user pointed at were gathered for the conversation
         // being left behind; the epoch is what tells the target store to let
         // them go (see its subscription).
@@ -833,7 +850,9 @@ export const useLangyStore = defineSlice<LangyState>({
     chosenChipIds: new Set<string>(),
     chooseChip: (id) => set((state) => withChipChosen(state, id)),
     dismissChip: (id) => set((state) => withChipDismissed(state, id)),
-    resetChosenChips: () => set({ chosenChipIds: new Set<string>() }),
+    dismissedChipIds: new Set<string>(),
+    resetChosenChips: () =>
+      set({ chosenChipIds: new Set<string>(), dismissedChipIds: new Set<string>() }),
 
     attachedContext: [],
     attachContext: (item) => set((state) => withContextAttached(state, item)),
@@ -997,6 +1016,20 @@ export function selectVisibleChips(
   chosen: Set<string>,
 ): LangyContextChip[] {
   return candidates.filter((chip) => chosen.has(chip.id));
+}
+
+/** The chosen ids plus the chips that attach themselves, less any the user removed. */
+export function withAutoAttachedChips({
+  chosen,
+  autoAttachedIds,
+  dismissed,
+}: {
+  chosen: Set<string>;
+  autoAttachedIds: readonly string[];
+  dismissed: Set<string>;
+}): Set<string> {
+  const attached = autoAttachedIds.filter((id) => !dismissed.has(id));
+  return attached.length === 0 ? chosen : new Set([...chosen, ...attached]);
 }
 
 /** Everything the page is OFFERING that hasn't been taken — the "+ context"

@@ -72,6 +72,14 @@ findById(id: string): Promise<Project | null>;
 getOrganizationId(projectId: string): Promise<string>;
 ```
 
+#### `isTeamMember`
+
+Whether the user belongs to the team that owns this project; false when no such project.
+
+```typescript
+isTeamMember(input: { projectId: string; userId: string }): Promise<boolean>;
+```
+
 #### `getWithTeam`
 
 ```typescript

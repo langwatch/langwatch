@@ -34,7 +34,9 @@ describe("given a long turn's finish delivered twice", () => {
   it("leaves one push queued for the owner", async () => {
     const queue = new KeyedPushQueue();
     const subscriber = createLangyWebPushSubscriber({
-      conversations: { find: async () => ({ ownerUserId: USER_ID, title: "Weekly costs" }) },
+      conversations: {
+        find: async () => ({ ownerUserId: USER_ID, title: "Weekly costs", origin: "interactive" }),
+      },
       turnStartedAt: async () => T0 - 90_000,
       users: { getNotificationPreference: async ({ topic }) => ({ topic, choice: "enabled" }) },
       projects: { findSummaryById: async () => ({ name: "ACME", slug: "acme-x1y2" }) },

@@ -227,6 +227,12 @@
       "status": "unheld",
       "note": "branch-era event type, never written by a release; the upcast-events overlay (L5) injects it"
     },
+    "user:lower-case-stored-addresses": {
+      "status": "pending",
+      "seed": "tenancy-sql:users",
+      "cells": ["C1", "C2"],
+      "note": "needs mixed-case addresses and one case-only twin; judge every other address lower-cased and the twin listed in the step report, not renamed"
+    },
     "user:record-created-facts": {
       "status": "seeded",
       "seed": "tenancy-sql",

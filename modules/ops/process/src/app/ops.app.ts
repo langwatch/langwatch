@@ -46,6 +46,7 @@ import { GatewayApi } from "@langwatch/gateway-contract";
 import { GithubApi } from "@langwatch/github-contract";
 import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { IdentityApi, type IdentityApi as IdentityApiContract } from "@langwatch/identity-contract";
+import { InsightApi } from "@langwatch/insight-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { LangyApi } from "@langwatch/langy-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -160,6 +161,7 @@ import {
   type ListParkedQueueTenantsInput,
   type ListPausedQueueKeysInput,
   type ListPausedQueueTenantsInput,
+  type ListInsightSchedulesInput,
   type ListPausedSchedulesInput,
   type ListPausedSchedulesResult,
   type ListQueueDlqGroupsInput,
@@ -182,6 +184,7 @@ import {
   type OpsQueueGroupsPage,
   type OpsQueueJobsPage,
   type OpsQueueReconcileOutcome,
+  type OpsInsightSchedule,
   type OpsScheduledJob,
   type PauseQueuePipelineInput,
   type PauseQueueTenantInput,
@@ -333,6 +336,7 @@ import {
   ImpersonationService,
   type ImpersonationSessions,
 } from "../services/impersonation.service.ts";
+import { InsightScheduleOpsService } from "../services/insight-schedule-ops.service.ts";
 import {
   type InstanceAdminAccounts,
   InstanceAdminService,
@@ -565,6 +569,8 @@ export interface OpsAppDependencies {
     AutomationApi,
     "findAllReportSchedules" | "setReportScheduleActive" | "requestReportRun" | "clearReportRun"
   >;
+  /** The daily insight schedules the operator scheduler lists; insight owns every write. */
+  insights: Pick<InsightApi, "findOperatorDailySchedules">;
 }
 
 /** The process-owned adapters used to make one Ops capability at boot. */
@@ -607,7 +613,7 @@ export interface OpsSystemMigrationRunner {
   }): Promise<OpsMigrationTargetedRunResult>;
   /** Asks a worker for one pass now, as the operator; resolves once the request is recorded. */
   startPass(input: { actorUserId: string }): Promise<void>;
-  /** One pass on this worker: the hourly re-drive only when a tenant could still move. */
+  /** One pass on this worker: a re-drive only when a tenant could still move. */
   executePass(input: { redrive: boolean }): Promise<void>;
   /** One pass of the tasks process's startup convergence, stopping at `signal`. */
   runConvergencePass(input: { signal: AbortSignal }): Promise<MigrationPassSummary>;
@@ -786,6 +792,7 @@ export class OpsModule implements OpsApi {
     prompts: PromptApi,
     workflows: WorkflowApi,
     automations: AutomationApi,
+    insights: InsightApi,
     github: GithubApi,
     langy: LangyApi,
     dashboards: DashboardApi,
@@ -1390,6 +1397,9 @@ export class OpsModule implements OpsApi {
   listSchedulerActions(input: ListSchedulerActionsInput): Promise<SchedulerAuditEntryView[]> {
     return this.#dependencies.ops.listSchedulerActions(input);
   }
+  listInsightSchedules(input: ListInsightSchedulesInput): Promise<OpsInsightSchedule[]> {
+    return this.#dependencies.ops.listInsightSchedules(input);
+  }
   listQueueGroups(input: ListQueueGroupsInput): Promise<OpsQueueGroupsPage> {
     return this.#dependencies.ops.listQueueGroups(input);
   }
@@ -1699,7 +1709,7 @@ export class OpsModule implements OpsApi {
   }
 
   /** One pass of `ops_system_migrations`, on the worker hosting it; not on {@link OpsApi}. */
-  executeSystemMigrationPass(input: { redrive: boolean; followUp: boolean }): Promise<void> {
+  executeSystemMigrationPass(input: { redrive: boolean; due: boolean }): Promise<void> {
     return this.#dependencies.systemMigrations.executePass(input);
   }
 
@@ -2405,6 +2415,7 @@ function buildOpsInfrastructure(input: {
         scheduler: {
           schedules: dependencies.automations,
           projects: dependencies.projects,
+          insights: dependencies.insights,
         },
         explorers: {
           eventExplorer: EventExplorerService.create({
@@ -2521,6 +2532,7 @@ interface OpsOperationsOptions {
   scheduler: {
     schedules: OpsAppDependencies["automations"];
     projects: ProjectApi;
+    insights: OpsAppDependencies["insights"];
   };
   /** The explorers, the replay runner and the snapshot reader the capability carries. */
   explorers: OpsExplorers;
@@ -2568,11 +2580,17 @@ export class OpsOperations {
         now: this.options.now,
       }),
       scheduler: SchedulerOpsService.create({
-        ...this.options.scheduler,
+        schedules: this.options.scheduler.schedules,
+        projects: this.options.scheduler.projects,
         audit: SchedulerAuditService.create({
           auditLog: this.options.auditLog,
           users: this.options.users,
         }),
+      }),
+      insightSchedules: InsightScheduleOpsService.create({
+        insights: this.options.scheduler.insights,
+        projects: this.options.scheduler.projects,
+        users: this.options.users,
       }),
       anomalyState: repositories.anomalyState,
       queues,
