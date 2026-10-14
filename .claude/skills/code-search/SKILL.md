@@ -65,6 +65,8 @@ Index one area (`modules/<name>`, `services/<name>`), not the root: the whole tr
 
 The index lives in `~/.sgrep` (outside the checkout), so git never sees it. An index belongs to
 one absolute path: a worktree does not share the main checkout's, so `status` there says `none`.
+Indexes stay until removed (`modules/` is about 500 MB); `sgrep.sh stop` stops the server only.
+`sgrep list` shows them; `cd <dir> && sgrep clear` deletes one.
 
 ## Install
 

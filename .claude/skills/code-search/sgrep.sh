@@ -48,6 +48,7 @@ start_server() {
       echo "http://localhost:$port" >"$STATE/endpoint"
       return 0
     fi
+    kill -0 "$(cat "$STATE/llama.pid")" 2>/dev/null || break
     sleep 1
   done
   echo "embedding server did not come up in 60s; log: $STATE/llama.log" >&2
