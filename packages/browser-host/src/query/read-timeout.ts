@@ -21,7 +21,7 @@ export class ReadTimeoutError extends Error {
 
 /**
  * A signal that aborts when either the caller's does or the time limit runs out, and `release`,
- * which drops the timer and the listener on the caller's signal once the read has settled: a
+ * which drops the timer and the listener on the caller's signal once the read's body has ended: a
  * long-lived caller signal must not collect one listener per read.
  */
 function eitherSignal(
@@ -59,6 +59,36 @@ export function readTimeoutFetch({
     if (method !== "GET") return send(input, init);
     // An explicit `init.signal` replaces the Request's own, so the Request's is carried over.
     const limited = eitherSignal(init?.signal ?? request?.signal, timeoutMs);
-    return send(input, { ...init, signal: limited.signal }).finally(limited.release);
+    return send(input, { ...init, signal: limited.signal }).then(
+      (response) => releasedWithBody({ response, release: limited.release }),
+      (error: unknown) => {
+        limited.release();
+        throw error;
+      },
+    );
   };
+}
+
+/**
+ * Headers can arrive long before the body, so the limit and the caller's cancel stay on until the
+ * body ends: an error (the abort among them) needs no release, since the timer can only abort a
+ * read that is already over.
+ */
+function releasedWithBody({
+  response,
+  release,
+}: {
+  response: Response;
+  release: () => void;
+}): Response {
+  if (!response.body) {
+    release();
+    return response;
+  }
+  const body = response.body.pipeThrough(new TransformStream({ flush: release }));
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }

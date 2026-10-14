@@ -42,6 +42,27 @@ describe("readTimeoutFetch", () => {
     });
   });
 
+  describe("given headers that arrive but a body that never ends", () => {
+    it("still gives up on the body after 45 seconds", async () => {
+      const stalledBody = vi.fn<typeof globalThis.fetch>(async (_input, init) => {
+        const body = new ReadableStream<Uint8Array>({
+          start(stream) {
+            init?.signal?.addEventListener("abort", () => stream.error(init.signal?.reason), {
+              once: true,
+            });
+          },
+        });
+        return new Response(body, { status: 200 });
+      });
+      const response = await readTimeoutFetch({ fetch: stalledBody })("/api/trpc/dataset.getAll");
+      const outcome = response.text().catch((error: unknown) => error);
+
+      await vi.advanceTimersByTimeAsync(45_000);
+
+      expect(await outcome).toBeInstanceOf(ReadTimeoutError);
+    });
+  });
+
   describe("given a read the page cancels", () => {
     /** @scenario "A read the page cancels is cancelled at once" */
     it("fails with the page's reason, not as timed out", async () => {
@@ -71,15 +92,15 @@ describe("readTimeoutFetch", () => {
   });
 
   describe("given reads that share one long-lived signal", () => {
-    it("leaves no listener on it once each read has settled", async () => {
+    it("leaves no listener on it once each read's body has been read", async () => {
       const page = new AbortController();
       const added = vi.spyOn(page.signal, "addEventListener");
       const removed = vi.spyOn(page.signal, "removeEventListener");
       const answering = vi.fn<typeof globalThis.fetch>(async () => new Response("{}"));
       const send = readTimeoutFetch({ fetch: answering });
 
-      await send("/api/trpc/a", { signal: page.signal });
-      await send("/api/trpc/b", { signal: page.signal });
+      await (await send("/api/trpc/a", { signal: page.signal })).text();
+      await (await send("/api/trpc/b", { signal: page.signal })).text();
 
       expect(removed).toHaveBeenCalledTimes(added.mock.calls.length);
       expect(vi.getTimerCount()).toBe(0);
