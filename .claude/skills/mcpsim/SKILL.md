@@ -50,15 +50,15 @@ Approval needs a signed-in LangWatch person:
 
 ## Scenarios
 
-| Verb             | What it asserts                                                                                   |
-| ---------------- | ------------------------------------------------------------------------------------------------- |
-| `connect`        | initialize, notifications/initialized, tools/list, one tool call (`--tool`, default `fetch_langwatch_docs`), DELETE; on /mcp and /sse by default |
-| `stream`         | the GET event stream stays open `--hold <s>` (default 60); reports when a proxy or the server dropped it, and that the session still answers |
-| `refresh`        | oauth: refresh, then the SAME session id answers with the new token (no 401, no re-initialize)   |
-| `double-refresh` | oauth: two concurrent refreshes with one refresh token both succeed with the same new pair       |
+| Verb             | What it asserts                                                                                                                                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `connect`        | initialize, notifications/initialized, tools/list, one tool call (`--tool`, default `fetch_langwatch_docs`), DELETE; on /mcp and /sse by default           |
+| `stream`         | the GET event stream stays open `--hold <s>` (default 60); reports when a proxy or the server dropped it, and that the session still answers               |
+| `refresh`        | oauth: refresh, then the SAME session id answers with the new token (no 401, no re-initialize)                                                             |
+| `double-refresh` | oauth: two concurrent refreshes with one refresh token both succeed with the same new pair                                                                 |
 | `reconnect`      | an unknown and an ended session id answer 404 (a 401 is reported as a failure: it would force a new sign-in), then re-initialize works with no new sign-in |
-| `idle`           | sleep `--idle <s>` (default 30), then the session answers (a 404 re-initializes silently, a 401 refreshes) |
-| `soak`           | `--clients <n>` (default 10, max 500) for `--duration` (default 1m, max 2h), each looping tools/list about once a second; fails on any failed request |
+| `idle`           | sleep `--idle <s>` (default 30), then the session answers (a 404 re-initializes silently, a 401 refreshes)                                                 |
+| `soak`           | `--clients <n>` (default 10, max 500) for `--duration` (default 1m, max 2h), each looping tools/list about once a second; fails on any failed request      |
 
 Every request recovers the way the spec asks: 404 on a session re-initializes without
 re-authenticating, 401 refreshes the OAuth token and retries once, 503/502/504 or no answer
