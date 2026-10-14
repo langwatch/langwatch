@@ -338,7 +338,7 @@ None: this module declares no REST family.
 
 ### `ssoConnections`
 
-Contract `../contract/src/sso-connection.trpc.ts:32`, router `src/transport/sso-connection.trpc.ts:39`.
+Contract `../contract/src/sso-connection.trpc.ts:32`, router `src/transport/sso-connection.trpc.ts:37`.
 
 | Procedure                             | Kind     | Gate                             | Input                                     | Output                         |
 | ------------------------------------- | -------- | -------------------------------- | ----------------------------------------- | ------------------------------ |

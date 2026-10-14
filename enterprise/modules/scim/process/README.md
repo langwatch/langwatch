@@ -596,7 +596,7 @@ type Response = unknown;
 
 ### `scimOversight`
 
-Contract `../contract/src/scim-oversight.trpc.ts:18`, router `src/transport/scim-oversight.trpc.ts:28`.
+Contract `../contract/src/scim-oversight.trpc.ts:18`, router `src/transport/scim-oversight.trpc.ts:26`.
 
 | Procedure                           | Kind     | Gate                             | Input                            | Output                            |
 | ----------------------------------- | -------- | -------------------------------- | -------------------------------- | --------------------------------- |
