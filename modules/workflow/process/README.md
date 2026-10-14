@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Workflow application.
 
-Peers call these through the token, declared at `../contract/src/workflow.api.ts:171`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/workflow.api.ts:179`; nothing else in this package is public.
 
 #### `executeComponent`
 
@@ -152,6 +152,14 @@ A peer's inbound Studio event, prepared the same way before it re-enters the gra
 
 ```typescript
 enrichStudioEvent(input: { event: StudioClientEvent; projectId: string; principal?: WorkflowRunPrincipal | undefined; }): Promise<StudioClientEvent>;
+```
+
+#### `executeStudioEventSync`
+
+One prepared Studio event run to completion on the project's engine; its answer unread.
+
+```typescript
+executeStudioEventSync(input: { projectId: string; event: StudioClientEvent; origin: WorkflowRunOrigin; causalityDepth?: number; parentTrace?: { traceId: string; parentSpanId: string }; }): Promise<WorkflowStudioSyncAnswer>;
 ```
 
 #### `getFields`
@@ -869,9 +877,9 @@ Declared at `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:31`.
 
 | Kind   | Leaf                         | Environment variable                      | Declared at                             |
 | ------ | ---------------------------- | ----------------------------------------- | --------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:498`           |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:499`           |
-| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:500`           |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:501`           |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:502`           |
+| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:503`           |
 | config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:82` |
 | config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:84` |
 | config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:85` |
