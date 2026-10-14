@@ -1074,7 +1074,7 @@ type Response = unknown;
 
 ### `checkup`
 
-Contract `../contract/src/features/checkup/checkup.trpc.ts:38`, router `src/transport/checkup.trpc.ts:13`.
+Contract `../contract/src/features/checkup/checkup.trpc.ts:38`, router `src/transport/checkup.trpc.ts:12`.
 
 | Procedure                        | Kind     | Gate                             | Input               | Output              |
 | -------------------------------- | -------- | -------------------------------- | ------------------- | ------------------- |

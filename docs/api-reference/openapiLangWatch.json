@@ -77091,7 +77091,7 @@
             "session"
           ],
           "permissions": [
-            "ops:manage"
+            "ops:view"
           ]
         }
       }
