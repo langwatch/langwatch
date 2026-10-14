@@ -309,8 +309,17 @@ function toRagChunk(ctx: unknown): RAGChunk {
   return {
     document_id: typeof obj.document_id === "string" ? obj.document_id : null,
     chunk_id: typeof obj.chunk_id === "string" ? obj.chunk_id : null,
-    content: typeof content === "object" ? (content as RAGChunk["content"]) : String(content),
+    content: typeof content === "object" ? (content as RAGChunk["content"]) : scalarText(content),
   };
+}
+
+/** A scalar's text. A non-JSON value (a function, a symbol) has none, so it reads as empty. */
+function scalarText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  return "";
 }
 
 /**

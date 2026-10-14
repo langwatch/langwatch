@@ -54,9 +54,7 @@ describe("parseLlmConfigVersion with a legacy prompting_technique", () => {
         columns: [{ id: "a", name: "a", type: "string" }],
         rows: [{ id: "r1", a: "x" }],
       };
-      const parsed = parseLlmConfigVersion(
-        versionWith({ type: "ChainOfThought", demonstrations }),
-      );
+      const parsed = parseLlmConfigVersion(versionWith({ type: "ChainOfThought", demonstrations }));
       expect(parsed.configData.prompting_technique?.type).toBe("chain_of_thought");
       expect(parsed.configData.prompting_technique?.demonstrations).toBeDefined();
     });
