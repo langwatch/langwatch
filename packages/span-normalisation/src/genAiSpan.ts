@@ -188,18 +188,27 @@ export class GenAiSpanService {
       ctx.recordRule(`${GEN_AI_RULE_PREFIX}:usage.reasoning.output_tokens`);
     }
 
-    const timeToFirstChunkSeconds = asNumber(
-      attrs.get(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK),
+    const responseSeconds = asNumber(attrs.get(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK));
+    const clientSeconds = asNumber(
+      attrs.get(ATTR_KEYS.GEN_AI_CLIENT_OPERATION_TIME_TO_FIRST_CHUNK),
     );
+    // The first valid value wins: a negative response key must not shadow a good client key.
+    const useResponseKey = responseSeconds !== null && responseSeconds >= 0;
+    const timeToFirstChunkKey = useResponseKey
+      ? ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK
+      : ATTR_KEYS.GEN_AI_CLIENT_OPERATION_TIME_TO_FIRST_CHUNK;
+    const timeToFirstChunkSeconds = useResponseKey ? responseSeconds : clientSeconds;
     const canFillTimeToFirstToken =
       timeToFirstChunkSeconds !== null &&
       timeToFirstChunkSeconds >= 0 &&
       ctx.out[ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN] === void 0 &&
       !attrs.has(ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN);
     if (canFillTimeToFirstToken) {
-      attrs.delete(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK);
+      attrs.delete(timeToFirstChunkKey);
       ctx.setAttr(ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN, timeToFirstChunkSeconds * 1000);
-      ctx.recordRule(`${GEN_AI_RULE_PREFIX}:response.time_to_first_chunk`);
+      ctx.recordRule(
+        `${GEN_AI_RULE_PREFIX}:${useResponseKey ? "response" : "client.operation"}.time_to_first_chunk`,
+      );
     }
   }
 

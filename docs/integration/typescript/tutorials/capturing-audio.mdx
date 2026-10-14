@@ -19,10 +19,13 @@ Put the recording in a `file` part inside the user message. `mediaType` is what 
 ```typescript
 import { readFileSync } from "node:fs";
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 import { setupObservability } from "langwatch/observability/node";
 
 setupObservability({ serviceName: "voice-service" });
+// AI SDK 6 and earlier: skip this and set experimental_telemetry: { isEnabled: true } per call
+registerTelemetry(new OpenTelemetry());
 
 const data = readFileSync("call.wav").toString("base64");
 
@@ -37,7 +40,6 @@ const { text } = await generateText({
       ],
     },
   ],
-  experimental_telemetry: { isEnabled: true },
 });
 
 console.log(text);

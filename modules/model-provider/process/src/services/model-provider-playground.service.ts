@@ -80,8 +80,10 @@ export class ModelProviderPlaygroundService {
     try {
       const result = streamText({
         model: vercelProvider(input.model),
-        system: input.systemPrompt?.trim() ? input.systemPrompt : undefined,
+        instructions: input.systemPrompt?.trim() ? input.systemPrompt : undefined,
         messages: input.messages as ModelMessage[],
+        // Users author and test their own system turns in the playground transcript.
+        allowSystemInMessages: true,
         maxRetries: chosen.provider.customKeys ? 1 : 3,
       });
       const response = result.toTextStreamResponse();

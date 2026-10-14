@@ -5,12 +5,16 @@
  */
 
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
+import { generateText, registerTelemetry } from "ai";
 import { getLangWatchTracer } from "langwatch";
 import { setupObservability } from "langwatch/observability/node";
 
 // Initialize LangWatch observability
 setupObservability();
+
+// AI SDK 7 emits no OpenTelemetry spans until an integration is registered.
+registerTelemetry(new OpenTelemetry());
 
 const tracer = getLangWatchTracer("metadata-example");
 
@@ -76,20 +80,14 @@ async function handleUserMessage(message: string, context: UserContext): Promise
       console.log("");
 
       const result = await generateText({
-        model: openai("gpt-4o-mini"),
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful assistant. Be concise.",
-          },
-          { role: "user", content: message },
-        ],
-        experimental_telemetry: { isEnabled: true },
+        model: openai("gpt-5-mini"),
+        instructions: "You are a helpful assistant. Be concise.",
+        messages: [{ role: "user", content: message }],
       });
 
       // You can also add/update metadata during the span
-      span.setAttribute("output.tokens", result.usage?.completionTokens ?? 0);
-      span.setAttribute("input.tokens", result.usage?.promptTokens ?? 0);
+      span.setAttribute("output.tokens", result.usage?.outputTokens ?? 0);
+      span.setAttribute("input.tokens", result.usage?.inputTokens ?? 0);
 
       return result.text;
     },

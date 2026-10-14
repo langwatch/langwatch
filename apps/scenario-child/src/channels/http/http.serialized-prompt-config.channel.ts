@@ -98,13 +98,17 @@ export class HttpSerializedPromptConfigChannel extends SerializedAgentChannel {
       })),
     );
 
-    // Build messages: system + template messages + conversation (if not in template)
     const messages = [
-      { role: "system" as const, content: systemPrompt },
       ...promptMessages,
       // Only append input.messages if the template doesn't place them itself
       ...(templateUsesConversation ? [] : input.messages),
     ];
+
+    // AI SDK 7 rejects an empty `messages`. When the template already carries the
+    // history, send just this turn's new message so the model has something to answer.
+    if (messages.length === 0) {
+      messages.push(...input.newMessages);
+    }
 
     const model = HttpLitellmModelChannel.create().model({
       litellmParams: this.litellmParams,
@@ -114,7 +118,10 @@ export class HttpSerializedPromptConfigChannel extends SerializedAgentChannel {
 
     const result = await generateText({
       model,
+      instructions: systemPrompt,
       messages,
+      // Scenario authors may script a system turn into the conversation history.
+      allowSystemInMessages: true,
       temperature: this.config.temperature,
       maxOutputTokens: this.config.maxTokens,
     });

@@ -9,7 +9,7 @@ import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import type { NormalizedSpan } from "../../trace.spans.ts";
 import { findStringAttribute, parseJsonStringArray } from "./trace-summary-attribute-values.ts";
 
-const VERCEL_METADATA_PREFIX = "ai.telemetry.metadata.";
+const VERCEL_METADATA_PREFIXES = ["ai.telemetry.metadata.", "ai.settings.context."] as const;
 
 /**
  * Depth of the evaluator causality chain a span was emitted under, stamped by
@@ -354,11 +354,10 @@ function applyVercelTelemetryMetadata({
   }
 }
 
-/** The metadata name behind a Vercel telemetry key, or null for any other key. */
+/** The name behind an AI SDK 6 metadata or AI SDK 7 runtime context key, or null. */
 function toVercelMetadataName(key: string): string | null {
-  return key.startsWith(VERCEL_METADATA_PREFIX)
-    ? key.slice(VERCEL_METADATA_PREFIX.length) || null
-    : null;
+  const prefix = VERCEL_METADATA_PREFIXES.find((candidate) => key.startsWith(candidate));
+  return prefix ? key.slice(prefix.length) || null : null;
 }
 
 /** Labels as an array, whether they arrive as one or as a JSON string. */

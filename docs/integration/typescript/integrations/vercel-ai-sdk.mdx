@@ -17,19 +17,19 @@ import TypeScriptIntro from "/snippets/typescript-intro.mdx";
 
 <CodeGroup>
 ```bash npm
-npm i langwatch ai @ai-sdk/openai
+npm i langwatch ai @ai-sdk/otel @ai-sdk/openai
 ```
 
 ```bash pnpm
-pnpm add langwatch ai @ai-sdk/openai
+pnpm add langwatch ai @ai-sdk/otel @ai-sdk/openai
 ```
 
 ```bash yarn
-yarn add langwatch ai @ai-sdk/openai
+yarn add langwatch ai @ai-sdk/otel @ai-sdk/openai
 ```
 
 ```bash bun
-bun add langwatch ai @ai-sdk/openai
+bun add langwatch ai @ai-sdk/otel @ai-sdk/openai
 ```
 
 </CodeGroup>
@@ -40,7 +40,34 @@ bun add langwatch ai @ai-sdk/openai
   The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
 </Info>
 
-Set up observability and enable telemetry on your Vercel AI SDK calls:
+Set up observability and register the OpenTelemetry integration for the Vercel AI SDK (AI SDK 7):
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
+import { openai } from "@ai-sdk/openai";
+
+setupObservability({ serviceName: "<project_name>" });
+registerTelemetry(new OpenTelemetry({ runtimeContext: true }));
+
+async function main(message: string): Promise<string> {
+  const response = await generateText({
+    model: openai("gpt-5-mini"),
+    instructions: "You are a witty assistant.",
+    prompt: message,
+  });
+  return response.text;
+}
+
+console.log(await main("Hey, tell me a joke"));
+```
+
+Once `registerTelemetry` has run, every `generateText` and `streamText` call reports to LangWatch, with no flag to set per call. `instructions` is the AI SDK 7 name for the system prompt. `runtimeContext: true` lets you attach metadata to a call (see [Metadata](#metadata)). For Next.js applications, configure OpenTelemetry in your `instrumentation.ts` file using `LangWatchExporter`.
+
+### AI SDK 6 and earlier
+
+There is no `registerTelemetry` before AI SDK 7. Enable telemetry on each call with `experimental_telemetry` instead, and use `system` for the system prompt:
 
 ```typescript
 import { setupObservability } from "langwatch/observability/node";
@@ -49,24 +76,23 @@ import { openai } from "@ai-sdk/openai";
 
 setupObservability({ serviceName: "<project_name>" });
 
-async function main(message: string): Promise<string> {
-  const response = await generateText({
-    model: openai("gpt-5-mini"),
-    prompt: message,
-    experimental_telemetry: { isEnabled: true },
-  });
-  return response.text;
-}
-
-console.log(await main("Hey, tell me a joke"));
+const response = await generateText({
+  model: openai("gpt-5-mini"),
+  system: "You are a witty assistant.",
+  prompt: "Hey, tell me a joke",
+  experimental_telemetry: { isEnabled: true },
+});
 ```
 
-The Vercel AI SDK automatically sends traces to LangWatch when `experimental_telemetry.isEnabled` is set to `true`. For Next.js applications, configure OpenTelemetry in your `instrumentation.ts` file using `LangWatchExporter`.
+<Note>
+  AI SDK 7 emits no spans until an integration is registered, so an AI SDK 6 snippet left
+  unchanged after upgrading to AI SDK 7 sends LangWatch no traces. Add the `registerTelemetry` call
+  shown above when you upgrade.
+</Note>
 
 ## Metadata
 
-Pass `experimental_telemetry.metadata` to tag the call. LangWatch reads these
-keys from it:
+LangWatch reads these keys from the metadata you attach to a call:
 
 | Key           | What it does                                                                      |
 | ------------- | --------------------------------------------------------------------------------- |
@@ -76,6 +102,39 @@ keys from it:
 | `customer_id` | The customer or tenant the call belongs to.                                       |
 
 Any other key becomes custom metadata on the trace, filterable by its own name.
+
+### AI SDK 7: runtime context
+
+Pass `runtimeContext` to the call and list the keys you want on the spans in
+`telemetry.includeRuntimeContext`. The integration must be registered with
+`runtimeContext: true`, as in the setup above; it is off by default.
+
+```typescript
+const response = await generateText({
+  model: openai("gpt-5-mini"),
+  prompt: message,
+  runtimeContext: {
+    labels: ["checkout", "beta"],
+    thread_id: "conversation-8f21",
+    user_id: "user-42",
+    tenant: "eu-west",
+  },
+  telemetry: {
+    includeRuntimeContext: {
+      labels: true,
+      thread_id: true,
+      user_id: true,
+      tenant: true,
+    },
+  },
+});
+```
+
+Only keys marked `true` in `includeRuntimeContext` are sent. Each one arrives on the
+span as `ai.settings.context.<key>`, and nested objects are flattened into dotted
+keys such as `ai.settings.context.a.b`.
+
+### AI SDK 6 and earlier: experimental_telemetry
 
 ```typescript
 const response = await generateText({
@@ -94,15 +153,16 @@ const response = await generateText({
 ```
 
 `experimental_telemetry` is the AI SDK's own experimental API, and its shape
-can change between AI SDK versions.
+can change between AI SDK versions. It accepts strings, numbers, booleans and
+arrays of them as metadata values. It does not accept a nested object, so
+flatten anything deeper into separate keys.
 
-It accepts strings, numbers, booleans and arrays of them as metadata values. It
-does not accept a nested object, so flatten anything deeper into separate keys.
-A `null` inside a `labels` array is dropped.
+### Precedence
 
-A `thread_id`, `user_id`, `customer_id` or `metadata.<key>` you also set as a
-span attribute wins over the one you pass here. Labels are the exception: the
-two sets are combined, so the trace keeps both. See
+A `null` inside a `labels` array is dropped. A `thread_id`, `user_id`,
+`customer_id` or `metadata.<key>` you also set as a span attribute wins over the
+one you pass here. Labels are the exception: the two sets are combined, so the
+trace keeps both. See
 [Capturing Metadata and Attributes](/integration/typescript/tutorials/capturing-metadata)
 for the attribute names.
 

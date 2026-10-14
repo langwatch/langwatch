@@ -21,7 +21,7 @@
     "generate:feature-map": "node --experimental-transform-types scripts/generate-feature-map.ts"
   },
   "dependencies": {
-    "@ai-sdk/react": "^3.0.219",
+    "@ai-sdk/react": "^4.0.133",
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
     "@langwatch/api": "workspace:*",

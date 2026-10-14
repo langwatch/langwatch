@@ -54,6 +54,11 @@ updates:
     open-pull-requests-limit: 50
     cooldown:
       default-days: 8
+      # @ai-sdk/react and @ai-sdk/otel pin `ai` to an exact version, so pnpm never
+      # flags a drifted pair (#7236). `patterns` groups the PR but does not check
+      # the versions work together; a longer major-bump cooldown lets every
+      # sibling of a new major line publish before any of them is proposed.
+      semver-major-days: 14
     ignore:
       # Pinned intentionally: langwatch needs @opentelemetry/otlp-transformer
       # held at 0.55.0, and keeps a separate @opentelemetry/otlp-transformer-next

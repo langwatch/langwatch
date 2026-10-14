@@ -1,4 +1,4 @@
-import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
 import type { LiteLLMParams } from "@langwatch/scenario-contract";
 
 export type LitellmModelInput = Readonly<{
@@ -10,7 +10,7 @@ export type LitellmModelInput = Readonly<{
 
 /** Language models served through the NLP engine's LiteLLM proxy. */
 export interface LitellmModelChannel {
-  model(input: LitellmModelInput): LanguageModelV3;
+  model(input: LitellmModelInput): LanguageModelV4;
   /** The same model, with reasoning turned off where the judge's forced tool call needs it. */
-  judgeModel(input: LitellmModelInput): LanguageModelV3;
+  judgeModel(input: LitellmModelInput): LanguageModelV4;
 }
