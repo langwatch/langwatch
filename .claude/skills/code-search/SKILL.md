@@ -11,7 +11,7 @@ Measured on this repository, 2026-10-14 (busy host, so times are rough):
 
 | Tool               | Setup                      | Per search | Finds the right code                 |
 | ------------------ | -------------------------- | ---------- | ------------------------------------ |
-| `rg`               | none                       | 0.06-0.8 s | always, if you know the word         |
+| `rg`               | none                       | 0.06-0.8 s | given the word, in non-ignored files |
 | `git grep`         | none                       | 0.07-2.4 s | same; tracked files only             |
 | `grep -r`          | none                       | 18-34 s    | same, but walks every `node_modules` |
 | sgrep, no index    | n/a                        | won't run  | n/a                                  |
@@ -33,7 +33,8 @@ guess two or three likely words ──▶ rg -n -i -e a -e b <dir>
 need every caller of a Go symbol, exactly? ──▶ gopls references file.go:line:col
 ```
 
-- **ripgrep first.** It needs nothing and never misses a literal match. Never `grep -r`.
+- **ripgrep first.** It needs nothing and never misses a literal match in the files it searches
+  (everything not excluded by `.gitignore` or `.ignore`; see below). Never `grep -r`.
   Give `rg` an explicit path: with no path and no terminal it reads stdin and hangs.
 - **sgrep only when the index is ready.** A query against a missing or half-built index is
   wrong or empty, so the helper refuses (exit 3) and you use `rg`. sgrep answers roughly half
@@ -62,7 +63,8 @@ Extra arguments after the question go to sgrep (`-n 5`, `-t`, `--profile fast`, 
 Index one area (`modules/<name>`, `services/<name>`), not the root: the whole tree takes
 2-3 hours. A Go service of ~300 files takes under two minutes.
 
-The index lives in `~/.sgrep` (outside the checkout), so git never sees it.
+The index lives in `~/.sgrep` (outside the checkout), so git never sees it. An index belongs to
+one absolute path: a worktree does not share the main checkout's, so `status` there says `none`.
 
 ## Install
 
