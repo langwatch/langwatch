@@ -34,7 +34,6 @@ const productPillStyle = {
   _hover: { backgroundColor: "bg.panel", borderColor: "border.emphasized" },
 } satisfies ButtonProps;
 
-/** One switcher row: icon and label, the pitch beneath, an optional mark at the end. */
 function SwitcherEntry({
   icon: Icon,
   label,
