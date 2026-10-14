@@ -35,18 +35,19 @@ const followVisibility = ({
 };
 
 /**
- * Calls `fetch` now and every `everyMs` while the tab is visible, and again the
- * moment it is shown. `fetch` is read afresh on each call, so an inline arrow is
- * fine; call `refresh` after changing what it reads to see the change at once.
+ * Calls `fetch` now and every `everyMs` (a number, or one derived from the latest
+ * answer) while the tab is visible, and again the moment it is shown. `fetch` is
+ * read afresh on each call; call `refresh` after changing what it reads.
  */
 export const useSimPoll = <T>({
   fetch,
   everyMs = 2_000,
 }: {
   fetch: () => Promise<T>;
-  everyMs?: number;
+  everyMs?: number | ((data: T | undefined) => number);
 }) => {
   const [answer, setAnswer] = useState<Answer<T>>({});
+  const every = typeof everyMs === "function" ? everyMs(answer.data) : everyMs;
   const [refreshing, setRefreshing] = useState(false);
   const latest = useRef(fetch);
   latest.current = fetch;
@@ -73,12 +74,12 @@ export const useSimPoll = <T>({
   }, []);
 
   useEffect(() => {
-    const stop = followVisibility({ refresh, inFlight, everyMs });
+    const stop = followVisibility({ refresh, inFlight, everyMs: every });
     return () => {
       stop();
       newest.current += 1;
     };
-  }, [refresh, everyMs]);
+  }, [refresh, every]);
 
   return { data: answer.data, error: answer.error, refreshing, refresh };
 };

@@ -222,6 +222,13 @@ Feature: Canonical user lifecycle
     And the sessions the old address outlives are auth's to end (modules/auth/specs/account-lifecycle.feature)
 
   @unit
+  Scenario: Changing an email clears its verification
+    Given a user whose address is verified
+    When the User service changes the user's email to a different address
+    Then the new address is stored as not verified
+    And a change of letter case alone keeps the address verified
+
+  @unit
   Scenario: Uploading an avatar uses the personal workspace
     Given a valid avatar image
     When the User service sets the avatar

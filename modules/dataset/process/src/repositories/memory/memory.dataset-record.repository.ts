@@ -31,6 +31,18 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     return this.#of(input).length;
   }
 
+  async countByDataset(input: {
+    projectId: string;
+    datasetIds: readonly string[];
+  }): Promise<{ datasetId: string; recordCount: number }[]> {
+    return input.datasetIds
+      .map((datasetId) => ({
+        datasetId,
+        recordCount: this.#of({ datasetId, projectId: input.projectId }).length,
+      }))
+      .filter(({ recordCount }) => recordCount > 0);
+  }
+
   async findPage(input: {
     datasetId: string;
     projectId: string;

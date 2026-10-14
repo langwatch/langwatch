@@ -273,6 +273,7 @@ export class MemoryUserRepository implements UserRepository {
       ...row,
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.email === undefined ? {} : { email: input.email }),
+      ...(input.emailVerified === undefined ? {} : { emailVerified: input.emailVerified }),
       updatedAt: nowInstant(),
     };
     this.#database.writeUser(updated);
