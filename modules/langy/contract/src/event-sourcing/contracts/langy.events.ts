@@ -6,6 +6,7 @@ import type { Named } from "@langwatch/module";
  */
 import { z } from "zod";
 
+import { LANGY_CONVERSATION_ORIGINS } from "../../constants.ts";
 import {
   langyJsonValueSchema,
   langyMessagePartSchema,
@@ -29,6 +30,8 @@ const langyConversationStartedEventDataSchemaDefinition = z.object({
    * client-facing projection.
    */
   runToken: z.string().nullable().optional(),
+  /** Absent on a conversation started before origins existed, which reads as interactive. */
+  origin: z.enum(LANGY_CONVERSATION_ORIGINS).optional(),
 });
 export interface LangyConversationStartedEventDataSchema extends Named<
   typeof langyConversationStartedEventDataSchemaDefinition
@@ -50,6 +53,8 @@ const langyConversationForkedEventDataSchemaDefinition = z.object({
   userId: z.string(),
   title: z.string().nullable(),
   runToken: z.string(),
+  /** Set to `run` when the source is a run: a copy of its history keeps the run's limits. */
+  origin: z.enum(LANGY_CONVERSATION_ORIGINS).optional(),
 });
 export interface LangyConversationForkedEventDataSchema extends Named<
   typeof langyConversationForkedEventDataSchemaDefinition

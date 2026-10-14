@@ -819,10 +819,10 @@ Declared at `src/eventing/scim.pipeline.ts:39`.
 
 | Kind   | Leaf                  | Environment variable          | Declared at                               |
 | ------ | --------------------- | ----------------------------- | ----------------------------------------- |
-| secret | `auth0WebhookSecret`  | `AUTH0_SCIM_WEBHOOK_SECRET`   | `../contract/src/scim.config.ts:14`       |
+| secret | `auth0WebhookSecret`  | `AUTH0_SCIM_WEBHOOK_SECRET`   | `../contract/src/scim.config.ts:22`       |
 | secret | `tokenPepper`         | `CREDENTIALS_SECRET`          | `../contract/src/scim-token-pepper.ts:10` |
 | secret | `tokenPepperFallback` | `NEXTAUTH_SECRET`             | `../contract/src/scim-token-pepper.ts:11` |
 | secret | `tokenPepperPrevious` | `CREDENTIALS_SECRET_PREVIOUS` | `../contract/src/scim-token-pepper.ts:13` |
-| config | `provenOffboarding`   | `SCIM_V2_GRANTS`              | `../contract/src/scim.config.ts:7`        |
+| config | `provenOffboarding`   | `SCIM_V2_GRANTS`              | `../contract/src/scim.config.ts:15`       |
 
 <!-- readme:generated:end -->

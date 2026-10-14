@@ -67,7 +67,7 @@ key and token shapes.
 | `-drills`, `-overlays`               | extra failure drills (`api-early`, `worker-restart`, `retry`, `private-down`, `route-broken`, `old-worker-lingers`) and planted data (`retention`, `tenant-oddities`, `operator-damage`)                      |
 | `-walk-every`                        | the browser walker's pause between rounds (10 s); lengthen it to cut Chromium's CPU                                                                                                                           |
 | `-max-load`                          | refuse above this load average (40)                                                                                                                                                                           |
-| `-run-dir`                           | where logs, screenshots and the report go; default `.claude/tmp/upgradelab/cells/<cell>-<time>`                                                                                                               |
+| `-run-dir`                           | where logs, screenshots and the report go; default `<cell>-<time>` under the gitignored upgradelab scratch folder                                                                                             |
 | `-keep`                              | keep the databases (kept anyway when a step fails)                                                                                                                                                            |
 | `-ledger`, `-tested-by`              | claim and report rows in the tested-flow ledger (`lane:<id>` or `@handle`)                                                                                                                                    |
 

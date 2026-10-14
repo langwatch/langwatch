@@ -26,6 +26,8 @@ export interface LangWatchQLWidgetChartProps {
   readonly vegaLiteSpec?: Record<string, unknown>;
   /** How the chart is described to a reader who cannot see it. */
   readonly ariaLabel: string;
+  /** Keeps the note about the workbench's table for screen readers only. */
+  readonly isResultNoteHidden?: boolean;
 }
 
 /** Draws one widget's result. */
@@ -34,6 +36,7 @@ export function LangWatchQLWidgetChart({
   rows,
   vegaLiteSpec,
   ariaLabel,
+  isResultNoteHidden = false,
 }: LangWatchQLWidgetChartProps) {
   const spec = useMemo(
     () => vegaLiteSpec ?? starterVegaLiteSpec({ columns, datasetName: LWQL_QUERY_RESULT_DATASET }),
@@ -47,6 +50,7 @@ export function LangWatchQLWidgetChart({
         datasets={{ [LWQL_QUERY_RESULT_DATASET]: rows }}
         columnsByDataset={{ [LWQL_QUERY_RESULT_DATASET]: columns }}
         ariaLabel={ariaLabel}
+        isResultNoteHidden={isResultNoteHidden}
       />
     </Box>
   );

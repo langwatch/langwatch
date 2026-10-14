@@ -24,6 +24,8 @@ const STORE_MS = env("BENCH_STORE_MS", 0);
 const CONCURRENCY = env("BENCH_CONCURRENCY", 0);
 const CH_POOL = env("BENCH_CH_POOL", 64);
 const MAX_OUTSTANDING = env("BENCH_MAX_OUTSTANDING", 1_000);
+/** Tenants the listed users share, so the tenant cap binds (0: a tenant per user). */
+const LISTED_TENANTS = env("BENCH_LISTED_TENANTS", 0);
 const CH_URL = process.env.BENCH_CH_URL;
 /** Folds waiting rows into one statement, this many statements at once (0: one per row). */
 const CH_GROUP_COMMIT = env("BENCH_CH_GROUP_COMMIT", 0);
@@ -229,8 +231,9 @@ async function main(): Promise<void> {
         const sendStarted = performance.now();
         await sender.sendBatch(
           Array.from({ length: count }, (_, offset) => {
-            const tenant = `u${start + offset}`;
-            return { kind: "command", tenant, group: `${tenant}/command/${tenant}`, at: now };
+            const user = `u${start + offset}`;
+            const tenant = LISTED_TENANTS > 0 ? `t${(start + offset) % LISTED_TENANTS}` : user;
+            return { kind: "command", tenant, group: `${tenant}/command/${user}`, at: now };
           }),
         );
         const roomStarted = performance.now();
@@ -258,6 +261,7 @@ async function main(): Promise<void> {
       PAGE,
       BACKLOG,
       FANOUT,
+      LISTED_TENANTS,
       STORE_MS,
       CONCURRENCY,
       CH: Boolean(CH_URL),
