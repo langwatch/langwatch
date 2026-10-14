@@ -1448,5 +1448,89 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
         expect(await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 })).toBe(0);
       });
     });
+
+    // The production shape: the table holds thousands of rows still inside the retention window
+    // and the sweep's cutoff matches none of them. On an empty table the planner's costs tie and
+    // its pick says nothing, so each plan is taken over such rows, with fresh statistics, inside a
+    // transaction that rolls back.
+    describe("when the planner plans each sweep delete", () => {
+      const liveRows = 5_000;
+      const cutoff = "2000-01-01T00:00:00Z";
+
+      async function planOf({
+        seed,
+        table,
+        statement,
+      }: {
+        seed: string;
+        table: string;
+        statement: string;
+      }): Promise<string> {
+        let plan = "";
+        const rollback = new Error("roll back the planner fixture");
+        await database()
+          .$transaction(async (tx) => {
+            await tx.$executeRawUnsafe(seed);
+            await tx.$executeRawUnsafe(`ANALYZE "${table}"`);
+            const rows = await tx.$queryRawUnsafe<{ "QUERY PLAN": string }[]>(
+              `EXPLAIN ${statement}`,
+            );
+            plan = rows.map((row) => row["QUERY PLAN"]).join("\n");
+            throw rollback;
+          })
+          .catch((error: unknown) => {
+            if (error !== rollback) throw error;
+          });
+        return plan;
+      }
+
+      /** @scenario "Each sweep delete finds its expired rows through an index" */
+      it("reads the dispatched outbox through its age index", async () => {
+        const plan = await planOf({
+          table: "ProcessManagerOutbox",
+          seed: `
+            INSERT INTO "ProcessManagerOutbox" ("id", "processName", "projectId", "processKey",
+              "tenantId", "messageKey", "intentType", "payload", "traceCarrier", "status",
+              "nextAttemptAt", "dispatchedAt", "createdAt", "updatedAt")
+            SELECT 'planner-' || n, '${processName}', 'project-1', 'key-' || n, 'tenant-1',
+              'message-' || n, 'intent', '{}', '{}', 'dispatched', now(), now(), now(), now()
+            FROM generate_series(1, ${liveRows}) AS n`,
+          statement: `
+            DELETE FROM "ProcessManagerOutbox"
+            WHERE "id" IN (
+              SELECT "id" FROM "ProcessManagerOutbox"
+              WHERE "status" = 'dispatched'::"ProcessManagerOutboxStatus"
+                AND "dispatchedAt" < '${cutoff}'
+              LIMIT 5000
+            )`,
+        });
+
+        expect(plan).toContain("ProcessManagerOutbox_dispatchedAt_idx");
+        expect(plan).not.toContain('Seq Scan on "ProcessManagerOutbox"');
+      });
+
+      /** @scenario "Each sweep delete finds its expired rows through an index" */
+      it("reads the consumed inbox through its age index", async () => {
+        const plan = await planOf({
+          table: "ProcessManagerInbox",
+          seed: `
+            INSERT INTO "ProcessManagerInbox" ("id", "processName", "projectId", "processKey",
+              "tenantId", "sourceEventId", "consumedAt")
+            SELECT 'planner-' || n, '${processName}', 'project-1', 'key-' || n, 'tenant-1',
+              'event-' || n, now()
+            FROM generate_series(1, ${liveRows}) AS n`,
+          statement: `
+            DELETE FROM "ProcessManagerInbox"
+            WHERE "id" IN (
+              SELECT "id" FROM "ProcessManagerInbox"
+              WHERE "consumedAt" < '${cutoff}'
+              LIMIT 5000
+            )`,
+        });
+
+        expect(plan).toContain("ProcessManagerInbox_consumedAt_idx");
+        expect(plan).not.toContain('Seq Scan on "ProcessManagerInbox"');
+      });
+    });
   });
 });
