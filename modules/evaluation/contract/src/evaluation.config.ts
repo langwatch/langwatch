@@ -16,14 +16,14 @@ export const EVAL_INPUTS_INLINE_MAX_BYTES = 1024 * 1024;
 /** Above this many bytes only the preview is kept: the full inputs are never uploaded. */
 export const EVAL_INPUTS_HARD_CEILING_BYTES = 50 * 1024 * 1024;
 
-/** A byte budget as the previous release read it: blank or unusable keeps the default. */
+/** A byte budget as the previous release read it: blank, under 1 or unusable keeps the default. */
 const byteBudget = (fallback: number) =>
   z
     .string()
     .optional()
     .transform((raw) => {
       const parsed = Number(raw ?? "");
-      return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+      return Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : fallback;
     });
 
 /**

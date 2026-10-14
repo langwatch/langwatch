@@ -208,6 +208,7 @@ describe("ModelProviderModule.create", () => {
     it("executes Bedrock with the deployment's region and never an environment secret", async () => {
       const app = await createRealModelProviderApp(undefined, undefined, {
         providerFallbacks: { AWS_REGION_NAME: "eu-west-1" },
+        environment: { AWS_SECRET_ACCESS_KEY: "deployment-secret" },
       });
       await app.upsertUnattributed({
         projectId: "project-1",

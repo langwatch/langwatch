@@ -19,7 +19,7 @@ describe("evaluation server configuration", () => {
         inputsInlineMaxBytes: 1024 * 1024,
         inputsHardCeilingBytes: 50 * 1024 * 1024,
       });
-      for (const unusable of ["", " ", "0", "-5", "lots"]) {
+      for (const unusable of ["", " ", "0", "0.5", "-5", "lots"]) {
         expect(
           read({
             LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES: unusable,
