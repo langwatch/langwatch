@@ -35,7 +35,7 @@ export function hiddenEvaluatorIdsOf({
   return [...new Set([...unfit, ...attached])];
 }
 
-/** Opens the list, without the evaluators a run plan cannot feed, and the toggles around it. */
+/** Opens the list, without the ids `hiddenEvaluatorIdsOf` hides, and the toggles around it. */
 export function useAddExtraFlow({
   attach,
   evaluatorsById,

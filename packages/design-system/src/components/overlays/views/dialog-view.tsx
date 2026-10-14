@@ -513,7 +513,7 @@ export function Dialog({
   contentRef,
   "data-testid": testId,
 }: DialogProps) {
-  // By id, not a ref: a resuming focus trap asks mid-commit, while refs are detached (#8642).
+  // By id, not a ref: a resuming focus trap calls this mid-commit, while React has refs detached.
   const contentId = React.useId();
   const endInset = useDrawerEndInset();
   const slot = (name: string) => (testId ? `${testId}-${name}` : undefined);
