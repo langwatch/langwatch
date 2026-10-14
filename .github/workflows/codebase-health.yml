@@ -1,9 +1,12 @@
 name: codebase-health
 
 # Nightly codebase health: type-check cost per program, root typecheck time and
-# peak RSS, longest reference chain, emitted .d.ts size and architecture
-# findings per policy, compared with the previous successful run's health.json.
-# A jump opens (or comments on) the issue labelled codebase-health.
+# peak RSS, longest reference chain, emitted .d.ts size, architecture findings
+# per policy, UI bundle size and test:repo time, compared with the previous
+# successful run's health.json. A jump opens (or comments on) the issue labelled
+# codebase-health; one pinned issue labelled codebase-health-dashboard has its
+# body rewritten every night. A failing typecheck or UI build is a breach, not
+# an aborted job.
 #
 # Spec: specs/tooling/codebase-health.feature
 
@@ -39,14 +42,41 @@ jobs:
       - uses: ./.github/actions/prepare-generated-files
 
       # The Nx cache would replay the typecheck and measure nothing.
+      # A type error must not stop the other measurements: the exit code is
+      # kept for the script, which reports it as a breach.
       - name: Root typecheck, timed
-        run: /usr/bin/time -v -o typecheck-time.txt pnpm typecheck --skip-nx-cache
+        run: |
+          set +e
+          /usr/bin/time -v -o typecheck-time.txt pnpm typecheck --skip-nx-cache > typecheck.log 2>&1
+          echo $? > typecheck-exit.txt
+          tail -n 40 typecheck.log
+          exit 0
 
       - name: Type-check cost per program
         run: node dev/scripts/ts-program-metrics.mjs --out=ts-program-metrics.jsonl
 
+      # A red suite must not stop the bundle and architecture measurements.
       - name: Repo-scanning suites
-        run: pnpm exec nx run-many -t test:repo --outputStyle=static
+        continue-on-error: true
+        run: |
+          start=$(date +%s)
+          status=0
+          pnpm exec nx run-many -t test:repo --outputStyle=static || status=$?
+          echo $(( $(date +%s) - start )) > test-repo-seconds.txt
+          exit $status
+
+      # Bundle size does not need a cold cache, so the Nx cache is used here.
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: health-build
+
+      # Same build as the app CI's build job. A failure is recorded, not fatal.
+      - name: Build the UI
+        run: |
+          set +e
+          (pnpm start:prepare:files && pnpm ensure:built && pnpm run build:types && pnpm exec nx run @langwatch/ui:build --outputStyle=static)
+          echo $? > ui-build-exit.txt
+          exit 0
 
       # Exit 1 means findings, which are what this step counts.
       - name: Architecture findings
@@ -61,13 +91,29 @@ jobs:
             echo "no previous successful run"
           fi
 
+      # The newest successful run at least six days old, for the weekly column.
+      - name: Health.json from about a week ago
+        run: |
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow codebase-health.yml --status success --limit 14 --json databaseId,createdAt --jq '[.[] | select(.createdAt < (now - 6*86400 | todate))][0].databaseId // empty')
+          if [ -n "$run_id" ]; then
+            gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name codebase-health --dir weekago || echo "no artifact on run $run_id"
+          else
+            echo "no run from a week ago"
+          fi
+
       - name: Compare and report
         run: >-
           node dev/scripts/codebase-health.mjs
           --metrics=ts-program-metrics.jsonl
           --architecture=architecture.txt
           --time=typecheck-time.txt
+          --typecheck-log=typecheck.log
+          --typecheck-exit=typecheck-exit.txt
+          --bundle-dir=apps/ui/dist/client
+          --bundle-exit=ui-build-exit.txt
+          --test-repo-seconds=test-repo-seconds.txt
           --previous=previous/health.json
+          --weekago=weekago/health.json
           --out=health.json
           --commit="$GITHUB_SHA"
           --publish
@@ -80,5 +126,7 @@ jobs:
             health.json
             ts-program-metrics.jsonl
             architecture.txt
+            typecheck.log
+            dashboard-body.md
           retention-days: 30
           if-no-files-found: warn

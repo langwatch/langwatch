@@ -379,6 +379,14 @@ Feature: The insights inbox
       And a link that opens the inbox
 
     @integration
+    Scenario: The bell with nothing new still points to the insights in the inbox
+      Given 2 insights in the inbox, both already seen
+      When a member opens the bell in the top bar
+      Then it reads "No new insights" and "2 insights in your inbox"
+      And it does not say "All caught up"
+      And a link that opens the inbox
+
+    @integration
     Scenario: The page says only you see your insights
       Given a member opens Insights
       When the page draws

@@ -7,7 +7,12 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { boardPromptDraft, boardQuestion, boardSubject } from "../model/board-langy.ts";
+import {
+  boardContextChip,
+  boardPromptDraft,
+  boardQuestion,
+  boardSubject,
+} from "../model/board-langy.ts";
 
 const PERIOD = {
   periodStart: Temporal.Instant.from("2026-09-01T00:00:00Z").epochMilliseconds,
@@ -81,6 +86,38 @@ describe("a draft about a board", () => {
       expect(request.context[0]?.ref).toContain(
         'From LangWatch dashboard "Release check" (template release, read-only, not stored)',
       );
+    });
+  });
+});
+
+describe("the chip a board shows in Langy", () => {
+  describe("given a board read over the last 30 days at one bucket per day", () => {
+    /** @scenario "The board chip carries the period the user is viewing" */
+    it("reads the board's name and the period, and hands over its id, period and grain", () => {
+      const chip = boardContextChip({
+        board: boardSubject({ board: { id: "board-9", name: "Costs" }, widgets: [] }),
+        range: "30d",
+        period: PERIOD,
+      });
+
+      expect(chip.id).toBe("dashboard:board-9");
+      expect(chip.kind).toBe("dashboard");
+      expect(chip.label).toBe("dashboard: Costs · 30d · 1d");
+      expect(chip.ref).toContain('dashboard "Costs" (id board-9)');
+      expect(chip.ref).toContain("2026-09-01T00:00:00Z to 2026-09-08T00:00:00Z");
+      expect(chip.ref).toContain("one bucket per 1 day");
+    });
+  });
+
+  describe("given the live range", () => {
+    it("reads Live and the minute grain", () => {
+      const chip = boardContextChip({
+        board: boardSubject({ board: { id: "board-9", name: "Costs" }, widgets: [] }),
+        range: "live",
+        period: { ...PERIOD, granularitySeconds: 60 },
+      });
+
+      expect(chip.label).toBe("dashboard: Costs · Live · 1m");
     });
   });
 });

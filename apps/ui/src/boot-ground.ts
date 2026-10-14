@@ -14,7 +14,7 @@ async function runOn(element: HTMLElement): Promise<void> {
   const mode = document.documentElement.classList.contains("dark") ? "dark" : "light";
   let stop: () => void;
   try {
-    stop = await mountAmbientShader({ element, mode });
+    stop = await mountAmbientShader({ element, mode, onSlow: () => delete element.dataset.live });
   } catch {
     return;
   }

@@ -244,13 +244,14 @@ export function bootSplash({
     transformIndexHtml: {
       order: "pre",
       handler: async (html) => {
-        const ground = await groundScript();
+        // A function replacement, so a `$` pattern in the bundled script stays literal text.
+        const ground = groundTag(await groundScript());
         return html
           .replace("</head>", () => `${BOOT_SPLASH_HEAD}\n  </head>`)
           .replace(
             '<div id="root"></div>',
             () =>
-              `<div id="root"></div>\n    ${BOOT_SPLASH_BODY}\n    ${HAND_OFF_SCRIPT}\n    ${groundTag(ground)}`,
+              `<div id="root"></div>\n    ${BOOT_SPLASH_BODY}\n    ${HAND_OFF_SCRIPT}\n    ${ground}`,
           );
       },
     },

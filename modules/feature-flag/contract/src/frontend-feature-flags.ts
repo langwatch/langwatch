@@ -39,8 +39,6 @@ export const FRONTEND_FEATURE_FLAGS = [
   // purely additive: the current Simulations pages and menu group are
   // untouched while it is off, and the backend it calls is unflagged.
   "release_ui_agent_testing_v2_enabled",
-  // Gates nothing now; kept until the flag is removed.
-  "release_custom_chart_playground",
   // The Dashboards area, its sidebar entry and its saved-dashboards list.
   "release_dashboards",
   // The Insights inbox, its sidebar entry, the topbar bell and "Save as insight" on Langy answers.
