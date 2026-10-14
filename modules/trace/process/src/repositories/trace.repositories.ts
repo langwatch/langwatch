@@ -27,6 +27,7 @@ import type { TraceModelSpendRepository } from "./trace-model-spend.repository.t
 import type { TracePayloadReaderRepository } from "./trace-payload-reader.repository.ts";
 import type { TraceProjectedReadRepository } from "./trace-projected-read.repository.ts";
 import type { TraceSpanDedupRepository } from "./trace-span-dedup.repository.ts";
+import type { TraceSpoolObjectsRepository } from "./trace-spool-objects.repository.ts";
 import type { TraceSummaryFoldCacheRepository } from "./trace-summary-fold-cache.repository.ts";
 import type { TraceSummaryProjectionRepository } from "./trace-summary-projection.repository.ts";
 import type { TraceSummaryRepository } from "./trace-summary.repository.ts";
@@ -79,6 +80,8 @@ export interface TraceRepositories {
   readonly attributedRollup: TraceAttributedRollupRepository;
   /** The ingestion doors' duplicate claim, so an SDK's retry is not a second span. */
   readonly spanDedup: TraceSpanDedupRepository;
+  /** The transient spool an over-threshold command rides in, door to worker (ADR-022). */
+  readonly spoolObjects: TraceSpoolObjectsRepository;
   /** The export door's in-flight slots. */
   readonly exportSlots: TraceExportSlotRepository;
   /** The export door's and the anonymous share read's rate windows. */

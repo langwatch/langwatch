@@ -100,6 +100,15 @@ Feature: The record path reads through the peers trace was installed with
       When the feature flag module's configuration is parsed, as every process parses it
       Then that flag is carried on the resolved configuration
 
+  Rule: The record path reads a spooled span from the spool the door wrote it to
+
+    @unit
+    Scenario: A spooled span is read back from the spool the door wrote it to
+      Given the ingestion door spooled an over-threshold span through the module's blob store
+      When the worker folds the spooled command
+      Then the recorded span carries the attributes the door spooled
+      And the spool object is removed after the span is stored
+
   Rule: The graph-alert vertical takes the project reads this process composes
 
     @unit

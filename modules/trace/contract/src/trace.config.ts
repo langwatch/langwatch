@@ -1,4 +1,8 @@
 import { Config, foldCacheTtlSeconds, publicBaseUrl, type ConfigOf } from "@langwatch/config";
+import {
+  legacySpoolRetentionConfirmed,
+  objectRetentionConfirmed,
+} from "@langwatch/stored-object-contract";
 import { z } from "zod";
 
 /**
@@ -30,6 +34,9 @@ export const traceConfig = Config.define((c) => ({
   ),
   foldCacheTtlSeconds,
   publicBaseUrl,
+  /** Stored-object's leaves: whether the Azure spool prefix has its lifecycle rule (ADR-022). */
+  objectRetentionConfirmed,
+  legacySpoolRetentionConfirmed,
 }));
 
 export type TraceServerConfig = ConfigOf<typeof traceConfig>;

@@ -37,6 +37,7 @@ function compose({ reads }: { reads: TraceSummaryData[] }) {
     peers: createApiFixture<Input["peers"]>(),
     repositories: MemoryTraceRepositories.create(),
     canonicalisation: TraceCanonicalisationService.create(),
+    spool: createApiFixture<Input["spool"]>(),
     commands: createApiFixture<Input["commands"]>({
       resolveOrigin: async (data) => {
         dispatched.push(data);

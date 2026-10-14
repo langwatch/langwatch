@@ -34,6 +34,7 @@ function compose({ storedSummary }: { storedSummary: TraceSummaryData | null }) 
     peers: createApiFixture<Input["peers"]>(),
     repositories: MemoryTraceRepositories.create(),
     canonicalisation: TraceCanonicalisationService.create(),
+    spool: createApiFixture<Input["spool"]>(),
     commands: createApiFixture<Input["commands"]>({ resolveOrigin }),
     findSummary,
     recordTrackedEvent: async () => undefined,

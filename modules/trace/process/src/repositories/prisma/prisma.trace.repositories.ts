@@ -52,6 +52,7 @@ export class PostgresTraceRepositories {
     | "rateLimits"
     | "clickhouseClients"
     | "eventPayloads"
+    | "spoolObjects"
   > {
     const traceClickHouse = MemberTraceClickHouseClientRepository.resolverFor(members.clickhouse);
     const clickhouse = MemberTraceClickHouseClientRepository.authorizedFor(members.clickhouse);

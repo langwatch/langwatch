@@ -1,4 +1,5 @@
 import type { FoldProjectionStore } from "@langwatch/eventing";
+import { memoryObjectStorage } from "@langwatch/process-stores";
 import { TraceCapabilityUnavailableError } from "@langwatch/trace-contract";
 
 import {
@@ -6,6 +7,7 @@ import {
   type TraceClickHouseClient,
 } from "../clickhouse/clickhouse.trace-member-client.repository.ts";
 import { NullLogRecordStorageRepository } from "../log-record-storage.repository.ts";
+import { ObjectStorageTraceSpoolObjectsRepository } from "../object-storage/object-storage.trace-spool-objects.repository.ts";
 import { NullSessionGroupsRepository } from "../session-groups.repository.ts";
 import type { TraceAnalyticsFoldCacheRepository } from "../trace-analytics-fold-cache.repository.ts";
 import { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
@@ -175,6 +177,9 @@ export class MemoryTraceRepositories {
       attributeSpend: MemoryTraceAttributeSpendRepository.create(),
       attributedRollup: MemoryNullTraceAttributedRollupRepository.create(),
       spanDedup: MemoryTraceSpanDedupRepository.create(),
+      spoolObjects: ObjectStorageTraceSpoolObjectsRepository.create({
+        objectStorage: memoryObjectStorage(),
+      }),
       exportSlots: MemoryTraceExportSlotRepository.create(),
       rateLimits: MemoryTraceRateLimitRepository.create(),
       clickhouseClients: MemoryTraceClickHouseClientsRepository.create(),
