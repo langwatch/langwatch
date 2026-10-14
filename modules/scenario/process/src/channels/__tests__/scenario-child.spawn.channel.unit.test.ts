@@ -22,6 +22,18 @@ const mockLogger = vi.hoisted(() => ({
   child: vi.fn(),
 }));
 
+/**
+ * Vitest's resolver finds a workspace tsx from any anchor, so the real
+ * `createRequire` cannot stand in for "not installed". This mock is the
+ * package lookup the resolver calls; the spawn module itself stays real.
+ */
+const resolveFromPackage = vi.hoisted(() => vi.fn());
+const createRequire = vi.hoisted(() => vi.fn(() => ({ resolve: resolveFromPackage })));
+
+vi.mock("node:module", () => ({
+  createRequire,
+}));
+
 // Mock fs.existsSync to control bundle presence
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof fsModule>();
@@ -51,21 +63,33 @@ import fs from "fs";
 import type * as fsModule from "fs";
 
 const PACKAGE_ROOT = path.resolve(import.meta.dirname, "..");
-const SOURCE_PATH = path.join(
-  PACKAGE_ROOT,
-  "src",
-  "services",
-  "scenario-child-execution.service.ts",
-);
-const SOURCE_ROOTS = [path.dirname(SOURCE_PATH)];
+const SOURCE_PATH = path.join(PACKAGE_ROOT, "src", "main.ts");
+const BUNDLE = path.join(PACKAGE_ROOT, "dist", "server", "scenario-child-process.mjs");
+const SECRET = "scenario-child-env-sentinel";
+const MISSING_TSX =
+  "Scenario child bundle is missing and tsx is unavailable. Run `pnpm install` or `pnpm --filter @langwatch/scenario-child build`.";
+const STALE_TSX =
+  "Scenario child bundle is stale and tsx is unavailable. Run `pnpm install` or `pnpm --filter @langwatch/scenario-child build`.";
 
 function spawnOptions(nodeEnv: string | undefined) {
   return {
     packageRoot: PACKAGE_ROOT,
     nodeEnv,
     sourcePath: SOURCE_PATH,
-    sourceRoots: SOURCE_ROOTS,
+    sourceRoots: [path.dirname(SOURCE_PATH)],
   };
+}
+
+function tsxResolves(): void {
+  resolveFromPackage.mockReturnValue(path.join(PACKAGE_ROOT, "node_modules", "tsx", "index.js"));
+}
+
+function tsxDoesNotResolve(): Error {
+  const cause = new Error("Cannot find module 'tsx'");
+  resolveFromPackage.mockImplementation(() => {
+    throw cause;
+  });
+  return cause;
 }
 
 describe("ScenarioChildSpawn.resolve", () => {
@@ -76,9 +100,15 @@ describe("ScenarioChildSpawn.resolve", () => {
     mockLogger.info.mockReset();
     mockLogger.debug.mockReset();
     mockLogger.error.mockReset();
+    createRequire.mockReset();
+    createRequire.mockImplementation(() => ({ resolve: resolveFromPackage }));
+    resolveFromPackage.mockReset();
+    tsxResolves();
+    vi.stubEnv("LANGWATCH_API_KEY", SECRET);
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -90,12 +120,21 @@ describe("ScenarioChildSpawn.resolve", () => {
 
       /** @scenario 'Processor spawns child process using the pre-compiled bundle in production' */
       it("invokes node with the path to the compiled bundle", () => {
+        // A newer source and no installed tsx must not leave the bundle path.
+        tsxDoesNotResolve();
+        vi.mocked(fs.readdirSync).mockReturnValue([
+          { name: "child.ts", isDirectory: () => false },
+        ] as never);
+        vi.mocked(fs.statSync).mockImplementation((target) => {
+          if (target === BUNDLE) return { mtimeMs: 1000 } as fs.Stats;
+          return { mtimeMs: 2000 } as fs.Stats;
+        });
+
         const result = ScenarioChildSpawn.create().resolve(spawnOptions("production"));
 
         expect(result.command).toBe("node");
-        expect(result.args).toEqual([
-          path.join(PACKAGE_ROOT, "dist", "server", "scenario-child-process.mjs"),
-        ]);
+        expect(result.args).toEqual([BUNDLE]);
+        expect(createRequire).not.toHaveBeenCalled();
       });
 
       it("does not invoke pnpm exec tsx", () => {
@@ -126,20 +165,15 @@ describe("ScenarioChildSpawn.resolve", () => {
       it("falls back to tsx instead of crashing", () => {
         const result = ScenarioChildSpawn.create().resolve(spawnOptions("production"));
 
-        expect(result.command).toBe("pnpm");
-        expect(result.args[0]).toBe("exec");
-        expect(result.args[1]).toBe("tsx");
+        expect(result).toEqual({ command: "pnpm", args: ["exec", "tsx", SOURCE_PATH] });
+        expect(createRequire).toHaveBeenCalledWith(path.join(PACKAGE_ROOT, "package.json"));
       });
 
       it("logs an error with the missing bundle path", () => {
         ScenarioChildSpawn.create().resolve(spawnOptions("production"));
 
         expect(mockLogger.error).toHaveBeenCalledWith(
-          expect.objectContaining({
-            bundlePath: expect.stringContaining(
-              path.join(PACKAGE_ROOT, "dist", "server", "scenario-child-process.mjs"),
-            ),
-          }),
+          expect.objectContaining({ bundlePath: BUNDLE }),
           expect.stringContaining("NOT FOUND"),
         );
       });
@@ -152,12 +186,26 @@ describe("ScenarioChildSpawn.resolve", () => {
           expect.stringContaining("build:server"),
         );
       });
+
+      /** @scenario "Missing tsx fails before spawn when the bundle is missing" */
+      it("fails before spawning pnpm when tsx does not resolve", () => {
+        const cause = tsxDoesNotResolve();
+
+        expect(() => ScenarioChildSpawn.create().resolve(spawnOptions("production"))).toThrow(
+          MISSING_TSX,
+        );
+
+        const logged = mockLogger.error.mock.calls.map((call) => String(call[1])).join("\n");
+        expect(logged).not.toContain(SECRET);
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.objectContaining({ bundleState: "missing", err: cause }),
+          MISSING_TSX,
+        );
+      });
     });
   });
 
   describe("when NODE_ENV is development", () => {
-    const BUNDLE = path.join(PACKAGE_ROOT, "dist", "server", "scenario-child-process.mjs");
-
     /**
      * Bundle at `bundleMtimeMs`, one child source at `sourceMtimeMs`. Omitting
      * the bundle mtime makes statSync throw for it, standing in for "not built".
@@ -184,12 +232,14 @@ describe("ScenarioChildSpawn.resolve", () => {
     };
 
     it("invokes node with the bundle when it is newer than every child source", () => {
+      tsxDoesNotResolve();
       givenMtimes({ bundleMtimeMs: 2000, sourceMtimeMs: 1000 });
 
       const result = ScenarioChildSpawn.create().resolve(spawnOptions("development"));
 
       expect(result.command).toBe("node");
       expect(result.args).toEqual([BUNDLE]);
+      expect(createRequire).not.toHaveBeenCalled();
     });
 
     it("falls back to tsx when a child source is newer than the bundle", () => {
@@ -197,7 +247,10 @@ describe("ScenarioChildSpawn.resolve", () => {
       // never silently runs the previously built code.
       givenMtimes({ bundleMtimeMs: 1000, sourceMtimeMs: 2000 });
 
-      expect(ScenarioChildSpawn.create().resolve(spawnOptions("development")).command).toBe("pnpm");
+      expect(ScenarioChildSpawn.create().resolve(spawnOptions("development"))).toEqual({
+        command: "pnpm",
+        args: ["exec", "tsx", SOURCE_PATH],
+      });
     });
 
     /** @scenario 'Processor spawns child process using tsx in development' */
@@ -210,11 +263,44 @@ describe("ScenarioChildSpawn.resolve", () => {
     });
 
     it("logs the environment at debug level", () => {
+      givenMtimes({ sourceMtimeMs: 1000 });
       ScenarioChildSpawn.create().resolve(spawnOptions("development"));
 
       expect(mockLogger.debug).toHaveBeenCalledWith(
         expect.objectContaining({ nodeEnv: "development" }),
         expect.stringContaining("tsx"),
+      );
+    });
+
+    /** @scenario "Missing tsx fails before spawn when the bundle is missing" */
+    it("names a missing bundle when tsx does not resolve", () => {
+      givenMtimes({ sourceMtimeMs: 1000 });
+      tsxDoesNotResolve();
+
+      expect(() => ScenarioChildSpawn.create().resolve(spawnOptions("development"))).toThrow(
+        MISSING_TSX,
+      );
+      expect(JSON.stringify(mockLogger.error.mock.calls)).not.toContain(SECRET);
+    });
+
+    /** @scenario "Missing tsx fails before spawn when the bundle is stale" */
+    it("names a stale bundle when tsx does not resolve", () => {
+      givenMtimes({ bundleMtimeMs: 1000, sourceMtimeMs: 2000 });
+      const cause = tsxDoesNotResolve();
+
+      let thrown: Error | undefined;
+      try {
+        ScenarioChildSpawn.create().resolve(spawnOptions("development"));
+      } catch (error) {
+        thrown = error instanceof Error ? error : undefined;
+      }
+
+      expect(thrown?.message).toBe(STALE_TSX);
+      expect(thrown?.message).not.toContain(SECRET);
+      expect(thrown?.cause).toBe(cause);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ bundleState: "stale", err: cause }),
+        STALE_TSX,
       );
     });
   });
@@ -224,8 +310,7 @@ describe("ScenarioChildSpawn.resolve", () => {
       const result = ScenarioChildSpawn.create().resolve(spawnOptions("test"));
 
       expect(result.command).toBe("pnpm");
-      expect(result.args[0]).toBe("exec");
-      expect(result.args[1]).toBe("tsx");
+      expect(result.args).toEqual(["exec", "tsx", SOURCE_PATH]);
     });
   });
 
@@ -234,8 +319,7 @@ describe("ScenarioChildSpawn.resolve", () => {
       const result = ScenarioChildSpawn.create().resolve(spawnOptions(undefined));
 
       expect(result.command).toBe("pnpm");
-      expect(result.args[0]).toBe("exec");
-      expect(result.args[1]).toBe("tsx");
+      expect(result.args).toEqual(["exec", "tsx", SOURCE_PATH]);
     });
   });
 });
