@@ -21,8 +21,12 @@ import type {
 } from "../../repositories/scim.repository.ts";
 import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
+import type { ScimSyncLifecycle } from "../scim-sync-lifecycle.service.ts";
 import { ScimService } from "../scim.service.ts";
-import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+import {
+  QuietScimSyncLifecycle,
+  RecordingScimSyncLifecycle,
+} from "./support/quiet-scim-sync-lifecycle.ts";
 
 /** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
 const openSeats = {
@@ -195,7 +199,11 @@ function departments(): ScimCostCenterFacts {
   };
 }
 
-function directory(store: DirectoryStore, connections = HeldConnectionsFake.of()) {
+function directory(
+  store: DirectoryStore,
+  connections = HeldConnectionsFake.of(),
+  lifecycle: ScimSyncLifecycle = new QuietScimSyncLifecycle(),
+) {
   const minted: ScimUserRecord[] = [];
   const users: ScimUserProvisioning = {
     findById: vi.fn(async ({ id }) => store.accounts.get(id) ?? null),
@@ -226,7 +234,7 @@ function directory(store: DirectoryStore, connections = HeldConnectionsFake.of()
       costCenterFacts: departments(),
       organization: new OrganizationAdministrationFake(),
       entitlements: new EnterpriseEntitlements(),
-      lifecycle: new QuietScimSyncLifecycle(),
+      lifecycle,
       provenOffboarding: false,
       tokenPepper: "scim-test-pepper",
       seats: openSeats,
@@ -559,5 +567,67 @@ describe("when two pushes of one new person arrive together", () => {
       detail: "User already exists in this organization",
     });
     expect(store.resources.size).toBe(0);
+  });
+});
+
+describe("when the directory re-sends a person", () => {
+  const CONNECTION = "okta";
+  const request = {
+    schemas: [USER_SCHEMA],
+    userName: "ada@example.test",
+    name: { givenName: "Ada", familyName: "Lovelace" },
+    active: true,
+  };
+
+  function held() {
+    const store = new DirectoryStore();
+    store.accounts.set("user-1", account({ id: "user-1", email: "ada@example.test" }));
+    store.memberships.add(`${ORGANIZATION}:user-1`);
+    const lifecycle = new RecordingScimSyncLifecycle();
+    const { service } = directory(store, HeldConnectionsFake.of([CONNECTION]), lifecycle);
+    return { service, lifecycle };
+  }
+
+  /** @scenario "A restated person is not a change" */
+  it("records the second identical replace as no change", async () => {
+    const { service, lifecycle } = held();
+    const replace = () =>
+      service.replaceUser({
+        id: "user-1",
+        organizationId: ORGANIZATION,
+        connectionId: CONNECTION,
+        request,
+      });
+
+    await replace();
+    await replace();
+
+    expect(lifecycle.pushes.map((push) => [push.op, push.changed])).toEqual([
+      ["update", true],
+      ["update", false],
+    ]);
+  });
+
+  /** @scenario "A changed name is a change" */
+  it("records a new name as a change", async () => {
+    const { service, lifecycle } = held();
+    await service.replaceUser({
+      id: "user-1",
+      organizationId: ORGANIZATION,
+      connectionId: CONNECTION,
+      request,
+    });
+
+    await service.updateUser({
+      id: "user-1",
+      organizationId: ORGANIZATION,
+      connectionId: CONNECTION,
+      patchRequest: {
+        schemas: [PATCH_SCHEMA],
+        Operations: [{ op: "replace", path: "name.familyName", value: "Byron" }],
+      },
+    });
+
+    expect(lifecycle.pushes.at(-1)).toMatchObject({ op: "update", changed: true });
   });
 });
