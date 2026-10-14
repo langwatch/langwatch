@@ -22,6 +22,7 @@ None.
 
 ## Calls
 
+- Client packages (package.json): `@langwatch/langy-client`.
 - Host APIs it requires: `GithubHostApi`.
 
 <!-- readme:generated:end -->

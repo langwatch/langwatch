@@ -24,6 +24,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/github-contract": "workspace:*",
+    "@langwatch/langy-client": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/slack-contract": "workspace:*",
     "lucide-react": "catalog:",

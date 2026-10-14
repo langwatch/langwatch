@@ -48,6 +48,13 @@
 		"userPrompt": "Connect my agent to LangWatch simulations"
 	},
 	{
+		"id": "connect-mcp",
+		"label": "Connect MCP",
+		"description": "Connect the LangWatch MCP server to the person's own AI client (Claude Desktop, claude.ai, Claude Code, ChatGPT, Cursor, VS Code with Copilot, or any other MCP client), so they can search traces, run evaluations and manage prompts from there. Shows the MCP setup card with this LangWatch's own MCP address, OAuth sign-in (recommended) or an API key, and the steps for their client, then fixes a connection that fails. Use when someone asks to set up, add or connect the LangWatch MCP, to use LangWatch from Claude, Cursor, ChatGPT, Copilot or their IDE, or why their MCP connection fails.",
+		"category": "skill",
+		"userPrompt": "Help me connect the LangWatch MCP"
+	},
+	{
 		"id": "context-sweet-spot",
 		"label": "Context sweet spot",
 		"description": "Investigates the context economics of your own coding-agent sessions in LangWatch. Reads real sessions to find where carrying a fat context stops paying for itself, measured in cache rebuilds, compactions and cost per turn, and delivers a report with the context size your sessions should stay under, with example sessions behind every claim. Use when coding-agent sessions feel expensive or degrade as they grow.",

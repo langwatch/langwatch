@@ -82,6 +82,7 @@ const CASING: Record<string, string> = {
   pr: "PR",
   api: "API",
   github: "GitHub",
+  mcp: "MCP",
 };
 function labelFor(id: string): string {
   const words = id.split("-").map((word, index) => {

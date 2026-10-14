@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import { useGithubHost } from "../../model/github-host.ts";
 import { GITHUB_ERROR_QUERY_KEY } from "../../model/github-install-address.ts";
 import { GithubCard } from "./github-card.tsx";
+import { LangwatchMcpBanner } from "./langwatch-mcp-banner.tsx";
 import { LangyCodeAccess } from "./langy-code-access.tsx";
 import { SlackCard } from "./slack-card.tsx";
 
@@ -42,6 +43,7 @@ export default function IntegrationsScreen() {
         <PageLayout.Heading>Integrations</PageLayout.Heading>
       </PageLayout.Header>
       <VStack align="stretch" gap={6} width="full" paddingTop={4}>
+        <LangwatchMcpBanner />
         <Text color="fg.muted">
           Connect the tools your team already uses, so automations and Langy can reach them.
         </Text>

@@ -25,6 +25,7 @@ export class FakeGithubHost extends GithubHostApi {
   readonly externals: string[] = [];
   readonly queryWrites: QueryWrite[] = [];
   readonly failures: GithubFailureNotice[] = [];
+  readonly langyQuestions: string[] = [];
 
   constructor(
     private readonly options: {
@@ -32,6 +33,8 @@ export class FakeGithubHost extends GithubHostApi {
       query?: Readonly<Record<string, string | undefined>>;
       /** Grants the reader holds; every grant when omitted. */
       permissions?: readonly string[];
+      /** Whether Langy is installed to be asked; yes when omitted. */
+      langy?: boolean;
     } = {},
   ) {
     super();
@@ -66,6 +69,14 @@ export class FakeGithubHost extends GithubHostApi {
 
   failed(failure: GithubFailureNotice): void {
     this.failures.push(failure);
+  }
+
+  canAskLangy(): boolean {
+    return this.options.langy ?? true;
+  }
+
+  askLangy(question: string): void {
+    this.langyQuestions.push(question);
   }
 }
 

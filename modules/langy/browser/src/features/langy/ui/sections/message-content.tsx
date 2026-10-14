@@ -41,10 +41,12 @@ import {
   codeAccessCallId,
   codeAccessOffersDescribe,
 } from "../../../tools/model/langy-code-access-tool.ts";
+import { mcpSetupCalls } from "../../../tools/model/langy-mcp-setup-tool.ts";
 import { questionToolCardParts } from "../../../tools/model/langy-question-tool.ts";
 import { sayToolText } from "../../../tools/model/langy-say-tool.ts";
 import { secretSnippetCalls } from "../../../tools/model/langy-secret-snippet-tool.ts";
 import { LangyCodeAccessCard } from "../../../tools/ui/sections/langy-code-access-card.tsx";
+import { LangyMcpSetupCard } from "../../../tools/ui/sections/langy-mcp-setup-card.tsx";
 import { LangySecretSnippetCard } from "../../../tools/ui/sections/langy-secret-snippet-card.tsx";
 import {
   hasLangyBlockParts,
@@ -257,6 +259,7 @@ function useAnswerReading({ message, isStreaming }: { message: UIMessage; isStre
   const codeAccessCall = useMemo(() => codeAccessCallId(parts), [parts]);
   const codeAccessDescribe = useMemo(() => codeAccessOffersDescribe(parts), [parts]);
   const secretSnippets = useMemo(() => secretSnippetCalls(parts), [parts]);
+  const mcpSetups = useMemo(() => mcpSetupCalls(parts), [parts]);
   // The notifications offer (`offer_notifications`). The answer lives on the account, so the
   // card reads it there and a reload shows what was chosen.
   const offerCallId = useMemo(() => offerNotificationsCallId(parts), [parts]);
@@ -290,6 +293,7 @@ function useAnswerReading({ message, isStreaming }: { message: UIMessage; isStre
     codeAccessCall,
     codeAccessDescribe,
     secretSnippets,
+    mcpSetups,
     offerCallId,
     pullRequestLinks,
     plan,
@@ -317,7 +321,8 @@ function answerHasContent(reading: AnswerReading): boolean {
     reading.prs.length +
     reading.progressEvents.length +
     reading.questionCards.length +
-    reading.secretSnippets.length;
+    reading.secretSnippets.length +
+    reading.mcpSetups.length;
   return Boolean(
     reading.displayText ||
     reading.hasBlocks ||
@@ -478,7 +483,7 @@ function isRecordedMessage(message: UIMessage): boolean {
 
 /**
  * The cards one call raised, drawn where the call ran: its pull requests (each once per message),
- * its proposal, the question it waits on, the code access ask, a secret snippet and the
+ * its proposal, the question it waits on, the code access ask, a secret snippet, MCP setup and the
  * notifications offer, which comes before long work so the work streams in below it.
  */
 function callCardsOf({
@@ -533,6 +538,11 @@ function callCardsOf({
     ...secretSnippetCalls([part]).map((call) => (
       <LangyCardBoundary key={call.callId} scope="the secret snippet card">
         <LangySecretSnippetCard organizationId={organizationId} call={call} />
+      </LangyCardBoundary>
+    )),
+    ...mcpSetupCalls([part]).map((call) => (
+      <LangyCardBoundary key={call.callId} scope="the MCP setup card">
+        <LangyMcpSetupCard call={call} />
       </LangyCardBoundary>
     )),
     reading.offerCallId !== null && offerNotificationsCallId([part]) === reading.offerCallId ? (
