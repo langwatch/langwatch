@@ -16,6 +16,8 @@ metadata:
 
 ## Show the card
 
+Your first call is `mcp_setup`, even when you do not know the client. Never ask which client they use, with the `question` tool or in text: the card's client picker is that question.
+
 1. **Find the client.** Map what the person said to the card's client:
 
    | They said                                      | `client`      |
