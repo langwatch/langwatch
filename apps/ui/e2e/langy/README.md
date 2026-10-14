@@ -452,8 +452,8 @@ state span included) where `LANGWATCH_ENDPOINT` and `LANGWATCH_API_KEY` point.
 A run's own `langwatch` option moves the results alone, while the spans stay
 where the first run's environment sent them, so the suite moves both through
 the environment. By default both land on the seeded local project. Set
-`LANGY_REPORT_API_KEY` (and `LANGY_REPORT_ENDPOINT`, default
-`https://app.langwatch.ai`) to send both to a stable project instead, while
+`LANGY_REPORT_API_KEY` together with `LANGY_REPORT_ENDPOINT` (required with
+it, no default) to send both to a stable project instead, while
 Langy still runs on the local stack. Without a real OpenAI key,
 `OPENAI_API_KEY` may be a LangWatch gateway virtual key with `OPENAI_BASE_URL`
 set to its gateway; the harness and the seeded provider both use it.

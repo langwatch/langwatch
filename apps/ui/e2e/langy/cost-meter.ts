@@ -60,6 +60,7 @@ const LANGY_KEY_NAME = "Langy";
 /** Wide enough on both sides to absorb clock skew; the before/after delta removes older spend. */
 const LANGY_WINDOW_MS = 24 * 3_600_000;
 
+/** Builds a meter that tallies harness model tokens and Langy's gateway spend per run. */
 export function createCostMeter({
   readLangyUsage = readLangyGatewayUsage,
 }: { readLangyUsage?: LangyUsageReader } = {}): CostMeter {
@@ -161,6 +162,13 @@ export const readLangyGatewayUsage: LangyUsageReader = async ({ organizationId, 
     input: { organizationId, fromDate: from.toISOString(), toDate: to.toISOString() },
   });
   const langyKeys = summary.byVirtualKey.filter((key) => key.name === LANGY_KEY_NAME);
+  // The key is minted on first use, so its id is unknown at `start`;
+  // a second match would be another key's spend.
+  if (langyKeys.length > 1) {
+    throw new Error(
+      `${langyKeys.length} gateway keys are named "${LANGY_KEY_NAME}" in this organization; spend cannot be attributed to Langy's`,
+    );
+  }
   return {
     usd: langyKeys.reduce((sum, key) => sum + Number(key.totalUsd), 0),
     requests: langyKeys.reduce((sum, key) => sum + key.requests, 0),

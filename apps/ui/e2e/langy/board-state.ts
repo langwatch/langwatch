@@ -114,6 +114,7 @@ export interface BoardDiff {
   unchanged: BoardItem[];
 }
 
+/** Compares two reads of one board, item by item. */
 export function diffBoards({
   before,
   after,

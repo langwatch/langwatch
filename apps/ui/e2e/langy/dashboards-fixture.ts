@@ -54,8 +54,10 @@ export async function seedDashboardsProject({ label }: { label: string }): Promi
 function reportResultsToStableProject(): void {
   const apiKey = process.env.LANGY_REPORT_API_KEY;
   if (!apiKey) return;
+  const endpoint = process.env.LANGY_REPORT_ENDPOINT;
+  if (!endpoint) throw new Error("LANGY_REPORT_ENDPOINT is required with LANGY_REPORT_API_KEY");
   process.env.LANGWATCH_API_KEY = apiKey;
-  process.env.LANGWATCH_ENDPOINT = process.env.LANGY_REPORT_ENDPOINT ?? "https://app.langwatch.ai";
+  process.env.LANGWATCH_ENDPOINT = endpoint;
 }
 
 /** A dashboard as `POST /api/dashboards` answers it. */
@@ -65,6 +67,7 @@ export interface Board {
   platformUrl: string;
 }
 
+/** Creates an empty dashboard in the seeded project. */
 export async function createBoard({ name }: { name: string }): Promise<Board> {
   return lwPost({ path: "/api/dashboards", body: { name } });
 }
