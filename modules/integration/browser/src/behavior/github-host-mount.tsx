@@ -75,7 +75,12 @@ class HostServiceGithubHost extends GithubHostApi {
 
   askLangy(question: string): void {
     if (!this.deps.langy) return;
-    void this.deps.langy().then((langy) => langy.ask({ question }));
+    void this.deps
+      .langy()
+      .then((langy) => langy.ask({ question }))
+      .catch((error: unknown) =>
+        this.deps.feedback.failed({ error, fallbackTitle: "Langy could not open" }),
+      );
   }
 }
 

@@ -137,7 +137,9 @@ function oauthSteps({ client, url }: { client: McpSetupClient; url: string }): M
       ];
     case "chatgpt":
       return [
-        { text: "In ChatGPT, turn on developer mode, then add a custom MCP server in the apps settings." },
+        {
+          text: "In ChatGPT, turn on developer mode, then add a custom MCP server in the apps settings.",
+        },
         { text: "Paste the URL above, choose OAuth as the authentication and click Connect." },
         SIGN_IN_STEP,
       ];
@@ -191,7 +193,9 @@ function apiKeySteps({
           text: "Add a custom connector as for OAuth, paste the URL above, and under Request headers add this header:",
           code: `Authorization: ${bearer}`,
         },
-        { text: "On Team and Enterprise plans everyone in the organization shares this key, so OAuth is the better choice there." },
+        {
+          text: "On Team and Enterprise plans everyone in the organization shares this key, so OAuth is the better choice there.",
+        },
       ];
     case "claude-code":
       return [
