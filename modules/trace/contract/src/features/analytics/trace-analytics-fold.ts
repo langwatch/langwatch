@@ -124,6 +124,7 @@ export function foldSpanIntoTraceAnalytics({
     outputSource: OUTPUT_SOURCE.INFERRED,
     inputIsFallback: false,
     outputIsFallback: false,
+    inputSpanStartTimeMs: null,
     inputMediaRefs: null,
     outputMediaRefs: null,
   });

@@ -204,9 +204,7 @@ export function normalizeLegacyPromptingTechnique(configData: Record<string, unk
   if (!mapped) return drop("object");
   const candidate = { ...technique, type: mapped };
   // If the demonstrations are malformed too, keep the technique and drop them.
-  const value = promptingTechniqueSchema.validate(candidate)
-    ? candidate
-    : { type: mapped };
+  const value = promptingTechniqueSchema.validate(candidate) ? candidate : { type: mapped };
   return {
     configData: { ...rest, prompting_technique: value },
     change: { storedShape: "object", action: "mapped", mappedTo: mapped },
