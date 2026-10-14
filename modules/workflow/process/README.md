@@ -156,7 +156,7 @@ enrichStudioEvent(input: { event: StudioClientEvent; projectId: string; principa
 
 #### `executeStudioEventSync`
 
-One prepared Studio event run to completion on the project's engine; its answer unread.
+One prepared Studio event run to completion on the project's engine. A JSON body comes back parsed; anything else, such as a gateway's error page, as text.
 
 ```typescript
 executeStudioEventSync(input: { projectId: string; event: StudioClientEvent; origin: WorkflowRunOrigin; causalityDepth?: number; parentTrace?: { traceId: string; parentSpanId: string }; }): Promise<WorkflowStudioSyncAnswer>;
@@ -877,9 +877,9 @@ Declared at `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:31`.
 
 | Kind   | Leaf                         | Environment variable                      | Declared at                             |
 | ------ | ---------------------------- | ----------------------------------------- | --------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:501`           |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:502`           |
-| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:503`           |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:502`           |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:503`           |
+| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:504`           |
 | config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:82` |
 | config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:84` |
 | config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:85` |

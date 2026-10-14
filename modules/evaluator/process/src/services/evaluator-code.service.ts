@@ -112,7 +112,8 @@ export class EvaluatorCodeService {
         ...(input.parentTrace ? { parentTrace: input.parentTrace } : {}),
       });
       if (!response.ok) {
-        throw new Error(`Error running code evaluator: ${response.statusText}`);
+        const reason = response.body.error?.message ?? response.statusText;
+        throw new Error(`Error running code evaluator: ${reason}`);
       }
 
       if (response.body.status !== "success") {

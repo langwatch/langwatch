@@ -240,7 +240,10 @@ export interface WorkflowApi {
     projectId: string;
     principal?: WorkflowRunPrincipal | undefined;
   }): Promise<StudioClientEvent>;
-  /** One prepared Studio event run to completion on the project's engine; its answer unread. */
+  /**
+   * One prepared Studio event run to completion on the project's engine. A JSON body comes
+   * back parsed; anything else, such as a gateway's error page, as text.
+   */
   executeStudioEventSync(input: {
     projectId: string;
     event: StudioClientEvent;

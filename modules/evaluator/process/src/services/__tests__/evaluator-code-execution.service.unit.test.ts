@@ -76,4 +76,23 @@ describe("EvaluatorCodeExecutionService", () => {
       });
     });
   });
+
+  describe("when the engine refuses with a structured error", () => {
+    it("keeps the engine's message and traceback", async () => {
+      const { service } = buildService({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        body: { status: "error", error: { message: "NameError: x", traceback: "line 3" } },
+      });
+
+      const result = await service.execute({ projectId: "project_1", event, causalityDepth: 0 });
+
+      expect(result).toEqual({
+        ok: false,
+        statusText: "Internal Server Error",
+        body: { status: "error", error: { message: "NameError: x", traceback: "line 3" } },
+      });
+    });
+  });
 });

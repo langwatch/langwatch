@@ -62,12 +62,26 @@ export class EvaluatorCodeExecutionService implements EvaluatorCodeExecution {
       ...(input.parentTrace ? { parentTrace: input.parentTrace } : {}),
     });
 
+    if (response.ok) {
+      return {
+        ok: true,
+        statusText: response.statusText,
+        body: codeExecutionResponseBodySchema.parse(response.body),
+      };
+    }
+
+    const refusal = codeExecutionResponseBodySchema.safeParse(response.body);
+    const error = refusal.success ? refusal.data.error : undefined;
     return {
-      ok: response.ok,
+      ok: false,
       statusText: response.statusText,
-      body: response.ok
-        ? codeExecutionResponseBodySchema.parse(response.body)
-        : { status: "error", error: { message: response.statusText } },
+      body: {
+        status: "error",
+        error: {
+          message: error?.message ?? response.statusText,
+          ...(error?.traceback ? { traceback: error.traceback } : {}),
+        },
+      },
     };
   }
 }
