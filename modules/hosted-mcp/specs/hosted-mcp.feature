@@ -67,7 +67,19 @@ Feature: Hosted MCP answers main's root paths on the api process
     When they approve an MCP client's request
     Then the approval is refused with access_denied before any authorization code is issued
 
-  # --- Session lifetime: a session ends by its TTL or the client's DELETE, never by a replica ---
+  # --- Session lifetime: a session ends 30 days after it opened or by the client's DELETE, never by a replica ---
+
+  @unit
+  Scenario: A session lasts 30 days from when it opened
+    Given a session opened by a client
+    When the client keeps using it
+    Then the session still ends 30 days after it opened
+
+  @unit
+  Scenario: Neither use nor a refreshed token extends a session's record
+    Given a session record with ten seconds left
+    When the session is used and its record is rewritten for a refreshed token
+    Then the record still ends within those ten seconds
 
   @integration
   Scenario: A session survives the replica that opened it shutting down

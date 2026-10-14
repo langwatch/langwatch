@@ -11,8 +11,8 @@ import {
 } from "../mcp-session.repository.ts";
 
 /**
- * A record lives 30 days past its last use. `activeByKey` is a sorted set of session ids scored by
- * last activity, a new name because the set it replaces (`mcp:sessions_by_key:`) is another type.
+ * A session lasts 30 days from when it opened; use never extends it. `activeByKey` is a sorted set
+ * of session ids scored by last activity, a new name because the set it replaced is another type.
  */
 const LAYOUT = {
   record: "mcp:session:",
@@ -78,8 +78,11 @@ export class RedisMcpSessionRepository extends McpSessionRepository {
   }): Promise<void> {
     if (!this.#redis) return;
     const encryptedApiKey = this.#cipher.encrypt(apiKey);
+    const recordKey = `${LAYOUT.record}${sessionId}`;
+    // A record rewritten for a refreshed token keeps the time its session has left.
+    const secondsLeft = await this.#redis.ttl(recordKey);
     await this.#redis.set(
-      `${LAYOUT.record}${sessionId}`,
+      recordKey,
       JSON.stringify({
         encryptedApiKey,
         projectId,
@@ -87,24 +90,27 @@ export class RedisMcpSessionRepository extends McpSessionRepository {
         createdAt: nowInstant().epochMilliseconds,
       }),
       "EX",
-      LAYOUT.ttlSeconds,
+      secondsLeft > 0 ? secondsLeft : LAYOUT.ttlSeconds,
     );
     await this.#markActive({ sessionId, apiKey });
   }
 
   async touch({ sessionId, apiKey }: { sessionId: string; apiKey: string }): Promise<void> {
     if (!this.#redis) return;
-    await this.#redis.expire(`${LAYOUT.record}${sessionId}`, LAYOUT.ttlSeconds);
     await this.#markActive({ sessionId, apiKey });
   }
 
   async getRecord({ sessionId }: { sessionId: string }): Promise<McpSessionRecordLookup> {
     if (!this.#redis) return { kind: "missing" };
-    const data = await this.#redis.get(`${LAYOUT.record}${sessionId}`);
+    const recordKey = `${LAYOUT.record}${sessionId}`;
+    const data = await this.#redis.get(recordKey);
     if (!data) return { kind: "missing" };
     const stored = storedSessionSchema.parse(JSON.parse(data));
+    const secondsLeft = await this.#redis.ttl(recordKey);
     return {
       kind: "found",
+      expiresAt:
+        nowInstant().epochMilliseconds + (secondsLeft > 0 ? secondsLeft : LAYOUT.ttlSeconds) * 1000,
       apiKey: this.#cipher.decrypt(stored.encryptedApiKey),
       projectId: stored.projectId,
       userId: stored.userId,

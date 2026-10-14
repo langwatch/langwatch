@@ -5,6 +5,8 @@
 export type McpSessionRecordLookup =
   | Readonly<{
       kind: "found";
+      /** When the session ends (epoch ms): 30 days after it opened. */
+      expiresAt: number;
       apiKey: string;
       projectId: string | undefined;
       userId: string | undefined;
@@ -19,13 +21,14 @@ export interface McpSessionCipher {
 
 /**
  * Session records every replica can read, so a session opened on one replica can be found,
- * counted and reached from another. A record ends by its TTL or by the client's DELETE; a replica
- * shutting down or dropping an idle local copy never removes it.
+ * counted and reached from another. A session lasts 30 days from when it opened, or until the
+ * client's DELETE; a replica shutting down or dropping an idle local copy never removes it.
  */
 export abstract class McpSessionRepository {
   /** False where the deployment has no shared store; records are then kept nowhere. */
   abstract isAvailable(): boolean;
 
+  /** A record rewritten for the same session (a refreshed token) keeps the time it has left. */
   abstract store(input: {
     sessionId: string;
     apiKey: string;
@@ -33,7 +36,7 @@ export abstract class McpSessionRepository {
     userId?: string;
   }): Promise<void>;
 
-  /** Extends the record's life and marks it active now for the key's session count. */
+  /** Marks the session active now for the key's session count; it never extends the session. */
   abstract touch(input: { sessionId: string; apiKey: string }): Promise<void>;
 
   /** A record whose key cannot be opened throws; the caller reads that as missing. */

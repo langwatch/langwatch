@@ -32,7 +32,7 @@ describe.each(TIERS)("the %s MCP session records", (_tier, build) => {
       });
 
       expect(records.isAvailable()).toBe(true);
-      await expect(records.getRecord({ sessionId: "session-1" })).resolves.toEqual({
+      await expect(records.getRecord({ sessionId: "session-1" })).resolves.toMatchObject({
         kind: "found",
         apiKey: "key-a",
         projectId: "project-1",
@@ -85,6 +85,30 @@ describe.each(TIERS)("the %s MCP session records", (_tier, build) => {
         apiKey: "token-new",
       });
     });
+  });
+});
+
+describe("the redis MCP session records' lifetime", () => {
+  /** @scenario "Neither use nor a refreshed token extends a session's record" */
+  it("ends a session 30 days after it opened, however much it is used", async () => {
+    const store = memoryRedisStore();
+    const records = redisTier(store);
+    await records.store({ sessionId: "s-1", apiKey: "token-old", userId: "user-1" });
+    const opened = await records.getRecord({ sessionId: "s-1" });
+    expect(opened).toMatchObject({ kind: "found" });
+    const thirtyDays = 30 * 24 * 3600 * 1000;
+    expect(opened.kind === "found" && opened.expiresAt - Date.now()).toBeGreaterThan(
+      thirtyDays - 60_000,
+    );
+
+    // Ten seconds left: neither use nor a refreshed token buys it more.
+    store.expiries.set("mcp:session:s-1", 10_000);
+    await records.touch({ sessionId: "s-1", apiKey: "token-old" });
+    await records.store({ sessionId: "s-1", apiKey: "token-new", userId: "user-1" });
+    const later = await records.getRecord({ sessionId: "s-1" });
+
+    expect(later).toMatchObject({ kind: "found", apiKey: "token-new" });
+    expect(later.kind === "found" && later.expiresAt - Date.now()).toBeLessThanOrEqual(10_000);
   });
 });
 

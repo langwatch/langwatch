@@ -2,7 +2,11 @@ import { nowInstant } from "@langwatch/time";
 
 import { McpSessionRepository, type McpSessionRecordLookup } from "../mcp-session.repository.ts";
 
+/** As long as the Redis tier keeps a session: 30 days from when it opened. */
+const SESSION_LIFETIME_MS = 30 * 24 * 3600 * 1000;
+
 type MemoryRecord = {
+  expiresAt: number;
   apiKey: string;
   projectId: string | undefined;
   userId: string | undefined;
@@ -32,7 +36,10 @@ export class MemoryMcpSessionRepository extends McpSessionRepository {
     projectId?: string;
     userId?: string;
   }): Promise<void> {
+    const now = nowInstant().epochMilliseconds;
+    const kept = this.#records.get(input.sessionId);
     this.#records.set(input.sessionId, {
+      expiresAt: kept && kept.expiresAt > now ? kept.expiresAt : now + SESSION_LIFETIME_MS,
       apiKey: input.apiKey,
       projectId: input.projectId,
       userId: input.userId,
@@ -48,7 +55,10 @@ export class MemoryMcpSessionRepository extends McpSessionRepository {
 
   getRecord(input: { sessionId: string }): Promise<McpSessionRecordLookup> {
     const record = this.#records.get(input.sessionId);
-    return Promise.resolve(record ? { kind: "found", ...record } : { kind: "missing" });
+    if (!record || record.expiresAt <= nowInstant().epochMilliseconds) {
+      return Promise.resolve({ kind: "missing" });
+    }
+    return Promise.resolve({ kind: "found", ...record });
   }
 
   remove(input: { sessionId: string; apiKey?: string }): Promise<void> {

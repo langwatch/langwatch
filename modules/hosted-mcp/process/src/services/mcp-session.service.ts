@@ -20,6 +20,9 @@ const logger = createLogger("langwatch:mcp");
  */
 const SESSION_MAX_AGE_MS = 30 * 60 * 1000;
 
+/** A session lasts this long from when it opened; use never extends it. */
+const SESSION_LIFETIME_MS = 30 * 24 * 3600 * 1000;
+
 /** An SSE comment line, which clients ignore and idle-timing proxies count as traffic. */
 const KEEPALIVE_COMMENT = ": keepalive\n\n";
 
@@ -37,6 +40,8 @@ type McpOpenSession<T> = {
   projectId: string | undefined;
   userId: string | undefined;
   lastActivityAt: number;
+  /** When the session ends (epoch ms); a local copy past it is dropped and its next request 404s. */
+  expiresAt: number;
 };
 
 export type McpStreamableSession = McpOpenSession<StreamableHTTPServerTransport>;
@@ -63,13 +68,20 @@ export class McpSessionService {
     return new McpSessionService(collaborators);
   }
 
+  /** A new session ends 30 days from now; one rebuilt from its record keeps the record's end. */
   openSession<T>(input: {
     transport: T;
     apiKey: string;
     projectId: string | undefined;
     userId: string | undefined;
+    expiresAt?: number;
   }): McpOpenSession<T> {
-    return { ...input, lastActivityAt: nowInstant().epochMilliseconds };
+    const now = nowInstant().epochMilliseconds;
+    return {
+      ...input,
+      lastActivityAt: now,
+      expiresAt: input.expiresAt ?? now + SESSION_LIFETIME_MS,
+    };
   }
 
   /** Runs `work` with the MCP server configured for this session's key. */
@@ -215,10 +227,14 @@ export class McpSessionService {
     return (await this.countForKey(apiKey)) >= MAX_SESSIONS_PER_KEY;
   }
 
-  /** Closes idle local transports. Their records stay, so each session can be rebuilt. */
+  /**
+   * Closes idle local transports, whose records stay so each session can be rebuilt, and ended
+   * ones, whose records Redis expires at the same moment.
+   */
   reapIdle(now: number): void {
     for (const [id, session] of this.streamable) {
-      if (now - session.lastActivityAt > SESSION_MAX_AGE_MS) this.#dropLocal(id, session);
+      const idle = now - session.lastActivityAt > SESSION_MAX_AGE_MS;
+      if (idle || now >= session.expiresAt) this.#dropLocal(id, session);
     }
   }
 
