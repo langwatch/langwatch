@@ -37,6 +37,7 @@ on:
       # died on its first import.
       - "infra/docker/Dockerfile"
       - "infra/docker/Dockerfile.go_service"
+      - "infra/clickhouse-serverless/**"
       - ".dockerignore"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
@@ -72,6 +73,7 @@ on:
       # died on its first import.
       - "infra/docker/Dockerfile"
       - "infra/docker/Dockerfile.go_service"
+      - "infra/clickhouse-serverless/**"
       - ".dockerignore"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
@@ -133,7 +135,11 @@ jobs:
           token: ""
           filters: |
             e2e:
-              - "charts/**"
+              - "charts/langwatch/**"
+              - "charts/clickhouse-serverless/**"
+              - "charts/gateway/**"
+              - "charts/langyagent/**"
+              - "charts/lib/**"
               - ".github/workflows/langwatch-chart.yml"
               - "infra/docker/Dockerfile"
               - "infra/docker/Dockerfile.go_service"

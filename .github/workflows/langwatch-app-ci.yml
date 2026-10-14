@@ -63,18 +63,9 @@ jobs:
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
       feature-parity: ${{ steps.detect.outputs.feature-parity }}
-      # Draft PRs get the fast, cheap signal only: lint, typecheck,
-      # feature-parity. The 10 test shards and the build are the runner budget,
-      # and on a draft they mostly re-run against work in progress.
-      #
-      # A PR labelled `ci:full` gets the full suite as a draft too.
-      # Everything heavy comes back on ready_for_review, and `merge_group`
-      # is never a draft — so nothing reaches main without the full suite
-      # having run on it.
-      #
-      # Release-please pull requests get the draft run too. The bot rewrites
-      # them on every merge to main, so a full run is almost always cancelled
-      # by the next one; the merge itself runs the full suite on main.
+      # Drafts and release-please PRs (rewritten on every merge) get lint, typecheck and
+      # feature-parity only; `ci:full` lifts that. merge_group is never a draft and main
+      # runs the full suite, so nothing lands without it.
       heavy: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
       # One shard each on a draft, because the draft run is affected-tests-only
       # and a subset does not need splitting.
