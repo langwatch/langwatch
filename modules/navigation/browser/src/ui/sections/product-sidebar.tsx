@@ -3,7 +3,7 @@
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
-import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Crown, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
@@ -208,7 +208,27 @@ function DetourMenuBody({
 
 /** The Settings sidebar body, with the same gates the legacy settings navigation applies. */
 function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
-  return <DetourMenuBody groups={useSettingsMenu()} showExpanded={showExpanded} />;
+  const hasOpsAccess = useNavigationHost().opsAccess().hasAccess;
+  return (
+    <>
+      <DetourMenuBody groups={useSettingsMenu()} showExpanded={showExpanded} />
+      {/* The operator pages left Settings for their own console; operators get a signpost. */}
+      {hasOpsAccess && (
+        <>
+          <Box flex={1} width="full" />
+          <SideMenuLink
+            icon={Crown}
+            label="Ops have moved"
+            href="/ops"
+            showLabel={showExpanded}
+            rightElement={
+              <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />
+            }
+          />
+        </>
+      )}
+    </>
+  );
 }
 
 /** The Admin console's sidebar body; the operations badge sits on its dashboard. */

@@ -1,7 +1,7 @@
 import { Menu } from "@langwatch/design-system/menu";
 import type { ButtonProps } from "@langwatch/design-system/primitives";
 import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
-import { Check, ChevronsUpDown, ServerCog } from "lucide-react";
+import { Check, ChevronsUpDown, Crown } from "lucide-react";
 
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
@@ -104,10 +104,15 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
                 paddingY={2}
                 borderRadius="lg"
               >
-                <HStack gap={2} width="full">
-                  <ServerCog size={13} color="var(--chakra-colors-fg-muted)" />
-                  <Text textStyle="label">Admin</Text>
-                </HStack>
+                <VStack align="start" gap={0.5} width="full">
+                  <HStack gap={2} width="full">
+                    <Crown size={13} color="var(--chakra-colors-fg-muted)" />
+                    <Text textStyle="label">Operations</Text>
+                  </HStack>
+                  <Text textStyle="micro" color="fg.muted" paddingLeft="21px">
+                    With LangWatch's great features, come great responsibility
+                  </Text>
+                </VStack>
               </Menu.Item>
             </>
           ) : null}
