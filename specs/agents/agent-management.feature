@@ -213,8 +213,15 @@ Feature: Agent management
   Scenario: Code agent outputs offer the code output types
     Given the AgentCodeEditorDrawer is open on a code agent
     When I open an output's type
-    Then I can pick Text, Number, Boolean, Object, List or Image
+    Then I can pick Text, Number, Boolean, JSON Schema, Object, List or Image
     And a type a stored output already has is offered too
+
+  @integration
+  Scenario: Adding a JSON schema output to a code agent saves it with its schema
+    Given the AgentCodeEditorDrawer is open on a code agent
+    When I add a JSON Schema output and save
+    Then the agent's config stores an output named output_1 of type JSON schema with its schema
+    And reopening the agent shows that output as a JSON schema output
 
   @integration
   Scenario: Changing a code agent output's type saves the new type

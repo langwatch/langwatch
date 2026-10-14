@@ -1,10 +1,11 @@
 import type { Field } from "@langwatch/agent-contract";
 
-/** The output types the code editor offers, as the previous release offered them. */
+/** The output types the code editor offers: the code types, and a JSON schema with its editor. */
 export const CODE_OUTPUT_TYPES: readonly Field["type"][] = [
   "str",
   "float",
   "bool",
+  "json_schema",
   "dict",
   "list",
   "image",

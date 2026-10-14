@@ -3,11 +3,12 @@ import { describe, expect, it } from "vitest";
 import { offeredOutputTypes, outputsFromEditor } from "../code-agent-outputs.ts";
 
 describe("offeredOutputTypes", () => {
-  it("offers the code output types", () => {
+  it("offers the code output types and a JSON schema", () => {
     expect(offeredOutputTypes([{ identifier: "output", type: "str" }])).toEqual([
       "str",
       "float",
       "bool",
+      "json_schema",
       "dict",
       "list",
       "image",
@@ -15,8 +16,8 @@ describe("offeredOutputTypes", () => {
   });
 
   it("also offers a type a stored output already has", () => {
-    expect(offeredOutputTypes([{ identifier: "verdict", type: "json_schema" }])).toContain(
-      "json_schema",
+    expect(offeredOutputTypes([{ identifier: "chat", type: "chat_messages" }])).toContain(
+      "chat_messages",
     );
   });
 });

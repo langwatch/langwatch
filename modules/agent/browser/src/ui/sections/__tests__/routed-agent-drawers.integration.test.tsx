@@ -127,7 +127,10 @@ vi.mock("../../../behavior/lent-setup-with-agent-button.tsx", () => ({
   ),
 }));
 
-/** Prompt's lent outputs editor, reduced to its contract: typed rows, retyped through onChange. */
+/**
+ * Prompt's lent outputs editor, reduced to its contract: typed rows retyped through onChange, and
+ * an add that names the row `output_1` and gives a JSON schema output its default schema.
+ */
 vi.mock("../../../behavior/lent-outputs-section.tsx", () => ({
   OutputsSection: ({
     title,
@@ -172,6 +175,29 @@ vi.mock("../../../behavior/lent-outputs-section.tsx", () => ({
           </select>
         </label>
       ))}
+      <select
+        aria-label="Add output"
+        value=""
+        onChange={(event) =>
+          onChange([
+            ...outputs,
+            {
+              identifier: "output_1",
+              type: event.target.value,
+              ...(event.target.value === "json_schema"
+                ? { json_schema: { type: "object", properties: { result: { type: "string" } } } }
+                : {}),
+            },
+          ])
+        }
+      >
+        <option value="">Add</option>
+        {availableTypes.map((type) => (
+          <option key={type} value={type}>
+            {type}
+          </option>
+        ))}
+      </select>
     </section>
   ),
 }));
@@ -662,7 +688,7 @@ describe("the agent list drawer opened by address", () => {
 
 describe("the code agent editor's outputs", () => {
   /** @scenario "Code agent outputs offer the code output types" */
-  it("offers the code output types, as the previous release did", () => {
+  it("offers the code output types and a JSON schema", () => {
     fetched.agent = storedCodeAgent;
     render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
 
@@ -671,9 +697,40 @@ describe("the code agent editor's outputs", () => {
       "str",
       "float",
       "bool",
+      "json_schema",
       "dict",
       "list",
       "image",
+    ]);
+  });
+
+  /** @scenario "Adding a JSON schema output to a code agent saves it with its schema" */
+  it("saves a new JSON schema output with its schema, and shows it on reopening", async () => {
+    fetched.agent = storedCodeAgent;
+    const { unmount } = render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText("Add output"), "json_schema");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    const schema = { type: "object", properties: { result: { type: "string" } } };
+    const saved = calls.agentUpdated[0] as { config: typeof storedCodeAgent.config };
+    expect(saved.config.outputs).toEqual([
+      ...storedCodeAgent.config.outputs,
+      { identifier: "output_1", type: "json_schema", json_schema: schema },
+    ]);
+
+    unmount();
+    calls.agentUpdated.length = 0;
+    fetched.agent = { ...storedCodeAgent, config: saved.config };
+    render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
+
+    expect(screen.getByLabelText("Type of output_1")).toHaveProperty("value", "json_schema");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+    expect(calls.agentUpdated).toEqual([
+      expect.objectContaining({
+        config: expect.objectContaining({ outputs: saved.config.outputs }),
+      }),
     ]);
   });
 
