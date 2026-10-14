@@ -734,14 +734,13 @@ export const TRACE_MAPPINGS = {
       );
 
       const eventDetails = events.flatMap((event) =>
-        Object.keys(event.event_details).map(
-          (detailKey) =>
-            `event_details.${
-              detailKey.startsWith(EVENT_DETAILS_PREFIX)
-                ? detailKey.slice(EVENT_DETAILS_PREFIX.length)
-                : detailKey
-            }`,
-        ),
+        Object.keys(event.event_details).map((detailKey) => {
+          const plain = detailKey.startsWith(EVENT_DETAILS_PREFIX)
+            ? detailKey.slice(EVENT_DETAILS_PREFIX.length)
+            : detailKey;
+          // Keep the full name when the plain one is already a separate detail.
+          return `event_details.${plain !== detailKey && plain in event.event_details ? detailKey : plain}`;
+        }),
       );
 
       return Array.from(new Set([...eventMetrics, ...eventDetails])).map((event) => ({

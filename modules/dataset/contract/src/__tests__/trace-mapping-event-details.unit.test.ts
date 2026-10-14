@@ -10,27 +10,31 @@ import { TRACE_MAPPINGS } from "../trace-mapping.ts";
 
 const timestamps = { started_at: 1_000, inserted_at: 1_000, updated_at: 1_000 };
 
-const trace: Trace = {
-  trace_id: "trace-1",
-  project_id: "project-1",
-  metadata: {},
-  timestamps,
-  spans: [],
-  events: [
-    {
-      event_id: "event-1",
-      event_type: "thumbs_up_down",
-      project_id: "project-1",
-      trace_id: "trace-1",
-      timestamps,
-      metrics: { vote: -1 },
-      event_details: {
-        "event.type": "thumbs_up_down",
-        "event.details.feedback": "too slow",
+function traceWithDetails(eventDetails: Record<string, string>): Trace {
+  return {
+    trace_id: "trace-1",
+    project_id: "project-1",
+    metadata: {},
+    timestamps,
+    spans: [],
+    events: [
+      {
+        event_id: "event-1",
+        event_type: "thumbs_up_down",
+        project_id: "project-1",
+        trace_id: "trace-1",
+        timestamps,
+        metrics: { vote: -1 },
+        event_details: eventDetails,
       },
-    },
-  ],
-};
+    ],
+  };
+}
+
+const trace = traceWithDetails({
+  "event.type": "thumbs_up_down",
+  "event.details.feedback": "too slow",
+});
 
 describe("given a trace with a thumbs_up_down event whose feedback is too slow", () => {
   describe("when a column maps one event detail", () => {
@@ -64,6 +68,46 @@ describe("given a trace with a thumbs_up_down event whose feedback is too slow",
         .map((option) => option.key);
 
       expect(keys).toContain("event_details.feedback");
+    });
+  });
+});
+
+describe("given a thumbs_up_down event as the tracked-event sync stores it", () => {
+  const converted = traceWithDetails({ feedback: "too slow" });
+
+  describe("when a column maps one event detail", () => {
+    it("returns that detail by its plain name", () => {
+      expect(
+        TRACE_MAPPINGS.events.mapping({
+          trace: converted,
+          key: "thumbs_up_down",
+          subkey: "event_details.feedback",
+        }),
+      ).toEqual(["too slow"]);
+    });
+  });
+});
+
+describe("given an event with both a feedback detail and one named event.details.feedback", () => {
+  const both = traceWithDetails({
+    feedback: "too slow",
+    "event.details.feedback": "a separate detail",
+  });
+
+  describe("when the subkeys are listed", () => {
+    it("offers both, so each can be mapped", () => {
+      const keys = TRACE_MAPPINGS.events.subkeys([both], "thumbs_up_down").map((o) => o.key);
+
+      expect(keys).toEqual(
+        expect.arrayContaining(["event_details.feedback", "event_details.event.details.feedback"]),
+      );
+      expect(
+        TRACE_MAPPINGS.events.mapping({
+          trace: both,
+          key: "thumbs_up_down",
+          subkey: "event_details.event.details.feedback",
+        }),
+      ).toEqual(["a separate detail"]);
     });
   });
 });
