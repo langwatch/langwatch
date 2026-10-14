@@ -21,7 +21,7 @@ function accessWith(...on: string[]): DashboardWidgetAccessService {
 }
 
 describe("DashboardWidgetAccessService", () => {
-  describe("given Dashboards and LangWatchQL are on and the custom chart playground is off", () => {
+  describe("given Dashboards and LangWatchQL are on", () => {
     /** @scenario "Dashboard widgets open with the Dashboards and LangWatchQL flags alone" */
     it("admits the project", async () => {
       await expect(
@@ -40,16 +40,5 @@ describe("DashboardWidgetAccessService", () => {
         await expect(accessWith(...on).assertEnabled(PROJECT)).rejects.toMatchObject({ code });
       },
     );
-  });
-
-  describe("given only the custom chart playground is on", () => {
-    /** @scenario "The custom chart playground alone does not open dashboard widgets" */
-    it("refuses the project", async () => {
-      const code = new CustomChartPlaygroundNotEnabledError().code;
-
-      await expect(
-        accessWith("release_custom_chart_playground").assertEnabled(PROJECT),
-      ).rejects.toMatchObject({ code });
-    });
   });
 });

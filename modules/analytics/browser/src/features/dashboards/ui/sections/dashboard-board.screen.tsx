@@ -29,8 +29,9 @@ import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
-import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
+import { useBoardLangyChip, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
+  boardContextChip,
   boardSubject,
   widgetMissingDataDraft,
   widgetPromptDraft,
@@ -94,6 +95,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const { widgets } = boardWidgets;
   const subject = boardSubject({ board, widgets });
   const langy = useLangyAsk();
+  useBoardLangyChip(boardContextChip({ board: subject, range, period }));
   const editor = useBoardEditor({ board: subject, period, widgets });
   const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
 

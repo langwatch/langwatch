@@ -105,6 +105,44 @@ describe("the synchronous workflow run routes", () => {
     await expect(response.json()).resolves.toEqual({ status: "success" });
   });
 
+  /** @scenario "A finished run answers with its trace id, cost, timing and node results" */
+  it("answers with the trace id, cost, timing and node results the engine reports", async () => {
+    const answer = {
+      status: "success" as const,
+      result: { answer: "hi" },
+      trace_id: "trace_1",
+      total_cost: 0.002,
+      duration_ms: 840,
+      nodes: { llm_1: { status: "success" } },
+    };
+
+    const response = await mount(async () => answer).request("/api/workflows/workflow_1/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question: "hello" }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(answer);
+  });
+
+  /** @scenario "A failed run answers with the engine's error and the failing node" */
+  it("answers a failed run with the error type, message and failing node", async () => {
+    const answer = {
+      status: "error" as const,
+      trace_id: "trace_1",
+      error: { type: "NodeError", message: "model refused", node_id: "llm_1" },
+    };
+
+    const response = await mount(async () => answer).request("/api/workflows/workflow_1/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question: "hello" }),
+    });
+
+    await expect(response.json()).resolves.toEqual(answer);
+  });
+
   /** @scenario "A run started with a personal access token holds no more than that token" */
   it("runs as the member and names the key they called with, so the run's key holds no more", async () => {
     const runSynchronous = vi.fn(async () => ({ status: "success" as const }));

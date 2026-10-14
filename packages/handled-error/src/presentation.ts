@@ -1744,11 +1744,6 @@ const presentations = {
     describe: () =>
       "This project needs both Dashboards and LangWatchQL switched on for dashboard widgets. Ask your administrator to switch them on.",
   },
-  custom_graph_writes_disabled_for_playground: {
-    title: "Dashboard graph editing is off while the playground is on",
-    describe: () =>
-      "This project has the custom chart playground enabled, which turns off creating or editing dashboard graphs. Use the playground to build a chart instead.",
-  },
   custom_role_not_found: {
     title: "Custom role not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
@@ -2142,11 +2137,6 @@ const presentations = {
   team_not_in_organization: {
     title: "That team isn't in this organization",
     describe: () => "Pick a team that belongs to this organization.",
-  },
-  user_email_ambiguous: {
-    title: "More than one account uses this address",
-    describe: () =>
-      "Two or more accounts hold this email address in different letter case. Change one of their addresses, then try again.",
   },
   user_last_platform_operator: {
     title: "This is the last platform operator",

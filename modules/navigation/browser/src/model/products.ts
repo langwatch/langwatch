@@ -48,7 +48,7 @@ export const PRODUCTS: readonly ProductDefinition[] = [
     icon: LayoutDashboard,
     scopeKind: "project",
     homeHref: ({ projectSlug }) => (projectSlug ? `/${projectSlug}/dashboards` : null),
-    gates: [{ flag: "release_dashboards" }, { permission: "analytics:view" }],
+    gates: [{ flag: "release_dashboards", closesPages: true }, { permission: "analytics:view" }],
   },
   {
     id: "me",

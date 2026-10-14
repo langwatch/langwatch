@@ -613,7 +613,7 @@ export interface OpsSystemMigrationRunner {
   }): Promise<OpsMigrationTargetedRunResult>;
   /** Asks a worker for one pass now, as the operator; resolves once the request is recorded. */
   startPass(input: { actorUserId: string }): Promise<void>;
-  /** One pass on this worker: the hourly re-drive only when a tenant could still move. */
+  /** One pass on this worker: a re-drive only when a tenant could still move. */
   executePass(input: { redrive: boolean }): Promise<void>;
   /** One pass of the tasks process's startup convergence, stopping at `signal`. */
   runConvergencePass(input: { signal: AbortSignal }): Promise<MigrationPassSummary>;
@@ -1709,7 +1709,7 @@ export class OpsModule implements OpsApi {
   }
 
   /** One pass of `ops_system_migrations`, on the worker hosting it; not on {@link OpsApi}. */
-  executeSystemMigrationPass(input: { redrive: boolean; followUp: boolean }): Promise<void> {
+  executeSystemMigrationPass(input: { redrive: boolean; due: boolean }): Promise<void> {
     return this.#dependencies.systemMigrations.executePass(input);
   }
 

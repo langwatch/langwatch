@@ -4,6 +4,7 @@
  * widget on it (AC120, AC140, AC142), and the editor's starting prompt. Pure.
  */
 
+import type { LangyContextChip } from "@langwatch/langy-contract";
 import { Temporal } from "@langwatch/time";
 
 import type {
@@ -11,7 +12,7 @@ import type {
   AnalyticsLangyContext,
   AnalyticsLangyDraftAbout,
 } from "../../../../model/analytics-host.ts";
-import type { BoardPeriod } from "../../model/board-period.ts";
+import type { BoardPeriod, BoardPeriodRange } from "../../model/board-period.ts";
 import type { WidgetShape } from "../../model/widget-shape.ts";
 
 /** The rollout flag that gives a project Langy at all. */
@@ -69,10 +70,10 @@ function periodText(period: BoardPeriod): string {
 }
 
 const GRAIN_UNITS = [
-  { unit: "week", seconds: 604_800 },
-  { unit: "day", seconds: 86_400 },
-  { unit: "hour", seconds: 3_600 },
-  { unit: "minute", seconds: 60 },
+  { unit: "week", short: "w", seconds: 604_800 },
+  { unit: "day", short: "d", seconds: 86_400 },
+  { unit: "hour", short: "h", seconds: 3_600 },
+  { unit: "minute", short: "m", seconds: 60 },
 ] as const;
 
 function grainText(granularitySeconds: number): string {
@@ -80,6 +81,13 @@ function grainText(granularitySeconds: number): string {
   if (!found) return `${granularitySeconds} seconds`;
   const count = granularitySeconds / found.seconds;
   return count === 1 ? `1 ${found.unit}` : `${count} ${found.unit}s`;
+}
+
+/** The grain as the header control writes it: "1d", "5m". */
+function shortGrainText(granularitySeconds: number): string {
+  const found = GRAIN_UNITS.find(({ seconds }) => granularitySeconds % seconds === 0);
+  if (!found) return `${granularitySeconds}s`;
+  return `${granularitySeconds / found.seconds}${found.short}`;
 }
 
 function context({ ref, label }: { ref: string; label: string }): AnalyticsLangyContext {
@@ -104,9 +112,35 @@ export function boardAskContext({
       ? `dashboard "${board.name}" (id ${board.id})`
       : `From LangWatch dashboard "${board.name}" (template ${board.templateId}, read-only, not stored)`;
   return context({
-    ref: [which, `widgets: ${widgets}`, `period: ${periodText(period)}`].join("; "),
+    ref: [
+      which,
+      `widgets: ${widgets}`,
+      `period: ${periodText(period)}, one bucket per ${grainText(period.granularitySeconds)}`,
+    ].join("; "),
     label: board.name,
   });
+}
+
+/**
+ * The open board as Langy's chip: keyed like the route's chip, so it replaces that one; it
+ * reads the period on screen ("30d · 1d") and hands over what a question about the board does.
+ */
+export function boardContextChip({
+  board,
+  range,
+  period,
+}: {
+  board: BoardSubject;
+  range: BoardPeriodRange;
+  period: BoardPeriod;
+}): LangyContextChip {
+  const shown = `${range === "live" ? "Live" : range} · ${shortGrainText(period.granularitySeconds)}`;
+  return {
+    id: `dashboard:${board.id}`,
+    kind: "dashboard",
+    label: `dashboard: ${board.name} · ${shown}`.slice(0, MAX_LABEL_LENGTH),
+    ref: boardAskContext({ board, period }).ref,
+  };
 }
 
 /** A typed question, asked with the board attached. */

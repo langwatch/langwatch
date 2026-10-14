@@ -112,7 +112,11 @@ async function openConnections({
     url === undefined ? null : openTasksDatabase(url, config),
   );
   const redis = await secrets.into(tasksSecrets.redisUrl, (url) =>
-    url === undefined ? null : new RedisConnectionService().connect({ url }),
+    secrets.into(tasksSecrets.redisClusterEndpoints, (clusterEndpoints) =>
+      url === undefined && clusterEndpoints === undefined
+        ? null
+        : new RedisConnectionService().connect({ url, clusterEndpoints }),
+    ),
   );
 
   resolver.seal();

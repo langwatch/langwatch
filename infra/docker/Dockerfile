@@ -246,6 +246,14 @@ RUN rm -rf node_modules/.pnpm/@prisma+studio-core@*/node_modules/@prisma/studio-
  && find node_modules/.pnpm -type l \( -path '*/@prisma/query-plan-executor' -o -path '*/@electric-sql/pglite*' -o -path '*/node_modules/elkjs' \) -delete \
  && node /tmp/check-links.mjs /app
 
+# ── Stage 2b: CDN assets ───────────────────────────────────────────
+# Not part of the runtime image: nothing reaches the default target through it.
+# publish-docker-ecr.yml builds this target with a local output to upload the
+# content-hashed files to the CDN bucket (ADR-086) from the builder layers it
+# just cached, without pulling the pushed image back.
+FROM scratch AS ui-assets
+COPY --from=builder /app/apps/ui/dist/client/assets /assets
+
 # ── Stage 3: runtime ───────────────────────────────────────────────
 FROM node:24-alpine
 RUN apk --no-cache add curl openssl bash

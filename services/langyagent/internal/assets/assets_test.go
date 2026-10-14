@@ -212,3 +212,30 @@ func TestDailyInsightsSkill_IsEmbeddedAndAnswersWithACard(t *testing.T) {
 		}
 	}
 }
+
+// QA on main found a chart placed on a board the user never named: the skills
+// only said where ids come from, so the model picked one off the list.
+//
+// @scenario "Langy places a chart on the dashboard in context and asks when none is"
+func TestChartSkills_PlaceOnTheDashboardInContextOrAsk(t *testing.T) {
+	dest := t.TempDir()
+	if err := MaterializeSkills(dest); err != nil {
+		t.Fatalf("MaterializeSkills: %v", err)
+	}
+	for _, name := range []string{"dashboard-widgets", "lwql-charts"} {
+		body, err := os.ReadFile(filepath.Join(dest, name, "SKILL.md"))
+		if err != nil {
+			t.Fatalf("read %s skill: %v", name, err)
+		}
+		skill := string(body)
+		for _, want := range []string{
+			"dashboard in the user's context",
+			"ask which board with the `question` tool",
+			"Never pick one from `langwatch dashboard list` on your own",
+		} {
+			if !strings.Contains(skill, want) {
+				t.Errorf("the %s skill lacks %q", name, want)
+			}
+		}
+	}
+}
