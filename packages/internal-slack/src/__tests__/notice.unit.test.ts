@@ -207,3 +207,24 @@ describe("defineNotice()", () => {
     ]);
   });
 });
+
+describe("given a card whose title runs past the card's limit", () => {
+  const message = composeMessage({
+    noticeId: "example",
+    layout: {
+      kind: "card",
+      tone: "signup",
+      title: "&".repeat(200),
+      subtitle: [bold("x".repeat(160))],
+    },
+    origin,
+  });
+  const card = message.blocks[0];
+
+  it("clips between whole entities and drops a formatted part that does not fit", () => {
+    if (card?.type !== "card") throw new Error(`expected a card, got ${card?.type}`);
+    expect(card.title?.text).toMatch(/^👋 (&amp;)+…$/);
+    expect(card.title?.text.length).toBeLessThanOrEqual(150);
+    expect(card.subtitle?.text).toBe("…");
+  });
+});
