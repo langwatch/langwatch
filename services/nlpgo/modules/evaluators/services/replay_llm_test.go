@@ -120,6 +120,7 @@ func (r *recordedLLM) addEmbeddings(call recordedCall) {
 }
 
 func embeddingTexts(t *testing.T, input json.RawMessage) []string {
+	t.Helper()
 	var one string
 	if json.Unmarshal(input, &one) == nil {
 		return []string{one}
@@ -265,6 +266,7 @@ func (r *recordedLLM) assertAllCallsMade(t *testing.T) {
 }
 
 func decodeObject(t *testing.T, raw []byte) map[string]any {
+	t.Helper()
 	var object map[string]any
 	require.NoError(t, json.Unmarshal(raw, &object), "request body: %s", raw)
 	return object

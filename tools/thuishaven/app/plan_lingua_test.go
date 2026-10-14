@@ -13,9 +13,10 @@ func goLane(t *testing.T, sel domain.Selection) Child {
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	repo := t.TempDir()
 	st := domain.Stack{Slug: "test", Services: []domain.Service{{Name: "nlp", Port: 44001}}}
-	for _, c := range o.planChildren(st, PlanOptions{RepoRoot: repo, Selection: sel}, repo) {
-		if c.Name == GoLane {
-			return c
+	children := o.planChildren(st, PlanOptions{RepoRoot: repo, Selection: sel}, repo)
+	for i := range children {
+		if children[i].Name == GoLane {
+			return children[i]
 		}
 	}
 	t.Fatal("no go lane was planned for a stack selecting nlp")

@@ -143,7 +143,6 @@ func TestReplayJudgeSkipsWhenThePromptLeavesNoRoom(t *testing.T) {
 	replayJudgeCases(t, judgeReplay{slug: "langevals/llm_boolean", file: "langevals__llm_boolean.json", names: []string{"over_token_budget_skipped"}})
 }
 
-// @scenario "Judge prompts and entry content never reach a log or a LangWatch span"
 // observedJudgeText is every log line and ops span text the replay wrote.
 func observedJudgeText(t *testing.T, seen judgeReplayObservers) []string {
 	t.Helper()
@@ -164,6 +163,7 @@ func observedJudgeText(t *testing.T, seen judgeReplayObservers) []string {
 	return written
 }
 
+// @scenario "Judge prompts and entry content never reach a log or a LangWatch span"
 func TestJudgePromptsAndContentNeverReachLogsOrOpsSpans(t *testing.T) {
 	seen := replayJudgeCases(t, judgeReplay{slug: "langevals/llm_boolean", file: "langevals__llm_boolean.json", names: []string{"pass", "refusal_no_tool_call", "tool_call_arguments_not_json"}})
 	secrets := []string{"What is the capital of France", "Paris is the capital", "You are an LLM evaluator", "Scripted reasoning", "Answer only by calling"}

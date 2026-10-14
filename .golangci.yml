@@ -141,13 +141,12 @@ linters:
       require-specific: true
 
   exclusions:
-    paths:
-      - third_party # vendored upstream code, kept as released
     presets:
       - common-false-positives
       - std-error-handling
 
     paths:
+      - third_party # vendored upstream code, kept as released
       - node_modules
       - \.claude
       - \.worktrees
