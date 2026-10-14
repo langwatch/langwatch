@@ -106,7 +106,7 @@ func Run(ctx context.Context, opts Options) error {
 	// The evaluator runtime is opt-in: without its internal secret (haven's
 	// +go-evaluators sets one) nothing is built and /go/evaluators stays unmounted.
 	var evaluatorsHandler http.Handler
-	if cfg.InternalSecret != "" {
+	if cfg.EvaluatorsInternalSecret != "" {
 		handler, shutdownEvaluators, err := nlpgo.NewEvaluatorsHandler(ctx, nlpgo.EvaluatorsOptions{
 			Config:     cfg,
 			Deps:       deps,
