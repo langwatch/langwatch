@@ -42,14 +42,27 @@ const refOf = (aggregateProjectId: string) => ({
   processKey: aggregateReconcileProcessKey({ aggregateProjectId }),
 });
 
-/** The reconcile outbox on the memory process store, drained by the real dispatcher ladder. */
-function outboxWorld({ failing }: { failing: ReadonlySet<string> }) {
+/**
+ * The reconcile outbox on the memory process store, drained by the real dispatcher ladder.
+ * `failing` throws on every try; `refusedOnce` attaches all but `p_b` on the first try only.
+ */
+function outboxWorld({
+  failing,
+  refusedOnce = new Set(),
+}: {
+  failing: ReadonlySet<string>;
+  refusedOnce?: ReadonlySet<string>;
+}) {
   const store = InMemoryProcessStore.createForTesting();
   const asked: string[] = [];
   const run = runAggregateReconcile({
     reconcile: async ({ aggregateProjectId }) => {
       asked.push(aggregateProjectId);
       if (failing.has(aggregateProjectId)) throw new Error("authz unavailable");
+      const firstTry = asked.filter((id) => id === aggregateProjectId).length === 1;
+      if (refusedOnce.has(aggregateProjectId) && firstTry) {
+        return { attached: ["p_a"], reattached: [], revoked: [], unchanged: [], failed: ["p_b"] };
+      }
       return { attached: [], reattached: [], revoked: [], unchanged: [], failed: [] };
     },
   });
@@ -161,6 +174,22 @@ describe("aggregate project reconcile process", () => {
 
       expect(world.asked).toEqual(Array.from({ length: 5 }, () => "agg_bad"));
       expect(await world.statuses(["agg_bad"])).toEqual(["dead"]);
+    });
+  });
+
+  describe("given a reconcile in which one member's attach is refused", () => {
+    /** @scenario "A reconcile that attaches every member but one is tried again" */
+    it("is not marked finished, then finishes on the try the attach goes through", async () => {
+      const world = outboxWorld({ failing: new Set(), refusedOnce: new Set(["agg_short"]) });
+      await world.enqueue(["agg_short"]);
+
+      await world.drain(1);
+      expect(world.asked).toEqual(["agg_short"]);
+      expect(await world.statuses(["agg_short"])).toEqual(["pending"]);
+
+      await world.drain(1);
+      expect(world.asked).toEqual(["agg_short", "agg_short"]);
+      expect(await world.statuses(["agg_short"])).toEqual(["dispatched"]);
     });
   });
 

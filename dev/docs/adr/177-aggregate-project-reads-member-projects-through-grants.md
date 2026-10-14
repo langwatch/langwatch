@@ -814,3 +814,7 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   its own: organisation's `member_department_changed` fact does. No
   deploy step re-checks existing aggregates for the v4.10 window: none
   exist yet, and a later aggregate is created with the full-history read.
+  A reconcile that attaches every member but one is not finished: it
+  throws, so the outbox tries it again on the same ladder, and the grants
+  already attached read as held on that try. (The "next reconcile" that
+  v4.10 relied on for a refused attach was the sweep.)

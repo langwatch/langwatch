@@ -392,6 +392,13 @@ Feature: An aggregate project reads its member projects
     And it stays in the outbox for an operator to redrive
 
   @unit
+  Scenario: A reconcile that attaches every member but one is tried again
+    Given a reconcile of an aggregate project in which one member's attach is refused
+    When the outbox runs it
+    Then the reconcile is not marked finished
+    And it is tried again, and finishes once that member's attach goes through
+
+  @unit
   Scenario: The daily wake only clears finished reconciles
     Given a finished reconcile and a dead one, both older than two days
     When the daily wake runs

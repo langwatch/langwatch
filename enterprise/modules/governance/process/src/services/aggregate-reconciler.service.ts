@@ -30,7 +30,7 @@ export const AGGREGATE_READ_WINDOW_CHANGED = "aggregate_read_window_changed";
 /** The revocation reason every shared read of an archived aggregate carries. */
 export const AGGREGATE_ARCHIVED = "aggregate_archived";
 
-/** Member project ids, each in one list; a `failed` attach is tried again by the next reconcile. */
+/** Member project ids, each in one list; a non-empty `failed` makes the intent throw, so the outbox tries again. */
 type AggregateReconcileResult = {
   attached: string[];
   /** Revoked and attached again because the read started at the wrong moment for the rule. */

@@ -51,12 +51,42 @@ export class OutboxAggregateReconcile {
   }
 }
 
-/** The reconcile intent: one aggregate, under its lock; a throw spends a rung of the outbox ladder. */
+/**
+ * One member's attach was refused while the rest went through — thrown to
+ * spend a rung of the outbox ladder; a quiet return would mark the reconcile
+ * finished with the aggregate short of a member, and no fact need ever come
+ * again. A plain `Error`, not `HandledError`: nothing here reaches a customer.
+ */
+export class AggregateReconcileIncompleteError extends Error {
+  readonly aggregateProjectId: string;
+  readonly failed: readonly string[];
+
+  constructor({
+    aggregateProjectId,
+    failed,
+  }: {
+    aggregateProjectId: string;
+    failed: readonly string[];
+  }) {
+    super(
+      `Aggregate ${aggregateProjectId} reconcile left ${failed.length} member(s) unattached: ${failed.join(", ")}; trying again`,
+    );
+    this.name = "AggregateReconcileIncompleteError";
+    this.aggregateProjectId = aggregateProjectId;
+    this.failed = failed;
+  }
+}
+
+/**
+ * The reconcile intent: one aggregate, under its lock; a throw spends a rung of the outbox
+ * ladder. A refused attach throws too: the grants already attached read as held next time.
+ */
 export function runAggregateReconcile(
   reconciler: Pick<AggregateReconcilerService, "reconcile">,
 ): IntentExecutor<AggregateReconcileIntent> {
   return async ({ aggregateProjectId }) => {
-    await reconciler.reconcile({ aggregateProjectId });
+    const { failed } = await reconciler.reconcile({ aggregateProjectId });
+    if (failed.length > 0) throw new AggregateReconcileIncompleteError({ aggregateProjectId, failed });
   };
 }
 
