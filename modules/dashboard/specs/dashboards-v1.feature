@@ -19,6 +19,13 @@ Feature: Dashboards v1
     And the product switcher does not offer Dashboards
 
   @integration
+  Scenario: AC1b A Dashboards address with the flag off is a 404 with no Dashboards sidebar
+    Given the release_dashboards flag is off for the project
+    When a member opens /[project]/dashboards or one of its boards
+    Then they get the not-found page with no product sidebar around it
+    And a project page still draws in its own chrome
+
+  @integration
   Scenario: AC3 Sidebar matches the reference
     Given the release_dashboards flag is on for the project
     When the member looks at the Dashboards product sidebar

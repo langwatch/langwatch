@@ -33,7 +33,7 @@ Feature: Ops runs the system migration passes and names their cohorts
     Given an upgrade run that has applied its schema and blocking steps
     When the upgrade finishes
     Then it asks a worker for one system-migrations pass and does not wait for it
-    And the tenant steps that pass drives settle without waiting for the hourly re-drive
+    And the tenant steps that pass drives settle without waiting for the idle hourly re-drive
 
   @unit
   Scenario: The pass a finished upgrade requests runs ahead of any queue backlog
@@ -54,7 +54,7 @@ Feature: Ops runs the system migration passes and names their cohorts
   Scenario: The worker's re-drive discovers a tenant migration no pass has run
     Given an installation where no parked or held tenant exists
     And an automatic tenant migration, registered or declared, that no tenant has met yet
-    When the worker's hourly re-drive wakes
+    When the worker's re-drive is due
     Then it runs a pass, so a fresh install or a new release's migration is picked up
     And a declared tenant step with a parked tenant is re-driven beside its finalised ones
 
@@ -63,7 +63,7 @@ Feature: Ops runs the system migration passes and names their cohorts
     Given every automatic tenant migration has a finalised or rolled-back tenant
     And no tenant is parked or held
     And a cloud migration still soaking has no enrolled organization
-    When the worker's hourly re-drive wakes
+    When the worker's re-drive is due
     Then no pass runs
 
   @unit
@@ -150,10 +150,17 @@ Feature: Ops runs the system migration passes and names their cohorts
   @unit
   Scenario: Each worker process finishes an interrupted pass on its first re-drive
     Given a pass died part-way, so the stored state reads latched while some tenants have no row
-    When a worker process's first hourly re-drive wakes
+    When a worker process's first re-drive wake reaches it
     Then it runs a pass without asking the stored state
     And its later re-drives ask the stored state first
     And a first pass that fails leaves the next re-drive ungated too
+
+  @unit
+  Scenario: A wake that is not due still gives a worker its first pass after boot
+    Given a worker process that has completed no pass
+    When a wake that is not due reaches it
+    Then it runs a pass without asking the stored state
+    And a later wake that is not due runs nothing
 
   # The unbatched tRPC link sends no body for a mutation without input, which the door refuses (WEB-9800).
   @unit

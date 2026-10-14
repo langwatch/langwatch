@@ -153893,8 +153893,18 @@ type PostApiOptimizationByWorkflowIdByVersionIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		Result *map[string]interface{}                                             `json:"result,omitempty"`
-		Status PostApiOptimizationByWorkflowIdByVersionId200JSONResponseBodyStatus `json:"status"`
+		DurationMs *float32 `json:"duration_ms,omitempty"`
+		Error      *struct {
+			Message   string  `json:"message"`
+			NodeId    *string `json:"node_id,omitempty"`
+			Traceback *string `json:"traceback,omitempty"`
+			Type      string  `json:"type"`
+		} `json:"error,omitempty"`
+		Nodes     *map[string]interface{}                                             `json:"nodes,omitempty"`
+		Result    *map[string]interface{}                                             `json:"result,omitempty"`
+		Status    PostApiOptimizationByWorkflowIdByVersionId200JSONResponseBodyStatus `json:"status"`
+		TotalCost *float32                                                            `json:"total_cost,omitempty"`
+		TraceId   *string                                                             `json:"trace_id,omitempty"`
 	}
 }
 
@@ -162867,8 +162877,18 @@ type PostApiWorkflowsByWorkflowIdRunResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		Result *map[string]interface{}                                  `json:"result,omitempty"`
-		Status PostApiWorkflowsByWorkflowIdRun200JSONResponseBodyStatus `json:"status"`
+		DurationMs *float32 `json:"duration_ms,omitempty"`
+		Error      *struct {
+			Message   string  `json:"message"`
+			NodeId    *string `json:"node_id,omitempty"`
+			Traceback *string `json:"traceback,omitempty"`
+			Type      string  `json:"type"`
+		} `json:"error,omitempty"`
+		Nodes     *map[string]interface{}                                  `json:"nodes,omitempty"`
+		Result    *map[string]interface{}                                  `json:"result,omitempty"`
+		Status    PostApiWorkflowsByWorkflowIdRun200JSONResponseBodyStatus `json:"status"`
+		TotalCost *float32                                                 `json:"total_cost,omitempty"`
+		TraceId   *string                                                  `json:"trace_id,omitempty"`
 	}
 }
 
@@ -162900,8 +162920,18 @@ type PostApiWorkflowsByWorkflowIdByVersionIdRunResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		Result *map[string]interface{}                                             `json:"result,omitempty"`
-		Status PostApiWorkflowsByWorkflowIdByVersionIdRun200JSONResponseBodyStatus `json:"status"`
+		DurationMs *float32 `json:"duration_ms,omitempty"`
+		Error      *struct {
+			Message   string  `json:"message"`
+			NodeId    *string `json:"node_id,omitempty"`
+			Traceback *string `json:"traceback,omitempty"`
+			Type      string  `json:"type"`
+		} `json:"error,omitempty"`
+		Nodes     *map[string]interface{}                                             `json:"nodes,omitempty"`
+		Result    *map[string]interface{}                                             `json:"result,omitempty"`
+		Status    PostApiWorkflowsByWorkflowIdByVersionIdRun200JSONResponseBodyStatus `json:"status"`
+		TotalCost *float32                                                            `json:"total_cost,omitempty"`
+		TraceId   *string                                                             `json:"trace_id,omitempty"`
 	}
 }
 
@@ -183998,8 +184028,18 @@ func ParsePostApiOptimizationByWorkflowIdByVersionIdResponse(rsp *http.Response)
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			Result *map[string]interface{}                                             `json:"result,omitempty"`
-			Status PostApiOptimizationByWorkflowIdByVersionId200JSONResponseBodyStatus `json:"status"`
+			DurationMs *float32 `json:"duration_ms,omitempty"`
+			Error      *struct {
+				Message   string  `json:"message"`
+				NodeId    *string `json:"node_id,omitempty"`
+				Traceback *string `json:"traceback,omitempty"`
+				Type      string  `json:"type"`
+			} `json:"error,omitempty"`
+			Nodes     *map[string]interface{}                                             `json:"nodes,omitempty"`
+			Result    *map[string]interface{}                                             `json:"result,omitempty"`
+			Status    PostApiOptimizationByWorkflowIdByVersionId200JSONResponseBodyStatus `json:"status"`
+			TotalCost *float32                                                            `json:"total_cost,omitempty"`
+			TraceId   *string                                                             `json:"trace_id,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -193591,8 +193631,18 @@ func ParsePostApiWorkflowsByWorkflowIdRunResponse(rsp *http.Response) (*PostApiW
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			Result *map[string]interface{}                                  `json:"result,omitempty"`
-			Status PostApiWorkflowsByWorkflowIdRun200JSONResponseBodyStatus `json:"status"`
+			DurationMs *float32 `json:"duration_ms,omitempty"`
+			Error      *struct {
+				Message   string  `json:"message"`
+				NodeId    *string `json:"node_id,omitempty"`
+				Traceback *string `json:"traceback,omitempty"`
+				Type      string  `json:"type"`
+			} `json:"error,omitempty"`
+			Nodes     *map[string]interface{}                                  `json:"nodes,omitempty"`
+			Result    *map[string]interface{}                                  `json:"result,omitempty"`
+			Status    PostApiWorkflowsByWorkflowIdRun200JSONResponseBodyStatus `json:"status"`
+			TotalCost *float32                                                 `json:"total_cost,omitempty"`
+			TraceId   *string                                                  `json:"trace_id,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -193620,8 +193670,18 @@ func ParsePostApiWorkflowsByWorkflowIdByVersionIdRunResponse(rsp *http.Response)
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			Result *map[string]interface{}                                             `json:"result,omitempty"`
-			Status PostApiWorkflowsByWorkflowIdByVersionIdRun200JSONResponseBodyStatus `json:"status"`
+			DurationMs *float32 `json:"duration_ms,omitempty"`
+			Error      *struct {
+				Message   string  `json:"message"`
+				NodeId    *string `json:"node_id,omitempty"`
+				Traceback *string `json:"traceback,omitempty"`
+				Type      string  `json:"type"`
+			} `json:"error,omitempty"`
+			Nodes     *map[string]interface{}                                             `json:"nodes,omitempty"`
+			Result    *map[string]interface{}                                             `json:"result,omitempty"`
+			Status    PostApiWorkflowsByWorkflowIdByVersionIdRun200JSONResponseBodyStatus `json:"status"`
+			TotalCost *float32                                                            `json:"total_cost,omitempty"`
+			TraceId   *string                                                             `json:"trace_id,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

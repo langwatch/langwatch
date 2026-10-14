@@ -812,7 +812,7 @@ interface Input {
   password: string;
   addressProof: string;
 }
-// Output: createdUserSchema, ../../user/contract/src/user.ts:114
+// Output: createdUserSchema, ../../user/contract/src/user.ts:115
 interface Output {
   id: string;
 }

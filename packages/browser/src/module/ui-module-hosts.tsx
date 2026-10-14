@@ -33,22 +33,37 @@ function loadHostProvider(mount: UiModuleHostMount): Promise<{ default: UiHostPr
   );
 }
 
+function UiNoHostMounts({ children }: { children?: ReactNode }) {
+  return <>{children}</>;
+}
+
 /**
- * `lazy` is called once per mount HERE, at composition time — calling it in a
- * render would make a new component type every pass and remount the whole tree
- * under it on every render.
+ * Every mount loads at once, under one suspension: a nested `lazy` per mount loaded ~40 chunks in
+ * series and held the first page for half a minute. `lazy` is called once, here, never in a render,
+ * or every pass would make a new component type and remount the whole tree under it.
  */
 export function createUiModuleHostStack(
   mounts: readonly UiModuleHostMount[],
 ): ComponentType<{ children?: ReactNode }> {
-  const providers = mounts.map((mount) => lazy(() => loadHostProvider(mount)));
+  if (mounts.length === 0) return UiNoHostMounts;
+  const Stack = lazy(async () => {
+    const providers = await Promise.all(mounts.map(loadHostProvider));
+    return {
+      default: function UiModuleHostProviders({ children }: { children?: ReactNode }) {
+        // Innermost first, so the list reads in mount order at the declaration.
+        return providers.reduceRight<ReactNode>(
+          (inner, { default: Provider }) => <Provider>{inner}</Provider>,
+          children,
+        );
+      },
+    };
+  });
 
   return function UiModuleHosts({ children }: { children?: ReactNode }) {
-    // Innermost first, so the list reads in mount order at the declaration.
-    const mounted = providers.reduceRight<ReactNode>(
-      (inner, Provider) => <Provider>{inner}</Provider>,
-      children,
+    return (
+      <Suspense>
+        <Stack>{children}</Stack>
+      </Suspense>
     );
-    return <Suspense>{mounted}</Suspense>;
   };
 }

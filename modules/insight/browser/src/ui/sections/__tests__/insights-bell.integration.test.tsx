@@ -51,3 +51,33 @@ describe("given 5 unseen insights in the inbox", () => {
     });
   });
 });
+
+describe("given 2 insights in the inbox, both already seen", () => {
+  describe("when a member opens the bell in the top bar", () => {
+    /** @scenario "The bell with nothing new still points to the insights in the inbox" */
+    it("says nothing is new, counts the inbox and links to it", async () => {
+      const seen = [1, 2].map((position) =>
+        insightEntry({
+          id: `insight-${position}`,
+          title: `Insight ${position}`,
+          filedAt: NOW - position * HOUR_MS,
+          seenAt: NOW,
+        }),
+      );
+      const { host } = renderWithInsightHost({
+        element: <InsightsBell />,
+        answer: () => Promise.resolve(seen),
+      });
+
+      await userEvent.click(await screen.findByRole("button", { name: "Inbox: new insights" }));
+
+      expect(await screen.findByText("No new insights")).toBeInTheDocument();
+      expect(screen.getByText("2 insights in your inbox")).toBeInTheDocument();
+      expect(screen.queryByText(/caught up/i)).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Open inbox" }));
+
+      expect(host.navigations).toEqual(["/acme/insights"]);
+    });
+  });
+});
