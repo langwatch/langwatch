@@ -22,6 +22,7 @@ describe("the MCP sim's wire types", () => {
     expect(bare.checks).toEqual([]);
   });
 
+  /** @scenario "The console tells which scenarios a flow can run" */
   it("blocks an oauth-only scenario on the apikey flow and any oauth run without a grant", () => {
     const refresh = { name: "refresh", summary: "", flows: ["oauth"] };
     const connect = { name: "connect", summary: "", flows: ["apikey", "oauth"] };

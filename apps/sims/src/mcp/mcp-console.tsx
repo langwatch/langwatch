@@ -19,14 +19,9 @@ const viewIds = Object.keys(views).filter((id): id is ViewId => id in views);
 export const McpConsole = () => {
   const [active, setActive] = useState<ViewId>("runs");
   // Poll fast while a run is going or waiting, slowly otherwise.
-  const [busy, setBusy] = useState(false);
   const status = useSimPoll({
-    fetch: async () => {
-      const next = await fetchStatus();
-      setBusy(next.runs.some(isActive));
-      return next;
-    },
-    everyMs: busy ? 1_500 : 4_000,
+    fetch: fetchStatus,
+    everyMs: (data) => (data?.runs.some(isActive) ? 1_500 : 4_000),
   });
   const View = views[active].view;
 

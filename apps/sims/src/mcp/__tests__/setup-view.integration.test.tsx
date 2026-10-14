@@ -11,6 +11,7 @@ const refresh = async () => undefined;
 describe("SetupView", () => {
   afterEach(() => cleanup());
 
+  /** @scenario "The setup view shows the target, the masked key and the grant" */
   it("shows the target, the masked key and the connected grant", () => {
     render(<SetupView status={statusSchema.parse(wireStatus)} refresh={refresh} />);
 
@@ -21,6 +22,7 @@ describe("SetupView", () => {
     expect(screen.getByRole("button", { name: "Forget" })).toHaveProperty("disabled", false);
   });
 
+  /** @scenario "The setup view offers an OAuth connect when there is no grant" */
   it("offers Connect OAuth and no Forget when there is no grant", () => {
     const status = statusSchema.parse({ ...wireStatus, oauth: { connected: false, refreshes: 0 } });
     render(<SetupView status={status} refresh={refresh} />);

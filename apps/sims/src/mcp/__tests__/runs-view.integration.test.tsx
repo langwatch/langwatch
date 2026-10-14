@@ -12,6 +12,7 @@ describe("RunsView", () => {
     window.location.hash = "";
   });
 
+  /** @scenario "An operator reads a failed run in the console" */
   it("opens a failed run with its failed check, load stats and steps", async () => {
     fakeSim({
       routes: {
@@ -35,6 +36,7 @@ describe("RunsView", () => {
     expect(within(detail).getByText("503")).toBeTruthy();
   });
 
+  /** @scenario "An operator starts a run from the console" */
   it("starts a connect run with the chosen flow and transport", async () => {
     const calls = fakeSim({
       routes: {
@@ -58,6 +60,7 @@ describe("RunsView", () => {
     });
   });
 
+  /** @scenario "The console disables a scenario the chosen flow cannot run" */
   it("disables oauth-only scenarios on the apikey flow", async () => {
     fakeSim({ routes: { "GET /_sim/api/status": () => json({ body: wireStatus }) } });
     render(<McpConsole />);
@@ -68,6 +71,7 @@ describe("RunsView", () => {
     expect(screen.getByRole("button", { name: "refresh" })).toHaveProperty("disabled", false);
   });
 
+  /** @scenario "The console shows the approval link while an OAuth connect waits" */
   it("shows the approval link while a connect run waits", async () => {
     fakeSim({
       routes: {

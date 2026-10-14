@@ -8,6 +8,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
+// @scenario "haven points mcpsim at the stack's app with its key, project and local login"
 func TestMcpEnvNamesTheStacksAppKeyProjectAndAdminLogin(t *testing.T) {
 	st := domain.Stack{Slug: "feat-x", LocalAPIKey: "sk-lw-test", Services: []domain.Service{
 		{Name: "app", URL: "https://app.feat-x.langwatch.localhost/"},
@@ -34,6 +35,7 @@ func TestMcpEnvNamesTheStacksAppKeyProjectAndAdminLogin(t *testing.T) {
 	}
 }
 
+// @scenario "haven runs mcpsim only when the worktree asks for it"
 func TestMcpsimIsHostedOnlyWhenSelected(t *testing.T) {
 	o := &Orchestrator{cfg: Config{Home: t.TempDir(), SimulatorArgv: []string{"/bin/haven", "simulator"}}, proxy: stubProxy{}}
 	repo := t.TempDir() // no combined_dev.go: haven runs its bundled copy as a lane of its own

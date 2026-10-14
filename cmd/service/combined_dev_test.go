@@ -18,3 +18,13 @@ func TestDevBuildHostsTheSimulators(t *testing.T) {
 		}
 	}
 }
+
+// @scenario "A dev build hosts mcpsim in the combined process"
+func TestDevBuildHostsMcpsim(t *testing.T) {
+	if _, ok := services["mcpsim"]; !ok {
+		t.Error("a dev build does not run `service mcpsim`")
+	}
+	if _, err := selectCombinedServices([]string{"mcpsim"}); err != nil {
+		t.Errorf("a dev build's combined process refuses mcpsim: %v", err)
+	}
+}

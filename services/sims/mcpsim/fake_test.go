@@ -40,7 +40,8 @@ type fakeLangWatch struct {
 	codes    map[string]fakeCode
 	access   map[string]string // access token -> owner
 	refresh  map[string]*fakeRefresh
-	requests []string // "METHOD path status"
+	requests []string       // "METHOD path status"
+	asked    map[string]int // "METHOD path" -> times asked, on every route
 }
 
 type fakeCode struct{ clientID, redirect, challenge string }
@@ -56,7 +57,7 @@ func newFakeLangWatch(t *testing.T) *fakeLangWatch {
 	f := &fakeLangWatch{
 		t: t, apiKey: "sk-lw-test-project-key-0000", cookie: "session-1", password: "pw", lostStatus: http.StatusNotFound,
 		sessions: map[string]string{}, clients: map[string]string{}, codes: map[string]fakeCode{},
-		access: map[string]string{}, refresh: map[string]*fakeRefresh{}, refreshCalm: true,
+		access: map[string]string{}, refresh: map[string]*fakeRefresh{}, refreshCalm: true, asked: map[string]int{},
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /.well-known/oauth-protected-resource/{rest...}", f.protectedResource)
@@ -71,12 +72,22 @@ func newFakeLangWatch(t *testing.T) *fakeLangWatch {
 		mux.HandleFunc("GET "+path, f.get)
 		mux.HandleFunc("DELETE "+path, f.delete)
 	}
-	f.srv = httptest.NewServer(mux)
+	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.set(func(f *fakeLangWatch) { f.asked[r.Method+" "+r.URL.Path]++ })
+		mux.ServeHTTP(w, r)
+	}))
 	t.Cleanup(f.srv.Close)
 	return f
 }
 
 func (f *fakeLangWatch) URL() string { return f.srv.URL }
+
+// timesAsked is how often route ("METHOD path") was asked.
+func (f *fakeLangWatch) timesAsked(route string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.asked[route]
+}
 
 func (f *fakeLangWatch) set(change func(*fakeLangWatch)) {
 	f.mu.Lock()

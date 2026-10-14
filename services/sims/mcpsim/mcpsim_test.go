@@ -99,6 +99,16 @@ func hasStep(st RunStatus, kind string, status int) bool {
 	return false
 }
 
+// passedCheck reports whether st has a passing check whose name contains part.
+func passedCheck(st RunStatus, part string) bool {
+	for i := range st.Checks {
+		if c := &st.Checks[i]; c.Pass && strings.Contains(c.Name, part) {
+			return true
+		}
+	}
+	return false
+}
+
 // connectOAuth runs an automated connect with the fake's session cookie.
 func connectOAuth(t *testing.T, sim string) RunStatus {
 	t.Helper()
@@ -109,6 +119,7 @@ func connectOAuth(t *testing.T, sim string) RunStatus {
 	return st
 }
 
+// @scenario "A client connects with a project API key on /mcp and /sse"
 func TestConnectWithAnAPIKeyOnMcpAndSse(t *testing.T) {
 	for _, sse := range []bool{false, true} {
 		f := newFakeLangWatch(t)
@@ -124,9 +135,17 @@ func TestConnectWithAnAPIKeyOnMcpAndSse(t *testing.T) {
 				t.Errorf("sse %t: no answered %s step", sse, kind)
 			}
 		}
+		for _, path := range []string{"/mcp", "/sse"} {
+			for _, check := range []string{"initialize on " + path, "tools/list on " + path, "tools/call " + defaultTool + " on " + path, "DELETE on " + path} {
+				if !passedCheck(st, check) {
+					t.Errorf("sse %t: no passing check %q: %+v", sse, check, st.Checks)
+				}
+			}
+		}
 	}
 }
 
+// @scenario "A wrong API key fails the run with the challenge reported"
 func TestABadAPIKeyFailsWithTheChallengeReported(t *testing.T) {
 	f := newFakeLangWatch(t)
 	_, sim := simAt(t, f)
@@ -139,17 +158,36 @@ func TestABadAPIKeyFailsWithTheChallengeReported(t *testing.T) {
 	}
 }
 
+// @scenario "A 503 from the endpoint is retried with backoff"
 func TestA503IsRetriedWithBackoff(t *testing.T) {
 	f := newFakeLangWatch(t)
 	f.set(func(f *fakeLangWatch) { f.fail503 = 2 })
 	_, sim := simAt(t, f)
 	st := runScenario(t, sim, RunRequest{Scenario: ScenarioConnect, Transport: "/mcp"})
 	mustPass(t, st)
-	if !hasStep(st, "initialize", 503) {
-		t.Errorf("the 503 attempts are not recorded: %s", stepLine(st))
+	retries := 0
+	for _, s := range st.Steps {
+		if s.Kind == "initialize" && s.Status == http.StatusServiceUnavailable {
+			retries++
+			if s.Detail != "retry in 0s" {
+				t.Errorf("a 503 with Retry-After: 0 waits %q", s.Detail)
+			}
+		}
+	}
+	if retries != 2 {
+		t.Errorf("%d 503 attempts recorded, want 2: %s", retries, stepLine(st))
+	}
+
+	// With no Retry-After the wait doubles from 250ms; a named one is honoured.
+	if a, b := backoff(exchange{}, 0), backoff(exchange{}, 1); a != 250*time.Millisecond || b != 500*time.Millisecond {
+		t.Errorf("backoff %s then %s, want 250ms then 500ms", a, b)
+	}
+	if d := backoff(exchange{header: http.Header{"Retry-After": {"2"}}}, 0); d != 2*time.Second {
+		t.Errorf("Retry-After: 2 waits %s", d)
 	}
 }
 
+// @scenario "A lost session answers 404 and the client re-initializes without a new sign-in"
 func TestReconnectExpects404ThenReinitializesWithoutSigningIn(t *testing.T) {
 	f := newFakeLangWatch(t)
 	_, sim := simAt(t, f)
@@ -158,8 +196,16 @@ func TestReconnectExpects404ThenReinitializesWithoutSigningIn(t *testing.T) {
 	if len(st.Checks) != 8 {
 		t.Errorf("%d checks: %+v", len(st.Checks), st.Checks)
 	}
+	for _, path := range []string{"/mcp", "/sse"} {
+		for _, what := range []string{"an unknown session id", "an ended session id"} {
+			if !passedCheck(st, what+" on "+path+" answers 404") || !passedCheck(st, "after "+what+", re-initializing on "+path+" works without a new sign-in") {
+				t.Errorf("%s on %s: checks %+v", what, path, st.Checks)
+			}
+		}
+	}
 }
 
+// @scenario "A lost session answered with 401 is reported as a failure"
 func TestReconnectReportsA401ForALostSession(t *testing.T) {
 	f := newFakeLangWatch(t)
 	f.set(func(f *fakeLangWatch) { f.lostStatus = http.StatusUnauthorized })
@@ -173,6 +219,7 @@ func TestReconnectReportsA401ForALostSession(t *testing.T) {
 	}
 }
 
+// @scenario "An idle client whose session was lost re-initializes silently"
 func TestIdleReinitializesSilentlyWhenTheSessionWasLost(t *testing.T) {
 	f := newFakeLangWatch(t)
 	s, sim := simAt(t, f)
@@ -182,8 +229,12 @@ func TestIdleReinitializesSilentlyWhenTheSessionWasLost(t *testing.T) {
 	if !hasStep(st, "tools/list", 404) || !hasStep(st, "initialize", 200) {
 		t.Errorf("no 404 then re-initialize: %s", stepLine(st))
 	}
+	if !passedCheck(st, "the session answers after 1h0m0s idle") {
+		t.Errorf("checks %+v", st.Checks)
+	}
 }
 
+// @scenario "The event stream is held, and a dropped one is reported"
 func TestStreamReportsADroppedEventStream(t *testing.T) {
 	f := newFakeLangWatch(t)
 	f.set(func(f *fakeLangWatch) { f.dropAfter = 100 * time.Millisecond })
@@ -195,12 +246,16 @@ func TestStreamReportsADroppedEventStream(t *testing.T) {
 	if fails := failedChecks(st); len(fails) != 1 || !strings.Contains(fails[0], "dropped after") {
 		t.Errorf("failures %v", fails)
 	}
+	if !passedCheck(st, "the session on /mcp still answers after the stream") {
+		t.Errorf("a dropped stream lost the session: %+v", st.Checks)
+	}
 
 	f.set(func(f *fakeLangWatch) { f.dropAfter = 0 })
 	mustPass(t, runScenario(t, sim, RunRequest{Scenario: ScenarioStream, HoldSeconds: 1, Transport: "/sse"}))
 }
 
-func TestOAuthConnectWithASessionCookieThenRefreshKeepsTheSession(t *testing.T) {
+// @scenario "An OAuth connect discovers, registers, gets approval and exchanges the code"
+func TestOAuthConnectWithASessionCookie(t *testing.T) {
 	f := newFakeLangWatch(t)
 	_, sim := simAt(t, f)
 	st := connectOAuth(t, sim)
@@ -214,15 +269,33 @@ func TestOAuthConnectWithASessionCookieThenRefreshKeepsTheSession(t *testing.T) 
 			t.Errorf("no successful %s step: %s", kind, stepLine(st))
 		}
 	}
+	if !passedCheck(st, "PKCE S256") || !passedCheck(st, "the new access token opens a session and lists tools") {
+		t.Errorf("checks %+v", st.Checks)
+	}
 	_, g := call[GrantStatus](t, http.MethodGet, sim+"/_sim/api/oauth", nil)
 	if !g.Connected || g.ClientID == "" || strings.Contains(g.AccessHint, "access-") && len(g.AccessHint) > 12 {
 		t.Errorf("grant %+v", g)
 	}
 
-	mustPass(t, runScenario(t, sim, RunRequest{Scenario: ScenarioRefresh, Flow: FlowOAuth}))
 	mustPass(t, runScenario(t, sim, RunRequest{Scenario: ScenarioConnect, Flow: FlowOAuth}))
 }
 
+// @scenario "A refresh mid-session keeps the same session"
+func TestRefreshKeepsTheSessionWithTheNewToken(t *testing.T) {
+	f := newFakeLangWatch(t)
+	_, sim := simAt(t, f)
+	mustPass(t, connectOAuth(t, sim))
+	st := runScenario(t, sim, RunRequest{Scenario: ScenarioRefresh, Flow: FlowOAuth})
+	mustPass(t, st)
+	if !passedCheck(st, "the refresh answers a new access token") || !passedCheck(st, "the same session id answers with the new token") {
+		t.Errorf("checks %+v", st.Checks)
+	}
+	if _, g := call[GrantStatus](t, http.MethodGet, sim+"/_sim/api/oauth", nil); g.Refreshes != 1 {
+		t.Errorf("the grant counts %d refreshes", g.Refreshes)
+	}
+}
+
+// @scenario "The sim signs in itself with the configured local login"
 func TestOAuthSignsInItselfWhenGivenTheLogin(t *testing.T) {
 	f := newFakeLangWatch(t)
 	_, sim := simAt(t, f, func(c *Config) { c.SignInEmail, c.SignInPassword = "admin@example.com", "pw" })
@@ -235,23 +308,35 @@ func TestOAuthSignsInItselfWhenGivenTheLogin(t *testing.T) {
 		t.Fatalf("connect answered %d", code)
 	}
 	mustPass(t, st)
+	if !hasStep(st, "sign-in", http.StatusOK) || f.timesAsked("POST /api/auth/sign-in/email") != 1 {
+		t.Errorf("no sign-in before the approval: %s", stepLine(st))
+	}
 }
 
+// @scenario "Two concurrent refreshes pass only inside the server's retry window"
 func TestDoubleRefreshPassesInsideTheRetryWindowAndFailsWithout(t *testing.T) {
 	f := newFakeLangWatch(t)
 	_, sim := simAt(t, f)
 	mustPass(t, connectOAuth(t, sim))
-	mustPass(t, runScenario(t, sim, RunRequest{Scenario: ScenarioDoubleRefresh, Flow: FlowOAuth}))
+	calm := runScenario(t, sim, RunRequest{Scenario: ScenarioDoubleRefresh, Flow: FlowOAuth})
+	mustPass(t, calm)
+	if !passedCheck(calm, "both answer the same new token pair") {
+		t.Errorf("checks %+v", calm.Checks)
+	}
 
 	f.set(func(f *fakeLangWatch) { f.refreshCalm = false })
 	st := runScenario(t, sim, RunRequest{Scenario: ScenarioDoubleRefresh, Flow: FlowOAuth})
 	if st.State != StateFailed {
 		t.Fatalf("a refused repeat refresh passed")
 	}
+	if fails := failedChecks(st); len(fails) == 0 || !strings.Contains(fails[0], "already used") {
+		t.Errorf("failures %v", fails)
+	}
 	// The pair one refresh answered is kept, so the flow goes on working.
 	mustPass(t, runScenario(t, sim, RunRequest{Scenario: ScenarioConnect, Flow: FlowOAuth, Transport: "/mcp"}))
 }
 
+// @scenario "An expired access token is refreshed and the request retried"
 func TestAnExpiredAccessTokenIsRefreshedAndTheRequestRetried(t *testing.T) {
 	f := newFakeLangWatch(t)
 	s, sim := simAt(t, f)
@@ -264,6 +349,7 @@ func TestAnExpiredAccessTokenIsRefreshedAndTheRequestRetried(t *testing.T) {
 	}
 }
 
+// @scenario "An interactive OAuth connect waits for a person to approve in the browser"
 func TestInteractiveConnectWaitsForTheBrowserCallback(t *testing.T) {
 	f := newFakeLangWatch(t)
 	_, sim := simAt(t, f)
@@ -304,6 +390,7 @@ func TestInteractiveConnectWaitsForTheBrowserCallback(t *testing.T) {
 	mustPass(t, st)
 }
 
+// @scenario "A soak runs concurrent clients and counts what they did"
 func TestSoakRunsConcurrentClientsAndCountsThem(t *testing.T) {
 	f := newFakeLangWatch(t)
 	f.set(func(f *fakeLangWatch) { f.fail503 = 1 })
@@ -316,6 +403,7 @@ func TestSoakRunsConcurrentClientsAndCountsThem(t *testing.T) {
 	}
 }
 
+// @scenario "A run request the sim cannot honour is refused before it starts"
 func TestRequestsAreCheckedBeforeARunStarts(t *testing.T) {
 	f := newFakeLangWatch(t)
 	_, sim := simAt(t, f)
@@ -332,8 +420,12 @@ func TestRequestsAreCheckedBeforeARunStarts(t *testing.T) {
 			t.Errorf("%+v answered %d %v", req, code, ans)
 		}
 	}
+	if _, list := call[map[string][]RunStatus](t, http.MethodGet, sim+"/_sim/api/runs", nil); len(list["runs"]) != 0 {
+		t.Errorf("a refused request started %d runs", len(list["runs"]))
+	}
 }
 
+// @scenario "Runs are listed newest first, bounded and cleared"
 func TestRunsAreListedNewestFirstAndCleared(t *testing.T) {
 	f := newFakeLangWatch(t)
 	_, sim := simAt(t, f)
@@ -353,6 +445,7 @@ func TestRunsAreListedNewestFirstAndCleared(t *testing.T) {
 	}
 }
 
+// @scenario "Runs are listed newest first, bounded and cleared"
 func TestStepsAreBounded(t *testing.T) {
 	rn := &run{}
 	for range maxSteps + 5 {
@@ -364,6 +457,7 @@ func TestStepsAreBounded(t *testing.T) {
 	}
 }
 
+// @scenario "An answer in an SSE body is found among pings and other messages"
 func TestReadSSEAnswerSkipsOtherMessages(t *testing.T) {
 	body := ": ping\n\nevent: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\n\nevent: message\ndata: {\"jsonrpc\":\"2.0\",\n" +
 		"data: \"id\":7,\"result\":{\"ok\":true}}\n\n"
@@ -376,6 +470,7 @@ func TestReadSSEAnswerSkipsOtherMessages(t *testing.T) {
 	}
 }
 
+// @scenario "Authorization-server metadata is looked up at the issuer's well-known address"
 func TestWellKnownInsertsTheSegmentBeforeTheIssuerPath(t *testing.T) {
 	if got := wellKnown("https://a.test", "oauth-authorization-server"); got != "https://a.test/.well-known/oauth-authorization-server" {
 		t.Error(got)
@@ -385,29 +480,51 @@ func TestWellKnownInsertsTheSegmentBeforeTheIssuerPath(t *testing.T) {
 	}
 }
 
+// @scenario "Held credentials only go to the endpoint they belong to"
 func TestHeldCredentialsOnlyGoToTheirOwnEndpoint(t *testing.T) {
-	f := newFakeLangWatch(t)
-	_, sim := simAt(t, f, func(c *Config) { c.Cookie = "better-auth.session_token=configured" })
-	mustPass(t, connectOAuth(t, sim))
-
-	// The grant's token never goes to an endpoint other than the one that issued it.
-	code, ans := call[map[string]string](t, http.MethodPost, sim+"/_sim/api/runs",
-		RunRequest{Scenario: ScenarioConnect, Flow: FlowOAuth, Endpoint: "http://elsewhere.test"})
-	if code != http.StatusBadRequest || !strings.Contains(ans["error"], "only goes there") {
-		t.Errorf("an oauth run to another endpoint answered %d %v", code, ans)
-	}
-
-	// The configured session never goes elsewhere: with no cookie of its own, the approval is refused.
-	other := newFakeLangWatch(t)
-	_, st := call[RunStatus](t, http.MethodPost, sim+"/_sim/api/oauth/connect",
-		ConnectRequest{Mode: "auto", Endpoint: other.URL(), Wait: true})
-	for _, s := range st.Steps {
-		if s.Kind == "approve" {
-			t.Errorf("the configured session was sent to another endpoint: %s", stepLine(st))
+	t.Run("the configured API key", func(t *testing.T) {
+		f, other := newFakeLangWatch(t), newFakeLangWatch(t)
+		_, sim := simAt(t, f)
+		code, ans := call[map[string]string](t, http.MethodPost, sim+"/_sim/api/runs", RunRequest{Scenario: ScenarioConnect, Endpoint: other.URL()})
+		if code != http.StatusBadRequest || !strings.Contains(ans["error"], "needs a project API key") || other.timesAsked("POST /mcp") != 0 {
+			t.Errorf("an apikey run to another endpoint answered %d %v", code, ans)
 		}
-	}
+	})
+
+	t.Run("the OAuth grant's token", func(t *testing.T) {
+		f, other := newFakeLangWatch(t), newFakeLangWatch(t)
+		_, sim := simAt(t, f)
+		mustPass(t, connectOAuth(t, sim))
+		code, ans := call[map[string]string](t, http.MethodPost, sim+"/_sim/api/runs",
+			RunRequest{Scenario: ScenarioConnect, Flow: FlowOAuth, Endpoint: other.URL()})
+		if code != http.StatusBadRequest || !strings.Contains(ans["error"], "only goes there") || other.timesAsked("POST /mcp") != 0 {
+			t.Errorf("an oauth run to another endpoint answered %d %v", code, ans)
+		}
+	})
+
+	t.Run("the configured session cookie", func(t *testing.T) {
+		f, other := newFakeLangWatch(t), newFakeLangWatch(t)
+		_, sim := simAt(t, f, func(c *Config) { c.Cookie = "better-auth.session_token=session-1" })
+		_, st := call[RunStatus](t, http.MethodPost, sim+"/_sim/api/oauth/connect", ConnectRequest{Mode: "auto", Endpoint: other.URL(), Wait: true})
+		if st.State != StateFailed || other.timesAsked("POST /api/mcp/authorize") != 0 {
+			t.Errorf("the configured session was sent to another endpoint: %s %s", st.State, stepLine(st))
+		}
+	})
+
+	t.Run("the configured login", func(t *testing.T) {
+		f, other := newFakeLangWatch(t), newFakeLangWatch(t)
+		_, sim := simAt(t, f, func(c *Config) { c.SignInEmail, c.SignInPassword = "admin@example.com", "pw" })
+		_, st := call[RunStatus](t, http.MethodPost, sim+"/_sim/api/oauth/connect", ConnectRequest{Mode: "auto", Endpoint: other.URL(), Wait: true})
+		if st.State != StateFailed || !strings.Contains(st.Error, "the configured login only goes to") {
+			t.Errorf("connect to another endpoint ended %s: %q", st.State, st.Error)
+		}
+		if n := other.timesAsked("POST /api/auth/sign-in/email") + other.timesAsked("POST /api/mcp/authorize"); n != 0 {
+			t.Errorf("the configured login reached another endpoint %d times", n)
+		}
+	})
 }
 
+// @scenario "The control API takes JSON only"
 func TestAPostThatIsNotJSONIsRefused(t *testing.T) {
 	f := newFakeLangWatch(t)
 	_, sim := simAt(t, f)
@@ -420,5 +537,8 @@ func TestAPostThatIsNotJSONIsRefused(t *testing.T) {
 		if resp.StatusCode != http.StatusUnsupportedMediaType {
 			t.Errorf("a text/plain POST to %s answered %d", path, resp.StatusCode)
 		}
+	}
+	if _, list := call[map[string][]RunStatus](t, http.MethodGet, sim+"/_sim/api/runs", nil); len(list["runs"]) != 0 {
+		t.Errorf("a refused POST started %d runs", len(list["runs"]))
 	}
 }

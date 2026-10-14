@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// @scenario "haven runs mcpsim only when the worktree asks for it"
 func TestMcpIsOptInAndNamedInTheSelection(t *testing.T) {
 	if DefaultSelection().Mcp {
 		t.Error("mcpsim must be off by default")

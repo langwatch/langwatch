@@ -44,6 +44,29 @@ describe("useSimPoll", () => {
     });
   });
 
+  describe("given an interval derived from the answer", () => {
+    it("asks at the pace the latest answer sets", async () => {
+      const fetch = vi
+        .fn<() => Promise<string>>()
+        .mockResolvedValueOnce("busy")
+        .mockResolvedValue("idle");
+      renderHook(() =>
+        useSimPoll({ fetch, everyMs: (data) => (data === "idle" ? 10_000 : 1_000) }),
+      );
+
+      // The second answer slows the pace: the hook asks once more at once, then waits 10s.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+      expect(fetch).toHaveBeenCalledTimes(3);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      expect(fetch).toHaveBeenCalledTimes(3);
+    });
+  });
+
   describe("when the tab is hidden", () => {
     /** @scenario "A console stops asking while its tab is hidden" */
     it("stops asking, then asks at once and resumes when shown", async () => {

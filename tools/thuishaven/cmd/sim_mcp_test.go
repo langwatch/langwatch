@@ -33,6 +33,7 @@ func fakeMcpsim(t *testing.T, state string) (sources.SimAPI, *mcpsim.RunRequest)
 	return sources.NewSimAPIAt(srv.URL), &got
 }
 
+// @scenario "An agent runs a scenario from the terminal and its exit code says whether it passed"
 func TestMcpRunVerbsWaitAndExitNonZeroUnlessPassed(t *testing.T) {
 	api, got := fakeMcpsim(t, mcpsim.StatePassed)
 	if err := mcpCommand(api, simInv("connect"), false); err != nil {
@@ -65,6 +66,7 @@ func TestMcpRunVerbsWaitAndExitNonZeroUnlessPassed(t *testing.T) {
 	}
 }
 
+// @scenario "An agent runs a scenario from the terminal and its exit code says whether it passed"
 func TestMcpRunTimeoutCoversTheScenario(t *testing.T) {
 	soak, _ := mcpRunRequest("soak", invocation{flags: map[string]string{"--duration": "5m", "--clients": "20"}})
 	if d, _ := mcpRunTimeout(simInv("soak"), soak); d < 5*time.Minute {
@@ -78,6 +80,7 @@ func TestMcpRunTimeoutCoversTheScenario(t *testing.T) {
 	}
 }
 
+// @scenario "An agent connects OAuth from the terminal"
 func TestMcpOAuthPollsUntilTheConnectEnds(t *testing.T) {
 	var polls atomic.Int32
 	var connect mcpsim.ConnectRequest
@@ -116,6 +119,7 @@ func TestMcpOAuthPollsUntilTheConnectEnds(t *testing.T) {
 	}
 }
 
+// @scenario "An agent reads and manages runs from the terminal"
 func TestMcpReadVerbsDriveTheSimsAPI(t *testing.T) {
 	api, seen := stubSim(t, map[string]string{
 		"GET /_sim/api/status":        `{"stack":"s","callbackUrl":"https://mcp.s.langwatch.localhost/callback","oauth":{"connected":false},"runs":[]}`,
