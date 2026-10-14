@@ -5,9 +5,9 @@ import type { EvaluatorRuntimeEngine } from "@langwatch/evaluation-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LangevalsEvaluateParams } from "../langevals-evaluator.service.ts";
 import type { LangevalsPayloadStaging } from "../../../../channels/langevals.channel.ts";
 import { MemoryLangevalsChannel } from "../../../../channels/memory/memory.langevals.channel.ts";
+import type { LangevalsEvaluateParams } from "../langevals-evaluator.service.ts";
 import { LangevalsEvaluatorService } from "../langevals-evaluator.service.ts";
 
 const { info } = vi.hoisted(() => ({ info: vi.fn() }));

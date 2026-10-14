@@ -541,6 +541,18 @@ export const goErrorCodes = {
    */
   tenant_missing: { service: "nlpgo", httpStatus: 400 },
   /**
+   * ErrTopicClusteringFailed
+   *
+   * @source services/nlpgo/modules/evaluators/contract/topic_clustering.go
+   */
+  topic_clustering_failed: { service: "nlpgo", httpStatus: 500 },
+  /**
+   * ErrTopicClusteringTooFewTraces
+   *
+   * @source services/nlpgo/modules/evaluators/contract/topic_clustering.go
+   */
+  topic_clustering_too_few_traces: { service: "nlpgo", httpStatus: 422 },
+  /**
    * ErrUnauthorized — signals a missing or invalid internal bearer secret on
    * /chat. The manager binds the cluster service surface, so this is the wall
    * against any pod that can route to it.

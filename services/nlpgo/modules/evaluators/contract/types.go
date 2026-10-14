@@ -50,6 +50,7 @@ type EvaluateRequest struct {
 // Status is a result's outcome, as langevals names it.
 type Status string
 
+// The three statuses a result carries.
 const (
 	StatusProcessed Status = "processed"
 	StatusSkipped   Status = "skipped"
