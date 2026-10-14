@@ -5,7 +5,8 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const tasksDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../apps/tasks");
+// The image copies this folder to /app/platform/app, so the tasks app is at /app/apps/tasks.
+const tasksDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../apps/tasks");
 
 /** The old task is now an upgrade step: `upgrade` runs it, and the worker already does at boot. */
 const upgradeStep = (step) => ({ run: ["upgrade"], note: `now the upgrade step ${step}` });
@@ -64,11 +65,13 @@ const assignments = [];
 const forwarded = target.passArgs ? args : [];
 if (target.outFlagToEnv) {
   const at = args.indexOf("--out");
-  if (at < 0 || !args[at + 1]) {
+  const joined = args.find((arg) => arg.startsWith("--out="));
+  const outDir = at >= 0 ? args[at + 1] : joined?.slice("--out=".length);
+  if (!outDir) {
     console.error(`"${name}" needs --out <dir>.`);
     process.exit(2);
   }
-  assignments.push(`${target.outFlagToEnv}=${args[at + 1]}`);
+  assignments.push(`${target.outFlagToEnv}=${outDir}`);
 }
 console.error(
   `[deprecated] "${name}" is now "${target.run.join(" ")}"${target.note ? ` (${target.note})` : ""}.`,

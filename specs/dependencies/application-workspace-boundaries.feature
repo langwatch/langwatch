@@ -333,6 +333,14 @@ Feature: Physical application workspace boundaries
       And its worker command starts the worker
       And no additional image is required by the source split
 
+    @unit @deployment
+    Scenario: An old Helm chart's LangWatchQL render task still runs from the previous path
+      Given the previous release's chart runs "cd /app/platform/app && pnpm run task renderLwqlAccessConfig --out /render"
+      When the image runs that command
+      Then it runs "lwql-render-access-config" from /app/apps/tasks
+      And the output folder reaches the task as LWQL_RENDER_OUT_DIR, not as an argument
+      And without --out it exits 2 and names the flag
+
     @unimplemented
     @integration @deployment
     Scenario: No new network service is required
