@@ -18,7 +18,7 @@ export function normaliseJsonObject(
   context: { column: string; triggerId?: unknown },
 ): Record<string, unknown> {
   if (value === null || value === undefined) return {};
-  let candidate = value;
+  let candidate: unknown = value;
   if (typeof candidate === "string") {
     try {
       candidate = JSON.parse(candidate);
