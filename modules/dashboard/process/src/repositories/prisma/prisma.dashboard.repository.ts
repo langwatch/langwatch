@@ -1,6 +1,7 @@
 import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import { chartGridBottomRow } from "@langwatch/analytics-contract/chart-grid";
 import {
+  DashboardLivesInReportsError,
   dashboardSchema,
   graphFiltersSchema,
   graphPayloadSchema,
@@ -284,9 +285,20 @@ export class PrismaDashboardRepository
   async deleteDashboard(input: {
     projectId: string;
     dashboardId: string;
+    cascadeLegacy?: boolean;
   }): Promise<DashboardRecord> {
     // Graphs cascade by foreign key; favourites have none, so remove them here.
     return this.transaction(async (transaction) => {
+      if (input.cascadeLegacy !== true) {
+        const legacyCharts = await transaction.customGraph.count({
+          where: {
+            projectId: input.projectId,
+            dashboardId: input.dashboardId,
+            kind: { not: DASHBOARD_SRCDOC_CHART_KIND },
+          },
+        });
+        if (legacyCharts > 0) throw new DashboardLivesInReportsError(input.projectId);
+      }
       await transaction.dashboardFavourite.deleteMany({
         where: { dashboardId: input.dashboardId, projectId: input.projectId },
       });

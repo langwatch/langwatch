@@ -225,6 +225,47 @@ function contractCases(backend: Backend): void {
         elsewhere: [],
       });
     });
+
+    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+    it("refuses to delete a board holding them unless asked to cascade, and keeps it", async () => {
+      const repository = backend.repository();
+      const ref = (dashboardId: string) => ({ projectId: backend.projectId(), dashboardId });
+      const [withGraph, withChart, empty] = [
+        await dashboard("Graph"),
+        await dashboard("Chart"),
+        await dashboard("Empty"),
+      ];
+      const placed = await graph(withGraph.id);
+      const saved = await chart();
+      await repository.placeSavedWorkbenchChart({
+        ...ref(withChart.id),
+        chartId: saved.id,
+        ...LAYOUT,
+      });
+
+      for (const board of [withGraph, withChart]) {
+        await expect(repository.deleteDashboard(ref(board.id))).rejects.toMatchObject({
+          code: "dashboard_lives_in_reports",
+        });
+      }
+      await expect(repository.deleteDashboard(ref(empty.id))).resolves.toMatchObject({
+        id: empty.id,
+      });
+
+      expect({
+        kept: await repository.findDashboards({
+          projectId: backend.projectId(),
+          dashboardIds: [withGraph.id, withChart.id],
+        }),
+        graph: await repository.findGraph({ projectId: backend.projectId(), graphId: placed.id }),
+      }).toMatchObject({
+        kept: expect.arrayContaining([
+          expect.objectContaining({ id: withGraph.id }),
+          expect.objectContaining({ id: withChart.id }),
+        ]),
+        graph: { id: placed.id },
+      });
+    });
   });
 
   describe("when dashboards are written", () => {
@@ -334,7 +375,11 @@ function contractCases(backend: Backend): void {
       const placed = await graph(created.id);
 
       await expect(
-        repository.deleteDashboard({ projectId: backend.projectId(), dashboardId: created.id }),
+        repository.deleteDashboard({
+          projectId: backend.projectId(),
+          dashboardId: created.id,
+          cascadeLegacy: true,
+        }),
       ).resolves.toMatchObject({ id: created.id });
       await expect(
         repository.findGraph({ projectId: backend.projectId(), graphId: placed.id }),

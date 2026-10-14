@@ -11,7 +11,6 @@ import {
   DashboardNotFoundError,
   DashboardReorderUnknownIdsError,
   dashboardDetailsUpdateSchema,
-  DashboardLivesInReportsError,
   GRAPH_KSUID_RESOURCE,
   graphCreateInputSchema,
   graphIdSchema,
@@ -35,7 +34,7 @@ import type {
   DashboardGraphKind,
   DashboardRepository,
 } from "../repositories/dashboard.repository.ts";
-import type { DashboardAccessService } from "./dashboard-access.service.ts";
+import type { BoardArea, DashboardAccessService } from "./dashboard-access.service.ts";
 
 const defaultLayout: GraphLayout = {
   gridColumn: 0,
@@ -85,8 +84,8 @@ export class DashboardService {
   }
 
   /**
-   * The project's boards the viewer may see; `includeOrganization` adds the organization's, and
-   * `excludeLegacy` leaves out the boards made in Analytics Reports.
+   * The project's boards the viewer may see; `includeOrganization` adds the organization's.
+   * `excludeLegacy` keeps the Dashboards area's boards, `onlyLegacy` the Reports boards alone.
    */
   async getAll(input: {
     projectId: string;
@@ -94,6 +93,7 @@ export class DashboardService {
     viewer?: DashboardViewer;
     includeOrganization?: boolean;
     excludeLegacy?: boolean;
+    onlyLegacy?: boolean;
   }): Promise<DashboardSummary[]> {
     const projectId = projectIdSchema.parse(input.projectId);
 
@@ -103,13 +103,14 @@ export class DashboardService {
         : await this.#placeableKinds(projectId);
 
     const all = await this.#access.listBoards({ projectId, viewer: input.viewer, graphKinds });
+    const area = listedArea(input);
     const listed =
-      input.excludeLegacy === true
-        ? {
-            home: await this.#access.withoutLegacy(all.home),
-            guests: await this.#access.withoutLegacy(all.guests),
-          }
-        : all;
+      area === "all"
+        ? all
+        : {
+            home: await this.#access.inArea({ boards: all.home, area }),
+            guests: await this.#access.inArea({ boards: all.guests, area }),
+          };
     const guests = input.includeOrganization === true ? listed.guests : [];
     const sharedProjectIds = [...new Set(guests.map((board) => board.projectId))];
     // Every guest is a board of the reader's own organization.
@@ -228,22 +229,22 @@ export class DashboardService {
   }
 
   /**
-   * Deletes the board, cascading to its charts. `refuseLegacy` is the Dashboards area's delete:
-   * a board holding any chart made in Analytics Reports is refused, since those carry alerts.
+   * Deletes the board with its charts. A board holding a chart made in Analytics Reports, which
+   * may carry alerts, is refused unless `cascadeLegacy`: only Reports and REST send it (AC199b).
    */
   async delete(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-    refuseLegacy?: boolean;
+    cascadeLegacy?: boolean;
   }): Promise<Dashboard> {
     const ref = dashboardRef(input);
-    const board = await this.#access.getWritable({ ...ref, viewer: input.viewer });
-    if (input.refuseLegacy === true && (await this.#access.holdsLegacyCharts(board))) {
-      throw new DashboardLivesInReportsError(ref.projectId);
-    }
+    await this.#access.getWritable({ ...ref, viewer: input.viewer });
 
-    return this.#repository.deleteDashboard(ref);
+    return this.#repository.deleteDashboard({
+      ...ref,
+      cascadeLegacy: input.cascadeLegacy === true,
+    });
   }
 
   /**
@@ -493,3 +494,10 @@ const graphRef = (input: { projectId: string; graphId: string }) => ({
   projectId: projectIdSchema.parse(input.projectId),
   graphId: graphIdSchema.parse(input.graphId),
 });
+
+/** The area a list asks for: the Reports boards alone, the Dashboards area's, or every board. */
+function listedArea(input: { excludeLegacy?: boolean; onlyLegacy?: boolean }): BoardArea | "all" {
+  if (input.onlyLegacy === true) return "reports";
+  if (input.excludeLegacy === true) return "dashboards";
+  return "all";
+}

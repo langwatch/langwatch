@@ -437,6 +437,7 @@ describe("board scope at the doors", () => {
       await deleted.call(AUTHOR, "dashboards.delete", {
         projectId: HOME,
         dashboardId: deleted.boardId,
+        cascadeLegacy: true,
       });
 
       expect(await read(await boardAt("PRIVATE"))).toEqual(await read(deleted));
@@ -717,28 +718,43 @@ describe("board scope at the doors", () => {
   describe("given a board that holds a widget and charts made in Analytics Reports", () => {
     /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
     /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
-    it("is listed while it holds a widget, its delete is refused, and Reports still deletes it", async () => {
+    /** @scenario "AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports" */
+    it("moves from the Dashboards list to Langy's once its widget goes, and only Reports deletes it", async () => {
       const { call, boardId, widgetId } = await boardAt("PROJECT");
       const list = (input: Input) => call(AUTHOR, "dashboards.getAll", input).then(idsOf);
-      const dashboardsList = () => list({ projectId: HOME, excludeLegacy: true });
+      const lists = async () => ({
+        dashboards: await list({ projectId: HOME, excludeLegacy: true }),
+        langy: await list({ projectId: HOME, onlyLegacy: true }),
+        reports: await list({ projectId: HOME }),
+      });
       const on = { projectId: HOME, dashboardId: boardId };
 
-      const mixedListed = await dashboardsList();
-      const refused = await codeOf(
-        call(AUTHOR, "dashboards.delete", { ...on, refuseLegacy: true }),
-      );
+      const mixed = await lists();
+      const refused = await codeOf(call(AUTHOR, "dashboards.delete", on));
       await call(AUTHOR, "dashboardWidgets.delete", { projectId: HOME, id: widgetId });
-      const reportsOnlyListed = await dashboardsList();
-      const reportsList = await list({ projectId: HOME });
-      const deleted = await codeOf(call(AUTHOR, "dashboards.delete", on));
+      const reportsOnly = await lists();
+      const refusedAgain = await codeOf(call(AUTHOR, "dashboards.delete", on));
+      const deleted = await codeOf(
+        call(AUTHOR, "dashboards.delete", { ...on, cascadeLegacy: true }),
+      );
 
-      expect({ mixedListed, refused, reportsOnlyListed, reportsList, deleted }).toEqual({
-        mixedListed: [boardId],
+      expect({ mixed, refused, reportsOnly, refusedAgain, deleted }).toEqual({
+        mixed: { dashboards: [boardId], langy: [], reports: [boardId] },
         refused: "dashboard_lives_in_reports",
-        reportsOnlyListed: [],
-        reportsList: [boardId],
+        reportsOnly: { dashboards: [], langy: [boardId], reports: [boardId] },
+        refusedAgain: "dashboard_lives_in_reports",
         deleted: "<resolved>",
       });
+    });
+
+    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+    it("is deleted over REST with its charts, as before", async () => {
+      const { app, call, boardId } = await boardAt("PROJECT");
+
+      const removed = await credentialDoors(app, HOME)("DELETE", `/api/dashboards/${boardId}`);
+      const reports = await call(AUTHOR, "dashboards.getAll", { projectId: HOME }).then(idsOf);
+
+      expect({ status: removed.status, reports }).toEqual({ status: 200, reports: [] });
     });
   });
 });

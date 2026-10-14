@@ -43,6 +43,8 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
       includeOrganization: z.boolean().optional(),
       /** Leaves out boards with Analytics Reports charts and no widget; Dashboards asks (AC199). */
       excludeLegacy: z.boolean().optional(),
+      /** Lists only those boards, where a builder chart may land; Langy asks (AC199c). */
+      onlyLegacy: z.boolean().optional(),
     }),
   )
   .withOutput(dashboardTrpcSummarySchema.array())
@@ -60,11 +62,11 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
   .withOutput(dashboardTrpcRowSchema)
 
   /**
-   * Cascades to the dashboard's graphs, and removes it from everyone's stars. `refuseLegacy`,
-   * sent by the Dashboards area alone, refuses a board holding any Analytics Reports chart.
+   * Cascades to the dashboard's graphs, and removes it from everyone's stars. A board holding
+   * any Analytics Reports chart is refused unless `cascadeLegacy`, which Reports alone sends.
    */
   .mutation("delete")
-  .withInput(z.object({ ...dashboardRefSchema.shape, refuseLegacy: z.boolean().optional() }))
+  .withInput(z.object({ ...dashboardRefSchema.shape, cascadeLegacy: z.boolean().optional() }))
   .withOutput(dashboardTrpcRowSchema)
 
   /**

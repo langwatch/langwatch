@@ -140,10 +140,12 @@ export const dashboardRest = defineRestRouter(DashboardApi)
     description: "Delete a dashboard and its graphs (hard delete, cascade)",
   })
   .handle(async ({ app, input, scope, actor }) => {
+    // REST deletes what Analytics Reports deletes, its charts included, as it always has.
     const deleted = await app.delete({
       projectId: scope.id,
       dashboardId: input.id,
       ...viewerOfActor({ actor }),
+      cascadeLegacy: true,
     });
 
     return { id: deleted.id, name: deleted.name };

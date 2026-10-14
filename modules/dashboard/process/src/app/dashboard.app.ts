@@ -260,6 +260,7 @@ export class DashboardModule implements DashboardApi {
     viewer?: DashboardViewer;
     includeOrganization?: boolean;
     excludeLegacy?: boolean;
+    onlyLegacy?: boolean;
   }): Promise<DashboardSummary[]> {
     return this.#dashboards.getAll(input);
   }
@@ -293,7 +294,7 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-    refuseLegacy?: boolean;
+    cascadeLegacy?: boolean;
   }): Promise<Dashboard> {
     return this.#dashboards.delete(input);
   }

@@ -140,12 +140,15 @@ describe("the current dashboard's actions", () => {
     expect(onRename).toHaveBeenCalledOnce();
   });
 
-  it("deletes after confirmation", async () => {
+  /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+  it("deletes after confirmation, its Analytics Reports charts included", async () => {
     const { user, open } = mountActions({ dashboardId: "d2" });
     await open();
     await user.click(screen.getByText("Delete"));
     await user.click(screen.getByRole("button", { name: "Delete" }));
-    expect(api.sent).toEqual([{ delete: { projectId: "proj-1", dashboardId: "d2" } }]);
+    expect(api.sent).toEqual([
+      { delete: { projectId: "proj-1", dashboardId: "d2", cascadeLegacy: true } },
+    ]);
   });
 
   it("never offers to delete the last dashboard", async () => {

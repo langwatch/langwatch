@@ -18,10 +18,10 @@ Peers call these through the token, declared at `../contract/src/dashboard.api.t
 
 #### `getAll`
 
-The project's boards the viewer may see, with their own `isStarred`; a project credential (no viewer) sees no Only me board. `includeOrganization` adds the Organization boards with their `ownerProject`; `excludeLegacy` drops boards holding only Analytics Reports charts.
+The project's boards the viewer may see with their `isStarred`, no Only me board for a project credential. `includeOrganization` adds the Organization boards with their `ownerProject`. Of the Reports boards (Reports charts, no widget) `excludeLegacy` drops, `onlyLegacy` keeps.
 
 ```typescript
-getAll(input: { projectId: string; graphCountScope: DashboardGraphCountScope; viewer?: DashboardViewer; includeOrganization?: boolean; excludeLegacy?: boolean; }): Promise<DashboardSummary[]>;
+getAll(input: { projectId: string; graphCountScope: DashboardGraphCountScope; viewer?: DashboardViewer; includeOrganization?: boolean; excludeLegacy?: boolean; onlyLegacy?: boolean; }): Promise<DashboardSummary[]>;
 ```
 
 #### `getById`
@@ -48,10 +48,10 @@ rename(input: { projectId: string; dashboardId: string; name: string; viewer?: D
 
 #### `delete`
 
-Deletes the board and its graphs, and removes it from every member's stars. With `refuseLegacy`, a board holding charts made in Analytics Reports is refused instead.
+Deletes the board and its graphs, and removes it from every member's stars. A board holding charts made in Analytics Reports is refused unless `cascadeLegacy` deletes those too.
 
 ```typescript
-delete(input: { projectId: string; dashboardId: string; viewer?: DashboardViewer; refuseLegacy?: boolean; }): Promise<Dashboard>;
+delete(input: { projectId: string; dashboardId: string; viewer?: DashboardViewer; cascadeLegacy?: boolean; }): Promise<Dashboard>;
 ```
 
 #### `reorder`
@@ -956,8 +956,9 @@ interface Input {
   projectId: string;
   includeOrganization?: boolean;
   excludeLegacy?: boolean;
+  onlyLegacy?: boolean;
 }
-// Output: dashboardTrpcSummarySchema.array() (inline, ../contract/src/dashboard.trpc.ts:48)
+// Output: dashboardTrpcSummarySchema.array() (inline, ../contract/src/dashboard.trpc.ts:50)
 
 // dashboards.getById
 // Input: dashboardRefSchema, ../contract/src/dashboard.trpc.ts:27
@@ -968,7 +969,7 @@ interface Input {
 type Output = z.infer<typeof dashboardTrpcDetailSchema>; // ../contract/src/dashboard.responses.ts:46
 
 // dashboards.create
-// Input: inline, ../contract/src/dashboard.trpc.ts:55
+// Input: inline, ../contract/src/dashboard.trpc.ts:57
 interface Input {
   projectId: string;
   name: string;
@@ -988,7 +989,7 @@ interface Output {
 }
 
 // dashboards.rename
-// Input: inline, ../contract/src/dashboard.trpc.ts:59
+// Input: inline, ../contract/src/dashboard.trpc.ts:61
 interface Input {
   projectId: string;
   dashboardId: string;
@@ -997,16 +998,16 @@ interface Input {
 type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:49
 
 // dashboards.delete
-// Input: inline, ../contract/src/dashboard.trpc.ts:67
+// Input: inline, ../contract/src/dashboard.trpc.ts:69
 interface Input {
   projectId: string;
   dashboardId: string;
-  refuseLegacy?: boolean;
+  cascadeLegacy?: boolean;
 }
 type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:49
 
 // dashboards.reorderDashboards
-// Input: inline, ../contract/src/dashboard.trpc.ts:75
+// Input: inline, ../contract/src/dashboard.trpc.ts:77
 interface Input {
   projectId: string;
   dashboardIds: string[];
@@ -1018,7 +1019,7 @@ type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/dashboard.trpc.ts:81
+// Output: inline, ../contract/src/dashboard.trpc.ts:83
 type Output = {
   id: string;
   projectId: string;
@@ -1033,7 +1034,7 @@ type Output = {
 } | null;
 
 // dashboards.updateDetails
-// Input: inline, ../contract/src/dashboard.trpc.ts:89
+// Input: inline, ../contract/src/dashboard.trpc.ts:91
 interface Input {
   projectId: string;
   dashboardId: string;
@@ -1043,7 +1044,7 @@ interface Input {
 type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:49
 
 // dashboards.setScope
-// Input: inline, ../contract/src/dashboard.trpc.ts:99
+// Input: inline, ../contract/src/dashboard.trpc.ts:101
 interface Input {
   projectId: string;
   dashboardId: string;
@@ -1076,10 +1077,10 @@ interface Output {
 
 // dashboards.listStarred
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/dashboard.trpc.ts:26
-// Output: starredDashboardSchema.array() (inline, ../contract/src/dashboard.trpc.ts:115)
+// Output: starredDashboardSchema.array() (inline, ../contract/src/dashboard.trpc.ts:117)
 
 // dashboards.star
-// Input: inline, ../contract/src/dashboard.trpc.ts:119
+// Input: inline, ../contract/src/dashboard.trpc.ts:121
 interface Input {
   projectId: string;
   star:
@@ -1095,7 +1096,7 @@ interface Input {
 type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:113
 
 // dashboards.unstar
-// Input: inline, ../contract/src/dashboard.trpc.ts:123
+// Input: inline, ../contract/src/dashboard.trpc.ts:125
 interface Input {
   projectId: string;
   star:
@@ -1111,7 +1112,7 @@ interface Input {
 type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:113
 
 // dashboards.reorderStars
-// Input: z.object({ ...projectScopeSchema.shape, stars: z.array(dashboardStarSchema) }) (inline, ../contract/src/dashboard.trpc.ts:128)
+// Input: z.object({ ...projectScopeSchema.shape, stars: z.array(dashboardStarSchema) }) (inline, ../contract/src/dashboard.trpc.ts:130)
 type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:113
 
 // dashboards.sourcePresence

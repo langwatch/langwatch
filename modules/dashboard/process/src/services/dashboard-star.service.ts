@@ -46,7 +46,9 @@ export class DashboardStarService {
       sharedProjectIds,
     });
     const boards = starred.flatMap((star) => (star.kind === "board" ? [star.dashboard] : []));
-    const listable = new Set((await this.#access.withoutLegacy(boards)).map((board) => board.id));
+    const listable = new Set(
+      (await this.#access.inArea({ boards, area: "dashboards" })).map((board) => board.id),
+    );
     return starred.filter(
       (star) =>
         star.kind === "template" ||

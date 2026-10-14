@@ -91,8 +91,16 @@ export interface DashboardRepository {
     projectIds: readonly string[];
     dashboardIds: readonly string[];
   }): Promise<DashboardChartHoldings[]>;
-  /** Removes the board, its graphs, and the row from every member's favourites. */
-  deleteDashboard(input: { projectId: string; dashboardId: string }): Promise<DashboardRecord>;
+  /**
+   * Removes the board, its graphs, and the row from every member's favourites. Unless
+   * `cascadeLegacy`, a board holding a chart made in Analytics Reports is refused with
+   * `DashboardLivesInReportsError`, checked in the same transaction as the delete.
+   */
+  deleteDashboard(input: {
+    projectId: string;
+    dashboardId: string;
+    cascadeLegacy?: boolean;
+  }): Promise<DashboardRecord>;
   updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void>;
 
   /**

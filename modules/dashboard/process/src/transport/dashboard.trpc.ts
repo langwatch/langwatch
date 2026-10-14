@@ -17,6 +17,7 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
         viewer: { userId: actor.id },
         ...(input.includeOrganization === true ? { includeOrganization: true } : {}),
         ...(input.excludeLegacy === true ? { excludeLegacy: true } : {}),
+        ...(input.onlyLegacy === true ? { onlyLegacy: true } : {}),
       });
 
       return dashboards.map(({ graphCount, ...dashboard }) => ({
@@ -59,7 +60,7 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
         projectId: input.projectId,
         dashboardId: input.dashboardId,
         viewer: { userId: actor.id },
-        ...(input.refuseLegacy === true ? { refuseLegacy: true } : {}),
+        ...(input.cascadeLegacy === true ? { cascadeLegacy: true } : {}),
       }),
     )
 

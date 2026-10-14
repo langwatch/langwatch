@@ -206,9 +206,9 @@ type BorrowedProcedures = {
       };
     };
     delete: {
-      /** `refuseLegacy` refuses a board holding Analytics Reports charts; Dashboards sends it. */
+      /** Refuses a board with Analytics Reports charts unless `cascadeLegacy`; Reports sends it. */
       mutation: {
-        input: ProjectScope & { dashboardId: string; refuseLegacy?: boolean };
+        input: ProjectScope & { dashboardId: string; cascadeLegacy?: boolean };
         output: unknown;
       };
     };

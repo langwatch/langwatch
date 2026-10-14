@@ -128,13 +128,13 @@ describe("given the project has boards", () => {
 
 describe("given a member deletes a board", () => {
   /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
-  it("asks the server to refuse a board made in Analytics Reports", () => {
+  it("never asks to cascade, so the server refuses a board made in Analytics Reports", () => {
     const { result } = renderHook(() => useSavedDashboards());
 
     act(() => result.current.deleteBoard({ dashboardId: "board-1", onDeleted: vi.fn() }));
 
     expect(mocks.remove.mutate).toHaveBeenCalledWith(
-      { projectId: "project-1", dashboardId: "board-1", refuseLegacy: true },
+      { projectId: "project-1", dashboardId: "board-1" },
       expect.anything(),
     );
   });

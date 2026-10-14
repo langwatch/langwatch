@@ -28,6 +28,13 @@ export interface DashboardsRollout {
 /** A board as the chart holdings name it. */
 type BoardRef = Pick<DashboardRecord, "id" | "projectId">;
 
+/** Which boards a list keeps: the ones the Dashboards area opens, or the Reports boards alone. */
+export type BoardArea = "dashboards" | "reports";
+
+/** Charts made in Analytics Reports and no widget: the board opens empty in Dashboards. */
+const isReportsBoard = (held: DashboardChartHoldings | undefined) =>
+  held !== undefined && held.legacyCharts && !held.widgets;
+
 /** Who is reading, from which project; no viewer is a project credential. */
 export type BoardReading = Readonly<{ projectId: string; viewer?: DashboardViewer }>;
 
@@ -99,20 +106,16 @@ export class DashboardAccessService {
   }
 
   /**
-   * These boards less the ones that open empty in the Dashboards area: charts made in Analytics
-   * Reports and no widget. A board holding both stays listed (dashboards-v2 AC199).
+   * These boards kept by area. A board holding widgets and Reports charts, or nothing, is a
+   * Dashboards one (dashboards-v2 AC199, AC199c).
    */
-  async withoutLegacy<Board extends BoardRef>(boards: readonly Board[]): Promise<Board[]> {
-    const holdings = await this.#holdings(boards);
-    return boards.filter((board) => {
-      const held = holdings.get(board.id);
-      return held === undefined || !held.legacyCharts || held.widgets;
-    });
-  }
-
-  /** Whether the board holds a chart made in Analytics Reports, so its delete would cascade. */
-  async holdsLegacyCharts(board: BoardRef): Promise<boolean> {
-    return (await this.#holdings([board])).get(board.id)?.legacyCharts === true;
+  async inArea<Board extends BoardRef>(input: {
+    boards: readonly Board[];
+    area: BoardArea;
+  }): Promise<Board[]> {
+    const holdings = await this.#holdings(input.boards);
+    const wantsReports = input.area === "reports";
+    return input.boards.filter((board) => isReportsBoard(holdings.get(board.id)) === wantsReports);
   }
 
   async #holdings(boards: readonly BoardRef[]): Promise<Map<string, DashboardChartHoldings>> {

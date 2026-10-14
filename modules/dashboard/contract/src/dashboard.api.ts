@@ -45,9 +45,9 @@ export interface DashboardUsageCount {
 /** Flat operations a door or a peer calls once the dashboard app is composed. */
 export interface DashboardApi {
   /**
-   * The project's boards the viewer may see, with their own `isStarred`; a project credential
-   * (no viewer) sees no Only me board. `includeOrganization` adds the Organization boards with
-   * their `ownerProject`; `excludeLegacy` drops boards holding only Analytics Reports charts.
+   * The project's boards the viewer may see with their `isStarred`, no Only me board for a project
+   * credential. `includeOrganization` adds the Organization boards with their `ownerProject`.
+   * Of the Reports boards (Reports charts, no widget) `excludeLegacy` drops, `onlyLegacy` keeps.
    */
   getAll(input: {
     projectId: string;
@@ -55,6 +55,7 @@ export interface DashboardApi {
     viewer?: DashboardViewer;
     includeOrganization?: boolean;
     excludeLegacy?: boolean;
+    onlyLegacy?: boolean;
   }): Promise<DashboardSummary[]>;
   /** One board the viewer may open here: the project's own, or the organization's. */
   getById(input: {
@@ -71,14 +72,14 @@ export interface DashboardApi {
     viewer?: DashboardViewer;
   }): Promise<Dashboard>;
   /**
-   * Deletes the board and its graphs, and removes it from every member's stars. With
-   * `refuseLegacy`, a board holding charts made in Analytics Reports is refused instead.
+   * Deletes the board and its graphs, and removes it from every member's stars. A board holding
+   * charts made in Analytics Reports is refused unless `cascadeLegacy` deletes those too.
    */
   delete(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-    refuseLegacy?: boolean;
+    cascadeLegacy?: boolean;
   }): Promise<Dashboard>;
   /** The legacy board `order`; written only by the REST reorder endpoint. */
   reorder(input: {

@@ -961,8 +961,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   # Boards made in Analytics Reports share the dashboards table. A board holding charts made
   # there and no widget opens empty in Dashboards, so Dashboards does not list it. Deleting any
-  # board with such charts deletes them and the alerts set on them, so only Analytics > Reports
-  # deletes it, even when it also holds widgets. A new board, empty or with widgets, is untouched.
+  # board with such charts deletes them and the alerts set on them, so a delete is refused unless
+  # the caller asks to cascade: only Analytics > Reports and REST do, even when it holds widgets.
+  # The check runs in the delete's own transaction. A new board, empty or with widgets, is untouched.
 
   @unit @integration
   Scenario: AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports
@@ -978,12 +979,20 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit @integration
   Scenario: AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports
     Given a board that holds a chart made in Analytics Reports, with or without widgets
-    When a member deletes it from the Dashboards area
+    When a member deletes it from the Dashboards area, or any caller deletes it without
+      asking to cascade
     Then the delete is refused with the code "dashboard_lives_in_reports", a 409 conflict
       that says to manage the board from Analytics > Reports
     And the board and its charts are kept
-    When the member deletes it from Analytics Reports
+    When the member deletes it from Analytics Reports, or a key deletes it over REST
     Then it is deleted with its charts, as before
+
+  @unit @integration
+  Scenario: AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports
+    Given a board made in Analytics Reports, a new empty board and a board holding widgets
+    When a member opens "Save to dashboard" on a chart Langy drew
+    Then only the board made in Analytics Reports is offered, with "New dashboard"
+    And a chart saved there never moves a board out of the Dashboards area
 
   # ---------------------------------------------------------------------------
   # Sidebar, My dashboard, From LangWatch and the ask bar (langwatch/tasks#911)
@@ -1510,7 +1519,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 170-186: "Board scope: Only me, Project, Organization" (owner decisions, 2026-10-09) → Scenario: AC170 Scope: a new board starts at Project and My dashboard at Only me; Scenario: AC171 Scope: an Only me board exists for its author alone; Scenario: AC172 Scope: an Organization board is listed in every project of its organization; Scenario: AC173 Scope: an Organization board is read-only outside the project that owns it; Scenario: AC174 Scope: only the author changes a board's scope; Scenario: AC175 Scope: any board can be set to Only me, My dashboard like any other; Scenario: AC176 Scope: a narrower scope keeps other members' stars; Scenario: AC177 Scope control: the board header shows the scope beside the title; Scenario: AC178 Scope control: the sidebar menu offers the same three choices; Scenario: AC179 Scope change: it asks first only when someone loses the board; Scenario: AC180 Scope change: any other change is made at once and offers Undo; Scenario: AC181 Sidebar: scope marks and the organization's group; Scenario: AC182 Organization board: the Project chip says whose data it shows; Scenario: AC183 A board the reader may not open is not available; Scenario: AC184 View-only: a board the reader cannot edit offers no edit control; Scenario: AC185 View-only: Duplicate to edit makes the reader's own copy; Scenario: AC186 Scope: the migration keeps today's audience
   # AC 187-189: "Board scope: what the access-control review closed" (2026-10-09: automation reads, archived projects, projects with Dashboards off) → Scenario: AC187 Scope: an alert or a scheduled report reads nothing from an Only me board; Scenario: AC188 Scope: an Organization board of an archived project is listed nowhere; Scenario: AC189 Scope: board scope reaches only a project where Dashboards is switched on
   # AC 196-197: "Board scope over REST: a key stands where its person does" (owner, 2026-10-10) → Scenario: AC196 Scope: a key that names a person reads and writes as that person over REST; Scenario: AC197 Scope: a key that names no person stands where a project credential does
-  # AC 199: "Boards made in Analytics Reports stay there" (prod test plan, 2026-10-14) → Scenario: AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports; Scenario: AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports
+  # AC 199: "Boards made in Analytics Reports stay there" (prod test plan, 2026-10-14) → Scenario: AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports; Scenario: AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports; Scenario: AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports
   # AC 160-165: "Sidebar, My dashboard and From LangWatch" (langwatch/tasks#911; changed on 2026-10-08: My dashboard starts starred) → Scenario: AC160 The dashboards area lands on My dashboard; Scenario: AC160b A member with no My dashboard gets one made, starred for them; Scenario: AC160c A member who unstars My dashboard keeps it unstarred; Scenario: AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order; Scenario: AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name; Scenario: AC161c Starred shows only when the member has stars, in their own order; Scenario: AC162 The '+' on Your dashboards makes a blank board at once; Scenario: AC163 My dashboard cannot be deleted; Scenario: AC164 From LangWatch folds only when the member clicks it; Scenario: AC165 A star can point at a From LangWatch board
   # Boards, From LangWatch and Langy drafts (langwatch/tasks#911) → the "Boards:", "From LangWatch:" and "Langy drafts:" scenarios
   # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate

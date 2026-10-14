@@ -112,7 +112,7 @@ export function useSavedDashboards() {
     onDeleted: () => void;
   }) => {
     remove.mutate(
-      { projectId, dashboardId, refuseLegacy: true },
+      { projectId, dashboardId },
       {
         onSuccess: () => {
           void refresh();

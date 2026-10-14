@@ -521,7 +521,7 @@ describe("DashboardService", () => {
 
     const listedIds = async (
       service: DashboardService,
-      options: { excludeLegacy?: boolean } = {},
+      options: { excludeLegacy?: boolean; onlyLegacy?: boolean } = {},
     ) =>
       (await service.getAll({ projectId: PROJECT, graphCountScope: "builder", viewer, ...options }))
         .map(({ id }) => id)
@@ -543,14 +543,21 @@ describe("DashboardService", () => {
       });
     });
 
+    /** @scenario "AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports" */
+    it("lists only the Reports board for a chart to land on", async () => {
+      const { service, reports } = await threeBoards();
+
+      await expect(listedIds(service, { onlyLegacy: true })).resolves.toEqual([reports.id]);
+    });
+
     /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
-    it("refuses the Dashboards delete of the Reports board and the mixed one, and keeps both", async () => {
+    it("refuses a delete that does not ask to cascade, on the Reports board and the mixed one", async () => {
       const { service, reports, mixed } = await threeBoards();
       const refusal = { code: "dashboard_lives_in_reports", httpStatus: 409 };
 
       for (const dashboardId of [reports.id, mixed.id]) {
         await expect(
-          service.delete({ projectId: PROJECT, dashboardId, viewer, refuseLegacy: true }),
+          service.delete({ projectId: PROJECT, dashboardId, viewer }),
         ).rejects.toMatchObject(refusal);
       }
 
@@ -564,13 +571,13 @@ describe("DashboardService", () => {
     it("still deletes it from Analytics Reports, and deletes a new board from Dashboards", async () => {
       const { service, reports, fresh, mixed } = await threeBoards();
 
-      await service.delete({ projectId: PROJECT, dashboardId: reports.id, viewer });
       await service.delete({
         projectId: PROJECT,
-        dashboardId: fresh.id,
+        dashboardId: reports.id,
         viewer,
-        refuseLegacy: true,
+        cascadeLegacy: true,
       });
+      await service.delete({ projectId: PROJECT, dashboardId: fresh.id, viewer });
 
       await expect(listedIds(service)).resolves.toEqual([mixed.id]);
       await expect(service.listGraphs({ projectId: PROJECT, viewer })).resolves.toEqual([]);

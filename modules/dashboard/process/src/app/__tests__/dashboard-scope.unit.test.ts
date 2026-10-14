@@ -316,6 +316,7 @@ describe("board scope on the server", () => {
           projectId: HOME,
           dashboardId: world.target.dashboardId,
           viewer: AUTHOR,
+          cascadeLegacy: true,
         });
         return world;
       };
@@ -631,7 +632,7 @@ describe("board scope on the server", () => {
 
       expect({
         renamed: await codeOf(app.rename({ ...on, name: "Ours" })),
-        deleted: await codeOf(app.delete(on)),
+        deleted: await codeOf(app.delete({ ...on, cascadeLegacy: true })),
       }).toEqual({ renamed: "<resolved>", deleted: "<resolved>" });
     });
 

@@ -1,5 +1,6 @@
 import { chartGridBottomRow } from "@langwatch/analytics-contract/chart-grid";
 import {
+  DashboardLivesInReportsError,
   dashboardSchema,
   graphSchema,
   savedWorkbenchChartSchema,
@@ -214,8 +215,14 @@ export class MemoryDashboardRepository implements DashboardRepository {
   async deleteDashboard(input: {
     projectId: string;
     dashboardId: string;
+    cascadeLegacy?: boolean;
   }): Promise<DashboardRecord> {
     const dashboard = this.#requireDashboard(input);
+    // Every chart this twin holds was made in Analytics Reports; widgets live in the widget twin.
+    const holdsLegacy = this.#charts.some((chart) => chart.dashboardId === dashboard.id);
+    if (input.cascadeLegacy !== true && holdsLegacy) {
+      throw new DashboardLivesInReportsError(input.projectId);
+    }
     this.#dashboards = this.#dashboards.filter((row) => row.id !== dashboard.id);
     // The stored foreign key cascades, as the schema's does.
     this.#charts = this.#charts.filter((chart) => chart.dashboardId !== dashboard.id);
