@@ -37354,6 +37354,7 @@ type CreateAgentJSONBody1 struct {
 		Parameters          []CreateAgentJSONBody_1_Config_Parameters_Item                                 `json:"parameters"`
 		ScenarioMappings    *map[string]CreateAgentJSONBody_1_Config_ScenarioMappings_AdditionalProperties `json:"scenarioMappings,omitempty"`
 		ScenarioOutputField *string                                                                        `json:"scenarioOutputField,omitempty"`
+		TimeoutMs           *int                                                                           `json:"timeoutMs,omitempty"`
 	} `json:"config"`
 	CopiedFromAgentId *string                  `json:"copiedFromAgentId,omitempty"`
 	Name              string                   `json:"name"`
