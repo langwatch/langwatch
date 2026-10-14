@@ -107,11 +107,12 @@ COPY apps/api/package.json ./apps/api/package.json
 COPY apps/ui/package.json ./apps/ui/package.json
 COPY apps/tasks/package.json ./apps/tasks/package.json
 COPY apps/scenario-child/package.json ./apps/scenario-child/package.json
-# Four filters: the four applications are four dependency subtrees and none is
-# a subset of another. apps/server and the SDK's e2e suites stay out. No
-# workspace member has an install lifecycle script, so no source is needed yet.
+# Five filters: the five applications are five dependency subtrees and none is
+# a subset of another (the scenario child's build needs its own esbuild). apps/server
+# and the SDK's e2e suites stay out. No workspace member has an install lifecycle
+# script, so no source is needed yet.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    CI=true pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
+    CI=true pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..." --filter "@langwatch/scenario-child..."
 
 # Source, after the install. The app imports the SDK and mcp/typescript as
 # workspace copies and builds them; the SDK's prebuild (copy-types.sh) reads

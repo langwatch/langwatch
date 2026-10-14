@@ -14,6 +14,10 @@ describe("infra/docker/Dockerfile scenario child", () => {
     expect(DOCKERFILE).toMatch(/--filter "@langwatch\/scenario-child\.\.\."[^\n]*run build/);
   });
 
+  it("installs @langwatch/scenario-child's build dependencies before building it", () => {
+    expect(DOCKERFILE).toMatch(/pnpm install --frozen-lockfile[^\n]*--filter "@langwatch\/scenario-child\.\.\."/);
+  });
+
   it("installs @langwatch/scenario-child's production dependencies for the bundle's external requires", () => {
     expect(DOCKERFILE).toContain('--filter-prod "@langwatch/scenario-child..."');
   });
