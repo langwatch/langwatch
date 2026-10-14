@@ -259,7 +259,7 @@ describe("Feature: MCP request logging", () => {
         });
 
         expect(response.status).toBe(401);
-        expect(await response.json()).toMatchObject({ code: "mcp_invalid_token" });
+        expect(await response.json()).toEqual({ error: "Invalid or expired token" });
         expect((await accessLogFor("/mcp")).fields).not.toHaveProperty("projectId");
       });
     });
@@ -309,7 +309,7 @@ describe("Feature: MCP request logging", () => {
         const line = await accessLogFor("/mcp");
 
         expect(line.fields.status).toBe(404);
-        expect(await response.json()).toMatchObject({ code: "mcp_session_not_found" });
+        expect(await response.json()).toEqual({ error: "Session not found" });
       });
     });
 

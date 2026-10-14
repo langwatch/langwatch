@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { MediaTypeMalformedRequestError, PayloadTooLargeError, retryAfterOf } from "@langwatch/api";
-import { canonicalErrorAnswer } from "@langwatch/api/rest";
+import { HandledError } from "@langwatch/handled-error";
 
 const MAX_BODY_BYTES = 10_485_760;
 
@@ -69,24 +69,23 @@ export class McpHttpService {
   }
 
   /**
-   * Every refusal this endpoint answers: the REST layer's canonical envelope, `Retry-After` from a
-   * refusal's wait, and on a 401 the protected-resource document where the client's OAuth starts.
+   * Answers a refusal in the endpoint's own wire shape, `{ error: "<text>" }`, which MCP clients
+   * already read: the code chooses the status and the text, never the body's shape.
    */
   async sendHandled(res: ServerResponse, error: unknown): Promise<void> {
-    const answer = canonicalErrorAnswer(error);
-    const body = await answer.text();
-    const headers: Record<string, string | number> = {
-      ...Object.fromEntries(answer.headers),
-      "Content-Length": Buffer.byteLength(body),
-    };
+    const handled = HandledError.isHandled(error) ? error : undefined;
+    const status = handled?.httpStatus ?? INTERNAL_ERROR;
+    const body = handled ? wireBodyOf(handled) : { error: "Internal server error" };
     const retryAfter = retryAfterOf(error);
-    if (retryAfter !== undefined) headers["Retry-After"] = retryAfter;
-    if (answer.status === UNAUTHORIZED) {
-      headers["WWW-Authenticate"] =
-        `Bearer resource_metadata="${this.#baseHost}/.well-known/oauth-protected-resource"`;
+    if (retryAfter !== undefined) res.setHeader("Retry-After", retryAfter);
+    if (status === UNAUTHORIZED) {
+      res.setHeader(
+        "WWW-Authenticate",
+        `Bearer resource_metadata="${this.#baseHost}/.well-known/oauth-protected-resource"`,
+      );
     }
-    res.writeHead(answer.status, headers);
-    res.end(body);
+    this.sendJson(res, status, body);
+    return Promise.resolve();
   }
 
   /** RFC 6749 §5.2's shape: OAuth clients parse it, so the OAuth endpoints keep it. */
@@ -146,4 +145,27 @@ function readBody(req: IncomingMessage): Promise<string> {
     });
     req.on("error", reject);
   });
+}
+
+const INTERNAL_ERROR = 500;
+
+/** The text each refusal has always carried on the wire, where it differs from the message. */
+const WIRE_TEXT: Readonly<Record<string, string>> = {
+  mcp_authorization_required: "Authorization required",
+  mcp_grant_revoked: "mcp_grant_revoked",
+  mcp_session_id_required: "Invalid request — no session ID or not an initialize request",
+  payload_too_large: "Request body too large",
+  malformed_request: "Invalid JSON body",
+  rate_limited: "Too many requests",
+};
+
+/** Discovery documents answer in OAuth's own shape, which the clients probing them parse. */
+function wireBodyOf(error: HandledError): Record<string, string> {
+  if (error.code === "mcp_metadata_unpublished") {
+    return {
+      error: "not_found",
+      error_description: "No metadata document is published at this path",
+    };
+  }
+  return { error: WIRE_TEXT[error.code] ?? error.message };
 }

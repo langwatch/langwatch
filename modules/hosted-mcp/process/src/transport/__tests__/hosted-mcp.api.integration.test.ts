@@ -431,7 +431,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       // is not matched as an MCP route. In production, start.ts checks
       // isMcpRoute() first and falls through to Next.js.
       expect(res.status).toBe(404);
-      expect(res.json().code).toBe("mcp_route_not_found");
+      expect(res.json().error).toBe("Not found");
     });
   });
 
@@ -880,7 +880,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
         expect(res.status).toBe(404);
         expect(res.contentType).toContain("application/json");
-        expect(res.body.code).toBe("mcp_metadata_unpublished");
+        expect(res.body.error).toBe("not_found");
       });
     });
 
@@ -891,7 +891,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
         expect(res.status).toBe(404);
         expect(res.contentType).toContain("application/json");
-        expect(res.body.code).toBe("mcp_metadata_unpublished");
+        expect(res.body.error).toBe("not_found");
       });
     });
   });
@@ -998,7 +998,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.status).toBe(401);
-      expect(res.json().code).toBe("mcp_invalid_api_key");
+      expect(res.json().error).toBe("Invalid API key");
     });
   });
 
@@ -1085,7 +1085,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         });
 
         expect(res.status).toBe(401);
-        expect(res.json().code).toBe("mcp_grant_revoked");
+        expect(res.json().error).toBe("mcp_grant_revoked");
       });
     });
 
@@ -1204,7 +1204,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       expect(res.status).toBe(401);
       expect(res.headers["www-authenticate"]).toContain("resource_metadata");
-      expect(res.json().code).toBe("mcp_invalid_token");
+      expect(res.json().error).toBe("Invalid or expired token");
     });
   });
 
@@ -1248,7 +1248,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(adopted.status).toBe(200);
       // A valid token for someone else learns nothing and is not sent to sign in again.
       expect(refused.status).toBe(404);
-      expect(refused.json().code).toBe("mcp_session_not_found");
+      expect(refused.json().error).toBe("Session not found");
     });
   });
 
@@ -1271,7 +1271,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       expect(res.status).toBe(401);
       expect(res.headers["www-authenticate"]).toContain("resource_metadata");
-      expect(res.json().code).toBe("mcp_invalid_api_key");
+      expect(res.json().error).toBe("Invalid API key");
     });
   });
 
@@ -1395,7 +1395,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.status).toBe(401);
-      expect(res.json().code).toBe("mcp_authorization_required");
+      expect(res.json().error).toBe("Authorization required");
     });
 
     it("returns 401 on GET", async () => {
@@ -1444,7 +1444,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.status).toBe(401);
-      expect(res.json().code).toBe("mcp_invalid_token");
+      expect(res.json().error).toBe("Invalid or expired token");
     });
   });
 
@@ -1916,7 +1916,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.status).toBe(404);
-      expect(res.json().code).toBe("mcp_route_not_found");
+      expect(res.json().error).toBe("Not found");
     });
   });
 
@@ -1929,14 +1929,14 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.status).toBe(400);
-      expect(res.json().code).toBe("mcp_session_id_required");
+      expect(res.json().error).toBe("Invalid request — no session ID or not an initialize request");
     });
 
     it("answers a method the route does not serve as 405 mcp_method_not_allowed", async () => {
       const res = await sendRequest({ server, method: "PUT", path: "/mcp" });
 
       expect(res.status).toBe(405);
-      expect(res.json().code).toBe("mcp_method_not_allowed");
+      expect(res.json().error).toBe("Method not allowed");
     });
   });
 });
