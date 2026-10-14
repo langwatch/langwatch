@@ -42,6 +42,8 @@ type fakeLangWatch struct {
 	refresh  map[string]*fakeRefresh
 	requests []string       // "METHOD path status"
 	asked    map[string]int // "METHOD path" -> times asked, on every route
+	// credentialed counts requests on any route that carried a bearer, a cookie or a sign-in.
+	credentialed int
 }
 
 type fakeCode struct{ clientID, redirect, challenge string }
@@ -73,7 +75,13 @@ func newFakeLangWatch(t *testing.T) *fakeLangWatch {
 		mux.HandleFunc("DELETE "+path, f.delete)
 	}
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		f.set(func(f *fakeLangWatch) { f.asked[r.Method+" "+r.URL.Path]++ })
+		hasCredential := r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" || r.URL.Path == "/api/auth/sign-in/email"
+		f.set(func(f *fakeLangWatch) {
+			f.asked[r.Method+" "+r.URL.Path]++
+			if hasCredential {
+				f.credentialed++
+			}
+		})
 		mux.ServeHTTP(w, r)
 	}))
 	t.Cleanup(f.srv.Close)
@@ -81,6 +89,13 @@ func newFakeLangWatch(t *testing.T) *fakeLangWatch {
 }
 
 func (f *fakeLangWatch) URL() string { return f.srv.URL }
+
+// credentialsSeen is how many requests, on any route, carried a bearer, a cookie or a sign-in.
+func (f *fakeLangWatch) credentialsSeen() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.credentialed
+}
 
 // timesAsked is how often route ("METHOD path") was asked.
 func (f *fakeLangWatch) timesAsked(route string) int {

@@ -16,7 +16,7 @@ func TestMcpEnvNamesTheStacksAppKeyProjectAndAdminLogin(t *testing.T) {
 	}}
 	env := mcpEnv(st)
 	for _, want := range []string{
-		"MCPSIM_ADDR=:45599", "MCPSIM_STACK=feat-x",
+		"MCPSIM_ADDR=127.0.0.1:45599", "MCPSIM_STACK=feat-x",
 		"MCPSIM_ENDPOINT=https://app.feat-x.langwatch.localhost",
 		"MCPSIM_API_KEY=sk-lw-test", "MCPSIM_PROJECT_ID=local-dev-project",
 		"MCPSIM_PUBLIC_URL=https://mcp.feat-x.langwatch.localhost",
@@ -52,7 +52,7 @@ func TestMcpsimIsHostedOnlyWhenSelected(t *testing.T) {
 	if !ok {
 		t.Fatal("+mcp planned no mcpsim lane")
 	}
-	if !strings.Contains(lane.Shell, "simulator") || !strings.Contains(lane.Shell, "mcp") || !slices.Contains(lane.Env, "MCPSIM_ADDR=:45599") {
+	if !strings.Contains(lane.Shell, "simulator") || !strings.Contains(lane.Shell, "mcp") || !slices.Contains(lane.Env, "MCPSIM_ADDR=127.0.0.1:45599") {
 		t.Errorf("mcpsim lane %+v", lane)
 	}
 }

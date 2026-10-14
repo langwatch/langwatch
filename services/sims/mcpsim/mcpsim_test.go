@@ -468,6 +468,14 @@ func TestReadSSEAnswerSkipsOtherMessages(t *testing.T) {
 	if _, err := readSSEAnswer(strings.NewReader(": only a comment\n\n"), int64(7)); err == nil {
 		t.Error("an answerless stream read as answered")
 	}
+	long := "data: " + strings.Repeat("x", maxSSEEvent) + "\n\n"
+	if _, err := readSSEAnswer(strings.NewReader(long), int64(7)); err == nil || !strings.Contains(err.Error(), "longer than") {
+		t.Errorf("a line past the limit read as %v", err)
+	}
+	unended := strings.Repeat("data: "+strings.Repeat("x", 1000)+"\n", maxSSEEvent/1000)
+	if _, err := readSSEAnswer(strings.NewReader(unended), int64(7)); err == nil || !strings.Contains(err.Error(), "longer than") {
+		t.Errorf("an event that never ends read as %v", err)
+	}
 }
 
 // @scenario "Authorization-server metadata is looked up at the issuer's well-known address"
@@ -486,7 +494,7 @@ func TestHeldCredentialsOnlyGoToTheirOwnEndpoint(t *testing.T) {
 		f, other := newFakeLangWatch(t), newFakeLangWatch(t)
 		_, sim := simAt(t, f)
 		code, ans := call[map[string]string](t, http.MethodPost, sim+"/_sim/api/runs", RunRequest{Scenario: ScenarioConnect, Endpoint: other.URL()})
-		if code != http.StatusBadRequest || !strings.Contains(ans["error"], "needs a project API key") || other.timesAsked("POST /mcp") != 0 {
+		if code != http.StatusBadRequest || !strings.Contains(ans["error"], "needs a project API key") || other.credentialsSeen() != 0 {
 			t.Errorf("an apikey run to another endpoint answered %d %v", code, ans)
 		}
 	})
@@ -497,7 +505,7 @@ func TestHeldCredentialsOnlyGoToTheirOwnEndpoint(t *testing.T) {
 		mustPass(t, connectOAuth(t, sim))
 		code, ans := call[map[string]string](t, http.MethodPost, sim+"/_sim/api/runs",
 			RunRequest{Scenario: ScenarioConnect, Flow: FlowOAuth, Endpoint: other.URL()})
-		if code != http.StatusBadRequest || !strings.Contains(ans["error"], "only goes there") || other.timesAsked("POST /mcp") != 0 {
+		if code != http.StatusBadRequest || !strings.Contains(ans["error"], "only goes there") || other.credentialsSeen() != 0 {
 			t.Errorf("an oauth run to another endpoint answered %d %v", code, ans)
 		}
 	})
@@ -506,7 +514,7 @@ func TestHeldCredentialsOnlyGoToTheirOwnEndpoint(t *testing.T) {
 		f, other := newFakeLangWatch(t), newFakeLangWatch(t)
 		_, sim := simAt(t, f, func(c *Config) { c.Cookie = "better-auth.session_token=session-1" })
 		_, st := call[RunStatus](t, http.MethodPost, sim+"/_sim/api/oauth/connect", ConnectRequest{Mode: "auto", Endpoint: other.URL(), Wait: true})
-		if st.State != StateFailed || other.timesAsked("POST /api/mcp/authorize") != 0 {
+		if st.State != StateFailed || other.credentialsSeen() != 0 {
 			t.Errorf("the configured session was sent to another endpoint: %s %s", st.State, stepLine(st))
 		}
 	})
@@ -518,8 +526,11 @@ func TestHeldCredentialsOnlyGoToTheirOwnEndpoint(t *testing.T) {
 		if st.State != StateFailed || !strings.Contains(st.Error, "the configured login only goes to") {
 			t.Errorf("connect to another endpoint ended %s: %q", st.State, st.Error)
 		}
-		if n := other.timesAsked("POST /api/auth/sign-in/email") + other.timesAsked("POST /api/mcp/authorize"); n != 0 {
+		if n := other.credentialsSeen(); n != 0 {
 			t.Errorf("the configured login reached another endpoint %d times", n)
+		}
+		if other.timesAsked("POST /mcp") == 0 {
+			t.Error("the connect never reached the other endpoint, so this proves nothing")
 		}
 	})
 }

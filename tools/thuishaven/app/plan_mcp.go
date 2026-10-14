@@ -25,7 +25,7 @@ func mcpEnv(st domain.Stack) []string {
 		}
 	}
 	env := []string{
-		fmt.Sprintf("MCPSIM_ADDR=:%d", port), "MCPSIM_STACK=" + st.Slug,
+		fmt.Sprintf("MCPSIM_ADDR=127.0.0.1:%d", port), "MCPSIM_STACK=" + st.Slug,
 		"MCPSIM_PROJECT_ID=" + domain.DefaultProjectID,
 		"MCPSIM_SIGNIN_EMAIL=" + domain.DefaultAdminEmail, "MCPSIM_SIGNIN_PASSWORD=" + domain.DefaultAdminPassword,
 	}

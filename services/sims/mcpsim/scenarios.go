@@ -1,10 +1,7 @@
 package mcpsim
 
 import (
-	"cmp"
 	"context"
-	"crypto/rand"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,139 +9,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"time"
 )
-
-// plan is a checked RunRequest.
-type plan struct {
-	RunRequest
-	persona    persona
-	transports []string
-	hold, idle time.Duration
-	duration   time.Duration
-	tool       string // the tool connect calls: Tool, or fetch_langwatch_docs
-}
-
-const defaultTool = "fetch_langwatch_docs"
-
-func (s *Server) plan(req RunRequest) (*plan, error) {
-	p := &plan{RunRequest: req}
-	p.Endpoint = strings.TrimRight(cmp.Or(req.Endpoint, s.cfg.Endpoint), "/")
-	p.Flow = cmp.Or(req.Flow, FlowAPIKey)
-	if err := s.planFlow(p, req.Endpoint != ""); err != nil {
-		return p, err
-	}
-	if err := checkEndpoint(p.Endpoint); err != nil {
-		return p, err
-	}
-	var ok bool
-	if p.persona, ok = personas[cmp.Or(req.Client, "claude-code")]; !ok {
-		return p, fmt.Errorf("client %q is not claude-code, claude-desktop or cursor", req.Client)
-	}
-	transports, err := transportsOf(req)
-	if err != nil {
-		return p, err
-	}
-	p.transports = transports
-	p.tool = cmp.Or(req.Tool, defaultTool)
-	err = p.checkScenario()
-	return p, err
-}
-
-// planFlow fills the credentials the flow presents.
-func (s *Server) planFlow(p *plan, endpointGiven bool) error {
-	switch p.Flow {
-	case FlowAPIKey:
-		// The configured key only ever goes to the configured endpoint.
-		if p.Endpoint == s.cfg.Endpoint {
-			p.APIKey = cmp.Or(p.APIKey, s.cfg.APIKey)
-		}
-		if p.APIKey == "" {
-			return errors.New("the apikey flow needs a project API key: pass apiKey or set MCPSIM_API_KEY")
-		}
-	case FlowOAuth:
-		g := s.grants.current()
-		if g == nil {
-			return errors.New("the oauth flow needs a grant: run the OAuth connect first (POST /_sim/api/oauth/connect, haven sim mcp oauth)")
-		}
-		// The grant's token only ever goes to the endpoint that issued it.
-		if endpointGiven && p.Endpoint != g.endpoint {
-			return fmt.Errorf("the OAuth grant was issued by %s and only goes there: connect OAuth to %s first", g.endpoint, p.Endpoint)
-		}
-		p.Endpoint = g.endpoint
-	default:
-		return fmt.Errorf("flow %q is neither apikey nor oauth", p.Flow)
-	}
-	return nil
-}
-
-// transportsOf is the paths a run uses; connect defaults to both.
-func transportsOf(req RunRequest) ([]string, error) {
-	switch req.Transport {
-	case "":
-		if req.Scenario == ScenarioConnect {
-			return []string{"/mcp", "/sse"}, nil
-		}
-		return []string{"/mcp"}, nil
-	case "/mcp", "mcp":
-		return []string{"/mcp"}, nil
-	case "/sse", "sse":
-		return []string{"/sse"}, nil
-	case "both":
-		return []string{"/mcp", "/sse"}, nil
-	}
-	return nil, fmt.Errorf("transport %q is not /mcp, /sse or both", req.Transport)
-}
-
-// secondsOr is n seconds (fallback when unset), refused outside 1..maxHold.
-func secondsOr(n, fallback int, what string) (time.Duration, error) {
-	if n == 0 {
-		n = fallback
-	}
-	if n < 0 || time.Duration(n)*time.Second > maxHold {
-		return 0, fmt.Errorf("%s takes 1 to %d seconds", what, int(maxHold.Seconds()))
-	}
-	return time.Duration(n) * time.Second, nil
-}
-
-func (p *plan) checkScenario() error {
-	var err error
-	switch p.Scenario {
-	case ScenarioConnect, ScenarioReconnect:
-	case ScenarioStream:
-		p.hold, err = secondsOr(p.HoldSeconds, 60, "holdSeconds")
-	case ScenarioIdle:
-		p.idle, err = secondsOr(p.IdleSeconds, 30, "idleSeconds")
-	case ScenarioRefresh, ScenarioDoubleRefresh:
-		if p.Flow != FlowOAuth {
-			err = fmt.Errorf("%s needs the oauth flow", p.Scenario)
-		}
-	case ScenarioSoak:
-		err = p.checkSoak()
-	case ScenarioOAuthConnect:
-		err = errors.New("oauth-connect starts at POST /_sim/api/oauth/connect")
-	default:
-		names := make([]string, 0, len(scenarios))
-		for _, sc := range scenarios {
-			names = append(names, sc.Name)
-		}
-		err = fmt.Errorf("unknown scenario %q; scenarios: %s", p.Scenario, strings.Join(names, ", "))
-	}
-	return err
-}
-
-func (p *plan) checkSoak() error {
-	p.Clients = cmp.Or(p.Clients, 10)
-	if p.Clients < 1 || p.Clients > maxClients {
-		return fmt.Errorf("soak takes 1 to %d clients", maxClients)
-	}
-	d, err := time.ParseDuration(cmp.Or(p.Duration, "1m"))
-	if err != nil || d <= 0 || d > maxDuration {
-		return fmt.Errorf("soak takes a duration up to %s, e.g. 5m", maxDuration)
-	}
-	p.duration = d
-	return nil
-}
 
 // scenario is one run of a plan.
 type scenario struct {
@@ -247,14 +112,14 @@ func (sc scenario) streamOn(ctx context.Context, path string) {
 	}
 	hold := sc.p.hold
 	res := c.hold(ctx, hold)
-	sc.rn.check("GET on "+path+" opens the event stream", res.opened, fmt.Sprintf("%d %s", res.status, res.lastError))
-	if res.opened {
+	sc.rn.check("GET on "+path+" opens the event stream", res.isOpened, fmt.Sprintf("%d %s", res.status, res.lastError))
+	if res.isOpened {
 		detail := fmt.Sprintf("held %.1fs of %s; %d events, %d keepalive comments", res.heldFor.Seconds(), hold, res.events, res.comments)
-		if res.dropped {
+		if res.wasDropped {
 			detail = fmt.Sprintf("dropped after %.1fs of %s (%s); %d events, %d keepalive comments", res.heldFor.Seconds(), hold, res.lastError, res.events, res.comments)
 		}
-		c.note("stream-end", detail, !res.dropped)
-		sc.rn.check("the event stream on "+path+" stays open for "+hold.String(), !res.dropped, detail)
+		c.note("stream-end", detail, !res.wasDropped)
+		sc.rn.check("the event stream on "+path+" stays open for "+hold.String(), !res.wasDropped, detail)
 	}
 	// The session must still answer after the stream: a dropped stream is not a lost session.
 	_, err := c.call(ctx, kindToolsList, map[string]any{})
@@ -289,7 +154,7 @@ func (sc scenario) refresh(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	c.reinitOn404 = false
+	c.shouldReinitOn404 = false
 	_, err = c.call(ctx, kindToolsList, map[string]any{})
 	sc.rn.check("the same session id answers with the new token", err == nil && c.sessionID == session && c.refreshes == 0,
 		firstOf(errString(err), fmt.Sprintf("session %s, refreshes after %d", hint(c.sessionID), c.refreshes)))
@@ -380,7 +245,7 @@ func (sc scenario) reconnectOn(ctx context.Context, path string) {
 // with the same credentials must work without any refresh or sign-in.
 func (sc scenario) expectLost(ctx context.Context, c *mcpClient, what string) {
 	c.note("lose-session", "ask with "+what+": "+hint(c.sessionID), true)
-	c.reinitOn404 = false
+	c.shouldReinitOn404 = false
 	x, err := c.send(ctx, map[string]any{"jsonrpc": "2.0", "id": c.nextID.Add(1), "method": kindToolsList}, true)
 	detail := fmt.Sprintf("answered %d", x.status)
 	if x.status == http.StatusUnauthorized {
@@ -388,7 +253,7 @@ func (sc scenario) expectLost(ctx context.Context, c *mcpClient, what string) {
 	}
 	sc.rn.check(what+" on "+c.path+" answers 404", errors.Is(err, errSessionLost) && x.status == http.StatusNotFound, detail)
 	refreshes := c.refreshes + sc.s.grants.status().Refreshes
-	c.reinitOn404 = true
+	c.shouldReinitOn404 = true
 	err = c.initialize(ctx)
 	if err == nil {
 		_, err = c.call(ctx, kindToolsList, map[string]any{})
@@ -428,55 +293,6 @@ func afterIdle(c *mcpClient) string {
 		return "the token was refreshed after a 401"
 	}
 	return "the same session answered"
-}
-
-// soak runs N clients for a duration, each looping tools/list (and the tool
-// when one was named) about once a second, re-initializing as needed.
-func (sc scenario) soak(ctx context.Context) error {
-	p := sc.p
-	sc.rn.update(func(st *RunStatus) { st.Load = &LoadStats{Clients: p.Clients} })
-	ctx, cancel := context.WithTimeout(ctx, p.duration)
-	defer cancel()
-	var wg sync.WaitGroup
-	for i := range p.Clients {
-		wg.Go(func() { sc.soakClient(ctx, p.transports[i%len(p.transports)]) })
-	}
-	wg.Wait()
-	l := sc.rn.snapshot(false).Load
-	sc.rn.check(fmt.Sprintf("%d clients for %s with no failed request", p.Clients, p.duration), l.Errors == 0 && l.Sessions > 0,
-		fmt.Sprintf("%d requests, %d sessions, %d errors, %d re-initialized, %d refreshed, %d retried",
-			l.Requests, l.Sessions, l.Errors, l.Reinitialized, l.Refreshed, l.Retried))
-	return nil
-}
-
-// soakClient is one client of a soak, until ctx ends.
-func (sc scenario) soakClient(ctx context.Context, path string) {
-	c := sc.client(path)
-	c.quiet = true
-	defer func() { _ = c.end(context.WithoutCancel(ctx)) }()
-	// Spread the first initializes over a second, as clients starting up would.
-	if !sc.s.sleep(ctx, jitter(time.Second)) {
-		return
-	}
-	for n := 0; ctx.Err() == nil; n++ {
-		if c.sessionID == "" && c.initialize(ctx) != nil {
-			sc.s.sleep(ctx, time.Second)
-			continue
-		}
-		if sc.p.Tool != "" && n%5 == 4 {
-			_, _ = c.call(ctx, "tools/call", map[string]any{"name": sc.p.tool, "arguments": orEmpty(sc.p.ToolArgs)})
-		} else {
-			_, _ = c.call(ctx, kindToolsList, map[string]any{})
-		}
-		sc.s.sleep(ctx, 900*time.Millisecond+jitter(200*time.Millisecond))
-	}
-}
-
-// jitter is a random duration below d.
-func jitter(d time.Duration) time.Duration {
-	var b [8]byte
-	_, _ = rand.Read(b[:])
-	return time.Duration(binary.LittleEndian.Uint64(b[:]) % uint64(d))
 }
 
 func orEmpty(m map[string]any) map[string]any {

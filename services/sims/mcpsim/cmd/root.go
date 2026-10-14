@@ -12,6 +12,7 @@ import (
 )
 
 // Root is the service entrypoint.
+// no-test: entrypoint wiring; mcpsim's tests cover the server it starts, combined_dev_test.go its registration.
 func Root(ctx context.Context, _ []string) error {
 	cfg := mcpsim.LoadConfig()
 

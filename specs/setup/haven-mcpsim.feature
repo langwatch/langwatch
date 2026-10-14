@@ -127,6 +127,7 @@ Feature: mcpsim, a simulator of MCP clients against the hosted MCP endpoint
       Given an SSE body with a comment, an answer to another request and a multi-line answer to this one
       Then the sim reads this request's answer from it
       And a body with no answer is reported as unanswered
+      And a line longer than 1 MiB is refused rather than buffered
 
   Rule: Credentials and the control API
 
@@ -140,6 +141,12 @@ Feature: mcpsim, a simulator of MCP clients against the hosted MCP endpoint
     Scenario: The control API takes JSON only
       When a run or an OAuth connect is posted as text/plain
       Then the sim answers 415 and starts no run
+
+    Scenario: The sim answers only on this machine
+      Then mcpsim listens on loopback by default, and haven gives it a loopback address too
+      When a request names a host that is not this machine, as a rebound DNS name does
+      Then the sim answers 403 and starts no run
+      But a request to localhost, 127.0.0.1 or a *.localhost name is served
 
     Scenario: A run request the sim cannot run is refused before it starts
       When a run names an unknown scenario, an OAuth-only scenario on the API key flow, the OAuth flow with no grant, an unknown transport, too many soak clients, or another endpoint with no key
@@ -202,6 +209,12 @@ Feature: mcpsim, a simulator of MCP clients against the hosted MCP endpoint
     Scenario: An operator starts a run from the console
       When the operator picks the both transport and starts connect
       Then the console posts the connect scenario on the API key flow for claude-code on both transports
+
+    @integration
+    Scenario: The console refuses a scenario setting that is not a whole number
+      When the operator empties the soak's client count and starts soak
+      Then the console says the count takes a whole number of 1 or more
+      And it posts nothing
 
     @integration
     Scenario: The console disables a scenario the chosen flow cannot run
