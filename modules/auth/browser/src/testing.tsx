@@ -27,6 +27,7 @@ export const TEST_PUBLIC_ENVIRONMENT: AuthPublicEnvironment = {
   STRIPE_LICENSE_PAYMENT_LINK_URL: undefined,
   NEXTAUTH_PROVIDER: undefined,
   SIGN_UP_MODE: "open",
+  EMAIL_PASSWORD_ENABLED: true,
 };
 
 export type TestAuthHostOptions = {

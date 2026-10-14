@@ -228,7 +228,7 @@ catalogs:
       specifier: ^5.4.0
       version: 5.4.0
     '@modelcontextprotocol/sdk':
-      specifier: ^1.29.0
+      specifier: 1.29.0
       version: 1.29.0
     '@monaco-editor/react':
       specifier: ^4.7.0
@@ -4134,6 +4134,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../../../modules/identity/contract
+      '@langwatch/internal-slack':
+        specifier: workspace:*
+        version: link:../../../../packages/internal-slack
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../../packages/ksuid
@@ -4155,6 +4158,9 @@ importers:
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../../packages/process
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../../packages/secrets
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
@@ -4164,6 +4170,9 @@ importers:
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../../../modules/user/contract
+      '@slack/webhook':
+        specifier: 'catalog:'
+        version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e))
@@ -4180,9 +4189,6 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../../packages/process-stores
-      '@langwatch/secrets':
-        specifier: workspace:*
-        version: link:../../../../packages/secrets
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../../packages/test-harness
@@ -4524,6 +4530,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/prompt-client':
+        specifier: workspace:*
+        version: link:../../prompt/client
       '@langwatch/scenario-client':
         specifier: workspace:*
         version: link:../../scenario/client
@@ -9349,6 +9358,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module

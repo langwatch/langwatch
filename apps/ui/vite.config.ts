@@ -453,11 +453,6 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           changeOrigin: true,
           secure: false,
         },
-        "/messages": {
-          target: API_TARGET,
-          changeOrigin: true,
-          secure: false,
-        },
         "/oauth": {
           target: API_TARGET,
           changeOrigin: true,

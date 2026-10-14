@@ -11,15 +11,15 @@ import { z } from "zod";
 
 /**
  * Where a domain proof's TXT lookup asks, in node's `setServers` spelling
- * (`127.0.0.1:15353`, comma-separated). A deployment names none and the
- * machine's own resolver answers; development names the simulator.
+ * (`127.0.0.1:15353`, comma or whitespace separated, as the previous release read it). A
+ * deployment names none and the machine's own resolver answers; development names the simulator.
  */
 const nameserversSchema = z
   .string()
   .optional()
   .transform((value) =>
     (value ?? "")
-      .split(",")
+      .split(/[\s,]+/)
       .map((entry) => entry.trim())
       .filter((entry) => entry !== ""),
   );

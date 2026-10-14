@@ -48,25 +48,26 @@ import type { GovernanceRepositories } from "../repositories/governance.reposito
 import { auditAggregateRead } from "./aggregate-read-audit.subscriber.ts";
 import {
   OutboxAggregateReconcile,
+  runAggregatePrune,
   runAggregateReconcile,
-  runAggregateSweep,
 } from "./aggregate-reconcile.intent.ts";
 import {
+  AGGREGATE_PRUNE_INTENT,
+  AGGREGATE_PRUNE_INTERVAL_MS,
   AGGREGATE_RECONCILE_INITIAL_STATE,
   AGGREGATE_RECONCILE_INTENT,
   AGGREGATE_RECONCILE_MAX_ATTEMPTS,
   AGGREGATE_RECONCILE_PROCESS_NAME,
-  AGGREGATE_SWEEP_INTENT,
-  AGGREGATE_SWEEP_INTERVAL_MS,
+  aggregatePruneIntentSchema,
+  aggregatePruneWake,
   aggregateReconcileIntentSchema,
   aggregateReconcileStateSchema,
-  aggregateSweepIntentSchema,
-  aggregateSweepWake,
 } from "./aggregate-reconcile.process.ts";
 import {
   enqueueAffectedAggregates,
   enqueueChangedAggregate,
   enqueueMemberAggregates,
+  settleAggregateReconcile,
 } from "./aggregate-reconcile.subscriber.ts";
 import { pruneAnomalyAlertDeliveries } from "./anomaly-alert-delivery.intent.ts";
 import {
@@ -149,12 +150,10 @@ function buildGovernanceActivityMonitor({
     | "departmentResolveByNameOrCreate"
     | "departmentAssignUser"
     | "aggregateReconciler"
-    | "connectAggregateReconcileOutbox"
     | "governanceAuditWorkspaceView"
   >
 >): StaticPipelineDefinition<never> {
   app.connectAnomalyAlertOutbox({ processStore });
-  app.connectAggregateReconcileOutbox({ processStore });
   const reconciler = app.aggregateReconciler;
   const aggregateOutbox = OutboxAggregateReconcile.create(processStore);
   const affected = (trigger: string) =>
@@ -233,52 +232,88 @@ function buildGovernanceActivityMonitor({
             leaseDurationMs: 5 * 60 * 1000,
           }),
       )
-      // M8487-RECONCILE-PM: project facts enqueue the aggregates they touch; each reconciles under its lock.
+      // M8487-RECONCILE-PM: facts enqueue the aggregates they touch, settled 30s per key (ADR-177).
       .withPeerSubscriber("reconcileAggregatesOnProjectCreated", {
         eventType: PROJECT_CREATED_EVENT_TYPE,
         data: projectCreatedEventDataSchema,
+        options: settleAggregateReconcile({
+          lane: "reconcileAggregatesOnProjectCreated",
+          per: "organization",
+        }),
         handle: affected("project-created"),
       })
       .withPeerSubscriber("reconcileAggregatesOnProjectArchived", {
         eventType: PROJECT_ARCHIVED_EVENT_TYPE,
         data: projectArchivedEventDataSchema,
+        options: settleAggregateReconcile({
+          lane: "reconcileAggregatesOnProjectArchived",
+          per: "project",
+        }),
         handle: affected("project-archived"),
       })
       .withPeerSubscriber("reconcileAggregatesOnDepartmentAssigned", {
         eventType: PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE,
         data: projectDepartmentAssignedEventDataSchema,
+        options: settleAggregateReconcile({
+          lane: "reconcileAggregatesOnDepartmentAssigned",
+          per: "project",
+        }),
         handle: affected("department-assigned"),
       })
       .withPeerSubscriber("reconcileAggregatesOnProjectRevived", {
         eventType: PROJECT_REVIVED_EVENT_TYPE,
         data: projectRevivedEventDataSchema,
+        options: settleAggregateReconcile({
+          lane: "reconcileAggregatesOnProjectRevived",
+          per: "organization",
+        }),
         handle: affected("project-revived"),
       })
       .withPeerSubscriber("reconcileAggregateOnRuleChanged", {
         eventType: PROJECT_AGGREGATE_RULE_CHANGED_EVENT_TYPE,
         data: projectAggregateRuleChangedEventDataSchema,
+        options: settleAggregateReconcile({
+          lane: "reconcileAggregateOnRuleChanged",
+          per: "project",
+        }),
         handle: enqueueChangedAggregate({ outbox: aggregateOutbox }),
       })
       .withPeerSubscriber("reconcileAggregatesOnMemberRemoved", {
         eventType: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
         data: organizationMemberRemovedEventDataSchema,
+        options: settleAggregateReconcile({
+          lane: "reconcileAggregatesOnMemberRemoved",
+          per: "organization",
+        }),
         handle: memberChanged("member-removed"),
       })
       .withPeerSubscriber("reconcileAggregatesOnMemberDepartmentChanged", {
         eventType: ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_TYPE,
         data: organizationMemberDepartmentChangedEventDataSchema,
+        options: settleAggregateReconcile({
+          lane: "reconcileAggregatesOnMemberDepartmentChanged",
+          per: "organization",
+        }),
         handle: memberChanged("member-department-changed"),
       })
       // M8487-DISABLED-SEAT: a disabled seat reconciles like a removal.
       .withPeerSubscriber("reconcileAggregatesOnMemberDisabled", {
         eventType: ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
         data: organizationMemberDisabledEventDataSchema,
+        options: settleAggregateReconcile({
+          lane: "reconcileAggregatesOnMemberDisabled",
+          per: "organization",
+        }),
         handle: memberChanged("member-disabled"),
       })
       // M8487-MEMBER-ENABLED: a seat given back reconciles the same way, so the project rejoins.
       .withPeerSubscriber("reconcileAggregatesOnMemberEnabled", {
         eventType: ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
         data: organizationMemberEnabledEventDataSchema,
+        options: settleAggregateReconcile({
+          lane: "reconcileAggregatesOnMemberEnabled",
+          per: "organization",
+        }),
         handle: memberChanged("member-enabled"),
       })
       // M8487-AUDIT-PIPELINE: authz's aggregate-read fact becomes the admin workspace view row.
@@ -296,17 +331,15 @@ function buildGovernanceActivityMonitor({
             runAggregateReconcile(reconciler),
           )
           .intent(
-            AGGREGATE_SWEEP_INTENT,
-            aggregateSweepIntentSchema,
-            runAggregateSweep({
-              reconciler,
-              outbox: aggregateOutbox,
+            AGGREGATE_PRUNE_INTENT,
+            aggregatePruneIntentSchema,
+            runAggregatePrune({
               deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
               now: () => nowInstant().epochMilliseconds,
             }),
           )
-          .schedule({ everyMs: AGGREGATE_SWEEP_INTERVAL_MS })
-          .onWake(aggregateSweepWake)
+          .schedule({ everyMs: AGGREGATE_PRUNE_INTERVAL_MS })
+          .onWake(aggregatePruneWake)
           .outbox({ maxAttempts: AGGREGATE_RECONCILE_MAX_ATTEMPTS }),
       )
       .withLaneAliases(MAIN_TRACE_GOVERNANCE_LANE_TOMBSTONES)

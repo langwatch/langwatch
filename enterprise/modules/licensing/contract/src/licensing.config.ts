@@ -49,7 +49,14 @@ export const licensingConfig = Config.define((c) => ({
       .optional()
       .transform((value) => value?.trim() || void 0),
   ),
-  connectDisabled: c.env("LANGWATCH_CONNECT_DISABLED", z.stringbool().optional()),
+  /** Blank reads as unset, as the previous release read it: Connect stays as the license says. */
+  connectDisabled: c.env(
+    "LANGWATCH_CONNECT_DISABLED",
+    z.preprocess(
+      (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+      z.stringbool().optional(),
+    ),
+  ),
   connectGatewayEndpoint: c.env(
     "LANGWATCH_CONNECT_GATEWAY_ENDPOINT",
     connectEndpoint("LANGWATCH_CONNECT_GATEWAY_ENDPOINT", CONNECT_DEFAULT_GATEWAY_ENDPOINT),

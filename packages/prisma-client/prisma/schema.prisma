@@ -6099,15 +6099,13 @@ model ProcessManagerInbox {
   /// adds NOT NULL once the fleet has cycled and closes it.
   sourceEventKey String?
   consumedAt     DateTime @db.Timestamptz(3)
-  // Do not add an index on `consumedAt` here. The retention sweep can use one,
-  // but a deploy-time CREATE INDEX holds a SHARE lock that blocks INSERT on
-  // this table, the highest-volume write path in the system. The index is
-  // ops-managed instead: built with CREATE INDEX CONCURRENTLY, see
-  // dev/docs/runbooks/process-manager-table-purge.md. The sweep works without
-  // it on the bounded table it maintains.
 
   @@unique([processName, projectId, sourceEventKey])
   @@index([processName, projectId, processKey, consumedAt])
+  // The retention sweep reaps by age across every process name. Migration
+  // 20261014150000_process_manager_sweep_age_indexes builds it; that file
+  // carries the ops pre-build note for installs with real traffic.
+  @@index([consumedAt])
 }
 
 enum ProcessManagerOutboxStatus {
@@ -6146,13 +6144,11 @@ model ProcessManagerOutbox {
   dispatchedAt  DateTime?                  @db.Timestamptz(3)
   createdAt     DateTime                   @db.Timestamptz(3)
   updatedAt     DateTime                   @db.Timestamptz(3)
-  // Do not add an index on `dispatchedAt` here. The retention sweep can use a
-  // partial one (WHERE status = 'dispatched'), but Prisma cannot express a
-  // partial index and a deploy-time CREATE INDEX holds a SHARE lock that
-  // blocks INSERT on this table, the highest-volume write path in the system.
-  // The index is ops-managed instead: built with CREATE INDEX CONCURRENTLY,
-  // see dev/docs/runbooks/process-manager-table-purge.md. The sweep works
-  // without it on the bounded table it maintains.
+  // A PARTIAL INDEX on (dispatchedAt) WHERE status = 'dispatched', for the
+  // retention sweep, is added by migration
+  // 20261014150000_process_manager_sweep_age_indexes - Prisma cannot express a
+  // partial index, so it is raw SQL there and this comment is its home in the
+  // model.
 
   attemptLog ProcessManagerOutboxAttempt[]
 
