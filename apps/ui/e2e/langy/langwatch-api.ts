@@ -343,20 +343,7 @@ export async function seedTraffic({
     lwPost({
       path: "/api/collector",
       body: {
-        spans: [
-          {
-            trace_id: trace.traceId,
-            span_id: trace.spanId,
-            type: "llm",
-            model: "gpt-5-mini",
-            input: { type: "text", value: trace.input },
-            output: { type: "text", value: trace.output },
-            timestamps: {
-              started_at: trace.startedAt,
-              finished_at: trace.startedAt + trace.durationMs,
-            },
-          },
-        ],
+        spans: modelCallsOf(trace),
         metadata: { labels: ["e2e-seed"] },
       },
     }),
@@ -366,6 +353,45 @@ export async function seedTraffic({
     timeoutMs: PATTERN_VISIBILITY_TIMEOUT_MS,
   });
   return traces;
+}
+
+/** A trace's two model calls, splitting its duration: a lookup, then the answer. */
+function modelCallsOf(trace: PlannedTrace) {
+  const half = Math.floor(trace.durationMs / 2);
+  const [lookup, answer] = trace.spanIds;
+  const call = ({
+    spanId,
+    start,
+    end,
+    output,
+  }: {
+    spanId: string;
+    start: number;
+    end: number;
+    output: string;
+  }) => ({
+    trace_id: trace.traceId,
+    span_id: spanId,
+    type: "llm",
+    model: "gpt-5-mini",
+    input: { type: "text", value: trace.input },
+    output: { type: "text", value: output },
+    timestamps: { started_at: start, finished_at: end },
+  });
+  return [
+    call({
+      spanId: lookup,
+      start: trace.startedAt,
+      end: trace.startedAt + half,
+      output: "Looking up the order.",
+    }),
+    call({
+      spanId: answer,
+      start: trace.startedAt + half,
+      end: trace.startedAt + trace.durationMs,
+      output: trace.output,
+    }),
+  ];
 }
 
 async function inBatches<T, R>(items: readonly T[], run: (item: T) => Promise<R>): Promise<R[]> {

@@ -10,6 +10,8 @@ import { trace } from "@opentelemetry/api";
 import {
   type BoardItem,
   type BoardSnapshot,
+  type Count,
+  countOf,
   countProjectItems,
   diffBoards,
   readBoard,
@@ -53,6 +55,8 @@ export interface WorldFacts {
   decoy_widgets: number;
   /** What the newest item added to the board counts over the seeded days; null while none is. */
   chart_total: number | null;
+  /** How many rows that count comes in: one per day for a per-day chart; null while none is. */
+  chart_days: number | null;
 }
 
 /** One read of the world: the facts, and the snapshots the code checks compare. */
@@ -130,12 +134,14 @@ export async function readWorld(world: World): Promise<WorldRead> {
   ]);
   const addedToBoard = diffBoards({ before: world.initial.board, after: board }).added;
   const newest = addedToBoard.at(-1);
+  const counted = newest ? await countedOver({ item: newest, world }) : null;
   return {
     facts: {
       widgets_on_board: board.items.length,
       project_widget_count: projectItems,
       decoy_widgets: decoy.items.length,
-      chart_total: newest ? await countedOver({ item: newest, world }) : null,
+      chart_total: counted?.total ?? null,
+      chart_days: counted?.rows ?? null,
     },
     board,
     decoy,
@@ -143,43 +149,21 @@ export async function readWorld(world: World): Promise<WorldRead> {
   };
 }
 
-/** The item's first statement that yields a count, summed over its rows; null when none does. */
+/** What the item counts over the seeded days, one bucket per day; null when nothing counts. */
 async function countedOver({
   item,
   world,
 }: {
   item: BoardItem;
   world: World;
-}): Promise<number | null> {
-  const outcomes = await runBoardQueries({
-    snapshot: { dashboardId: world.board.id, items: [item] },
-    window: world.window,
-    granularitySeconds: 86_400,
-  });
-  for (const outcome of outcomes) {
-    const total = outcome.rows ? totalOf(outcome.rows) : null;
-    if (total !== null) return total;
-  }
-  return null;
-}
-
-const TIME_COLUMN = /bucket|day|date|time|hour|period|week/i;
-const COUNT_COLUMN = /count|trace|total|volume|events/i;
-
-/**
- * Sums the count column of a result. ClickHouse answers a UInt64 as a string,
- * so a numeric string counts as a number; a time bucket column never counts.
- */
-export function totalOf(rows: Record<string, unknown>[]): number | null {
-  if (rows.length === 0) return 0;
-  const numeric = (value: unknown): boolean =>
-    typeof value === "number" || (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value));
-  const columns = Object.keys(rows[0] ?? {}).filter(
-    (column) => !TIME_COLUMN.test(column) && rows.every((row) => numeric(row[column])),
+}): Promise<Count | null> {
+  return countOf(
+    await runBoardQueries({
+      snapshot: { dashboardId: world.board.id, items: [item] },
+      window: world.window,
+      granularitySeconds: 86_400,
+    }),
   );
-  const column = columns.find((name) => COUNT_COLUMN.test(name)) ?? columns[0];
-  if (!column) return null;
-  return rows.reduce((sum, row) => sum + Number(row[column]), 0);
 }
 
 const tracer = trace.getTracer("langy-e2e-world");

@@ -164,6 +164,16 @@ describe("seeding a scenario's own account", () => {
       ).toThrow(/points at an address that does not parse\.$/);
     });
 
+    it("refuses a database under .localhost, which loopback for the app does not extend to", () => {
+      expect(() =>
+        resolveSeedDatabaseUrl({
+          appBase: LOCAL_APP,
+          env: { DATABASE_URL: "postgresql://u@db.localhost:5432/x" },
+          readDotenv: () => undefined,
+        }),
+      ).toThrow(/points at db\.localhost\.$/);
+    });
+
     it("does not take a loopback word inside the credentials for the host", () => {
       expect(() =>
         resolveSeedDatabaseUrl({

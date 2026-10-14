@@ -35,10 +35,11 @@ export interface TrafficPlan {
   injection?: string;
 }
 
-/** One trace to send, with its single LLM span's timing and text. */
+/** One trace to send: its timing and text, and the ids of its two model calls. */
 export interface PlannedTrace {
   traceId: string;
-  spanId: string;
+  /** Two LLM spans per trace, so a span or model-call count never equals the trace count. */
+  spanIds: [string, string];
   startedAt: number;
   durationMs: number;
   input: string;
@@ -86,7 +87,10 @@ export function planTraffic({
         const question = `customer support question #${order}: where is my order?`;
         traces.push({
           traceId: `trace_e2e_${runId}_${label}_${hour}_${i}`,
-          spanId: `span_e2e_${runId}_${label}_${hour}_${i}`,
+          spanIds: [
+            `span_e2e_${runId}_${label}_${hour}_${i}_lookup`,
+            `span_e2e_${runId}_${label}_${hour}_${i}_answer`,
+          ],
           startedAt: hourStart + Math.floor(((i + 0.5) * HOUR_MS) / count),
           // 0.8s to 9.6s, so latency charts have a real spread.
           durationMs: 800 + (order % 9) * 1_100,

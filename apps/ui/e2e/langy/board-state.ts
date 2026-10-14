@@ -214,3 +214,46 @@ export async function runBoardQueries({
     }),
   );
 }
+
+/** What an item counts: the sum of its count column, and how many rows carry it. */
+export interface Count {
+  total: number;
+  rows: number;
+}
+
+/**
+ * The first statement that counts. A statement with no rows never wins over a
+ * later one that counts; it gives a count of 0 only when no statement counts.
+ * Null when every statement was refused or returned no number.
+ */
+export function countOf(outcomes: QueryOutcome[]): Count | null {
+  let ranEmpty = false;
+  for (const { rows } of outcomes) {
+    if (!rows) continue;
+    if (rows.length === 0) {
+      ranEmpty = true;
+      continue;
+    }
+    const total = totalOf(rows);
+    if (total !== null) return { total, rows: rows.length };
+  }
+  return ranEmpty ? { total: 0, rows: 0 } : null;
+}
+
+const TIME_COLUMN = /bucket|day|date|time|hour|period|week/i;
+const COUNT_COLUMN = /count|trace|total|volume|events/i;
+
+/**
+ * Sums the count column of a non-empty result. ClickHouse answers a UInt64 as
+ * a string, so a numeric string counts as a number; a time bucket column never counts.
+ */
+function totalOf(rows: Record<string, unknown>[]): number | null {
+  const numeric = (value: unknown): boolean =>
+    typeof value === "number" || (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value));
+  const columns = Object.keys(rows[0] ?? {}).filter(
+    (column) => !TIME_COLUMN.test(column) && rows.every((row) => numeric(row[column])),
+  );
+  const column = columns.find((name) => COUNT_COLUMN.test(name)) ?? columns[0];
+  if (!column) return null;
+  return rows.reduce((sum, row) => sum + Number(row[column]), 0);
+}

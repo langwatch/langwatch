@@ -436,9 +436,12 @@ the saved board and the numbers with code first, then the reply with a judge.
   and a decoy board with one widget of its own. The scenario's description
   and criteria interpolate the same object. `reportWorldStateEachTurn` wraps
   the adapter so a `world state` tool span is emitted when a conversation
-  starts and after every turn, with four flat facts the judge reads in the
-  trace: `widgets_on_board`, `project_widget_count`, `decoy_widgets` and
-  `chart_total` (the newest board item's count over the seeded days). A
+  starts and after every turn, with five flat facts the judge reads in the
+  trace: `widgets_on_board`, `project_widget_count`, `decoy_widgets`,
+  `chart_total` (the newest board item's count over the seeded days) and
+  `chart_days` (how many rows that count comes in, one per day for a per-day
+  chart). Each seeded trace carries two model calls, so only a trace count
+  lands on the seeded total. A
   saved chart counts as a widget. After the run, the test reads the world
   again and asserts the same conditions in code.
 

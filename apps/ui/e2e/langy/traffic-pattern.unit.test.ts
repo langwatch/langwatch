@@ -97,9 +97,18 @@ describe("planTraffic", () => {
 
   it("gives every trace and span a unique id", () => {
     const traces = plan({ spike: { hour: 0, extra: 7 } });
+    const spanIds = traces.flatMap((trace) => trace.spanIds);
 
     expect(new Set(traces.map((trace) => trace.traceId)).size).toBe(traces.length);
-    expect(new Set(traces.map((trace) => trace.spanId)).size).toBe(traces.length);
+    expect(new Set(spanIds).size).toBe(spanIds.length);
+  });
+
+  // A chart counting spans or model calls must not land on the trace total by accident.
+  it("plans two model calls per trace, so only a trace count equals the trace total", () => {
+    const traces = plan({});
+
+    expect(traces.every((trace) => trace.spanIds.length === 2)).toBe(true);
+    expect(traces.flatMap((trace) => trace.spanIds)).toHaveLength(2 * traces.length);
   });
 
   it("refuses a baseline that is not a positive integer", () => {

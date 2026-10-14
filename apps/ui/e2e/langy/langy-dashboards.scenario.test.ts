@@ -70,6 +70,7 @@ describe("Langy builds a dashboard chart on the board the user attached", () => 
             criteria: [
               `Adds one chart of trace volume to the "${params.board}" dashboard and to no other dashboard`,
               `The chart counts ${seededTotal} traces in total over the ${params.days} days`,
+              `The chart shows one value per day, ${params.days} values in all, not a single total`,
               `The "${params.decoy}" dashboard still holds exactly its ${world.initial.decoy.items.length} widget: nothing added to it or removed from it`,
               "Does not ask which dashboard to use, since the attached dashboard names it",
             ],
@@ -94,6 +95,7 @@ describe("Langy builds a dashboard chart on the board the user attached", () => 
     expect(board.changed).toHaveLength(0);
     expect(after.facts.project_widget_count).toBe(world.initial.projectItems + 1);
     expect(after.facts.chart_total).toBe(seededTotal);
+    expect(after.facts.chart_days).toBe(params.days);
     expect(decoy.added).toHaveLength(0);
     expect(decoy.removed).toHaveLength(0);
     expect(decoy.changed).toHaveLength(0);

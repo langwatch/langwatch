@@ -4,7 +4,9 @@ import {
   type BoardItem,
   type BoardSnapshot,
   type ChartResource,
+  countOf,
   diffBoards,
+  type QueryOutcome,
   statementsOf,
   type WidgetResource,
 } from "./board-state";
@@ -141,6 +143,50 @@ describe("statementsOf", () => {
           parameters: { model: "gpt-5-mini" },
         },
       ]);
+    });
+  });
+});
+
+describe("countOf", () => {
+  function outcome(rows: Record<string, unknown>[] | null, query = "main"): QueryOutcome {
+    return { itemId: "w_1", kind: "widget", query, rows, error: rows ? null : "refused" };
+  }
+
+  describe("when a statement returns one row per day", () => {
+    it("sums the count column and reports how many rows carry it", () => {
+      const rows = [
+        { day: "2026-10-11", traces: "24" },
+        { day: "2026-10-12", traces: "24" },
+      ];
+
+      expect(countOf([outcome(rows)])).toEqual({ total: 48, rows: 2 });
+    });
+  });
+
+  describe("when a statement returns a single total", () => {
+    it("reports one row, so a per-day ask can tell it apart", () => {
+      expect(countOf([outcome([{ traces: 48 }])])).toEqual({ total: 48, rows: 1 });
+    });
+  });
+
+  describe("when the first statement returns no rows", () => {
+    it("takes a later statement that counts", () => {
+      const counted = [{ day: "2026-10-11", n: 24 }];
+
+      expect(countOf([outcome([], "empty"), outcome(counted, "per_day")])).toEqual({
+        total: 24,
+        rows: 1,
+      });
+    });
+  });
+
+  describe("when no statement counts", () => {
+    it("reports zero when a statement ran and returned no rows", () => {
+      expect(countOf([outcome(null), outcome([])])).toEqual({ total: 0, rows: 0 });
+    });
+
+    it("reports nothing when every statement was refused or had no number", () => {
+      expect(countOf([outcome(null), outcome([{ label: "x" }])])).toBeNull();
     });
   });
 });
