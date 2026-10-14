@@ -2777,6 +2777,35 @@ describe("the evaluators of a run", () => {
     ]);
   });
 
+  /** @scenario "The evaluator list hides the evaluators the suite already attaches" */
+  it("hides an evaluator the suite in scope already attaches when Add evaluator is pressed", async () => {
+    const user = userEvent.setup();
+    // PII needs no golden value, so only the suite's attachment can hide it.
+    mockTestSuitesGetAll.mockReturnValue({
+      data: [
+        {
+          ...refundsWith({}),
+          evaluators: [
+            {
+              id: "att_pii",
+              evaluatorId: "eval_pii",
+              required: false,
+              mappings: { output: lastAgentMessage },
+            },
+          ],
+        },
+      ],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("run-dialog-add-evaluator"));
+
+    expect(mockOpenDrawer).toHaveBeenCalledWith("evaluatorList", {
+      hiddenEvaluatorIds: expect.arrayContaining(["eval_pii"]),
+    });
+  });
+
   /** @scenario "The plan's own evaluator is edited in the evaluator editor with the run sources" */
   /** @scenario "A stored run plan opens on the evaluators it carries" */
   it("opens a stored plan on its own evaluators and edits one with the run sources", async () => {

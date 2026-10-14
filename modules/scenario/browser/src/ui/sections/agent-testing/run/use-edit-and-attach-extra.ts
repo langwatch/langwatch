@@ -267,6 +267,7 @@ export function useExtraEvaluatorsFlow({
   const { addExtra, showEvaluatorsBlock, removeEvaluatorsBlock } = useAddExtraFlow({
     attach,
     evaluatorsById,
+    inherited,
     openDrawer,
     closeDrawer,
     utils,

@@ -544,6 +544,12 @@ Feature: The run dialog
     And the run goes out with it as the plan's own evaluator
 
   @integration
+  Scenario: The evaluator list hides the evaluators the suite already attaches
+    Given the run dialog on a suite that attaches an evaluator
+    When "Add evaluator" is pressed under "On this run"
+    Then the evaluator list opens without that evaluator
+
+  @integration
   Scenario: The plan's own evaluator is edited in the evaluator editor with the run sources
     Given the run dialog with an evaluator of its own
     When its pill is chosen
