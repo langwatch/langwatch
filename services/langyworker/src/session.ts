@@ -20,7 +20,7 @@ import {
 
 import type { LangyWorkerConfig } from "./config.js";
 import { guidedSkillRefusal } from "./guided-kickoff.js";
-import { closingLineRefusal } from "./guided-turn-end.js";
+import { closingLineRefusal, midSetupLineRefusal } from "./guided-turn-end.js";
 import { MODEL_RETRY_MAX_ATTEMPTS, installModelRetry } from "./model-retry.js";
 import { writeModelsJson } from "./models.js";
 import {
@@ -166,6 +166,7 @@ export async function createLangySession({
       createSayExtension({
         refuse: (text) =>
           closingLineRefusal({ text, calls: turnContext.calls }) ??
+          midSetupLineRefusal({ text, continued: turnContext.continued }) ??
           repeatedLineRefusal({ text, calls: turnContext.calls }),
       }),
       createSecretSnippetExtension(),

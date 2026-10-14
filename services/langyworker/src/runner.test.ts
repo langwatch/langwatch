@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { ANSWERED_CARD_MESSAGE } from "./guided-turn-end.js";
+import {
+  ANSWERED_CARD_MESSAGE,
+  continuationPrompt,
+  MID_SETUP_LINE,
+  midSetupLineRefusal,
+} from "./guided-turn-end.js";
 import { TurnRunner, lastAssistantError, type SessionLike } from "./runner.js";
 import { ANSWERED_CONTINUE_LINE } from "./tools/question.js";
 import { createTurnContext, type TurnContext } from "./tools/turn-context.js";
@@ -293,7 +298,9 @@ describe("TurnRunner", () => {
       );
       expect(prompts[0]?.startsWith("[Resumed conversation")).toBe(true);
       expect(prompts[1]).toBe(
-        "The path is not finished. The history shows: the three step 2 lines said and the first scenario card answered. Continue from step 4 (The checklist, then create, explain, run), through `langwatch onboarding complete-path` and the closing line.",
+        continuationPrompt(
+          "The path is not finished. The history shows: the three step 2 lines said and the first scenario card answered. Continue from step 4 (The checklist, then create, explain, run), through `langwatch onboarding complete-path` and the closing line.",
+        ),
       );
       fake.session.agent.state.messages = [];
       await runner.submitTurn({
@@ -303,7 +310,9 @@ describe("TurnRunner", () => {
         resumeToken: SEED_WITH_KICKOFF,
       });
       expect((fake.session.agent.state.messages[1] as { content: string }).content).toBe(
-        "The path is not finished. The history shows none of the path's steps done. Continue from step 2 (Read the code and wire it), through `langwatch onboarding complete-path` and the closing line.",
+        continuationPrompt(
+          "The path is not finished. The history shows none of the path's steps done. Continue from step 2 (Read the code and wire it), through `langwatch onboarding complete-path` and the closing line.",
+        ),
       );
     });
 
@@ -363,7 +372,9 @@ describe("TurnRunner", () => {
       fake.finish();
       await until(() => fake.promptCalls.length === 2);
       expect(fake.promptCalls[1]?.prompt).toBe(
-        "Step 2 is not finished: the branch line was not said, and the first scenario card was not asked. Say the missing line, then continue with step 3 and end on the question card.",
+        continuationPrompt(
+          "Step 2 is not finished: the branch line was not said, and the first scenario card was not asked. Say the missing line, then continue with step 3 and end on the question card.",
+        ),
       );
       expect(events).toContainEqual({
         type: "guided_turn",
@@ -387,6 +398,31 @@ describe("TurnRunner", () => {
         },
         { type: "turn_done", turnId: "t2", outcome: "ok" },
       ]);
+    });
+
+    /** @scenario "The mid-setup line is refused in a continued turn" */
+    it("marks the turn continued while the continuation runs, and clears it when the turn ends", async () => {
+      const fake = makeFakeSession();
+      fake.session.agent.state.messages = GUIDED_HISTORY;
+      const turnContext = createTurnContext();
+      const { runner } = makeRunner({ session: fake.session, options: { turnContext } });
+      const done = runner.submitTurn({
+        type: "turn",
+        turnId: "t2",
+        prompt: "Local folder connected",
+      });
+      await until(() => fake.promptCalls.length === 1);
+      expect(turnContext.continued).toBe(false);
+      feedStep2WithoutBranchLine(runner);
+      fake.finish();
+      await until(() => fake.promptCalls.length === 2);
+      expect(turnContext.continued).toBe(true);
+      expect(
+        midSetupLineRefusal({ text: MID_SETUP_LINE, continued: turnContext.continued }),
+      ).toBeDefined();
+      fake.finish();
+      await done;
+      expect(turnContext.continued).toBe(false);
     });
 
     /** @scenario "The continuation names the step 2 lines the turn did not say" */
@@ -451,7 +487,7 @@ describe("TurnRunner", () => {
       // The turn stops right on the answered card.
       fake.finish();
       await until(() => fake.promptCalls.length === 3);
-      expect(fake.promptCalls[2]?.prompt).toBe(ANSWERED_CARD_MESSAGE);
+      expect(fake.promptCalls[2]?.prompt).toBe(continuationPrompt(ANSWERED_CARD_MESSAGE));
       expect(events).toContainEqual({
         type: "guided_turn",
         turnId: "t2",

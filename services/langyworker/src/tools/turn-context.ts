@@ -22,10 +22,16 @@ export type TurnContext = {
    * before the prompt goes out; false between turns.
    */
   guided: boolean;
+  /**
+   * The worker appended a continuation to the turn in flight: what the
+   * model reads last is the guard's note, not a message the person typed.
+   * False between turns.
+   */
+  continued: boolean;
 };
 
 export function createTurnContext(): TurnContext {
-  return { turnId: null, calls: [], guided: false };
+  return { turnId: null, calls: [], guided: false, continued: false };
 }
 
 /** The conversation this worker serves, as the manager named it at spawn. */

@@ -16,6 +16,7 @@ import {
   GUIDED_TURN_BARE_END_LOG,
   GUIDED_TURN_CONTINUED_LOG,
   TurnCallLog,
+  continuationPrompt,
   decideGuidedContinuation,
   guidedSegment,
 } from "./guided-turn-end.js";
@@ -208,6 +209,7 @@ export class TurnRunner {
     if (this.options.turnContext) {
       this.options.turnContext.turnId = command.turnId;
       this.options.turnContext.calls = state.calls.calls;
+      this.options.turnContext.continued = false;
     }
 
     let terminal: TerminalEvent;
@@ -252,6 +254,7 @@ export class TurnRunner {
       this.options.turnContext.turnId = null;
       this.options.turnContext.calls = [];
       this.options.turnContext.guided = false;
+      this.options.turnContext.continued = false;
     }
     // The terminal is flushed to the pipe before anything else can run.
     await writer.emit(terminal);
@@ -317,9 +320,10 @@ export class TurnRunner {
     state.continuations += 1;
     state.turnContinuations += 1;
     await this.reportGuidedTurn({ state, event: GUIDED_TURN_CONTINUED_LOG, decision });
+    if (this.options.turnContext) this.options.turnContext.continued = true;
     let thrown: unknown;
     try {
-      await this.options.session.prompt(decision.message);
+      await this.options.session.prompt(continuationPrompt(decision.message));
     } catch (error) {
       thrown = error;
     }
