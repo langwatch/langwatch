@@ -67,7 +67,7 @@
     "tsup": "catalog:",
     "typescript": "catalog:sdk-toolchain",
     "vitest": "catalog:",
-    "yargs": "^18.0.0",
+    "yargs": "^18.2.0",
     "zod-validation-error": "catalog:"
   },
   "engines": {
