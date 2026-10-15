@@ -109,15 +109,19 @@ function project(): Project {
   };
 }
 
-function compose({ dropsInput = false }: { dropsInput?: boolean } = {}) {
-  const repositories = MemoryTraceRepositories.create();
-  // The one blob store the module composes for both halves: the door writes through it, the
-  // worker's record-span command reads back through it.
-  const blobStore = TraceModule.composeBlobStore({
+function composeBlobStore(repositories: ReturnType<typeof MemoryTraceRepositories.create>) {
+  return TraceModule.composeBlobStore({
     repositories,
     channels: { legacySpool: MemoryTraceLegacySpoolChannel.create() },
     config: { objectRetentionConfirmed: undefined, legacySpoolRetentionConfirmed: undefined },
   });
+}
+
+function compose({ dropsInput = false }: { dropsInput?: boolean } = {}) {
+  const repositories = MemoryTraceRepositories.create();
+  // The one blob store the module composes for both halves: the door writes through it, the
+  // worker's record-span command reads back through it.
+  const blobStore = composeBlobStore(repositories);
   const listCosts = vi.fn<Peers["modelProviders"]["listCosts"]>(async () => [ownRateFor(MODEL)]);
   const dropSpanContent = vi.fn<Peers["dataPrivacy"]["dropSpanContent"]>(async ({ span }) => {
     if (!dropsInput) return { droppedCount: 0, droppedCategories: [], droppedAttributeKeys: [] };
@@ -209,7 +213,8 @@ async function foldSpanThroughRecordCommand(
   const emitted: unknown[] = await sealed.open(async (registration) => {
     const handler = registration.createHandler();
     const events: unknown[] = await Reflect.apply(handler.handle, handler, [command]);
-    // What the queue runs once the event is stored: the spool object's best-effort delete.
+    // The spool object's best-effort delete. The queue runs it after storing the event; that
+    // ordering is the queue's, and is not exercised here.
     const cleanup: unknown = Reflect.get(handler, "cleanupAfterStore");
     if (typeof cleanup === "function") await Reflect.apply(cleanup, handler, [command]);
     return events;
@@ -419,9 +424,11 @@ describe("the consumer pipeline composed over the installed peers", () => {
     describe("when the worker folds it", () => {
       /** @scenario A spooled span is read back from the spool the door wrote it to */
       it("reads the object by the command's own ids rather than refusing the reference", async () => {
-        const { pipeline, blobStore } = compose();
+        const { pipeline, repositories } = compose();
+        // A blob store of its own, as the previous process had, over the same object storage.
+        const previousProcess = composeBlobStore(repositories);
         const full = recordSpanData(oversizedSpan());
-        await blobStore.putSpool({
+        await previousProcess.putSpool({
           projectId: TENANT,
           traceId: "trace-1",
           spanId: "span-1",
@@ -435,6 +442,12 @@ describe("the consumer pipeline composed over the installed peers", () => {
         });
 
         expect(attributes.map((attribute) => attribute.key)).toContain("langwatch.input");
+        await expect(
+          repositories.spoolObjects.read({
+            projectId: TENANT,
+            key: "trace-blobs/spool/project-1/trace-1/span-1",
+          }),
+        ).rejects.toMatchObject({ name: "StoredObjectNotFoundError" });
       });
     });
   });
