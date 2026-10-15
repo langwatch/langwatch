@@ -244,6 +244,15 @@ export class AuthorizationExpiredError extends Error {
   }
 }
 
+/** Platform code asked for a proof on a project that no longer exists (deleted since its event). */
+export class ProjectNotFoundError extends Error {
+  readonly code = "project_not_found" as const;
+  constructor(readonly projectId: string) {
+    super(`Project ${projectId} no longer exists`);
+    this.name = "ProjectNotFoundError";
+  }
+}
+
 export class AccessNotGrantedError extends Error {
   readonly code = "access_not_granted" as const;
   constructor(readonly permission: string) {
