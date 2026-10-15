@@ -78,7 +78,7 @@ func TestAgentsTemplate_EmptyWindowStatesDataAge(t *testing.T) {
 	if rule == "" {
 		t.Fatalf("AGENTS.md has no line starting with %q", "- A list question")
 	}
-	for _, phrase := range []string{"newest", "never received", "errors"} {
+	for _, phrase := range []string{"newest", "never received", "errors", "say none", "likely cause", "never say you cannot see"} {
 		if !strings.Contains(rule, phrase) {
 			t.Errorf("AGENTS.md list-question rule never says %q, so an empty window cannot be told from a broken pipeline or zero errors from a fault", phrase)
 		}

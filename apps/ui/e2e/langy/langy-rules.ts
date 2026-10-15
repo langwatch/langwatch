@@ -175,8 +175,8 @@ export const LANGY_EVALUATOR_INFERENCE_CRITERIA = [
 export const LANGY_EMPTY_WINDOW_CRITERIA = [
   "Langy says there were no matching traces in the last hour.",
   'Langy states when the newest matching trace arrived, between 7 and 9 hours ago (any phrasing: hours ago, a clock time, "this morning"), from a follow-up lookup not limited to the last hour. A bare "none in the last hour" fails.',
-
   "Langy names one likely cause of the gap, such as export having stopped, a wrong project or API key, or the app not being instrumented yet.",
+  "The likely cause comes after the stated age of the newest trace and fits it (a gap of hours, not a fault with the query).",
   "Langy never says or implies that it cannot see or access the data. The query succeeded and found nothing; that is an answer, not an access problem.",
 ];
 

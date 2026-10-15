@@ -108,8 +108,8 @@ describe("the coding-agent-cost skill", () => {
     /** @scenario "The coding-agent-cost skill checks an empty window before reporting" */
     it("looks up the newest session event in any window and states its age", () => {
       const rendered = costSkill();
-      expect(rendered).toMatch(/newest/i);
-      expect(rendered).toContain("count()");
+      expect(rendered).toContain("max(TimeUnixMs) AS newest");
+      expect(rendered).toContain("events = 0");
       expect(rendered).toMatch(/never received/i);
     });
 
