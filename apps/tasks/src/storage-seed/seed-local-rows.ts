@@ -58,7 +58,8 @@ export function upsertTeam({
   organizationId: string;
 }) {
   return prisma.team.upsert({
-    where: { slug },
+    // The slug finds the row; the organization satisfies the tenancy guard.
+    where: { slug, organizationId },
     create: { id: generate(TEAM_KSUID_RESOURCE).toString(), name, slug, organizationId },
     update: {},
   });
