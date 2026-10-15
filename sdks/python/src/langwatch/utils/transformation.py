@@ -68,7 +68,9 @@ class SerializableWithStringFallback(SerializableAndPydanticEncoder):
 
     def default(self, o: Any) -> Any:
         try:
-            if hasattr(o, "model_dump"):
+            if _is_langchain_message(o):
+                result = super().default(o)
+            elif hasattr(o, "model_dump"):
                 result = o.model_dump(exclude_unset=True)
             elif isinstance(o, set):
                 result = list(o)
@@ -83,6 +85,14 @@ class SerializableWithStringFallback(SerializableAndPydanticEncoder):
 
     def iterencode(self, o: Any, _one_shot: bool = False) -> Any:
         return super().iterencode(_sanitize_nan(o), _one_shot)
+
+
+def _is_langchain_message(o: Any) -> bool:
+    try:
+        from langchain_core.messages import BaseMessage
+    except ImportError:
+        return False
+    return isinstance(o, BaseMessage)
 
 
 def _sanitize_nan(obj: Any) -> Any:
