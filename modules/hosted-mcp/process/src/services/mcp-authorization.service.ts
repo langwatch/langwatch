@@ -31,9 +31,10 @@ const AUTH_CODE_BYTES = 32;
 
 /**
  * The permission a caller must hold to mint an authorization code here. The code becomes a
- * session as the approving person capped at this project, so approving one confers the project.
+ * session that acts as the approving person, asked their own permission on every call, so
+ * seeing the project is enough: a viewer's client can do only what the viewer can.
  */
-export const MCP_AUTHORIZE_PERMISSION = "project:update" as const;
+export const MCP_AUTHORIZE_PERMISSION = "project:view" as const;
 
 /** The signed-in person an authorization code is minted for. */
 export type McpApprover = Readonly<{ user: Readonly<{ id: string }> }>;
@@ -165,7 +166,7 @@ export class McpAuthorizationService {
 
     if (!project) return { kind: "denied" };
 
-    // ADR-177 decision 7: the code carries the project's base key, and these kinds hold none.
+    // ADR-177 decision 7: these kinds are not a destination an MCP session can act in.
     if (NON_DESTINATION_PROJECT_KINDS.includes(project.kind)) {
       return isAggregateProjectKind(project.kind) ? aggregateRefusalOutcome() : { kind: "denied" };
     }

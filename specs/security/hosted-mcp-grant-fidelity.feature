@@ -2,37 +2,37 @@ Feature: Hosted MCP sessions carry no more authority than the grant behind them
   As a LangWatch operator
   I want the hosted Model Context Protocol flow to demand, and keep demanding,
   the permission its bearer actually confers
-  So that a viewer cannot mint a writer's credential and an offboarded person
-  cannot keep one
+  So that a viewer's client can do only what the viewer can and an offboarded
+  person cannot keep one
 
   Background:
     Given the hosted MCP endpoint is mounted on the API process
 
-  Rule: The approval step demands the permission the minted credential confers
+  Rule: The approval step demands no more than the session it mints can use
 
-    The authorization code embeds the project's legacy API key, which every
-    REST family lets past its permission check. Approving one therefore hands
-    over the whole project, so the approval is gated on the same grain that
-    reveals that key directly, never on the weakest read permission.
+    The authorization code becomes a session that acts as the approving person,
+    capped at one project, and every call it makes is asked that person's own
+    permission. Seeing the project is therefore enough to approve a client: a
+    viewer's client can read what the viewer reads and change nothing.
 
     @unit @regression
-    Scenario: A project viewer cannot mint an MCP authorization code
+    Scenario: A project viewer mints an MCP authorization code
       Given a signed-in person who may view a project but not update it
+      When they approve an MCP client for that project
+      Then an authorization code bound to that client and redirect URI is stored
+
+    @unit @regression
+    Scenario: The approval step names the view grain
+      Given a signed-in person and a registered MCP client
+      When they approve that client for a project
+      Then the permission probed is the one that lets them see the project
+
+    @unit
+    Scenario: A person who cannot see the project mints no code
+      Given a signed-in person who holds no permission on a project
       When they approve an MCP client for that project
       Then the approval is refused as access denied
       And no authorization code is stored
-
-    @unit @regression
-    Scenario: The approval step names the update grain, not the view grain
-      Given a signed-in person and a registered MCP client
-      When they approve that client for a project
-      Then the permission probed is the one that reveals the project's API key
-
-    @unit
-    Scenario: A person who may update the project mints a code
-      Given a signed-in person who may update a project
-      When they approve a registered MCP client for that project
-      Then an authorization code bound to that client and redirect URI is stored
 
   Rule: A bearer stops working when the grant it was minted from is gone
 
