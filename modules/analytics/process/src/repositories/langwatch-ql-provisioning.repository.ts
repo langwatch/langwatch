@@ -26,8 +26,8 @@ export type ProvisioningFailureLevel = "error" | "warn";
 
 /** The named tables, views and SQL functions the server holds now. */
 export interface LwqlClickHouseInventory {
-  /** Each named table or view present, with its column names. */
-  readonly relations: ReadonlyMap<string, readonly string[]>;
+  /** Each named table or view present. */
+  readonly relations: readonly string[];
   /** The named SQL user-defined functions present. */
   readonly functions: readonly string[];
 }

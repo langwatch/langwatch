@@ -28,6 +28,12 @@ import { LWQL_KEY_MAP_INSERT_SETTINGS } from "./clickhouse.langwatch-ql-key-map.
 
 const logger = createLogger("langwatch:analytics:lwql:clickhouseRunner");
 
+/** At warn the check logs its own alert, so a text-only alert must not match this line too. */
+const FAILED_STATEMENT_MESSAGES: Record<ProvisioningFailureLevel, string> = {
+  error: "lwql provisioning failed creating ClickHouse objects",
+  warn: "lwql reconvergence statement failed",
+};
+
 /** Runs each statement, skipping only the config-store failures the inventory explains. */
 async function runClickHouseStatements({
   client,
@@ -59,7 +65,7 @@ async function runClickHouseStatements({
             targets,
             missing: findMissingObjects(error),
           },
-          "lwql provisioning failed creating ClickHouse objects",
+          FAILED_STATEMENT_MESSAGES[failureLevel],
         );
         throw error;
       }
@@ -74,7 +80,7 @@ async function runClickHouseStatements({
   return { skipped };
 }
 
-/** The named relations' columns and the named SQL functions, from two `system` tables. */
+/** The named relations and the named SQL functions present, from two `system` tables. */
 async function readClickHouseInventory({
   client,
   database,
@@ -86,9 +92,9 @@ async function readClickHouseInventory({
   relations: readonly string[];
   functions: readonly string[];
 }): Promise<LwqlClickHouseInventory> {
-  const columns = await client.rows(
-    "SELECT table, groupArray(name) AS columns FROM system.columns " +
-      "WHERE database = {database:String} AND has({relations:Array(String)}, table) GROUP BY table",
+  const present = await client.rows(
+    "SELECT name FROM system.tables " +
+      "WHERE database = {database:String} AND has({relations:Array(String)}, name)",
     { database, relations: [...relations] },
   );
   const held =
@@ -100,12 +106,7 @@ async function readClickHouseInventory({
           { functions: [...functions] },
         );
   return {
-    relations: new Map(
-      columns.map((row) => [
-        String(row.table),
-        Array.isArray(row.columns) ? row.columns.map(String) : [],
-      ]),
-    ),
+    relations: present.map((row) => String(row.name)),
     functions: held.map((row) => String(row.name)),
   };
 }

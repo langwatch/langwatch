@@ -206,6 +206,18 @@ export function clickHouseErrorCodeFields(error: unknown): {
   return { clickhouseCode: failure.code, clickhouseCodeName: name };
 }
 
+/** Prisma's error code and the PostgreSQL server's SQLSTATE for a log line; null where absent. */
+export function postgresErrorCodeFields(error: unknown): {
+  code: string | null;
+  sqlState: string | null;
+} {
+  const failure = error as { code?: unknown; meta?: { code?: unknown } } | null;
+  return {
+    code: typeof failure?.code === "string" ? failure.code : null,
+    sqlState: typeof failure?.meta?.code === "string" ? failure.meta.code : null,
+  };
+}
+
 function statementTokens(statement: string): string[] {
   return statement
     .replace(/\bOR\s+REPLACE\b/gi, " ")

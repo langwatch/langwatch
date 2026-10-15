@@ -12,7 +12,6 @@ import type { LwqlPostgresViewFound } from "../../../repositories/langwatch-ql-p
 import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../../services/langwatch-ql-access-model-definition.service.ts";
 import {
-  KEY_MAP_COLUMNS,
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
 } from "../../../services/langwatch-ql-access-model.service.ts";
@@ -72,38 +71,29 @@ export type LwqlSelfProvisionRequest =
 /** `rendered`: a config store owns user, profile, policies and collection; `sql`: the app does. */
 export type LwqlAccessModelMode = "rendered" | "sql";
 
-/** A table or view the app creates, by name, with the column names it must carry. */
-interface LwqlExpectedRelation {
-  readonly name: string;
-  readonly columns: readonly string[];
-}
-
 /** What the app-owned ClickHouse objects lack; names only, never DDL. */
 interface LwqlClickHouseDrift {
-  /** Each object absent, or lacking a column the catalog declares. */
+  /** Each object absent. */
   readonly objects: readonly string[];
   /** The key map was among them, so a converge that repairs it is followed by a fill. */
   readonly keyMap: boolean;
 }
 
-/** What the reconvergence check found missing in each store; both empty means converged. */
-export interface LwqlAppOwnedDrift {
-  readonly clickHouse: readonly string[];
-  readonly postgres: readonly string[];
-  readonly keyMap: boolean;
+/** An approved view the check repairs: created when absent, then granted to the reader. */
+export interface LwqlPostgresGap {
+  readonly view: string;
+  readonly absent: boolean;
 }
 
-const columnNames = (view: LangWatchQLViewDefinition): string[] =>
-  view.columns.map((column) => column.name);
-
 /**
- * Order-blind, and blind to extra columns: those are a newer deploy's, so a worker still on an
- * older catalog never rewrites a newer view during a rollout.
+ * What the check found absent in each store; both empty means converged. Columns are the
+ * deploy's, so an older worker never rewrites a newer object. `unknown`: PostgreSQL could not
+ * be read, so it is neither converged nor cleared.
  */
-function holdsColumns(found: readonly string[] | undefined, expected: readonly string[]): boolean {
-  if (found === undefined) return false;
-  const held = new Set(found);
-  return expected.every((column) => held.has(column));
+export interface LwqlAppOwnedDrift {
+  readonly clickHouse: readonly string[];
+  readonly postgres: readonly LwqlPostgresGap[] | "unknown";
+  readonly keyMap: boolean;
 }
 
 /** The endpoint must be reachable from the ClickHouse server; the chart's cluster DNS is. */
@@ -314,17 +304,15 @@ export class LangWatchQLSelfProvisioningService {
   }
 
   /** The relations a rendered-mode converge creates: the key map, engine tables and views. */
-  appOwnedRelations({ names }: { names: LangWatchQLNames }): LwqlExpectedRelation[] {
+  appOwnedRelations({ names }: { names: LangWatchQLNames }): string[] {
     return [
-      { name: names.keyMapTable, columns: [KEY_MAP_COLUMNS.keyHash, KEY_MAP_COLUMNS.tenantId] },
-      ...catalogShapes
-        .postgresViews(LWQL_VIEW_CATALOG)
-        .map((view) => ({ name: view.sourceTable, columns: columnNames(view) })),
-      ...LWQL_VIEW_CATALOG.map((view) => ({ name: view.name, columns: columnNames(view) })),
+      names.keyMapTable,
+      ...catalogShapes.postgresViews(LWQL_VIEW_CATALOG).map((view) => view.sourceTable),
+      ...LWQL_VIEW_CATALOG.map((view) => view.name),
     ];
   }
 
-  /** Each expected relation absent or lacking an expected column, then each absent app function. */
+  /** Each expected relation absent, then each expected app function absent. */
   findDrift({
     names,
     relations,
@@ -332,39 +320,29 @@ export class LangWatchQLSelfProvisioningService {
     found,
   }: {
     names: LangWatchQLNames;
-    relations: readonly LwqlExpectedRelation[];
+    relations: readonly string[];
     /** The app functions to expect; empty where a `CREATE FUNCTION` cannot reach every replica. */
     functions: readonly string[];
-    found: {
-      relations: ReadonlyMap<string, readonly string[]>;
-      functions: readonly string[];
-    };
+    found: { relations: readonly string[]; functions: readonly string[] };
   }): LwqlClickHouseDrift {
     const objects = [
-      ...relations
-        .filter((relation) => !holdsColumns(found.relations.get(relation.name), relation.columns))
-        .map((relation) => relation.name),
+      ...relations.filter((name) => !found.relations.includes(name)),
       ...functions.filter((name) => !found.functions.includes(name)),
     ];
     return { objects, keyMap: objects.includes(names.keyMapTable) };
   }
 
-  /** The approved views the reader role must select from, with their exposed columns. */
-  approvedPostgresViews(): LwqlExpectedRelation[] {
-    return catalogShapes
-      .postgresViews(LWQL_VIEW_CATALOG)
-      .map((view) => ({ name: view.postgres.approvedView, columns: columnNames(view) }));
+  /** The approved views the reader role must select from. */
+  approvedPostgresViews(): string[] {
+    return postgresViews.approvedViewNames();
   }
 
-  /** Each approved view absent, lacking an expected column, or not selectable by the reader. */
-  findPostgresGaps({ found }: { found: readonly LwqlPostgresViewFound[] }): string[] {
+  /** Each approved view absent, or present but not selectable by the reader. */
+  findPostgresGaps({ found }: { found: readonly LwqlPostgresViewFound[] }): LwqlPostgresGap[] {
     const byName = new Map(found.map((view) => [view.view, view]));
     return this.approvedPostgresViews()
-      .filter((expected) => {
-        const view = byName.get(expected.name);
-        return !view?.granted || !holdsColumns(view.columns, expected.columns);
-      })
-      .map((expected) => expected.name);
+      .filter((view) => byName.get(view)?.granted !== true)
+      .map((view) => ({ view, absent: !byName.has(view) }));
   }
 
   /** A failed statement echoes its DDL, which embeds passwords; every logged error passes here. */

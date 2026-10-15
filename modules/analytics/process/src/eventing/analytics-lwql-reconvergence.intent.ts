@@ -6,6 +6,7 @@ import {
   clickHouseErrorCodeFields,
   clickHouseErrorSummary,
   type LwqlAccessModelOwner,
+  postgresErrorCodeFields,
 } from "../rules/langwatch-ql-config-store.rules.ts";
 
 const logger = createLogger("langwatch:analytics:lwql:reconvergence");
@@ -28,7 +29,7 @@ interface LwqlReconvergenceRunDeps {
   readonly probe: () => Promise<LwqlAccessModelOwner>;
   /** The SQL-mode re-provision of the whole access model; logs and swallows its own failure. */
   readonly converge: () => Promise<void>;
-  /** Catalog reads only, never DDL; empty outside rendered mode, throws when unreadable. */
+  /** Catalog reads only; throws when ClickHouse is unreadable, `unknown` when PostgreSQL is. */
   readonly findDrift: () => Promise<LwqlAppOwnedDrift>;
   /** Converges the objects the drift names; throws on failure so the next check retries. */
   readonly convergeAppOwned: (drift: LwqlAppOwnedDrift) => Promise<void>;
@@ -38,16 +39,27 @@ interface LwqlReconvergenceRunDeps {
   readonly now?: () => number;
 }
 
-function failureSignature(error: unknown): string {
+/** The store's own codes, and the `error_signature` built from them and the error type. */
+function failureCodeFields(store: LwqlStore, error: unknown) {
+  const type = clickHouseErrorSummary(error).type;
+  if (store === "postgres") {
+    const { code, sqlState } = postgresErrorCodeFields(error);
+    return { error_signature: `${code}:${sqlState}:${type}`, code, sqlState };
+  }
   const { clickhouseCode, clickhouseCodeName } = clickHouseErrorCodeFields(error);
-  return `${clickhouseCode}:${clickhouseCodeName}:${clickHouseErrorSummary(error).type}`;
+  return {
+    error_signature: `${clickhouseCode}:${clickhouseCodeName}:${type}`,
+    clickhouseCode,
+    clickhouseCodeName,
+  };
 }
 
 function driftFields(drift: LwqlAppOwnedDrift) {
+  const postgres = drift.postgres === "unknown" ? [] : drift.postgres.map((gap) => gap.view);
   return {
     clickHouseObjects: drift.clickHouse.length,
-    postgresViews: drift.postgres.length,
-    sample: [...drift.clickHouse, ...drift.postgres].slice(0, 5),
+    postgresViews: postgres.length,
+    sample: [...drift.clickHouse, ...postgres].slice(0, 5),
   };
 }
 
@@ -75,13 +87,12 @@ function logConvergeFailure({
   alerts: LwqlAlerts;
   at: number;
 }): void {
-  const signature = failureSignature(error);
   const fields = {
-    error_signature: signature,
     error: clickHouseErrorSummary(error),
-    ...clickHouseErrorCodeFields(error),
+    ...failureCodeFields(store, error),
     ...driftFields(drift),
   };
+  const signature = fields.error_signature;
   const last = alerts.get(store);
   if (last?.signature === signature && at - last.at < REALERT_AFTER_MS) {
     logger.warn(
@@ -94,8 +105,41 @@ function logConvergeFailure({
   alerts.set(store, { signature, at });
 }
 
+/** Converges one store's share of the drift; true when that store is now converged. */
+async function convergeStore({
+  store,
+  drift,
+  convergeAppOwned,
+  alerts,
+  now,
+}: {
+  store: LwqlStore;
+  drift: LwqlAppOwnedDrift;
+  convergeAppOwned: LwqlReconvergenceRunDeps["convergeAppOwned"];
+  alerts: LwqlAlerts;
+  now: () => number;
+}): Promise<boolean> {
+  const only = driftIn(store, drift);
+  const pending = only[store];
+  // An unread PostgreSQL is neither converged nor cleared.
+  if (pending === "unknown") return false;
+  if (pending.length === 0) {
+    alerts.delete(store);
+    return true;
+  }
+  logger.info(driftFields(only), "lwql reconvergence check found app-owned objects to converge");
+  try {
+    await convergeAppOwned(only);
+    alerts.delete(store);
+    return true;
+  } catch (error) {
+    logConvergeFailure({ store, error, drift: only, alerts, at: now() });
+    return false;
+  }
+}
+
 /**
- * One check: read what the app-owned objects lack, converge PostgreSQL then ClickHouse where
+ * One check: read which app-owned objects are absent, converge PostgreSQL then ClickHouse where
  * either does, fill the key map when asked or once a converge repaired it, then the SQL-mode
  * owner probe. Any worker may run any check; the closure only rates the failure log's level.
  */
@@ -104,23 +148,8 @@ export function runLwqlReconvergence(
 ): (payload: { fillKeyMap: boolean }) => Promise<void> {
   const now = deps.now ?? (() => nowInstant().epochMilliseconds);
   const alerts: LwqlAlerts = new Map();
-
-  async function convergeStore(store: LwqlStore, drift: LwqlAppOwnedDrift): Promise<boolean> {
-    const only = driftIn(store, drift);
-    if (only[store].length === 0) {
-      alerts.delete(store);
-      return true;
-    }
-    logger.info(driftFields(only), "lwql reconvergence check found app-owned objects to converge");
-    try {
-      await deps.convergeAppOwned(only);
-      alerts.delete(store);
-      return true;
-    } catch (error) {
-      logConvergeFailure({ store, error, drift: only, alerts, at: now() });
-      return false;
-    }
-  }
+  const converge = (store: LwqlStore, drift: LwqlAppOwnedDrift) =>
+    convergeStore({ store, drift, convergeAppOwned: deps.convergeAppOwned, alerts, now });
 
   return async ({ fillKeyMap }): Promise<void> => {
     const drift = await deps.findDrift().catch((error: unknown): undefined => {
@@ -131,8 +160,8 @@ export function runLwqlReconvergence(
       return undefined;
     });
     // Unread is not converged: an unreadable catalog leaves the last alert as it was.
-    if (drift !== undefined) await convergeStore("postgres", drift);
-    const clickHouseConverged = drift === undefined || (await convergeStore("clickHouse", drift));
+    if (drift !== undefined) await converge("postgres", drift);
+    const clickHouseConverged = drift === undefined || (await converge("clickHouse", drift));
     const keyMapRepaired = drift?.keyMap === true;
     if ((fillKeyMap || keyMapRepaired) && (!keyMapRepaired || clickHouseConverged)) {
       await deps.fillKeyMap().catch((error: unknown) => {

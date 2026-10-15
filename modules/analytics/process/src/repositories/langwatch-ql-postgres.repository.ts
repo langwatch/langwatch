@@ -8,10 +8,9 @@ export type LwqlProvisioningDatabase = {
   ) => Promise<T>;
 };
 
-/** One approved view as PostgreSQL holds it, and whether the reader role may select from it. */
+/** One approved view PostgreSQL holds, and whether the reader role may select from it. */
 export interface LwqlPostgresViewFound {
   readonly view: string;
-  readonly columns: readonly string[];
   readonly granted: boolean;
 }
 
@@ -19,7 +18,7 @@ export interface LwqlPostgresViewFound {
 export abstract class LangWatchQLPostgresRepository {
   /** Runs catalog statements shared by every tenant, one at a time. */
   abstract runStatements(statements: readonly string[]): Promise<void>;
-  /** The named views present in `schema`, their columns, and the reader's SELECT on each. */
+  /** The named views present in `schema`, and the reader's SELECT on each. */
   abstract findApprovedViews(input: {
     schema: string;
     role: string;

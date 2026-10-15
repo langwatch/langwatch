@@ -178,7 +178,7 @@ describe("given a check over the app-owned objects", () => {
   });
 
   describe("when an engine table is missing", () => {
-    /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing or stale" */
+    /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
     it("converges with the drift it read and leaves the access model to the config store", async () => {
       const drift: LwqlAppOwnedDrift = { clickHouse: ["agents_pg"], postgres: [], keyMap: false };
       const convergeAppOwned = vi.fn((_drift: LwqlAppOwnedDrift) => Promise.resolve());
@@ -195,7 +195,7 @@ describe("given a check over the app-owned objects", () => {
       expect(converge).not.toHaveBeenCalled();
     });
 
-    /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing or stale" */
+    /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
     it("converges nothing when ClickHouse cannot be read, and checks again next time", async () => {
       const convergeAppOwned = vi.fn(() => Promise.resolve());
       await runLwqlReconvergence({
@@ -292,11 +292,15 @@ describe("given a check over the app-owned objects", () => {
   });
 
   describe("when PostgreSQL refuses its half", () => {
+    const refusal = () =>
+      Object.assign(new Error("permission denied"), { code: "P2010", meta: { code: "42501" } });
+    const gap = { view: "lwql_agents", absent: true };
+
     /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
-    it("alerts with the PostgreSQL message and still converges ClickHouse", async () => {
+    it("alerts with the PostgreSQL message and its SQLSTATE, and still converges ClickHouse", async () => {
       const drift: LwqlAppOwnedDrift = {
         clickHouse: ["agents_pg"],
-        postgres: ["lwql_agents"],
+        postgres: [gap],
         keyMap: false,
       };
       const converged: LwqlAppOwnedDrift[] = [];
@@ -305,18 +309,42 @@ describe("given a check over the app-owned objects", () => {
         converge: () => Promise.resolve(),
         findDrift: () => Promise.resolve(drift),
         convergeAppOwned: async (half) => {
-          if (half.postgres.length > 0) {
-            throw Object.assign(new Error("permission denied"), { code: "P2010" });
-          }
+          if (half.clickHouse.length === 0) throw refusal();
           converged.push(half);
         },
         fillKeyMap: () => Promise.resolve(),
       })(wakeOnce);
 
-      expect(logCalls.filter((call) => call.level === "error").map((call) => call.message)).toEqual(
-        [POSTGRES_ALERT],
-      );
+      expect(logCalls.filter((call) => call.level === "error")).toEqual([
+        expect.objectContaining({
+          message: POSTGRES_ALERT,
+          fields: expect.objectContaining({
+            error_signature: "P2010:42501:Error",
+            code: "P2010",
+            sqlState: "42501",
+          }),
+        }),
+      ]);
       expect(converged).toEqual([{ clickHouse: ["agents_pg"], postgres: [], keyMap: false }]);
+    });
+
+    /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
+    it("neither converges nor clears the alert while PostgreSQL cannot be read", async () => {
+      const reads: LwqlAppOwnedDrift["postgres"][] = [[gap], "unknown", [gap]];
+      const convergeAppOwned = vi.fn((_half: LwqlAppOwnedDrift) => Promise.reject(refusal()));
+      const check = runLwqlReconvergence({
+        probe: () => Promise.resolve("config_store"),
+        converge: () => Promise.resolve(),
+        findDrift: () =>
+          Promise.resolve({ clickHouse: [], postgres: reads.shift() ?? [], keyMap: false }),
+        convergeAppOwned,
+        fillKeyMap: () => Promise.resolve(),
+      });
+
+      for (let checks = 0; checks < 3; checks++) await check(wakeOnce);
+
+      expect(convergeAppOwned).toHaveBeenCalledTimes(2);
+      expect(logCalls.filter((call) => call.level === "error")).toHaveLength(1);
     });
   });
 

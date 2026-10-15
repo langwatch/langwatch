@@ -199,6 +199,14 @@ such a rollback, check that every `_pg` table exists in the LangWatchQL database
 has finished rolling, and run the LangWatchQL provisioning again if one is missing. Rolling forward
 to an image with the check repairs them within 5 minutes.
 
+**What the LangWatchQL check repairs.** Every 5 minutes the worker's check creates the app-owned
+objects that are missing (engine tables, views, key map, app functions, approved PostgreSQL views)
+and grants the reader SELECT on an approved view that lacks it. It never compares columns, never
+revokes and never creates the reader role, so a changed column or a missing role converges only on
+a deploy: use Ops > Upgrades Retry. Alert on `level=error` with the message "lwql provisioning failed
+creating ClickHouse objects" or "lwql provisioning failed creating PostgreSQL objects"; the check
+also logs its failed statements at warn, in other words, every 5 minutes.
+
 ## One runner at a time
 
 Only one process runs the upgrade at once, because of the runner lease: a row lease in the

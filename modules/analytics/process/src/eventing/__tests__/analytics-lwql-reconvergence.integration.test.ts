@@ -170,12 +170,48 @@ describe("given a rendered install whose config store has not mounted the named 
     await Promise.all([harness?.stop(), postgres?.stop()]);
   });
 
+  describe("when the PostgreSQL catalog is read for the reader's approved views", () => {
+    /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
+    it("finds no gap for a role granted every view, and every view ungranted for a role that does not exist", async () => {
+      const views = selfProvisioning.approvedPostgresViews();
+      const repository = PrismaLangWatchQLPostgresRepository.create(database());
+
+      const granted = await repository.findApprovedViews({
+        schema: "public",
+        role: postgres.readerRole,
+        views,
+      });
+      expect(selfProvisioning.findPostgresGaps({ found: granted })).toEqual([]);
+
+      const absent = await repository.findApprovedViews({
+        schema: "public",
+        role: "lwql_role_that_does_not_exist",
+        views,
+      });
+      expect(selfProvisioning.findPostgresGaps({ found: absent })).toEqual(
+        views.map((view) => ({ view, absent: false })),
+      );
+    });
+  });
+
   describe("when checks run before and after the collection appears", () => {
     /** @scenario "A rendered install whose named collection appears late converges on a later check" */
     it("fails without crashing while it is absent, then converges on the next check and then does nothing", async () => {
+      // A deploy fails at the engine tables, but its PostgreSQL half and reader role land.
+      await convergeLwqlAccessModel({ database: database(), plan: plan() });
+      const [dropped, revoked] = selfProvisioning.approvedPostgresViews();
+      if (!dropped || !revoked) throw new Error("the catalog maps too few PostgreSQL datasets");
+      await database().$executeRawUnsafe(`DROP VIEW public."${dropped}"`);
+      await database().$executeRawUnsafe(
+        `REVOKE SELECT ON public."${revoked}" FROM ${LWQL_POSTGRES_READER_ROLE}`,
+      );
+
       const before = await findLwqlAppOwnedDrift({ database: database(), plan: plan() });
       expect(before.clickHouse).toEqual(expect.arrayContaining(ENGINE_TABLES));
-      expect(before.postgres.length).toBeGreaterThan(0);
+      expect(before.postgres).toEqual([
+        { view: dropped, absent: true },
+        { view: revoked, absent: false },
+      ]);
 
       for (let checks = 0; checks < 2; checks++) {
         await expect(freshWorkerCheck().check({ fillKeyMap: false })).resolves.toBeUndefined();
@@ -201,30 +237,6 @@ describe("given a rendered install whose config store has not mounted the named 
       const later = freshWorkerCheck();
       await later.check({ fillKeyMap: false });
       expect(later.convergeAppOwned).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the PostgreSQL catalog is read for the reader's approved views", () => {
-    /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
-    it("finds no gap for a role granted every view, and every view a gap for a role that does not exist", async () => {
-      const views = selfProvisioning.approvedPostgresViews().map((view) => view.name);
-      const repository = PrismaLangWatchQLPostgresRepository.create(database());
-
-      const granted = await repository.findApprovedViews({
-        schema: "public",
-        role: postgres.readerRole,
-        views,
-      });
-      expect(selfProvisioning.findPostgresGaps({ found: granted })).toEqual([]);
-
-      const absent = await repository.findApprovedViews({
-        schema: "public",
-        role: "lwql_role_that_does_not_exist",
-        views,
-      });
-      expect(selfProvisioning.findPostgresGaps({ found: absent }).toSorted()).toEqual(
-        views.toSorted(),
-      );
     });
   });
 });

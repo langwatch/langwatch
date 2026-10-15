@@ -18,6 +18,7 @@ import {
 import {
   LangWatchQLSelfProvisioningService,
   type LwqlAppOwnedDrift,
+  type LwqlPostgresGap,
   type LwqlSelfProvisionRequest,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
@@ -27,7 +28,10 @@ import type {
   ProvisioningFailureLevel,
 } from "../repositories/langwatch-ql-provisioning.repository.ts";
 import { PrismaLangWatchQLPostgresRepository } from "../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
-import { clickHouseErrorSummary } from "../rules/langwatch-ql-config-store.rules.ts";
+import {
+  clickHouseErrorSummary,
+  postgresErrorCodeFields,
+} from "../rules/langwatch-ql-config-store.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 
@@ -290,10 +294,8 @@ export interface LwqlConvergencePlan {
 
 /** The PostgreSQL failure as log fields: Prisma's code and the server's SQLSTATE, redacted. */
 function postgresFailureFields({ error, secret }: { error: unknown; secret: string }) {
-  const failure = error as { code?: unknown; meta?: { code?: unknown } } | null;
   return {
-    code: typeof failure?.code === "string" ? failure.code : null,
-    sqlState: typeof failure?.meta?.code === "string" ? failure.meta.code : null,
+    ...postgresErrorCodeFields(error),
     error: selfProvisioning.redactSecrets({
       text: error instanceof Error ? error.message : String(error),
       secrets: [secret],
@@ -301,44 +303,69 @@ function postgresFailureFields({ error, secret }: { error: unknown; secret: stri
   };
 }
 
-/** One message on both paths, so one alert covers a deploy's failure and a check's. */
-const POSTGRES_FAILED_MESSAGE = "lwql provisioning failed creating PostgreSQL objects";
+/** At warn the check logs its own alert, so a text-only alert must not match this line too. */
+const POSTGRES_FAILED_MESSAGES: Record<ProvisioningFailureLevel, string> = {
+  error: "lwql provisioning failed creating PostgreSQL objects",
+  warn: "lwql reconvergence statement failed",
+};
 
-/** The approved views (only the drifted ones, when named), then the reader role's grants. */
+/**
+ * A deploy's whole half: every approved view, then the reader role with its revokes and grants.
+ * A check's gaps: only the absent views, then additive grants on each gap, never a revoke.
+ */
+function postgresStatements({
+  plan,
+  gaps,
+}: {
+  plan: LwqlConvergencePlan;
+  gaps: readonly LwqlPostgresGap[] | undefined;
+}): string[] {
+  const schema = plan.schema;
+  const readerRole = LWQL_POSTGRES_READER_ROLE;
+  if (gaps === undefined) {
+    return [
+      ...lwqlProvisioning.postgresApprovedViewStatements({ schema, readerRole }),
+      // After the views: the reader role's grants name them.
+      ...selfProvisioning.postgresReaderStatements({
+        readerPassword: plan.request.postgresReaderPassword,
+        schema,
+      }),
+    ];
+  }
+  const absent = gaps.filter((gap) => gap.absent).map((gap) => gap.view);
+  const views = (approvedViews: string[]) => selfProvisioning.postgresDatasets({ approvedViews });
+  return [
+    ...lwqlProvisioning.postgresApprovedViewStatements({
+      schema,
+      readerRole,
+      views: views(absent),
+    }),
+    ...lwqlProvisioning.postgresReaderGrantStatements({
+      schema,
+      role: readerRole,
+      views: views(gaps.map((gap) => gap.view)),
+    }),
+  ];
+}
+
 async function convergePostgres({
   database,
   plan,
   failureLevel,
-  only,
+  gaps,
 }: {
   database: LwqlProvisioningDatabase;
   plan: LwqlConvergencePlan;
   failureLevel: ProvisioningFailureLevel;
-  only: readonly string[] | undefined;
+  gaps: readonly LwqlPostgresGap[] | undefined;
 }): Promise<unknown> {
   try {
-    await runPostgresStatements({
-      database,
-      statements: [
-        ...lwqlProvisioning.postgresApprovedViewStatements({
-          schema: plan.schema,
-          readerRole: LWQL_POSTGRES_READER_ROLE,
-          ...(only === undefined
-            ? {}
-            : { views: selfProvisioning.postgresDatasets({ approvedViews: only }) }),
-        }),
-        // After the views: the reader role's grants name them.
-        ...selfProvisioning.postgresReaderStatements({
-          readerPassword: plan.request.postgresReaderPassword,
-          schema: plan.schema,
-        }),
-      ],
-    });
+    await runPostgresStatements({ database, statements: postgresStatements({ plan, gaps }) });
     return undefined;
   } catch (error) {
     logger[failureLevel](
       postgresFailureFields({ error, secret: plan.request.postgresReaderPassword }),
-      POSTGRES_FAILED_MESSAGE,
+      POSTGRES_FAILED_MESSAGES[failureLevel],
     );
     return error;
   }
@@ -357,10 +384,9 @@ async function convergeLocked({
   sourceDatabase: string;
 }): Promise<void> {
   const failureLevel: ProvisioningFailureLevel = only ? "warn" : "error";
+  const gaps = only?.postgres === "unknown" ? [] : only?.postgres;
   const postgresFailure =
-    only && only.postgres.length === 0
-      ? undefined
-      : await convergePostgres({ database, plan, failureLevel, only: only?.postgres });
+    gaps?.length === 0 ? undefined : await convergePostgres({ database, plan, failureLevel, gaps });
   if (!only || only.clickHouse.length > 0) {
     await withProvisioningRepository({
       open: plan.openRepository,
@@ -424,27 +450,27 @@ export async function convergeLwqlAccessModel({
   }
 }
 
-/** A PostgreSQL that cannot be read is left alone this check, never mistaken for a gap. */
-async function findPostgresGaps({
+/** A PostgreSQL that cannot be read is `unknown`: never mistaken for a gap or for converged. */
+async function readPostgresGaps({
   database,
   schema,
 }: {
   database: LwqlProvisioningDatabase;
   schema: string;
-}): Promise<string[]> {
+}): Promise<LwqlAppOwnedDrift["postgres"]> {
   try {
     const found = await PrismaLangWatchQLPostgresRepository.create(database).findApprovedViews({
       schema,
       role: LWQL_POSTGRES_READER_ROLE,
-      views: selfProvisioning.approvedPostgresViews().map((view) => view.name),
+      views: selfProvisioning.approvedPostgresViews(),
     });
     return selfProvisioning.findPostgresGaps({ found });
   } catch (error) {
     logger.warn(
-      { error: clickHouseErrorSummary(error) },
+      { error: clickHouseErrorSummary(error), ...postgresErrorCodeFields(error) },
       "lwql reconvergence check could not read the PostgreSQL catalog; it checks again in 5 minutes",
     );
-    return [];
+    return "unknown";
   }
 }
 
@@ -462,9 +488,9 @@ async function expectedAppFunctions({
 }
 
 /**
- * What the app-owned objects lack right now, from catalog reads only (no DDL): the key map,
- * engine tables, views and app functions in ClickHouse, and the approved views and their grant
- * in PostgreSQL. Throws when ClickHouse cannot be read.
+ * Which app-owned objects are absent, from catalog reads only: the key map, engine tables, views
+ * and app functions in ClickHouse, the approved views and their grant in PostgreSQL. Columns are
+ * the deploy's, never compared. Throws when ClickHouse cannot be read.
  */
 export async function findLwqlAppOwnedDrift({
   database,
@@ -480,14 +506,14 @@ export async function findLwqlAppOwnedDrift({
     fn: async (repository) => {
       const found = await repository.readInventory({
         database: names.database,
-        relations: relations.map((relation) => relation.name),
+        relations,
         functions: lwqlAppFunctionNames(),
       });
       const functions = await expectedAppFunctions({ repository, held: found.functions });
       return selfProvisioning.findDrift({ names, relations, functions, found });
     },
   });
-  const postgres = await findPostgresGaps({ database, schema: plan.schema });
+  const postgres = await readPostgresGaps({ database, schema: plan.schema });
   return { clickHouse: clickHouse.objects, postgres, keyMap: clickHouse.keyMap };
 }
 

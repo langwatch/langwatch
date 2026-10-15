@@ -1,6 +1,7 @@
 import type * as Observability from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { lwqlAppFunctionNames } from "../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,
@@ -11,8 +12,10 @@ import {
 } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import {
   convergeLwqlAccessModel,
+  findLwqlAppOwnedDrift,
   type LwqlConvergencePlan,
   LwqlProvisionTask,
 } from "../lwql-provision.task.ts";
@@ -248,25 +251,33 @@ describe("convergeLwqlAccessModel", () => {
       keyMap: false,
       ...drift,
     });
-    const [engineTable] = selfProvisioning
+    const engineTable = selfProvisioning
       .appOwnedRelations({ names: NAMES })
-      .filter((relation) => relation.name.endsWith("_pg"));
-    const approvedViews = selfProvisioning.approvedPostgresViews().map((view) => view.name);
-
-    /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
-    it("skips the PostgreSQL half when no approved view drifted", async () => {
-      const postgres = postgresThat({ refuses: false });
-      const clickHouse = clickHouseThat();
-
-      await convergeLwqlAccessModel({
-        database: postgres.database,
-        plan: clickHouse.plan,
-        failOnError: true,
-        only: only({ clickHouse: [engineTable?.name ?? ""] }),
+      .find((name) => name.endsWith("_pg"));
+    const approvedViews = selfProvisioning.approvedPostgresViews();
+    const viewStatements = (view: string) =>
+      LangWatchQLProductionProvisioningService.create().postgresApprovedViewStatements({
+        schema: "public",
+        readerRole: LWQL_POSTGRES_READER_ROLE,
+        views: selfProvisioning.postgresDatasets({ approvedViews: [view] }),
       });
 
-      expect(postgres.ran).toEqual([]);
-      expect(clickHouse.ran.filter((s) => s.includes("ENGINE = PostgreSQL"))).toHaveLength(1);
+    /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
+    it("skips the PostgreSQL half when no approved view drifted, or PostgreSQL was unread", async () => {
+      for (const postgresDrift of [[], "unknown"] as const) {
+        const postgres = postgresThat({ refuses: false });
+        const clickHouse = clickHouseThat();
+
+        await convergeLwqlAccessModel({
+          database: postgres.database,
+          plan: clickHouse.plan,
+          failOnError: true,
+          only: only({ clickHouse: [engineTable ?? ""], postgres: postgresDrift }),
+        });
+
+        expect(postgres.ran).toEqual([]);
+        expect(clickHouse.ran.filter((s) => s.includes("ENGINE = PostgreSQL"))).toHaveLength(1);
+      }
     });
 
     /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
@@ -278,55 +289,152 @@ describe("convergeLwqlAccessModel", () => {
         database: postgres.database,
         plan: clickHouse.plan,
         failOnError: true,
-        only: only({ postgres: approvedViews.slice(0, 1) }),
+        only: only({ postgres: [{ view: approvedViews[0] ?? "", absent: true }] }),
       });
 
       expect(postgres.ran.length).toBeGreaterThan(0);
       expect(clickHouse.ran).toEqual([]);
     });
 
-    /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing or stale" */
-    it("re-creates only the drifted approved view, then converges the reader's grants", async () => {
-      const [drifted, untouched] = approvedViews;
-      if (!drifted || !untouched) throw new Error("the catalog maps too few PostgreSQL datasets");
+    /** @scenario "An older worker never rewrites a newer view" */
+    it("creates only the absent approved view, grants SELECT on each gap and never revokes", async () => {
+      const [absent, ungranted, untouched] = approvedViews;
+      if (!absent || !ungranted || !untouched) throw new Error("the catalog maps too few datasets");
       const postgres = postgresThat({ refuses: false });
-      const viewStatements = (view: string) =>
-        LangWatchQLProductionProvisioningService.create().postgresApprovedViewStatements({
-          schema: "public",
-          readerRole: LWQL_POSTGRES_READER_ROLE,
-          views: selfProvisioning.postgresDatasets({ approvedViews: [view] }),
-        });
       const ran = (statement: string) => postgres.ran.some((run) => run.endsWith(statement));
 
       await convergeLwqlAccessModel({
         database: postgres.database,
         plan: clickHouseThat().plan,
         failOnError: true,
-        only: only({ postgres: [drifted] }),
+        only: only({
+          postgres: [
+            { view: absent, absent: true },
+            { view: ungranted, absent: false },
+          ],
+        }),
       });
 
-      expect(viewStatements(drifted).every(ran)).toBe(true);
+      expect(viewStatements(absent).every(ran)).toBe(true);
+      expect(viewStatements(ungranted).some(ran)).toBe(false);
       expect(viewStatements(untouched).some(ran)).toBe(false);
+      const grants = postgres.ran.join("\n");
+      expect(grants).toContain(`GRANT SELECT ON "public"."${absent}"`);
+      expect(grants).toContain(`GRANT SELECT ON "public"."${ungranted}"`);
+      expect(grants).not.toContain(`"${untouched}" TO`);
+      expect(grants).not.toMatch(/REVOKE|ALTER ROLE|CREATE ROLE/);
+    });
+
+    /** @scenario "An older worker never rewrites a newer view" */
+    it("keeps the revokes and the full grants on a deploy's converge", async () => {
+      const postgres = postgresThat({ refuses: false });
+
+      await convergeLwqlAccessModel({ database: postgres.database, plan: clickHouseThat().plan });
+
       expect(postgres.ran.some((run) => run.includes("REVOKE ALL"))).toBe(true);
     });
 
     /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
-    it("logs its own failure at warn, leaving the alert to the check, where a deploy logs error", async () => {
+    it("logs its own failure at warn in other words than the alert, where a deploy logs the alert", async () => {
       const failing = /ENGINE = PostgreSQL/;
-      const errorsOf = async (drift: LwqlAppOwnedDrift | undefined) => {
+      const logsOf = async (drift: LwqlAppOwnedDrift | undefined, refuses: boolean) => {
         logCalls.length = 0;
         await convergeLwqlAccessModel({
-          database: postgresThat({ refuses: false }).database,
+          database: postgresThat({ refuses }).database,
           plan: clickHouseThat({ failing }).plan,
           ...(drift ? { only: drift } : {}),
         });
-        return logCalls.filter((call) => call.level === "error").map((call) => call.message);
+        return logCalls;
       };
-
-      expect(await errorsOf(only({ clickHouse: [engineTable?.name ?? ""] }))).toEqual([]);
-      expect(await errorsOf(undefined)).toContain(
+      const alerts = [
         "lwql provisioning failed creating ClickHouse objects",
+        "lwql provisioning failed creating PostgreSQL objects",
+      ];
+      const gap = { view: approvedViews[0] ?? "", absent: true };
+
+      const check = await logsOf(only({ clickHouse: [engineTable ?? ""], postgres: [gap] }), true);
+      expect(check.filter((call) => call.level === "error")).toEqual([]);
+      expect(check.filter((call) => alerts.includes(String(call.message)))).toEqual([]);
+      expect(check).toContainEqual(
+        expect.objectContaining({
+          level: "warn",
+          fields: expect.objectContaining({ code: "P2010", sqlState: "42501" }),
+          message: "lwql reconvergence statement failed",
+        }),
       );
+
+      const deploy = await logsOf(undefined, true);
+      const errors = deploy.filter((call) => call.level === "error").map((call) => call.message);
+      expect(errors).toEqual(expect.arrayContaining(alerts));
     });
+  });
+});
+
+describe("findLwqlAppOwnedDrift", () => {
+  const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
+  const approvedViews = selfProvisioning.approvedPostgresViews();
+  const catalogColumns = LWQL_VIEW_CATALOG.flatMap((view) => view.columns.map((c) => c.name));
+
+  /** Every app-owned object present, each with `columns`; a read of columns is answered too. */
+  function presentWith({
+    columns,
+    postgresRead = true,
+  }: {
+    columns: string[];
+    postgresRead?: boolean;
+  }) {
+    const database: LwqlProvisioningDatabase = {
+      ...postgresThat({ refuses: false }).database,
+      $queryRawUnsafe: async () => {
+        if (!postgresRead) throw Object.assign(new Error("connection refused"), { code: "P1001" });
+        return approvedViews.map((view) => ({ view, granted: true, columns }));
+      },
+    };
+    const plan = {
+      names: NAMES,
+      schema: "public",
+      openRepository: () =>
+        ClickHouseLangWatchQLProvisioningRepository.create({
+          statements: {
+            command: async () => undefined,
+            rows: async (sql: string) => {
+              if (sql.includes("system.functions")) {
+                return lwqlAppFunctionNames().map((name) => ({ name }));
+              }
+              if (sql.includes("system.columns")) {
+                return relations.map((table) => ({ table, columns }));
+              }
+              return relations.map((name) => ({ name }));
+            },
+            insert: async () => undefined,
+          },
+        }),
+    };
+    return findLwqlAppOwnedDrift({ database, plan });
+  }
+
+  /** @scenario "An older worker never rewrites a newer view" */
+  it.each([
+    {
+      shape: "a newer deploy's extra columns",
+      columns: [...catalogColumns, "AddedByANewerDeploy"],
+    },
+    { shape: "fewer columns than this worker's catalog declares", columns: ["TenantId"] },
+  ])("finds no drift in objects holding $shape", async ({ columns }) => {
+    expect(await presentWith({ columns })).toEqual({ clickHouse: [], postgres: [], keyMap: false });
+  });
+
+  /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
+  it("reads an unreadable PostgreSQL as unknown, with a warning, never as a gap or as converged", async () => {
+    const drift = await presentWith({ columns: catalogColumns, postgresRead: false });
+
+    expect(drift.postgres).toBe("unknown");
+    expect(logCalls).toContainEqual(
+      expect.objectContaining({
+        level: "warn",
+        fields: expect.objectContaining({ code: "P1001" }),
+      }),
+    );
+    expect(logCalls.map((call) => call.level)).not.toContain("error");
   });
 });
