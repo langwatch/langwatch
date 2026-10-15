@@ -1,6 +1,6 @@
 import { ATTR_KEYS, CODEX_TURN_SPAN_NAME } from "../attributeKeys.ts";
 import { type ExtractorContext, takeAttribute } from "../canonicalAttributes.ts";
-import { restateInputAsFresh } from "../canonicalExtraction.ts";
+import { restateInputAsFresh, setFreshInputTokens } from "../canonicalExtraction.ts";
 import {
   applyCanonicalLifts,
   asNumber,
@@ -87,7 +87,10 @@ export class CodexSpanCanonicaliserService {
     }
     // Codex's own non-cached count wins over a whole input the GenAI pass read.
     if (nonCachedInput !== null) {
-      ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, nonCachedInput);
+      setFreshInputTokens(ctx, {
+        freshInput: nonCachedInput,
+        ruleId: "codex/session_task.turn(fresh input)",
+      });
     } else {
       this.restateWholeInput(ctx);
     }
@@ -122,13 +125,9 @@ export class CodexSpanCanonicaliserService {
 
   /**
    * Codex sends `gen_ai.usage.input_tokens` as the whole input, cached tokens included, as the
-   * OpenAI usage does. A span that also sends a cache write was restated by the GenAI pass.
+   * OpenAI usage does.
    */
   private restateWholeInput(ctx: ExtractorContext): void {
-    if (ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS)) {
-      return;
-    }
-
     restateInputAsFresh(ctx, { cacheWrite: 0, ruleId: "codex/usage.input_tokens(fresh)" });
   }
 

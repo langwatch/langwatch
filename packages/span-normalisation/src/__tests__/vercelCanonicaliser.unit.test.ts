@@ -290,19 +290,41 @@ describe("VercelCanonicaliserService", () => {
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(371);
     });
 
-    it("falls back to the cachedInputTokens alias for the read count", () => {
+    /** @scenario "An AI SDK v5 Anthropic span's input count is kept as sent" */
+    it("keeps an AI SDK v5 Anthropic input count, which excludes the cache, as sent", () => {
       const ctx = createExtractorContext(
         {
           [ATTR_KEYS.AI_MODEL]: JSON.stringify({
             id: "claude-haiku-4-5",
-            provider: "anthropic",
+            provider: "anthropic.messages",
           }),
+          "gen_ai.usage.input_tokens": 255,
+          [ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS]: 8745,
+        },
+        {
+          name: "ai.streamText.doStream",
+          instrumentationScope: { name: "ai", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(8745);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBeUndefined();
+      expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS)).toBe(255);
+    });
+
+    /** @scenario "An AI SDK v5 OpenAI span's input count is restated as fresh input" */
+    it("restates an AI SDK v5 OpenAI input count, which includes the cache, falling back to the cachedInputTokens alias", () => {
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_MODEL]: JSON.stringify({ id: "gpt-5-mini", provider: "openai.chat" }),
           "gen_ai.usage.input_tokens": 9000,
           [ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS]: 8745,
         },
         {
           name: "ai.streamText.doStream",
-          instrumentationScope: { name: "opencode", version: null },
+          instrumentationScope: { name: "ai", version: null },
         },
       );
 

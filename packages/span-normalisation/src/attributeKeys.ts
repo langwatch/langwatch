@@ -35,6 +35,7 @@ export const ATTR_KEYS = {
   GEN_AI_USAGE_OUTPUT_TOKENS: "gen_ai.usage.output_tokens",
   GEN_AI_USAGE_PROMPT_TOKENS: "gen_ai.usage.prompt_tokens",
   GEN_AI_USAGE_COMPLETION_TOKENS: "gen_ai.usage.completion_tokens",
+  GEN_AI_USAGE_TOTAL_TOKENS: "gen_ai.usage.total_tokens",
   // Reasoning output tokens (OTel GenAI semconv v1.41). Supersedes the legacy
   // gen_ai.usage.reasoning_tokens; canonicalised onto it so downstream
   // metric/cost mapping keeps reading one key.
@@ -238,9 +239,14 @@ export const ATTR_KEYS = {
   // reader which cache a session is paying for.
   GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS: "gen_ai.usage.cache_creation_5m.input_tokens",
   GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS: "gen_ai.usage.cache_creation_1h.input_tokens",
-  GEN_AI_USAGE_CACHED_INPUT_TOKENS: "gen_ai.usage.cached_input_tokens", // Mastra non-standard
-  // The GenAI conventions' cache-write count. Emitters that send it report the
-  // input count with the cache reads and writes included.
+  // The flat cache-read count the LangWatch SDKs and older Mastra releases send.
+  GEN_AI_USAGE_CACHED_INPUT_TOKENS: "gen_ai.usage.cached_input_tokens",
+  // Older OpenLLMetry and Strands releases' cache counts.
+  GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS_LEGACY: "gen_ai.usage.cache_read_input_tokens",
+  GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS_LEGACY: "gen_ai.usage.cache_creation_input_tokens",
+  GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS_LEGACY: "gen_ai.usage.cache_write_input_tokens",
+  // The Claude SDK's cache-write count. It sends the input count with the cache
+  // reads and writes included.
   GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS: "gen_ai.usage.cache_write.input_tokens",
 
   // Claude SDK and Claude API spans (platform.claude.com OpenTelemetry reference)
