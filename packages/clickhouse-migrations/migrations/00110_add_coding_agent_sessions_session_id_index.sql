@@ -12,13 +12,12 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions
     TYPE bloom_filter(0.001) GRANULARITY 1;
 -- +goose StatementEnd
 
--- ADD INDEX covers only parts written after it, so backfill the existing ones inline: the
--- table is small, so the rewrite is cheap now. Deferring it to an ops task left the indexes
--- of migrations 00062 and 00063 inert for a month (#5864).
-
+-- ADD INDEX covers only parts written after it; materialise the existing ones as a background
+-- mutation. Deferring it to an ops task left the indexes of 00062 and 00063 inert for a month (#5864).
+-- background step: coding-agent:track-session-id-index-materialisation
 -- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions
-  MATERIALIZE INDEX idx_session_id SETTINGS mutations_sync = 0;
+  MATERIALIZE INDEX idx_session_id;
 -- +goose StatementEnd
 
 -- +goose Down

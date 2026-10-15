@@ -2,6 +2,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { CodingAgentServerConfig } from "@langwatch/coding-agent-contract";
 import type { Cluster, Redis } from "ioredis";
 
+import { ClickHouseCodingAgentSessionIndexMaterialisationRepository } from "../clickhouse/clickhouse.coding-agent-session-index-materialisation.repository.ts";
 import { ClickHouseCodingAgentRepositories } from "../clickhouse/clickhouse.coding-agent.repositories.ts";
 import type { CodingAgentRepositories } from "../coding-agent.repositories.ts";
 import { RedisCodingAgentSessionFoldCacheRepository } from "../redis/redis.coding-agent-session-fold-cache.repository.ts";
@@ -27,6 +28,8 @@ export class LiveCodingAgentRepositories {
         redis,
         ttlSeconds: config.foldCacheTtlSeconds,
       }),
+      sessionIdIndexMaterialisation:
+        ClickHouseCodingAgentSessionIndexMaterialisationRepository.create(clickhouse),
     };
   }
 }

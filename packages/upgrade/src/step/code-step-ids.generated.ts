@@ -11,6 +11,7 @@ export type CodeStepId =
   | "automation:reconcile-slack-claims"
   | "billing:record-usage-billing-catch-up"
   | "billing:fill-seat-change-organizations"
+  | "coding-agent:track-session-id-index-materialisation"
   | "data-retention:keep-control-plane-events-forever"
   | "dataset:move-content-to-object-storage"
   | "governance:record-coding-assistant-billing"
