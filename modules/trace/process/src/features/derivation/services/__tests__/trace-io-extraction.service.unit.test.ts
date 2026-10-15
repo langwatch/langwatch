@@ -884,4 +884,78 @@ describe("TraceIOExtractionService", () => {
       });
     });
   });
+
+  describe("when a span carries serialised LangChain messages", () => {
+    const dumpd = (className: string, kwargs: Record<string, unknown>) => ({
+      lc: 1,
+      type: "constructor",
+      id: ["langchain", "schema", "messages", className],
+      kwargs,
+    });
+
+    /** @scenario "A span input of LangChain messages gives the trace the last user message as input" */
+    it("reads the last user message as the input text", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.input": {
+            messages: [
+              [
+                dumpd("SystemMessage", {
+                  content: "You are a helpful travel agent.",
+                  type: "system",
+                }),
+                dumpd("HumanMessage", {
+                  content: [{ type: "text", text: "What is the weather in Paris?" }],
+                  type: "human",
+                }),
+              ],
+            ],
+          },
+        },
+      });
+
+      expect(service.extractRichIOFromSpan(span, "input")?.text).toBe(
+        "What is the weather in Paris?",
+      );
+    });
+
+    /** @scenario "A span input of LangChain messages gives the trace the last user message as input" */
+    it("does not take a system prompt as the input text when no user message has text", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.input": {
+            messages: [
+              [dumpd("SystemMessage", { content: "You are a helpful agent.", type: "system" })],
+            ],
+          },
+        },
+      });
+
+      expect(service.extractRichIOFromSpan(span, "input")).toBeNull();
+    });
+
+    /** @scenario "A span output of LangChain messages gives the trace the last assistant reply as output" */
+    it("reads the last assistant message with text as the output text", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.output": {
+            messages: [
+              dumpd("HumanMessage", { content: "What is the weather in Paris?", type: "human" }),
+              dumpd("AIMessage", {
+                content: "",
+                type: "ai",
+                tool_calls: [{ name: "get_weather", args: { city: "Paris" }, id: "call_1" }],
+              }),
+              dumpd("ToolMessage", { content: "Sunny, 22C", type: "tool", tool_call_id: "call_1" }),
+              dumpd("AIMessage", { content: "It is sunny and 22C in Paris.", type: "ai" }),
+            ],
+          },
+        },
+      });
+
+      expect(service.extractRichIOFromSpan(span, "output")?.text).toBe(
+        "It is sunny and 22C in Paris.",
+      );
+    });
+  });
 });
