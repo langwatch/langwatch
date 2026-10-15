@@ -97,9 +97,20 @@ export class ProcessServer implements ProcessBoot {
     if (!this.config.http)
       throw new Error("The HTTP config owner must be installed before exposing transports.");
     const config = this.config.http as ApiHostConfig;
+    const storage = (this.config.stores as StoresConfig | undefined)?.objectStorage;
     return {
       production: this.production,
       assetOrigin: assetBaseOrigin(normalizeAssetBase(config.assetBase)),
+      ...(storage
+        ? {
+            storage: {
+              s3Endpoint: storage.s3.endpoint,
+              s3Region: storage.s3.region,
+              s3Bucket: storage.s3.bucket,
+              azureBlobEndpoint: storage.azure.endpoint,
+            },
+          }
+        : {}),
     };
   }
 
@@ -154,12 +165,6 @@ export class ProcessServer implements ProcessBoot {
         doors = RawHttpHost.create();
         surface = await processSurface({
           config: this.config.http as ApiHostConfig,
-          storage: {
-            s3Endpoint: config.objectStorage.s3.endpoint,
-            s3Region: config.objectStorage.s3.region,
-            s3Bucket: config.objectStorage.s3.bucket,
-            azureBlobEndpoint: config.objectStorage.azure.endpoint,
-          },
           production: this.production,
           isSaas: this.settings.isSaas ?? false,
           executionProxyBaseUrl: this.settings.nlpServiceUrl,

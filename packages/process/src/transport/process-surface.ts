@@ -1,6 +1,5 @@
 import type { RawHttpHost, TransportPeers, WebSocketHost } from "@langwatch/api";
 import type { TransportSelection } from "@langwatch/api/hosting";
-import type { StorageEndpoints } from "@langwatch/api/policy";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import type { ScopedSecrets } from "@langwatch/secrets";
 
@@ -11,7 +10,6 @@ import { apiOwner, type ApiHostConfig } from "./config-owner.ts";
 
 export async function processSurface({
   config,
-  storage,
   production,
   isSaas,
   executionProxyBaseUrl,
@@ -24,8 +22,6 @@ export async function processSurface({
   doors,
 }: {
   config: ApiHostConfig;
-  /** The shared bucket the browser uploads to directly; the page policy must admit it. */
-  storage: StorageEndpoints;
   production: boolean;
   isSaas: boolean;
   executionProxyBaseUrl: string | undefined;
@@ -50,7 +46,6 @@ export async function processSurface({
     logger: members.read("logger"),
     stores: { database: true, redis: true },
     bundle,
-    storage,
     instanceAdmin,
     trustedProxies: config.trustedProxies,
     executionProxyBaseUrl,
