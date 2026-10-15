@@ -402,10 +402,12 @@ function RowTrailing({
   file,
   isOpen,
   onToggle,
+  onOpen,
 }: {
   file: BulkFile;
   isOpen: boolean;
   onToggle: () => void;
+  onOpen: () => void;
 }) {
   switch (file.status) {
     case "pending":
@@ -450,7 +452,18 @@ function RowTrailing({
       );
     case "ready":
       return (
-        <HStack gap={1} color="fg.success" textStyle="bodySm">
+        <HStack
+          as="button"
+          gap={1}
+          color="fg.success"
+          textStyle="bodySm"
+          cursor="pointer"
+          title="Open dataset"
+          aria-label={`Open dataset ${file.name}`}
+          data-testid="dataset-bulk-open"
+          _hover={{ textDecoration: "underline" }}
+          onClick={onOpen}
+        >
           <CheckCircle size={14} />
           <Text>Ready</Text>
         </HStack>
@@ -504,6 +517,7 @@ function BulkFileRow({
   onName,
   onReady,
   onFailed,
+  onOpen,
 }: {
   file: BulkFile;
   projectId: string;
@@ -514,6 +528,7 @@ function BulkFileRow({
   onName: (next: string) => void;
   onReady: () => void;
   onFailed: (error?: string) => void;
+  onOpen: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   // Only an in-flight PUT is cancellable; a `processing` row is already
@@ -557,7 +572,12 @@ function BulkFileRow({
           </Text>
         </VStack>
         <Spacer />
-        <RowTrailing file={file} isOpen={isOpen} onToggle={() => setIsOpen((o) => !o)} />
+        <RowTrailing
+          file={file}
+          isOpen={isOpen}
+          onToggle={() => setIsOpen((o) => !o)}
+          onOpen={onOpen}
+        />
         {file.status === "failed" && (
           <Button size="xs" variant="outline" onClick={onRetry}>
             <RefreshCw size={12} /> Retry
@@ -646,7 +666,9 @@ export function BulkUploadDrawer({
    *  instead. Omit to hide the "Skip" affordance. */
   onCreateFromScratch?: () => void;
 }) {
-  const projectId = useDatasetHost().project()?.id;
+  const host = useDatasetHost();
+  const projectId = host.project()?.id;
+  const projectSlug = host.project()?.slug;
   const importTransport = useDatasetImportTransport();
   const retryNormalize = datasetClient.dataset.retryNormalize.useMutation();
   const bulkTransport: BulkUploadTransport = useMemo(
@@ -679,6 +701,12 @@ export function BulkUploadDrawer({
       ? `Fix the column names in ${invalidFiles.join(", ")} (open "confirm types").`
       : undefined;
   const unavailableReason = unavailableReasonOf({ hasUploadable: bulk.hasUploadable, projectId });
+
+  const openDataset = (datasetId: string | undefined) => {
+    if (!datasetId || !projectSlug) return;
+    host.navigate(`/${projectSlug}/datasets/${datasetId}`);
+    onClose();
+  };
 
   const upload = () => {
     setRefused(hasInvalidColumns);
@@ -784,7 +812,9 @@ export function BulkUploadDrawer({
               onReady={() => {
                 bulk.markReady(file.id);
                 onUploaded?.();
+                if (bulk.files.length === 1) openDataset(file.datasetId);
               }}
+              onOpen={() => openDataset(file.datasetId)}
               onFailed={(error) => bulk.markFailed(file.id, error)}
             />
           ))}

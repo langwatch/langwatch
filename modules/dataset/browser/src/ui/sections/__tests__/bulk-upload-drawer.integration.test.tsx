@@ -226,6 +226,37 @@ describe("given the bulk upload drawer", () => {
       expect(createFromStoredObject).toHaveBeenCalledTimes(2);
     });
 
+    it("opens the dataset and closes the drawer when a single file becomes ready", async () => {
+      const user = userEvent.setup();
+      const onClose = vi.fn();
+      const { host } = renderWithDatasetHost(<BulkUploadDrawer open onClose={onClose} />, {
+        project: { id: "proj_1", slug: "proj" },
+      });
+      await user.upload(fileInput(), [csv("one.csv")]);
+      await waitFor(() => expect(screen.getByText("one")).toBeInTheDocument());
+
+      await user.click(uploadButton());
+
+      await waitFor(() => expect(host.navigations).toEqual(["/proj/datasets/dataset_1"]));
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it("opens a ready dataset when its row is clicked among several files", async () => {
+      const user = userEvent.setup();
+      const { host } = renderWithDatasetHost(<BulkUploadDrawer open onClose={vi.fn()} />, {
+        project: { id: "proj_1", slug: "proj" },
+      });
+      await user.upload(fileInput(), [csv("one.csv"), csv("two.csv")]);
+      await waitFor(() => expect(screen.getByText("one")).toBeInTheDocument());
+      await user.click(uploadButton());
+
+      const open = await screen.findAllByTestId("dataset-bulk-open");
+      expect(host.navigations).toEqual([]);
+      await user.click(open[0]!);
+
+      expect(host.navigations).toEqual(["/proj/datasets/dataset_1"]);
+    });
+
     /** @scenario The types I confirmed are applied to that file's dataset */
     it("sends the confirmed column types for that file", async () => {
       const user = userEvent.setup();
