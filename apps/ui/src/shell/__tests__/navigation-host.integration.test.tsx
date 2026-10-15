@@ -412,6 +412,59 @@ describe("the application chrome", () => {
     );
   });
 
+  describe("when nobody is signed in on a page that needs a session", () => {
+    class SignedOutSession extends UiSession {
+      currentUser(): null {
+        return null;
+      }
+      snapshot(): UiSessionSnapshot {
+        return {
+          session: { status: "anonymous", user: null },
+          scope: { status: "ready", organization: void 0, team: void 0, project: void 0 },
+          permissions: {
+            status: "ready",
+            isLoading: false,
+            can: () => false,
+            canInOrganization: () => false,
+          },
+        };
+      }
+      hasPermission(): boolean {
+        return false;
+      }
+      isSettled(): boolean {
+        return true;
+      }
+    }
+    class SignedOutScope extends UiScope {
+      activeScope(): UiActiveScope {
+        return { organizationId: null, projectId: null };
+      }
+    }
+    class RecordingRpc extends GraphRpc {
+      readonly paths: string[] = [];
+      override query(path: string): Promise<unknown> {
+        this.paths.push(path);
+        return super.query(path);
+      }
+    }
+
+    /** @scenario "A page that needs a session asks for the scope graph only once someone is signed in" */
+    it("does not ask for the scope graph, which would only answer 401", async () => {
+      const rpc = new RecordingRpc();
+
+      renderChrome({
+        ...HOST_SERVICES,
+        rpc,
+        session: new SignedOutSession(),
+        scope: new SignedOutScope(),
+      });
+      await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+
+      expect(rpc.paths).not.toContain("organization.getScopeGraph");
+    });
+  });
+
   describe("when the workspace read is refused", () => {
     it("says the workspace could not be opened and offers to try again", async () => {
       class FailingRpc extends GraphRpc {

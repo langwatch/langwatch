@@ -7,7 +7,7 @@
 # Trigger policy:
 # - workflow_dispatch (manual, with optional `port_base` input)
 # - nightly schedule (04:00 UTC)
-# - push, on any branch INCLUDING main, when key files change
+# - push, on any branch INCLUDING main, when key files change (Linux only off main)
 #
 # main was excluded from the push trigger for as long as this file has existed,
 # which left the nightly as its only cover. A defect that lands after the
@@ -76,10 +76,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner:
-          - macos-latest
-          - ubuntu-latest
-          - ubuntu-24.04-arm
+        # Every platform on main, nightly and manual runs; a branch push gets
+        # Linux only. Branch pushes were 118 runs in three days, each holding a
+        # macOS and an arm runner for ~18 minutes.
+        runner: ${{ fromJSON((github.ref == 'refs/heads/main' || github.event_name != 'push') && '["macos-latest","ubuntu-latest","ubuntu-24.04-arm"]' || '["ubuntu-latest"]') }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 35
     env:

@@ -4,6 +4,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 
 import { DashboardModule } from "./app/dashboard.app.ts";
 import { dashboardRepositories } from "./repositories/dashboard-repositories.registry.ts";
+import { widgetSourceOfCredential } from "./rules/dashboard-widget-source.rules.ts";
 import { dashboardWidgetRest } from "./transport/dashboard-widget.rest.ts";
 import { dashboardWidgetTrpcTransport } from "./transport/dashboard-widget.trpc.ts";
 import { dashboardRest } from "./transport/dashboard.rest.ts";
@@ -53,4 +54,6 @@ export const dashboardProcessModule: PublishedProcessModule<
       app.dashboardWidgetPlatformUrl({
         projectSlug: projectCredentialOfRequest(request).project.slug,
       }),
+    dashboardWidgetCallerSource: (request) =>
+      widgetSourceOfCredential({ credential: projectCredentialOfRequest(request) }),
   });

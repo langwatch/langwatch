@@ -11,6 +11,8 @@ export function completeDatasetApi(overrides: Partial<DatasetApi> = {}): Dataset
     validateDatasetName: unused,
     findNextAvailableName: unused,
     listDatasets: unused,
+    findDatasetSummaries: unused,
+    countRecords: unused,
     listStoragePage: unused,
     getBySlugOrId: unused,
     findBySlugOrId: unused,

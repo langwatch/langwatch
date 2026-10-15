@@ -11,6 +11,12 @@ from ..models.post_api_workflows_by_workflow_id_run_response_200_status import (
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.post_api_workflows_by_workflow_id_run_response_200_error import (
+        PostApiWorkflowsByWorkflowIdRunResponse200Error,
+    )
+    from ..models.post_api_workflows_by_workflow_id_run_response_200_nodes import (
+        PostApiWorkflowsByWorkflowIdRunResponse200Nodes,
+    )
     from ..models.post_api_workflows_by_workflow_id_run_response_200_result_type_0 import (
         PostApiWorkflowsByWorkflowIdRunResponse200ResultType0,
     )
@@ -25,10 +31,20 @@ class PostApiWorkflowsByWorkflowIdRunResponse200:
     Attributes:
         status (PostApiWorkflowsByWorkflowIdRunResponse200Status):
         result (None | PostApiWorkflowsByWorkflowIdRunResponse200ResultType0 | Unset):
+        trace_id (str | Unset):
+        nodes (PostApiWorkflowsByWorkflowIdRunResponse200Nodes | Unset):
+        total_cost (float | Unset):
+        duration_ms (float | Unset):
+        error (PostApiWorkflowsByWorkflowIdRunResponse200Error | Unset):
     """
 
     status: PostApiWorkflowsByWorkflowIdRunResponse200Status
     result: None | PostApiWorkflowsByWorkflowIdRunResponse200ResultType0 | Unset = UNSET
+    trace_id: str | Unset = UNSET
+    nodes: PostApiWorkflowsByWorkflowIdRunResponse200Nodes | Unset = UNSET
+    total_cost: float | Unset = UNSET
+    duration_ms: float | Unset = UNSET
+    error: PostApiWorkflowsByWorkflowIdRunResponse200Error | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.post_api_workflows_by_workflow_id_run_response_200_result_type_0 import (
@@ -45,6 +61,20 @@ class PostApiWorkflowsByWorkflowIdRunResponse200:
         else:
             result = self.result
 
+        trace_id = self.trace_id
+
+        nodes: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.nodes, Unset):
+            nodes = self.nodes.to_dict()
+
+        total_cost = self.total_cost
+
+        duration_ms = self.duration_ms
+
+        error: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.error, Unset):
+            error = self.error.to_dict()
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -54,11 +84,27 @@ class PostApiWorkflowsByWorkflowIdRunResponse200:
         )
         if result is not UNSET:
             field_dict["result"] = result
+        if trace_id is not UNSET:
+            field_dict["trace_id"] = trace_id
+        if nodes is not UNSET:
+            field_dict["nodes"] = nodes
+        if total_cost is not UNSET:
+            field_dict["total_cost"] = total_cost
+        if duration_ms is not UNSET:
+            field_dict["duration_ms"] = duration_ms
+        if error is not UNSET:
+            field_dict["error"] = error
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.post_api_workflows_by_workflow_id_run_response_200_error import (
+            PostApiWorkflowsByWorkflowIdRunResponse200Error,
+        )
+        from ..models.post_api_workflows_by_workflow_id_run_response_200_nodes import (
+            PostApiWorkflowsByWorkflowIdRunResponse200Nodes,
+        )
         from ..models.post_api_workflows_by_workflow_id_run_response_200_result_type_0 import (
             PostApiWorkflowsByWorkflowIdRunResponse200ResultType0,
         )
@@ -83,9 +129,34 @@ class PostApiWorkflowsByWorkflowIdRunResponse200:
 
         result = _parse_result(d.pop("result", UNSET))
 
+        trace_id = d.pop("trace_id", UNSET)
+
+        _nodes = d.pop("nodes", UNSET)
+        nodes: PostApiWorkflowsByWorkflowIdRunResponse200Nodes | Unset
+        if isinstance(_nodes, Unset):
+            nodes = UNSET
+        else:
+            nodes = PostApiWorkflowsByWorkflowIdRunResponse200Nodes.from_dict(_nodes)
+
+        total_cost = d.pop("total_cost", UNSET)
+
+        duration_ms = d.pop("duration_ms", UNSET)
+
+        _error = d.pop("error", UNSET)
+        error: PostApiWorkflowsByWorkflowIdRunResponse200Error | Unset
+        if isinstance(_error, Unset):
+            error = UNSET
+        else:
+            error = PostApiWorkflowsByWorkflowIdRunResponse200Error.from_dict(_error)
+
         post_api_workflows_by_workflow_id_run_response_200 = cls(
             status=status,
             result=result,
+            trace_id=trace_id,
+            nodes=nodes,
+            total_cost=total_cost,
+            duration_ms=duration_ms,
+            error=error,
         )
 
         return post_api_workflows_by_workflow_id_run_response_200

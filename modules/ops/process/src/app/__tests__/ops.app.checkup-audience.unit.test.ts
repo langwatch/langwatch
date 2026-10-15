@@ -271,15 +271,17 @@ describe("given no platform operator exists and the caller manages the organizat
   });
 
   describe("when the usage report switches are changed", () => {
-    /** @scenario "An organization manager changes what the install reports" */
-    it("writes the switches", async () => {
-      await managerApp().setUsageReportSwitches({
-        organizationId: "org-1",
-        operator: MANAGER,
-        hostnameOptOut: true,
-      });
+    /** @scenario "An organization manager cannot change what the install reports" */
+    it("refuses as operator-only and writes nothing", async () => {
+      await expect(
+        managerApp().setUsageReportSwitches({
+          organizationId: "org-1",
+          operator: MANAGER,
+          hostnameOptOut: true,
+        }),
+      ).rejects.toMatchObject({ code: "permission_denied" });
 
-      expect(switchWrites).toEqual([{ hostnameOptOut: true }]);
+      expect(switchWrites).toEqual([]);
     });
   });
 

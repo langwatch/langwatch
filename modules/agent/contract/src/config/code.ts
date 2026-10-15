@@ -49,6 +49,11 @@ const codeAgentConfigSchemaDefinition = z.object({
         ),
       "Code agent config requires a code parameter.",
     ),
+  /**
+   * Wall-clock budget for the agent's code, in milliseconds. The previous release stored and
+   * honoured it; a schema without it drops the stored value on every read and every save.
+   */
+  timeoutMs: z.number().int().positive().optional(),
   scenarioMappings: z.record(z.string(), agentInputBindingSchema).optional(),
   scenarioOutputField: z.string().optional(),
 });

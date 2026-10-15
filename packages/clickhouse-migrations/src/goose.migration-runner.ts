@@ -581,8 +581,13 @@ export function gooseVersionSyncStatement({
   return `SYSTEM SYNC REPLICA ON CLUSTER ${config.clusterName} ${config.database}.goose_db_version LIGHTWEIGHT`;
 }
 
-/** The most replicas any shard of the cluster has; a write waiting for all of them reaches each. */
-const CLUSTER_REPLICAS_QUERY = `SELECT toUInt32(count()) AS replicas FROM system.clusters
+/**
+ * The most replicas any shard of the cluster has. A Replicated database also lists a cluster under
+ * its own name (rows with database_shard_name set), so a same-named one counted each replica twice;
+ * the server's configured rows win, and the database's count only when it is the sole definition.
+ */
+const CLUSTER_REPLICAS_QUERY = `SELECT toUInt32(if(countIf(database_shard_name = '') > 0,
+    countIf(database_shard_name = ''), count())) AS replicas FROM system.clusters
   WHERE cluster = {cluster:String} GROUP BY shard_num ORDER BY replicas DESC LIMIT 1`;
 
 async function readClusterReplicas({

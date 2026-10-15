@@ -91,13 +91,21 @@ describe("a platform route", () => {
     return { asked, door };
   }
 
-  function declaration({ refusal, ran }: { refusal: "denied" | "hidden"; ran: string[] }) {
+  function declaration({
+    refusal,
+    ran,
+    permission = "ops:manage",
+  }: {
+    refusal: "denied" | "hidden";
+    ran: string[];
+    permission?: "ops:view" | "ops:manage";
+  }) {
     return defineRestRouter(DoorsApi)
       .withNamespace(`e4-${refusal}`)
       .withVersion(VERSION)
       .withCredential("browser")
       .post("/impersonate", "run")
-      .withPermission("ops:manage", { at: "platform", refusal })
+      .withPermission(permission, { at: "platform", refusal })
       .withInput(z.object({ userId: z.string() }))
       .withBodyLimit({ maxBytes: 64 })
       .withOutput(z.object({ actor: z.string() }))
@@ -144,13 +152,30 @@ describe("a platform route", () => {
     it("asks about the grant of the operator behind them", async () => {
       const ran: string[] = [];
       const { asked, door } = browserDoor({ holders: ["operator-1"] });
-      const app = mount(declaration({ refusal: "denied", ran }), door);
+      const app = mount(declaration({ refusal: "denied", ran, permission: "ops:view" }), door);
 
       const response = await call(app, "denied", "impersonated", JSON.stringify({ userId: "u" }));
 
       expect(response.status).toBe(200);
-      expect(asked).toEqual([{ userId: "operator-1", permission: "ops:manage" }]);
+      expect(asked).toEqual([{ userId: "operator-1", permission: "ops:view" }]);
       expect(ran).toEqual(["member-1"]);
+    });
+
+    /** @scenario "A platform route asks the operator's platform grant at its door" */
+    it("refuses ops:manage 403 permission_denied without asking, before the body is read", async () => {
+      const ran: string[] = [];
+      const { asked, door } = browserDoor({ holders: ["operator-1"] });
+      const app = mount(declaration({ refusal: "denied", ran }), door);
+
+      const response = await call(app, "denied", "impersonated", "{not json");
+
+      expect(response.status).toBe(403);
+      expect(await bodyOf(response)).toMatchObject({
+        code: "permission_denied",
+        meta: { permission: "ops:manage" },
+      });
+      expect(asked).toEqual([]);
+      expect(ran).toEqual([]);
     });
   });
 

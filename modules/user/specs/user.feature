@@ -28,13 +28,52 @@ Feature: Canonical user lifecycle
     Then one is deactivated and the other is refused
     And one active operator remains
 
+  # Addresses are stored lower-cased (Alex, 2026-10-13): every lookup is a plain match on the
+  # unique index first; only a miss asks again case aside, for rows not lower-cased yet.
   @unit
-  Scenario: A lookup by address never guesses between case-twins
-    Given accounts whose addresses differ only in case
-    When an account is looked up by address
-    Then the account holding the address exactly is answered
-    And with no exact holder the lookup is refused with code user_email_ambiguous
-    And the address still counts as taken
+  Scenario: Stored addresses are lower-cased
+    When an account is minted, or its address changed, with capitals or spaces in the address
+    Then the account stores the trimmed, lower-cased address
+
+  @unit @integration
+  Scenario: A mixed-case sign-in still finds the account
+    Given an account whose address is stored lower-cased
+    When it is looked up by the address typed with capitals
+    Then that account is answered
+    And the store is asked for the lower-cased address only, matched exactly
+
+  @unit
+  Scenario: An address stored with capitals still signs in
+    Given an account stored with capitals that the address step has not reached, or an older image wrote
+    When it is looked up by its address and no account holds the lower-cased form
+    Then the lookup asks again case aside and answers the oldest such account
+    And the address counts as taken
+
+  @unit @integration
+  Scenario: The address step lower-cases every stored address
+    Given accounts stored with capitals before addresses were lower-cased
+    When the background step "user:lower-case-stored-addresses" runs, as soon as the upgrade starts
+    Then each such address is stored lower-cased, and a mixed-case lookup finds the account
+
+  @unit @integration
+  Scenario: A case-only duplicate is left as it is and reported
+    Given another account already holds an address's lower-cased form
+    When the address step runs
+    Then the account keeps its address as it is, and the step logs it without the address
+    And nothing is merged or removed
+    And the step report on Ops > Upgrades lists the account with its address, for an admin to fix by hand
+
+  @integration
+  Scenario: The address step never overwrites a save made during its pass
+    Given an address that changed after the step read it
+    When the step writes
+    Then the row keeps the newer address
+
+  @unit
+  Scenario: Running the address step twice changes nothing more
+    Given the address step has run
+    When it runs again
+    Then it finds no address to change
 
   @unit
   Scenario: Deactivating the last active platform operator is refused
@@ -183,6 +222,13 @@ Feature: Canonical user lifecycle
     And the sessions the old address outlives are auth's to end (modules/auth/specs/account-lifecycle.feature)
 
   @unit
+  Scenario: Changing an email clears its verification
+    Given a user whose address is verified
+    When the User service changes the user's email to a different address
+    Then the new address is stored as not verified
+    And a change of letter case alone keeps the address verified
+
+  @unit
   Scenario: Uploading an avatar uses the personal workspace
     Given a valid avatar image
     When the User service sets the avatar
@@ -308,10 +354,11 @@ Feature: Canonical user lifecycle
       And no switch is claimed twice
 
     @unit
-    Scenario: A capability switch written a way nothing reads refuses the boot
+    Scenario: A capability switch written another way reads as the previous release read it
       Given a deployment that sets one of the switches to a value outside "on" and "off"
       When user's configuration is parsed
-      Then the boot is refused rather than the surface left quietly off
+      Then the boot goes ahead
+      And two-step enrolment and own passwords read it as off, and passkeys read it as on
 
   # Round 54 (O1-P2): a first visit can act before its personal project arrives; the server
   # answers the retryable "personal_workspace_pending" and the screen waits instead of failing.

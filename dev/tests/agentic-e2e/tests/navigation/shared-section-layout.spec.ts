@@ -30,7 +30,7 @@ test("complex product areas share one local navigation layout", async ({ page },
     name: string;
     navigationWidth: number;
     containerWidth: number;
-    borderColor: string;
+    ground: { fill: string; rule: string };
   }[] = [];
 
   for (const section of sections) {
@@ -64,10 +64,11 @@ test("complex product areas share one local navigation layout", async ({ page },
       name: section.name,
       navigationWidth: navigationBox!.width,
       containerWidth: containerBox!.width,
-      // The divider is the rail's ::after hairline, not a border of its own.
-      borderColor: await navigation.evaluate(
-        (element) => getComputedStyle(element, "::after").backgroundColor,
-      ),
+      // The rail sits on the page's ground with no rule against the content (#8588).
+      ground: await navigation.evaluate((element) => ({
+        fill: getComputedStyle(element).backgroundColor,
+        rule: getComputedStyle(element, "::after").content,
+      })),
     });
 
     await page.screenshot({
@@ -80,10 +81,9 @@ test("complex product areas share one local navigation layout", async ({ page },
   expect(new Set(measurements.map(({ navigationWidth }) => navigationWidth)).size).toBe(1);
   for (const { navigationWidth } of measurements) expect(navigationWidth).toBeGreaterThan(0);
   expect(new Set(measurements.map(({ containerWidth }) => containerWidth)).size).toBe(1);
-  expect(new Set(measurements.map(({ borderColor }) => borderColor)).size).toBe(1);
-  for (const { borderColor } of measurements) {
-    expect(borderColor).not.toBe("rgb(0, 0, 0)");
-    expect(borderColor).not.toBe("rgba(0, 0, 0, 0)");
+  for (const { ground } of measurements) {
+    expect(ground.fill).toBe("rgba(0, 0, 0, 0)");
+    expect(ground.rule).toBe("none");
   }
 
   // The rail marks the page it is on: following one of its links moves the

@@ -1029,6 +1029,8 @@ export interface LwqlClickHouseRows {
     readonly Labels: "Array(String)";
     readonly TotalCost: "Nullable(Float64)";
     readonly NonBilledCost: "Nullable(Float64)";
+    readonly UnpricedSpanCount: "UInt32";
+    readonly UnpricedModels: "Array(LowCardinality(String))";
     readonly TotalDurationMs: "Int64";
     readonly TimeToFirstTokenMs: "Nullable(UInt32)";
     readonly TokensPerSecond: "Nullable(UInt32)";
@@ -1092,6 +1094,8 @@ export interface LwqlClickHouseRows {
     readonly Models: "Array(String)";
     readonly TotalCost: "Nullable(Float64)";
     readonly NonBilledCost: "Nullable(Float64)";
+    readonly UnpricedSpanCount: "UInt32";
+    readonly UnpricedModels: "Array(LowCardinality(String))";
     readonly TokensEstimated: "Bool";
     readonly TotalPromptTokenCount: "Nullable(UInt32)";
     readonly TotalCompletionTokenCount: "Nullable(UInt32)";

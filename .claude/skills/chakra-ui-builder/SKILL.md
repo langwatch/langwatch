@@ -43,15 +43,15 @@ before building.
 
 Reach for the right Chakra primitive rather than wrapping everything in `Box`:
 
-| Need                     | Use                                     |
-| ------------------------ | --------------------------------------- |
-| Vertical stack of items  | `Stack` (default) or `VStack`           |
-| Horizontal row           | `HStack` or `Flex`                      |
-| CSS Grid                 | `Grid` + `GridItem`                     |
-| Equal-column grid        | `SimpleGrid columns={N}`                |
+| Need                     | Use                                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| Vertical stack of items  | `Stack` (default) or `VStack`                                                                   |
+| Horizontal row           | `HStack` or `Flex`                                                                              |
+| CSS Grid                 | `Grid` + `GridItem`                                                                             |
+| Equal-column grid        | `SimpleGrid columns={N}`                                                                        |
 | Centered page content    | the product layout component (`PageLayout`), or `Container` with a size from `system/config.ts` |
-| Full flexbox control     | `Flex` with explicit props              |
-| Semantic section/article | `Box as="section"` / `Box as="article"` |
+| Full flexbox control     | `Flex` with explicit props                                                                      |
+| Semantic section/article | `Box as="section"` / `Box as="article"`                                                         |
 
 Avoid deep nesting. If you're three `Box` levels deep with no semantic reason,
 flatten it. Prefer `gap` over margin between siblings.
@@ -126,7 +126,9 @@ override it. The things you do need to provide:
 
 - **Icon-only buttons**: always add `aria-label`
   ```tsx
-  <IconButton aria-label="Close dialog"><CloseIcon /></IconButton>
+  <IconButton aria-label="Close dialog">
+    <CloseIcon />
+  </IconButton>
   ```
 - **Images**: always pass meaningful `alt` text (or `alt=""` for decorative)
 - **Form labels**: use `Field.Label` or ensure `htmlFor` matches the input `id`

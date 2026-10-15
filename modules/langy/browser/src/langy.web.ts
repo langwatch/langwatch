@@ -5,7 +5,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { GuidedOnboardingToken } from "@langwatch/langy-client";
+import { GuidedOnboardingToken, LangyAskToken } from "@langwatch/langy-client";
 
 import { langyApi } from "./behavior/langy-api.ts";
 import { langyGuidedOnboarding } from "./behavior/langy-guided-onboarding.capability.ts";
@@ -24,8 +24,10 @@ export const langyWeb = defineBrowserModule("langy")
     },
   })
   // All another module may do to the panel: dock it with a kickoff and hear
-  // the scope it entered, lent by token; nothing else reaches Langy's store.
+  // the scope it entered, or ask it a question with the view it is about, each
+  // lent by token; nothing else reaches Langy's store.
   .lends(GuidedOnboardingToken, { value: langyGuidedOnboarding })
+  .lends(LangyAskToken, { load: () => import("./behavior/langy-ask.capability.ts") })
   .withHosts({
     requires: ["LangyHostApi"],
     mounts: { LangyHostApi: { load: () => import("./behavior/langy-host-mount.tsx") } },

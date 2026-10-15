@@ -54,13 +54,18 @@ describe("given the memory identity repositories", () => {
   });
 
   describe("when an address is held on the legacy branch", () => {
-    it("answers the holder case-insensitively", async () => {
+    /** User stores addresses lower-cased; a row still carrying capitals awaits its step. */
+    it("answers the holder of the exact lower-cased address", async () => {
       const { store, repositories } = scenario();
-      seedUser(store, "user_1", "Sam@Acme.com");
+      seedUser(store, "user_1", "sam@acme.com");
+      seedUser(store, "user_2", "Kim@Acme.com");
 
       expect(
         await repositories.users.findUserIdsByEmail({ normalizedValue: "sam@acme.com" }),
       ).toEqual(["user_1"]);
+      expect(
+        await repositories.users.findUserIdsByEmail({ normalizedValue: "kim@acme.com" }),
+      ).toEqual([]);
     });
   });
 

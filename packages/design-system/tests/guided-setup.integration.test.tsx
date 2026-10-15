@@ -516,8 +516,11 @@ describe("given the source of the example", () => {
     const specifiers = [...guidedSetupSource.matchAll(/from "([^"]+)"/g)].map((match) => match[1]);
     expect(specifiers.length).toBeGreaterThan(10);
     for (const specifier of specifiers) {
+      // `@langwatch/time` is the house clock, which the time lint rules require.
       const allowed =
-        specifier === "react" || specifier?.startsWith("@langwatch/design-system/") === true;
+        specifier === "react" ||
+        specifier === "@langwatch/time" ||
+        specifier?.startsWith("@langwatch/design-system/") === true;
       expect(allowed, `${specifier} is not a public entry point`).toBe(true);
     }
   });
