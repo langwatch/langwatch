@@ -109,6 +109,7 @@ describe("the coding-agent-cost skill", () => {
     it("looks up the newest session event in any window and states its age", () => {
       const rendered = costSkill();
       expect(rendered).toMatch(/newest/i);
+      expect(rendered).toContain("count()");
       expect(rendered).toMatch(/never received/i);
     });
 
@@ -117,7 +118,7 @@ describe("the coding-agent-cost skill", () => {
       const rendered = costSkill();
       expect(rendered).toContain("CLAUDE_CODE_ENABLE_TELEMETRY");
       expect(rendered).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
-      expect(rendered).toMatch(/API key/i);
+      expect(rendered).toContain("OTEL_EXPORTER_OTLP_HEADERS");
     });
   });
 });

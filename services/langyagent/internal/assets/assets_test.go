@@ -60,6 +60,7 @@ func TestAgentsTemplate_SaysHowToCount(t *testing.T) {
 // window so the reply states its age, or says the data never arrived.
 //
 // @scenario "The prompt no longer answers an empty window with a bare line"
+// @scenario "A filtered question with no matches gets a plain none"
 func TestAgentsTemplate_EmptyWindowStatesDataAge(t *testing.T) {
 	tmpl, err := AgentsTemplate()
 	if err != nil {
@@ -68,10 +69,18 @@ func TestAgentsTemplate_EmptyWindowStatesDataAge(t *testing.T) {
 	if strings.Contains(tmpl, `"No X in last 24h."`) {
 		t.Errorf(`AGENTS.md still tells the agent to answer an empty time-bounded result with the bare "No X in last 24h."`)
 	}
-	lower := strings.ToLower(tmpl)
-	for _, phrase := range []string{"newest", "never received"} {
-		if !strings.Contains(lower, phrase) {
-			t.Errorf("AGENTS.md empty-results rule never says %q, so an empty window cannot be told from a broken pipeline", phrase)
+	rule := ""
+	for _, line := range strings.Split(tmpl, "\n") {
+		if strings.HasPrefix(line, "- A list question") {
+			rule = strings.ToLower(line)
+		}
+	}
+	if rule == "" {
+		t.Fatalf("AGENTS.md has no line starting with %q", "- A list question")
+	}
+	for _, phrase := range []string{"newest", "never received", "errors"} {
+		if !strings.Contains(rule, phrase) {
+			t.Errorf("AGENTS.md list-question rule never says %q, so an empty window cannot be told from a broken pipeline or zero errors from a fault", phrase)
 		}
 	}
 }

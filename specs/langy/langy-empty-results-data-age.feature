@@ -29,6 +29,14 @@ Feature: Langy tells an idle project from a broken pipeline
     Given the project has traces, the newest of them about 8 hours old
     When I ask how many traces I got in the last hour
     Then Langy names one likely cause such as export stopped, a wrong project or API key, or the app not being instrumented yet
+    And the cause is offered because the newest trace is hours old
+
+  @unit
+  Scenario: A filtered question with no matches gets a plain none
+    Given the user asks about errors in the last 24h and none exist
+    When the prompt asset is checked
+    Then its empty-results rule tells the agent to say there were none
+    And it does not tell the agent to suggest the pipeline is broken
 
   @e2e
   Scenario: A project that never received the data says so
