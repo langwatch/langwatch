@@ -71,6 +71,93 @@ Feature: Dataset TypeScript SDK
     When I call langwatch.datasets.get("does-not-exist")
     Then the SDK throws a DatasetNotFoundError
 
+  # ── Get Dataset: paged read ─────────────────────────────────────
+  # datasets.get() reads the entries from the records endpoint page by page,
+  # so the size of a dataset is not bound by what one response can hold. Each
+  # page also carries the dataset's metadata. A server that does not send it is
+  # asked through the datasets list, then through the single request.
+
+  @unit
+  Scenario: datasets.get reads a dataset larger than the single response limit page by page
+    Given a dataset whose rows add up to more than one response can hold
+    When I call langwatch.datasets.get("product-images")
+    Then I receive every row in its original order
+    And the metadata comes from the records page
+    And the dataset was never asked for in a single response
+
+  @unit
+  Scenario: datasets.get keeps the shape of the single response
+    Given a dataset "product-images" exists with 3 records
+    When I call langwatch.datasets.get("product-images")
+    Then I receive the id, name, slug, columnTypes and timestamps the single response gives
+    And every entry has the fields the single response gives it
+
+  @unit
+  Scenario: datasets.get by id reads the same dataset page by page
+    Given a dataset with slug "product-images" and id "dataset_images" exists
+    When I call langwatch.datasets.get("dataset_images")
+    Then I receive the dataset "product-images" with every row
+
+  @unit
+  Scenario: datasets.get follows the page size a refusal suggests
+    Given the server refuses a page of rows as too large and suggests a smaller page size
+    When I call langwatch.datasets.get("product-images")
+    Then the SDK asks again for the same rows with the suggested page size
+    And I receive every row in its original order
+
+  @unit
+  Scenario: datasets.get finds the metadata in the datasets list on a server that sends none with its pages
+    Given a server whose records pages do not carry the dataset
+    When I call langwatch.datasets.get("product-images")
+    Then the dataset's id, name and slug come from the datasets list
+    And the dataset was never asked for in a single response
+
+  @unit
+  Scenario: datasets.get throws the server's refusal when only the single request can name the dataset
+    Given a server whose records pages and datasets list do not name the dataset
+    And the dataset is too large for the single response
+    When I call langwatch.datasets.get("product-images")
+    Then the SDK throws a DatasetApiError with status 400 that carries the server's refusal
+    And no partial dataset is returned
+
+  @unit
+  Scenario: datasets.get asks for fewer rows when the server refuses a page as too large
+    Given the server refuses a page of rows as too large without suggesting a page size
+    When I call langwatch.datasets.get("product-images")
+    Then the SDK asks again for the same rows with half the page size until a page is accepted
+    And I receive every row in its original order
+
+  @unit
+  Scenario: datasets.get reads one oversized row alone and returns to larger pages
+    Given a dataset whose first row is as large as a whole page may be
+    When I call langwatch.datasets.get("product-images")
+    Then the first row is read in a page of its own
+    And the following small rows are read in large pages again
+
+  @unit
+  Scenario: datasets.get throws the refusal when a single row is too large to read
+    Given a server that refuses even a page that holds only one row
+    When I call langwatch.datasets.get("product-images")
+    Then the SDK throws a DatasetApiError with status 413
+
+  @unit
+  Scenario: datasets.get falls back to the single request on a server without the records endpoint
+    Given a self-hosted server that has no records endpoint
+    When I call langwatch.datasets.get("product-images")
+    Then the dataset is read with the single request
+    And I receive every row
+
+  @unit
+  Scenario: datasets.get throws not found when neither request finds the dataset
+    When I call langwatch.datasets.get("does-not-exist")
+    Then the SDK throws a DatasetNotFoundError
+
+  @unit
+  Scenario: datasets.get stops when rows are removed while it is reading
+    Given rows are removed from the dataset after the first page was read
+    When I call langwatch.datasets.get("product-images")
+    Then the read ends at the first page that comes back short
+
   # ── Update Dataset ──────────────────────────────────────────────
 
   @integration

@@ -1,16 +1,13 @@
 /**
- * The flags of `langwatch query`, resolved, and the table it prints.
- *
- * Split from the command itself because they are two different jobs: this one
- * turns strings a person typed into the request's own types and refuses what
- * cannot mean anything, and does it before any credential is read or any
- * request is sent. The command is then only the two execution shapes.
- *
+ * The flags of `langwatch query`, resolved into the request's own types and
+ * refused where they cannot mean anything — before any credential is read.
+ * The command is then only the two execution shapes.
  * @see specs/analytics/lwql-cli-query.feature
  */
 
-import chalk from "chalk";
 import { readFileSync } from "node:fs";
+
+import chalk from "chalk";
 
 import { formatTable } from "../../utils/formatting";
 import {
@@ -31,13 +28,7 @@ export function refuse(message: string): never {
 }
 
 /** The statement, from the argument or the file, never from both. */
-export function resolveStatement({
-  sql,
-  sqlFile,
-}: {
-  sql?: string;
-  sqlFile?: string;
-}): string {
+export function resolveStatement({ sql, sqlFile }: { sql?: string; sqlFile?: string }): string {
   if (sql !== undefined && sqlFile !== undefined) {
     refuse("give a statement or --sql-file, not both");
   }
@@ -57,16 +48,11 @@ export function resolveStatement({
 }
 
 /**
- * `--param k=v` into bound parameters.
- *
- * Values stay strings. A parameter's type is declared inside the statement
- * (`{days:UInt32}`) and the database coerces on that declaration, so guessing a
- * type here could only ever disagree with the one the author wrote.
+ * `--param k=v` into bound parameters. Values stay strings: the type is
+ * declared inside the statement (`{days:UInt32}`), so guessing one here could
+ * only disagree with the author's.
  */
-export function resolveParameters(pairs: readonly string[] = []): Record<
-  string,
-  ParameterValue
-> {
+export function resolveParameters(pairs: readonly string[] = []): Record<string, ParameterValue> {
   const parameters: Record<string, ParameterValue> = {};
   for (const pair of pairs) {
     const separator = pair.indexOf("=");
@@ -78,11 +64,16 @@ export function resolveParameters(pairs: readonly string[] = []): Record<
   return parameters;
 }
 
+/** Whether a flag's value is one of the formats this command writes. */
+function isQueryOutputFormat(format: string): format is QueryOutputFormat {
+  return QUERY_OUTPUT_FORMATS.some((offered) => offered === format);
+}
+
 export function resolveFormat(format = "table"): QueryOutputFormat {
-  if (!(QUERY_OUTPUT_FORMATS as readonly string[]).includes(format)) {
+  if (!isQueryOutputFormat(format)) {
     refuse(`--format must be one of ${QUERY_OUTPUT_FORMATS.join(", ")}`);
   }
-  return format as QueryOutputFormat;
+  return format;
 }
 
 export function resolveLimit(limit?: string): number | undefined {
@@ -131,9 +122,7 @@ export function printTable(result: {
     const shown = result.rows.slice(0, TABLE_ROW_CAP);
     formatTable({
       data: shown.map((row) =>
-        Object.fromEntries(
-          headers.map((name) => [name, tableCell(row[name])]),
-        ),
+        Object.fromEntries(headers.map((name) => [name, tableCell(row[name])])),
       ),
       headers,
     });
@@ -162,11 +151,7 @@ export function printTable(result: {
 }
 
 /**
- * The last row's cursor, read from the two columns the statement projects
- * under the cursor parameters' own names.
- *
- * Read by name rather than guessed from the row's shape: a statement that
- * projects any other timestamp before its ordering one would otherwise bind the
- * wrong cursor and page over the wrong rows, skipping or repeating them with
- * nothing in the output to say so.
+ * The last row's cursor, read by NAME from the two columns the statement
+ * projects under the cursor parameters: guessed from the row's shape, another
+ * timestamp column would bind the wrong cursor and page over the wrong rows.
  */

@@ -1,0 +1,36 @@
+{
+  "name": "@langwatch/sims",
+  "version": "0.0.1",
+  "private": true,
+  "description": "The simulators' consoles (llm, mail, idp, payment, storage, analytics, outbound, telemetry, voice, lambda, mcp): one multi-page React app built by Vite into services/sims/simconsole/dist, each page served by its own Go simulator (ADR-160).",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "screenshot:idp": "node scripts/idp-screenshot.ts",
+    "screenshot:mail": "node scripts/mail-screenshot.ts",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/design-system-internal": "workspace:*",
+    "@langwatch/sim-console": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "jsdom": "catalog:",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

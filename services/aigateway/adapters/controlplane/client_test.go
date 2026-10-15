@@ -349,3 +349,23 @@ func TestFetchConfig_NotFound_IsTheKeysOwnRejection(t *testing.T) {
 
 	require.ErrorIs(t, err, domain.ErrInvalidAPIKey, "a deleted key is a rejection, not an outage")
 }
+
+func TestFetchConfig_KeyStatus(t *testing.T) {
+	for name, tc := range map[string]struct {
+		body     string
+		inactive bool
+	}{
+		"an active key":                        {`{"status":"active","models_allowed":[]}`, false},
+		"a revoked key":                        {`{"status":"revoked","models_allowed":[]}`, true},
+		"a control plane older than the field": {`{"models_allowed":[]}`, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cp := (&configServer{revision: "42", body: tc.body}).start(t)
+
+			res, err := cp.FetchConfig(context.Background(), "vk_acme", "")
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.inactive, res.KeyInactive)
+		})
+	}
+}

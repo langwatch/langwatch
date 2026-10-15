@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 if TYPE_CHECKING:
     from ..models.update_agent_response_200_instances_item_sdk import UpdateAgentResponse200InstancesItemSdk
@@ -23,7 +24,7 @@ class UpdateAgentResponse200InstancesItem:
         pid (float):
         label (None | str):
         sdk (UpdateAgentResponse200InstancesItemSdk):
-        connected_at (str):
+        connected_at (datetime.datetime):
         inflight (float):
         max_concurrency (float):
     """
@@ -34,10 +35,9 @@ class UpdateAgentResponse200InstancesItem:
     pid: float
     label: None | str
     sdk: UpdateAgentResponse200InstancesItemSdk
-    connected_at: str
+    connected_at: datetime.datetime
     inflight: float
     max_concurrency: float
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         instance_id = self.instance_id
@@ -53,14 +53,14 @@ class UpdateAgentResponse200InstancesItem:
 
         sdk = self.sdk.to_dict()
 
-        connected_at = self.connected_at
+        connected_at = self.connected_at.isoformat()
 
         inflight = self.inflight
 
         max_concurrency = self.max_concurrency
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "instanceId": instance_id,
@@ -99,7 +99,7 @@ class UpdateAgentResponse200InstancesItem:
 
         sdk = UpdateAgentResponse200InstancesItemSdk.from_dict(d.pop("sdk"))
 
-        connected_at = d.pop("connectedAt")
+        connected_at = isoparse(d.pop("connectedAt"))
 
         inflight = d.pop("inflight")
 
@@ -117,21 +117,4 @@ class UpdateAgentResponse200InstancesItem:
             max_concurrency=max_concurrency,
         )
 
-        update_agent_response_200_instances_item.additional_properties = d
         return update_agent_response_200_instances_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

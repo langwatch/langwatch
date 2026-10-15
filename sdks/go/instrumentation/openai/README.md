@@ -14,12 +14,12 @@ tiebreaker. A generic fallback extractor is tried last, so unknown or
 unsupported OpenAI-compatible endpoints still produce a useful span instead of
 nothing.
 
-| Extractor    | Request discriminator                                          | Response discriminator (`object`) | Streaming reconstruction |
-| ------------ | -------------------------------------------------------------- | --------------------------------- | ------------------------ |
-| `chat`       | `messages[]` (or a `chat/completions` path)                    | `chat.completion`                 | accumulate `choices[].delta.content`; terminated by `[DONE]`; usage from the final chunk |
-| `responses`  | `input` + (`instructions`/`max_output_tokens`/`reasoning`/…)   | `response`                        | typed events: accumulate `response.output_text.delta`, read the final `response.completed` event (no `[DONE]`) |
-| `embeddings` | `input` + (`encoding_format`/`dimensions`); never streams      | `list`                            | n/a                      |
-| `generic`    | anything (terminal fallback)                                   | anything                          | best-effort chat-style delta probing |
+| Extractor    | Request discriminator                                        | Response discriminator (`object`) | Streaming reconstruction                                                                                       |
+| ------------ | ------------------------------------------------------------ | --------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `chat`       | `messages[]` (or a `chat/completions` path)                  | `chat.completion`                 | accumulate `choices[].delta.content`; terminated by `[DONE]`; usage from the final chunk                       |
+| `responses`  | `input` + (`instructions`/`max_output_tokens`/`reasoning`/…) | `response`                        | typed events: accumulate `response.output_text.delta`, read the final `response.completed` event (no `[DONE]`) |
+| `embeddings` | `input` + (`encoding_format`/`dimensions`); never streams    | `list`                            | n/a                                                                                                            |
+| `generic`    | anything (terminal fallback)                                 | anything                          | best-effort chat-style delta probing                                                                           |
 
 ## Supported OpenAI Operations
 

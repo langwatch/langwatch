@@ -33,7 +33,7 @@ Two corollaries, both learned from the same page:
 **A question is answered on exactly one surface.** These pages accrete: each
 new mechanism arrives with its own card, and the reader is left to know which
 mechanism to suspect before they can look. That is backwards — an operator
-knows the *symptom*, not the machinery, so the page has to be organised by the
+knows the _symptom_, not the machinery, so the page has to be organised by the
 question rather than by what implements it.
 
 Two questions were split across three surfaces each before this rule existed:
@@ -48,7 +48,7 @@ Two questions were split across three surfaces each before this rule existed:
 Merge the answer, keep the mechanisms distinguishable. A merged panel states
 the shared fact once and then keeps one section per mechanism, because the
 remedy differs — parking clears itself when capacity frees, a paused subscriber
-needs a human. Merging the *tables* would imply one action fits all three.
+needs a human. Merging the _tables_ would imply one action fits all three.
 
 Corollaries:
 
@@ -131,15 +131,15 @@ have needed.
 It is easy to forget here because the reader is technical, but a technical
 reader still should not have to expand an abbreviation:
 
-| Don't | Do |
-| --- | --- |
-| `Redis conns` | `Redis connections` |
-| `PEND.` | `Pending` |
-| `OLDEST` with no unit | `Oldest wait` |
+| Don't                 | Do                  |
+| --------------------- | ------------------- |
+| `Redis conns`         | `Redis connections` |
+| `PEND.`               | `Pending`           |
+| `OLDEST` with no unit | `Oldest wait`       |
 
 Terms of art that name a real mechanism — dead-letter queue, P50, P99 — stay,
 because they are what the thing is called and the operator already knows them.
-The test is whether the word is a *term* or a *truncation*: truncations get
+The test is whether the word is a _term_ or a _truncation_: truncations get
 spelled out.
 
 State the meaning of a quantity the operator will not infer. "Parked" means a
@@ -147,7 +147,7 @@ tenant is at its in-flight capacity limit, not that anything failed; the label
 says so, because an orange six-figure number that means "working as designed"
 otherwise reads as an outage. Note that GroupQueue uses "park" for two unrelated
 things — tenant soft-cap parking, and the poison-group guard parking a
-crash-looping group into the *blocked* set. On any surface showing both, say
+crash-looping group into the _blocked_ set. On any surface showing both, say
 which one you mean.
 
 ## Controls

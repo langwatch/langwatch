@@ -1,0 +1,51 @@
+import { isInternalSecretValid } from "../access-policy.ts";
+import {
+  SurfaceBlankSecretError,
+  SurfaceUnconfiguredError,
+  SurfaceUnverifiedError,
+} from "../errors.ts";
+import type { RestCaller, RestIdentity } from "../hosting/api-door.ts";
+
+export class BearerIdentity implements RestIdentity {
+  readonly #name: string;
+  readonly #token: string | undefined;
+  private constructor(name: string, token: string | undefined) {
+    this.#name = name;
+    this.#token = token;
+  }
+  static create(options: { name: string; token: string | undefined }): BearerIdentity {
+    return new BearerIdentity(options.name, options.token);
+  }
+  authenticate(): never {
+    throw new SurfaceUnverifiedError(this.#name);
+  }
+  identify({ request }: { request: Request }): RestCaller {
+    if (this.#token === void 0) throw new SurfaceUnconfiguredError(this.#name);
+
+    if (this.#token.trim() === "") throw new SurfaceBlankSecretError(this.#name);
+
+    const token = bearerTokenOf(request.headers.get("authorization"));
+
+    if (
+      token === null ||
+      !isInternalSecretValid({
+        authorizationHeader: `Bearer ${token}`,
+        expected: this.#token.trim(),
+      })
+    )
+      throw new SurfaceUnverifiedError(this.#name);
+
+    return {
+      actor: null,
+      scope: null,
+      internal: { type: "internalSecret", secretName: this.#name },
+    };
+  }
+}
+
+/** RFC 6750: the "Bearer" scheme in any case, then the token; anything else presents none. */
+export function bearerTokenOf(header: string | null): string | null {
+  const presented = /^Bearer\s+(.+)$/i.exec(header?.trim() ?? "")?.[1]?.trim();
+
+  return presented ? presented : null;
+}

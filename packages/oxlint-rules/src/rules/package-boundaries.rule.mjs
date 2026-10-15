@@ -1,0 +1,485 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
+
+import { modulePackageOf } from "../classify.mjs";
+import { defineRule } from "../define-rule.mjs";
+
+// Which workspace package may import which, read off the module tree the
+// classifier discovers. The shape it enforces is ARCHITECTURE.md §2, §3 and §3.4.
+
+const APPLICATION = /^apps\/[^/]+\//;
+const NODE_RUNTIME = /^node:/;
+const BROWSER_RUNTIME =
+  /^(?:react|react-dom|@chakra-ui\/|@langwatch\/(?:browser-host|design-system|browser)(?:\/|$))/;
+const SERVER_RUNTIME =
+  /^(?:hono|@trpc\/server|@langwatch\/(?:eventing|group-queue|process|process-stores)(?:\/|$))/;
+/** The one eventing subpath a contract may read: its plain-data table list (ET-2, 2026-10-08). */
+const CONTRACT_PLAIN_DATA = /^@langwatch\/eventing\/tables$/;
+/** The raw store clients: a module client never takes one (§3.4). */
+const STORE_CLIENT = /^@langwatch\/(?:prisma-client|clickhouse-client|redis-client)(?:\/|$)/;
+/** The browser runtime a module client may take: React and browser-host (Alex, 2026-10-06). */
+const CLIENT_BROWSER_RUNTIME = /^(?:react|@langwatch\/browser-host)(?:\/|$)/;
+/** apps/tasks' pre-serve migration steps: its `*migrat*` files and the two LangWatchQL steps. */
+const MIGRATION_RUNNER =
+  /^apps\/tasks\/src\/(?:[^/]*migrat[^/]*|lwql-provision|lwql-render-access-config)\.[cm]?tsx?$/;
+/** The scenario child program and the one scenario-process subpath it may take. */
+const SCENARIO_CHILD_PROGRAM = "apps/scenario-child/src/main.ts";
+const SCENARIO_CHILD_SUBPATH = "./scenario-child";
+const SCHEMA_BINDING = new Set(["@hono/zod-validator", "hono-openapi/zod"]);
+/** Seams that let a test stand in for a peer; production code never takes them. */
+const TEST_ONLY_SEAMS = new Set(["@langwatch/process/testing"]);
+
+const RETIRED_PACKAGE_ENTRYPOINTS = new Map([
+  ["zod/v3", "zod"],
+  [
+    "@langwatch/automations",
+    "@langwatch/automation-contract, @langwatch/automation-process, or @langwatch/automation-browser",
+  ],
+  ["@ee", "the owning module's `@langwatch/enterprise-<module>-contract`"],
+]);
+
+const WORKSPACE_SCOPE = "@langwatch/";
+const DEPENDENCY_FIELDS = [
+  "dependencies",
+  "devDependencies",
+  "peerDependencies",
+  "optionalDependencies",
+];
+
+const packageRootCache = new Map();
+const declaredCache = new Map();
+
+function remember(visited, root) {
+  for (const seen of visited) packageRootCache.set(seen, root);
+
+  return root ?? undefined;
+}
+
+function isOutside(cwd, directory) {
+  const parent = dirname(directory);
+
+  return parent === directory || relative(cwd, parent).startsWith("..");
+}
+
+/** The nearest package.json above the file, so every workspace member is held. */
+function packageRootForFile(filename, cwd) {
+  let directory = dirname(resolve(cwd, filename));
+  const visited = [];
+  for (;;) {
+    const cached = packageRootCache.get(directory);
+    if (cached !== undefined) return remember(visited, cached);
+    visited.push(directory);
+    if (existsSync(join(directory, "package.json"))) return remember(visited, directory);
+    if (isOutside(cwd, directory)) return remember(visited, null);
+    directory = dirname(directory);
+  }
+}
+
+// Every import in a file asks for the same root; the last answer saves a path resolve per import.
+let lastRoot = { filename: undefined, cwd: undefined, root: undefined };
+
+function packageRootOfLintedFile(filename, cwd) {
+  if (lastRoot.filename !== filename || lastRoot.cwd !== cwd) {
+    lastRoot = { filename, cwd, root: packageRootForFile(filename, cwd) };
+  }
+
+  return lastRoot.root;
+}
+
+function retiredReplacement(specifier) {
+  for (const [retired, replacement] of RETIRED_PACKAGE_ENTRYPOINTS) {
+    if (specifier === retired || specifier.startsWith(`${retired}/`)) return replacement;
+  }
+
+  return undefined;
+}
+
+function workspaceRelative(cwd, path) {
+  return relative(cwd, path).split(sep).join("/");
+}
+
+function escapeFinding(file, specifier, cwd) {
+  const packageRoot = packageRootOfLintedFile(file.filename, cwd);
+  if (!packageRoot) return undefined;
+  const targetPath = resolve(dirname(file.filename), specifier);
+  if (!relative(packageRoot, targetPath).startsWith("..")) return undefined;
+
+  const targetRoot = packageRootForFile(targetPath, cwd);
+  const intoAMember = targetRoot !== undefined && targetRoot !== packageRoot && targetRoot !== cwd;
+
+  return {
+    messageId: intoAMember ? "packageEscape" : "unownedEscape",
+    data: { specifier, packageRoot: workspaceRelative(cwd, packageRoot) },
+  };
+}
+
+/** The package's own name and every name its package.json declares as a dependency. */
+function declaredNamesOf(packageRoot) {
+  const cached = declaredCache.get(packageRoot);
+  if (cached) return cached;
+  const manifest = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8"));
+  const names = new Set([manifest.name]);
+  for (const field of DEPENDENCY_FIELDS) {
+    for (const name of Object.keys(manifest[field] ?? {})) names.add(name);
+  }
+  declaredCache.set(packageRoot, names);
+
+  return names;
+}
+
+/** An `@langwatch/*` import its package.json does not declare: no graph edge, so a stale cache. */
+function undeclaredFinding(file, specifier, cwd) {
+  if (!specifier.startsWith(WORKSPACE_SCOPE)) return undefined;
+  const packageRoot = packageRootOfLintedFile(file.filename, cwd);
+  if (!packageRoot) return undefined;
+  const dependency = specifier.split("/").slice(0, 2).join("/");
+  if (declaredNamesOf(packageRoot).has(dependency)) return undefined;
+
+  return {
+    messageId: "undeclaredDependency",
+    data: { dependency, packageRoot: workspaceRelative(cwd, packageRoot) },
+  };
+}
+
+function runtimeFinding(file, specifier) {
+  if (file.isTest) return undefined;
+  const node = NODE_RUNTIME.test(specifier);
+  const server = SERVER_RUNTIME.test(specifier);
+  const browser = BROWSER_RUNTIME.test(specifier);
+  if (file.role === "contract" && CONTRACT_PLAIN_DATA.test(specifier)) return undefined;
+  if (file.role === "contract" && (node || server || browser)) return "contractRuntime";
+  if (file.role === "browser" && (node || server)) return "browserImportsProcess";
+  if (file.role === "process" && browser) return "processImportsBrowser";
+  const runtime = node || server || browser;
+  if (file.role === "library" && runtime) return "libraryRuntime";
+  if (file.role === "client") return clientRuntimeFinding({ node, server, browser, specifier });
+
+  return undefined;
+}
+
+/** A client takes React and browser-host, never node, a server runtime or a store (§3.4). */
+function clientRuntimeFinding({ node, server, browser, specifier }) {
+  if (node || server || STORE_CLIENT.test(specifier)) return "clientRuntime";
+  if (browser && !CLIENT_BROWSER_RUNTIME.test(specifier)) return "clientRuntime";
+
+  return undefined;
+}
+
+/** A library takes its own module's contract and other libraries, nothing else (§2). */
+function libraryDirectionFinding(file, target) {
+  if (target.role === "library") return undefined;
+  if (target.role === "contract" && target.module === file.module) return undefined;
+
+  return "libraryRuntime";
+}
+
+/** A client takes its own contract only; only browser code reads a client (§3.4, §10.1). */
+function clientDirectionFinding(file, target) {
+  if (file.role === "client") {
+    const isOwnContract = target.role === "contract" && target.module === file.module;
+
+    const isSelf = target.role === "client" && target.module === file.module;
+
+    return isOwnContract || isSelf ? undefined : "clientRuntime";
+  }
+  if (target.role !== "client") return undefined;
+  const isBrowserReader = file.role === "browser" || file.workspacePath.startsWith("apps/ui/");
+
+  return isBrowserReader ? undefined : "clientConsumer";
+}
+
+function directionFinding(file, target) {
+  const client = clientDirectionFinding(file, target);
+  if (client) return client;
+  if (file.role === "client" || target.role === "client") return undefined;
+  if (file.role === "library") return libraryDirectionFinding(file, target);
+  if (file.role === "contract" && target.role !== "contract") return "contractRuntime";
+  if (file.role === "browser" && target.role === "process") return "browserImportsProcess";
+  if (file.role === "process" && target.role === "browser") return "processImportsBrowser";
+
+  return undefined;
+}
+
+function pascalCase(kebab) {
+  return kebab
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join("");
+}
+
+function camelCase(kebab) {
+  const pascal = pascalCase(kebab);
+
+  return pascal.charAt(0).toLowerCase() + pascal.slice(1);
+}
+
+function importedNames(node) {
+  const specifiers = node.parent?.type === "ImportDeclaration" ? node.parent.specifiers : [];
+
+  return specifiers.map((entry) =>
+    entry.type === "ImportSpecifier" && entry.imported.type === "Identifier"
+      ? entry.imported.name
+      : undefined,
+  );
+}
+
+/** §13: an installation test installs its peers' process modules for real. */
+function isPeerInstallation({ file, target, subpath, node }) {
+  if (!file.isTest || subpath !== ".") return false;
+  const installers = new Set([
+    `${camelCase(target.module)}Server`,
+    `${camelCase(target.module)}ProcessModule`,
+  ]);
+  const names = importedNames(node);
+
+  return names.length > 0 && names.every((name) => installers.has(name));
+}
+
+function isTestSeam(file, subpath, target) {
+  return file.isTest && subpath === "./testing" && target.exports.has(subpath);
+}
+
+function peerData(target) {
+  const prefix = target.enterprise ? "enterprise-" : "";
+
+  return {
+    api: `${pascalCase(target.module)}Api`,
+    contract: `@langwatch/${prefix}${target.module}-contract`,
+    module: target.module,
+  };
+}
+
+function crossModuleFinding({ file, target, subpath, node }) {
+  const isPortable =
+    target.role === "contract" || target.role === "library" || target.role === "client";
+  if (isPortable || target.module === file.module) return undefined;
+  if (isTestSeam(file, subpath, target) || isPeerInstallation({ file, target, subpath, node })) {
+    return undefined;
+  }
+
+  return target.role === "process" ? "crossModuleProcess" : "crossModuleBrowser";
+}
+
+function outsideModuleFinding(file, target, subpath) {
+  if (target.role === "process") {
+    if (isTestSeam(file, subpath, target)) return undefined;
+    // Migrations run by hand, before any module boots (§7; Alex, 2026-09-27).
+    if (MIGRATION_RUNNER.test(file.workspacePath)) return undefined;
+    // The voice transports stay in scenario-process until the live voice session spawns its
+    // own child (Alex, 2026-09-28).
+    const isScenarioChildVoice =
+      file.workspacePath === SCENARIO_CHILD_PROGRAM &&
+      target.module === "scenario" &&
+      subpath === SCENARIO_CHILD_SUBPATH;
+    if (isScenarioChildVoice) return undefined;
+
+    return APPLICATION.test(file.workspacePath) ? "compositionRoot" : "processOutsideModule";
+  }
+  if (
+    target.role === "browser" &&
+    subpath !== "./declaration" &&
+    !isTestSeam(file, subpath, target)
+  ) {
+    return "browserSideDoor";
+  }
+
+  return undefined;
+}
+
+function ownershipFinding({ file, target, subpath, node, typeOnly }) {
+  // Types are erased: a browser package's types may cross; its values stay closed (2026-09-27).
+  if (typeOnly && target.role === "browser") return undefined;
+  if (file.module) return crossModuleFinding({ file, target, subpath, node });
+
+  return outsideModuleFinding(file, target, subpath);
+}
+
+function isCoreSource(file) {
+  return !file.enterprise && file.role !== "other";
+}
+
+/** A core browser reads an enterprise client as it reads a core one (Alex, 2026-10-07). */
+function isAdmittedEnterpriseTarget(file, target) {
+  return target.role === "contract" || (target.role === "client" && file.role === "browser");
+}
+
+function packageFindings({ file, specifier, cwd, node, typeOnly }) {
+  const found = modulePackageOf(cwd, specifier);
+  if (!found) return [];
+  const { pkg: target, subpath } = found;
+  const findings = [];
+  if (!target.exports.has(subpath)) {
+    findings.push({ messageId: "sealedExports", data: { subpath, package: target.name } });
+  }
+  const shape =
+    directionFinding(file, target) ?? ownershipFinding({ file, target, subpath, node, typeOnly });
+  if (shape) findings.push({ messageId: shape, data: { specifier, ...peerData(target) } });
+  if (isCoreSource(file) && target.enterprise && !isAdmittedEnterpriseTarget(file, target)) {
+    findings.push({ messageId: "coreImportsEnterprise", data: { specifier } });
+  }
+
+  return findings;
+}
+
+function specifierFindings({ file, specifier, cwd, node, typeOnly = false }) {
+  const replacement = retiredReplacement(specifier);
+  if (replacement)
+    return [{ messageId: "retiredPackageRuntime", data: { specifier, replacement } }];
+
+  const findings = [];
+  if (specifier.startsWith(".")) {
+    const escape = escapeFinding(file, specifier, cwd);
+    if (escape) findings.push(escape);
+  }
+  const undeclared = undeclaredFinding(file, specifier, cwd);
+  if (undeclared) findings.push(undeclared);
+  findings.push(...packageFindings({ file, specifier, cwd, node, typeOnly }));
+  if (file.module && SCHEMA_BINDING.has(specifier)) {
+    findings.push({ messageId: "schemaBoundary", data: { specifier } });
+  }
+  if (TEST_ONLY_SEAMS.has(specifier) && !file.isTest) {
+    findings.push({ messageId: "testSeamOutsideTest", data: { specifier } });
+  }
+  const runtime = runtimeFinding(file, specifier);
+  if (runtime) findings.push({ messageId: runtime, data: { specifier } });
+
+  return findings;
+}
+
+/** Whether a declaration carries types only, so nothing it names survives compilation. */
+function isTypeOnly(node) {
+  if (node.importKind === "type" || node.exportKind === "type") return true;
+  const specifiers = node.specifiers ?? [];
+
+  return (
+    specifiers.length > 0 &&
+    specifiers.every((entry) => entry.importKind === "type" || entry.exportKind === "type")
+  );
+}
+
+export const boundaryRule = defineRule({
+  name: "package-boundaries",
+  kind: "problem",
+  messages: {
+    compositionRoot: {
+      what: "`{{specifier}}` is `{{module}}`'s process package, and an application composes modules without naming one.",
+      why: "An app that names a process package builds the module by hand, beside the installed list it boots.",
+      fix: "Take `{{module}}` from the app's generated `process-modules.generated.ts` list (catalogue-driven, `pnpm generate:modules`), and move whatever this root builds from `{{specifier}}` behind the module's own declaration so the module constructs it. Read the `module` skill.",
+    },
+    processOutsideModule: {
+      what: "`{{specifier}}` is `{{module}}`'s process package, and only `{{module}}` itself may import it.",
+      why: "A module is an isolated service: others see only its contract, so its internals stay free to change.",
+      fix: "Call `{{api}}` from `{{contract}}` instead; if the operation is not there, it is a new `{{api}}` operation to propose to the module's owner.",
+    },
+    crossModuleProcess: {
+      what: "`{{specifier}}` is another module's process package.",
+      why: "A module is an isolated service: others see only its contract, so its internals stay free to change.",
+      fix: "Call `{{api}}` from `{{contract}}` instead; if the operation is not there, it is a new `{{api}}` operation to propose to the module's owner.",
+    },
+    crossModuleBrowser: {
+      what: "`{{specifier}}` is `{{module}}`'s browser package, which is closed to every other module.",
+      why: "A browser package is private to its module, so importing it couples two modules' screens.",
+      fix: "Move what this needs out of `{{module}}`'s browser package: pure domain logic into the owner's contract, shared UI into `@langwatch/design-system`, a framework hook into `@langwatch/browser-host`. Where fewer than two modules share it, inline it here instead (ARCHITECTURE.md §3.4).",
+    },
+    browserSideDoor: {
+      what: "`{{specifier}}` reaches past `{{module}}`'s browser declaration, the only door a browser package has.",
+      why: "Past the declaration is the module's private browser code, which it may change without telling anyone.",
+      fix: "Read what `{{module}}` lends through its token from `{{module}}`'s contract with `useLent(Token)`, the owner declaring `.lends(Token, { load })`, or move a shared component into `@langwatch/design-system`.",
+    },
+    packageEscape: {
+      what: "`{{specifier}}` resolves outside `{{packageRoot}}`, so this package depends on a file it does not own.",
+      why: "A relative path across packages hides the dependency from the manifest, the task graph and the cache.",
+      fix: "Replace `{{specifier}}` with the target's package name — `@langwatch/<module>-<contract|process|browser>` for a module package, `@langwatch/<name>` for any other workspace package. Move the file into `{{packageRoot}}` instead only when nothing outside `{{packageRoot}}` imports it.",
+    },
+    unownedEscape: {
+      what: "`{{specifier}}` resolves outside `{{packageRoot}}` into a directory no package owns, so nothing records that this package depends on it.",
+      why: "A file no package owns has no manifest, so no cache or task graph knows this package depends on it.",
+      fix: "Give the target directory a `package.json` and add it to `pnpm-workspace.yaml`, then import it by that name — the way `dev/scripts` became `@langwatch/dev-scripts`. Move the file into `{{packageRoot}}` instead when only this package reads it.",
+    },
+    undeclaredDependency: {
+      what: "`{{dependency}}` is imported but not declared in `{{packageRoot}}/package.json`, so the task graph has no edge to it and a cached result survives its changes.",
+      why: "Builds, tests and caches follow package.json, so an undeclared import is an edge they cannot see.",
+      fix: 'Add `"{{dependency}}": "workspace:*"` to `{{packageRoot}}/package.json` (`devDependencies` when only tests import it), or remove the import.',
+    },
+    contractRuntime: {
+      what: "A contract package is runtime-neutral: `{{specifier}}` is a node, browser or process runtime.",
+      why: "Both process and browser import the contract, so a runtime import drags into the side that cannot run it.",
+      fix: "Keep only schemas, types, errors and the `*Api` token here; move the code that needs `{{specifier}}` into this module's process package, or into its browser package when it is a browser import.",
+    },
+    browserImportsProcess: {
+      what: "`{{specifier}}` is process-only, and this is a browser package.",
+      why: "Process code runs on the server beside secrets and stores; bundled into the browser it breaks or leaks.",
+      fix: "Call the procedure through this module's derived tRPC client, and import any shared type from the owning module's contract.",
+    },
+    processImportsBrowser: {
+      what: "`{{specifier}}` is browser-only, and this is a process package.",
+      why: "Browser code needs a DOM and the browser bundle's graph, neither of which a server process has.",
+      fix: "Move the browser-only code into this module's browser package; share a type through the contract.",
+    },
+    coreImportsEnterprise: {
+      what: "`{{specifier}}` is an enterprise module's implementation, and this is core code.",
+      why: "Core builds and runs without enterprise code, which is licensed apart and installed only when entitled.",
+      fix: "Depend on that module's peer `*Api` from its contract instead; the enterprise module installs like any other and the process resolves the peer (ARCHITECTURE.md §11).",
+    },
+    libraryRuntime: {
+      what: "`{{specifier}}` is a runtime, framework or another package's implementation, and this is a module's portable, framework-free library.",
+      why: "Process and browser both import a module library, so a runtime import ties it to one side.",
+      fix: "Import only this module's contract, other module libraries and framework-free packages here; move the code that needs `{{specifier}}` into the module's process or browser package.",
+    },
+    clientRuntime: {
+      what: "`{{specifier}}` is a runtime, store, component or another package's implementation, and this is a module's client package.",
+      why: "Every browser that reads a client takes all it imports, so it stays light.",
+      fix: "Import only this module's contract, `@langwatch/api`, `@langwatch/browser-host` and `react` here; restate another module's type as a structural shape, and move the rest into the module's browser package (ARCHITECTURE.md §3.4, §10.1).",
+    },
+    clientConsumer: {
+      what: "`{{specifier}}` is `{{module}}`'s client, and only browser packages and apps/ui read a client.",
+      why: "A client carries React hooks and lent tokens, browser code a server graph must not hold.",
+      fix: "Call `{{api}}` from `{{contract}}` instead, or move this read into a browser package (ARCHITECTURE.md §2, §3.4).",
+    },
+    retiredPackageRuntime: {
+      what: "`{{specifier}}` is a retired runtime or package entry point.",
+      why: "A retired entry point is on its way out; each new import adds work to the change that removes it.",
+      fix: "Import {{replacement}} instead.",
+    },
+    schemaBoundary: {
+      what: "`{{specifier}}` binds the module to Hono.",
+      why: "A contract is framework-free, so Hono in it couples every reader to one transport.",
+      fix: "Export a plain Zod schema from the contract and let the transport adapt it.",
+    },
+    testSeamOutsideTest: {
+      what: "`{{specifier}}` is a test seam, and this file is not a test.",
+      why: "A stand-in peer in production code boots a process on a fake, so a missing peer would never refuse.",
+      fix: "Install the peer's module in the process, or move this boot into a `*.test.ts` or `__tests__/` file. Read the `process-composition` skill.",
+    },
+    sealedExports: {
+      what: "`{{subpath}}` is not in `{{package}}`'s `exports`.",
+      why: "A package's exports are its public surface; a deep import couples to internals it may move.",
+      fix: 'Import from `{{package}}` itself when its entry already re-exports the symbol. A browser package exports only `./declaration`, so there the symbol is private; for a contract or process package, add `"{{subpath}}"` to its `exports` and re-export the symbol from that entry.',
+    },
+  },
+  create(context, file) {
+    const check = (node, typeOnly = false) => {
+      if (typeof node?.value !== "string") return;
+      for (const finding of specifierFindings({
+        file,
+        specifier: node.value,
+        cwd: context.cwd,
+        node,
+        typeOnly,
+      })) {
+        context.report({ node, ...finding });
+      }
+    };
+
+    return {
+      ImportDeclaration: (node) => check(node.source, isTypeOnly(node)),
+      ExportNamedDeclaration: (node) => check(node.source, isTypeOnly(node)),
+      ExportAllDeclaration: (node) => check(node.source, isTypeOnly(node)),
+      ImportExpression: (node) => check(node.source),
+      CallExpression(node) {
+        const isRequire = node.callee.type === "Identifier" && node.callee.name === "require";
+        if (isRequire) check(node.arguments[0]);
+      },
+    };
+  },
+});

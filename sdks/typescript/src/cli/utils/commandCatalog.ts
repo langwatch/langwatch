@@ -1,20 +1,10 @@
 /**
- * The machine-readable command catalog — one builder behind
- * `langwatch commands`, `langwatch help-tree`, and the `status` cheat-sheet.
- *
- * The command tree itself comes from commander (`buildProgram()` is the
- * ground truth for what exists); the metadata layered on top — usage hints
- * and skill annotations — comes from the canonical `feature-map.json`,
- * embedded at codegen time as `internal/generated/cli/feature-map.generated.ts`
- * (same copy-types.sh precedent as llmModels.json). No hand-maintained
- * parallel registry: a command added to program.ts shows up here
- * automatically, and the drift test in `cli/__tests__/` fails if the feature
- * map doesn't claim it.
- *
- * Token cost follows gcx: an estimate of what injecting this command's help
- * into an agent's context costs — chars of its rendered help / 4, rounded up.
+ * The machine-readable command catalog behind `langwatch commands`, `help-tree`, and the
+ * `status` cheat-sheet — metadata comes from `feature-map.json`, kept in sync by a drift test.
+ * Token cost estimates an agent's context cost for a command's help: chars / 4, rounded up.
  */
 import type { Command } from "commander";
+
 import {
   FEATURE_MAP,
   type GeneratedFeature,
@@ -49,13 +39,9 @@ export interface CatalogEntry {
 }
 
 /**
- * Top-level commands that are CLI plumbing rather than product resources:
- * auth, config, browser openers, docs fetchers, the daemon, the gateway
- * pass-through wrappers, and the catalog commands themselves (self-referential).
- * Shared by the status cheat-sheet (which lists only resources) and the
- * feature-map drift test (which requires feature-map coverage for everything
- * NOT in this set). Keep it in sync with the exclusion list in the app-side
- * capabilityCatalog coverage test.
+ * Top-level commands that are CLI plumbing, not product resources — excluded from the
+ * feature-map coverage the drift test requires. Keep in sync with the exclusion list in the
+ * app-side capabilityCatalog coverage test.
  */
 export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   // Auth/session plumbing.
@@ -126,10 +112,7 @@ interface FeatureMeta {
 }
 
 const flattenFeatures = (features: GeneratedFeature[]): GeneratedFeature[] =>
-  features.flatMap((feature) => [
-    feature,
-    ...flattenFeatures(feature.children ?? []),
-  ]);
+  features.flatMap((feature) => [feature, ...flattenFeatures(feature.children ?? [])]);
 
 /** Command string (`trace search`) -> metadata declared by the feature map. */
 const featureMetaIndex = (): Map<string, FeatureMeta> => {
@@ -165,17 +148,11 @@ const renderedHelp = (entry: Omit<CatalogEntry, "tokenCost">): string => {
   const usage = ["langwatch", entry.path, usageArgs(entry.args)]
     .filter((part) => part.length > 0)
     .join(" ");
-  const flagLines = entry.flags.map(
-    (flag) => `\n  ${flag.name}  ${flag.description}`,
-  );
+  const flagLines = entry.flags.map((flag) => `\n  ${flag.name}  ${flag.description}`);
   return `${usage} — ${entry.description}${flagLines.join("")}`;
 };
 
-const toEntry = (
-  command: Command,
-  path: string,
-  meta: Map<string, FeatureMeta>,
-): CatalogEntry => {
+const toEntry = (command: Command, path: string, meta: Map<string, FeatureMeta>): CatalogEntry => {
   const children = command.commands
     .filter((child) => !isHidden(child))
     .map((child) => toEntry(child, `${path} ${child.name()}`, meta));
@@ -261,7 +238,5 @@ export const renderHelpTree = (entries: CatalogEntry[]): string => {
 export const renderStatusSummary = (entries: CatalogEntry[]): string[] => {
   const groups = entries.filter((entry) => !PLUMBING_COMMANDS.has(entry.path));
   const width = Math.max(...groups.map((entry) => entry.path.length));
-  return groups.map(
-    (entry) => `langwatch ${entry.path.padEnd(width)}  ${entry.description}`,
-  );
+  return groups.map((entry) => `langwatch ${entry.path.padEnd(width)}  ${entry.description}`);
 };

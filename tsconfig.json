@@ -1,0 +1,811 @@
+{
+  // The workspace solution: `pnpm typecheck` runs one `tsc -b` over every package's
+  // container tsconfig.json, so each project is checked once (ADR-150, 2026-10-10).
+  // `references` is written by `pnpm sync:references` (`nx sync`, @nx/js:typescript-sync)
+  // from the Nx project graph, and `nx sync:check` fails CI when it drifts. Do not hand-edit it.
+  "files": [],
+  "exclude": [".claude/"],
+  "references": [
+    {
+      "path": "./apps/api"
+    },
+    {
+      "path": "./apps/backend"
+    },
+    {
+      "path": "./apps/haven-web"
+    },
+    {
+      "path": "./apps/scenario-child"
+    },
+    {
+      "path": "./apps/server"
+    },
+    {
+      "path": "./apps/sims"
+    },
+    {
+      "path": "./apps/tasks"
+    },
+    {
+      "path": "./apps/ui"
+    },
+    {
+      "path": "./apps/worker"
+    },
+    {
+      "path": "./dev/tests/agentic-e2e"
+    },
+    {
+      "path": "./dev/tests/e2e-stack"
+    },
+    {
+      "path": "./enterprise/modules/billing/browser"
+    },
+    {
+      "path": "./enterprise/modules/billing/client"
+    },
+    {
+      "path": "./enterprise/modules/billing/contract"
+    },
+    {
+      "path": "./enterprise/modules/billing/process"
+    },
+    {
+      "path": "./enterprise/modules/connect/contract"
+    },
+    {
+      "path": "./enterprise/modules/connect/process"
+    },
+    {
+      "path": "./enterprise/modules/demo-data/contract"
+    },
+    {
+      "path": "./enterprise/modules/demo-data/process"
+    },
+    {
+      "path": "./enterprise/modules/digest/process"
+    },
+    {
+      "path": "./enterprise/modules/enterprise-gateway/contract"
+    },
+    {
+      "path": "./enterprise/modules/enterprise-gateway/process"
+    },
+    {
+      "path": "./enterprise/modules/enterprise-ops/contract"
+    },
+    {
+      "path": "./enterprise/modules/enterprise-ops/process"
+    },
+    {
+      "path": "./enterprise/modules/governance/browser"
+    },
+    {
+      "path": "./enterprise/modules/governance/client"
+    },
+    {
+      "path": "./enterprise/modules/governance/contract"
+    },
+    {
+      "path": "./enterprise/modules/governance/process"
+    },
+    {
+      "path": "./enterprise/modules/licensing/browser"
+    },
+    {
+      "path": "./enterprise/modules/licensing/client"
+    },
+    {
+      "path": "./enterprise/modules/licensing/contract"
+    },
+    {
+      "path": "./enterprise/modules/licensing/process"
+    },
+    {
+      "path": "./enterprise/modules/managed-provider/browser"
+    },
+    {
+      "path": "./enterprise/modules/managed-provider/client"
+    },
+    {
+      "path": "./enterprise/modules/managed-provider/contract"
+    },
+    {
+      "path": "./enterprise/modules/managed-provider/process"
+    },
+    {
+      "path": "./enterprise/modules/nurturing/contract"
+    },
+    {
+      "path": "./enterprise/modules/nurturing/process"
+    },
+    {
+      "path": "./enterprise/modules/saas/browser"
+    },
+    {
+      "path": "./enterprise/modules/saas/contract"
+    },
+    {
+      "path": "./enterprise/modules/saas/process"
+    },
+    {
+      "path": "./enterprise/modules/scim/browser"
+    },
+    {
+      "path": "./enterprise/modules/scim/client"
+    },
+    {
+      "path": "./enterprise/modules/scim/contract"
+    },
+    {
+      "path": "./enterprise/modules/scim/process"
+    },
+    {
+      "path": "./enterprise/modules/sso/browser"
+    },
+    {
+      "path": "./enterprise/modules/sso/contract"
+    },
+    {
+      "path": "./enterprise/modules/sso/process"
+    },
+    {
+      "path": "./enterprise/packages/license-signing"
+    },
+    {
+      "path": "./mcp/typescript"
+    },
+    {
+      "path": "./modules/agent/browser"
+    },
+    {
+      "path": "./modules/agent/client"
+    },
+    {
+      "path": "./modules/agent/contract"
+    },
+    {
+      "path": "./modules/agent/process"
+    },
+    {
+      "path": "./modules/analytics/browser"
+    },
+    {
+      "path": "./modules/analytics/client"
+    },
+    {
+      "path": "./modules/analytics/contract"
+    },
+    {
+      "path": "./modules/analytics/filters"
+    },
+    {
+      "path": "./modules/analytics/process"
+    },
+    {
+      "path": "./modules/annotation/browser"
+    },
+    {
+      "path": "./modules/annotation/client"
+    },
+    {
+      "path": "./modules/annotation/contract"
+    },
+    {
+      "path": "./modules/annotation/process"
+    },
+    {
+      "path": "./modules/api-key/browser"
+    },
+    {
+      "path": "./modules/api-key/client"
+    },
+    {
+      "path": "./modules/api-key/contract"
+    },
+    {
+      "path": "./modules/api-key/process"
+    },
+    {
+      "path": "./modules/audit-log/contract"
+    },
+    {
+      "path": "./modules/audit-log/process"
+    },
+    {
+      "path": "./modules/auth/browser"
+    },
+    {
+      "path": "./modules/auth/contract"
+    },
+    {
+      "path": "./modules/auth/process"
+    },
+    {
+      "path": "./modules/authz/browser"
+    },
+    {
+      "path": "./modules/authz/contract"
+    },
+    {
+      "path": "./modules/authz/process"
+    },
+    {
+      "path": "./modules/automation/browser"
+    },
+    {
+      "path": "./modules/automation/contract"
+    },
+    {
+      "path": "./modules/automation/process"
+    },
+    {
+      "path": "./modules/coding-agent/browser"
+    },
+    {
+      "path": "./modules/coding-agent/client"
+    },
+    {
+      "path": "./modules/coding-agent/contract"
+    },
+    {
+      "path": "./modules/coding-agent/process"
+    },
+    {
+      "path": "./modules/dashboard/contract"
+    },
+    {
+      "path": "./modules/dashboard/process"
+    },
+    {
+      "path": "./modules/data-privacy/browser"
+    },
+    {
+      "path": "./modules/data-privacy/contract"
+    },
+    {
+      "path": "./modules/data-privacy/process"
+    },
+    {
+      "path": "./modules/data-retention/browser"
+    },
+    {
+      "path": "./modules/data-retention/contract"
+    },
+    {
+      "path": "./modules/data-retention/process"
+    },
+    {
+      "path": "./modules/dataset/browser"
+    },
+    {
+      "path": "./modules/dataset/client"
+    },
+    {
+      "path": "./modules/dataset/contract"
+    },
+    {
+      "path": "./modules/dataset/process"
+    },
+    {
+      "path": "./modules/entitlement/contract"
+    },
+    {
+      "path": "./modules/entitlement/process"
+    },
+    {
+      "path": "./modules/evaluation/contract"
+    },
+    {
+      "path": "./modules/evaluation/process"
+    },
+    {
+      "path": "./modules/evaluator/browser"
+    },
+    {
+      "path": "./modules/evaluator/client"
+    },
+    {
+      "path": "./modules/evaluator/contract"
+    },
+    {
+      "path": "./modules/evaluator/process"
+    },
+    {
+      "path": "./modules/experiment/browser"
+    },
+    {
+      "path": "./modules/experiment/client"
+    },
+    {
+      "path": "./modules/experiment/contract"
+    },
+    {
+      "path": "./modules/experiment/process"
+    },
+    {
+      "path": "./modules/feature-flag/browser"
+    },
+    {
+      "path": "./modules/feature-flag/client"
+    },
+    {
+      "path": "./modules/feature-flag/contract"
+    },
+    {
+      "path": "./modules/feature-flag/process"
+    },
+    {
+      "path": "./modules/gateway/browser"
+    },
+    {
+      "path": "./modules/gateway/contract"
+    },
+    {
+      "path": "./modules/gateway/process"
+    },
+    {
+      "path": "./modules/github/browser"
+    },
+    {
+      "path": "./modules/github/client"
+    },
+    {
+      "path": "./modules/github/contract"
+    },
+    {
+      "path": "./modules/github/process"
+    },
+    {
+      "path": "./modules/hosted-mcp/contract"
+    },
+    {
+      "path": "./modules/hosted-mcp/process"
+    },
+    {
+      "path": "./modules/identity/client"
+    },
+    {
+      "path": "./modules/identity/contract"
+    },
+    {
+      "path": "./modules/identity/process"
+    },
+    {
+      "path": "./modules/instant-eval-judge/contract"
+    },
+    {
+      "path": "./modules/instant-eval-judge/process"
+    },
+    {
+      "path": "./modules/instant-eval/contract"
+    },
+    {
+      "path": "./modules/instant-eval/process"
+    },
+    {
+      "path": "./modules/integration/browser"
+    },
+    {
+      "path": "./modules/langy/browser"
+    },
+    {
+      "path": "./modules/langy/client"
+    },
+    {
+      "path": "./modules/langy/contract"
+    },
+    {
+      "path": "./modules/langy/process"
+    },
+    {
+      "path": "./modules/log/contract"
+    },
+    {
+      "path": "./modules/log/process"
+    },
+    {
+      "path": "./modules/metric/contract"
+    },
+    {
+      "path": "./modules/metric/process"
+    },
+    {
+      "path": "./modules/model-provider/browser"
+    },
+    {
+      "path": "./modules/model-provider/client"
+    },
+    {
+      "path": "./modules/model-provider/contract"
+    },
+    {
+      "path": "./modules/model-provider/process"
+    },
+    {
+      "path": "./modules/monitor/browser"
+    },
+    {
+      "path": "./modules/monitor/client"
+    },
+    {
+      "path": "./modules/monitor/contract"
+    },
+    {
+      "path": "./modules/monitor/process"
+    },
+    {
+      "path": "./modules/navigation/browser"
+    },
+    {
+      "path": "./modules/navigation/client"
+    },
+    {
+      "path": "./modules/navigation/contract"
+    },
+    {
+      "path": "./modules/notification/browser"
+    },
+    {
+      "path": "./modules/notification/contract"
+    },
+    {
+      "path": "./modules/notification/process"
+    },
+    {
+      "path": "./modules/onboarding/browser"
+    },
+    {
+      "path": "./modules/onboarding/client"
+    },
+    {
+      "path": "./modules/onboarding/contract"
+    },
+    {
+      "path": "./modules/onboarding/process"
+    },
+    {
+      "path": "./modules/ops/browser"
+    },
+    {
+      "path": "./modules/ops/contract"
+    },
+    {
+      "path": "./modules/ops/process"
+    },
+    {
+      "path": "./modules/organization/browser"
+    },
+    {
+      "path": "./modules/organization/client"
+    },
+    {
+      "path": "./modules/organization/contract"
+    },
+    {
+      "path": "./modules/organization/process"
+    },
+    {
+      "path": "./modules/platform-health/contract"
+    },
+    {
+      "path": "./modules/platform-health/process"
+    },
+    {
+      "path": "./modules/presence/browser"
+    },
+    {
+      "path": "./modules/presence/contract"
+    },
+    {
+      "path": "./modules/presence/process"
+    },
+    {
+      "path": "./modules/project/browser"
+    },
+    {
+      "path": "./modules/project/client"
+    },
+    {
+      "path": "./modules/project/contract"
+    },
+    {
+      "path": "./modules/project/process"
+    },
+    {
+      "path": "./modules/prompt/browser"
+    },
+    {
+      "path": "./modules/prompt/client"
+    },
+    {
+      "path": "./modules/prompt/contract"
+    },
+    {
+      "path": "./modules/prompt/process"
+    },
+    {
+      "path": "./modules/role/contract"
+    },
+    {
+      "path": "./modules/role/process"
+    },
+    {
+      "path": "./modules/rum/contract"
+    },
+    {
+      "path": "./modules/rum/process"
+    },
+    {
+      "path": "./modules/sample-agents/contract"
+    },
+    {
+      "path": "./modules/sample-agents/process"
+    },
+    {
+      "path": "./modules/scenario/browser"
+    },
+    {
+      "path": "./modules/scenario/client"
+    },
+    {
+      "path": "./modules/scenario/contract"
+    },
+    {
+      "path": "./modules/scenario/process"
+    },
+    {
+      "path": "./modules/secret/browser"
+    },
+    {
+      "path": "./modules/secret/contract"
+    },
+    {
+      "path": "./modules/secret/process"
+    },
+    {
+      "path": "./modules/share/browser"
+    },
+    {
+      "path": "./modules/share/contract"
+    },
+    {
+      "path": "./modules/share/process"
+    },
+    {
+      "path": "./modules/slack/browser"
+    },
+    {
+      "path": "./modules/slack/contract"
+    },
+    {
+      "path": "./modules/slack/process"
+    },
+    {
+      "path": "./modules/stored-object/contract"
+    },
+    {
+      "path": "./modules/stored-object/process"
+    },
+    {
+      "path": "./modules/suite/browser"
+    },
+    {
+      "path": "./modules/suite/contract"
+    },
+    {
+      "path": "./modules/suite/process"
+    },
+    {
+      "path": "./modules/topic/browser"
+    },
+    {
+      "path": "./modules/topic/contract"
+    },
+    {
+      "path": "./modules/topic/process"
+    },
+    {
+      "path": "./modules/trace/browser"
+    },
+    {
+      "path": "./modules/trace/client"
+    },
+    {
+      "path": "./modules/trace/contract"
+    },
+    {
+      "path": "./modules/trace/process"
+    },
+    {
+      "path": "./modules/user/browser"
+    },
+    {
+      "path": "./modules/user/contract"
+    },
+    {
+      "path": "./modules/user/process"
+    },
+    {
+      "path": "./modules/webhook/client"
+    },
+    {
+      "path": "./modules/webhook/contract"
+    },
+    {
+      "path": "./modules/webhook/process"
+    },
+    {
+      "path": "./modules/workflow/browser"
+    },
+    {
+      "path": "./modules/workflow/client"
+    },
+    {
+      "path": "./modules/workflow/contract"
+    },
+    {
+      "path": "./modules/workflow/process"
+    },
+    {
+      "path": "./packages/api"
+    },
+    {
+      "path": "./packages/architecture-enforcer"
+    },
+    {
+      "path": "./packages/authorization"
+    },
+    {
+      "path": "./packages/aws-client"
+    },
+    {
+      "path": "./packages/browser"
+    },
+    {
+      "path": "./packages/browser-host"
+    },
+    {
+      "path": "./packages/clickhouse-client"
+    },
+    {
+      "path": "./packages/clickhouse-markers"
+    },
+    {
+      "path": "./packages/clickhouse-migrations"
+    },
+    {
+      "path": "./packages/config"
+    },
+    {
+      "path": "./packages/csv"
+    },
+    {
+      "path": "./packages/design-system"
+    },
+    {
+      "path": "./packages/design-system-internal"
+    },
+    {
+      "path": "./packages/egress"
+    },
+    {
+      "path": "./packages/error-views"
+    },
+    {
+      "path": "./packages/eventing"
+    },
+    {
+      "path": "./packages/group-queue"
+    },
+    {
+      "path": "./packages/handled-error"
+    },
+    {
+      "path": "./packages/internal-slack"
+    },
+    {
+      "path": "./packages/ksuid"
+    },
+    {
+      "path": "./packages/limiter"
+    },
+    {
+      "path": "./packages/mail"
+    },
+    {
+      "path": "./packages/module"
+    },
+    {
+      "path": "./packages/observability"
+    },
+    {
+      "path": "./packages/otlp"
+    },
+    {
+      "path": "./packages/oxlint-rules"
+    },
+    {
+      "path": "./packages/plans"
+    },
+    {
+      "path": "./packages/prisma-client"
+    },
+    {
+      "path": "./packages/process"
+    },
+    {
+      "path": "./packages/process-stores"
+    },
+    {
+      "path": "./packages/react-rum"
+    },
+    {
+      "path": "./packages/redaction"
+    },
+    {
+      "path": "./packages/redis-client"
+    },
+    {
+      "path": "./packages/secrets"
+    },
+    {
+      "path": "./packages/sim-console"
+    },
+    {
+      "path": "./packages/span-normalisation"
+    },
+    {
+      "path": "./packages/system-migrations"
+    },
+    {
+      "path": "./packages/task"
+    },
+    {
+      "path": "./packages/test-harness"
+    },
+    {
+      "path": "./packages/time"
+    },
+    {
+      "path": "./packages/upgrade"
+    },
+    {
+      "path": "./packages/vitest-config"
+    },
+    {
+      "path": "./packages/webhook-verify"
+    },
+    {
+      "path": "./plugins/langwatch"
+    },
+    {
+      "path": "./sdks/typescript"
+    },
+    {
+      "path": "./services/langyworker"
+    },
+    {
+      "path": "./skills"
+    },
+    {
+      "path": "./tools/dev-runtime"
+    },
+    {
+      "path": "./tools/seedgen/runner"
+    },
+    {
+      "path": "./modules/ops/client"
+    },
+    {
+      "path": "./modules/insight/contract"
+    },
+    {
+      "path": "./modules/insight/browser"
+    },
+    {
+      "path": "./modules/insight/process"
+    }
+  ]
+}

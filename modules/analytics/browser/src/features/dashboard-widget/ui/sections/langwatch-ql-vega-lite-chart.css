@@ -1,0 +1,10 @@
+/*
+ * The design system's reset gives every element `font: inherit`, which beats the font attributes
+ * Vega writes on its SVG text: labels drew at the page's size, not the size Vega laid out, and
+ * ran into each other. Inside the reset layer, `revert-layer` falls back to those attributes.
+ */
+@layer reset {
+  [data-lwql-chart-mount] text {
+    font: revert-layer;
+  }
+}

@@ -1,8 +1,11 @@
 import type fs from "fs";
+
 import * as yaml from "js-yaml";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
+
 import type { PromptsApiService } from "@/client-sdk/services/prompts";
+
+import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
 
 const { mockWriteFileSync } = vi.hoisted(() => ({
   mockWriteFileSync: vi.fn(),
@@ -30,8 +33,8 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { pushPrompts } from "../push";
 import { FileManager } from "../../utils/fileManager";
+import { pushPrompts } from "../push";
 
 describe("pushPrompts", () => {
   let mockSync: ReturnType<typeof vi.fn>;
@@ -75,7 +78,7 @@ describe("pushPrompts", () => {
       };
 
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         modelParameters: { temperature: 0 },
         messages: [
           { role: "system", content: "You are a mapping assistant." },
@@ -124,7 +127,7 @@ describe("pushPrompts", () => {
 
     it("uses response_format name as output identifier", async () => {
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "test" }],
         response_format: {
           name: "custom_output_name",
@@ -152,14 +155,12 @@ describe("pushPrompts", () => {
       await pushPrompts({ config, lock, promptsApiService, result });
 
       const syncCall = mockSync.mock.calls[0]![0];
-      expect(syncCall.configData.outputs[0].identifier).toBe(
-        "custom_output_name"
-      );
+      expect(syncCall.configData.outputs[0].identifier).toBe("custom_output_name");
     });
 
     it("defaults to 'output' when response_format has no name", async () => {
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "test" }],
         response_format: {
           // A rich (non-flat) schema stays a single json_schema output, so the
@@ -202,11 +203,9 @@ describe("pushPrompts", () => {
   describe("when local config has no response_format", () => {
     it("sends default str output", async () => {
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         modelParameters: { temperature: 0.7 },
-        messages: [
-          { role: "system", content: "You are a helpful assistant." },
-        ],
+        messages: [{ role: "system", content: "You are a helpful assistant." }],
       } as any);
 
       mockSync.mockResolvedValue({
@@ -231,9 +230,7 @@ describe("pushPrompts", () => {
       const syncCall = mockSync.mock.calls[0]![0];
 
       // Default output type should be str
-      expect(syncCall.configData.outputs).toEqual([
-        { identifier: "output", type: "str" },
-      ]);
+      expect(syncCall.configData.outputs).toEqual([{ identifier: "output", type: "str" }]);
 
       // No response_format should be set
       expect(syncCall.configData.response_format).toBeUndefined();
@@ -243,7 +240,7 @@ describe("pushPrompts", () => {
   describe("when response_format has no schema", () => {
     it("falls back to default str output", async () => {
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "test" }],
         response_format: { name: "my_format" },
       } as any);
@@ -270,9 +267,7 @@ describe("pushPrompts", () => {
       const syncCall = mockSync.mock.calls[0]![0];
 
       // Without schema, outputs fall back to default str
-      expect(syncCall.configData.outputs).toEqual([
-        { identifier: "output", type: "str" },
-      ]);
+      expect(syncCall.configData.outputs).toEqual([{ identifier: "output", type: "str" }]);
 
       // No response_format sent
       expect(syncCall.configData.response_format).toBeUndefined();
@@ -312,12 +307,10 @@ describe("pushPrompts", () => {
   });
 
   describe("when local config has runtime parameters", () => {
+    /** @scenario TypeScript local prompt files preserve runtime parameters */
     it("sends config to prompt sync", async () => {
-      /**
-       * @scenario TypeScript local prompt files preserve runtime parameters
-       */
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "test" }],
         parameters: { cli: true },
       } as any);
@@ -348,12 +341,10 @@ describe("pushPrompts", () => {
       );
     });
 
+    /** @scenario Syncing a local prompt detects runtime parameters conflicts */
     it("writes remote config when resolving a conflict with remote", async () => {
-      /**
-       * @scenario Syncing a local prompt detects runtime parameters conflicts
-       */
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "local" }],
         parameters: { local: true },
       } as any);
@@ -365,7 +356,7 @@ describe("pushPrompts", () => {
           remoteVersion: 1,
           differences: ["parameters changed"],
           remoteConfigData: {
-            model: "openai/gpt-4o",
+            model: "openai/gpt-5-mini",
             prompt: "remote",
             messages: [],
           },
