@@ -11,6 +11,7 @@ import {
   type AutomationServerConfig,
   type CreateTriggerCommand,
 } from "@langwatch/automation-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -26,7 +27,11 @@ import type { SlackApi } from "@langwatch/slack-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
-import { isMigrationStep, type MigrationStepReport } from "@langwatch/upgrade/step";
+import {
+  isDeclaredMigrationStep,
+  isMigrationStep,
+  type MigrationStepReport,
+} from "@langwatch/upgrade/step";
 import type { WebhookApi } from "@langwatch/webhook-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -79,6 +84,7 @@ async function bootWorker() {
       trace: createApiFixture<TraceApi>(),
       evaluation: createApiFixture<EvaluationApi>(),
       dataset: createApiFixture<DatasetApi>(),
+      "data-retention": createApiFixture<DataRetentionApi>(),
       annotation: createApiFixture<AnnotationApi>(),
       authz: createApiFixture<AuthzApi>(),
       notification: createApiFixture<NotificationService>(),
@@ -87,7 +93,7 @@ async function bootWorker() {
     })
     .boot();
   const automations = runtime.service(AutomationApi);
-  const steps = runtime.migrationSteps(isMigrationStep);
+  const steps = runtime.migrationSteps(isDeclaredMigrationStep).filter(isMigrationStep);
   const step = (id: string) => {
     const found = steps.find((candidate) => candidate.id === id);
     if (!found) throw new Error(`step ${id} is not declared`);

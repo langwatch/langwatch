@@ -31,10 +31,11 @@ export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof grap
   defineTrpcRouter(DashboardApi, graphTrpc)
     .procedure("create")
     .withPermission("analytics:create")
-    .handle(async ({ app, input }) =>
+    .handle(async ({ app, input, actor }) =>
       legacyGraph(
         await app.createGraph({
           projectId: input.projectId,
+          viewer: { userId: actor.id },
           name: input.name,
           graph: input.graph,
           filters: input.filterParams?.filters ?? {},
@@ -51,10 +52,11 @@ export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof grap
 
     .procedure("getAll")
     .withPermission("analytics:view")
-    .handle(async ({ app, input }) => {
+    .handle(async ({ app, input, actor }) => {
       const { projectId, dashboardId } = input;
       const graphs = await app.listGraphs({
         projectId,
+        viewer: { userId: actor.id },
         ...(dashboardId === undefined ? {} : { dashboardId }),
       });
 
@@ -76,14 +78,24 @@ export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof grap
 
     .procedure("delete")
     .withPermission("analytics:delete")
-    .handle(async ({ app, input }) =>
-      legacyGraph(await app.deleteGraph({ projectId: input.projectId, graphId: input.id })),
+    .handle(async ({ app, input, actor }) =>
+      legacyGraph(
+        await app.deleteGraph({
+          projectId: input.projectId,
+          graphId: input.id,
+          viewer: { userId: actor.id },
+        }),
+      ),
     )
 
     .procedure("getById")
     .withPermission("analytics:view")
-    .handle(async ({ app, input }) => {
-      const graph = await app.getGraph({ projectId: input.projectId, graphId: input.id });
+    .handle(async ({ app, input, actor }) => {
+      const graph = await app.getGraph({
+        projectId: input.projectId,
+        graphId: input.id,
+        viewer: { userId: actor.id },
+      });
 
       const trigger = await app.findAlertForGraph({
         customGraphId: input.id,
@@ -101,10 +113,11 @@ export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof grap
 
     .procedure("updateById")
     .withPermission("analytics:update")
-    .handle(async ({ app, input }) =>
+    .handle(async ({ app, input, actor }) =>
       legacyGraph(
         await app.updateGraph({
           projectId: input.projectId,
+          viewer: { userId: actor.id },
           graphId: input.graphId,
           name: input.name,
           graph: input.graph,
@@ -115,10 +128,11 @@ export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof grap
 
     .procedure("updateLayout")
     .withPermission("analytics:update")
-    .handle(async ({ app, input }) =>
+    .handle(async ({ app, input, actor }) =>
       legacyGraph(
         await app.updateGraphLayout({
           projectId: input.projectId,
+          viewer: { userId: actor.id },
           graphId: input.graphId,
           layout: {
             gridColumn: input.gridColumn,
@@ -132,9 +146,10 @@ export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof grap
 
     .procedure("batchUpdateLayouts")
     .withPermission("analytics:update")
-    .handle(async ({ app, input }) =>
+    .handle(async ({ app, input, actor }) =>
       app.batchUpdateGraphLayouts({
         projectId: input.projectId,
+        viewer: { userId: actor.id },
         layouts: input.layouts.map((layout) => ({
           graphId: layout.graphId,
           layout: {

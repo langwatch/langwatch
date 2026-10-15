@@ -18,6 +18,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaInstanceAdminRepository } from "../../repositories/prisma/prisma.instance-admin.repository.ts";
 import { AdminAuditSink } from "../impersonation.service.ts";
 import { InstanceAdminService } from "../instance-admin.service.ts";
+import { noOperators } from "./support/admin-doubles.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 class SilentAudit extends AdminAuditSink {
@@ -57,6 +58,7 @@ describe.skipIf(!DB_URL)("the back office's max dataset file size on Postgres", 
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
     service = InstanceAdminService.create({
+      operators: noOperators,
       accounts: {
         deactivateUser: () => Promise.reject(new Error("unreached")),
         changeUserEmail: () => Promise.reject(new Error("unreached")),

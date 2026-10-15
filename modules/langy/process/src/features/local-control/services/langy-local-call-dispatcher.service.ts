@@ -14,7 +14,6 @@ import {
   CALL_POLL_HOLD_MS,
   CALL_RESULT_TTL_MS,
   PERMISSION_WAIT_BUDGET_MS,
-  LIVE_STREAM_KEEPALIVE_MS,
   POLL_INTERVAL_MS,
   LangyLocalRecordUnreadableError,
   LangyLocalWorkspaceOfflineError,
@@ -33,12 +32,11 @@ import type { LangyLocalWorkspaceChannel } from "../../../channels/langy-local-w
 import { LANGY_ID_RESOURCES } from "../../../eventing/langy-conversation-process.schemas.ts";
 import type { LangyLocalCallRepository } from "../../../repositories/langy-local-call.repository.ts";
 import type { LangyLocalPresenceRepository } from "../../../repositories/langy-local-presence.repository.ts";
-import { callActivityLine } from "../../../rules/langy-local-call-activity.rules.ts";
 import type {
   LocalCallBuffer,
   StoredLocalCall,
 } from "../../../rules/langy-local-call-record.rules.ts";
-import { LANGY_LIVENESS } from "../../../rules/langy-streaming-constants.rules.ts";
+import { LocalCallKeepaliveService } from "./langy-local-call-keepalive.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:dispatcher");
 
@@ -64,6 +62,7 @@ export class LocalCallDispatcherService {
   private readonly buffer: LocalCallBuffer | null;
   private readonly offlineWaitMs: number;
   private readonly pollIntervalMs: number;
+  private readonly keepalive: LocalCallKeepaliveService;
   readonly now: () => number;
 
   static create(options: LocalCallDispatcherOptions): LocalCallDispatcherService {
@@ -78,6 +77,12 @@ export class LocalCallDispatcherService {
     this.now = options.now ?? (() => nowInstant().epochMilliseconds);
     this.offlineWaitMs = options.offlineWaitMs ?? CALL_OFFLINE_WAIT_MS;
     this.pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
+    this.keepalive = LocalCallKeepaliveService.create({
+      calls: this.calls,
+      presence: this.presence,
+      buffer: this.buffer,
+      now: this.now,
+    });
   }
 
   /**
@@ -141,7 +146,7 @@ export class LocalCallDispatcherService {
     signal?: AbortSignal;
   }): Promise<LocalCallPoll> {
     const until = this.now() + holdMs;
-    const beat = this.beater();
+    const beat = this.keepalive.beater();
     const look = async (): Promise<LocalCallLookup> => {
       const lookup = await this.getCall(callId);
       if (lookup.kind === "hit" && lookup.call.state !== "done") await beat(lookup.call);
@@ -162,72 +167,6 @@ export class LocalCallDispatcherService {
     return lookup.kind === "hit"
       ? { outcome: "polled", answer: toPollResponse(lookup.call) }
       : { outcome: "gone" };
-  }
-
-  /**
-   * The keepalive gate of one poll request: it refreshes on the first pass,
-   * then once per heartbeat interval for as long as the request holds.
-   */
-  private beater(): (call: StoredLocalCall) => Promise<void> {
-    let lastBeatAt: number | null = null;
-
-    return async (call) => {
-      const now = this.now();
-      const due = lastBeatAt === null || now - lastBeatAt >= LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS;
-      if (!due) {
-        return;
-      }
-
-      lastBeatAt = now;
-      await this.keepTurnAlive(call);
-    };
-  }
-
-  /**
-   * Holds the turn open, and says on the panel what the machine is doing, at
-   * most once per window. Gated on its own key, not the call record — two
-   * replicas polling one call must not each write a line.
-   */
-  private async keepTurnAlive(call: StoredLocalCall): Promise<void> {
-    const buffer = this.buffer;
-    if (!buffer) {
-      return;
-    }
-
-    await buffer.heartbeat({
-      conversationId: call.conversationId,
-      turnId: call.turnId,
-      now: this.now(),
-    });
-    if (this.now() - call.createdAt < LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS) {
-      return;
-    }
-
-    const firstOfWindow = await this.calls.claimKeepaliveWindow({
-      callId: call.callId,
-      at: this.now(),
-      ttlSeconds: Math.ceil(LIVE_STREAM_KEEPALIVE_MS / 1000),
-    });
-    if (!firstOfWindow) {
-      return;
-    }
-
-    const workspace = await this.presence
-      .getByConversationId(call.conversationId)
-      .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "langy_local_workspace_offline") {
-          return null;
-        }
-        throw error;
-      });
-    await buffer.appendStatus({
-      conversationId: call.conversationId,
-      turnId: call.turnId,
-      status: callActivityLine({
-        call,
-        machine: workspace?.hostname ?? "your machine",
-      }),
-    });
   }
 
   /** The command line started the call. */

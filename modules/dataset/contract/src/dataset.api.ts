@@ -7,6 +7,7 @@ import type { DatasetApiDeleteInput } from "./dataset.schemas.ts";
 import type {
   AppendStoredObjectToDatasetInput,
   CopyDatasetInput,
+  CountDatasetRecordsInput,
   CreateDatasetAttachmentUploadInput,
   CreateDatasetFromStoredObjectInput,
   CreateDatasetFromUploadInput,
@@ -25,6 +26,8 @@ import type {
   DatasetPage,
   DatasetPageInput,
   DatasetRecord,
+  DatasetRecordCount,
+  DatasetSummary,
   DatasetRecordMutationResult,
   DatasetRecordPage,
   DatasetStorageEntry,
@@ -84,6 +87,10 @@ export interface DatasetApi {
   validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult>;
   findNextAvailableName(input: DatasetNameInput): Promise<string>;
   listDatasets: (input: ListDatasetsInput) => Promise<DatasetListResult>;
+  /** The same page without entry counts, for the browser's list surfaces (tRPC `getAll`). */
+  findDatasetSummaries(input: ListDatasetsInput): Promise<DatasetSummary[]>;
+  /** Each named dataset's entry count, read apart from the list so the list never waits on it. */
+  countRecords(input: CountDatasetRecordsInput): Promise<DatasetRecordCount[]>;
   getBySlugOrId(input: DatasetLookupInput): Promise<Dataset>;
   findBySlugOrId(input: DatasetLookupInput): Promise<Dataset | null>;
   /** The dataset holding exactly this slug, archived or not; empty when none does. */

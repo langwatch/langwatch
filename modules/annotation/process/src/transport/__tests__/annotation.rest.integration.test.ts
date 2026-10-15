@@ -67,6 +67,7 @@ describe("annotation REST read failures", () => {
     it("answers the canonical internal_error 500 rather than the store's own message", async () => {
       const runtime = createRestRuntime({
         authorization: restTestAuthorization(),
+        audit: { record: () => {} },
         identity: {
           authenticate: () => ({
             actor: { type: "user", id: "user-1" },

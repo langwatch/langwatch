@@ -21,7 +21,8 @@ new image ─► worker boot ─► gate.admit (behind or first install)
                  │              ledger schema, lease, seed, plan
                  │              per release: schema (Prisma, goose programs) ─► blocking steps
                  │              ─► blocking done: a serving worker is admitted here
-                 │              ─► reconcilers (TTL, `pnpm task upgrade lwql-provision`, pass request)
+                 │              ─► reconcilers (TTL, `pnpm task upgrade lwql-provision`, pass request:
+                 │                 a serving worker's run only, never the run-once `pnpm task upgrade`)
                  │                 finish beside it; a run-once worker waits for all of them
                  ▼
              ledger current ─► takes jobs ─► background steps (per-step leases, own queue lists)

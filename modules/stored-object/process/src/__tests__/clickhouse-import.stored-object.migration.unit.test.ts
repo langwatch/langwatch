@@ -9,7 +9,10 @@ import {
 } from "../repositories/stored-object-legacy-source.repository.ts";
 
 class OneLegacyObject extends StoredObjectLegacySourceRepository {
-  constructor(private readonly storageUri = "s3://bucket/project_1/so_legacy") {
+  constructor(
+    private readonly storageUri = "s3://bucket/project_1/so_legacy",
+    private readonly purpose = "trace_content",
+  ) {
     super();
   }
 
@@ -19,7 +22,7 @@ class OneLegacyObject extends StoredObjectLegacySourceRepository {
       {
         id: "so_legacy",
         projectId: "project_1",
-        purpose: "trace_content",
+        purpose: this.purpose,
         ownerKind: "trace",
         ownerId: "trace_1",
         mediaType: "application/octet-stream",
@@ -73,6 +76,25 @@ describe("ClickHouseImportStoredObjectMigration.step", () => {
       audiences: ["traces:view"],
       storage: { provider: "s3", destinationId: "bucket", relativeId: "project_1/so_legacy" },
     });
+  });
+
+  it.each([
+    ["dataset_attachment", "datasets:view"],
+    ["user_avatar", "project:view"],
+  ])("imports a legacy %s row with the %s audience", async (purpose, audience) => {
+    const records = MemoryStoredObjectRecordRepository.create();
+    const step = ClickHouseImportStoredObjectMigration.create({
+      legacy: new OneLegacyObject("s3://bucket/project_1/so_legacy", purpose),
+      records,
+    }).step();
+
+    await expect(step.migrateTenant({ tenantId: "project_1" })).resolves.toMatchObject({
+      status: "finalized",
+      report: { scanned: 1, imported: 1 },
+    });
+    await expect(
+      records.findById({ tenantId: "project_1", id: "so_legacy" }),
+    ).resolves.toMatchObject({ purpose, audiences: [audience] });
   });
 
   /** @scenario "A second Stored Objects import of a project changes nothing" */

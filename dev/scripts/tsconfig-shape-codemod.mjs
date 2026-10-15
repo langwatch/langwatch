@@ -125,15 +125,8 @@ function intersect({ include, exclude }) {
   return name.endsWith(extension) ? [`${prefix}/**/${name}`] : [];
 }
 
-/** Step 1: the test config checks only what the build config excludes. */
-function narrowTestConfig({ directory, buildFiles, buildRaw }) {
-  const file = join(root, directory, "tsconfig.test.json");
-  if (!existsSync(file)) return new Set();
-  const raw = readConfig(file);
-  const before = filesOf({ raw, file });
-  // Ambient declarations (`*.d.ts`) stay in both programs: a reference does not carry them.
-  const ambient = (name) => name.endsWith(".d.ts");
-  const target = new Set([...before].filter((name) => !buildFiles.has(name) || ambient(name)));
+/** The test config's includes cut to what the build config excludes; undefined if one cannot be. */
+function narrowedIncludes({ directory, file, raw, buildFiles, buildRaw, ambient }) {
   const include = [];
   for (const glob of raw.include ?? []) {
     const own = filesOf({ raw: { ...raw, include: [glob], files: undefined }, file });
@@ -144,11 +137,25 @@ function narrowTestConfig({ directory, buildFiles, buildRaw }) {
     const parts = (buildRaw.exclude ?? []).map((exclude) => intersect({ include: glob, exclude }));
     if (parts.some((part) => part === undefined)) {
       problems.push(`${directory}: cannot narrow include ${glob}`);
-      return target;
+      return undefined;
     }
     include.push(...parts.flat());
     include.push(...[...own].filter(ambient).map((name) => relative(join(root, directory), name)));
   }
+  return include;
+}
+
+/** Step 1: the test config checks only what the build config excludes. */
+function narrowTestConfig({ directory, buildFiles, buildRaw }) {
+  const file = join(root, directory, "tsconfig.test.json");
+  if (!existsSync(file)) return new Set();
+  const raw = readConfig(file);
+  const before = filesOf({ raw, file });
+  // Ambient declarations (`*.d.ts`) stay in both programs: a reference does not carry them.
+  const ambient = (name) => name.endsWith(".d.ts");
+  const target = new Set([...before].filter((name) => !buildFiles.has(name) || ambient(name)));
+  const include = narrowedIncludes({ directory, file, raw, buildFiles, buildRaw, ambient });
+  if (include === undefined) return target;
   const unique = [...new Set(include)];
   const overlap = filesOf({ raw: { ...raw, include: unique }, file });
   const shared = [...overlap].filter((name) => buildFiles.has(name) && !ambient(name));

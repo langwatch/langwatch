@@ -141,9 +141,8 @@ export class MemoryIdentityUsersRepository implements IdentityUsersRepository {
   }
 
   async findUserIdsByEmail(args: { normalizedValue: string }): Promise<string[]> {
-    const wanted = args.normalizedValue.toLowerCase();
     return [...this.store.users.values()]
-      .filter((candidate) => (candidate.email ?? "").toLowerCase() === wanted)
+      .filter((candidate) => candidate.email === args.normalizedValue)
       .map((row) => row.id);
   }
 }
@@ -246,9 +245,8 @@ export class MemoryIdentityBackfillRepository implements IdentityBackfillReposit
   }
 
   async findAddressSharers(args: { normalizedValue: string }): Promise<BackfillUserRow[]> {
-    const wanted = args.normalizedValue.toLowerCase();
     return [...this.store.users.values()]
-      .filter((row) => (row.email ?? "").toLowerCase() === wanted)
+      .filter((row) => row.email === args.normalizedValue)
       .map(memoryBackfillUserRow);
   }
 

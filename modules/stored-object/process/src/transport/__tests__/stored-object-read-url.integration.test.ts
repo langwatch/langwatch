@@ -85,6 +85,7 @@ function installed() {
 
   const rest = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: {
       authenticate: () => {
         throw new Error("The signed read asks no credential of the door.");

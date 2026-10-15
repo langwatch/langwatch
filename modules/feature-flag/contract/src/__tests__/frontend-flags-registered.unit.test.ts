@@ -10,11 +10,7 @@ import { FRONTEND_FEATURE_FLAGS } from "../frontend-feature-flags.ts";
  * (`envOverridable: false`, operator-store-only) that happen to gate a
  * product surface. See feature-flag.ts's own comments on each key.
  */
-const FRONTEND_SYSTEM_FLAGS = [
-  "release_custom_chart_playground",
-  "release_langy_enabled",
-  "release_langy_ui_actions",
-];
+const FRONTEND_SYSTEM_FLAGS = ["release_langy_enabled", "release_langy_ui_actions"];
 
 function definitionOf(key: string): FeatureFlagDefinition | "unregistered" {
   try {

@@ -151,6 +151,31 @@ const COMMIT_TRANSACTION_OPTIONS = {
 } as const;
 
 /** Durable Postgres implementation of the process state/inbox/outbox port. */
+/** The sweep's dispatched-outbox delete, shared with the test that plans it. */
+export function dispatchedOutboxSweepDelete(params: { before: number; limit: number }): Prisma.Sql {
+  return Prisma.sql`
+    DELETE FROM "ProcessManagerOutbox"
+    WHERE "id" IN (
+      SELECT "id" FROM "ProcessManagerOutbox"
+      WHERE "status" = 'dispatched'::"ProcessManagerOutboxStatus"
+        AND "dispatchedAt" < ${asDate(params.before)}
+      LIMIT ${params.limit}
+    )
+  `;
+}
+
+/** The sweep's consumed-inbox delete, shared with the test that plans it. */
+export function consumedInboxSweepDelete(params: { before: number; limit: number }): Prisma.Sql {
+  return Prisma.sql`
+    DELETE FROM "ProcessManagerInbox"
+    WHERE "id" IN (
+      SELECT "id" FROM "ProcessManagerInbox"
+      WHERE "consumedAt" < ${asDate(params.before)}
+      LIMIT ${params.limit}
+    )
+  `;
+}
+
 export class PrismaProcessStore implements ProcessStore {
   static create(options: { database: EventingProcessPersistenceDatabase }): PrismaProcessStore {
     if (!isProcessPersistencePrismaClient(options.database)) {
@@ -816,13 +841,7 @@ export class PrismaProcessStore implements ProcessStore {
   async deleteDispatchedOutboxBatch(params: { before: number; limit: number }): Promise<number> {
     if (params.limit <= 0) return 0;
     return this.#prisma.$executeRaw`
-      DELETE FROM "ProcessManagerOutbox"
-      WHERE "id" IN (
-        SELECT "id" FROM "ProcessManagerOutbox"
-        WHERE "status" = 'dispatched'::"ProcessManagerOutboxStatus"
-          AND "dispatchedAt" < ${asDate(params.before)}
-        LIMIT ${params.limit}
-      )
+      ${dispatchedOutboxSweepDelete(params)}
       ${skipTenantCheck({
         // Process-manager retention sweep, dispatched outbox (system-owned maintenance)
         SKIP_TENANT_CHECK: true,
@@ -853,12 +872,7 @@ export class PrismaProcessStore implements ProcessStore {
   async deleteConsumedInboxBatch(params: { before: number; limit: number }): Promise<number> {
     if (params.limit <= 0) return 0;
     return this.#prisma.$executeRaw`
-      DELETE FROM "ProcessManagerInbox"
-      WHERE "id" IN (
-        SELECT "id" FROM "ProcessManagerInbox"
-        WHERE "consumedAt" < ${asDate(params.before)}
-        LIMIT ${params.limit}
-      )
+      ${consumedInboxSweepDelete(params)}
       ${skipTenantCheck({
         // Process-manager retention sweep, consumed inbox (system-owned maintenance)
         SKIP_TENANT_CHECK: true,

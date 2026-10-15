@@ -134,6 +134,30 @@ func TestCompatWorkflowRunsBaseSuitesOnHeadsSchema(t *testing.T) {
 	}
 }
 
+// @scenario "Base's worker takes jobs while base's suites run"
+func TestCompatWorkflowStartsBasesWorkerBeforeTheSuites(t *testing.T) {
+	workflow, _ := loadWorkflow(t, "migration-compat.yml")
+	steps := workflow.Jobs["n-minus-one"].Steps
+	names := make([]string, len(steps))
+	for i, s := range steps {
+		names[i] = s.Name
+	}
+	worker := slices.Index(names, "Start base's worker beside the suites")
+	suites := slices.Index(names, "Base's live api suites on head's schema")
+	if worker < 0 || suites < 0 || worker > suites {
+		t.Fatalf("base's worker must start before base's suites: %q", names)
+	}
+	step := steps[worker]
+	if !strings.HasSuffix(step.Env["CLICKHOUSE_URL"], "/test_analytics_migrated_schema") {
+		t.Errorf("base's worker is not on the suites' ClickHouse database: %+v", step.Env)
+	}
+	for _, want := range []string{"src/main.ts", "/readyz", "exit 1"} {
+		if !strings.Contains(step.Run, want) {
+			t.Errorf("base's worker step leaves out %q:\n%s", want, step.Run)
+		}
+	}
+}
+
 // @scenario "A base suite that silently skips fails the job"
 func TestCompatWorkflowFailsASuiteThatPassedNothing(t *testing.T) {
 	workflow, _ := loadWorkflow(t, "migration-compat.yml")

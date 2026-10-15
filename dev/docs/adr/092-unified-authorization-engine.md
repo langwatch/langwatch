@@ -497,6 +497,14 @@ theirs) while the actor stays the admin:
  grants resolve for the SUBJECT · every AuthzDecision records BOTH
 ```
 
+Amended (Alex, 2026-10-14): while impersonating, the actor keeps `ops:view` at
+the platform, so ops reads such as Deja View stay open, but `ops:manage` is not
+answered until the operator is signed in as themselves. The access check
+(`decidePlatform` in `packages/api/src/access/access.ts`) refuses it for an
+impersonated caller, and the ops application refuses its own `ops:manage`
+questions the same way. Ending the impersonation asks `ops:view`, so the way
+out stays open.
+
 Audit attribution (`metadata.impersonatorId` today), the ops-scope
 impersonator carve-out (`rbac.ts:1568`), and the impersonation banner all
 stop being special cases - they read straight off `actor`. The same shape

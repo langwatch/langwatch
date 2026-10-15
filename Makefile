@@ -143,7 +143,7 @@ DEV_ENV_FILE ?= .env
 # combined_dev.go); release images build untagged. SIM_CONSOLES are the
 # simulators the run hosts; any at all builds @langwatch/sims, the one app holding
 # every console (ADR-160). Nx caches the build, so unchanged consoles cost a cache hit.
-SIMULATORS = idpsim mailsim storagesim voicesim llmsim analyticssim telemetrysim outboundsim paymentsim lambdasim githubsim
+SIMULATORS = idpsim mailsim storagesim voicesim llmsim analyticssim telemetrysim outboundsim paymentsim lambdasim githubsim mcpsim
 SIM_CONSOLES = $(if $(filter combined,$(svc)),$(if $(args),$(filter $(SIMULATORS),$(args)),$(SIMULATORS)),$(filter $(SIMULATORS),$(svc)))
 BUILD_SIM_CONSOLES = $(if $(SIM_CONSOLES),$(NX) run @langwatch/sims:build --outputStyle=static || echo "@langwatch/sims did not build; each console names the fix",true)
 # pipefail needs bash; CI runners default to dash.
