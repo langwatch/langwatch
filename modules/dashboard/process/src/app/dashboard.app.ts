@@ -27,6 +27,7 @@ import {
   DashboardsNotEnabledError,
   dashboardConfig,
   type Dashboard,
+  type BoardSummary,
   type DashboardScope,
   type DashboardScopeImpact,
   type DashboardScopeProjects,
@@ -412,7 +413,7 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     viewer?: DashboardViewer;
     includeOrganization?: boolean;
-  }): Promise<DashboardSummary[]> {
+  }): Promise<BoardSummary[]> {
     return this.#boards.findBoards(input);
   }
 
@@ -426,11 +427,12 @@ export class DashboardModule implements DashboardApi {
   }
 
   /** A new board; a member's own My dashboard starts starred for them, at Only me. */
-  createBoard(input: {
+  async createBoard(input: {
     projectId: string;
     name: string;
     createdById?: string;
   }): Promise<Dashboard> {
+    await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.createBoard(input);
   }
 
@@ -447,11 +449,12 @@ export class DashboardModule implements DashboardApi {
   }
 
   /** Removes a board with its widgets and every member's star of it. */
-  deleteBoard(input: {
+  async deleteBoard(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
+    await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.deleteBoard(input);
   }
 
@@ -746,7 +749,7 @@ export class DashboardModule implements DashboardApi {
   }): Promise<SavedWorkbenchChart[]> {
     await this.#requireWorkbench(input.projectId);
 
-    return this.#charts.getAll({ projectId: input.projectId });
+    return this.#charts.getAll(input);
   }
 
   /** One saved chart, with its query, parameters and specification. */
@@ -779,9 +782,7 @@ export class DashboardModule implements DashboardApi {
     definitionUpdate?: SavedWorkbenchChartDefinitionUpdate;
     viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
-    const { viewer: _viewer, ...update } = input;
-    await this.#charts.getById(input);
-    return this.#charts.update(update);
+    return this.#charts.update(input);
   }
 
   /**
@@ -840,6 +841,7 @@ export class DashboardModule implements DashboardApi {
     return this.#charts.update({
       projectId: input.projectId,
       chartId: input.chartId,
+      viewer: input.viewer,
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(definitionUpdate === undefined ? {} : { definitionUpdate }),
     });
@@ -870,10 +872,9 @@ export class DashboardModule implements DashboardApi {
     rowSpan?: number;
     viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
-    const { viewer: _viewer, ...placement } = input;
-    // The chart service refuses a board Reports does not hold.
-    await this.#charts.getById(placement);
-    return this.#charts.place(placement);
+    // The chart service refuses a board the viewer's Reports does not hold.
+    await this.#charts.getById(input);
+    return this.#charts.place(input);
   }
 
   /**
@@ -910,6 +911,7 @@ export class DashboardModule implements DashboardApi {
     return this.#charts.run({
       projectId: input.projectId,
       chartId: input.chartId,
+      viewer: input.viewer,
       execution: {
         project,
         protections,

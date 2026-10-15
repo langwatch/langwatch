@@ -1,6 +1,7 @@
 import type {
   Dashboard,
   DashboardSummary,
+  DashboardViewer,
   Graph,
   GraphLayout,
   SavedWorkbenchChart,
@@ -15,11 +16,13 @@ export type DashboardRecord = Dashboard;
 
 /** The editable field of a Reports board; its retiring scope columns take no new write. */
 export type DashboardUpdate = Readonly<{ name?: string }>;
-/** The stored summary: stars and the owner's name are per reader, so the service adds them. */
-export type DashboardSummaryRecord = Omit<DashboardSummary, "isStarred" | "ownerProject">;
+export type DashboardSummaryRecord = DashboardSummary;
 
-/** The project a Reports read is made from: Reports boards have no scope (A8). */
-export type DashboardReach = Readonly<{ projectId: string }>;
+/**
+ * Who reads, from which project. Another member's Only me row, and a chart on one, is not there;
+ * nor is any Only me row for a project credential or once its author is erased (AC199m).
+ */
+export type DashboardReach = Readonly<{ projectId: string; viewer?: DashboardViewer }>;
 export type GraphRecord = Graph;
 
 /** The stored chart before its definition is parsed against the contract. */
@@ -29,8 +32,8 @@ export type SavedWorkbenchChartRecord = Omit<SavedWorkbenchChart, "definition"> 
 
 /**
  * The Analytics Reports boards, builder graphs and saved workbench charts (Dashboard, CustomGraph).
- * Board reads leave out a board only Dashboards holds (in DashboardsV2, no Reports chart); a srcdoc
- * row is a stale copy, never a chart. A write naming a row the project lacks is refused.
+ * Reads leave out a board only Dashboards holds and what the reach does not see; a srcdoc row is a
+ * stale copy, never a chart. A write naming a row the project lacks is refused.
  */
 export interface DashboardRepository {
   /** The project's boards in `order`. */
@@ -67,8 +70,8 @@ export interface DashboardRepository {
   deleteDashboard(input: { projectId: string; dashboardId: string }): Promise<DashboardRecord>;
   updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void>;
 
-  findAllGraphs(input: { projectId: string; dashboardId?: string }): Promise<GraphRecord[]>;
-  findGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord | undefined>;
+  findAllGraphs(input: DashboardReach & { dashboardId?: string }): Promise<GraphRecord[]>;
+  findGraph(input: DashboardReach & { graphId: string }): Promise<GraphRecord | undefined>;
   /**
    * The first grid row below every Reports card on the dashboard, builder or workbench, so a
    * new card never lands on a tall one; row 0 on an empty dashboard.
@@ -101,11 +104,10 @@ export interface DashboardRepository {
     layouts: { graphId: string; layout: GraphLayout }[];
   }): Promise<void>;
 
-  findAllSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChartRecord[]>;
-  findSavedWorkbenchChart(input: {
-    projectId: string;
-    chartId: string;
-  }): Promise<SavedWorkbenchChartRecord | undefined>;
+  findAllSavedWorkbenchCharts(input: DashboardReach): Promise<SavedWorkbenchChartRecord[]>;
+  findSavedWorkbenchChart(
+    input: DashboardReach & { chartId: string },
+  ): Promise<SavedWorkbenchChartRecord | undefined>;
   createSavedWorkbenchChart(input: {
     id: string;
     projectId: string;

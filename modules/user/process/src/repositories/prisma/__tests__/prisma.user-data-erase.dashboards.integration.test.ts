@@ -1,8 +1,8 @@
 /**
  * @vitest-environment node
  *
- * The erasure against a real Postgres for the Dashboards tables: a person's Only me boards and
- * stars go, a board others can see stays without its author.
+ * The erasure against a real Postgres for the Dashboards tables: a person's Only me boards, their
+ * stale Reports copies and stars go, a board others can see stays without its author.
  * @see modules/user/specs/data-erasure.feature
  */
 import { randomUUID } from "node:crypto";
@@ -46,13 +46,44 @@ describe.skipIf(!databaseUrl)("given a user's boards, widgets and stars in Dashb
     const prisma = connection.client;
     userId = (await prisma.user.create({ data: { name: "Ada", email: `ada@${RUN}.test` } })).id;
     otherId = (await prisma.user.create({ data: { name: "Kay", email: `kay@${RUN}.test` } })).id;
+    // Dashboard and CustomGraph name their project by foreign key; the Dashboards tables do not.
+    const organization = await prisma.organization.create({ data: { name: RUN, slug: RUN } });
+    const team = await prisma.team.create({
+      data: { name: RUN, slug: RUN, organizationId: organization.id },
+    });
+    await prisma.project.create({
+      data: {
+        id: SHARED_PROJECT,
+        name: RUN,
+        slug: RUN,
+        apiKey: RUN,
+        teamId: team.id,
+        language: "typescript",
+        framework: "other",
+      },
+    });
 
     await prisma.dashboardsV2.createMany({
       data: [
         board("only-me", { createdById: userId, scope: "PRIVATE" }),
+        board("mixed", { createdById: userId, scope: "PRIVATE" }),
         board("shared", { createdById: userId, scope: "PROJECT" }),
         board("others", { createdById: otherId, scope: "PROJECT" }),
         board("owned", { createdById: otherId, scope: "PROJECT", projectId: OWNED_PROJECT }),
+      ],
+    });
+    // The split left each Only me board's Reports row and srcdoc copy; the mixed one has a chart.
+    await prisma.dashboard.createMany({
+      data: [
+        board("only-me", { createdById: userId, scope: "PRIVATE" }),
+        board("mixed", { createdById: userId, scope: "PRIVATE" }),
+      ],
+    });
+    await prisma.customGraph.createMany({
+      data: [
+        chart("only-me", "dashboard_srcdoc"),
+        chart("mixed", "dashboard_srcdoc"),
+        chart("mixed", "builder"),
       ],
     });
     await prisma.dashboardWidget.createMany({
@@ -81,9 +112,14 @@ describe.skipIf(!databaseUrl)("given a user's boards, widgets and stars in Dashb
   afterAll(async () => {
     const prisma = connection.client;
     const projectId = { in: [SHARED_PROJECT, OWNED_PROJECT] };
+    await prisma.customGraph.deleteMany({ where: { projectId } });
+    await prisma.dashboard.deleteMany({ where: { projectId } });
     await prisma.dashboardFavourite.deleteMany({ where: { projectId } });
     await prisma.dashboardWidget.deleteMany({ where: { projectId } });
     await prisma.dashboardsV2.deleteMany({ where: { projectId } });
+    await prisma.project.deleteMany({ where: { id: SHARED_PROJECT } });
+    await prisma.team.deleteMany({ where: { slug: RUN } });
+    await prisma.organization.deleteMany({ where: { slug: RUN } });
     await prisma.user.deleteMany({ where: { email: { contains: RUN } } });
     await prisma.$disconnect();
   });
@@ -110,6 +146,26 @@ describe.skipIf(!databaseUrl)("given a user's boards, widgets and stars in Dashb
           select: { userId: true, dashboardId: true },
         }),
       ).resolves.toEqual([{ userId: otherId, dashboardId: id("shared") }]);
+    });
+
+    /** @scenario "Erasing a user removes the Reports copy of their Only me boards" */
+    it("removes each Only me board's srcdoc copy, and its Reports row unless it holds a chart", async () => {
+      const prisma = connection.client;
+
+      expect({
+        reports: await prisma.dashboard.findMany({
+          where: { projectId: SHARED_PROJECT },
+          select: { id: true, scope: true, createdById: true },
+        }),
+        charts: await prisma.customGraph.findMany({
+          where: { projectId: SHARED_PROJECT },
+          select: { dashboardId: true, kind: true },
+        }),
+      }).toEqual({
+        // Only me with no author: Reports shows it to nobody.
+        reports: [{ id: id("mixed"), scope: "PRIVATE", createdById: null }],
+        charts: [{ dashboardId: id("mixed"), kind: "builder" }],
+      });
     });
 
     /** @scenario "Erasing a user removes their Only me boards and their stars, and keeps shared boards" */
@@ -144,6 +200,17 @@ function board(
     name,
     createdById: fields.createdById,
     scope: fields.scope,
+  };
+}
+
+function chart(boardName: string, kind: "builder" | "dashboard_srcdoc") {
+  return {
+    id: `${id(boardName)}-${kind}`,
+    projectId: SHARED_PROJECT,
+    dashboardId: id(boardName),
+    name: "Chart",
+    graph: {},
+    kind,
   };
 }
 

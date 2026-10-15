@@ -88,7 +88,7 @@ describe("given an insight that came from a widget on a board", () => {
   });
 
   describe("when the board holds only charts made in Analytics Reports", () => {
-    /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
+    /** @scenario "AC199 Split: Dashboards and Analytics Reports each list and open only their own boards" */
     it("asks for the Dashboards area's boards alone, so it offers no link to that board", async () => {
       const { inputs } = renderPointer({ boards: [], widgets: [] });
 

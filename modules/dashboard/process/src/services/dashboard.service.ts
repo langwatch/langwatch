@@ -48,8 +48,8 @@ export interface WorkbenchAccess {
 }
 
 /**
- * The Analytics Reports boards and their chart-builder graphs. Reports boards have no scope,
- * so every reader of the project reaches each; a board only the Dashboards area holds is not one
+ * The Analytics Reports boards and their chart-builder graphs. Another member's Only me board and
+ * its graphs read and write as absent (AC199m); so does a board only the Dashboards area holds
  * (dashboards-v2.feature AC199j). The Dashboards area's boards are BoardService's.
  */
 export class DashboardService {
@@ -85,8 +85,7 @@ export class DashboardService {
       input.graphCountScope === "builder"
         ? (["builder"] as const)
         : await this.#placeableKinds(projectId);
-    const boards = await this.#repository.findAllDashboards({ projectId, graphKinds });
-    return boards.map((board) => ({ ...board, isStarred: false, ownerProject: null }));
+    return this.#repository.findAllDashboards({ projectId, viewer: input.viewer, graphKinds });
   }
 
   async getById(input: {
@@ -96,7 +95,7 @@ export class DashboardService {
   }): Promise<Dashboard & { graphs: Graph[] }> {
     const parsed = dashboardRef(input);
 
-    const found = await this.#repository.findDashboard(parsed);
+    const found = await this.#repository.findDashboard({ ...parsed, viewer: input.viewer });
     if (!found) throw new DashboardNotFoundError(parsed.projectId);
 
     return found;
@@ -121,10 +120,10 @@ export class DashboardService {
     name: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
-    const { viewer: _viewer, ...fields } = input;
+    const { viewer, ...fields } = input;
     const parsed = dashboardRenameInputSchema.parse(fields);
 
-    await this.#assertReportsBoard(parsed);
+    await this.#assertReportsBoard({ ...parsed, viewer });
     return this.#repository.updateDashboard({
       projectId: parsed.projectId,
       dashboardId: parsed.dashboardId,
@@ -139,7 +138,7 @@ export class DashboardService {
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
     const ref = dashboardRef(input);
-    await this.#assertReportsBoard(ref);
+    await this.#assertReportsBoard({ ...ref, viewer: input.viewer });
     return this.#repository.deleteDashboard(ref);
   }
 
@@ -149,10 +148,10 @@ export class DashboardService {
     dashboardIds: string[];
     viewer?: DashboardViewer;
   }): Promise<{ success: true }> {
-    const { viewer: _viewer, ...fields } = input;
+    const { viewer, ...fields } = input;
     const parsed = dashboardReorderInputSchema.parse(fields);
 
-    const found = await this.#repository.findDashboards(parsed);
+    const found = await this.#repository.findDashboards({ ...parsed, viewer });
     const reachable = new Set(found.map(({ id }) => id));
     const missingIds = parsed.dashboardIds.filter((id) => !reachable.has(id));
     if (missingIds.length > 0) throw new DashboardReorderUnknownIdsError(missingIds);
@@ -170,7 +169,11 @@ export class DashboardService {
   }): Promise<Dashboard[]> {
     const projectId = projectIdSchema.parse(input.projectId);
 
-    const [first] = await this.#repository.findAllDashboards({ projectId, graphKinds: [] });
+    const [first] = await this.#repository.findAllDashboards({
+      projectId,
+      viewer: input.viewer,
+      graphKinds: [],
+    });
     if (first) {
       const { graphCount: _graphCount, ...dashboard } = first;
       return [dashboard];
@@ -187,11 +190,11 @@ export class DashboardService {
     dashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<Graph[]> {
-    const projectId = projectIdSchema.parse(input.projectId);
+    const reach = { projectId: projectIdSchema.parse(input.projectId), viewer: input.viewer };
     return input.dashboardId === undefined
-      ? this.#repository.findAllGraphs({ projectId })
+      ? this.#repository.findAllGraphs(reach)
       : this.#repository.findAllGraphs({
-          projectId,
+          ...reach,
           dashboardId: dashboardIdSchema.parse(input.dashboardId),
         });
   }
@@ -203,7 +206,7 @@ export class DashboardService {
   }): Promise<Graph> {
     const parsed = graphRef(input);
 
-    const graph = await this.#repository.findGraph(parsed);
+    const graph = await this.#repository.findGraph({ ...parsed, viewer: input.viewer });
     if (!graph) throw new GraphNotFoundError(parsed.projectId);
 
     return graph;
@@ -222,7 +225,7 @@ export class DashboardService {
     // schema is strict and flattens the grid onto the row, so spreading
     // `input` whole would offer it the `layout` key it refuses.
     // An empty `dashboardId` places the graph on no dashboard, as main's `&&` did.
-    const { layout: requestedLayout, viewer: _viewer, dashboardId, ...withoutLayout } = input;
+    const { layout: requestedLayout, viewer, dashboardId, ...withoutLayout } = input;
     const parsed = graphCreateInputSchema.parse({
       ...withoutLayout,
       ...requestedLayout,
@@ -233,6 +236,7 @@ export class DashboardService {
       await this.#assertReportsBoard({
         projectId: parsed.projectId,
         dashboardId: parsed.dashboardId,
+        viewer,
       });
     }
 
@@ -331,10 +335,15 @@ export class DashboardService {
     return { success: true as const };
   }
 
-  /** The project's own Reports board; a board only Dashboards holds is absent (AC199j). */
-  async #assertReportsBoard(ref: { projectId: string; dashboardId: string }): Promise<void> {
+  /** A Reports board the viewer sees; one only Dashboards holds is absent (AC199j). */
+  async #assertReportsBoard(ref: {
+    projectId: string;
+    dashboardId: string;
+    viewer: DashboardViewer | undefined;
+  }): Promise<void> {
     const [board] = await this.#repository.findDashboards({
       projectId: ref.projectId,
+      viewer: ref.viewer,
       dashboardIds: [ref.dashboardId],
     });
     if (!board) throw new DashboardNotFoundError(ref.projectId);

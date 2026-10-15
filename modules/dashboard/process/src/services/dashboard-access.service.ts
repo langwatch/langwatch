@@ -119,12 +119,6 @@ export class DashboardAccessService {
     return found.board;
   }
 
-  /** Whether the project holds this board and the reader may write it. */
-  async isWritable(input: BoardReading & { dashboardId: string }): Promise<boolean> {
-    const found = await this.#findAtHome(input);
-    return found !== undefined && found !== "elsewhere";
-  }
-
   /** Whether the project holds this board and the reader may not see it. */
   async isHidden(input: BoardReading & { dashboardId: string }): Promise<boolean> {
     return (await this.#findAtHome(input)) === undefined;

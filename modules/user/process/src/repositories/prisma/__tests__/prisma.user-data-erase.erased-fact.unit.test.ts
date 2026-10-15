@@ -44,6 +44,7 @@ function databaseRecording({ failOn }: { failOn?: string } = {}) {
       updateMany: write("dashboardsV2.updateMany"),
     },
     dashboardFavourite: { deleteMany: write("dashboardFavourite.deleteMany") },
+    dashboard: { updateMany: write("dashboard.updateMany") },
     teamUser: { deleteMany: write("teamUser.deleteMany") },
     organizationUser: {
       deleteMany: write("organizationUser.deleteMany"),

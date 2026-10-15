@@ -34,6 +34,14 @@ Feature: Erasing a user removes their personal data everywhere
     And the Project board and its widgets stay with no author, with the other member's star
     And the boards, widgets and stars of a project only the user owned go with that project
 
+  @integration
+  Scenario: Erasing a user removes the Reports copy of their Only me boards
+    Given a user's Only me board with only widgets, and one that also holds a chart made in
+      Analytics Reports, each with the Reports row and srcdoc copies the split left behind
+    When their erasure runs
+    Then no srcdoc copy of either board is left, and Reports no longer holds the first board
+    And the second board's Reports row keeps its chart at Only me with no author, so nobody sees it
+
   @unit
   Scenario: Erasing a user with no blockers runs the erase transaction for the resolved user
     Given a user with no erasure blockers

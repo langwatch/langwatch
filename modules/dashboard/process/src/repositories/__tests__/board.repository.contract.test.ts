@@ -487,7 +487,7 @@ function contractCases(backend: DashboardBackend): void {
       ),
     });
 
-    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+    /** @scenario "AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart" */
     it("deletes the board, its widgets, its stars and its stale srcdoc rows, and nothing of Reports", async () => {
       const boards = backend.boards();
       const mixed = await mixedBoard();
@@ -542,7 +542,7 @@ function contractCases(backend: DashboardBackend): void {
       });
     });
 
-    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+    /** @scenario "AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart" */
     it("deletes the stale Dashboard row of a board holding no Reports chart, so Reports lists no copy", async () => {
       const created = await backend
         .dashboards()
@@ -567,7 +567,7 @@ function contractCases(backend: DashboardBackend): void {
       }).toEqual({ reports: [], stale: [] });
     });
 
-    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+    /** @scenario "AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart" */
     it("refuses the id of a board only Reports holds, and keeps that board and its charts", async () => {
       const reports = await reportsBoard("Reports only");
       const before = await reportsArea();
@@ -579,7 +579,7 @@ function contractCases(backend: DashboardBackend): void {
       await expect(reportsArea()).resolves.toEqual(before);
     });
 
-    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+    /** @scenario "AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart" */
     it("deletes a widget with its stale srcdoc copy, and no other row", async () => {
       const created = await board();
       const [gone, kept] = [await widget(created.id), await widget(created.id)];
@@ -609,7 +609,7 @@ describe.skipIf(!databaseUrl)("given the Postgres board repository", () => {
   const backend = postgresBackend(`board-contract-${randomUUID()}`);
   contractCases(backend);
 
-  /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+  /** @scenario "AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart" */
   it("leaves the Reports chart's Trigger and its sent alert untouched when a mixed board is deleted", async () => {
     const projectId = backend.projectId();
     const reports = await backend

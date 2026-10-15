@@ -10,6 +10,7 @@ import type { Trigger } from "@langwatch/automation-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type {
+  BoardSummary,
   Dashboard,
   DashboardScope,
   DashboardScopeImpact,
@@ -45,15 +46,15 @@ export interface DashboardUsageCount {
 /** Flat operations a door or a peer calls once the dashboard app is composed. */
 export interface DashboardApi {
   /**
-   * The Analytics Reports boards, in `order`; they have no scope, so every reader lists the same.
-   * A board only the Dashboards area holds is not one of them (dashboards-v2.feature AC199).
+   * The Analytics Reports boards the viewer may see, in `order`: no other member's Only me board
+   * (AC199m), and no board only the Dashboards area holds (dashboards-v2.feature AC199).
    */
   getAll(input: {
     projectId: string;
     graphCountScope: DashboardGraphCountScope;
     viewer?: DashboardViewer;
   }): Promise<DashboardSummary[]>;
-  /** One Reports board with its builder graphs. */
+  /** One Reports board the viewer may see, with its builder graphs. */
   getById(input: {
     projectId: string;
     dashboardId: string;
@@ -91,7 +92,7 @@ export interface DashboardApi {
     projectId: string;
     viewer?: DashboardViewer;
     includeOrganization?: boolean;
-  }): Promise<DashboardSummary[]>;
+  }): Promise<BoardSummary[]>;
   /** Where a reader opens each of these Dashboards boards, keyed by board id. */
   getBoardLinks(input: {
     projectId: string;
@@ -106,6 +107,7 @@ export interface DashboardApi {
   /**
    * A Dashboards board at the scope Project; `createdById` is its author, absent for a project
    * credential. A member's own My dashboard starts starred for them, at Only me (AC160b, AC170).
+   * `dashboards_not_enabled` while `release_dashboards` is off (AC189).
    */
   createBoard(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard>;
   /**
@@ -119,7 +121,10 @@ export interface DashboardApi {
     name?: string;
     description?: string | null;
   }): Promise<Dashboard>;
-  /** The board, its widgets, every star on it and its stale legacy copy (AC199b). */
+  /**
+   * The board, its widgets, every star on it and its stale legacy copy (AC199b);
+   * `dashboards_not_enabled` while `release_dashboards` is off.
+   */
   deleteBoard(input: {
     projectId: string;
     dashboardId: string;
@@ -176,7 +181,7 @@ export interface DashboardApi {
     viewer: DashboardViewer;
   }): Promise<DashboardSourcePresence>;
 
-  /** Every builder graph in the project, optionally only those on one board. */
+  /** The builder graphs the viewer may see, optionally only those on one board. */
   listGraphs(input: {
     projectId: string;
     dashboardId?: string;

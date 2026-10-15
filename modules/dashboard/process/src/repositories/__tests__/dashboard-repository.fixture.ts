@@ -46,6 +46,8 @@ export type DashboardBackend = Readonly<{
   }) => Promise<void>;
   /** The ids of the srcdoc rows CustomGraph still holds for the project. */
   findStaleCopyIds: (projectId: string) => Promise<string[]>;
+  /** Puts a Reports row at Only me with an author, as a board made before the split could be. */
+  seedOnlyMeReportsBoard: (input: { dashboardId: string; createdById: string }) => Promise<void>;
 }>;
 
 export const id = (prefix: string) => `${prefix}_${randomUUID()}`;
@@ -89,6 +91,11 @@ export function memoryBackend(): DashboardBackend {
       database.charts
         .filter((chart) => chart.projectId === projectId && chart.kind === "dashboard_srcdoc")
         .map((chart) => chart.id),
+    seedOnlyMeReportsBoard: async ({ dashboardId, createdById }) => {
+      database.dashboards = database.dashboards.map((row) =>
+        row.id === dashboardId ? { ...row, scope: "PRIVATE" as const, createdById } : row,
+      );
+    },
   };
 }
 
@@ -187,6 +194,12 @@ export function postgresBackend(namespace: string): DashboardBackend {
         select: { id: true },
       });
       return rows.map((row) => row.id);
+    },
+    seedOnlyMeReportsBoard: async ({ dashboardId, createdById }) => {
+      await database().dashboard.update({
+        where: { id: dashboardId },
+        data: { scope: "PRIVATE", createdById },
+      });
     },
   };
 }

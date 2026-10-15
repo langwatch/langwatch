@@ -8,7 +8,7 @@ import {
   newDashboardScope,
   projectIdSchema,
   type Dashboard,
-  type DashboardSummary,
+  type BoardSummary,
   type DashboardViewer,
 } from "@langwatch/dashboard-contract";
 import { generate } from "@langwatch/ksuid";
@@ -44,7 +44,7 @@ export class BoardService {
     projectId: string;
     viewer?: DashboardViewer;
     includeOrganization?: boolean;
-  }): Promise<DashboardSummary[]> {
+  }): Promise<BoardSummary[]> {
     const projectId = projectIdSchema.parse(input.projectId);
     const listed = await this.#access.listBoards({ projectId, viewer: input.viewer });
     const guests = input.includeOrganization === true ? listed.guests : [];
@@ -79,7 +79,7 @@ export class BoardService {
 
   /**
    * A new board at the scope Project. A member's own My dashboard alone starts starred for them,
-   * and at Only me where Dashboards is switched on (AC160b, AC170, AC189).
+   * at Only me (AC160b, AC170); the app refuses it where Dashboards is switched off (AC189).
    */
   async createBoard(input: {
     projectId: string;
@@ -88,16 +88,13 @@ export class BoardService {
   }): Promise<Dashboard> {
     const { createdById, ...fields } = input;
     const parsed = dashboardCreateInputSchema.parse(fields);
-    const dashboardsEnabled = await this.#access.isDashboardsEnabled({
-      projectId: parsed.projectId,
-    });
 
     const board = await this.#repository.createBoard({
       id: generate(DASHBOARD_KSUID_RESOURCE).toString(),
       projectId: parsed.projectId,
       name: parsed.name,
       createdById: createdById ?? null,
-      scope: newDashboardScope({ name: parsed.name, createdById, dashboardsEnabled }),
+      scope: newDashboardScope({ name: parsed.name, createdById }),
     });
     // Stored as an ordinary star, so unstarring it later removes it for good.
     if (createdById !== undefined && parsed.name === MY_DASHBOARD_NAME) {

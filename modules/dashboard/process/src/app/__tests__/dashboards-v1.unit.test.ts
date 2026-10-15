@@ -121,7 +121,7 @@ describe("Dashboards v1 on the server", () => {
         name: "Usage",
         createdById: CREATOR.userId,
       });
-      // A saved chart is placed on a Reports board, which has no scope.
+      // A saved chart is placed on a Reports board, made there at the scope Project.
       const reports = await app.create({ projectId: PROJECT, name: "Reports" });
       const placed = await app.createDashboardWidget({
         ...WIDGET,
@@ -243,11 +243,21 @@ describe("Dashboards v1 on the server", () => {
       const ref = { projectId: PROJECT, dashboardId: board.id, viewer: CREATOR };
 
       const codes = await Promise.all([
+        codeOf(app.createBoard({ projectId: PROJECT, name: "New", createdById: CREATOR.userId })),
         codeOf(app.updateBoard({ ...ref, name: "Off" })),
+        codeOf(app.deleteBoard(ref)),
         codeOf(app.getSourcePresence({ projectId: PROJECT, viewer: CREATOR })),
       ]);
 
-      expect(codes).toEqual(Array(codes.length).fill("dashboards_not_enabled"));
+      expect({
+        codes,
+        kept: (await seeded.getBoard(ref)).name,
+        boards: (await seeded.findBoards({ projectId: PROJECT, viewer: CREATOR })).length,
+      }).toEqual({
+        codes: Array(codes.length).fill("dashboards_not_enabled"),
+        kept: "Reports",
+        boards: 1,
+      });
     });
 
     it("leaves the procedures legacy analytics reads untouched", async () => {

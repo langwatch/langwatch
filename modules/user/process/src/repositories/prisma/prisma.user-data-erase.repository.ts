@@ -10,6 +10,9 @@ import type {
 } from "../user-data-erase.repository.ts";
 import { PrismaUserLifecycleOutboxStore } from "./prisma.user-lifecycle-outbox.store.ts";
 
+/** CustomGraph's `kind` for the stale copy of a Dashboards widget the split left behind. */
+const DASHBOARD_SRCDOC_CHART_KIND = "dashboard_srcdoc";
+
 /**
  * Exactly the model delegate methods this task calls, picked from the real `PrismaClient`
  * rather than hand-typed, so a real `PrismaClient` satisfies this narrower shape for free.
@@ -50,7 +53,7 @@ type GdprUserDataEraseDatabase = {
   datasetRecord: Delegate<"datasetRecord", "deleteMany">;
   dataset: Delegate<"dataset", "deleteMany">;
   customGraph: Delegate<"customGraph", "deleteMany">;
-  dashboard: Delegate<"dashboard", "deleteMany">;
+  dashboard: Delegate<"dashboard", "deleteMany" | "updateMany">;
   dashboardsV2: Delegate<"dashboardsV2", "findMany" | "updateMany" | "deleteMany">;
   dashboardWidget: Delegate<"dashboardWidget", "deleteMany">;
   dashboardFavourite: Delegate<"dashboardFavourite", "deleteMany">;
@@ -326,15 +329,18 @@ export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepos
 }
 
 /**
- * The person's Dashboards rows in projects that outlive them: their Only me boards with the
- * widgets and stars on them, and their own stars. A board others can see stays, authorless,
- * like an annotation; an Only me board with no author would be no one's.
+ * The person's boards in projects that outlive them: their Only me boards with the widgets, stars
+ * and stale Reports copy on them, and their own stars. A board others see stays authorless; a
+ * Reports row holding charts stays at Only me with no author, there for nobody (AC199m).
  */
 async function eraseDashboardsOf({
   tx,
   userId,
 }: {
-  tx: Pick<GdprUserDataEraseDatabase, "dashboardsV2" | "dashboardWidget" | "dashboardFavourite">;
+  tx: Pick<
+    GdprUserDataEraseDatabase,
+    "dashboardsV2" | "dashboardWidget" | "dashboardFavourite" | "customGraph" | "dashboard"
+  >;
   userId: string;
 }): Promise<void> {
   const privateBoardIds = (
@@ -347,7 +353,12 @@ async function eraseDashboardsOf({
     await tx.dashboardWidget.deleteMany({ where: { dashboardId: { in: privateBoardIds } } });
     await tx.dashboardFavourite.deleteMany({ where: { dashboardId: { in: privateBoardIds } } });
     await tx.dashboardsV2.deleteMany({ where: { id: { in: privateBoardIds } } });
+    await tx.customGraph.deleteMany({
+      where: { dashboardId: { in: privateBoardIds }, kind: DASHBOARD_SRCDOC_CHART_KIND },
+    });
+    await tx.dashboard.deleteMany({ where: { id: { in: privateBoardIds }, graphs: { none: {} } } });
   }
   await tx.dashboardsV2.updateMany({ where: { createdById: userId }, data: { createdById: null } });
+  await tx.dashboard.updateMany({ where: { createdById: userId }, data: { createdById: null } });
   await tx.dashboardFavourite.deleteMany({ where: { userId } });
 }

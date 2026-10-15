@@ -10,7 +10,7 @@ import type {
 export type BoardRecord = Dashboard;
 
 /** The stored summary: `graphCount` is its widgets; stars and the owner are per reader. */
-export type BoardSummaryRecord = Omit<DashboardSummary, "isStarred" | "ownerProject">;
+export type BoardSummaryRecord = DashboardSummary;
 
 /** The editable fields of a stored board; an absent key is left as it is. */
 export type BoardUpdate = Readonly<{

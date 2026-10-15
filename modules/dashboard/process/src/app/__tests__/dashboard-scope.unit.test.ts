@@ -60,7 +60,7 @@ function appWith(input: World = {}) {
 
 /**
  * The author's Dashboards board in HOME with a widget on it. Graphs and saved charts sit on
- * Reports boards, which have no scope (dashboards-v2.feature AC199).
+ * Reports boards (dashboards-v2.feature AC199).
  */
 async function boardAt(scope: DashboardScope, world: World = {}) {
   const { app, repositories, dashboardsOff } = appWith(world);
@@ -682,18 +682,16 @@ describe("board scope on the server", () => {
 
   describe("given a project where Dashboards is switched off", () => {
     /** @scenario "AC189 Scope: board scope reaches only a project where Dashboards is switched on" */
-    it("starts a member's My dashboard at Project there, so a teammate lists it", async () => {
+    it("makes no board there, My dashboard included", async () => {
       const { app } = appWith({ dashboardsOffIn: [HOME] });
 
-      const own = await app.createBoard({
-        projectId: HOME,
-        name: MY_DASHBOARD_NAME,
-        createdById: AUTHOR.userId,
-      });
+      const refusal = await codeOf(
+        app.createBoard({ projectId: HOME, name: MY_DASHBOARD_NAME, createdById: AUTHOR.userId }),
+      );
 
-      expect({ scope: own.scope, teammateLists: await listedIds(app, HOME, TEAMMATE) }).toEqual({
-        scope: "PROJECT",
-        teammateLists: [own.id],
+      expect({ refusal, listed: await listedIds(app, HOME, AUTHOR) }).toEqual({
+        refusal: "dashboards_not_enabled",
+        listed: [],
       });
     });
 

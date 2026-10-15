@@ -11,7 +11,7 @@ Dashboards and the graphs and saved workbench charts on them.
 | Classification | core (`modules/catalogue.json`)                                                                                |
 | Subjects       | dashboard, graph, saved-workbench-chart                                                                        |
 | Halves         | [contract](contract) · [process](process/README.md)                                                            |
-| Api token      | `DashboardApi` = `moduleApi<DashboardApi>()("dashboard")`, `contract/src/dashboard.api.ts:397` (58 operations) |
+| Api token      | `DashboardApi` = `moduleApi<DashboardApi>()("dashboard")`, `contract/src/dashboard.api.ts:402` (58 operations) |
 | Installed by   | api, worker, tasks (process)                                                                                   |
 
 ## What dashboard owns
@@ -26,10 +26,10 @@ Dashboards and the graphs and saved workbench charts on them.
 | Postgres table | `DashboardWidget`           | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:58` |
 | Postgres table | `DashboardsV2`              | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:58` |
 | Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:58` |
-| Postgres table | `Dashboard`                 | `process/src/repositories/prisma/prisma.dashboard.repository.ts:110`       |
-| Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.dashboard.repository.ts:110`       |
-| Postgres table | `DashboardsV2`              | `process/src/repositories/prisma/prisma.dashboard.repository.ts:110`       |
-| Postgres table | `DashboardWidget`           | `process/src/repositories/prisma/prisma.dashboard.repository.ts:110`       |
+| Postgres table | `Dashboard`                 | `process/src/repositories/prisma/prisma.dashboard.repository.ts:122`       |
+| Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.dashboard.repository.ts:122`       |
+| Postgres table | `DashboardsV2`              | `process/src/repositories/prisma/prisma.dashboard.repository.ts:122`       |
+| Postgres table | `DashboardWidget`           | `process/src/repositories/prisma/prisma.dashboard.repository.ts:122`       |
 | Postgres table | `SavedView`                 | `process/src/repositories/prisma/prisma.saved-view.repository.ts:20`       |
 | Config         | `publicBaseUrl` (BASE_HOST) | `contract/src/dashboard.config.ts:5`                                       |
 

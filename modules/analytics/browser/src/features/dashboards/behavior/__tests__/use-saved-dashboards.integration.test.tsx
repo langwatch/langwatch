@@ -118,7 +118,7 @@ describe("given the project has boards", () => {
     });
   });
 
-  /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
+  /** @scenario "AC199 Split: Dashboards and Analytics Reports each list and open only their own boards" */
   it("asks the Dashboards area's own list, never the Analytics Reports one", () => {
     renderHook(() => useSavedDashboards());
 
@@ -128,7 +128,7 @@ describe("given the project has boards", () => {
 });
 
 describe("given a member deletes a board", () => {
-  /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+  /** @scenario "AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart" */
   it("deletes through the Dashboards area's own procedure, which keeps a Reports board", () => {
     const { result } = renderHook(() => useSavedDashboards());
 

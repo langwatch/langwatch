@@ -607,7 +607,7 @@ function contractCases(backend: DashboardBackend): void {
       return board;
     };
 
-    /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
+    /** @scenario "AC199 Split: Dashboards and Analytics Reports each list and open only their own boards" */
     it("leaves out of every read a board only Dashboards holds, and keeps a mixed one", async () => {
       const repository = backend.dashboards();
       const reports = await dashboard("Reports only", 0);
@@ -650,6 +650,65 @@ function contractCases(backend: DashboardBackend): void {
         opened: undefined,
         mixed: mixed.id,
         dashboardsOnly: [moved.id],
+      });
+    });
+
+    /** @scenario "AC199m Split: Analytics Reports keeps another member's Only me board hidden" */
+    it("leaves another member's Only me board and its charts out of every read", async () => {
+      const repository = backend.dashboards();
+      const mixed = await copied("Mixed");
+      const placed = await graph(mixed.id);
+      const loose = await graph(null, "Loose");
+      const saved = await chart();
+      await repository.placeSavedWorkbenchChart({
+        projectId: projectId(),
+        chartId: saved.id,
+        dashboardId: mixed.id,
+        ...LAYOUT,
+      });
+      await backend.seedOnlyMeReportsBoard({ dashboardId: mixed.id, createdById: "author" });
+      const readBy = async (viewer?: { userId: string }) => {
+        const reach = { projectId: projectId(), viewer };
+        return {
+          listed: (await repository.findAllDashboards({ ...reach, graphKinds: BOTH_KINDS })).map(
+            (row) => row.id,
+          ),
+          among: (await repository.findDashboards({ ...reach, dashboardIds: [mixed.id] })).map(
+            (row) => row.id,
+          ),
+          opened: (await repository.findDashboard({ ...reach, dashboardId: mixed.id }))?.id,
+          graphs: (await repository.findAllGraphs(reach)).map((row) => row.id).toSorted(),
+          graph: (await repository.findGraph({ ...reach, graphId: placed.id }))?.id,
+          charts: (await repository.findAllSavedWorkbenchCharts(reach)).map((row) => row.id),
+          chart: (await repository.findSavedWorkbenchChart({ ...reach, chartId: saved.id }))?.id,
+        };
+      };
+      const hidden = {
+        listed: [],
+        among: [],
+        opened: undefined,
+        graphs: [loose.id],
+        graph: undefined,
+        charts: [],
+        chart: undefined,
+      };
+
+      expect({
+        author: await readBy({ userId: "author" }),
+        member: await readBy({ userId: "member" }),
+        credential: await readBy(),
+      }).toEqual({
+        author: {
+          listed: [mixed.id],
+          among: [mixed.id],
+          opened: mixed.id,
+          graphs: [placed.id, loose.id].toSorted(),
+          graph: placed.id,
+          charts: [saved.id],
+          chart: saved.id,
+        },
+        member: hidden,
+        credential: hidden,
       });
     });
 

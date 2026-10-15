@@ -9,6 +9,7 @@ import {
   savedWorkbenchChartSchema,
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartNotFoundError,
+  type DashboardViewer,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
   type DashboardUsageCount,
@@ -34,6 +35,17 @@ const WORKBENCH_SQL_CHART_KIND = "workbench_sql";
 const REPORTS_CHART = {
   kind: { not: DASHBOARD_SRCDOC_CHART_KIND },
 } satisfies Prisma.CustomGraphWhereInput;
+
+/** An Only me row is its author's alone, so a project credential sees none (AC199m). */
+const boardSeenBy = (viewer: DashboardViewer | undefined): Prisma.DashboardWhereInput =>
+  viewer === undefined
+    ? { scope: { not: "PRIVATE" } }
+    : { OR: [{ scope: { not: "PRIVATE" } }, { createdById: viewer.userId }] };
+
+/** A chart on no board, or on a board the reader sees. */
+const chartSeenBy = (viewer: DashboardViewer | undefined): Prisma.CustomGraphWhereInput => ({
+  OR: [{ dashboardId: null }, { dashboard: boardSeenBy(viewer) }],
+});
 
 const dashboardRow = (row: {
   id: string;
@@ -166,7 +178,7 @@ export class PrismaDashboardRepository
     const rows = await this.#inReports(
       input.projectId,
       await this.prisma.dashboard.findMany({
-        where: { projectId: input.projectId },
+        where: { projectId: input.projectId, ...boardSeenBy(input.viewer) },
         orderBy: [{ order: "asc" }, { name: "asc" }],
       }),
     );
@@ -194,7 +206,7 @@ export class PrismaDashboardRepository
     input: DashboardReach & { dashboardId: string },
   ): Promise<(DashboardRecord & { graphs: GraphRecord[] }) | undefined> {
     const row = await this.prisma.dashboard.findFirst({
-      where: { id: input.dashboardId, projectId: input.projectId },
+      where: { id: input.dashboardId, projectId: input.projectId, ...boardSeenBy(input.viewer) },
       include: {
         graphs: {
           where: { kind: BUILDER_CHART_KIND },
@@ -211,7 +223,11 @@ export class PrismaDashboardRepository
     input: DashboardReach & { dashboardIds: string[] },
   ): Promise<DashboardRecord[]> {
     const rows = await this.prisma.dashboard.findMany({
-      where: { id: { in: input.dashboardIds }, projectId: input.projectId },
+      where: {
+        id: { in: input.dashboardIds },
+        projectId: input.projectId,
+        ...boardSeenBy(input.viewer),
+      },
     });
     return (await this.#inReports(input.projectId, rows)).map((row) => dashboardRow(row));
   }
@@ -282,11 +298,12 @@ export class PrismaDashboardRepository
     });
   }
 
-  async findAllGraphs(input: { projectId: string; dashboardId?: string }): Promise<GraphRecord[]> {
+  async findAllGraphs(input: DashboardReach & { dashboardId?: string }): Promise<GraphRecord[]> {
     const rows = await this.prisma.customGraph.findMany({
       where: {
         projectId: input.projectId,
         kind: BUILDER_CHART_KIND,
+        ...chartSeenBy(input.viewer),
         ...(input.dashboardId ? { dashboardId: input.dashboardId } : {}),
       },
       orderBy: input.dashboardId
@@ -296,9 +313,14 @@ export class PrismaDashboardRepository
     return rows.map((row) => graphRow(row));
   }
 
-  async findGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord | undefined> {
+  async findGraph(input: DashboardReach & { graphId: string }): Promise<GraphRecord | undefined> {
     const row = await this.prisma.customGraph.findFirst({
-      where: { id: input.graphId, projectId: input.projectId, kind: BUILDER_CHART_KIND },
+      where: {
+        id: input.graphId,
+        projectId: input.projectId,
+        kind: BUILDER_CHART_KIND,
+        ...chartSeenBy(input.viewer),
+      },
     });
     return row ? graphRow(row) : undefined;
   }
@@ -386,22 +408,28 @@ export class PrismaDashboardRepository
     });
   }
 
-  async findAllSavedWorkbenchCharts(input: {
-    projectId: string;
-  }): Promise<SavedWorkbenchChartRecord[]> {
+  async findAllSavedWorkbenchCharts(input: DashboardReach): Promise<SavedWorkbenchChartRecord[]> {
     const rows = await this.prisma.customGraph.findMany({
-      where: { projectId: input.projectId, kind: WORKBENCH_SQL_CHART_KIND },
+      where: {
+        projectId: input.projectId,
+        kind: WORKBENCH_SQL_CHART_KIND,
+        ...chartSeenBy(input.viewer),
+      },
       orderBy: { createdAt: "desc" },
     });
     return rows.map((row) => savedWorkbenchChartRow(row));
   }
 
-  async findSavedWorkbenchChart(input: {
-    projectId: string;
-    chartId: string;
-  }): Promise<SavedWorkbenchChartRecord | undefined> {
+  async findSavedWorkbenchChart(
+    input: DashboardReach & { chartId: string },
+  ): Promise<SavedWorkbenchChartRecord | undefined> {
     const row = await this.prisma.customGraph.findFirst({
-      where: { id: input.chartId, projectId: input.projectId, kind: WORKBENCH_SQL_CHART_KIND },
+      where: {
+        id: input.chartId,
+        projectId: input.projectId,
+        kind: WORKBENCH_SQL_CHART_KIND,
+        ...chartSeenBy(input.viewer),
+      },
     });
     return row ? savedWorkbenchChartRow(row) : undefined;
   }

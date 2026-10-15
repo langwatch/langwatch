@@ -9,7 +9,7 @@ import { z } from "zod";
 import {
   dashboardReorderResponseSchema,
   dashboardTrpcRowSchema,
-  dashboardTrpcSummarySchema,
+  boardTrpcSummarySchema,
 } from "./dashboard.responses.ts";
 import {
   dashboardDescriptionSchema,
@@ -34,7 +34,7 @@ export const boardTrpc = defineTrpcContract("boards")
       includeOrganization: z.boolean().optional(),
     }),
   )
-  .withOutput(dashboardTrpcSummarySchema.array())
+  .withOutput(boardTrpcSummarySchema.array())
 
   .query("getById")
   .withInput(boardRefSchema)

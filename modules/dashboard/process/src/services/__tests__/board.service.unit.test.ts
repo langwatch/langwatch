@@ -264,7 +264,7 @@ describe("BoardService", () => {
         ({ id }) => id,
       );
 
-    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+    /** @scenario "AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart" */
     it("deletes the mixed board's Dashboards copy, its widget and stars, and keeps its Reports chart", async () => {
       const { service, reports, widgets, stars, mixed } = await threeBoards();
 
@@ -285,7 +285,7 @@ describe("BoardService", () => {
       });
     });
 
-    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+    /** @scenario "AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart" */
     it("deletes the stale Reports copy of a board that holds no Reports chart", async () => {
       const { service, database, copied } = await threeBoards();
       const stored = () => database.dashboards.some((row) => row.id === copied.id);
@@ -296,7 +296,7 @@ describe("BoardService", () => {
       expect({ before, after: stored() }).toEqual({ before: true, after: false });
     });
 
-    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+    /** @scenario "AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart" */
     it("answers a delete of a board only Reports holds as not found, and keeps it", async () => {
       const { service, reports, legacy } = await threeBoards();
 

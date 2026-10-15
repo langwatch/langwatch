@@ -1,7 +1,7 @@
 /**
  * The Analytics Reports boards and the graphs placed on them, over the memory
  * repository the Prisma one is the twin of. Spec: dashboard-service.feature,
- * dashboards-v2.feature AC199 to AC199k.
+ * dashboards-v2.feature AC199 to AC199m.
  */
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import {
@@ -373,7 +373,7 @@ describe("DashboardService", () => {
         .map(({ id }) => id)
         .toSorted();
 
-    /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
+    /** @scenario "AC199 Split: Dashboards and Analytics Reports each list and open only their own boards" */
     it("lists the Reports and the mixed board in Reports, and Dashboards lists its own two", async () => {
       const { service, boardService, reports, moved, mixed } = await threeBoards();
 
@@ -482,6 +482,75 @@ describe("DashboardService", () => {
           .filter((widget) => widget.dashboardId === mixed.id)
           .map(({ id }) => id),
       }).toEqual({ reports: false, board: mixed.id, widgets: ["widget_mixed"] });
+    });
+
+    /** @scenario "AC199m Split: Analytics Reports keeps another member's Only me board hidden" */
+    it("hides another member's Only me mixed board and its charts, and shows them to its author", async () => {
+      const { service, repository, database, mixed } = await threeBoards();
+      const graph = await service.createGraph({
+        projectId: PROJECT,
+        name: "Errors",
+        graph: { graphType: "line" },
+        dashboardId: mixed.id,
+      });
+      database.dashboards = database.dashboards.map((row) =>
+        row.id === mixed.id
+          ? { ...row, scope: "PRIVATE" as const, createdById: viewer.userId }
+          : row,
+      );
+      const analytics = createApiFixture<AnalyticsApi>({});
+      const charts = SavedWorkbenchChartService.create({
+        repository,
+        policy: SavedWorkbenchChartPolicyService.create({ analytics }),
+        analytics,
+      });
+      const codeOf = (call: Promise<unknown>) =>
+        call.then(
+          () => "<resolved>",
+          (error: { code: string }) => error.code,
+        );
+      const readBy = async (reader?: { userId: string }) => {
+        const on = { projectId: PROJECT, viewer: reader };
+        const board = { ...on, dashboardId: mixed.id };
+        return {
+          listed: (await service.getAll({ ...on, graphCountScope: "placeable" }))
+            .map(({ id }) => id)
+            .includes(mixed.id),
+          opened: await codeOf(service.getById(board)),
+          renamed: await codeOf(service.rename({ ...board, name: mixed.name })),
+          graphs: (await service.listGraphs(on)).map(({ id }) => id).includes(graph.id),
+          graph: await codeOf(service.getGraph({ ...on, graphId: graph.id })),
+          savedCharts: (await charts.getAll(on)).map(({ id }) => id),
+          savedChart: await codeOf(charts.getById({ ...on, chartId: "chart_1" })),
+        };
+      };
+      const hidden = {
+        listed: false,
+        opened: "dashboard_not_found",
+        renamed: "dashboard_not_found",
+        graphs: false,
+        graph: "graph_not_found",
+        savedCharts: [],
+        savedChart: "saved_workbench_chart_not_found",
+      };
+
+      expect({
+        author: await readBy(viewer),
+        member: await readBy({ userId: "other-member" }),
+        credential: await readBy(),
+      }).toEqual({
+        author: {
+          listed: true,
+          opened: "<resolved>",
+          renamed: "<resolved>",
+          graphs: true,
+          graph: "<resolved>",
+          savedCharts: ["chart_1"],
+          savedChart: "<resolved>",
+        },
+        member: hidden,
+        credential: hidden,
+      });
     });
   });
 });

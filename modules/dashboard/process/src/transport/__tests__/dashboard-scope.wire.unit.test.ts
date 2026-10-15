@@ -607,7 +607,7 @@ describe("the Dashboards and Analytics Reports boards at the doors", () => {
     reports: idsOf(await call(AUTHOR, "dashboards.getAll", { projectId: HOME })).toSorted(),
   });
 
-  /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
+  /** @scenario "AC199 Split: Dashboards and Analytics Reports each list and open only their own boards" */
   /** @scenario "AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports" */
   it("lists each board in its own area, the mixed board in both, and opens none across", async () => {
     const world = await threeBoards();
@@ -627,7 +627,7 @@ describe("the Dashboards and Analytics Reports boards at the doors", () => {
     });
   });
 
-  /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
+  /** @scenario "AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart" */
   it("deletes the mixed board from Dashboards and leaves its Reports board and graph", async () => {
     const world = await threeBoards();
     const { call, reports, board, mixed } = world;
