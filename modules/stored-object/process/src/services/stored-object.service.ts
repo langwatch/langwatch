@@ -3,7 +3,7 @@ import { Readable } from "node:stream";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { type AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { generate } from "@langwatch/ksuid";
+import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
 import {
   StoredObjectBytesMissingError,
   StoredObjectDeletedError,
@@ -74,9 +74,6 @@ type StoredObjectServiceOptions = Readonly<{
   newId?: () => string;
 }>;
 
-/** Every stored object's id is a fresh KSUID of this resource (ADR-158 §3). */
-const STORED_OBJECT_KSUID_RESOURCE = "so";
-
 /** The feature's only lifecycle/orchestration class. */
 export class StoredObjectService {
   static create(options: StoredObjectServiceOptions): StoredObjectService {
@@ -111,7 +108,7 @@ export class StoredObjectService {
       maximumUploadBytes: options.maximumUploadBytes,
       uploadExpiryMs: options.uploadExpiryMs,
       now: this.now,
-      newId: options.newId ?? (() => generate(STORED_OBJECT_KSUID_RESOURCE).toString()),
+      newId: options.newId ?? (() => generate(KSUID_RESOURCES.STORED_OBJECT).toString()),
     });
   }
 
