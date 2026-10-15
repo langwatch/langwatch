@@ -123,6 +123,9 @@ const GLOBAL_MODELS = [
   // Identity's sign-in switch (sign-in-switch.feature): keyed by userId alone, read on the
   // sign-in path before any tenant is known, like AccountCredential; written in raw SQL only.
   "IdentitySignInSwitch",
+  // Testing-licence tokens (ADR-180): keyed by the hash a bearer presents, before any tenant is
+  // known, and owned by a person on the platform rather than by an organization or project.
+  "TestingLicenseToken",
 ] as const;
 
 /**
