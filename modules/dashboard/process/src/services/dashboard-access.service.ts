@@ -24,10 +24,10 @@ export interface DashboardsRollout {
 }
 
 /** Who is reading, from which project; no viewer is a project credential. */
-export type BoardReading = Readonly<{ projectId: string; viewer?: DashboardViewer }>;
+type BoardReading = Readonly<{ projectId: string; viewer?: DashboardViewer }>;
 
 /** A board the reader may open here, and how they stand to it. */
-export type ReadableBoard = Readonly<{
+type ReadableBoard = Readonly<{
   board: BoardRecord;
   standing: Exclude<DashboardStanding, "none">;
 }>;

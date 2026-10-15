@@ -6,7 +6,7 @@ import type { DashboardWidgetRow } from "../dashboard-widget.repository.ts";
 import type { DashboardRecord, GraphRecord } from "../dashboard.repository.ts";
 
 /** A CustomGraph kind: Reports' two, and the stale srcdoc copies the split left behind. */
-export type StoredChartKind = "builder" | "workbench_sql" | "dashboard_srcdoc";
+type StoredChartKind = "builder" | "workbench_sql" | "dashboard_srcdoc";
 
 /** One CustomGraph row; `graph` is a builder payload or a saved chart's definition. */
 export type StoredChart = GraphLayout &

@@ -1,12 +1,12 @@
 /**
- * The project's dashboards and the graphs placed on them, over the memory
- * repository the Prisma one is the twin of. Spec: dashboard-service.feature.
+ * The Analytics Reports boards and the graphs placed on them, over the memory
+ * repository the Prisma one is the twin of. Spec: dashboard-service.feature,
+ * dashboards-v2.feature AC199 to AC199j.
  */
 import {
   DashboardNotFoundError,
   DashboardReorderUnknownIdsError,
   GraphNotFoundError,
-  MY_DASHBOARD_NAME,
 } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
@@ -19,8 +19,8 @@ import { MemoryBoardRepository } from "../../repositories/memory/memory.board.re
 import { MemoryDashboardWidgetRepository } from "../../repositories/memory/memory.dashboard-widget.repository.ts";
 import { MemoryDashboardDatabase } from "../../repositories/memory/memory.dashboard.database.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
+import { BoardService } from "../board.service.ts";
 import { DashboardAccessService } from "../dashboard-access.service.ts";
-import { DashboardStarService } from "../dashboard-star.service.ts";
 import type { WorkbenchAccess } from "../dashboard.service.ts";
 import { DashboardService } from "../dashboard.service.ts";
 
@@ -45,15 +45,14 @@ function serviceWith(workbenchEnabled = true) {
   });
 
   return {
+    database,
     repository,
     boards,
     widgets,
-    stars: DashboardStarService.create({ repository: boards, access }),
+    boardService: BoardService.create({ repository: boards, access }),
     service: DashboardService.create({
       repository,
-      boards,
       workbenchAccess: new FixedWorkbenchAccess(workbenchEnabled),
-      access,
     }),
   };
 }
@@ -206,188 +205,6 @@ describe("DashboardService", () => {
     });
   });
 
-  describe("given a member creates a dashboard", () => {
-    /** @scenario "AC156 No board is starred unless the member stars it" */
-    it("stars it for nobody, the creator included", async () => {
-      const { service, stars } = serviceWith();
-
-      const created = await service.create({
-        projectId: PROJECT,
-        name: "Reports",
-        createdById: "member-1",
-      });
-
-      expect(created.createdById).toBe("member-1");
-      await expect(stars.listStarred({ projectId: PROJECT, userId: "member-1" })).resolves.toEqual(
-        [],
-      );
-      const [listed] = await service.getAll({
-        projectId: PROJECT,
-        graphCountScope: "builder",
-        viewer: { userId: "member-1" },
-      });
-      expect(listed?.isStarred).toBe(false);
-    });
-  });
-
-  describe("given a member's My dashboard is made", () => {
-    const myDashboard = (service: DashboardService) =>
-      service.create({ projectId: PROJECT, name: MY_DASHBOARD_NAME, createdById: "member-1" });
-    const starredIds = async (stars: DashboardStarService, userId: string) =>
-      (await stars.listStarred({ projectId: PROJECT, userId })).map((entry) =>
-        entry.kind === "board" ? entry.dashboard.id : entry.templateId,
-      );
-
-    /** @scenario "AC160b A member with no My dashboard gets one made, starred for them" */
-    it("stars it for its maker and for nobody else", async () => {
-      const { service, stars } = serviceWith();
-
-      const created = await myDashboard(service);
-
-      await expect(starredIds(stars, "member-1")).resolves.toEqual([created.id]);
-      await expect(starredIds(stars, "member-2")).resolves.toEqual([]);
-      const [listed] = await service.getAll({
-        projectId: PROJECT,
-        graphCountScope: "builder",
-        viewer: { userId: "member-1" },
-      });
-      expect(listed?.isStarred).toBe(true);
-    });
-
-    /** @scenario "AC160c A member who unstars My dashboard keeps it unstarred" */
-    it("keeps it unstarred once its maker unstars it", async () => {
-      const { service, stars } = serviceWith();
-      const created = await myDashboard(service);
-
-      await stars.unstar({
-        projectId: PROJECT,
-        userId: "member-1",
-        star: { kind: "board", dashboardId: created.id },
-      });
-      await service.getOrCreateFirst({
-        projectId: PROJECT,
-        acceptsWrites: true,
-        viewer: { userId: "member-1" },
-      });
-
-      await expect(starredIds(stars, "member-1")).resolves.toEqual([]);
-    });
-
-    it("stars nobody when the board has no maker", async () => {
-      const { service, stars } = serviceWith();
-
-      await service.create({ projectId: PROJECT, name: MY_DASHBOARD_NAME });
-
-      await expect(starredIds(stars, "member-1")).resolves.toEqual([]);
-    });
-  });
-
-  describe("given one member's stars", () => {
-    const board = (dashboardId: string) => ({ kind: "board" as const, dashboardId });
-    const template = (templateId: string) => ({ kind: "template" as const, templateId });
-    const listed = async (stars: DashboardStarService, userId: string) =>
-      (await stars.listStarred({ projectId: PROJECT, userId })).map((entry) =>
-        entry.kind === "board" ? entry.dashboard.id : `template:${entry.templateId}`,
-      );
-
-    /** @scenario "AC157 Stars are per member" */
-    it("does not show them to another member", async () => {
-      const { service, stars } = serviceWith();
-      const created = await service.create({ projectId: PROJECT, name: "Reports" });
-      await stars.star({ projectId: PROJECT, userId: "a", star: board(created.id) });
-
-      await expect(listed(stars, "a")).resolves.toEqual([created.id]);
-      await expect(listed(stars, "b")).resolves.toEqual([]);
-
-      const forB = await service.getAll({
-        projectId: PROJECT,
-        graphCountScope: "builder",
-        viewer: { userId: "b" },
-      });
-      expect(forB.map((entry) => entry.isStarred)).toEqual([false]);
-    });
-
-    it("appends a star at the end and is idempotent", async () => {
-      const { service, stars } = serviceWith();
-      const first = await service.create({ projectId: PROJECT, name: "One" });
-      const second = await service.create({ projectId: PROJECT, name: "Two" });
-      const third = await service.create({ projectId: PROJECT, name: "Three" });
-
-      await stars.star({ projectId: PROJECT, userId: "a", star: board(first.id) });
-      await stars.star({ projectId: PROJECT, userId: "a", star: board(third.id) });
-      await stars.star({ projectId: PROJECT, userId: "a", star: board(second.id) });
-      // Starring twice changes nothing.
-      await stars.star({ projectId: PROJECT, userId: "a", star: board(third.id) });
-
-      await expect(listed(stars, "a")).resolves.toEqual([first.id, third.id, second.id]);
-    });
-
-    /** @scenario "AC165 A star can point at a From LangWatch board" */
-    it("round-trips a template star without checking it against a list", async () => {
-      const { stars } = serviceWith();
-
-      await stars.star({ projectId: PROJECT, userId: "a", star: template("llm-costs") });
-      await stars.star({ projectId: PROJECT, userId: "a", star: template("llm-costs") });
-
-      await expect(listed(stars, "a")).resolves.toEqual(["template:llm-costs"]);
-    });
-
-    /** @scenario "AC165 A star can point at a From LangWatch board" */
-    it("lists boards and templates in the order they were starred", async () => {
-      const { service, stars } = serviceWith();
-      const created = await service.create({ projectId: PROJECT, name: "One" });
-
-      await stars.star({ projectId: PROJECT, userId: "a", star: template("t1") });
-      await stars.star({ projectId: PROJECT, userId: "a", star: board(created.id) });
-
-      await expect(listed(stars, "a")).resolves.toEqual(["template:t1", created.id]);
-    });
-
-    /** @scenario "AC155 Move up and Move down reorder the member's stars" */
-    it("unstars a board or a template and reorders both kinds", async () => {
-      const { service, stars } = serviceWith();
-      const a = await service.create({ projectId: PROJECT, name: "A" });
-      const b = await service.create({ projectId: PROJECT, name: "B" });
-      for (const star of [board(a.id), board(b.id), template("t1")]) {
-        await stars.star({ projectId: PROJECT, userId: "u", star });
-      }
-
-      await stars.unstar({ projectId: PROJECT, userId: "u", star: board(b.id) });
-      await expect(listed(stars, "u")).resolves.toEqual([a.id, "template:t1"]);
-
-      await stars.reorderStars({
-        projectId: PROJECT,
-        userId: "u",
-        stars: [template("t1"), board(a.id)],
-      });
-      await expect(listed(stars, "u")).resolves.toEqual(["template:t1", a.id]);
-
-      await stars.unstar({ projectId: PROJECT, userId: "u", star: template("t1") });
-      await expect(listed(stars, "u")).resolves.toEqual([a.id]);
-    });
-
-    /** @scenario "AC26 Deleting a board removes it from every member's stars" */
-    it("removes the board from every member's stars when it is deleted", async () => {
-      const { service, stars } = serviceWith();
-      const created = await service.create({ projectId: PROJECT, name: "Shared" });
-      await stars.star({ projectId: PROJECT, userId: "a", star: board(created.id) });
-      await stars.star({ projectId: PROJECT, userId: "b", star: board(created.id) });
-
-      await service.delete({ projectId: PROJECT, dashboardId: created.id });
-
-      await expect(listed(stars, "a")).resolves.toEqual([]);
-      await expect(listed(stars, "b")).resolves.toEqual([]);
-    });
-
-    it("refuses a star on a board the project does not have", async () => {
-      const { stars } = serviceWith();
-
-      await expect(
-        stars.star({ projectId: PROJECT, userId: "a", star: board("missing") }),
-      ).rejects.toBeInstanceOf(DashboardNotFoundError);
-    });
-  });
-
   describe("given a dashboard belonging to another project", () => {
     /** @scenario "A dashboard from another project cannot be renamed" */
     it("refuses the rename as one this project does not have", async () => {
@@ -477,36 +294,65 @@ describe("DashboardService", () => {
     });
   });
 
-  describe("given a Reports board, a new empty board and a mixed board", () => {
+  describe("given a Reports board, a board only Dashboards holds and a mixed board", () => {
     const viewer = { userId: "member" };
+    const WIDGET = { name: "Usage", code: "export default () => null;", queries: [] };
 
+    /** The split's three classes: each in Dashboard, DashboardsV2 or both, under one id. */
     async function threeBoards() {
       const built = serviceWith();
-      const board = (name: string) => built.service.create({ projectId: PROJECT, name });
-      const [reports, fresh, mixed] = [
-        await board("Reports"),
-        await board("Fresh"),
-        await board("Shop assistant health"),
-      ];
-      await built.service.createGraph({
+      const { service, repository, boards, widgets, database } = built;
+      const reports = await service.create({ projectId: PROJECT, name: "Reports" });
+      await service.createGraph({
         projectId: PROJECT,
         name: "Latency",
         graph: { graphType: "line" },
         dashboardId: reports.id,
       });
-      await built.widgets.createWidget({
-        id: "widget_1",
+      const moved = await repository.createDashboard({
+        id: "board_moved",
+        projectId: PROJECT,
+        name: "Moved",
+        order: 1,
+      });
+      await boards.createBoard({ id: moved.id, projectId: PROJECT, name: moved.name });
+      // The split leaves a widget's srcdoc row behind in CustomGraph: a stale copy, not a chart.
+      database.charts.push({
+        id: "widget_moved",
+        projectId: PROJECT,
+        name: "Usage",
+        kind: "dashboard_srcdoc",
+        graph: {},
+        filters: null,
+        dashboardId: moved.id,
+        gridColumn: 0,
+        gridRow: 0,
+        colSpan: 1,
+        rowSpan: 1,
+        createdAt: database.now(),
+        updatedAt: database.now(),
+      });
+      await widgets.createWidget({
+        id: "widget_moved",
+        projectId: PROJECT,
+        dashboardId: moved.id,
+        input: WIDGET,
+      });
+      const mixed = await service.create({ projectId: PROJECT, name: "Shop assistant health" });
+      await boards.createBoard({ id: mixed.id, projectId: PROJECT, name: mixed.name });
+      await widgets.createWidget({
+        id: "widget_mixed",
         projectId: PROJECT,
         dashboardId: mixed.id,
-        input: { name: "Usage", code: "export default () => null;", queries: [] },
+        input: WIDGET,
       });
-      await built.repository.createSavedWorkbenchChart({
+      await repository.createSavedWorkbenchChart({
         id: "chart_1",
         projectId: PROJECT,
         name: "Spend",
         definition: { version: 1, sql: "SELECT 1", parameters: {} },
       });
-      await built.repository.placeSavedWorkbenchChart({
+      await repository.placeSavedWorkbenchChart({
         projectId: PROJECT,
         chartId: "chart_1",
         dashboardId: mixed.id,
@@ -515,78 +361,93 @@ describe("DashboardService", () => {
         colSpan: 1,
         rowSpan: 1,
       });
-      for (const dashboardId of [reports.id, fresh.id, mixed.id]) {
-        await built.stars.star({
-          projectId: PROJECT,
-          userId: viewer.userId,
-          star: { kind: "board", dashboardId },
-        });
-      }
-      return { ...built, reports, fresh, mixed };
+      return { ...built, reports, moved, mixed };
     }
 
-    const listedIds = async (
-      service: DashboardService,
-      options: { excludeLegacy?: boolean; onlyLegacy?: boolean } = {},
-    ) =>
-      (await service.getAll({ projectId: PROJECT, graphCountScope: "builder", viewer, ...options }))
+    const reportsIds = async (service: DashboardService) =>
+      (await service.getAll({ projectId: PROJECT, graphCountScope: "placeable", viewer }))
         .map(({ id }) => id)
         .toSorted();
 
     /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
-    it("leaves only the Reports board out of the Dashboards list and stars, and Reports lists all", async () => {
-      const { service, stars, reports, fresh, mixed } = await threeBoards();
-      const starred = await stars.listStarred({ projectId: PROJECT, userId: viewer.userId });
+    it("lists the Reports and the mixed board in Reports, and Dashboards lists its own two", async () => {
+      const { service, boardService, reports, moved, mixed } = await threeBoards();
 
       expect({
-        dashboards: await listedIds(service, { excludeLegacy: true }),
-        starred: starred.map((star) => (star.kind === "board" ? star.dashboard.id : star)),
-        reports: await listedIds(service),
+        reports: await reportsIds(service),
+        dashboards: (await boardService.findBoards({ projectId: PROJECT, viewer }))
+          .map(({ id }) => id)
+          .toSorted(),
+        opened: await boardService
+          .getBoard({ projectId: PROJECT, dashboardId: reports.id, viewer })
+          .catch((error: { code: string }) => error.code),
       }).toEqual({
-        dashboards: [fresh.id, mixed.id].toSorted(),
-        starred: [fresh.id, mixed.id],
-        reports: [reports.id, fresh.id, mixed.id].toSorted(),
+        reports: [reports.id, mixed.id].toSorted(),
+        dashboards: [moved.id, mixed.id].toSorted(),
+        opened: "dashboard_not_found",
       });
     });
 
     /** @scenario "AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports" */
-    it("lists only the Reports board for a chart to land on", async () => {
-      const { service, reports } = await threeBoards();
+    it("offers no board only Dashboards holds for a builder chart to land on", async () => {
+      const { service, moved } = await threeBoards();
 
-      await expect(listedIds(service, { onlyLegacy: true })).resolves.toEqual([reports.id]);
+      await expect(reportsIds(service)).resolves.not.toContain(moved.id);
     });
 
-    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
-    it("refuses a delete that does not ask to cascade, on the Reports board and the mixed one", async () => {
-      const { service, reports, mixed } = await threeBoards();
-      const refusal = { code: "dashboard_lives_in_reports", httpStatus: 409 };
+    /** @scenario "AC199j Split: a Reports write refuses the id of a board only Dashboards holds" */
+    it("answers a rename, delete or reorder of a board only Dashboards holds as not found", async () => {
+      const { service, boardService, moved } = await threeBoards();
+      const on = { projectId: PROJECT, dashboardId: moved.id, viewer };
+      const codeOf = (call: Promise<unknown>) =>
+        call.then(
+          () => "<resolved>",
+          (error: { code: string }) => error.code,
+        );
 
-      for (const dashboardId of [reports.id, mixed.id]) {
-        await expect(
-          service.delete({ projectId: PROJECT, dashboardId, viewer }),
-        ).rejects.toMatchObject(refusal);
-      }
-
-      await expect(listedIds(service)).resolves.toContain(mixed.id);
-      await expect(
-        service.listGraphs({ projectId: PROJECT, dashboardId: reports.id, viewer }),
-      ).resolves.toHaveLength(1);
-    });
-
-    /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
-    it("still deletes it from Analytics Reports, and deletes a new board from Dashboards", async () => {
-      const { service, reports, fresh, mixed } = await threeBoards();
-
-      await service.delete({
-        projectId: PROJECT,
-        dashboardId: reports.id,
-        viewer,
-        cascadeLegacy: true,
+      expect({
+        rename: await codeOf(service.rename({ ...on, name: "Taken" })),
+        delete: await codeOf(service.delete(on)),
+        reorder: await codeOf(service.reorder({ projectId: PROJECT, dashboardIds: [moved.id] })),
+        opened: await codeOf(service.getById(on)),
+        board: (await boardService.getBoard(on)).name,
+      }).toEqual({
+        rename: "dashboard_not_found",
+        delete: "dashboard_not_found",
+        reorder: "dashboard_reorder_unknown_ids",
+        opened: "dashboard_not_found",
+        board: "Moved",
       });
-      await service.delete({ projectId: PROJECT, dashboardId: fresh.id, viewer });
+    });
 
-      await expect(listedIds(service)).resolves.toEqual([mixed.id]);
-      await expect(service.listGraphs({ projectId: PROJECT, viewer })).resolves.toEqual([]);
+    /** @scenario "AC199j Split: a Reports write refuses the id of a board only Dashboards holds" */
+    it("never lands the Reports area on a board only Dashboards holds as its first", async () => {
+      const { service, repository, boards } = serviceWith();
+      const moved = { id: "board_moved", projectId: PROJECT, name: "Moved" };
+      await repository.createDashboard({ ...moved, order: 0 });
+      await boards.createBoard(moved);
+
+      const [first] = await service.getOrCreateFirst({ projectId: PROJECT, acceptsWrites: true });
+
+      expect({ name: first?.name, isMoved: first?.id === moved.id }).toEqual({
+        name: "Reports",
+        isMoved: false,
+      });
+    });
+
+    /** @scenario "AC199d Split: a Reports delete leaves the Dashboards area unchanged" */
+    it("deletes the mixed board from Reports and leaves its Dashboards board and widget", async () => {
+      const { service, boardService, widgets, mixed } = await threeBoards();
+
+      await service.delete({ projectId: PROJECT, dashboardId: mixed.id, viewer });
+
+      expect({
+        reports: (await reportsIds(service)).includes(mixed.id),
+        board: (await boardService.getBoard({ projectId: PROJECT, dashboardId: mixed.id })).id,
+        widgets: (await widgets.findAll({ projectId: PROJECT }))
+          .filter((widget) => widget.dashboardId === mixed.id)
+          .map(({ id }) => id),
+      }).toEqual({ reports: false, board: mixed.id, widgets: ["widget_mixed"] });
     });
   });
 });

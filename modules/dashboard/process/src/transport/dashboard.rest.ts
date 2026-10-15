@@ -63,13 +63,8 @@ export const dashboardRest = defineRestRouter(DashboardApi)
   .withOutput(dashboardResponseSchema)
   .withStatus(201)
   .withDocs({ tags: ["Dashboards"], description: "Create a new dashboard" })
-  .handle(async ({ app, input, scope, actor }) => {
-    const { viewer } = viewerOfActor({ actor });
-    const created = await app.create({
-      projectId: scope.id,
-      name: input.name,
-      ...(viewer === undefined ? {} : { createdById: viewer.userId }),
-    });
+  .handle(async ({ app, input, scope }) => {
+    const created = await app.create({ projectId: scope.id, name: input.name });
 
     return withLink(app, scope.id, created);
   })
@@ -140,12 +135,10 @@ export const dashboardRest = defineRestRouter(DashboardApi)
     description: "Delete a dashboard and its graphs (hard delete, cascade)",
   })
   .handle(async ({ app, input, scope, actor }) => {
-    // REST deletes what Analytics Reports deletes, its charts included, as it always has.
     const deleted = await app.delete({
       projectId: scope.id,
       dashboardId: input.id,
       ...viewerOfActor({ actor }),
-      cascadeLegacy: true,
     });
 
     return { id: deleted.id, name: deleted.name };

@@ -45,41 +45,34 @@ export interface DashboardUsageCount {
 /** Flat operations a door or a peer calls once the dashboard app is composed. */
 export interface DashboardApi {
   /**
-   * The project's boards the viewer may see with their `isStarred`, no Only me board for a project
-   * credential. `includeOrganization` adds the Organization boards with their `ownerProject`.
-   * Of the Reports boards (Reports charts, no widget) `excludeLegacy` drops, `onlyLegacy` keeps.
+   * The Analytics Reports boards, in `order`; they have no scope, so every reader lists the same.
+   * A board only the Dashboards area holds is not one of them (dashboards-v2.feature AC199).
    */
   getAll(input: {
     projectId: string;
     graphCountScope: DashboardGraphCountScope;
     viewer?: DashboardViewer;
-    includeOrganization?: boolean;
-    excludeLegacy?: boolean;
-    onlyLegacy?: boolean;
   }): Promise<DashboardSummary[]>;
-  /** One board the viewer may open here: the project's own, or the organization's. */
+  /** One Reports board with its builder graphs. */
   getById(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard & { graphs: Graph[] }>;
-  /** `createdById` is the member creating it; absent for a project credential. Stars nothing. */
-  create(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard>;
+  /** A Reports board: at the scope Project, with no author and no star (AC199i). */
+  create(input: { projectId: string; name: string }): Promise<Dashboard>;
+  /** Refuses the id of a board only the Dashboards area holds as not found (AC199j). */
   rename(input: {
     projectId: string;
     dashboardId: string;
     name: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard>;
-  /**
-   * Deletes the board and its graphs, and removes it from every member's stars. A board holding
-   * charts made in Analytics Reports is refused unless `cascadeLegacy` deletes those too.
-   */
+  /** The Reports board and its charts; the Dashboards area's rows are untouched (AC199d). */
   delete(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-    cascadeLegacy?: boolean;
   }): Promise<Dashboard>;
   /** The legacy board `order`; written only by the REST reorder endpoint. */
   reorder(input: {
@@ -87,8 +80,46 @@ export interface DashboardApi {
     dashboardIds: string[];
     viewer?: DashboardViewer;
   }): Promise<{ success: true }>;
-  /** The first dashboard, created on demand; empty on an aggregate that has none (ADR-177). */
+  /** The first Reports board, created on demand; empty on an aggregate that has none (ADR-177). */
   getOrCreateFirst(input: { projectId: string; viewer?: DashboardViewer }): Promise<Dashboard[]>;
+
+  /**
+   * The Dashboards area's boards the viewer may see, with `isStarred`; no Only me board for a
+   * project credential. `includeOrganization` adds the Organization boards with `ownerProject`.
+   */
+  findBoards(input: {
+    projectId: string;
+    viewer?: DashboardViewer;
+    includeOrganization?: boolean;
+  }): Promise<DashboardSummary[]>;
+  /** One Dashboards board the viewer may open here: the project's own, or the organization's. */
+  getBoard(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer?: DashboardViewer;
+  }): Promise<Dashboard>;
+  /**
+   * A Dashboards board at the scope Project; `createdById` is its author, absent for a project
+   * credential. A member's own My dashboard starts starred for them, at Only me (AC160b, AC170).
+   */
+  createBoard(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard>;
+  /**
+   * The board's name and description, an absent field left as it is; `dashboards_not_enabled`
+   * while `release_dashboards` is off.
+   */
+  updateBoard(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer?: DashboardViewer;
+    name?: string;
+    description?: string | null;
+  }): Promise<Dashboard>;
+  /** The board, its widgets, every star on it and its stale legacy copy (AC199b). */
+  deleteBoard(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer?: DashboardViewer;
+  }): Promise<Dashboard>;
 
   /** The member's stars for this project, boards and templates, in their own order. */
   listStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]>;
@@ -115,14 +146,6 @@ export interface DashboardApi {
     dashboardIds: string[];
   }): Promise<Record<string, string>>;
 
-  /** Dashboards area: `dashboards_not_enabled` while `release_dashboards` is off. */
-  updateDashboardDetails(input: {
-    projectId: string;
-    dashboardId: string;
-    viewer: DashboardViewer;
-    name?: string;
-    description?: string | null;
-  }): Promise<Dashboard>;
   /** Dashboards area: the author alone changes who sees a board, in the project that owns it. */
   setDashboardScope(input: {
     projectId: string;

@@ -25,18 +25,11 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  createDashboardTestAnalytics,
-  createDashboardTestAuthz,
-  createDashboardTestProjects,
-  DASHBOARDS_ROLLED_OUT,
-} from "../../../app/__tests__/dashboard.fixture.ts";
-import { DashboardAccessService } from "../../../services/dashboard-access.service.ts";
+import { createDashboardTestAnalytics } from "../../../app/__tests__/dashboard.fixture.ts";
 import type { WorkbenchAccess } from "../../../services/dashboard.service.ts";
 import { DashboardService } from "../../../services/dashboard.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../../../services/saved-workbench-chart-policy.service.ts";
 import { SavedWorkbenchChartService } from "../../../services/saved-workbench-chart.service.ts";
-import { PrismaBoardRepository } from "../prisma.board.repository.ts";
 import { PrismaDashboardRepository } from "../prisma.dashboard.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -75,18 +68,9 @@ let projectId = "";
 let otherProjectId = "";
 
 function dashboards(): DashboardService {
-  const repository = PrismaDashboardRepository.create({ prisma: database() });
-  const boards = PrismaBoardRepository.create({ prisma: database() });
   return DashboardService.create({
-    repository,
-    boards,
+    repository: PrismaDashboardRepository.create({ prisma: database() }),
     workbenchAccess: new WorkbenchOn(),
-    access: DashboardAccessService.create({
-      repository: boards,
-      projects: createDashboardTestProjects(),
-      rollout: DASHBOARDS_ROLLED_OUT,
-      authz: createDashboardTestAuthz(),
-    }),
   });
 }
 

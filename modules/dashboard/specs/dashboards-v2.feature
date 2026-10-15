@@ -774,8 +774,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC171 Scope: an Only me board exists for its author alone
     Given a board its author set to Only me
     When another member of the project, or a project credential, lists the boards or the
-      starred boards, opens the board by its id, renames, deletes, reorders, stars or copies it,
-      or reads, adds, edits, moves or deletes a widget, graph or saved chart on it
+      starred boards, opens the board by its id, renames, deletes, stars or copies it,
+      or reads, adds, edits, moves or deletes a widget on it
     Then every one of these answers as it does for a board that does not exist
     And the author lists it, opens it and edits it as before
     And a LangWatchQL query reads neither the board nor what is placed on it, for any caller:
@@ -943,10 +943,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC196 Scope: a key that names a person reads and writes as that person over REST
-    Given a board its author set to Only me, with a widget, a graph and a saved chart on it
+    Given a board its author set to Only me, with a widget on it
     When a REST call arrives with the author's own API key or access token
-    Then it lists the board, opens it, and reads and edits what is placed on it
-    And a board made with that key records them as its author
+    Then it lists, reads and edits the widget placed on it
     When a REST call arrives with another person's key
     Then every route answers as it does for a board that does not exist
     # Why: a scheduled Langy run holds its person's key and must read that person's own board
@@ -956,7 +955,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a legacy project key, a service key or the key of an unattended run
     When it calls a dashboards, graphs, widgets or saved charts route
     Then it reads Project boards, an Organization board by its id, and never an Only me board
-    And a board it makes has no recorded author and the scope Project
+    And a board it makes is a Reports board, with no recorded author and the scope Project
     And no REST route changes a board's scope, whichever key calls it
 
   # Dashboards and Analytics Reports keep their boards apart (owner, 2026-10-15). A Dashboards
@@ -1057,14 +1056,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then custom_graphs leaves out every srcdoc row
     And dashboards leaves out that board, and lists a mixed board once
 
-  @unit @unimplemented
+  @unit
   Scenario: AC199i Split: a board made in Analytics Reports is not starred and not Only me
     Given Dashboards is switched on for the project
     When a member makes a board in Analytics Reports, named "My dashboard" or not
     Then it is made at the scope Project with no star
     And only a board made in the Dashboards area starts starred and at Only me (AC160b, AC170)
 
-  @unit @unimplemented
+  @unit
   Scenario: AC199j Split: a Reports write refuses the id of a board only Dashboards holds
     Given a board in DashboardsV2 whose legacy Dashboard row holds no chart made in Reports
     When any caller renames, deletes or reorders that id through Analytics Reports or its REST routes

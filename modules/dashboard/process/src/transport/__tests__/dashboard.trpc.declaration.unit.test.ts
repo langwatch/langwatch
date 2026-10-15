@@ -6,6 +6,7 @@ import type { TrpcProcedureFactory, TrpcProcedureRequest } from "@langwatch/api/
  */
 import type { AuthzPermission } from "@langwatch/authorization";
 import {
+  boardTrpc,
   dashboardTrpc,
   graphTrpc,
   savedViewTrpc,
@@ -15,6 +16,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { createDashboardTestApp } from "../../app/__tests__/dashboard.fixture.ts";
+import { boardTrpcTransport } from "../board.trpc.ts";
 import { dashboardTrpcTransport } from "../dashboard.trpc.ts";
 import { graphTrpcTransport } from "../graph.trpc.ts";
 import { savedViewTrpcTransport } from "../saved-view.trpc.ts";
@@ -67,7 +69,18 @@ describe("the dashboard tRPC declarations", () => {
         ["delete", "mutation", "analytics:delete"],
         ["reorderDashboards", "mutation", "analytics:update"],
         ["getOrCreateFirst", "query", "analytics:view"],
-        ["updateDetails", "mutation", "analytics:update"],
+        ["sourcePresence", "query", "analytics:view"],
+      ]);
+    });
+
+    /** @scenario "AC21 A member without analytics:view is refused" */
+    it("keeps the boards wire names, kinds and permissions", () => {
+      expect(tableOf(boardTrpc, mounted(boardTrpcTransport))).toEqual([
+        ["getAll", "query", "analytics:view"],
+        ["getById", "query", "analytics:view"],
+        ["create", "mutation", "analytics:create"],
+        ["update", "mutation", "analytics:update"],
+        ["delete", "mutation", "analytics:delete"],
         ["setScope", "mutation", "analytics:update"],
         ["scopeImpact", "query", "analytics:view"],
         ["scopeProjects", "query", "analytics:view"],
@@ -75,7 +88,6 @@ describe("the dashboard tRPC declarations", () => {
         ["star", "mutation", "analytics:view"],
         ["unstar", "mutation", "analytics:view"],
         ["reorderStars", "mutation", "analytics:view"],
-        ["sourcePresence", "query", "analytics:view"],
       ]);
     });
 
