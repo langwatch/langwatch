@@ -4,14 +4,7 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { EmojiPicker } from "@langwatch/design-system/emoji-picker";
-import {
-  Field,
-  HStack,
-  Input,
-  Text,
-  Textarea,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Field, HStack, Input, Text, Textarea, VStack } from "@langwatch/design-system/primitives";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import { createLogger } from "@langwatch/observability/browser";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";

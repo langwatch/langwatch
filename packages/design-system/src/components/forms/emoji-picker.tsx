@@ -1,8 +1,3 @@
-/**
- * Icon chooser: a button showing the current emoji that opens a short grid of common ones, or
- * takes any other typed in. The popover is portalled, so dialogs and drawers never clip it.
- */
-
 import { Button, type ButtonProps, Input, SimpleGrid, VStack } from "@chakra-ui/react";
 import * as React from "react";
 
@@ -40,6 +35,10 @@ export interface EmojiPickerProps extends Omit<ButtonProps, "value" | "onChange"
   onChange: (emoji: string) => void;
 }
 
+/**
+ * Icon chooser: a button showing the current emoji that opens a short grid of common ones, or
+ * takes any other typed in. The popover is portalled, so dialogs and drawers never clip it.
+ */
 export function EmojiPicker({
   value,
   onChange,
