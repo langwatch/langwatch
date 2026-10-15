@@ -1,0 +1,31 @@
+import type { DerivedTraceEvent } from "@langwatch/trace-contract";
+
+import { useIsReadOnlyTrace } from "../../../behavior/explorer/context/trace-viewer-context.tsx";
+import { useTraceQueryArgs } from "../../../behavior/explorer/use-trace-query-args.ts";
+import { api } from "../../../behavior/trace-api.ts";
+
+interface TraceEventsResult {
+  events: DerivedTraceEvent[];
+  isLoading: boolean;
+  isError: boolean;
+}
+
+/**
+ * Trace-level events for the drawer, fetched as its own query (like
+ * `useTraceEvaluations`) rather than riding on the header. The header stays a pure
+ * summary read; this reads only the `Events.*` columns from stored_spans.
+ */
+export function useTraceEvents(): TraceEventsResult {
+  const isReadOnly = useIsReadOnlyTrace();
+  const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
+
+  const query = api.traces.traceEvents.useQuery(queryArgs, {
+    enabled: isReady && hintReady && !isReadOnly,
+  });
+
+  return {
+    events: query.data ?? [],
+    isLoading: query.isLoading,
+    isError: query.isError,
+  };
+}

@@ -4,7 +4,7 @@ Feature: Open trace in Playground
   So that I can iterate on the prompt used in the traced LLM call
 
   # The remaining @unimplemented scenarios are KEEP per AUDIT_MANIFEST.md:
-  # the LLM_PARAMETER_MAP loop in clickhouse-trace.service.ts extracts all
+  # the LLM_PARAMETER_MAP loop in server/traces/prompt-studio-span.ts extracts all
   # gen_ai.request.* params plus routes unknown keys into litellmParams, but
   # no integration test exercises the ClickHouse path end-to-end with these
   # attributes.

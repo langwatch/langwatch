@@ -180,13 +180,36 @@ jobs:
             langwatch-app:
               - 'infra/docker/Dockerfile'
               - 'infra/docker/Dockerfile.langyagent'
-              - 'platform/app/**'
+              - 'apps/**'
               - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
               - 'mcp/typescript/**'
               - 'sdks/typescript/**'
               - 'skills/**'
               - 'services/langevals/ts-integration/evaluators.generated.ts'
-              - 'tests/agentic-e2e/package.json'
+              - 'dev/tests/agentic-e2e/package.json'
+              - 'dev/tests/e2e-stack/package.json'
+              - 'tools/seedgen/runner/package.json'
+              - 'patches/**'
+              - 'dev/scripts/**'
+              - 'vendor/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'cmd/go.*'
+              - 'cmd/devscripts/**'
+              - 'pkg/go.*'
+              - 'services/go.*'
+              - 'tools/go.*'
+              - 'tools/devscripts/**'
+              - 'sdks/go/go.*'
+              - 'infra/clickhouse-serverless/go.*'
+              # The Go scenario runner stage: its source and the two modules it imports.
+              - 'services/scenariorunner/**'
+              - 'pkg/**'
+              - 'sdks/go/**'
+              - 'tsconfig.*.json'
+              - '.dockerignore'
               - 'feature-map.json'
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -199,13 +222,13 @@ jobs:
               - 'pkg/**'
               - 'services/**'
               - 'sdks/go/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-langevals:
               - 'infra/docker/Dockerfile.langevals'
               - 'services/langevals/**'
-              - 'platform/app/src/server/modelProviders/llmModels*.json'
+              - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-gateway:
               - 'infra/docker/Dockerfile.go_service'
@@ -213,8 +236,8 @@ jobs:
               - 'pkg/**'
               - 'services/**'
               - 'sdks/go/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - '.github/workflows/publish-docker-ecr.yml'
 
       - name: Select the images to build
@@ -336,13 +359,83 @@ jobs:
           # consumers (Lambda in particular) refuse to run.
           provenance: false
           cache-from: type=gha,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
           # The Go images stamp this into main.Version, which every log line and
           # the OTel resource report; the other images ignore it.
           build-args: |
             VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
+            LANGWATCH_BUILD_COMMIT=${{ github.sha }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
+
+      # ── Frontend assets for the CDN (langwatch-app only) ──────────────────
+      # The cloud serves the app's hashed assets from a CDN at
+      # LANGWATCH_ASSET_BASE=https://<cdn-host>/<image tag>/ (ADR-086), so each
+      # tag needs dist/client/assets under s3://<bucket>/<tag>/assets/. The
+      # bucket is a repository variable; unset (forks, or before it exists) skips
+      # the whole group. `.complete` is written last: a consumer treats the
+      # prefix as usable only once it exists, and a re-run skips a finished one.
+      - name: Check the CDN assets for this tag
+        id: cdn
+        if: matrix.image == 'langwatch-app'
+        env:
+          BUCKET: ${{ vars.FRONTEND_ASSETS_BUCKET }}
+          IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BUCKET}" ]; then
+            echo "::notice::FRONTEND_ASSETS_BUCKET is not set; skipping the CDN asset upload"
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if aws s3api head-object --bucket "${BUCKET}" --key "${IMAGE_TAG}/.complete" \
+              >/dev/null 2>"${RUNNER_TEMP}/head.err"; then
+            echo "::notice::${IMAGE_TAG} is already on the CDN; skipping the upload"
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+          elif grep -qE 'Not Found|404' "${RUNNER_TEMP}/head.err"; then
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          else
+            cat "${RUNNER_TEMP}/head.err"
+            exit 1
+          fi
+
+      # The `ui-assets` stage of the Dockerfile holds only the assets directory.
+      # Same cache scope as the image build above, so the builder layers are
+      # reused and nothing is pulled back from ECR.
+      - name: Export the frontend assets
+        if: steps.cdn.outputs.upload == 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ui-assets
+          push: false
+          platforms: ${{ matrix.platform }}
+          provenance: false
+          cache-from: type=gha,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
+          outputs: type=local,dest=${{ runner.temp }}/cdn
+          build-args: |
+            VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
+            LANGWATCH_BUILD_COMMIT=${{ github.sha }}
+
+      # Only assets/ goes up: index.html is rewritten and served by the pod, and
+      # public/ files stay same-origin (ADR-086). No --delete, so earlier tags'
+      # prefixes survive. Sourcemaps stay off the public CDN.
+      - name: Upload the frontend assets to the CDN
+        if: steps.cdn.outputs.upload == 'true'
+        env:
+          BUCKET: ${{ vars.FRONTEND_ASSETS_BUCKET }}
+          IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          test -n "$(ls -A "${RUNNER_TEMP}/cdn/assets")"
+          aws s3 sync "${RUNNER_TEMP}/cdn/assets" "s3://${BUCKET}/${IMAGE_TAG}/assets" \
+            --size-only --no-progress --exclude "*.map" \
+            --cache-control "public, max-age=31536000, immutable"
+          : > "${RUNNER_TEMP}/complete"
+          aws s3 cp "${RUNNER_TEMP}/complete" "s3://${BUCKET}/${IMAGE_TAG}/.complete" \
+            --cache-control "no-cache"
+          echo "Uploaded \`${IMAGE_TAG}\` frontend assets to the CDN bucket" >> "$GITHUB_STEP_SUMMARY"
 
   # EVERY image gets this commit's tag, including the ones the path filter
   # skipped. The point of the whole workflow is that SaaS can pin one `git-<sha>`
@@ -398,6 +491,7 @@ jobs:
       # No `:latest` here, on purpose — see the header. The SaaS pipeline owns
       # that tag on these repositories.
       - name: Publish this commit's tag
+        id: publish
         env:
           IMAGE: ${{ matrix.image }}
           REPO: ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}
@@ -442,6 +536,7 @@ jobs:
               exit 0
             fi
             echo "Re-tagging ${IMAGE} ${PREVIOUS} -> ${IMAGE_TAG} (unchanged by this commit)"
+            echo "previous=${PREVIOUS}" >> "$GITHUB_OUTPUT"
             SOURCES=("${REPO}:${PREVIOUS}")
           fi
 
@@ -454,3 +549,29 @@ jobs:
           fi
 
           echo "Published \`${IMAGE}\` to ECR with tags: ${TAGS}" >> "$GITHUB_STEP_SUMMARY"
+
+      # A re-tagged app image needs its frontend assets under the new tag too:
+      # the deployment points LANGWATCH_ASSET_BASE at this tag. Copied inside S3
+      # from the tag it was re-tagged from; `.complete` last, as on a build.
+      - name: Copy the CDN assets to the re-tagged app image
+        if: matrix.image == 'langwatch-app' && steps.publish.outputs.previous != '' && vars.FRONTEND_ASSETS_BUCKET != ''
+        env:
+          BUCKET: ${{ vars.FRONTEND_ASSETS_BUCKET }}
+          PREVIOUS: ${{ steps.publish.outputs.previous }}
+          IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          if aws s3api head-object --bucket "${BUCKET}" --key "${IMAGE_TAG}/.complete" >/dev/null 2>&1; then
+            echo "Assets for ${IMAGE_TAG} already on the CDN."
+            exit 0
+          fi
+          if ! aws s3api head-object --bucket "${BUCKET}" --key "${PREVIOUS}/.complete" >/dev/null; then
+            echo "::error::${PREVIOUS} has no complete CDN upload, so ${IMAGE_TAG} cannot reuse it; dispatch this workflow to rebuild langwatch-app"
+            exit 1
+          fi
+          aws s3 sync "s3://${BUCKET}/${PREVIOUS}/assets" "s3://${BUCKET}/${IMAGE_TAG}/assets" \
+            --size-only --no-progress --exclude "*.map" \
+            --cache-control "public, max-age=31536000, immutable" --metadata-directive REPLACE
+          aws s3api put-object --bucket "${BUCKET}" --key "${IMAGE_TAG}/.complete" \
+            --cache-control "no-cache" --content-length 0 >/dev/null
+          echo "Copied CDN assets ${PREVIOUS} -> ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"

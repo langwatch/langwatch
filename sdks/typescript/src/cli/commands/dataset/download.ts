@@ -1,9 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import type { DatasetRecordResponse } from "@/client-sdk/services/datasets/types";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Escapes a value for inclusion in a CSV field.
@@ -12,7 +14,13 @@ import { handleDatasetCommandError } from "./error-handler";
 export const escapeCsvField = (value: unknown): string => {
   if (value === null || value === undefined) return "";
   const str = typeof value === "string" ? value : JSON.stringify(value);
-  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+  if (str.includes(",")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  if (str.includes('"')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  if (str.includes("\n")) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
@@ -60,9 +68,7 @@ export const downloadCommand = async (
 
   const format = options.format ?? "csv";
   if (format !== "csv" && format !== "jsonl") {
-    console.error(
-      chalk.red(`Invalid format "${format}". Use "csv" or "jsonl".`),
-    );
+    console.error(chalk.red(`Invalid format "${format}". Use "csv" or "jsonl".`));
     process.exit(1);
   }
 

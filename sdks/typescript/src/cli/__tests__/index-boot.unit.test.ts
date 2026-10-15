@@ -1,32 +1,14 @@
-/**
- * Two invariants of the CLI entrypoint.
- *
- * 1. .env loading. The entrypoint loads .env before dispatching — except when
- *    the process being booted IS the daemon server. That boot runs with
- *    cwd=$HOME (daemon/spawn.ts), and its process env becomes the baseline
- *    every request resets to, so loading ~/.env there would drop
- *    home-directory secrets into every caller's execution window.
- *
- * 2. The boot module graph. The CLI's ~30ms cold start exists ONLY because
- *    commander, chalk, zod, js-yaml, the command modules and the command
- *    catalog are reached through lazy `import()`, never a top-level `import`.
- *    Nothing about that is enforced by the type system: a single innocuous
- *    `import { something } from "../utils/output"` added to a module on the
- *    boot path drags its whole transitive graph into every invocation, and no
- *    test fails. The graph guard below pins the set so it fails loudly.
- */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 /**
- * Append-only across the whole file — never cleared. It records when the
- * dispatch MODULE is evaluated relative to when dotenv's config() is CALLED,
- * which is the ordering that actually matters and the one the entrypoint's
- * source order misrepresents. Deliberately not reset per test: vitest
- * evaluates a mock factory once, so only the first boot in the file produces
- * the module-evaluation entry, and the assertion is written to hold whichever
- * test ran first.
+ * Invariants: .env loads before dispatch (except daemon), and the boot module
+ * graph stays lazy to preserve cold start performance.
+ */
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+
+/**
+ * Append-only record of module eval vs config() call order (not reset per test).
  */
 const bootEvents = vi.hoisted(() => [] as string[]);
 
@@ -79,12 +61,9 @@ describe("the CLI boot (index.ts)", () => {
     it("evaluates the dispatch module before config() despite the source order", async () => {
       await boot(["node", "cli.js", "trace", "search"]);
 
-      // index.ts reads as though config() precedes `import { runCli } from
-      // "./daemon/dispatch"`, but ES module semantics (and esbuild's bundling)
-      // hoist every static import above the module body. dispatch's
-      // MODULE-LEVEL side effects therefore run FIRST; only its function
-      // bodies see the loaded .env. Pinned here so the entrypoint's comment
-      // and reality cannot drift apart again.
+      // ES module semantics hoist every static import above the module body,
+      // so dispatch's MODULE-LEVEL side effects run FIRST; only its function
+      // bodies see the loaded .env. Pinned so comment and reality can't drift.
       expect(bootEvents[0]).toBe("dispatch module evaluated");
       expect(bootEvents.indexOf("dispatch module evaluated")).toBeLessThan(
         bootEvents.indexOf("dotenv config() called"),
@@ -103,17 +82,9 @@ describe("the CLI boot (index.ts)", () => {
 });
 
 /**
- * Static-import graph reachable from src/cli/index.ts.
- *
- * Source-level rather than runtime: the shipped CLI is a single tsup bundle
- * with `splitting: false`, so a require-hook (scripts/startup-require-hook.cjs)
- * can only observe the EXTERNAL deps — it cannot see an in-bundle module being
- * pulled onto the boot path, which is exactly the regression that matters.
- * Reading the imports is what catches it, and it needs no build to run.
+ * Static-import graph reachable from src/cli/index.ts (source-level, not
+ * runtime, to catch in-bundle boot-path regressions).
  */
-// `__dirname`, not `import.meta.url`: this package type-checks against a
-// CommonJS target, where `import.meta` is a compile error (TS1470). The
-// sibling feature-map-drift suite resolves paths the same way.
 const SRC_ROOT = resolve(__dirname, "..", "..");
 
 const resolveImport = (spec: string, importer: string): string | null => {
@@ -130,11 +101,9 @@ const resolveImport = (spec: string, importer: string): string | null => {
 };
 
 /**
- * Top-level static imports only. `import type` is skipped (erased at compile
- * time); dynamic `import()` is skipped by construction because the pattern is
- * anchored to the start of a line. `[^;]*?` keeps the optional `… from` clause
- * from running past a side-effect import (`import "./compileCache";`) and
- * stealing the next statement's specifier.
+ * Top-level static imports only: `import type` is skipped, dynamic
+ * `import()` skipped by anchoring to line-start. `[^;]*?` stops the
+ * optional `... from` clause from stealing the next statement's specifier.
  */
 const STATIC_IMPORT = /^import\s+(?!type\s)(?:[^;]*?\sfrom\s+)?["']([^"']+)["']/gm;
 
@@ -155,8 +124,8 @@ const collectBootGraph = (): { local: string[]; bare: string[] } => {
 
   walk(join(SRC_ROOT, "cli", "index.ts"));
   return {
-    local: [...local].map((f) => relative(SRC_ROOT, f)).sort(),
-    bare: [...bare].sort(),
+    local: [...local].map((f) => relative(SRC_ROOT, f)).toSorted(),
+    bare: [...bare].toSorted(),
   };
 };
 
@@ -207,10 +176,7 @@ describe("the CLI boot module graph", () => {
         (spec) => !spec.startsWith("node:") && !spec.endsWith(".json"),
       );
 
-      expect(
-        thirdParty,
-        `A third-party package reached the boot path. ${WHY}`,
-      ).toEqual(["dotenv"]);
+      expect(thirdParty, `A third-party package reached the boot path. ${WHY}`).toEqual(["dotenv"]);
     });
 
     it("keeps the known-heavy modules off the boot path", () => {
@@ -225,7 +191,7 @@ describe("the CLI boot module graph", () => {
         "js-yaml",
         "zod",
         "ora",
-        "@langwatch/langy/cards",
+        "@langwatch/langy-contract/cards",
         "cli/program.ts",
         "cli/utils/commandCatalog.ts",
       ];

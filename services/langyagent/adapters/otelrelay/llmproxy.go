@@ -19,7 +19,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
 // llmPrefix is the path segment separating the routing token from the
@@ -129,6 +131,13 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			// "gpt-…"; restore the full provider-prefixed id on the wire and
 			// the gateway routes it to the codex credential. See provision.go.
 			rewriteCodexModelBody(pr.Out, entry.info.Model)
+			// The gateway tiers its mirror by the Langy key, which a chat turn
+			// and a read-only run share; this turn's own tier withholds it.
+			// The worker's value never travels.
+			pr.Out.Header.Del(customertracebridge.HeaderLangyMirror)
+			if domain.NormalizeMirrorTier(entry.info.MirrorTier) == domain.MirrorTierSkip {
+				pr.Out.Header.Set(customertracebridge.HeaderLangyMirror, customertracebridge.LangyMirrorWithheld)
+			}
 			// Stamp a traceparent so the gateway's customer-facing gen_ai span
 			// joins the turn's trace, nested where the call really happened.
 			// The worker's own traceparent is never continued verbatim: its
@@ -549,7 +558,22 @@ func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr
 		// top-level error codes and do not belong in the generated code list.
 		e.Reasons = []error{herr.E{Code: code}}
 	}
+	if refusal, ok := credentialRefusalReason(status); ok && refusal != code {
+		e.Reasons = append(e.Reasons, herr.E{Code: refusal})
+	}
 	return e
+}
+
+// credentialRefusalReason names a 401 or 403 next to the provider's own
+// discriminant. Every provider has its own vocabulary for a refused key
+// (Bedrock alone answers with a dozen exception names), and a client that
+// knows only some of them would read the rest as a failure worth retrying.
+// The status says "refused credential" in every dialect.
+func credentialRefusalReason(status int) (herr.Code, bool) {
+	if status != http.StatusUnauthorized && status != http.StatusForbidden {
+		return "", false
+	}
+	return upstreamReasonCodes[status], true
 }
 
 func providerErrorCode(body []byte) herr.Code {
@@ -590,7 +614,7 @@ func providerCodeCandidate(body []byte, path string) (herr.Code, bool) {
 // body carries no discriminant of its own (see providerErrorCode for that
 // case). Status 0 is never a real HTTP status; decodeProviderErrorBody passes
 // it for the SSE lane, where a terminal in-stream event has no status at all,
-// so every capture still carries exactly one reason.
+// so every capture still carries a reason.
 var upstreamReasonCodes = map[int]herr.Code{
 	0:                              "upstream_stream_error",
 	http.StatusBadRequest:          "upstream_bad_request",

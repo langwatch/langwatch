@@ -90,12 +90,12 @@ Concretely:
 5. **Handled-ness is preserved across the Go↔TS boundary.** When the control
    plane proxies a Go service, an `herr` envelope is adapted into a
    `HandledError` (`Code → code`, `meta → meta`, `trace_id/span_id →
-   traceId/spanId`, `reasons → reasons`); a plain Go `error` stays unhandled and
+traceId/spanId`, `reasons → reasons`); a plain Go `error` stays unhandled and
    becomes "unknown." A handled error in Go is a handled error in the browser.
 
 6. **Non-tRPC/Hono transports carry the same shape.** Streamed responses (e.g.
    the Langy chat NDJSON stream) that today emit `{ type: "error", error:
-   string }` must instead emit the `SerializedHandledError` on their error event,
+string }` must instead emit the `SerializedHandledError` on their error event,
    so the client's handled/unknown logic is identical regardless of transport.
 
 7. **The client is the single place that decides presentation.** A shared reader
@@ -103,10 +103,10 @@ Concretely:
    an `explain*`-style mapping keyed on `code` turns it into user-facing copy and
    an optional action/render choice. The server never dictates UI; it emits the
    typed fact, the client renders it. Absence of a domain payload → the generic
-   unknown treatment. *(Amended 2026-07-18 — see below: remediation facts now
+   unknown treatment. _(Amended 2026-07-18 — see below: remediation facts now
    travel with the error for consumers that have no client explainer. Amended
    2026-07-21 — the per-feature explainers this named are gone; there is now one
-   registry, `features/errors/logic/presentation.ts`.)*
+   registry, `features/errors/logic/presentation.ts`.)_
 
 `code` (Go: `Code`) is a **serialisable string discriminant** and is the correct
 check across process, worker, and serialisation boundaries — use
@@ -128,7 +128,7 @@ without parsing prose.
 The deliberate asymmetry — rich detail for handled, opaque "unknown" for
 unhandled — is a security and UX position, not an oversight. Unhandled internal
 detail is not actionable to a caller and is a leak surface; masking it (and
-masking unhandled *reasons* inside handled errors) keeps the blast radius of a
+masking unhandled _reasons_ inside handled errors) keeps the blast radius of a
 bug to the server logs, where the trace id ties it back for whoever is on call.
 The one accepted cost is that debugging an unhandled failure requires the trace
 id and the server logs rather than reading the client response — which is the
@@ -182,8 +182,8 @@ ignore unknown keys; the REST envelope shape is unchanged):
    `SerializedHandledError`) gained optional `tips` (short, actionable
    remediation lines) and `docsUrl` (a canonical docs.langwatch.ai link to the
    relevant markdown page). This revises §7's "the server never dictates UI":
-   the server still never dictates *presentation*, but it now emits *remediation
-   facts* because the most important consumers — agents driving the CLI, API and
+   the server still never dictates _presentation_, but it now emits _remediation
+   facts_ because the most important consumers — agents driving the CLI, API and
    MCP server — have no client-side `explain*` mapping to fall back on. The UI's
    `code`-keyed explainers may still override or ignore these fields; agents
    render them verbatim. On the Go side, `herr` carries them as reserved `Meta`
@@ -191,12 +191,12 @@ ignore unknown keys; the REST envelope shape is unchanged):
    wire — the same mechanism as `Meta["message"]`, so `Body`/`FromBody`
    round-trips stay lossless.
 2. **Log level is driven by fault attribution, not handled-ness or status
-   alone.** Handled-ness decides only what the *client* sees. The new `fault`
+   alone.** Handled-ness decides only what the _client_ sees. The new `fault`
    field (`"customer" | "platform" | "provider"`, default `"customer"`) says who
    can act: customer-fault errors are expected and log at **warn** (tracked by
    `handledErrorCode` for spike alerts); platform/provider failures are
    incidents and keep logging at **error**. PostHog exception capture is now
-   reserved for *unhandled* errors — a handled error is by definition not a
+   reserved for _unhandled_ errors — a handled error is by definition not a
    bug. This mirrors the existing classification in
    `services/aigateway/adapters/httpapi/faults.go`. Subclasses with 5xx
    statuses must be audited and annotated `platform`/`provider` explicitly,
@@ -222,7 +222,7 @@ matching the pre-existing Go behavior for expected control-flow errors.
 
 ## Amendment 2026-07-20: the wire message is the code, and one `error` object
 
-The boundary was sanitising the *payload* but not the *message*. A
+The boundary was sanitising the _payload_ but not the _message_. A
 `HandledError`'s message was treated as vetted user copy and passed straight
 through, so `langy.createConversation` returned
 `"LW_GATEWAY_BASE_URL is not configured on the control plane."` as the wire
@@ -238,11 +238,11 @@ transport sends the stable `code` where a message is required:
 - **Hono** — the **`error` field** is the code, and `message` carries the
   error's own sentence alongside it (`errorSchema.parse({ error: code, message })`
   in `error-handler.ts`); `meta`, `reasons`, `tips`, `docsUrl` and `fault` carry
-  the rest. *(Corrected 2026-07-22 — an earlier revision of this line claimed
+  the rest. _(Corrected 2026-07-22 — an earlier revision of this line claimed
   Hono's `message` was the code. It never was, and published SDKs read it. The
   consequence is stated in the 2026-07-22 amendment below: a handled error's
   `message` must be **written** customer-safe, which is the durable form of the
-  rule this amendment was reaching for.)*
+  rule this amendment was reaching for.)_
 - **Streams and stream-adjacent routes** — the code goes in the string slot,
   with the serialised payload beside it, but the payload key differs by route:
   `sse.ts` emits `{ type: "error", message: <code>, error: <serialised> }`,
@@ -286,7 +286,7 @@ the deprecated pre-`HandledError` alias.
 A handled error carries no message on the tRPC wire, so a consumer rendering one
 reads, in order: **`meta.message` → `message` → `code`**.
 
-- `meta.message` is prose the server *deliberately* authored to be shown. It is
+- `meta.message` is prose the server _deliberately_ authored to be shown. It is
   the only channel that carries a sentence, and it is opt-in per error — which
   is what keeps the leak closed: the constructor's `message` stays server-side.
   `herr.FromBody` populates it, so proxied Go errors explain themselves.
@@ -295,7 +295,7 @@ reads, in order: **`meta.message` → `message` → `code`**.
   authored — still exactly what to show, which is why it has to be written
   customer-safe.
 - `code` is the last resort, so a caller never gets an empty string. A bare slug
-  is ugly but *specific*: `project_slug_taken` is more use to a CLI user than a
+  is ugly but _specific_: `project_slug_taken` is more use to a CLI user than a
   generic "the request failed" invented over the top of it.
 
 The CLI implements this in `parseHandledError`
@@ -307,7 +307,7 @@ used to as well; it was deleted by the 2026-07-21 amendment.
 ### One deliberate asymmetry
 
 **The Hono body stays flat at the root.** Nesting it under an `error` key would
-read better, but `error` is already a *string* there, and the Python SDK
+read better, but `error` is already a _string_ there, and the Python SDK
 (`better_raise_for_status`), the TS SDK's legacy path and `directUpload.ts` all
 read it as one. Changing it is a breaking change to published SDKs and needs its
 own migration, not a drive-by.
@@ -351,7 +351,7 @@ Three decisions close it:
    with it made a platform failure on an older payload read "Check your input"
    and a customer's own error read "A connected service didn't respond"
    (`presentation.ts:1141`). The `fault` titles are reached only when there is
-   no code at all. A call site may supply a *fallback* title naming the action
+   no code at all. A call site may supply a _fallback_ title naming the action
    that failed; registry copy outranks it, because it describes the actual
    failure — the humanised code does not, so a supplied fallback wins there.
 
@@ -402,7 +402,7 @@ The rule is inverted, and this is the durable form of it:
    env vars, no internal hostnames, no service names, no driver text. Those
    belong in the log line next to the throw, which is where the trace id ties
    them back.
-2. **`message` is still not the app's UI copy.** It is what a consumer *without*
+2. **`message` is still not the app's UI copy.** It is what a consumer _without_
    a presentation registry falls back to (CLI, SDKs, MCP, an agent reading a
    REST body). What a customer reads in the product comes from the code-keyed
    registry, per the 2026-07-21 amendment. One code, one authoring surface —
@@ -418,7 +418,7 @@ The rule is inverted, and this is the durable form of it:
    `unknown`.** Best effort, then the honest generic — never a fabricated
    domain code, which promises the caller an action they do not have.
 
-No wire change: this is a rule about how `message` is *written*, and it makes
+No wire change: this is a rule about how `message` is _written_, and it makes
 the REST behaviour that was already shipping correct by construction rather than
 by luck.
 

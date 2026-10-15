@@ -1,8 +1,6 @@
-import json
 from typing import Literal, Optional, cast
 from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
-    MAX_TOKENS_HARD_LIMIT,
     BaseEvaluator,
     EvaluatorEntry,
     EvaluationResult,
@@ -13,12 +11,72 @@ from langevals_core.base_evaluator import (
     Money,
 )
 from langevals_core.image_support import build_content_parts
+from langevals_core.token_budget import fit_judge_content
+from langevals_core.tool_calls import (
+    JudgeAnswerError,
+    read_boolean,
+    read_tool_call_arguments,
+)
 from pydantic import BaseModel, Field
 import litellm
-from litellm import Choices, Message
 from litellm.files.main import ModelResponse
 from litellm.cost_calculator import completion_cost
 import dspy
+
+
+# Most customer prompts state a fail condition ("return false if the answer
+# mentions a competitor"). The field is named `result`, not `passed`, and
+# every description says it carries the value the instructions ask for, so a
+# judge never flips it into its own "did the output pass" reading.
+RESULT_FRAMING = (
+    "Answer by calling the `evaluation` function, setting `result` to exactly the "
+    "true or false value the instructions above ask you to return. If they say "
+    "when to return false, return false in that case and true in every other "
+    "case. If they say when to return true, return true in that case and false "
+    "in every other case. `result` is not a rating of the output, never invert it."
+)
+
+# `reasoning` keeps its name for the result schema, but the wording asks for a
+# justification from the evidence: asking a model to write out its reasoning
+# trips reasoning-extraction safeguards on some Claude routes.
+EVALUATION_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "evaluation",
+        "description": (
+            "Record the true or false value the instructions ask for, with a "
+            "short justification that cites the evidence in the content."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "reasoning": {
+                    "type": "string",
+                    "description": (
+                        "A short justification, written before the result: the "
+                        "condition the instructions give, the evidence in the content "
+                        "that settles it (quote the values or name the tool result), "
+                        "and the value that follows."
+                    ),
+                },
+                "result": {
+                    "type": "boolean",
+                    "description": (
+                        "Exactly the value the instructions ask you to return. If they "
+                        "say when to return false: false in that case, true otherwise. "
+                        "If they say when to return true: true in that case, false "
+                        "otherwise. Not a judgment of whether the content is good."
+                    ),
+                },
+            },
+            "required": ["reasoning", "result"],
+        },
+    },
+}
+
+
+def judge_system_prompt(prompt: str) -> str:
+    return f"{prompt}\n\n{RESULT_FRAMING}"
 
 
 class CustomLLMBooleanEntry(EvaluatorEntry):
@@ -60,27 +118,26 @@ class CustomLLMBooleanEvaluator(
         if not entry.input and not entry.output and not entry.contexts:
             return EvaluationResultSkipped(details="No content to evaluate")
 
-        content = build_content_parts(
+        fitted = fit_judge_content(
+            model=self.settings.model,
+            max_tokens=self.settings.max_tokens,
+            reserved_texts=[judge_system_prompt(self.settings.prompt), self.settings.prompt],
             input=entry.input,
             output=entry.output,
             contexts=entry.contexts,
+        )
+        if isinstance(fitted, EvaluationResultSkipped):
+            return fitted
+
+        content = build_content_parts(
+            input=fitted.input,
+            output=fitted.output,
+            contexts=fitted.contexts,
             task=self.settings.prompt,
         )
-
-        # Token counting uses the plain-text version for estimation
         content_text = content if isinstance(content, str) else " ".join(
             p["text"] for p in content if p.get("type") == "text"  # type: ignore
         )
-        total_tokens = len(
-            litellm.encode(  # type: ignore
-                model=self.settings.model, text=f"{self.settings.prompt} {content_text}"
-            )
-        )
-        max_tokens = min(self.settings.max_tokens, MAX_TOKENS_HARD_LIMIT)
-        if total_tokens > max_tokens:
-            return EvaluationResultSkipped(
-                details=f"Total tokens exceed the maximum of {max_tokens}: {total_tokens}"
-            )
 
         cost = None
 
@@ -104,50 +161,37 @@ class CustomLLMBooleanEvaluator(
                 messages=[
                     {
                         "role": "system",
-                        "content": self.settings.prompt
-                        + ". Always output a valid json for the function call",
+                        "content": judge_system_prompt(self.settings.prompt),
                     },
                     {
                         "role": "user",
                         "content": content,
                     },
                 ],
-                tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "evaluation",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "reasoning": {
-                                        "type": "string",
-                                        "description": "use this field to ponder and write a short reasoning behind the decision written before a result is actually given",
-                                    },
-                                    "passed": {
-                                        "type": "boolean",
-                                        "description": "your final veredict, reply true or false if the content passes the test or not",
-                                    },
-                                },
-                                "required": ["reasoning", "passed"],
-                            },
-                            "description": "use this function to write your thoughts on the reasoning, then decide if it passed or not with this json structure",
-                        },
-                    },
-                ],
+                tools=[EVALUATION_TOOL],
                 tool_choice={"type": "function", "function": {"name": "evaluation"}},  # type: ignore
             )
 
             response = cast(ModelResponse, response)
-            choice = cast(Choices, response.choices[0])
-            arguments = json.loads(
-                cast(Message, choice.message).tool_calls[0].function.arguments  # type: ignore
+            tool_arguments = read_tool_call_arguments(
+                response,
+                "evaluation",
+                required=["reasoning", "result"],
+                model=self.settings.model,
             )
+            result = read_boolean(tool_arguments["result"])
+            if result is None:
+                raise JudgeAnswerError(
+                    "evaluation",
+                    "sent a result that is neither true nor false",
+                    self.settings.model,
+                )
+            arguments = {"passed": result, "reasoning": tool_arguments["reasoning"]}
             cost = completion_cost(completion_response=response)
 
         return CustomLLMBooleanResult(
             score=1 if arguments["passed"] else 0,
             passed=arguments["passed"],
-            details=arguments["reasoning"],
+            details=fitted.with_note(arguments["reasoning"]),
             cost=Money(amount=cost, currency="USD") if cost else None,
         )

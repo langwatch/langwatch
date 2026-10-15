@@ -1,9 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface UpdateProjectOptions {
   name?: string;
@@ -60,7 +62,9 @@ export const updateProjectCommand = async (
         console.log(`${chalk.bold("Language:")}        ${updated.language}`);
         console.log(`${chalk.bold("Framework:")}       ${updated.framework}`);
         console.log(`${chalk.bold("PII Redaction:")}   ${updated.piiRedactionLevel}`);
-        console.log(`${chalk.bold("Updated:")}         ${new Date(updated.updatedAt).toLocaleString()}`);
+        console.log(
+          `${chalk.bold("Updated:")}         ${new Date(updated.updatedAt).toLocaleString()}`,
+        );
         console.log();
       },
     };
