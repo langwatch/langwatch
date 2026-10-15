@@ -108,6 +108,31 @@ Feature: Developer testing licenses
     Then the next testing license asked for with that token is refused
     And the licenses already issued run only until their expiry
 
+  @unit
+  Scenario: An ops manager creates a service token for CI
+    Given a person holding ops permissions on Cloud
+    When they create a service token named "GitHub Actions" without choosing an expiry
+    Then the token is shown once and expires in 90 days
+    And choosing an expiry longer than a year is refused
+
+  @unit
+  Scenario: A revoked or expired service token issues nothing
+    Given a service token that was revoked, and another past its expiry
+    When either asks for a testing license
+    Then it is refused and no license is written
+
+  @unit
+  Scenario: A service token outlives the person who made it
+    Given a service token made by someone whose ops permissions were later removed
+    When the token asks for a testing license
+    Then it is issued, because the token stands on its own until it expires or is revoked
+
+  @unit
+  Scenario: Ops managers see every service token and when it was last used
+    When an ops manager opens the service token list
+    Then each token shows its name, who made it, its expiry and when it last issued a license
+    And any ops manager can revoke it
+
   # ============================================================================
   # Ops pages
   # ============================================================================
@@ -158,8 +183,8 @@ Feature: Developer testing licenses
     And haven says to sign in first, naming the command
 
   @unit
-  Scenario: CI gets a testing license through its own service principal
-    Given a CI job holding the service principal's token in its protected secrets
+  Scenario: CI gets a testing license through a service token
+    Given a CI job holding a service token in its protected secrets
     When the job starts a stack asking for a testing license
     Then it gets the license without a person present
-    And the registry names the service principal as the issuer
+    And the registry names the service token as the issuer

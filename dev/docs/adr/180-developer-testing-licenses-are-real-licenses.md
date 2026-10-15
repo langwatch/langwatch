@@ -36,20 +36,26 @@ running stack trusts any key but the embedded production one.
 
 ### 2. Rulings
 
-| Question                  | Ruling                                                                                                                        |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Who can get one           | Only a person holding ops permissions on LangWatch Cloud, checked by Cloud on every issue                                     |
-| How haven is trusted      | The developer signs haven in to Cloud once; the stored token is limited to issuing testing licences, nothing else they may do |
-| When does an instance ask | Only when a developer asks for a gated feature (a haven flag or command), never on every boot                                 |
-| How long it lasts         | Picked when asked; default 5 days, at most 30; haven renews it before expiry while signed in                                  |
-| What it covers            | One local organization on one instance; Enterprise features; 10 full and 10 Lite seats; no hosted services, commit or overage |
-| CI                        | Its own service principal holding the same narrow right, kept in protected CI secrets; never a person's token                 |
-| New operations            | `LicensingApi.issueTestingLicense` and `EnterpriseOpsApi.issueTestingLicense` (the ops door and audit)                        |
-| Which builds accept it    | Source and release builds alike, verifying the same way                                                                       |
+| Question                  | Ruling                                                                                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Who can get one           | Only a person holding ops permissions on LangWatch Cloud, checked by Cloud on every issue                                                                                                              |
+| How haven is trusted      | The developer signs haven in to Cloud once; the stored personal token can only issue testing licences, and Cloud re-checks their ops permissions on every call                                         |
+| When does an instance ask | Only when a developer asks for a gated feature (a haven flag or command), never on every boot                                                                                                          |
+| How long it lasts         | Picked when asked; default 5 days, at most 30; haven renews it before expiry while signed in                                                                                                           |
+| What it covers            | One local organization on one instance; Enterprise features; 10 full and 10 Lite seats; no hosted services, commit or overage                                                                          |
+| CI                        | A service token: created in the ops console by someone holding ops permissions, named, expiring (default 90 days, at most a year), revocable by any ops manager, independent of the person who made it |
+| New operations            | `LicensingApi.issueTestingLicense`; creating, listing and revoking service tokens through `EnterpriseOpsApi` (the ops door and audit)                                                                  |
+| Which builds accept it    | Source and release builds alike, verifying the same way                                                                                                                                                |
 
 Everything else reuses existing operations: sync, reissue and revoke, and the list and detail
-reads. The sign-in reuses the `langwatch` CLI's browser sign-in if it fits; a token limited to one
-operation is the gap to fill if access tokens cannot be limited that way today.
+reads.
+
+Both tokens are one credential kind, a testing-licence token, that reaches only
+`issueTestingLicense`; no token carries `ops:manage`, so a leaked one can do nothing else. A
+personal token is minted through the existing CLI browser sign-in (`/api/auth/cli`), which then
+requires ops permissions, and counts as its person: Cloud asks their platform permission on every
+call. A service token stands alone: Cloud asks only that it is unexpired and unrevoked. The
+registry names the person or the service token as the issuer of every licence.
 
 ### 3. How a testing licence is marked and bound
 
