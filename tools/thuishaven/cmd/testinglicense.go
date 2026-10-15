@@ -142,25 +142,18 @@ func (s stackSession) organizationID(ctx context.Context) (string, error) {
 	return "", fmt.Errorf("the stack has no organization %q yet; the seed creates it", domain.DefaultOrganizationSlug)
 }
 
-// instanceID is the stack's instance id, read from the usage report preview an install admin sees.
+// instanceID is the stack's instance id, as license.getInstanceId answers an organization admin.
 func (s stackSession) instanceID(ctx context.Context, organizationID string) (string, error) {
 	var answer struct {
-		Deployment string `json:"deployment"`
-		Payload    struct {
-			InstanceID string `json:"instance_id"`
-		} `json:"payload"`
+		InstanceID string `json:"instanceId"`
 	}
-	if err := s.trpc(ctx, "checkup.usageReport", false, map[string]any{"organizationId": organizationID}, &answer); err != nil {
+	if err := s.trpc(ctx, "license.getInstanceId", false, map[string]any{"organizationId": organizationID}, &answer); err != nil {
 		return "", err
 	}
-	id := answer.Payload.InstanceID
-	switch {
-	case answer.Deployment == "saas":
-		return "", errors.New("the stack answers as LangWatch Cloud, which reports no instance id")
-	case id == "" || strings.HasPrefix(id, "("):
-		return "", errors.New("the stack has not minted its instance id yet")
+	if answer.InstanceID == "" {
+		return "", errors.New("the stack answered no instance id")
 	}
-	return id, nil
+	return answer.InstanceID, nil
 }
 
 // licenseStatus is what license.getStatus says the organization runs on.

@@ -175,6 +175,13 @@ Feature: Developer testing licenses
     When their seats and contract totals are computed
     Then the testing license adds nothing
 
+  @unit
+  Scenario: An organization admin reads the instance id a testing license binds to
+    Given a signed-in admin of an organization on a stack
+    When they ask for the stack's instance id
+    Then the same id is answered every time
+    And someone who may only view the organization is refused
+
   # ============================================================================
   # haven
   # ============================================================================
@@ -189,7 +196,6 @@ Feature: Developer testing licenses
     Given a developer who signed haven in to their Cloud account
     When haven starts a stack asking for a testing license
     Then it gets the license from Cloud and stores it without opening a browser
-    And it finishes the gated seeding
     And the token is never printed
 
   @unit

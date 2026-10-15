@@ -96,8 +96,8 @@ func newFakeStack(t *testing.T) *fakeLicenseStack {
 		switch r.URL.Path {
 		case "/api/trpc/organization.getAll":
 			answer(`[{"id":"org_other","slug":"someone-else"},{"id":"org_local","slug":"local-dev-org"}]`)
-		case "/api/trpc/checkup.usageReport":
-			answer(`{"deployment":"self-hosted","payload":{"instance_id":"inst_local"}}`)
+		case "/api/trpc/license.getInstanceId":
+			answer(`{"instanceId":"inst_local"}`)
 		case "/api/trpc/license.getStatus":
 			if !s.held {
 				answer(`{"hasLicense":false,"valid":false}`)
