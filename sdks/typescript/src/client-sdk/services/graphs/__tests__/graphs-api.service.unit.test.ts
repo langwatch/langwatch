@@ -26,16 +26,16 @@ describe("GraphsApiService", () => {
       const thrown = await rejectionOf(
         serviceWith({
           error: {
-            type: "forbidden",
-            code: "custom_graph_writes_disabled_for_playground",
-            message: "Creating or editing dashboard graphs is turned off.",
+            type: "not_found",
+            code: "graph_not_found",
+            message: "Graph not found.",
           },
         }).create({} as never),
       );
 
       expect(isLangWatchHandledError(thrown)).toBe(true);
       expect(thrown).toMatchObject({
-        code: "custom_graph_writes_disabled_for_playground",
+        code: "graph_not_found",
       });
     });
   });

@@ -1,0 +1,45 @@
+# ripgrep skips these: the linguist-generated paths in .gitattributes. Not .ignore: Nx reads that and loses the lockfile.
+# Regenerate the list below: awk '/linguist-(generated|vendored)/{print $1}' .gitattributes
+# Search them anyway: rg --no-ignore-dot
+**/package-lock.json
+**/pnpm-lock.yaml
+**/uv.lock
+**/go.sum
+go.work.sum
+sdks/python/src/langwatch/generated/**/*
+docs/api-reference/openapiLangWatch.json
+sdks/typescript/src/internal/generated/openapi/api-client.ts
+sdks/go/client/internal/openapi/zz_generated.gen.go
+packages/handled-error/src/codes.generated.ts
+modules/evaluator/contract/src/evaluators.generated.ts
+services/langevals/ts-integration/evaluators.generated.ts
+modules/langy/browser/src/model/shared/langy/langySkills.generated.json
+sdks/typescript/src/internal/generated/redaction/*.ts
+docs/llms.txt
+docs/llms-full.txt
+docs/api-reference/openapi-evals.json
+packages/prisma-client/src/generated/**
+modules/langy/process/src/rules/setup-skill-bodies.rules.ts
+modules/analytics/contract/src/visualization/vega-lite-schema-validator.generated.js
+modules/analytics/contract/src/visualization/vega-lite-schema-validator.generated.d.ts
+modules/langy/browser/src/model/shared/langy/feature-map.generated.json
+skills/_compiled/native/**
+**/*.generated.*
+sdks/typescript/src/internal/generated/**/*.ts
+docs/self-hosting/usage-report-dictionary.mdx
+services/langyagent/internal/assets/skills/**
+**/__snapshots__/**
+mcp/typescript/src/__tests__/fixtures/*.json
+modules/README.md
+packages/README.md
+apps/README.md
+enterprise/README.md
+enterprise/modules/README.md
+enterprise/packages/README.md
+modules/*/README.md
+modules/*/process/README.md
+modules/*/browser/README.md
+enterprise/modules/*/README.md
+enterprise/modules/*/process/README.md
+enterprise/modules/*/browser/README.md
+dev/docs/lint-rules.md

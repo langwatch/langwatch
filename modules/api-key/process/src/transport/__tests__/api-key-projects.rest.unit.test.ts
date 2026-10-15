@@ -424,7 +424,7 @@ describe("the projects collection, served by api-key", () => {
         organizationId: ORGANIZATION_ID,
         page: 1,
         limit: 100,
-        hiddenKinds: ["internal_governance"],
+        hiddenKinds: ["internal_governance", "internal_checkup"],
         projectIds: ["project_1", "project_9"],
       });
     });
@@ -457,16 +457,28 @@ describe("the projects collection, served by api-key", () => {
         organizationId: ORGANIZATION_ID,
         page: 1,
         limit: 50,
-        hiddenKinds: ["internal_governance"],
+        hiddenKinds: ["internal_governance", "internal_checkup"],
       });
     });
 
     describe("when the organization holds an aggregate project", () => {
       it.each([
-        ["an admin owner", { ownerRole: "ADMIN" }, ["internal_governance"]],
-        ["a member owner", { ownerRole: "MEMBER" }, ["internal_governance", "aggregate"]],
-        ["a non-member owner", { ownerRole: null }, ["internal_governance", "aggregate"]],
-        ["a service key", { ownerUserId: null }, ["internal_governance", "aggregate"]],
+        ["an admin owner", { ownerRole: "ADMIN" }, ["internal_governance", "internal_checkup"]],
+        [
+          "a member owner",
+          { ownerRole: "MEMBER" },
+          ["internal_governance", "internal_checkup", "aggregate"],
+        ],
+        [
+          "a non-member owner",
+          { ownerRole: null },
+          ["internal_governance", "internal_checkup", "aggregate"],
+        ],
+        [
+          "a service key",
+          { ownerUserId: null },
+          ["internal_governance", "internal_checkup", "aggregate"],
+        ],
       ] as const)(
         "hides aggregates unless the key acts for an admin: %s",
         async (_, owner, hidden) => {

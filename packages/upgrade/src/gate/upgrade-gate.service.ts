@@ -1,4 +1,4 @@
-import type { InferredStep, UpgradeRun, UpgradeStep } from "../ledger.ts";
+import type { InferredStep, UpgradeStep } from "../ledger.ts";
 import type { ServingRoster } from "../serving-roster/index.ts";
 import {
   detectRollbacks,

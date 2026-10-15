@@ -127,25 +127,28 @@ export class ScimSyncLifecycleService {
     );
   }
 
-  /** A push changed one person. */
+  /** A push reached one person; `changed` is false when it restated what we held. */
   async userPushed({
     organizationId,
     connectionId,
     userId,
     externalId,
     op,
+    changed,
   }: {
     organizationId: string;
     connectionId: string;
     userId: string;
     externalId: string;
     op: ScimUserOp;
+    changed: boolean;
   }): Promise<void> {
     const data = {
       ...this.identity({ organizationId, connectionId }),
       userId,
       externalId,
       op,
+      changed,
     };
     await this.commit(
       { type: RECORD_SCIM_USER_PUSH_COMMAND_TYPE, data },

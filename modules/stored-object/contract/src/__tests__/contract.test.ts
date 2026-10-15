@@ -134,6 +134,8 @@ describe("Stored Objects IDs and references", () => {
     expect(mapLegacyStoredObjectPurposeToAudience("scenario_event")).toBe("scenarios:view");
     expect(mapLegacyStoredObjectPurposeToAudience("trace_content")).toBe("traces:view");
     expect(mapLegacyStoredObjectPurposeToAudience("evaluation_inputs")).toBe("evaluations:view");
+    expect(mapLegacyStoredObjectPurposeToAudience("dataset_attachment")).toBe("datasets:view");
+    expect(mapLegacyStoredObjectPurposeToAudience("user_avatar")).toBe("project:view");
     expect(mapLegacyStoredObjectPurposeToAudience("unknown")).toBeUndefined();
   });
 });

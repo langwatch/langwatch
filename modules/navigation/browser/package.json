@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/analytics-client": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/browser": "workspace:*",
@@ -32,6 +33,7 @@
     "@langwatch/feature-flag-client": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/insight-contract": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/navigation-client": "workspace:*",
     "@langwatch/navigation-contract": "workspace:*",

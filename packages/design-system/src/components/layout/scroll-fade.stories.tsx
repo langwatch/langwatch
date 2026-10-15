@@ -44,7 +44,7 @@ function VerticalList() {
 }
 
 const meta = {
-  title: "Layout/Scroll fade",
+  title: "Navigation and layout/Scroll fade",
   parameters: {
     usage: {
       use: "Any strip, table or list that scrolls inside a fixed box: the fade marks the edge that still hides content.",

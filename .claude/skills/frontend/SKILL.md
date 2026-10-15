@@ -26,7 +26,7 @@ const installed = await createUi({ document, mount: "root" })
   .withModules(browserModules) // generated from the catalogue
   .withTransport(transport)
   .render();
-UiRuntime.create({ document, shell: BrowserUiShell.create({ config, /* ... */ }) });
+UiRuntime.create({ document, shell: BrowserUiShell.create({ config /* ... */ }) });
 ```
 
 Read `apps/ui/src/main.tsx` for the real composition; `mountShell` is not a function.

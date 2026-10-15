@@ -16,15 +16,15 @@ prop exists, so a restyle does not compile. Never assemble parts in a module.
 
 ```tsx
 <Drawer
-  title="Edit annotation"          // required: the accessible name
-  onClose={closeDrawer}            // a request to close; see below
+  title="Edit annotation" // required: the accessible name
+  onClose={closeDrawer} // a request to close; see below
   onBack={canGoBack ? goBack : undefined}
-  size="lg"                        // a maximum; default "md"
+  size="lg" // a maximum; default "md"
   footer={{
     primaryAction: { type: "submit", label: "Save", loading: saving },
-    cancel: { onClick: closeDrawer },   // Cancel only when you pass it
+    cancel: { onClick: closeDrawer }, // Cancel only when you pass it
   }}
-  onSubmit={handleSubmit}          // the drawer owns the form
+  onSubmit={handleSubmit} // the drawer owns the form
 >
   {body}
 </Drawer>
@@ -90,14 +90,14 @@ appending list; `NoDataInfoBlock size="line"` is the one-line empty state.
 
 Do not write these in new code, and convert a call site you touch:
 
-| Legacy                                                          | Current                                  |
-| --------------------------------------------------------------- | ---------------------------------------- |
-| `Drawer.Root` / `.Content` / `.Header` / `.Body` / `DrawerActions` | `<Drawer title onClose footer>`        |
-| `Dialog.Root` / `.Content` / `.Footer`, `DialogCloseTrigger`    | `<Dialog open onClose title ...>`        |
-| `Card.Root` / `Card.Body` from `/primitives`                    | `Card` from `/card`                      |
-| `studio-drawer`, `studio-dialog` subpaths                       | `/drawer`, `/dialog`                     |
-| `DetailDrawerHeader`, `SettingsCard`, `WorkflowCard` aliases    | `Drawer` props, `Card`                   |
-| Drawer size `2xl`, dialog `maxWidth`                            | a named size from the scales above       |
+| Legacy                                                             | Current                            |
+| ------------------------------------------------------------------ | ---------------------------------- |
+| `Drawer.Root` / `.Content` / `.Header` / `.Body` / `DrawerActions` | `<Drawer title onClose footer>`    |
+| `Dialog.Root` / `.Content` / `.Footer`, `DialogCloseTrigger`       | `<Dialog open onClose title ...>`  |
+| `Card.Root` / `Card.Body` from `/primitives`                       | `Card` from `/card`                |
+| `studio-drawer`, `studio-dialog` subpaths                          | `/drawer`, `/dialog`               |
+| `DetailDrawerHeader`, `SettingsCard`, `WorkflowCard` aliases       | `Drawer` props, `Card`             |
+| Drawer size `2xl`, dialog `maxWidth`                               | a named size from the scales above |
 
 Checking whether a call site is legacy: `Drawer.Root`, `Dialog.Root` or `Card.Root` in a module
 means it is. The part statics stay `@deprecated` until the final removal wave.

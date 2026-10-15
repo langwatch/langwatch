@@ -702,7 +702,7 @@ describe("OrganizationService", () => {
     await expect(
       createService(new StubRepository("team"), new RecordingGrants(), teams).createTeam({
         organizationId: "org",
-        name: "Shared",
+        name: "Platform",
       }),
     ).resolves.toMatchObject({ id: "team", slug: "team" });
   });
