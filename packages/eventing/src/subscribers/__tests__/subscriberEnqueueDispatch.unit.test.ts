@@ -3,8 +3,8 @@
  * ADR-069), proven at the fan-out seam. These drive the real ProjectionRouter,
  * @see packages/group-queue/specs/payload-cost.feature
  */
-import { register } from "prom-client";
-import { describe, expect, it, vi } from "vitest";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
 import { InMemoryProcessStore } from "../../process-manager/stores/inMemoryProcessStore.ts";
@@ -63,15 +63,13 @@ function makeEvent(id: string): Event {
   );
 }
 
-async function enqueueOutcomeCount(outcome: string): Promise<number> {
-  const metric = register.getSingleMetric("es_subscriber_enqueue_total");
-  if (!metric) return 0;
-  const snapshot = (await metric.get()) as {
-    values: { labels: Record<string, string>; value: number }[];
-  };
-  return snapshot.values
-    .filter((v) => v.labels.subscriber_name === "seamSubscriber" && v.labels.outcome === outcome)
-    .reduce((sum, v) => sum + v.value, 0);
+let meter = createRecordingMeterProvider();
+
+function enqueueOutcomeCount(outcome: string): number {
+  return meter.valueOf("es_subscriber_enqueue_total", {
+    subscriber_name: "seamSubscriber",
+    outcome,
+  });
 }
 
 const raises = () => {
@@ -96,12 +94,18 @@ async function expectDispatchFailure(
 }
 
 describe("subscriber enqueue-time contract", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+  });
+  afterEach(() => meter.uninstall());
+
   describe("given a subscriber with an enqueue filter", () => {
     describe("when the filter rejects the event", () => {
       /** @scenario a non-matching event never mints a job */
       it("never mints a job and counts it as filtered", async () => {
         const received: unknown[] = [];
-        const before = await enqueueOutcomeCount("filtered");
+        const before = enqueueOutcomeCount("filtered");
         const router = makeRouter({
           name: "seamSubscriber",
           eventTypes: [],
@@ -114,7 +118,7 @@ describe("subscriber enqueue-time contract", () => {
         await router.dispatch([makeEvent("evt-filtered")], readContext);
 
         expect(received).toHaveLength(0);
-        expect(await enqueueOutcomeCount("filtered")).toBe(before + 1);
+        expect(enqueueOutcomeCount("filtered")).toBe(before + 1);
       });
     });
 
@@ -123,9 +127,9 @@ describe("subscriber enqueue-time contract", () => {
       /** @scenario work lost before it was queued is visible as lost */
       /** @scenario "A failing relevance guard is reported as a publish failure" */
       it("reports the failure and counts it as failed, so a raise is never mistaken for a decline", async () => {
-        const beforeFiltered = await enqueueOutcomeCount("filtered");
-        const beforeStaged = await enqueueOutcomeCount("staged");
-        const beforeFailed = await enqueueOutcomeCount("failed");
+        const beforeFiltered = enqueueOutcomeCount("filtered");
+        const beforeStaged = enqueueOutcomeCount("staged");
+        const beforeFailed = enqueueOutcomeCount("failed");
         const received: unknown[] = [];
         const router = makeRouter({
           name: "seamSubscriber",
@@ -146,9 +150,9 @@ describe("subscriber enqueue-time contract", () => {
         // A raise is its own outcome. It must not read as a decline, and it
         // must not be silent either — the routing path has no retry, so this
         // event's job is gone and only this counter says so.
-        expect(await enqueueOutcomeCount("failed")).toBe(beforeFailed + 1);
-        expect(await enqueueOutcomeCount("filtered")).toBe(beforeFiltered);
-        expect(await enqueueOutcomeCount("staged")).toBe(beforeStaged);
+        expect(enqueueOutcomeCount("failed")).toBe(beforeFailed + 1);
+        expect(enqueueOutcomeCount("filtered")).toBe(beforeFiltered);
+        expect(enqueueOutcomeCount("staged")).toBe(beforeStaged);
       });
 
       /** @scenario a subscriber that cannot decide relevance loses only its own work */
@@ -245,8 +249,8 @@ describe("subscriber enqueue-time contract", () => {
     describe("when they are published together", () => {
       /** @scenario enqueue outcomes are visible to operators */
       it("moves the discarded and the queued counts independently", async () => {
-        const beforeStaged = await enqueueOutcomeCount("staged");
-        const beforeFiltered = await enqueueOutcomeCount("filtered");
+        const beforeStaged = enqueueOutcomeCount("staged");
+        const beforeFiltered = enqueueOutcomeCount("filtered");
         const handled: string[] = [];
         const router = makeRouter({
           name: "seamSubscriber",
@@ -275,8 +279,8 @@ describe("subscriber enqueue-time contract", () => {
         // Both series move, by their own amounts — the distinction an operator
         // reads. One counter for both outcomes, or a filtered event counted as
         // staged, would show the seam doing work it declined to do.
-        expect(await enqueueOutcomeCount("staged")).toBe(beforeStaged + 2);
-        expect(await enqueueOutcomeCount("filtered")).toBe(beforeFiltered + 3);
+        expect(enqueueOutcomeCount("staged")).toBe(beforeStaged + 2);
+        expect(enqueueOutcomeCount("filtered")).toBe(beforeFiltered + 3);
         expect(handled).toEqual(["keep-1", "keep-2"]);
       });
     });
@@ -286,7 +290,7 @@ describe("subscriber enqueue-time contract", () => {
     describe("when the event is staged", () => {
       it("stages the full event unchanged and counts it as staged", async () => {
         const received: unknown[] = [];
-        const before = await enqueueOutcomeCount("staged");
+        const before = enqueueOutcomeCount("staged");
         const event = makeEvent("evt-full");
         const router = makeRouter({
           name: "seamSubscriber",
@@ -300,7 +304,7 @@ describe("subscriber enqueue-time contract", () => {
 
         expect(received).toHaveLength(1);
         expect(received[0]).toEqual(event);
-        expect(await enqueueOutcomeCount("staged")).toBe(before + 1);
+        expect(enqueueOutcomeCount("staged")).toBe(before + 1);
       });
     });
 
@@ -308,7 +312,7 @@ describe("subscriber enqueue-time contract", () => {
       /** @scenario two relevant events that share no payload identity are still delivered separately */
       it("delivers each as its own unit of work", async () => {
         const received: Event[] = [];
-        const before = await enqueueOutcomeCount("staged");
+        const before = enqueueOutcomeCount("staged");
         const sameAggregate = (id: string) =>
           createTestEvent(
             TEST_CONSTANTS.AGGREGATE_ID,
@@ -333,14 +337,14 @@ describe("subscriber enqueue-time contract", () => {
         await router.dispatch([first, second], readContext);
 
         expect(received).toEqual([first, second]);
-        expect(await enqueueOutcomeCount("staged")).toBe(before + 2);
+        expect(enqueueOutcomeCount("staged")).toBe(before + 2);
       });
     });
 
     describe("when the subscriber's queue rejects the send", () => {
       /** @scenario work that never reaches the queue is not counted as queued */
       it("reports the failure and does not count the event as staged", async () => {
-        const before = await enqueueOutcomeCount("staged");
+        const before = enqueueOutcomeCount("staged");
         const queueManager = makeQueueManager();
         // Only the queue boundary is faked: the router still runs its real
         // queued branch, which is the path that can fail in production.
@@ -365,7 +369,7 @@ describe("subscriber enqueue-time contract", () => {
           /queue unavailable/,
         );
 
-        expect(await enqueueOutcomeCount("staged")).toBe(before);
+        expect(enqueueOutcomeCount("staged")).toBe(before);
       });
     });
   });
@@ -375,7 +379,7 @@ describe("subscriber enqueue-time contract", () => {
       /** @scenario relevant work waits in the queue at the cost of a pointer, not of its payload */
       it("stages the reference in place of the event and counts it as referenced", async () => {
         const received: unknown[] = [];
-        const before = await enqueueOutcomeCount("referenced");
+        const before = enqueueOutcomeCount("referenced");
         const event = makeEvent("evt-ref");
         const router = makeRouter({
           name: "seamSubscriber",
@@ -410,7 +414,7 @@ describe("subscriber enqueue-time contract", () => {
         expect(staged.id).toBe(event.id);
         expect(staged.aggregateId).toBe(event.aggregateId);
         expect(staged.occurredAt).toBe(event.occurredAt);
-        expect(await enqueueOutcomeCount("referenced")).toBe(before + 1);
+        expect(enqueueOutcomeCount("referenced")).toBe(before + 1);
       });
     });
 
@@ -418,8 +422,8 @@ describe("subscriber enqueue-time contract", () => {
       /** @scenario an event whose payload cannot be pointed at is still processed */
       it("stages the full event and counts it as staged, not referenced", async () => {
         const received: unknown[] = [];
-        const beforeStaged = await enqueueOutcomeCount("staged");
-        const beforeReferenced = await enqueueOutcomeCount("referenced");
+        const beforeStaged = enqueueOutcomeCount("staged");
+        const beforeReferenced = enqueueOutcomeCount("referenced");
         const event = makeEvent("evt-passthrough");
         const router = makeRouter({
           name: "seamSubscriber",
@@ -433,8 +437,8 @@ describe("subscriber enqueue-time contract", () => {
         await router.dispatch([event], readContext);
 
         expect(received[0]).toEqual(event);
-        expect(await enqueueOutcomeCount("staged")).toBe(beforeStaged + 1);
-        expect(await enqueueOutcomeCount("referenced")).toBe(beforeReferenced);
+        expect(enqueueOutcomeCount("staged")).toBe(beforeStaged + 1);
+        expect(enqueueOutcomeCount("referenced")).toBe(beforeReferenced);
       });
     });
 

@@ -7,7 +7,7 @@ import {
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 
-import type { LangyRestMetrics } from "./langy-rest-metrics-prometheus.service.ts";
+import type { LangyRestMetrics } from "./langy-rest-metrics-otel.service.ts";
 import type { LangyService } from "./langy.service.ts";
 
 const logger = createLogger("langwatch:langy:internal");

@@ -1,5 +1,5 @@
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import IORedis, { type Redis } from "ioredis";
-import { register } from "prom-client";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GroupQueueProcessor } from "../groupQueue.ts";
@@ -12,9 +12,10 @@ type TestPayload = {
 
 const SCORE_BASE_MS = Date.now() - 60 * 60 * 1000;
 
-async function readyScoreImplausibleCount(queueName: string): Promise<number> {
-  const metric = await register.getSingleMetric("gq_ready_score_implausible_total")?.get();
-  return metric?.values.find((v) => v.labels.queue_name === queueName)?.value ?? 0;
+let meter = createRecordingMeterProvider();
+
+function readyScoreImplausibleCount(queueName: string): number {
+  return meter.valueOf("gq_ready_score_implausible_total", { queue_name: queueName });
 }
 
 describe("GroupQueueProcessor — ready score integrity", () => {
@@ -28,10 +29,13 @@ describe("GroupQueueProcessor — ready score integrity", () => {
   });
 
   beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
     queues = [];
   });
 
   afterEach(async () => {
+    meter.uninstall();
     await Promise.all(queues.map((q) => q.close().catch(() => {})));
     const keys = await redis.keys("{test/readyscore/*");
     if (keys.length > 0) await redis.del(...keys);
@@ -118,7 +122,7 @@ describe("GroupQueueProcessor — ready score integrity", () => {
 
       // Exactly one: the counter reports PRODUCERS, so only the supplied score
       // the queue refused registers. The two accepted scores do not.
-      expect(await readyScoreImplausibleCount(queueName)).toBe(1);
+      expect(readyScoreImplausibleCount(queueName)).toBe(1);
     });
   });
 });

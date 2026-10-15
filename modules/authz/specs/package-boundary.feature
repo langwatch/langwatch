@@ -62,7 +62,7 @@ Feature: AuthZ package boundary
   Scenario: AuthZ counts on the process registry
     Given a process composes the AuthZ adapter
     When it builds the feature
-    Then its engine-gate read failure and queue-bypassing write counters are in the process registry
+    Then its engine-gate read failure and queue-bypassing write counters record through the process metrics provider
 
   @unit @architecture @persistence
   Scenario: Persistence stays behind the server package

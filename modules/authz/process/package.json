@@ -49,7 +49,6 @@
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
-    "prom-client": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

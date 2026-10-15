@@ -1,16 +1,10 @@
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { register } from "prom-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  gqGroupStagingDepthMax,
-  gqGroupsOverStagingDepth,
-  gqOldestBacklogAgeMilliseconds,
-  gqOldestPendingAgeMilliseconds,
-  STAGING_DEPTH_REPORT_FLOOR,
-} from "../metrics.ts";
+import { STAGING_DEPTH_REPORT_FLOOR } from "../metrics.ts";
 import { GroupQueueMetricsCollector } from "../metricsCollector.ts";
 import { MIN_PLAUSIBLE_EPOCH_MS } from "../readyScore.ts";
 import { GroupStagingScripts } from "../scripts.ts";
@@ -213,14 +207,21 @@ function runCollect(redis: IORedis | Cluster) {
   return makeCollector({ redis }).collect();
 }
 
-async function readGauge(): Promise<number | undefined> {
-  const m = await gqOldestPendingAgeMilliseconds.get();
-  return m.values.find((v) => v.labels.queue_name === QUEUE)?.value;
+let meter = createRecordingMeterProvider();
+
+/** The latest value a gauge wrote for the test queue. */
+function lastGauge(name: string): number | undefined {
+  return meter.valuesOf(name, { queue_name: QUEUE }).at(-1);
+}
+
+function readGauge(): number | undefined {
+  return lastGauge("gq_oldest_pending_age_milliseconds");
 }
 
 describe("GroupQueueMetricsCollector — oldest pending age", () => {
   beforeEach(() => {
-    register.resetMetrics();
+    meter = createRecordingMeterProvider();
+    meter.install();
     // Freeze the clock so scores seeded relative to "now" keep their
     // eligible/deferred classification no matter how slowly the test runs,
     // and ages assert exactly instead of through tolerance windows.
@@ -229,6 +230,7 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    meter.uninstall();
   });
 
   it("reports the age of the oldest eligible-waiting group", async () => {
@@ -238,7 +240,7 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
 
     await runCollect(redis);
 
-    expect(await readGauge()).toBe(5_000);
+    expect(readGauge()).toBe(5_000);
 
     // The query must start at the plausible-epoch floor (which drops the
     // unblock sentinel and every mis-scored row alike), cap at "now", and read
@@ -262,7 +264,7 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
       readyZset: [{ member: "just-unblocked", score: 1 }],
     });
     await runCollect(redis);
-    expect(await readGauge()).toBe(0);
+    expect(readGauge()).toBe(0);
   });
 
   it("never emits a negative age (clock skew / future score)", async () => {
@@ -270,19 +272,21 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
       readyZset: [{ member: "group-future", score: Date.now() + 1_000 }],
     });
     await runCollect(redis);
-    const age = await readGauge();
+    const age = readGauge();
     expect(age).toBeGreaterThanOrEqual(0);
   });
 });
 
 describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
   beforeEach(() => {
-    register.resetMetrics();
+    meter = createRecordingMeterProvider();
+    meter.install();
     vi.useFakeTimers({ now: Date.now() });
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    meter.uninstall();
   });
 
   describe("given a group staged a few seconds after the Unix epoch", () => {
@@ -300,8 +304,8 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
 
       await runCollect(redis);
 
-      expect(await readGauge()).toBe(0);
-      expect(await readBacklogGauge()).toBe(0);
+      expect(readGauge()).toBe(0);
+      expect(readBacklogGauge()).toBe(0);
       expect(zrangebyscore.mock.calls[0]![1]).toBe(MIN_PLAUSIBLE_EPOCH_MS);
     });
 
@@ -317,7 +321,7 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
 
       await runCollect(redis);
 
-      expect(await readGauge()).toBe(5_000);
+      expect(readGauge()).toBe(5_000);
     });
   });
 
@@ -338,7 +342,7 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
 
       await runCollect(redis);
 
-      expect(await readBacklogGauge()).toBe(0);
+      expect(readBacklogGauge()).toBe(0);
     });
 
     it("still reports a genuinely old head job, however far past it is", async () => {
@@ -352,19 +356,19 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
 
       await runCollect(redis);
 
-      expect(await readBacklogGauge()).toBe(30 * 24 * 60 * 60 * 1000);
+      expect(readBacklogGauge()).toBe(30 * 24 * 60 * 60 * 1000);
     });
   });
 });
 
-async function readBacklogGauge(): Promise<number | undefined> {
-  const m = await gqOldestBacklogAgeMilliseconds.get();
-  return m.values.find((v) => v.labels.queue_name === QUEUE)?.value;
+function readBacklogGauge(): number | undefined {
+  return lastGauge("gq_oldest_backlog_age_milliseconds");
 }
 
 describe("GroupQueueMetricsCollector — oldest backlog age", () => {
   beforeEach(() => {
-    register.resetMetrics();
+    meter = createRecordingMeterProvider();
+    meter.install();
     // Frozen clock: a score of now+5s must stay DEFERRED through the whole
     // test, however slowly CI runs it — otherwise the group turns eligible,
     // the deferred sample skips its head job, and the assertion flakes.
@@ -373,6 +377,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    meter.uninstall();
   });
 
   describe("when a group is pinned in retry backoff (deferred ready score, day-old head job)", () => {
@@ -390,8 +395,8 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
       await runCollect(redis);
 
-      expect(await readGauge()).toBe(0);
-      expect(await readBacklogGauge()).toBe(60_000);
+      expect(readGauge()).toBe(0);
+      expect(readBacklogGauge()).toBe(60_000);
     });
   });
 
@@ -409,7 +414,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
       await runCollect(redis);
 
-      expect(await readBacklogGauge()).toBe(0);
+      expect(readBacklogGauge()).toBe(0);
     });
   });
 
@@ -421,7 +426,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
       await runCollect(redis);
 
-      expect(await readBacklogGauge()).toBe(5_000);
+      expect(readBacklogGauge()).toBe(5_000);
     });
   });
 
@@ -453,7 +458,7 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
         await runCollect(redis);
 
-        expect(await readBacklogGauge()).toBe(86_400_000);
+        expect(readBacklogGauge()).toBe(86_400_000);
       });
     });
   });
@@ -466,19 +471,19 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
  */
 describe("GroupQueueMetricsCollector, per-group staging depth", () => {
   beforeEach(() => {
-    register.resetMetrics();
+    meter = createRecordingMeterProvider();
+    meter.install();
     vi.useFakeTimers({ now: Date.now() });
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    meter.uninstall();
   });
 
-  const readMax = async () =>
-    (await gqGroupStagingDepthMax.get()).values.find((v) => v.labels.queue_name === QUEUE)?.value;
+  const readMax = () => lastGauge("gq_group_staging_depth_max");
 
-  const readOverThreshold = async () =>
-    (await gqGroupsOverStagingDepth.get()).values.find((v) => v.labels.queue_name === QUEUE)?.value;
+  const readOverThreshold = () => lastGauge("gq_groups_over_staging_depth");
 
   const ready = (...members: string[]): ReadyEntry[] =>
     members.map((member, i) => ({ member, score: Date.now() + i }));
@@ -493,7 +498,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
 
         await runCollect(redis);
 
-        expect(await readMax()).toBe(900);
+        expect(readMax()).toBe(900);
       });
 
       it("counts how many are over the reporting threshold", async () => {
@@ -513,7 +518,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         // The floor is inclusive: `a` sits exactly on it and counts, `b` is
         // one below and does not. That boundary is the one most likely to be
         // chosen deliberately, so it is the one worth pinning.
-        expect(await readOverThreshold()).toBe(2);
+        expect(readOverThreshold()).toBe(2);
       });
     });
   });
@@ -529,10 +534,10 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         const collector = makeCollector({ redis });
 
         await collector.collect();
-        expect(await readMax()).toBe(2);
+        expect(readMax()).toBe(2);
 
         await collector.collect();
-        expect(await readMax()).toBe(250_000);
+        expect(readMax()).toBe(250_000);
       });
     });
   });
@@ -549,12 +554,12 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
 
         // One cycle covers both groups, so this cycle completes a rotation.
         await collector.collect();
-        expect(await readMax()).toBe(250_000);
+        expect(readMax()).toBe(250_000);
 
         depths.deep = 0;
         await collector.collect();
 
-        expect(await readMax()).toBe(3);
+        expect(readMax()).toBe(3);
       });
     });
   });
@@ -572,8 +577,8 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
 
         await runCollect(redis);
 
-        expect(await readMax()).toBe(7);
-        expect(await readOverThreshold()).toBe(0);
+        expect(readMax()).toBe(7);
+        expect(readOverThreshold()).toBe(0);
       });
     });
   });
@@ -596,8 +601,8 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
 
         await runCollect(redis);
 
-        expect(await readMax()).toBe(STAGING_DEPTH_REPORT_FLOOR * 25);
-        expect(await readOverThreshold()).toBe(1);
+        expect(readMax()).toBe(STAGING_DEPTH_REPORT_FLOOR * 25);
+        expect(readOverThreshold()).toBe(1);
       });
     });
   });
@@ -652,8 +657,8 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         await collector.collect();
         await collector.collect();
 
-        expect(await readOverThreshold()).toBe(1);
-        expect(await readMax()).toBe(deep);
+        expect(readOverThreshold()).toBe(1);
+        expect(readMax()).toBe(deep);
       });
     });
   });
@@ -672,7 +677,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         // Both gauges read 0 here, which is indistinguishable from a quiet
         // queue. The log line is the only thing that says the sweep saw
         // nothing rather than nothing being there.
-        expect(await readMax()).toBe(0);
+        expect(readMax()).toBe(0);
         expect(logger.debug).toHaveBeenCalledWith(
           expect.objectContaining({ dropped: 2, ofGroups: 2 }),
           expect.stringContaining("dropped replies"),
@@ -688,8 +693,8 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
 
         await runCollect(redis);
 
-        expect(await readMax()).toBe(0);
-        expect(await readOverThreshold()).toBe(0);
+        expect(readMax()).toBe(0);
+        expect(readOverThreshold()).toBe(0);
       });
     });
   });

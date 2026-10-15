@@ -3,8 +3,8 @@
  * Enqueue-time map-projection contract (ADR-069 invariant 4): `filter` false
  * mints no job; one that raises admits the event since fan-out is never replayed.
  */
-import { register } from "prom-client";
-import { describe, expect, it, vi } from "vitest";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
 import type { EventSourcedQueueProcessor } from "../../queues/index.ts";
@@ -124,28 +124,29 @@ function makeInlineRouter(projection: MapProjectionDefinition<SeamRecord, Event>
   return router;
 }
 
-async function enqueueOutcomeCount(outcome: string): Promise<number> {
-  const metric = register.getSingleMetric("es_map_projection_enqueue_total");
-  if (!metric) return 0;
-  const snapshot = (await metric.get()) as {
-    values: { labels: Record<string, string>; value: number }[];
-  };
-  return snapshot.values
-    .filter(
-      (value) =>
-        value.labels.projection_name === PROJECTION_NAME && value.labels.outcome === outcome,
-    )
-    .reduce((sum, value) => sum + value.value, 0);
+let meter = createRecordingMeterProvider();
+
+function enqueueOutcomeCount(outcome: string): number {
+  return meter.valueOf("es_map_projection_enqueue_total", {
+    projection_name: PROJECTION_NAME,
+    outcome,
+  });
 }
 
 describe("map projection enqueue-time contract", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+  });
+  afterEach(() => meter.uninstall());
+
   describe("given a map projection that declares an enqueue filter", () => {
     describe("when a batch of events it maps to nothing is dispatched", () => {
       /** @scenario "A contribution the fact table declines mints no queue job" */
       it("mints a job only for the events it would map", async () => {
         const before = {
-          queued: await enqueueOutcomeCount("queued"),
-          filtered: await enqueueOutcomeCount("filtered"),
+          queued: enqueueOutcomeCount("queued"),
+          filtered: enqueueOutcomeCount("filtered"),
         };
         const appended: SeamRecord[] = [];
         const { router, queued } = makeQueuedRouter(
@@ -168,8 +169,8 @@ describe("map projection enqueue-time contract", () => {
         );
 
         expect(queued().map((event) => event.id)).toEqual(["evt-keep-1", "evt-keep-2"]);
-        expect(await enqueueOutcomeCount("queued")).toBe(before.queued + 2);
-        expect(await enqueueOutcomeCount("filtered")).toBe(before.filtered + 3);
+        expect(enqueueOutcomeCount("queued")).toBe(before.queued + 2);
+        expect(enqueueOutcomeCount("filtered")).toBe(before.filtered + 3);
       });
     });
 

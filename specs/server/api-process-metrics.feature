@@ -73,3 +73,19 @@ Feature: The standalone API process serves its own metrics
       Given the API process serves its metrics endpoint
       When a caller scrapes it
       Then the response carries Node's default process and runtime series
+
+  Rule: Every platform metric leaves the process by the OTLP push as well as the scrape
+
+    @unit
+    Scenario: Group Queue series are recorded through the metrics facade
+      Given the process metrics provider is installed
+      When the Group Queue records a job outcome
+      Then the gq_ series are written to that provider under their unchanged names and labels
+      # Until 2026-10 these sat on prom-client's registry, which only the scrape
+      # read; a push-only deployment lost every gq_ and es_ series.
+
+    @unit
+    Scenario: Eventing series are recorded through the metrics facade
+      Given the process metrics provider is installed
+      When an eventing command, projection, subscriber or process manager records its outcome
+      Then the es_ series are written to that provider under their unchanged names and labels

@@ -54,7 +54,6 @@
     "@slack/webhook": "catalog:",
     "better-auth": "catalog:",
     "nanoid": "catalog:",
-    "prom-client": "catalog:",
     "samlify": "2.13.1",
     "zod": "catalog:"
   },

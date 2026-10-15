@@ -1,5 +1,5 @@
-import { register } from "prom-client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
 import {
@@ -17,6 +17,8 @@ import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
  * can't read back into fold state (lossy analytics rows, ADR-034): on a miss
  * the executor rebuilds state from the event log up to the delivered event.
  */
+let meter = createRecordingMeterProvider();
+
 describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
   const tenantId = createTestTenantId();
   let executor: FoldProjectionExecutor;
@@ -51,8 +53,11 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
   }
 
   beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
     executor = new FoldProjectionExecutor();
   });
+  afterEach(() => meter.uninstall());
 
   describe("given the store misses and the option is enabled", () => {
     /** @scenario a stored state written under an older shape is rebuilt rather than trusted */
@@ -292,6 +297,12 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
 // ADR-066 transitional net must be observable to distinguish refolds from
 // regressions and confirm the deletion condition.
 describe("FoldProjectionExecutor refoldOnStoreMiss instrumentation", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+  });
+  afterEach(() => meter.uninstall());
+
   const tenantId = createTestTenantId();
   const context: ProjectionStoreContext = {
     aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -308,16 +319,11 @@ describe("FoldProjectionExecutor refoldOnStoreMiss instrumentation", () => {
     LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt ?? 0),
   });
 
-  async function refoldCount(projectionName: string, outcome: string): Promise<number> {
-    const metric = register.getSingleMetric("es_fold_refold_on_miss_total");
-    if (!metric) return 0;
-    const snapshot = await metric.get();
-    return (
-      snapshot.values.find(
-        (value) =>
-          value.labels.projection_name === projectionName && value.labels.outcome === outcome,
-      )?.value ?? 0
-    );
+  function refoldCount(projectionName: string, outcome: string): number {
+    return meter.valueOf("es_fold_refold_on_miss_total", {
+      projection_name: projectionName,
+      outcome,
+    });
   }
 
   function missingStoreFold(name: string) {
@@ -347,11 +353,11 @@ describe("FoldProjectionExecutor refoldOnStoreMiss instrumentation", () => {
         );
         const foldDef = missingStoreFold("counted-performed");
         foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue([event]);
-        const before = await refoldCount("counted-performed", "performed");
+        const before = refoldCount("counted-performed", "performed");
 
         await executor.execute(foldDef, event, context);
 
-        expect(await refoldCount("counted-performed", "performed")).toBe(before + 1);
+        expect(refoldCount("counted-performed", "performed")).toBe(before + 1);
       });
     });
   });
@@ -372,11 +378,11 @@ describe("FoldProjectionExecutor refoldOnStoreMiss instrumentation", () => {
         );
         const foldDef = missingStoreFold("counted-absent");
         foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue([]);
-        const before = await refoldCount("counted-absent", "absent");
+        const before = refoldCount("counted-absent", "absent");
 
         await executor.execute(foldDef, event, context);
 
-        expect(await refoldCount("counted-absent", "absent")).toBe(before + 1);
+        expect(refoldCount("counted-absent", "absent")).toBe(before + 1);
       });
     });
   });

@@ -22,8 +22,8 @@ import {
   reduceIdentity,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
+import { counter, histogram } from "@langwatch/observability/metrics";
 import { nowInstant } from "@langwatch/time";
-import { Counter, Histogram, register } from "prom-client";
 
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
@@ -33,30 +33,21 @@ import type { IdentityEvent, IdentityFoldState } from "./identity-state.projecti
 
 const logger = createLogger("langwatch:identity:ledger");
 
-// Remove existing metrics if they exist (for hot reload)
-const metricNames = [
-  "identity_projection_convergence_timeouts_total",
-  "identity_commit_duration_seconds",
-] as const;
-
-for (const name of metricNames) {
-  register.removeSingleMetric(name);
-}
-
 /**
  * A ceremony's read-your-writes wait expired before the fold landed its events in the `Identifier`
  * projection (the grants ledger's `awaitProjection` shape).
  */
-export const identityProjectionConvergenceTimeoutsTotal = new Counter({
+export const identityProjectionConvergenceTimeoutsTotal = counter({
   name: "identity_projection_convergence_timeouts_total",
-  help: "Identity ceremonies that returned before the fold landed their events; the append is durable and the projection converges later.",
+  description:
+    "Identity ceremonies that returned before the fold landed their events; the append is durable and the projection converges later.",
 });
 
 /** End-to-end cost of one identity commit: append, stage, and the wait. */
-const identityCommitDurationSeconds = new Histogram({
+const identityCommitDurationSeconds = histogram({
   name: "identity_commit_duration_seconds",
-  help: "Duration of an identity ledger commit: durable append, queue staging, and the read-your-writes wait.",
-  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+  description:
+    "Duration of an identity ledger commit: durable append, queue staging, and the read-your-writes wait.",
 });
 
 /** The read-your-writes window, the grants ledger's convergence shape. */
@@ -139,13 +130,13 @@ export class IdentityLedgerStore implements IdentityLedger {
   }): Promise<IdentityFact[]> {
     const events = identityEventsFor({ command, facts });
     if (events.length === 0) return [];
-    const done = identityCommitDurationSeconds.startTimer();
+    const startedAt = performance.now();
     try {
       await this.writeProvisionalHeads({ command, events });
       await this.stageAndAwait({ command, events });
       return events;
     } finally {
-      done();
+      identityCommitDurationSeconds.observe((performance.now() - startedAt) / 1000);
     }
   }
 
