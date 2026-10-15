@@ -7,7 +7,8 @@
 -- lookup by request id alone reads only the partitions the request lives in.
 -- Neither source carries _retention_days, so the column is the "forever"
 -- sentinel 65535. gateway_spend keeps a fixed 13 months (00067) and its index
--- expires seven days after that; the ledger has no TTL and neither has its
+-- expires seven days after that, except the fill marker (TenantId ''), which
+-- carries no time and must outlive every expiry merge; the ledger has no TTL and neither has its
 -- index, which makes "seen" exact for the idempotency probes. A view fills each
 -- inside every insert; older rows come from the owner's background step
 -- (gateway:fill-id-indexes).
@@ -24,7 +25,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.gateway_spend_id_index
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, GatewayRequestId)
-TTL toDateTime(ToAt) + INTERVAL 13 MONTH + INTERVAL 7 DAY DELETE;
+TTL IF(TenantId = '', toDateTime('2106-01-01'), toDateTime(ToAt) + INTERVAL 13 MONTH + INTERVAL 7 DAY) DELETE;
 -- +goose StatementEnd
 
 -- +goose StatementBegin

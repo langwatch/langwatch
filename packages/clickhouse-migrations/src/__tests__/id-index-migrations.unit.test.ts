@@ -82,5 +82,14 @@ describe("id index migrations", () => {
       expect(tables.map((table) => table.name).toSorted()).toEqual(EXPECTED_INDEXES.toSorted());
       expect(new Set(tables.map((table) => table.file)).size).toBe(9);
     });
+
+    // The fill marker ('', '__fill_complete__', 65535) has no time; an expiry merge must keep it.
+    it("exempts the fill marker from every index's TTL", () => {
+      for (const table of indexTables()) {
+        const ttl = /\bTTL\b([\s\S]*)DELETE/.exec(table.definition)?.[1];
+        if (ttl === undefined) continue;
+        expect(ttl, table.name).toMatch(/_retention_days BETWEEN 1 AND 65534|TenantId = ''/);
+      }
+    });
   });
 });
