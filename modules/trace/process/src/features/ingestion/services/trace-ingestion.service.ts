@@ -31,8 +31,8 @@ import {
   stampCodexHelperThread,
   type ScopedSpans,
 } from "../../claude-code/rules/codex-helper-thread.rules.ts";
-import { usageCountingOf, withUsageCountedElsewhere } from "../rules/trace-request-usage.rules.ts";
 import { TraceIngestionMetricsService } from "./trace-ingestion-metrics.service.ts";
+import { TraceRequestUsageService } from "./trace-request-usage.service.ts";
 
 type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
 
@@ -376,6 +376,7 @@ export class TraceIngestionService {
  */
 class TraceSpanCollectionService {
   private readonly logger = createLogger("langwatch:trace-processing:span-collection");
+  private readonly usage: TraceRequestUsageService;
 
   private constructor(
     private readonly options: {
@@ -383,7 +384,9 @@ class TraceSpanCollectionService {
       commands: TraceIngressCommand;
       payloads?: TraceIngressPayload;
     },
-  ) {}
+  ) {
+    this.usage = TraceRequestUsageService.create({ dedup: options.dedup });
+  }
 
   static create(options: {
     dedup: TraceSpanDedupRepository;
@@ -416,7 +419,7 @@ class TraceSpanCollectionService {
 
       lockAcquired = claim.outcome === "acquired";
 
-      const usage = await this.claimRequestUsage(input);
+      const usage = await this.usage.claim(input);
       usageRecord = usage.acquired;
 
       const commandData: RecordSpanCommandData = {
@@ -448,7 +451,7 @@ class TraceSpanCollectionService {
         });
       }
       if (usageRecord) {
-        await this.options.dedup.releaseUsageRecord(usageRecord);
+        await this.usage.release({ record: usageRecord });
       }
 
       input.otelSpanRef?.addEvent("span_ingestion_error", {
@@ -465,37 +468,6 @@ class TraceSpanCollectionService {
         error: error instanceof Error ? error.message : String(error),
       };
     }
-  }
-
-  /**
-   * One billed request can reach the door as two spans (the Claude SDK's and the Claude API's).
-   * The first to claim the request's usage record counts it; a later one is marked counted
-   * elsewhere. A claim the store cannot answer counts the span, as the span claim does.
-   */
-  private async claimRequestUsage(input: {
-    tenantId: string;
-    span: OtlpSpan;
-    instrumentationScope: OtlpInstrumentationScope | null;
-  }): Promise<{ span: OtlpSpan; acquired: UsageRecordRef | null }> {
-    const counting = usageCountingOf({
-      span: input.span,
-      scopeName: input.instrumentationScope?.name,
-    });
-    if (counting.kind === "per-span") {
-      return { span: input.span, acquired: null };
-    }
-
-    const record: UsageRecordRef = {
-      tenantId: input.tenantId,
-      recordId: counting.recordId,
-      spanId: input.span.spanId,
-    };
-    const claim = await this.options.dedup.claimUsageRecord(record);
-    if (claim.outcome === "held") {
-      return { span: withUsageCountedElsewhere(input.span), acquired: null };
-    }
-
-    return { span: input.span, acquired: claim.outcome === "acquired" ? record : null };
   }
 }
 

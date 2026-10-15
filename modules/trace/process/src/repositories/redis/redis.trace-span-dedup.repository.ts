@@ -29,6 +29,23 @@ const USAGE_RECORD_TTL_SECONDS = 24 * 60 * 60;
 const usageKey = (record: UsageRecordRef): string =>
   `${USAGE_DEDUP_KEY_PREFIX}${record.tenantId}:${record.recordId}`;
 
+/** Sets the holder when the record is free and returns whoever holds it. */
+const CLAIM_USAGE_RECORD_SCRIPT = `
+local holder = redis.call('GET', KEYS[1])
+if holder then
+  return holder
+end
+redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+return ARGV[1]
+`;
+
+const RELEASE_USAGE_RECORD_SCRIPT = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`;
+
 /**
  * The claim, over the process's Redis. Every failure is a warning and an
  * ingestion that proceeds: losing a duplicate is worse than recording one.
@@ -86,17 +103,14 @@ export class RedisTraceSpanDedupRepository extends TraceSpanDedupRepository {
   }
 
   async claimUsageRecord(record: UsageRecordRef): Promise<SpanDedupClaim> {
-    const key = usageKey(record);
     try {
-      const claimed = await this.#connection.set(
-        key,
+      const holder = await this.#connection.eval(
+        CLAIM_USAGE_RECORD_SCRIPT,
+        1,
+        usageKey(record),
         record.spanId,
-        "EX",
-        USAGE_RECORD_TTL_SECONDS,
-        "NX",
+        String(USAGE_RECORD_TTL_SECONDS),
       );
-      if (claimed === "OK") return { outcome: "acquired" };
-      const holder = await this.#connection.get(key);
       return holder === record.spanId ? { outcome: "acquired" } : { outcome: "held" };
     } catch (error) {
       this.#logger.warn({ error, ...record }, "usage record claim failed; counting the span");
@@ -105,11 +119,8 @@ export class RedisTraceSpanDedupRepository extends TraceSpanDedupRepository {
   }
 
   async releaseUsageRecord(record: UsageRecordRef): Promise<void> {
-    const key = usageKey(record);
     try {
-      if ((await this.#connection.get(key)) === record.spanId) {
-        await this.#connection.del(key);
-      }
+      await this.#connection.eval(RELEASE_USAGE_RECORD_SCRIPT, 1, usageKey(record), record.spanId);
     } catch (error) {
       this.#logger.warn({ error, ...record }, "usage record release failed");
     }
