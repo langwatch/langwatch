@@ -6,7 +6,7 @@ The server half of [scenario](../README.md). Scenarios and simulations: authored
 
 ## Installation
 
-`defineProcessModule("scenario").withRepositories(scenarioRepositories).withChannels(scenarioChannels).withApi(ScenarioModule).withTransports(…, …, …, scenarioAgentTestRest, scenarioEventsRest, scenarioGenerateRest, scenarioRunExportRest, scenarioVoiceRest, scenarioTrpcTransport).provideMiddlewareContext(…).withEventing(scenarioLifecycleEventing).withEventing(simulationProcessingEventing).withMigrations(…)`, `src/scenario.module.ts:31`.
+`defineProcessModule("scenario").withRepositories(scenarioRepositories).withChannels(scenarioChannels).withApi(ScenarioModule).withTransports(…, …, …, scenarioAgentTestRest, scenarioEventsRest, scenarioGenerateRest, scenarioRunExportRest, scenarioVoiceRest, scenarioTrpcTransport).provideMiddlewareContext(…).withEventing(scenarioLifecycleEventing).withEventing(simulationProcessingEventing).withMigrations(…).withIdIndexes(SCENARIO_ID_INDEXES, …)`, `src/scenario.module.ts:32`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1476,9 +1476,9 @@ Declared at `src/eventing/simulation-processing.pipeline.ts:116`. Events: `Simul
 
 | Kind   | Leaf                                                  | Environment variable                      | Declared at                              |
 | ------ | ----------------------------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:275`            |
-| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:276`            |
-| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:278`            |
+| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:271`            |
+| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:272`            |
+| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:274`            |
 | config | `langwatchEndpoint`                                   | `LANGWATCH_ENDPOINT`                      | `../contract/src/scenario.config.ts:96`  |
 | config | `voicePublicBaseUrl`                                  | `VOICE_PUBLIC_BASE_URL`                   | `../contract/src/scenario.config.ts:98`  |
 | config | `voiceTunnel`                                         | `VOICE_TUNNEL`                            | `../contract/src/scenario.config.ts:100` |

@@ -6,7 +6,7 @@ The server half of [analytics](../README.md). Analytics reads: timeseries, feedb
 
 ## Installation
 
-`defineProcessModule("analytics").withRepositories(analyticsRepositories).withChannels(analyticsChannels).withApi(AnalyticsModule).withTransports(analyticsRest, analyticsLegacyRest, queryRest, analyticsTrpcTransport, analyticsLwqlTrpcTransport).provideMiddlewareContext(…).withEventing(lwqlReconvergenceEventing).withMigrations(…)`, `src/analytics.module.ts:21`.
+`defineProcessModule("analytics").withRepositories(analyticsRepositories).withChannels(analyticsChannels).withApi(AnalyticsModule).withTransports(analyticsRest, analyticsLegacyRest, queryRest, analyticsTrpcTransport, analyticsLwqlTrpcTransport).provideMiddlewareContext(…).withEventing(lwqlReconvergenceEventing).withMigrations(…).withIdIndexes(ANALYTICS_ID_INDEXES, …)`, `src/analytics.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

@@ -6,7 +6,7 @@ The server half of [gateway](../README.md). The AI Gateway: virtual keys, gatewa
 
 ## Installation
 
-`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).provideMiddlewareBindings(…).provideMiddlewareContext(…).withMigrations(…)`, `src/gateway.module.ts:47`.
+`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).provideMiddlewareBindings(…).provideMiddlewareContext(…).withIdIndexes(GATEWAY_ID_INDEXES, …)`, `src/gateway.module.ts:47`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1777,17 +1777,17 @@ Declared at `src/eventing/gateway-realtime-session.pipeline.ts:41`.
 
 ### Pipeline `gateway_spend_processing` (aggregate `gateway_request`)
 
-Declared at `src/eventing/gateway-spend.pipeline.ts:108`. Events: `gatewaySpendAdmittedEventSchema`, `gatewaySpendConfirmedEventSchema`, `gatewaySpendFailedEventSchema`, `gatewaySpendSettledEventSchema`.
+Declared at `src/eventing/gateway-spend.pipeline.ts:103`. Events: `gatewaySpendAdmittedEventSchema`, `gatewaySpendConfirmedEventSchema`, `gatewaySpendFailedEventSchema`, `gatewaySpendSettledEventSchema`.
 
 | Kind                       | Name                                                               | Handles                                                                                | Declared at                                  |
 | -------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | -------------------------------------------- |
-| command                    | `admitSpend`                                                       | –                                                                                      | `src/eventing/gateway-spend.pipeline.ts:121` |
-| command                    | `confirmSpend`                                                     | –                                                                                      | `src/eventing/gateway-spend.pipeline.ts:122` |
-| command                    | `failSpend`                                                        | –                                                                                      | `src/eventing/gateway-spend.pipeline.ts:123` |
-| command                    | `settleSpend`                                                      | –                                                                                      | `src/eventing/gateway-spend.pipeline.ts:124` |
-| process manager            | `≈ this.options.gatewayDebits.name`                                | ≈ applier `this.options.gatewayDebits.applier`                                         | `src/eventing/gateway-spend.pipeline.ts:126` |
-| process manager            | `spendSettlement`                                                  | every 5 min (`SETTLEMENT_SWEEP_INTERVAL_MS = 5 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/gateway-spend.pipeline.ts:132` |
-| ClickHouse fold projection | `≈ GatewaySpendFoldProjection.create({ store: this.foldStore() })` | –                                                                                      | `src/eventing/gateway-spend.pipeline.ts:120` |
+| command                    | `admitSpend`                                                       | –                                                                                      | `src/eventing/gateway-spend.pipeline.ts:116` |
+| command                    | `confirmSpend`                                                     | –                                                                                      | `src/eventing/gateway-spend.pipeline.ts:117` |
+| command                    | `failSpend`                                                        | –                                                                                      | `src/eventing/gateway-spend.pipeline.ts:118` |
+| command                    | `settleSpend`                                                      | –                                                                                      | `src/eventing/gateway-spend.pipeline.ts:119` |
+| process manager            | `≈ this.options.gatewayDebits.name`                                | ≈ applier `this.options.gatewayDebits.applier`                                         | `src/eventing/gateway-spend.pipeline.ts:121` |
+| process manager            | `spendSettlement`                                                  | every 5 min (`SETTLEMENT_SWEEP_INTERVAL_MS = 5 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/gateway-spend.pipeline.ts:127` |
+| ClickHouse fold projection | `≈ GatewaySpendFoldProjection.create({ store: this.foldStore() })` | –                                                                                      | `src/eventing/gateway-spend.pipeline.ts:115` |
 
 ### Tasks
 
@@ -1801,9 +1801,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1161`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1162`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1163`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1151`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1152`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1153`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:27` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:29` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:31` |
