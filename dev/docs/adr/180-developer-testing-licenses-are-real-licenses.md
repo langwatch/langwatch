@@ -1,4 +1,4 @@
-# ADR-180: Developer testing licenses are real licenses a Cloud admin approves
+# ADR-180: Developer testing licenses are real licenses issued to signed-in Cloud staff
 
 **Date:** 2026-10-15
 
@@ -21,31 +21,35 @@ inside the open-source plan needs none.
 
 ## Decisions
 
-### 1. A testing licence is a real licence, issued by Cloud and approved by a person
+### 1. A testing licence is a real licence, issued to Cloud staff who signed in
 
-When a developer asks for a gated feature, the instance starts a testing activation request on
-Cloud. Cloud answers with a short human code and URL for the browser, and a separate private
-redemption code the instance keeps. A Cloud admin signs in on langwatch.ai, checks the code and
-instance, picks how long the licence lasts and approves. The instance redeems its private code
-through the existing activation path and stores the licence through the existing upload path.
+A developer who holds ops permissions on LangWatch Cloud signs haven in to their Cloud account once,
+in the browser. haven keeps a token that can do one thing: issue testing licences. From then on,
+when the developer asks for a gated feature, haven calls Cloud with that token, the instance id and
+the local organization id; Cloud checks the caller still holds ops permissions and issues the
+licence; haven stores it through the existing upload path. No browser step and no waiting per
+licence. A developer without ops permissions on Cloud gets no licence and develops inside the
+open-source plan.
 
 The licence is signed by the production key on Cloud. No machine holds a signing key, and no
 running stack trusts any key but the embedded production one.
 
 ### 2. Rulings
 
-| Question                  | Ruling                                                                                                                                  |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| When does an instance ask | Only when a developer asks for a gated feature (a haven flag or command), never on every boot                                           |
-| How long it lasts         | The approving admin picks it; default 5 days, at most 30; no automatic renewal                                                          |
-| Who approves              | A Cloud admin holding `ops:manage` at platform scope, through the Cloud ops capability                                                  |
-| What it covers            | One local organization on one instance; Enterprise features; 10 full and 10 Lite seats; no hosted services, commit or overage           |
-| CI                        | A person approves each gated run; no stored staff token in CI                                                                           |
-| New operations            | `LicensingApi.startTestingLicenseRequest`, `LicensingApi.approveTestingLicenseRequest`, `EnterpriseOpsApi.approveTestingLicenseRequest` |
-| Which builds accept it    | Source and release builds alike, verifying the same way                                                                                 |
+| Question                  | Ruling                                                                                                                        |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Who can get one           | Only a person holding ops permissions on LangWatch Cloud, checked by Cloud on every issue                                     |
+| How haven is trusted      | The developer signs haven in to Cloud once; the stored token is limited to issuing testing licences, nothing else they may do |
+| When does an instance ask | Only when a developer asks for a gated feature (a haven flag or command), never on every boot                                 |
+| How long it lasts         | Picked when asked; default 5 days, at most 30; haven renews it before expiry while signed in                                  |
+| What it covers            | One local organization on one instance; Enterprise features; 10 full and 10 Lite seats; no hosted services, commit or overage |
+| CI                        | Its own service principal holding the same narrow right, kept in protected CI secrets; never a person's token                 |
+| New operations            | `LicensingApi.issueTestingLicense` and `EnterpriseOpsApi.issueTestingLicense` (the ops door and audit)                        |
+| Which builds accept it    | Source and release builds alike, verifying the same way                                                                       |
 
-Everything else reuses existing operations: activation codes, `redeemActivationCode`, sync,
-reissue and revoke, and the list and detail reads.
+Everything else reuses existing operations: sync, reissue and revoke, and the list and detail
+reads. The sign-in reuses the `langwatch` CLI's browser sign-in if it fits; a token limited to one
+operation is the gap to fill if access tokens cannot be limited that way today.
 
 ### 3. How a testing licence is marked and bound
 
@@ -57,10 +61,8 @@ reissue and revoke, and the list and detail reads.
   signed organization id are checked on upload and on every entitlement read. Reissue keeps them;
   a testing licence never becomes standard. Older verifiers must refuse the new shape rather than
   accept it without its restrictions.
-- A testing activation code uses its own prefix (`LWT-`) so an older Cloud replica cannot redeem
-  an unapproved request as an ordinary `LW-` code.
-- The registry row is bound to the approved instance when it is issued, not to whichever instance
-  redeems first. Resetting a testing licence's binding is refused: a new instance needs approval.
+- The registry row is bound to the instance it was issued for when it is issued. Resetting a
+  testing licence's binding is refused: a new instance gets a new licence.
 
 ### 4. Expiry and revocation are enforced, for testing licences
 
@@ -92,16 +94,16 @@ this once the kind exists.
 
 1. Random seeded ids; the `kind` column, the signed claims and readers that refuse what they cannot
    enforce; expiry enforcement for testing licences.
-2. Cloud request, approval (with the admin's chosen duration) and redemption; the ops approval
-   screen.
-3. haven and CI ask for a licence through it.
+2. Cloud issues a testing licence to a signed-in caller holding ops permissions; the token limited
+   to that one operation; the ops pages show who issued each testing licence.
+3. `haven login`, haven asks for and renews licences through it; CI through its service principal.
 4. The shortcuts in the context above are deleted, keeping isolated cryptography fixtures for unit
    tests and refusal tests only. Known dogfood licences are reviewed by id and revoked; nothing is
    reclassified by name or email.
 
 ## Consequences
 
-- Testing a gated feature needs a signed-in Cloud admin, once per licence lifetime.
+- Testing a gated feature needs Cloud ops permissions and one sign-in per machine.
 - The licence path developers use is the one customers use, so a break shows up in development.
 - Upgrade lanes for releases that cannot enforce the new claims keep their fixtures or retire;
   that is decided when step 4 reaches upgradelab.

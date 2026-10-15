@@ -1,7 +1,7 @@
 Feature: Developer testing licenses
   A developer who needs a license-gated feature on their own stack asks Cloud
-  for a testing license. A Cloud admin signs in, checks the request, picks how
-  long it lasts and approves it. The license is real: signed on Cloud, bound to
+  for a testing license. Only Cloud staff with ops permissions can, after
+  signing haven in to their Cloud account once. The license is real: signed on Cloud, bound to
   one instance and one local organization, refused once expired. Development
   inside the open-source plan needs no license at all. ADR-180.
 
@@ -34,7 +34,7 @@ Feature: Developer testing licenses
   Scenario: A testing license carries its kind and its instance
     When Cloud signs a testing license
     Then the signed license says it is a testing license
-    And it names the instance and the local organization it was approved for
+    And it names the instance and the local organization it was issued for
 
   @unit
   Scenario: A license with no kind is a standard license
@@ -44,7 +44,7 @@ Feature: Developer testing licenses
 
   @unit
   Scenario: A testing license is refused on another instance or organization
-    Given a testing license approved for one instance and one local organization
+    Given a testing license issued for one instance and one local organization
     When it is uploaded on a different instance, or for a different organization
     Then it is refused with a code naming the mismatch
     And no plan or feature is granted
@@ -70,57 +70,43 @@ Feature: Developer testing licenses
     And the reissued license is still a testing license for the same instance and organization
 
   # ============================================================================
-  # Asking and approving
+  # Issuing
   # ============================================================================
 
   @unit
-  Scenario: An instance asks for a testing license and gets two codes
-    When an instance starts a testing license request for one of its organizations
-    Then Cloud answers with a short code and a URL for a person
-    And a separate private code that only the instance keeps
-    And the request expires after ten minutes unless it is approved
+  Scenario: Cloud staff get a testing license with no browser step
+    Given a caller signed in with a token from a person holding ops permissions on Cloud
+    When they ask for a testing license for an instance and one of its organizations
+    Then Cloud issues it, naming that person as the issuer
+    And it lasts 5 days unless they asked for another length
 
   @unit
-  Scenario: A Cloud admin approves a request and picks how long it lasts
-    Given a pending testing license request
-    When a Cloud admin approves it without choosing a length
-    Then the license will last 5 days from approval
-    When a Cloud admin approves another request choosing 12 hours
-    Then that license will last 12 hours from approval
+  Scenario: A testing license can be asked for a shorter or longer time, up to 30 days
+    Given a signed-in caller holding ops permissions on Cloud
+    When they ask for a testing license lasting 12 hours
+    Then it lasts 12 hours
+    When they ask for one lasting 45 days
+    Then it is refused with a code naming the limit of 30 days
 
   @unit
-  Scenario: An approval longer than the limit is refused
-    Given a pending testing license request
-    When a Cloud admin approves it choosing 45 days
-    Then the approval is refused with a code naming the limit of 30 days
+  Scenario: Someone without ops permissions on Cloud gets no testing license
+    Given a signed-in caller who holds no ops permissions on Cloud
+    When they ask for a testing license
+    Then it is refused before the handler runs
+    And no license is written to the registry
 
   @unit
-  Scenario: Only a Cloud admin who may manage licenses can approve
-    Given a pending testing license request
-    When a signed-in user without ops:manage tries to approve it
-    Then the approval is refused before the handler runs
-    And the request stays pending
+  Scenario: The signed-in token can only issue testing licenses
+    Given a token haven received when its developer signed in
+    When it is presented to any other ops or licensing operation
+    Then it is refused, even though the person behind it may do that operation in the browser
 
   @unit
-  Scenario: The instance waits while the request is pending, then redeems it once
-    Given a pending testing license request
-    When the instance redeems its private code before approval
-    Then it is told the request is still pending
-    When the request is approved and the instance redeems again
-    Then it receives the testing license and stores it
-    And redeeming the same code a second time does not issue a second license
-
-  @unit
-  Scenario: A lost answer to a redemption can be recovered
-    Given an approved request whose redemption answer never reached the instance
-    When the instance redeems the same private code again
-    Then it receives the same license, not a new one
-
-  @unit
-  Scenario: The short code alone cannot redeem a license
-    Given a pending testing license request
-    When anyone presents only the short code for redemption
-    Then it is refused
+  Scenario: Losing ops permissions stops new testing licenses
+    Given a person whose haven token issued testing licenses before
+    When their ops permissions on Cloud are removed
+    Then the next testing license asked for with that token is refused
+    And the licenses already issued run only until their expiry
 
   # ============================================================================
   # Ops pages
@@ -132,7 +118,7 @@ Feature: Developer testing licenses
     When an operator opens the license list
     Then only the standard license is listed and counted
     When the operator asks to include testing licenses
-    Then the testing license is listed with a Testing badge, its approver, instance and expiry
+    Then the testing license is listed with a Testing badge, its issuer, instance and expiry
 
   @unit
   Scenario: Testing licenses never count towards seats or invoices
@@ -147,17 +133,33 @@ Feature: Developer testing licenses
   @unit
   Scenario: haven asks for a testing license only when told to
     When haven starts a stack without asking for a testing license
-    Then it does not contact Cloud for a license and opens no browser
+    Then it does not contact Cloud for a license
 
   @unit
-  Scenario: haven opens the approval page and waits for the license
+  Scenario: Signing haven in once is enough
+    Given a developer who signed haven in to their Cloud account
     When haven starts a stack asking for a testing license
-    Then it prints the short code and URL and opens the URL in the browser
-    And it never prints the private code
-    And once the request is approved it stores the license and finishes the gated seeding
+    Then it gets the license from Cloud and stores it without opening a browser
+    And it finishes the gated seeding
+    And the token is never printed
 
   @unit
-  Scenario: An agent asks without a browser and resumes later
-    When haven is asked for a testing license in agent mode without opening a browser
-    Then it reports the URL, short code and expiry and returns without waiting
-    And a later wait command picks the request up and stores the license once approved
+  Scenario: haven renews a testing license before it expires
+    Given a stack holding a testing license close to its expiry, and a signed-in haven
+    When haven checks the stack
+    Then it asks Cloud for a new testing license for the same instance and organization
+    And the stack keeps its licensed features without a gap
+
+  @unit
+  Scenario: A haven that is not signed in still starts the stack
+    Given a haven that was never signed in to Cloud
+    When it starts a stack asking for a testing license
+    Then the stack starts on the open-source plan
+    And haven says to sign in first, naming the command
+
+  @unit
+  Scenario: CI gets a testing license through its own service principal
+    Given a CI job holding the service principal's token in its protected secrets
+    When the job starts a stack asking for a testing license
+    Then it gets the license without a person present
+    And the registry names the service principal as the issuer
