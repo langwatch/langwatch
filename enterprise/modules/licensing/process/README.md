@@ -654,13 +654,13 @@ Run by the tasks process, before serve.
 | secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:157`           |
 | secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:158`           |
 | config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
-| config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:52` |
-| config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:53` |
-| config | `connectLicenseEndpoint` | `LANGWATCH_CONNECT_LICENSE_ENDPOINT` | `../contract/src/licensing.config.ts:57` |
-| config | `connectInstanceId`      | `LANGWATCH_CONNECT_INSTANCE_ID`      | `../contract/src/licensing.config.ts:62` |
-| config | `isSaas`                 | `IS_SAAS`                            | `../contract/src/licensing.config.ts:70` |
-| config | `serviceVersion`         | `SERVICE_VERSION`                    | `../contract/src/licensing.config.ts:72` |
-| config | `otelResourceAttributes` | `OTEL_RESOURCE_ATTRIBUTES`           | `../contract/src/licensing.config.ts:73` |
-| config | `outboundProxy`          | `HTTPS_PROXY`                        | `../contract/src/licensing.config.ts:75` |
+| config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:53` |
+| config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:60` |
+| config | `connectLicenseEndpoint` | `LANGWATCH_CONNECT_LICENSE_ENDPOINT` | `../contract/src/licensing.config.ts:64` |
+| config | `connectInstanceId`      | `LANGWATCH_CONNECT_INSTANCE_ID`      | `../contract/src/licensing.config.ts:69` |
+| config | `isSaas`                 | `IS_SAAS`                            | `../contract/src/licensing.config.ts:77` |
+| config | `serviceVersion`         | `SERVICE_VERSION`                    | `../contract/src/licensing.config.ts:79` |
+| config | `otelResourceAttributes` | `OTEL_RESOURCE_ATTRIBUTES`           | `../contract/src/licensing.config.ts:80` |
+| config | `outboundProxy`          | `HTTPS_PROXY`                        | `../contract/src/licensing.config.ts:82` |
 
 <!-- readme:generated:end -->

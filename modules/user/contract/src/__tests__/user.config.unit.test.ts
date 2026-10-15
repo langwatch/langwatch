@@ -1,6 +1,5 @@
 import {
   Config,
-  ConfigParseError,
   localPasswords,
   mfaEnrollmentOpen,
   parseProcessConfig,
@@ -54,12 +53,13 @@ describe("user's sign-in capability switches", () => {
     });
   });
 
-  describe("given a switch written a way nothing reads", () => {
-    /** @scenario "A capability switch written a way nothing reads refuses the boot" */
-    it("refuses the boot rather than leaving the surface quietly off", () => {
-      expect(() => read({ PASSKEYS_ENABLED: "true" })).toThrow(ConfigParseError);
-      expect(() => read({ MFA_ENROLLMENT_OPEN: "yes" })).toThrow(ConfigParseError);
-      expect(() => read({ LOCAL_PASSWORDS_ENABLED: "1" })).toThrow(ConfigParseError);
+  describe("given a switch written outside on and off", () => {
+    /** @scenario "A capability switch written another way reads as the previous release read it" */
+    it("reads passkeys as on and the two opt-in switches as off", () => {
+      expect(
+        read({ PASSKEYS_ENABLED: "true", MFA_ENROLLMENT_OPEN: "yes", LOCAL_PASSWORDS_ENABLED: "1" })
+          .user,
+      ).toMatchObject({ passkeysEnabled: true, mfaEnrollmentOpen: false, localPasswords: false });
     });
   });
 });

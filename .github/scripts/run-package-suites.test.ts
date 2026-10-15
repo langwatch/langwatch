@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  DEFAULT_WEIGHT_SECONDS,
+  balanceShards,
   discover,
+  formatMeasured,
   parseOnly,
   parseRegister,
   parseShard,
+  parseWeights,
   runPackage,
   scriptsFor,
   shardOf,
@@ -259,10 +263,112 @@ void describe("given the job is split into shards", () => {
   void describe("when every shard of a split takes its share", () => {
     /** @scenario "Every package lands on exactly one shard" */
     void it("runs each package on exactly one shard", () => {
-      const names = ["a", "b", "c", "d", "e", "f", "g"];
-      const shares = [1, 2, 3].map((index) => shardOf(names, { index, total: 3 }));
-      assert.deepEqual(shares.flat().toSorted(), names);
-      assert.deepEqual(shares[0], ["a", "d", "g"]);
+      const items = ["a", "b", "c", "d", "e", "f", "g"].map((name) => ({ name }));
+      const weightOf = () => 1;
+      const shares = [1, 2, 3].map((index) =>
+        shardOf({ items, weightOf, shard: { index, total: 3 } }),
+      );
+      assert.deepEqual(
+        shares
+          .flat()
+          .map((p) => p.name)
+          .toSorted(),
+        ["a", "b", "c", "d", "e", "f", "g"],
+      );
+    });
+  });
+
+  void describe("when the packages differ in how long they take", () => {
+    const weights = new Map([
+      ["slow", 600],
+      ["mid", 300],
+      ["a", 200],
+      ["b", 200],
+      ["c", 200],
+    ]);
+    const items = ["a", "b", "c", "mid", "slow"].map((name) => ({ name }));
+    const weightOf = (p: { name: string }) => weights.get(p.name) ?? DEFAULT_WEIGHT_SECONDS;
+
+    /** @scenario "Shards are balanced by measured weight" */
+    void it("places the heaviest first, each on the lightest shard", () => {
+      const groups = balanceShards({ items, weightOf, total: 2 }).map((g) => g.map((p) => p.name));
+      assert.deepEqual(groups, [
+        ["c", "slow"],
+        ["a", "b", "mid"],
+      ]);
+    });
+
+    /** @scenario "Every shard computes the same split" */
+    void it("gives the same split whatever order the packages arrive in", () => {
+      const split = (list: typeof items) =>
+        balanceShards({ items: list, weightOf, total: 3 }).map((g) =>
+          g.map((p) => p.name).toSorted(),
+        );
+      assert.deepEqual(split(items), split(items.toReversed()));
+    });
+  });
+
+  void describe("when a package is missing from the weights", () => {
+    /** @scenario "A package with no recorded weight still lands on a shard" */
+    void it("is weighed at the default and assigned like any other", () => {
+      const { weights } = parseWeights("known  100\n", "weights");
+      const weightOf = (p: { name: string }) => weights.get(p.name) ?? DEFAULT_WEIGHT_SECONDS;
+      const items = [{ name: "known" }, { name: "new-a" }, { name: "new-b" }];
+      assert.equal(weightOf(items[1]), DEFAULT_WEIGHT_SECONDS);
+      const placed = balanceShards({ items, weightOf, total: 2 })
+        .flat()
+        .map((p) => p.name)
+        .toSorted();
+      assert.deepEqual(placed, ["known", "new-a", "new-b"]);
+    });
+  });
+
+  void describe("when a pull request narrows the packages", () => {
+    /** @scenario "A pull request balances over only the packages it reaches" */
+    void it("balances over just the packages given, not the whole workspace", () => {
+      const reached = [{ name: "big" }, { name: "small-a" }, { name: "small-b" }];
+      const weightOf = (p: { name: string }) => (p.name === "big" ? 300 : 100);
+      const groups = balanceShards({ items: reached, weightOf, total: 2 });
+      assert.deepEqual(
+        groups.map((g) => g.map((p) => p.name)),
+        [["big"], ["small-a", "small-b"]],
+      );
+    });
+  });
+
+  void describe("given the weights file", () => {
+    /** @scenario "A malformed weights file is refused" */
+    void it("reads a package and its seconds, skipping blanks and comments", () => {
+      const { weights, errors } = parseWeights(
+        "# header\n\n@fix/a  120\n@fix/b 45.5  # note\n",
+        "weights",
+      );
+      assert.deepEqual(errors, []);
+      assert.deepEqual(
+        [...weights],
+        [
+          ["@fix/a", 120],
+          ["@fix/b", 45.5],
+        ],
+      );
+    });
+
+    void it("refuses a missing, zero, non-numeric, infinite or repeated weight", () => {
+      const infinite = `@fix/a  ${"9".repeat(400)}`;
+      for (const bad of ["@fix/a", "@fix/a  0", "@fix/a  slow", infinite, "@fix/a 1\n@fix/a 2"]) {
+        assert.equal(parseWeights(bad, "weights").errors.length, 1, bad);
+      }
+    });
+
+    void it("prints the slow packages of a run in its own format", () => {
+      assert.deepEqual(
+        formatMeasured([
+          { name: "@fix/quick", seconds: 3 },
+          { name: "@fix/slow", seconds: 120.4 },
+          { name: "@fix/slower", seconds: 640 },
+        ]),
+        ["@fix/slower  640", "@fix/slow  120"],
+      );
     });
   });
 

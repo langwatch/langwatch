@@ -25,6 +25,15 @@ describe("licensing server configuration", () => {
     });
   });
 
+  describe("given the Connect off switch exported blank", () => {
+    /** @scenario "A setting written the way the previous release read it keeps that meaning" */
+    it("reads it as unset rather than refusing the boot", () => {
+      expect(read({ LANGWATCH_CONNECT_DISABLED: "" }).connectDisabled).toBeUndefined();
+      expect(read({ LANGWATCH_CONNECT_DISABLED: "TRUE" }).connectDisabled).toBe(true);
+      expect(read({ LANGWATCH_CONNECT_DISABLED: "1" }).connectDisabled).toBe(true);
+    });
+  });
+
   describe("given the connect endpoints", () => {
     describe("given an https endpoint", () => {
       it("accepts it", () => {

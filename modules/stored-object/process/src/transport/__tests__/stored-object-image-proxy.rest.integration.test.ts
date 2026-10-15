@@ -7,7 +7,10 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { createStoredObjectTestApp } from "../../app/__tests__/stored-object.fixture.ts";
-import type { ExternalImageResponse } from "../../channels/external-image.channel.ts";
+import {
+  type ExternalImageResponse,
+  ExternalImageTooLargeError,
+} from "../../channels/external-image.channel.ts";
 import { MemoryExternalImageChannel } from "../../channels/memory/memory.external-image.channel.ts";
 import { storedObjectImageProxyRest } from "../stored-object-image-proxy.rest.ts";
 
@@ -29,6 +32,11 @@ function proxy() {
     "https://pics.test/page": answered({ contentType: "text/html" }),
     "https://pics.test/gone": answered({ ok: false, status: 404, statusText: "Not Found" }),
     "https://pics.test/origin-down": answered({ ok: false, status: 520, statusText: "" }),
+    "https://pics.test/huge.png": answered({
+      bytes: async () => {
+        throw new ExternalImageTooLargeError();
+      },
+    }),
   });
   const app = createStoredObjectTestApp({ images });
   const runtime = createRestRuntime({
@@ -105,6 +113,14 @@ describe("GET /api/image-proxy", () => {
     expect(response.status).toBe(520);
     expect(await response.json()).toEqual({ error: "Failed to fetch image: " });
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
+  /** @scenario "the image proxy refuses a picture over the size limit" */
+  it("answers 413 for a picture over the size limit", async () => {
+    const response = await proxy()(at("https://pics.test/huge.png"));
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ error: "Image is too large" });
   });
 
   /** @scenario "the image proxy answers 500 when the address cannot be reached" */

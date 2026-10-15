@@ -1,6 +1,7 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { datasetClient } from "@langwatch/dataset-client";
 
+import { useDatasetRecordCounts } from "../../behavior/use-dataset-record-counts.ts";
 import {
   DatasetPickerList as DatasetPickerListView,
   type DatasetPickerSelection,
@@ -21,10 +22,16 @@ export function DatasetPickerList({
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id && enabled },
   );
+  const { recordCounts, countsFailed } = useDatasetRecordCounts({
+    projectId: project?.id,
+    datasets: datasetsQuery.data,
+  });
 
   return (
     <DatasetPickerListView
       datasets={datasetsQuery.data}
+      recordCounts={recordCounts}
+      countsFailed={countsFailed}
       isLoading={datasetsQuery.isLoading}
       isError={datasetsQuery.isError}
       onSelect={onSelect}

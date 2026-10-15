@@ -208,6 +208,14 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
     When the member provides a valid bar specification over the query result view
     Then the chart renders from the registered view
 
+  @e2e
+  Scenario: A chart's axis labels draw at the size the chart laid them out
+    Given a categorical result with long category names
+    And a card as narrow as an insight's evidence, under the design system's page styles
+    When the starter specification draws it
+    Then no axis label sits on an axis title
+    And every axis label stays inside the chart
+
   @integration
   Scenario: A time-bucketed multi-series result renders responsively with tooltips
     Given a successful time-bucketed, multi-series LangWatchQL result shape

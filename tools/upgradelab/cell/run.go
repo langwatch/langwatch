@@ -51,6 +51,7 @@ type Options struct {
 	MaxLoad                          float64  // refuse to start above this 1-minute load average
 	TestedBy                         string   // who runs the cell, for the ledger's Tested by (lane:<id> (model) or @handle)
 	Keep, Shots                      bool
+	ProfilingEnabled                 bool      // node CPU profiles, process and Postgres samples, datastore totals under <run>/profile
 	NoAdminEmails                    bool      // boot self-hosted-free without ADMIN_EMAILS
 	Signups                          bool      // two people sign up through head's door once it is ready (P1)
 	Stdout                           io.Writer // where the live origin lines go; nil prints nothing
@@ -205,7 +206,13 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 	if cell.emptyOrigin() {
 		steps = cell.emptySteps()
 	}
+	stopProfiling := func() {}
+	steps = slices.Insert(steps, 2, step{"profile", func(ctx context.Context) error {
+		stopProfiling = cell.startProfiling(ctx)
+		return nil
+	}})
 	cell.runSteps(ctx, steps)
+	stopProfiling()
 	cell.finishTraffic()
 	cell.partialChecks(ctx)
 	cell.noteLoad("end")
@@ -358,6 +365,9 @@ func (cell *run) freshStores(ctx context.Context) error {
 		return fmt.Errorf("private-down gates: %w", err)
 	}
 	if cell.profile.Objects {
+		if err := cell.ensureServiceBinary(ctx, cell.options.ServiceBin); err != nil {
+			return err
+		}
 		if err := cell.startObjectStores(slices.Collect(maps.Keys(shape.PrivateObjectTargets()))); err != nil {
 			return err
 		}
@@ -429,6 +439,9 @@ func (cell *run) envWith(extra map[string]string) []string {
 	}
 	for key, value := range extra {
 		merged[key] = value
+	}
+	if cell.options.ProfilingEnabled {
+		merged["NODE_OPTIONS"] = cell.profileNodeOptions()
 	}
 	return Env(merged)
 }

@@ -79,6 +79,12 @@
     },
     {
       "path": "../../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/internal-slack/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/secrets/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
@@ -87,7 +93,6 @@
       "ignoredDependencies": [
         "@langwatch/auth-contract",
         "@langwatch/process-stores",
-        "@langwatch/secrets",
         "@langwatch/test-harness",
         "@langwatch/vitest-config"
       ]

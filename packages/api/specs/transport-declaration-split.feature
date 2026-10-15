@@ -379,7 +379,7 @@ Feature: Transport declaration split
     Given a route behind the browser door declares a platform-tier permission at the platform (Alex, 2026-10-05, E4)
     When a signed-in caller holding that permission at the platform calls it
     Then the door asks the platform question before the body is read, and the handler runs
-    And a caller acting as another user is asked about the grant of the operator behind them
+    And a caller acting as another user is asked about the grant of the operator behind them, and refused ops:manage without asking (Alex, 2026-10-14)
     And a caller lacking it is refused 403 permission_denied naming the permission, and a caller with no session 401, before the body is read
     And a non-platform permission asked at the platform, or a platform permission asked anywhere else, is refused where it is written
     And a mount whose door cannot identify the caller or answer the platform question is refused, naming the route

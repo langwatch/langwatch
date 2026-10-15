@@ -6,7 +6,7 @@ The server half of [automation](../README.md). Automations: triggers and their f
 
 ## Installation
 
-`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).provideMiddlewareContext(…).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:23`.
+`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).provideMiddlewareContext(…).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1009,7 +1009,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                        | Environment variable                   | Declared at                               |
 | ------ | --------------------------- | -------------------------------------- | ----------------------------------------- |
-| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:428`           |
+| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:433`           |
 | config | `emailHourlyCap`            | `TRIGGER_EMAIL_HOURLY_CAP`             | `../contract/src/automation.config.ts:18` |
 | config | `tenantDailyCap`            | `TRIGGER_EMAIL_TENANT_DAILY_CAP`       | `../contract/src/automation.config.ts:19` |
 | config | `persistDailyCapFree`       | `TRIGGER_PERSIST_DAILY_CAP_FREE`       | `../contract/src/automation.config.ts:20` |

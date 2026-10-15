@@ -45,7 +45,14 @@ function probe(options: { getRestCaller?: () => Promise<LangyRestCaller> } = {})
     },
     awaitTurnSettlement: async () => ({
       kind: "settled",
-      settlement: { succeeded: true, outcome: "completed", text: "Hello!", error: null },
+      settlement: {
+        succeeded: true,
+        outcome: "completed",
+        text: "Hello!",
+        messageId: "message-1",
+        parts: [{ type: "text", text: "Hello!" }],
+        error: null,
+      },
     }),
   });
   const canary = LangyCanaryService.create({ langy });

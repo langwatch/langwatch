@@ -6,7 +6,7 @@
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -142,7 +142,8 @@ describe("RunDetails step tabs", () => {
       expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
       await user.click(screen.getByRole("tab", { name: "Predictors (1)" }));
       expect(screen.getByRole("checkbox", { name: "Raw" })).toBeChecked();
-      expect(screen.getByTestId("raw-json")).toBeInTheDocument();
+      // The LLM Calls panel unmounts on exit, so it can linger a tick on a slow runner.
+      await waitFor(() => expect(screen.getByTestId("raw-json")).toHaveTextContent("generate"));
     });
   });
 

@@ -49,7 +49,7 @@ export const noRawFontSizeRule = defineRule({
     rawFontSize: {
       what: "`{{prop}}` sizes text as `{{value}}`, a raw size off the product type scale.",
       why: "Ad hoc pixel sizes make related text differ by half a pixel from screen to screen.",
-      fix: "Set `textStyle` to a product style (bodySm, label, caption, micro, mono…) as mapped in dev/docs/best_practices/type-scale.md; where an API takes a number, use `TYPE_SCALE_PX` from `@langwatch/design-system/typography`.",
+      fix: "Set `textStyle` to a product style (bodySm, label, caption, micro, mono…) as mapped in dev/docs/best_practices/type-scale.md; where an API takes a number, use `TYPE_SCALE_PX` from `@langwatch/design-system/typography`. See the `design-system` skill.",
     },
   },
   create(context) {
