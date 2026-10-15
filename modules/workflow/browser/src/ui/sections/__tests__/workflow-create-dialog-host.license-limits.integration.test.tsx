@@ -70,10 +70,6 @@ vi.mock("../../../model/workflow-host.ts", async (importOriginal) => ({
   }),
 }));
 
-vi.mock("../../blocks/workflow-emoji-picker.tsx", () => ({
-  WorkflowEmojiPicker: () => null,
-}));
-
 import { WorkflowCreateDialogHost } from "../workflow-create-dialog-host.tsx";
 
 /** A limit refusal the licence handler has already answered with its upgrade modal. */

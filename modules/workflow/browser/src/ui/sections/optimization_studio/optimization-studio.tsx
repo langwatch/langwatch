@@ -83,10 +83,7 @@ import { HoverableBigText } from "../hoverable-big-text.tsx";
 import { WorkflowAutosave } from "../workflow-autosave.tsx";
 import { WorkflowDragPreview } from "../workflow-drag-preview.tsx";
 import { WorkflowEdge } from "../workflow-edge.tsx";
-import {
-  type WorkflowEmojiPickerRenderProps,
-  WorkflowNamePopover,
-} from "../workflow-name-popover.tsx";
+import { WorkflowNamePopover } from "../workflow-name-popover.tsx";
 import {
   WorkflowNodeSelectionPanel,
   WorkflowNodeSelectionPanelButton,
@@ -103,7 +100,6 @@ import { StudioNodeDrawer } from "./drawers/studio-node-drawer.tsx";
 import { Evaluate } from "./evaluate.tsx";
 import { History } from "./history.tsx";
 import { Optimize } from "./optimize.tsx";
-import { EmojiPickerModal } from "./properties/modals/emoji-picker-modal.tsx";
 import { Publish } from "./publish.tsx";
 import { ResultsPanel } from "./results-panel.tsx";
 import { useComponentExecution } from "./use-component-execution.ts";
@@ -661,7 +657,7 @@ function StudioWorkflowUndoRedo() {
 }
 
 function StudioWorkflowNamePopover() {
-  return <WorkflowNamePopover renderEmojiPicker={renderWorkflowEmojiPicker} />;
+  return <WorkflowNamePopover />;
 }
 
 function StudioWorkflowProgressToast() {
@@ -678,10 +674,6 @@ function StudioWorkflowProgressToast() {
 }
 
 const StudioWorkflowNodeSelectionPanelButton = WorkflowNodeSelectionPanelButton;
-
-function renderWorkflowEmojiPicker(props: WorkflowEmojiPickerRenderProps) {
-  return <EmojiPickerModal {...props} />;
-}
 
 function normalizePaletteFields(fields: unknown[] | undefined) {
   return (fields ?? []).flatMap((field) => {

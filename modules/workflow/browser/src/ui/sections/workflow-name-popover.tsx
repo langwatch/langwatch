@@ -1,33 +1,14 @@
+import { EmojiPicker } from "@langwatch/design-system/emoji-picker";
 import { Popover } from "@langwatch/design-system/popover";
-import {
-  Button,
-  Field,
-  HStack,
-  Input,
-  Text,
-  Textarea,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Field, HStack, Input, Text, Textarea, VStack } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import { WorkflowIcon } from "../elements/workflow-icons.tsx";
 
-export type WorkflowEmojiPickerRenderProps = {
-  open: boolean;
-  onClose: () => void;
-  onChange: (emoji: string) => void;
-  transform?: string;
-};
-
-/** Workflow metadata editor. The app supplies its lazy emoji-picker implementation. */
-export function WorkflowNamePopover({
-  renderEmojiPicker,
-}: {
-  renderEmojiPicker: (props: WorkflowEmojiPickerRenderProps) => React.ReactNode;
-}) {
+/** Workflow metadata editor: name, icon and description. */
+export function WorkflowNamePopover() {
   const { name, icon, description, setWorkflow } = useWorkflowStore(
     useShallow((state) => ({
       name: state.name,
@@ -37,7 +18,6 @@ export function WorkflowNamePopover({
     })),
   );
   const [isOpen, setIsOpen] = useState(false);
-  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [localName, setLocalName] = useState(name);
   const [localDescription, setLocalDescription] = useState(description);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -100,23 +80,11 @@ export function WorkflowNamePopover({
                 Name and icon
               </Field.Label>
               <HStack>
-                {renderEmojiPicker({
-                  open: isEmojiPickerOpen,
-                  onClose: () => setIsEmojiPickerOpen(false),
-                  onChange: (emoji) => setWorkflow({ icon: emoji }),
-                  transform: "translateY(48%)",
-                })}
-                <Tooltip content="Change icon" positioning={{ placement: "top" }} openDelay={200}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsEmojiPickerOpen(true)}
-                    textStyle="metric"
-                    flexShrink={0}
-                  >
-                    {icon}
-                  </Button>
-                </Tooltip>
+                <EmojiPicker
+                  size="sm"
+                  value={icon}
+                  onChange={(emoji) => setWorkflow({ icon: emoji })}
+                />
                 <Input
                   ref={nameInputRef}
                   size="sm"
