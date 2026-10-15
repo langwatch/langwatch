@@ -36,26 +36,29 @@ running stack trusts any key but the embedded production one.
 
 ### 2. Rulings
 
-| Question                  | Ruling                                                                                                                                                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Who can get one           | Only a person holding ops permissions on LangWatch Cloud, checked by Cloud on every issue                                                                                                              |
-| How haven is trusted      | The developer signs haven in to Cloud once; the stored personal token can only issue testing licences, and Cloud re-checks their ops permissions on every call                                         |
-| When does an instance ask | Only when a developer asks for a gated feature (a haven flag or command), never on every boot                                                                                                          |
-| How long it lasts         | Picked when asked; default 5 days, at most 30; haven renews it before expiry while signed in                                                                                                           |
-| What it covers            | One local organization on one instance; Enterprise features; 10 full and 10 Lite seats; no hosted services, commit or overage                                                                          |
-| CI                        | A service token: created in the ops console by someone holding ops permissions, named, expiring (default 90 days, at most a year), revocable by any ops manager, independent of the person who made it |
-| New operations            | `LicensingApi.issueTestingLicense`; creating, listing and revoking service tokens through `EnterpriseOpsApi` (the ops door and audit)                                                                  |
-| Which builds accept it    | Source and release builds alike, verifying the same way                                                                                                                                                |
+| Question                  | Ruling                                                                                                                                                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Who can get one           | Only a person holding ops permissions on LangWatch Cloud, checked by Cloud on every issue                                                                                                                                       |
+| How haven is trusted      | The developer signs haven in to Cloud once; the stored personal token can only issue testing licences, and Cloud re-checks their ops permissions on every call                                                                  |
+| When does an instance ask | Only when a developer asks for a gated feature (a haven flag or command), never on every boot                                                                                                                                   |
+| How long it lasts         | Picked when asked; default 5 days, at most 30; haven renews it before expiry while signed in                                                                                                                                    |
+| What it covers            | One local organization on one instance; Enterprise features; 10 full and 10 Lite seats; no hosted services, commit or overage                                                                                                   |
+| CI                        | A service account: a user on Cloud that cannot sign in, holding the ops role, created with its token in the ops console (expiring: default 90 days, at most a year). Removing its role or the account ends every token it holds |
+| New operations            | `LicensingApi.issueTestingLicense`; creating, listing and revoking service tokens through `EnterpriseOpsApi` (the ops door and audit)                                                                                           |
+| Which builds accept it    | Source and release builds alike, verifying the same way                                                                                                                                                                         |
 
 Everything else reuses existing operations: sync, reissue and revoke, and the list and detail
 reads.
 
-Both tokens are one credential kind, a testing-licence token, that reaches only
-`issueTestingLicense`; no token carries `ops:manage`, so a leaked one can do nothing else. A
-personal token is minted through the existing CLI browser sign-in (`/api/auth/cli`), which then
-requires ops permissions, and counts as its person: Cloud asks their platform permission on every
-call. A service token stands alone: Cloud asks only that it is unexpired and unrevoked. The
-registry names the person or the service token as the issuer of every licence.
+Every token is a testing-licence token that reaches only `issueTestingLicense`; no token carries
+`ops:manage`, so a leaked one can do nothing else. A token always belongs to a user, and on every
+call Cloud asks that user's ops permission at platform scope: one rule, no service exception
+(Alex, 2026-10-15). A person's token is minted through the existing CLI browser sign-in
+(`/api/auth/cli`), which shows the device's name and requires ops permissions. A service account is
+a user who cannot sign in, holding the ops role, so its token is the same kind of token. A person
+revokes their own token (`haven logout` does so on Cloud), and an ops manager can revoke any. The
+registry names the user, person or service account, as the issuer of every licence; ops screens
+show names, not ids.
 
 ### 3. How a testing licence is marked and bound
 

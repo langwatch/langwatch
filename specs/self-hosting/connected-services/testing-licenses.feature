@@ -123,9 +123,15 @@ Feature: Developer testing licenses
 
   @unit
   Scenario: A service token outlives the person who made it
-    Given a service token made by someone whose ops permissions were later removed
+    Given a service account and token made by someone whose ops permissions were later removed
     When the token asks for a testing license
-    Then it is issued, because the token stands on its own until it expires or is revoked
+    Then it is issued, because the service account still holds the ops role
+
+  @unit
+  Scenario: Removing a service account's ops role ends its tokens
+    Given a service account whose token issued testing licenses before
+    When its ops role is removed
+    Then its token is refused on the next ask
 
   @unit
   Scenario: Ops managers see every service token and when it was last used
@@ -181,6 +187,13 @@ Feature: Developer testing licenses
     When they ask for the stack's instance id
     Then the same id is answered every time
     And someone who may only view the organization is refused
+
+  @unit
+  Scenario: Signing haven out revokes its token on Cloud
+    Given a signed-in haven
+    When the developer signs haven out
+    Then the token is revoked on Cloud and forgotten locally
+    And a later ask with that token is refused
 
   # ============================================================================
   # haven
