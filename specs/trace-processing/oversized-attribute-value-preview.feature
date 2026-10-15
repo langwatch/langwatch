@@ -22,12 +22,6 @@ Feature: Oversized span attribute values keep a readable preview
   # default and about 4 MB for a full 1M-token context, so both sit under the
   # record cap. The 10 MiB OTLP request body limit stays the outer bound.
   #
-  # Measured on the dev box (Node 24, ClickHouse 26.9, synthetic spans):
-  # record + event_log insert 0.75 MB ~80 ms, 4 MB ~115 ms, 8 MB ~125-255 ms;
-  # full read back 0.75 MB ~20 ms, 4 MB ~55-85 ms, 8 MB ~100-160 ms; projection
-  # lean of a 4 MB message history ~7 ms; a re-fold loading 20 spans of 4 MB
-  # from event_log ~1.9 s and ~90 MB of RSS.
-  #
   # A cut is never silent: the placeholder replaces the value, and the span
   # lists every cut attribute with its original size under
   # langwatch.truncated_attributes, which the span detail shows as a notice.
@@ -127,6 +121,13 @@ Feature: Oversized span attribute values keep a readable preview
       When the span is ingested
       Then the value is replaced by the byte-count placeholder
       And langwatch.truncated_attributes names the attribute and its original size
+
+    @unit
+    Scenario: A client cannot send its own truncation marker
+      Given a span sent with its own langwatch.truncated_attributes attribute
+      When the span is ingested
+      Then the sent marker is dropped
+      And langwatch.truncated_attributes names only the values the record cap cut
 
     @unit
     Scenario: A value cut in the projection names itself on the span

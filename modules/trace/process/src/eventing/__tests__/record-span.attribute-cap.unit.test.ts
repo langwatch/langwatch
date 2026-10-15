@@ -119,4 +119,31 @@ describe("EventingRecordSpanAdapter attribute cap", () => {
       expect(attributes.has(TRUNCATED_ATTRIBUTES_KEY)).toBe(true);
     });
   });
+
+  describe("given a span that arrives with its own truncation marker", () => {
+    const forged = JSON.stringify([{ key: "gen_ai.input.messages", bytes: 999 }]);
+
+    /** @scenario "A client cannot send its own truncation marker" */
+    it("drops the marker when nothing was cut", async () => {
+      const span = spanWithInput(1024);
+      span.attributes.push({ key: TRUNCATED_ATTRIBUTES_KEY, value: { stringValue: forged } });
+
+      const attributes = await recordedAttributes(commandFor(span));
+
+      expect(attributes.has(TRUNCATED_ATTRIBUTES_KEY)).toBe(false);
+    });
+
+    /** @scenario "A client cannot send its own truncation marker" */
+    it("names only what the cap cut", async () => {
+      const overCap = MAX_RECORDED_ATTRIBUTE_VALUE_BYTES + 1024;
+      const span = spanWithInput(overCap);
+      span.attributes.push({ key: TRUNCATED_ATTRIBUTES_KEY, value: { stringValue: forged } });
+
+      const attributes = await recordedAttributes(commandFor(span));
+
+      expect(JSON.parse(attributes.get(TRUNCATED_ATTRIBUTES_KEY) ?? "[]")).toEqual([
+        { key: "gen_ai.input.messages", bytes: overCap },
+      ]);
+    });
+  });
 });

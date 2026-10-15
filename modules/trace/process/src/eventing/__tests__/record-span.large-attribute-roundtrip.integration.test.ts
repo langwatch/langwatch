@@ -167,11 +167,11 @@ async function fullRead(span: NormalizedSpan): Promise<NormalizedSpan> {
   return resolvedSpans[0]!;
 }
 
-beforeAll(async () => {
-  ch = await startMigratedTraceClickHouse();
-});
-
 describe.skipIf(!clickHouseConfigured)("a large Anthropic content span round trip", () => {
+  beforeAll(async () => {
+    ch = await startMigratedTraceClickHouse();
+  });
+
   describe("given a default Anthropic span with 0.75 MB of input messages", () => {
     /** @scenario "A default Anthropic content span is recorded whole" */
     it("keeps a bounded preview in the projection and reads the full input back from event_log", async () => {

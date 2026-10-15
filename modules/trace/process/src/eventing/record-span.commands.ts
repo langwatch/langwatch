@@ -23,6 +23,7 @@ import {
   type RecordSpanCommandData,
   type SpanReceivedEvent,
   type PIIRedactionLevel,
+  TRUNCATED_ATTRIBUTES_KEY,
 } from "@langwatch/trace-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
@@ -326,9 +327,9 @@ export class EventingRecordSpanAdapter implements CommandHandler<
   private stripReservedAttributes(span: OtlpSpan, resource: OtlpResource | null): void {
     const strip = (attributes: OtlpSpan["attributes"]): OtlpSpan["attributes"] =>
       attributes.filter((attribute) => {
-        const reserved = attribute.key.startsWith(
-          EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PREFIX,
-        );
+        const reserved =
+          attribute.key.startsWith(EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PREFIX) ||
+          attribute.key === TRUNCATED_ATTRIBUTES_KEY;
         const allowed = EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PASSTHROUGH.has(attribute.key);
         if (!reserved || allowed) {
           return true;
@@ -336,7 +337,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
 
         this.logger.warn(
           { attributeKey: attribute.key },
-          "Stripped user-submitted langwatch.reserved.* attribute",
+          "Stripped a user-submitted reserved attribute",
         );
         return false;
       });

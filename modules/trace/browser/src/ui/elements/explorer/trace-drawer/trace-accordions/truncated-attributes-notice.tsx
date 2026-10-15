@@ -29,7 +29,7 @@ export function TruncatedAttributesNotice({
             their place:{" "}
           </Text>
           {attributes.map((attribute, index) => (
-            <Text as="span" key={`${attribute.on ?? "span"}:${attribute.key}`}>
+            <Text as="span" key={`${index}:${attribute.on ?? "span"}:${attribute.key}`}>
               {index > 0 && ", "}
               <Code size="sm">{attribute.key}</Code> ({formatBytes(attribute.bytes)}
               {attribute.on ? ` ${SURFACE_LABELS[attribute.on]}` : ""})
