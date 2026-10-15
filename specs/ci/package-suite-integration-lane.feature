@@ -65,6 +65,30 @@ Feature: A package's integration suite runs in CI when it declares one
       Then each package is run by exactly one shard
 
     @unit
+    Scenario: Shards are balanced by measured weight
+      Given a weights file recording how many seconds each slow package takes
+      When the packages are split over the shards
+      Then the heaviest packages are placed first, each on the shard with the least weight so far
+
+    @unit
+    Scenario: Every shard computes the same split
+      Given the same packages and the same weights file
+      When two shards each compute the split in their own process
+      Then they agree on which shard runs every package
+
+    @unit
+    Scenario: A package with no recorded weight still lands on a shard
+      Given a package the weights file does not name
+      When the packages are split over the shards
+      Then it is weighed at the default and run by exactly one shard
+
+    @unit
+    Scenario: A malformed weights file is refused
+      Given a weights line that is not "<package>  <seconds>" with a positive number
+      When the package suites job starts
+      Then it fails instead of splitting by guesswork
+
+    @unit
     Scenario: A malformed shard value is refused
       Given PACKAGE_SUITES_SHARD is not "<index>/<total>"
       When the package suites job starts
@@ -77,6 +101,12 @@ Feature: A package's integration suite runs in CI when it declares one
       Given the affected job lists the projects a pull request reaches
       When the package suites job runs
       Then only the packages in that list are sharded and run
+
+    @unit
+    Scenario: A pull request balances over only the packages it reaches
+      Given the affected job lists a few projects
+      When those packages are split over the shards
+      Then the weights of the unaffected packages play no part in the split
 
     @unit
     Scenario: Without an affected list every suite runs

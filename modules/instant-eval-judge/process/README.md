@@ -91,11 +91,12 @@ Declared at `src/eventing/instant-eval-judge-spend.pipeline.ts:41`. Events: `ins
 
 | Kind   | Leaf                    | Environment variable                    | Declared at                                       |
 | ------ | ----------------------- | --------------------------------------- | ------------------------------------------------- |
-| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:61`            |
+| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:62`            |
 | config | `classifierBaseUrl`     | `JEV_BASE_URL`                          | `../contract/src/instant-eval-judge.config.ts:10` |
 | config | `classifierModel`       | `JEV_MODEL`                             | `../contract/src/instant-eval-judge.config.ts:18` |
 | config | `globalTokensPerSecond` | `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:20` |
 | config | `tenantTokensPerSecond` | `INSTANT_EVAL_TENANT_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:25` |
 | config | `isSaas`                | `IS_SAAS`                               | `../contract/src/instant-eval-judge.config.ts:30` |
+| config | `nodeEnvironment`       | `NODE_ENV`                              | `../contract/src/instant-eval-judge.config.ts:32` |
 
 <!-- readme:generated:end -->

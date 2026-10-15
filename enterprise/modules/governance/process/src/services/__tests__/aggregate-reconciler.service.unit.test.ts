@@ -70,7 +70,6 @@ function setup({
   const projects = {
     findAggregate: vi.fn<ProjectApi["findAggregate"]>(async () => (aggregate ? [aggregate] : [])),
     findLiveAggregateIds: vi.fn<ProjectApi["findLiveAggregateIds"]>(async () => liveAggregateIds),
-    findAllLiveAggregates: vi.fn<ProjectApi["findAllLiveAggregates"]>(async () => []),
     findPersonalProjectIds: vi.fn<ProjectApi["findPersonalProjectIds"]>(async () => desired),
     findReadableProjectIds: vi.fn<ProjectApi["findReadableProjectIds"]>(async () => desired),
   };

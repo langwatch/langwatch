@@ -20,11 +20,13 @@ function passFor({
   judgesThroughConnect,
   isLicensed,
   isOptedIn,
+  hosted = false,
 }: {
   flag: boolean;
   judgesThroughConnect: boolean;
   isLicensed: boolean;
   isOptedIn: boolean;
+  hosted?: boolean;
 }) {
   const asked: LangWatchQLPassInput[] = [];
   const access = InstantEvalAccessService.create({
@@ -33,6 +35,7 @@ function passFor({
     judgesThroughConnect,
     optIns: { isOptedIn: () => Promise.resolve(isOptedIn) },
     isJudgeConfigured: () => true,
+    hostedPlans: hosted ? { isEnterprisePlan: () => Promise.resolve(false) } : null,
     ...(judgesThroughConnect
       ? { judge: { isAvailableForOrganization: () => Promise.resolve(isLicensed) } }
       : {}),
@@ -97,6 +100,7 @@ describe("given a run reading a statement that calls an eval function", () => {
         judgesThroughConnect: false,
         isLicensed: false,
         isOptedIn: true,
+        hosted: true,
       });
 
       await expect(read()).resolves.toEqual([true]);

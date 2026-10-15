@@ -29,12 +29,12 @@ const advance = (ms: number) =>
     await vi.advanceTimersByTimeAsync(ms);
   });
 
-function renderAutoRefresh() {
+function renderAutoRefresh({ live = false }: { live?: boolean } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
-  const rendered = renderHook(() => useDashboardAutoRefresh(), { wrapper });
+  const rendered = renderHook(() => useDashboardAutoRefresh({ live }), { wrapper });
   return { ...rendered, client };
 }
 
@@ -53,11 +53,32 @@ afterEach(() => {
   clearReaderUiStorage();
 });
 
-describe("given auto-refresh is left on its default of every minute", () => {
+/** A member who picked every minute, on a fresh mount. */
+function renderEveryMinute() {
+  const picked = renderAutoRefresh();
+  act(() => picked.result.current.setOption("1m"));
+  picked.unmount();
+  return renderAutoRefresh();
+}
+
+describe("given a member who never picked an interval", () => {
+  /** @scenario "Auto-refresh is off until the member picks an interval" */
+  it("reads once and schedules no refresh", async () => {
+    act(() => clearReaderUiStorage());
+    const { result } = renderAutoRefresh();
+
+    expect(result.current.option).toBe("off");
+    expect(result.current.refetchInterval).toBe(false);
+    await advance(MINUTE * 5);
+    expect(result.current.refreshedAt).toBeUndefined();
+  });
+});
+
+describe("given auto-refresh is set to every minute", () => {
   describe("when a minute passes", () => {
     /** @scenario "Every chart on the dashboard refreshes on a schedule" */
     it("polls on that interval and moves refreshedAt on each poll after the first", async () => {
-      const { result, client } = renderAutoRefresh();
+      const { result, client } = renderEveryMinute();
       expect(result.current.option).toBe("1m");
       expect(result.current.refetchInterval).toBe(MINUTE);
       await waitFor(() => {
@@ -79,7 +100,7 @@ describe("given auto-refresh is set to every minute and the tab is hidden for se
   describe("when the tab becomes visible again", () => {
     /** @scenario "Auto-refresh pauses while the tab is hidden and catches up on return" */
     it("runs no refresh while hidden and refreshes immediately on return", async () => {
-      const { result, client } = renderAutoRefresh();
+      const { result, client } = renderEveryMinute();
       await waitFor(() => {
         expect(client.getQueryData(["analytics", "dashboard-refresh-clock"])).toBe(0);
       });
@@ -116,8 +137,24 @@ describe("given the member changes the interval", () => {
     });
   });
 
+  describe("when the board is Live", () => {
+    /** @scenario "AC19c Live is the last hour, rolling, refreshed every minute" */
+    it("polls every minute without changing the member's own choice", () => {
+      const first = renderAutoRefresh();
+      act(() => first.result.current.setOption("off"));
+      first.unmount();
+
+      const live = renderAutoRefresh({ live: true });
+      expect(live.result.current.option).toBe("1m");
+      expect(live.result.current.refetchInterval).toBe(MINUTE);
+      live.unmount();
+
+      expect(renderAutoRefresh().result.current.option).toBe("off");
+    });
+  });
+
   describe("when the member signs out", () => {
-    it("forgets the choice and falls back to every minute", () => {
+    it("forgets the choice and falls back to off", () => {
       const first = renderAutoRefresh();
       act(() => first.result.current.setOption("5m"));
       first.unmount();
@@ -125,7 +162,7 @@ describe("given the member changes the interval", () => {
       act(() => clearReaderUiStorage());
 
       const second = renderAutoRefresh();
-      expect(second.result.current.option).toBe("1m");
+      expect(second.result.current.option).toBe("off");
     });
   });
 });

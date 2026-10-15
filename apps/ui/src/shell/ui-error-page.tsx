@@ -4,6 +4,8 @@
  */
 
 import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
+import { isChunkLoadFailure, signalUiMounted } from "@langwatch/browser-host/navigation";
+import { UiChunkLoadFailure } from "@langwatch/browser/page-fallbacks";
 import {
   Box,
   Button,
@@ -27,11 +29,21 @@ type UiErrorProps = { error: unknown; isDevelopment: boolean };
 
 /** The whole viewport: the error card centred on the page ground. */
 export function UiErrorPage(props: UiErrorProps) {
+  // The app answered: the boot recovery must not reload over its message.
+  useEffect(signalUiMounted, []);
   return (
     <Center minHeight="100vh" padding={8} backgroundColor="bg.canvas">
-      <UiErrorCard {...props} />
+      <UiFailure {...props} />
     </Center>
   );
+}
+
+/**
+ * Code that did not arrive says so and offers a retry; any other throw gets the error card.
+ * Spec: specs/navigation/chunk-load-retry.feature
+ */
+function UiFailure(props: UiErrorProps) {
+  return isChunkLoadFailure(props.error) ? <UiChunkLoadFailure /> : <UiErrorCard {...props} />;
 }
 
 /**
@@ -51,7 +63,7 @@ export function UiScreenErrorBoundary({
       resetKeys={[pathname]}
       fallbackRender={({ error }) => (
         <Center minHeight="60vh" padding={8}>
-          <UiErrorCard error={error} isDevelopment={isDevelopment} />
+          <UiFailure error={error} isDevelopment={isDevelopment} />
         </Center>
       )}
     >

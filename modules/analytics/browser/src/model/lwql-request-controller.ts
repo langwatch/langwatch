@@ -5,6 +5,7 @@
  */
 
 import type {
+  LangWatchQLAcceptedGranularityStep,
   LangWatchQLQueryResult,
   LangWatchQLGranularityStep,
 } from "@langwatch/analytics-contract";
@@ -35,7 +36,9 @@ export interface LangWatchQLExecuteRequest {
    * window: the backend refuses it as a named parameter, since a chart pinning its own step
    * would ignore the one the surface chose.
    */
-  readonly granularitySeconds?: LangWatchQLGranularityStep;
+  readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+  /** Trace origins the surface leaves out of every view the statement reads, as a board does. */
+  readonly excludeOrigins?: readonly string[];
 }
 
 /** How a submission reaches the server. */

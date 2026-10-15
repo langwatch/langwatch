@@ -231,8 +231,9 @@ branded page while an upgrade blocks, so the operator signals below are the only
    `mutations_sync` is 0, because migration 00103 runs a `MATERIALIZE INDEX` mutation.
 6. On the OLD image's Deployment, for the window, set the old image's own skip switches
    (`SKIP_PRISMA_MIGRATE`, `SKIP_CLICKHOUSE_MIGRATE`, `SKIP_LWQL_PROVISION`) so restarting old
-   pods do not race the upgrade. These are switches of the old image only; the new image does
-   not read them.
+   pods do not race the upgrade. The new image ignores the first two, but its tasks job still
+   reads `SKIP_LWQL_PROVISION` and would skip LangWatchQL provisioning, so set the switches on
+   the old Deployment alone and keep them off the new image's job and worker.
 7. Confirm `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` on the old line, so jobs the old api
    enqueues are readable by new workers.
 8. Cut over at low traffic with no long transactions open. Keep

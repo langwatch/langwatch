@@ -27,11 +27,13 @@ export const datasetTrpcTransport: TrpcRouterDeclaration<DatasetApi, typeof data
 
     .procedure("getAll")
     .withPermission("datasets:view")
-    .handle(async ({ app, input }) => {
-      const result = await app.listDatasets({ projectId: input.projectId, page: 1, limit: 200 });
+    .handle(({ app, input }) =>
+      app.findDatasetSummaries({ projectId: input.projectId, page: 1, limit: 200 }),
+    )
 
-      return result.data;
-    })
+    .procedure("recordCounts")
+    .withPermission("datasets:view")
+    .handle(({ app, input }) => app.countRecords(input))
 
     .procedure("getById")
     .withPermission("datasets:view")

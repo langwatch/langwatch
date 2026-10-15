@@ -24,7 +24,7 @@ async function mounted(bases: Partial<Record<"google" | "github", string>>): Pro
 }
 
 async function link(provider: Provider | undefined): Promise<URL> {
-  return await provider!.createAuthorizationURL({
+  return provider!.createAuthorizationURL({
     state: "s",
     codeVerifier: "v".repeat(43),
     redirectURI: "http://app.test/api/auth/callback/x",

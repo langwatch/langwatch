@@ -1,0 +1,19 @@
+{
+  "name": "langwatch-platform-app-compat",
+  "version": "0.0.0",
+  "private": true,
+  "description": "DEPRECATED. Forwards the pre-restructure commands run from /app/platform/app to /app/apps/*. Kept for two releases after the one that introduces it.",
+  "scripts": {
+    "start": "/app/start.sh",
+    "start:app": "/app/start.sh",
+    "start:workers": "cd /app/apps/worker && exec pnpm --silent run start",
+    "start:prepare:db": "cd /app/apps/tasks && exec pnpm --silent task upgrade",
+    "prisma:migrate": "node task.mjs clickhouseMigrate",
+    "clickhouse:migrate": "node task.mjs clickhouseMigrate",
+    "lwql:provision": "node task.mjs provisionLwql",
+    "task": "node task.mjs",
+    "task:backfill-datasets-s3": "node task.mjs backfillDatasetContentToS3",
+    "task:migrate-object-storage": "NODE_OPTIONS=--max-old-space-size=4096 node task.mjs migrateObjectStorage"
+  },
+  "//": "Old compose files and Helm charts run `cd /app/platform/app && pnpm run <script>`; these scripts keep them working. Remove this folder two releases after it first ships."
+}

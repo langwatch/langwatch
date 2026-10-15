@@ -55,7 +55,7 @@ function makeService({
   const dispatcher = LangyUiActionService.create({
     uiActions: RedisLangyUiActionRepository.create({ redis }),
     conversations: {
-      getById: async () => ({ currentTurnId: IDS.turnId }),
+      getById: async () => ({ currentTurnId: IDS.turnId, origin: "interactive" as const }),
     },
     buffer: {
       appendUiAction: async ({ actionId }) => {

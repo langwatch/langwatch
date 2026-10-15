@@ -3,6 +3,7 @@ import type { AdminOperationInput } from "@langwatch/ops-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { noOperators } from "../../services/__tests__/support/admin-doubles.ts";
 import { TestUserApi } from "../../services/__tests__/support/test-user-api.ts";
 import { AdminAuditSink } from "../../services/impersonation.service.ts";
 import { InstanceAdminService } from "../../services/instance-admin.service.ts";
@@ -46,6 +47,7 @@ function input(email: string): AdminOperationInput {
 
 function serviceWith(changeUserEmail: AuthApi["changeUserEmail"]) {
   return InstanceAdminService.create({
+    operators: noOperators,
     accounts: {
       deactivateUser: () => Promise.reject(new Error("unreached")),
       changeUserEmail,
