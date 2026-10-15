@@ -36,6 +36,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import {
   AlertTriangle,
+  ArrowRight,
   CheckCircle,
   ChevronDown,
   ChevronUp,
@@ -465,7 +466,8 @@ function RowTrailing({
           onClick={onOpen}
         >
           <CheckCircle size={14} />
-          <Text>Ready</Text>
+          <Text>Ready · Open</Text>
+          <ArrowRight size={14} />
         </HStack>
       );
     case "failed":
