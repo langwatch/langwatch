@@ -190,10 +190,13 @@ export function narrowAuthorization({
   });
 }
 
-/** The projects a proof reads traces in: its `traces:view` grants, cut to `narrowedTo` when set. */
-export function projectIdsReadBy(authorization: Authorization): string[] {
+/** The projects a proof reads in: its grants under `permission`, cut to `narrowedTo` when set. */
+export function projectIdsReadBy(
+  authorization: Authorization,
+  permission: ProofBearingPermission = "traces:view",
+): string[] {
   const projects = authorization.grants
-    .filter((grant) => grant.permissions.includes("traces:view"))
+    .filter((grant) => grant.permissions.includes(permission))
     .flatMap((grant) => grant.projectId ?? []);
   const { narrowedTo } = authorization;
   const read = narrowedTo === undefined ? projects : projects.filter((id) => id === narrowedTo);
@@ -210,12 +213,15 @@ export function ownProjectIdReadBy(authorization: Authorization): string {
   return own;
 }
 
-/** A stable key for the projects and windows a proof reads traces in; an aggregate and a
- *  member never share one. */
-export function readScopeKeyOf(authorization: Authorization): string {
+/** A stable key for the projects and windows a proof reads in under `permission`; an aggregate
+ *  and a member never share one. */
+export function readScopeKeyOf(
+  authorization: Authorization,
+  permission: ProofBearingPermission = "traces:view",
+): string {
   const { narrowedTo } = authorization;
   return authorization.grants
-    .filter((grant) => grant.permissions.includes("traces:view"))
+    .filter((grant) => grant.permissions.includes(permission))
     .filter((grant) => narrowedTo === undefined || grant.projectId === narrowedTo)
     .flatMap(({ kind, projectId, condition }) => {
       if (projectId === undefined) return [];
@@ -283,11 +289,14 @@ export function usableAuthorization({
 }
 
 /**
- * The permissions a route's permission check mints a proof for: only the
- * trace read's. Every read that applies a proof is checked under it, and
- * minting for any other would cost an engine pass nothing consumes.
+ * The permissions a route's permission check mints a proof for: the trace read's and the
+ * analytics read's, the two a shared grant's window applies to. Minting for any other would
+ * cost an engine pass nothing consumes.
  */
-const PROOF_BEARING = ["traces:view"] as const satisfies readonly AuthzPermission[];
+const PROOF_BEARING = [
+  "traces:view",
+  "analytics:view",
+] as const satisfies readonly AuthzPermission[];
 /** A permission whose route check hands the handler its proof, typed so a door can say so. */
 export type ProofBearingPermission = (typeof PROOF_BEARING)[number];
 export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set<AuthzPermission>(

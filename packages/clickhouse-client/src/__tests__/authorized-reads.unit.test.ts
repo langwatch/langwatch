@@ -359,6 +359,25 @@ describe("AuthorizedClickHouse", () => {
       });
     });
 
+    describe("when the marker names the analytics rollups' minute bucket", () => {
+      /** @scenario "A rollup bucket a grant's edge cuts through is left out" */
+      it("admits a bucket from the grant's start and only once it ends by the grant's end", () => {
+        const { query } = expand(
+          `SELECT 1 FROM trace_analytics_rollup WHERE ${tenantScope("BucketStart")}`,
+        );
+        const until =
+          "transform(TenantId, {tenantScope_ids:Array(String)}, {tenantScope_until:Array(Int64)}, toInt64(0))";
+        expect(query).toContain(
+          "BucketStart >= fromUnixTimestamp64Milli(transform(TenantId, {tenantScope_ids:Array(String)}, {tenantScope_from:Array(Int64)}, toInt64(0)))",
+        );
+        // An open grant still reads as `until = 0`; a closed one keeps a bucket that ends by it.
+        expect(query).toContain(
+          `(${until} = 0 OR BucketStart <= fromUnixTimestamp64Milli(${until} - 60000))`,
+        );
+        expect(query).not.toContain("BucketStart < fromUnixTimestamp64Milli");
+      });
+    });
+
     describe("when the marker names a column the window cannot be applied to", () => {
       it("refuses it", () => {
         expect(() => expand("SELECT 1 FROM t WHERE {{tenantScope:TraceId}}")).toThrow(

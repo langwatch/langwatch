@@ -8,6 +8,7 @@ import type { AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
 import type { AnalyticsTimeseriesQuery } from "../../analytics.repository.ts";
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
@@ -29,13 +30,14 @@ function makeQuery(overrides: Partial<AnalyticsTimeseriesInput> = {}): Analytics
   const endDate = Temporal.Instant.from("2026-07-16T00:00:00.000Z");
   return {
     table: "trace_summaries",
-    tenantId: "project-1",
+    authorization: analyticsProof({ projectId: "project-1" }),
     startDate,
     endDate,
     previousPeriodStartDate: startDate,
     adjustedTimeScale: 1440,
     maxResultRows: undefined,
     input: {
+      projectId: "project-1",
       filters: { "metadata.labels": ["prod"] },
       series: [
         {
@@ -54,6 +56,7 @@ function makeQuery(overrides: Partial<AnalyticsTimeseriesInput> = {}): Analytics
 describe("ClickHouseAnalyticsRepository", () => {
   const repository = ClickHouseAnalyticsRepository.create({
     resolveClient: async () => fakeClient as any,
+    clickhouse: fakeClient as any,
   });
 
   beforeEach(() => {
@@ -104,6 +107,24 @@ describe("ClickHouseAnalyticsRepository", () => {
           timeZone: "UTC",
         }),
       );
+    });
+  });
+
+  describe("when the proof was minted for another project", () => {
+    /** @scenario "A series asked under another project's proof is refused" */
+    it("refuses the read before building or sending anything", async () => {
+      fakeClient.query.mockClear();
+
+      const refused = repository
+        .runTimeseries({
+          ...makeQuery(),
+          authorization: analyticsProof({ projectId: "project-2" }),
+        })
+        .catch((error: unknown) => error);
+
+      await expect(refused).resolves.toMatchObject({ code: "analytics_proof_project_mismatch" });
+      expect(buildTimeseriesQueryMock).not.toHaveBeenCalled();
+      expect(fakeClient.query).not.toHaveBeenCalled();
     });
   });
 });

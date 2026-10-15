@@ -142,11 +142,39 @@ Feature: Analytics timeseries service
       Then only the trace analytics rollup is read
 
     @unit
+    Scenario: An aggregate's series is not compared with the legacy tables
+      Given the analytics read tripwire flag is on for an aggregate project
+      And the series is read under a proof that opens a member project
+      When the Analytics service executes it
+      Then only the routed table is read
+
+    @unit
     Scenario: A routed result that diverges from the legacy result is logged
       Given the routed and legacy results disagree beyond the tolerance on one metric
       When the tripwire compares them
       Then a warning names the project, the table and the diverging metric
       And no warning is logged when the two agree
+
+  Rule: Read every series under a proof (ADR-177)
+
+    @unit
+    Scenario: A series asked without a proof reads its own project alone
+      Given a caller with no proof, such as a scheduled report, asks for a project's series
+      When the Analytics service executes it
+      Then the series is read under a proof the platform mints for that project alone
+
+    @unit
+    Scenario: Callers with different grants on one aggregate do not share a cached series
+      Given two callers ask for the same series on one aggregate project
+      And one caller's proof opens a member project the other's does not
+      When the Analytics service executes both
+      Then each caller's series is read under its own proof
+
+    @unit
+    Scenario: A series asked under another project's proof is refused
+      Given a proof minted for one project
+      When a series for a different project is read under it
+      Then nothing is read and the read is refused
 
   Rule: Keep feature ownership narrow
 

@@ -11,7 +11,7 @@ export const analyticsTrpcTransport: TrpcRouterDeclaration<AnalyticsApi, typeof 
   defineTrpcRouter(AnalyticsApi, analyticsTrpc)
     .procedure("getTimeseries")
     .withPermission("analytics:view")
-    .handle(({ app, input }) => app.getTimeseries(input))
+    .handle(({ app, input, authorization }) => app.getTimeseries(input, { authorization }))
 
     .procedure("dataForFilter")
     .withPermission("analytics:view")

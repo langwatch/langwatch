@@ -248,7 +248,7 @@ resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatc
 
 |             |                                             |
 | ----------- | ------------------------------------------- |
-| Declared at | `src/transport/analytics-legacy.rest.ts:43` |
+| Declared at | `src/transport/analytics-legacy.rest.ts:47` |
 | Base URL    | none: each route's path is its address      |
 | Addressing  | literal                                     |
 | Credential  | project                                     |
@@ -257,12 +257,12 @@ resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatc
 
 Query analytics timeseries (legacy path)
 
-Permission `analytics:view`. Declared at `src/transport/analytics-legacy.rest.ts:48`.
+Permission `analytics:view`. Declared at `src/transport/analytics-legacy.rest.ts:52`.
 
 Answers at `/api/analytics`, `/api/v1/analytics`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/analytics-legacy.rest.ts:52)
+// Rawbody: "text" (inline, src/transport/analytics-legacy.rest.ts:55)
 ```
 
 ### `analyticsRest`
@@ -328,7 +328,7 @@ type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.i
 
 Discover the queryable LangWatchQL schema
 
-Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:144`.
+Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:143`.
 
 Answers at `/api/v1/query/schema`.
 
@@ -340,7 +340,7 @@ type Response = z.infer<typeof lwqlSchemaSchema>; // ../contract/src/analytics.i
 
 Discover both query languages
 
-Authenticated: Any credential for the project may read the reference: half of what it describes is the traces family's own filter vocabulary, so a key without analytics:view is answered with the LangWatchQL half withheld rather than refused. Declared at `src/transport/query.rest.ts:168`.
+Authenticated: Any credential for the project may read the reference: half of what it describes is the traces family's own filter vocabulary, so a key without analytics:view is answered with the LangWatchQL half withheld rather than refused. Declared at `src/transport/query.rest.ts:167`.
 
 Answers at `/api/v1/query/reference`.
 
@@ -422,7 +422,7 @@ Contract `../contract/src/analytics.trpc.ts:56`, router `src/transport/analytics
 ```typescript
 // analytics.getTimeseries
 type Input = z.infer<typeof timeseriesInputSchema>; // ../contract/src/analytics.input-schemas.ts:134
-// Output: analyticsTimeseriesResultSchema, ../contract/src/analytics.timeseries.ts:107
+// Output: analyticsTimeseriesResultSchema, ../contract/src/analytics.timeseries.ts:108
 interface Output {
   previousPeriod: {
     date: string;
@@ -436,7 +436,7 @@ interface Output {
 
 // analytics.dataForFilter
 type Input = z.infer<typeof analyticsDataForFilterInputSchema>; // ../contract/src/analytics.trpc.ts:44
-// Output: analyticsFilterOptionsResultSchema, ../contract/src/analytics.timeseries.ts:278
+// Output: analyticsFilterOptionsResultSchema, ../contract/src/analytics.timeseries.ts:279
 interface Output {
   options: {
     field: string;
@@ -447,7 +447,7 @@ interface Output {
 
 // analytics.topUsedDocuments
 type Input = z.infer<typeof sharedFiltersInputSchema>; // ../contract/src/analytics.input-schemas.ts:85
-// Output: analyticsTopDocumentsResultSchema, ../contract/src/analytics.timeseries.ts:254
+// Output: analyticsTopDocumentsResultSchema, ../contract/src/analytics.timeseries.ts:255
 interface Output {
   topDocuments: {
     documentId: string;
@@ -460,11 +460,11 @@ interface Output {
 
 // analytics.feedbacks
 type Input = z.infer<typeof sharedFiltersInputSchema>; // ../contract/src/analytics.input-schemas.ts:85
-type Output = z.infer<typeof analyticsFeedbacksResultSchema>; // ../contract/src/analytics.timeseries.ts:168
+type Output = z.infer<typeof analyticsFeedbacksResultSchema>; // ../contract/src/analytics.timeseries.ts:169
 
 // analytics.feedbacksPage
 type Input = z.infer<typeof analyticsFeedbacksPageInputSchema>; // ../contract/src/analytics.trpc.ts:54
-type Output = z.infer<typeof analyticsFeedbacksPageResultSchema>; // ../contract/src/analytics.timeseries.ts:230
+type Output = z.infer<typeof analyticsFeedbacksPageResultSchema>; // ../contract/src/analytics.timeseries.ts:231
 ```
 
 ## Sockets

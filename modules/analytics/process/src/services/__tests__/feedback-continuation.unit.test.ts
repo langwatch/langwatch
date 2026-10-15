@@ -14,6 +14,7 @@ import {
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { describe, expect, it } from "vitest";
 
+import { analyticsTestAuthz } from "../../repositories/__tests__/analytics-proof.fixture.ts";
 import { NullAnalyticsEvaluationRepository } from "../../repositories/analytics-persistence.repository.ts";
 import {
   AnalyticsRepository,
@@ -113,6 +114,7 @@ function serviceOver(repository: AnalyticsRepository): AnalyticsService {
   return AnalyticsService.create({
     repository,
     evaluationRepository: NullAnalyticsEvaluationRepository.create(),
+    authz: analyticsTestAuthz(),
     tenantLimiter: new InProcessTenantStatementLimiter({
       maxConcurrent: 4,
       maxQueued: 64,

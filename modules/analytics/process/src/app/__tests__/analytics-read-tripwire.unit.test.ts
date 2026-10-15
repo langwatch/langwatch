@@ -21,6 +21,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { analyticsProof } from "../../repositories/__tests__/analytics-proof.fixture.ts";
 import {
   AnalyticsRepository,
   type AnalyticsTimeseriesQuery,
@@ -79,7 +80,9 @@ async function harness(tripwireOn: boolean) {
           return Promise.resolve(key === TRIPWIRE_FLAG && tripwireOn);
         },
       }),
-      authz: createApiFixture<AuthzApi>(),
+      authz: createApiFixture<AuthzApi>({
+        authorizeInternal: async ({ projectId }) => analyticsProof({ projectId }),
+      }),
       dataPrivacy: createApiFixture<DataPrivacyApi>(),
       projects: createApiFixture<ProjectApi>(),
       plans: createApiFixture<EntitlementApi>(),
@@ -135,6 +138,23 @@ describe("AnalyticsModule.getTimeseries read tripwire", () => {
       expect(flagReads).toEqual([
         { key: TRIPWIRE_FLAG, target: { kind: "project", projectId: PROJECT_ID } },
       ]);
+    });
+  });
+
+  describe("given the tripwire flag is on for an aggregate read under a member's grant", () => {
+    /** @scenario "An aggregate's series is not compared with the legacy tables" */
+    it("reads only the routed table, since the legacy tables read the aggregate alone", async () => {
+      const { app, repository } = await harness(true);
+
+      const result = await app.getTimeseries(timeseriesInput, {
+        authorization: analyticsProof({
+          projectId: PROJECT_ID,
+          shared: [{ projectId: "project-member", from: Date.UTC(2025, 11, 1) }],
+        }),
+      });
+
+      expect(repository.tablesRead).toEqual(["trace_analytics_rollup"]);
+      expect(result).toEqual(routedResult);
     });
   });
 
