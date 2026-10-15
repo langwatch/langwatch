@@ -87,6 +87,9 @@ const scimUserPushedPayloadSchemaDefinition = z.object({
    *  their email changing. Scoped by connection, never global. */
   externalId: z.string().min(1),
   op: scimUserOpSchema,
+  /** False when the push restated what we already held, as a directory's periodic re-send
+   *  does. Absent on events recorded before it was; read as a change. */
+  changed: z.boolean().optional(),
 });
 export interface ScimUserPushedPayloadSchema extends Named<
   typeof scimUserPushedPayloadSchemaDefinition

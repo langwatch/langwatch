@@ -1,11 +1,13 @@
-import type {
-  Dataset,
-  DatasetColumns,
-  DatasetStorageEntry,
-  DatasetStoragePageInput,
-  DatasetSummary,
+import {
+  datasetSchema,
+  type Dataset,
+  type DatasetColumns,
+  type DatasetStorageEntry,
+  type DatasetStoragePageInput,
+  type DatasetSummary,
 } from "@langwatch/dataset-contract";
 import type { Instant } from "@langwatch/time";
+import type { z } from "zod";
 
 /** Raw storage row (scalar columns only), not parsed Dataset. Keeps
  * columnTypes read raw in some paths, parsed in others.
@@ -31,6 +33,16 @@ export type DatasetRow = Pick<Dataset, "createdAt" | "updatedAt" | "archivedAt">
   chunkCount: number | null;
   chunkOffsets: unknown;
 };
+
+/** The columns that say where a dataset's entry count lives, and hold it when stored. */
+export const datasetRecordCountColumnsSchema = datasetSchema.pick({
+  id: true,
+  contentLayout: true,
+  useS3: true,
+  rowCount: true,
+  s3RecordCount: true,
+});
+export type DatasetRecordCountColumns = z.infer<typeof datasetRecordCountColumnsSchema>;
 
 export type DatasetCreateInput = {
   projectId: string;
@@ -60,6 +72,10 @@ export interface DatasetRepository {
     includeArchived?: boolean;
   }): Promise<Dataset | null>;
   findAll(input: { projectId: string; page: number; limit: number }): Promise<DatasetSummary[]>;
+  findRecordCountColumns(input: {
+    projectId: string;
+    datasetIds: readonly string[];
+  }): Promise<DatasetRecordCountColumns[]>;
   create(input: DatasetCreateInput): Promise<Dataset>;
   update(input: DatasetUpdateInput): Promise<Dataset>;
   archive(input: {

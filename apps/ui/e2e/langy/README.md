@@ -523,7 +523,7 @@ Three handles, in increasing order of what they prove:
 | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | `langy.*`, `experiments.saveEvaluationsV3`, `experiments.getEvaluationsV3BySlug`, `langy.messages`, `POST /api/experiments/execute` | the session cookie (`trpc.ts`)                          |
 | `GET/PUT /api/experiments/:slug/workbench-state`, `GET /api/experiments/runs*`, `POST /api/experiments`                             | `X-Auth-Token: LANGWATCH_API_KEY` (`workbench-rest.ts`) |
-| `POST /api/v1/langy/ui/actions`                                                                                                        | the agent worker's own session key, never the suite's   |
+| `POST /api/v1/langy/ui/actions`                                                                                                     | the agent worker's own session key, never the suite's   |
 
 `LANGY_PROJECT_ID` is the project's real id, not its slug: the tRPC procedures
 resolve permissions on the id, and a slug there is refused as `no-grant` on

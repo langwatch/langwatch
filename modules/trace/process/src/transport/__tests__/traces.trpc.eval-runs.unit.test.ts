@@ -40,7 +40,9 @@ const FILTERED_FACETS = {
 
 function harness() {
   const findExplorerEvalRuns = vi.fn<TraceApi["findExplorerEvalRuns"]>(async () => [RESOLVED]);
-  const compileExplorerTraceFilter = vi.fn<TraceApi["compileExplorerTraceFilter"]>(() => COMPILED);
+  const compileExplorerTraceFilter = vi.fn<TraceApi["compileExplorerTraceFilter"]>(
+    async () => COMPILED,
+  );
   const readFilteredFacets = vi.fn<TraceApi["readFilteredFacets"]>(async () => FILTERED_FACETS);
   const readDiscoverForQuery = vi.fn<TraceApi["readDiscoverForQuery"]>(async () => FILTERED_FACETS);
   const app = createApiFixture<TraceApi>({

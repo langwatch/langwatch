@@ -57,6 +57,26 @@ describe("resolveShellRoute", () => {
     });
   });
 
+  describe("given a project's Dashboards area", () => {
+    it("names Dashboards, a project product", () => {
+      expect(resolve("/acme-app/dashboards/agent-flight-deck")).toEqual({
+        isSettingsRoute: false,
+        isPersonalScopeRoute: false,
+        isOrgScopeRoute: false,
+        isResolverRoute: false,
+        activeProductId: "dashboards",
+        seatRefusal: null,
+      });
+    });
+
+    it("keeps Dashboards on the reader's own personal project", () => {
+      expect(
+        resolve("/personal-mia-abc123/dashboards", { isOnOwnPersonalProject: true })
+          .activeProductId,
+      ).toBe("dashboards");
+    });
+  });
+
   describe("given the last workspace was my personal one", () => {
     /** @scenario A sticky personal workspace does not follow me onto an org-wide page */
     it.each(["/gateway/virtual-keys", "/governance/people"])(

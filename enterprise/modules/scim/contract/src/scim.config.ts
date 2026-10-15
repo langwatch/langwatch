@@ -1,10 +1,23 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { Config, environmentBooleanSchema, type ConfigOf } from "@langwatch/config";
+import {
+  Config,
+  environmentBooleanSchema,
+  environmentExactOnSchema,
+  publicBaseUrl,
+  type ConfigOf,
+} from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
 
-/** `provenOffboarding` selects one process-wide offboarding path at boot. */
+/** true/false/1/0 read as booleans; otherwise only `on` is on, as the previous release read it. */
+const scimGrantsSwitchSchema = environmentBooleanSchema.or(environmentExactOnSchema);
+
+/**
+ * `provenOffboarding` selects one process-wide offboarding path at boot; `publicBaseUrl` is the
+ * shared deployment origin the directory-sync summary card links to.
+ */
 export const scimConfig = Config.define((c) => ({
-  provenOffboarding: c.env("SCIM_V2_GRANTS", environmentBooleanSchema.default(true)),
+  provenOffboarding: c.env("SCIM_V2_GRANTS", scimGrantsSwitchSchema.default(true)),
+  publicBaseUrl,
 }));
 
 export type ScimServerConfig = ConfigOf<typeof scimConfig>;

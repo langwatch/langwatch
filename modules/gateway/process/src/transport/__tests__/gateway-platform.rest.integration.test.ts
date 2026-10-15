@@ -169,6 +169,7 @@ function mountFamily({
   });
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: { authenticate: projectDoor, identify: projectDoor },
     doors: { api_key: fakeKeyDoor({ asked, keyHolds }) },
     idempotency,

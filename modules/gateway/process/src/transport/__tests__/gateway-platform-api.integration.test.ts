@@ -109,6 +109,7 @@ async function mount() {
   const keyDoor = () => ({ ...door(), scope: { tier: "organization" as const, id: ORG_ID } });
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: { authenticate: door, identify: door },
     doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
     idempotency: async ({ handler }) => {

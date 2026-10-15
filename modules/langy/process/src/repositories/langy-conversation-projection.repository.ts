@@ -5,6 +5,8 @@ export interface LangyConversationRow {
   userId: string;
   title: string | null;
   isShared: boolean;
+  /** `interactive` or `run`, as the fold stored it. */
+  origin: string;
   status: string;
   /**
    * The turn the conversation has IN FLIGHT right now, or null when none.

@@ -16,6 +16,7 @@ import type { UIMessage } from "ai";
 import { Fragment, memo, type ReactNode, useMemo } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { LentAnswerActions } from "../../../../behavior/lent-answer-actions.tsx";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   isSubstantiveLangyAnswer,
@@ -47,6 +48,7 @@ import { LangyCodeAccessCard } from "../../../tools/ui/sections/langy-code-acces
 import { LangySecretSnippetCard } from "../../../tools/ui/sections/langy-secret-snippet-card.tsx";
 import {
   hasLangyBlockParts,
+  langyAnswerInsightsCard,
   type LangyAnswerSegment,
   langyAnswerSegments,
   langyAnswerSegmentsFromText,
@@ -266,6 +268,18 @@ function useAnswerReading({ message, isStreaming }: { message: UIMessage; isStre
   const feedbackDirective = parseLangyFeedbackDirective(messageText(message));
   const showsActivity = hasLangyActivity(message);
   const hasActivity = showsActivity || Boolean(plan);
+  // The findings an answer action may keep, as typed data: never read back out of the prose.
+  const insights = useMemo(
+    () =>
+      isStreaming
+        ? undefined
+        : langyAnswerInsightsCard({
+            parts,
+            text: messageText(message),
+            isRecorded: isRecordedMessage(message),
+          }),
+    [isStreaming, parts, message],
+  );
   // Thinking headlines fold into the receipt on a settled turn, never loose paragraphs above it.
   const reasoningFold = isStreaming
     ? { titles: [], text: feedbackDirective.cleanedText }
@@ -290,6 +304,7 @@ function useAnswerReading({ message, isStreaming }: { message: UIMessage; isStre
     prs: githubPrsFromToolParts(parts),
     proposals: extractProposals(message),
     hasBlocks: hasLangyBlockParts(parts),
+    insights,
   };
 }
 
@@ -425,6 +440,15 @@ function AssistantMessage(props: MessageContentProps) {
         <AnswerCards props={props} />
         {/* The reply the user cut short says so, whatever it managed to say first. */}
         {interrupted && !isStreaming ? <MutedAnswerLine>Interrupted</MutedAnswerLine> : null}
+        {!isStreaming && (reading.displayText || reading.insights?.findings.length) && project ? (
+          <LentAnswerActions
+            projectId={project.id}
+            conversationId={conversationId ?? null}
+            messageId={message.id}
+            answerText={reading.displayText}
+            {...(reading.insights ? { insights: reading.insights } : {})}
+          />
+        ) : null}
         {showsFeedbackPrompt({ props, reading }) ? (
           <LangyFeedback
             conversationId={conversationId ?? undefined}

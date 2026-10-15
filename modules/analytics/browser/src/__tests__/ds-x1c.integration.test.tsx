@@ -68,7 +68,8 @@ import { CustomReportsSection } from "../ui/sections/analytics/analytics-overvie
 import { LLMMetrics } from "../ui/sections/llm-metrics.tsx";
 import { UserMetrics } from "../ui/sections/user-metrics.tsx";
 
-type DrawerProps = ComponentProps<typeof DashboardWidgetEditDrawer>;
+// No added tabs: Code and Queries only.
+type DrawerProps = ComponentProps<typeof DashboardWidgetEditDrawer<never>>;
 
 const validQueries: DashboardWidgetQuery[] = [{ name: "query1", sql: "select 1" }];
 

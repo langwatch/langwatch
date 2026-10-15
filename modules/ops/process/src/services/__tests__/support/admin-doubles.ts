@@ -15,6 +15,9 @@ import { vi } from "vitest";
 import { InstanceAdminRepository } from "../../../repositories/instance-admin.repository.ts";
 import { AdminAuditSink } from "../../impersonation.service.ts";
 
+/** No account holds the platform-operator grant. */
+export const noOperators = { isAdmin: async (): Promise<boolean> => false };
+
 export const adminOperator: UserProfile = {
   id: "olive",
   name: "Olive",

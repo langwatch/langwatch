@@ -40,7 +40,6 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
-    "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
@@ -55,6 +54,7 @@
   "devDependencies": {
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authorization": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
