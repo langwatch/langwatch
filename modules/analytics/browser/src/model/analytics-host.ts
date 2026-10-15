@@ -19,6 +19,8 @@ export type AnalyticsHostProject = {
   hasFirstMessage: boolean;
   /** The project's kind (`application`, `aggregate`, ...), when the host has read it. */
   kind?: string;
+  /** Whether it is a person's own project, where Langy's conversations are the data. */
+  isPersonal?: boolean;
 };
 
 /** The path parameters and query string a screen was opened with. */
@@ -61,6 +63,26 @@ export type AnalyticsAlertAuthoring = {
   seriesName?: string;
 };
 
+/** One reference riding with a question to Langy, as self-describing text the agent reads. */
+export type AnalyticsLangyContext = { kind: "dashboard"; ref: string; label: string };
+
+/** What a Langy draft is about: a board, and a widget on it when the draft names one. */
+export type AnalyticsLangyDraftAbout = { ref: string; itemRef?: string };
+
+/** A question for Langy and what it is asked about. */
+export type AnalyticsLangyAskRequest = {
+  /** A question to send outright; absent when only a draft is handed over. */
+  question?: string;
+  /** A prompt seeded into the composer for the reader to send; never sent for them. */
+  draft?: string;
+  /** What the draft is about; left unsent, it is dropped once that leaves the screen. */
+  about?: AnalyticsLangyDraftAbout;
+  context: readonly AnalyticsLangyContext[];
+};
+
+/** The release flags an Analytics screen reads; the mount answers each one. */
+export type AnalyticsReleaseFlag = "release_dashboards" | "release_langy_enabled";
+
 export abstract class AnalyticsHostApi {
   /** The project in scope, or undefined before one resolves. */
   abstract project(): AnalyticsHostProject | undefined;
@@ -68,7 +90,22 @@ export abstract class AnalyticsHostApi {
   /** The organization the project sits in, for reads scoped above a project. */
   abstract organizationId(): string | undefined;
 
+  /** That organization's name, as a sentence about the whole organization says it. */
+  abstract organizationName(): string | undefined;
+
+  /** The signed-in member's id, or undefined before the session has one. */
+  abstract userId(): string | undefined;
+
   abstract hasPermission(permission: string): boolean;
+
+  /**
+   * Whether the grants have arrived: before then `hasPermission` answers
+   * `false` for everything.
+   */
+  abstract isSettled(): boolean;
+
+  /** On, off, or `undefined` while the flag has not answered yet. */
+  abstract featureFlag(flag: AnalyticsReleaseFlag): boolean | undefined;
 
   abstract route(): AnalyticsRouteReading;
 
@@ -78,8 +115,8 @@ export abstract class AnalyticsHostApi {
     options?: { replace?: boolean },
   ): void;
 
-  /** Sends the reader somewhere else in the application. */
-  abstract navigate(to: string): void;
+  /** Sends the reader somewhere else; `replace` leaves no history entry to come back to. */
+  abstract navigate(to: string, options?: { replace?: boolean }): void;
 
   /** Opens automation's drawer, which owns alert authoring; analytics never renders it. */
   abstract openAutomationDrawer(request: AnalyticsAlertAuthoring): void;
@@ -87,6 +124,15 @@ export abstract class AnalyticsHostApi {
   abstract succeeded(notice: AnalyticsSuccessNotice): void;
 
   abstract failed(failure: AnalyticsFailureNotice): void;
+
+  /**
+   * Hands a question, and what it is about, to Langy. An application without
+   * Langy does nothing with it, which is why a screen never reaches Langy itself.
+   */
+  abstract askLangy(request: AnalyticsLangyAskRequest): void;
+
+  /** Tells Langy which board (and widget) is on screen; null once none is. */
+  abstract showLangy(about: AnalyticsLangyDraftAbout | null): void;
 }
 
 const AnalyticsHostContext = createContext<AnalyticsHostApi | undefined>(void 0);

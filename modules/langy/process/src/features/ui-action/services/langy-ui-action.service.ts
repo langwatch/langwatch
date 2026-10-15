@@ -1,8 +1,11 @@
 import { generate } from "@langwatch/ksuid";
 import {
+  LANGY_CONVERSATION_ORIGIN,
+  type LangyConversationOrigin,
   LangyUiHandlerFailedError,
   LangyUiNoBrowserError,
   LangyUiPayloadInvalidError,
+  LangyUiRunConversationError,
   LangyUiTimeoutError,
   LangyUiTurnInactiveError,
 } from "@langwatch/langy-contract";
@@ -81,7 +84,7 @@ interface UiActionConversations {
     id: string;
     projectId: string;
     userId: string;
-  }): Promise<{ currentTurnId: string | null }>;
+  }): Promise<{ currentTurnId: string | null; origin: LangyConversationOrigin }>;
 }
 
 /** Everything the UI-action channel needs from the process that holds it. */
@@ -143,6 +146,11 @@ export class LangyUiActionService {
       projectId,
       userId,
     });
+
+    // A run conversation holds trace text nobody vetted, and no page is open for it.
+    if (conversation.origin === LANGY_CONVERSATION_ORIGIN.RUN) {
+      throw new LangyUiRunConversationError();
+    }
 
     const turnId = conversation.currentTurnId;
     if (!turnId) {

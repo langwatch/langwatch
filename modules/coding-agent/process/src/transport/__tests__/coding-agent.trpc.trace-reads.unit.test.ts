@@ -79,7 +79,7 @@ describe("codingAgents.session", () => {
 describe("codingAgents.transcript", () => {
   describe("given a signed-in viewer and a partition hint", () => {
     /** @scenario "The drawer's transcript is read for the signed-in viewer" */
-    it("reads the transcript for that viewer, trace and hint, and answers it unchanged", async () => {
+    it("reads the transcript for that viewer, their authorization, trace and hint, and answers it unchanged", async () => {
       const { caller, readTranscriptForViewer } = harness(null);
 
       const answer = await caller.transcript({
@@ -94,6 +94,7 @@ describe("codingAgents.transcript", () => {
         traceId: TRACE_ID,
         occurredAtMs: 1_700_000_000_000,
         viewerUserId: "viewer-1",
+        authorization: expect.objectContaining({ principal: { id: "viewer-1", type: "user" } }),
       });
     });
   });

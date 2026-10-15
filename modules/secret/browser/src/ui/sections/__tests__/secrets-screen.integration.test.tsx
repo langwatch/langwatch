@@ -265,9 +265,9 @@ describe("given the list is still loading", () => {
   afterEach(() => vi.useRealTimers());
 
   /** @scenario A fast load never flashes a skeleton */
-  it("shows neither skeleton nor table when it answers quickly, then the empty state", () => {
+  it("shows neither skeleton nor table when it answers quickly, then the empty state", async () => {
     const view = renderWithSecretHost(<SecretsScreen />);
-    act(() => vi.advanceTimersByTime(100));
+    await act(() => vi.advanceTimersByTimeAsync(100));
     expect(screen.queryByTestId("secrets-loading")).toBeNull();
     state.isLoading = false;
     view.rerender(
@@ -281,10 +281,10 @@ describe("given the list is still loading", () => {
   });
 
   /** @scenario A slow load shows a light skeleton */
-  it("shows a skeleton once the delay has passed", () => {
+  it("shows a skeleton once the delay has passed", async () => {
     renderWithSecretHost(<SecretsScreen />);
     expect(screen.queryByTestId("secrets-loading")).toBeNull();
-    act(() => vi.advanceTimersByTime(400));
+    await act(() => vi.advanceTimersByTimeAsync(400));
     expect(screen.getByTestId("secrets-loading")).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
   });

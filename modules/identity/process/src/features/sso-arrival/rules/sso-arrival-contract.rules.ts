@@ -63,7 +63,13 @@ export interface SsoArrivalJoinRequests {
 
 /** Tells our own team somebody signed up through a domain rule; never fatal to the sign-in. */
 export interface SsoArrivalSignupAnnouncement {
-  announce(args: { userName: string; userEmail: string; organizationName: string }): Promise<void>;
+  announceJoin(args: {
+    userId: string;
+    userName: string;
+    userEmail: string;
+    organizationId: string;
+    organizationName: string;
+  }): Promise<void>;
 }
 
 export interface SsoArrivalNotifications {

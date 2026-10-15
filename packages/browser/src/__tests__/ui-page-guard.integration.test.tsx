@@ -333,7 +333,7 @@ describe("given a module declaring a screen that requires a grant", () => {
   it("shows the missing grant instead of the screen to a viewer without it", async () => {
     await renderDeclared({ page: "pages/[project]/probe", permissions: [] });
 
-    expect(screen.getByText("workflows:view")).toBeDefined();
+    expect(screen.getByText("Missing permission: workflows:view")).toBeDefined();
     expect(screen.queryByText("the page")).toBeNull();
   });
 
@@ -348,7 +348,7 @@ describe("given a module declaring a screen that requires a grant", () => {
   it("titles the refusal with the area the viewer needs access to", async () => {
     await renderDeclared({ page: "pages/[project]/probe", permissions: [] });
 
-    expect(screen.getByText(/You need access to/)).toBeDefined();
+    expect(screen.getByText(/You don't have access to/)).toBeDefined();
   });
 
   /** @scenario "A declared screen behind a release flag that is off answers not found" */

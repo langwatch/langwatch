@@ -53,10 +53,10 @@ function violation(file: string, message: string, allowed: string): Architecture
 
 /**
  * The composition root's feature-API vocabulary: the DI token a contract
- * declares its callable API with, and the name of a feature. Everything else
- * the package exports is process wiring a contract may not reach.
+ * declares its callable API with, the name of a feature, and `Named`, the
+ * type-only schema name (ADR-178). The rest is process wiring.
  */
-const FEATURE_API_VOCABULARY = new Set(["moduleApi", "ModuleApiToken", "ModuleName"]);
+const FEATURE_API_VOCABULARY = new Set(["moduleApi", "ModuleApiToken", "ModuleName", "Named"]);
 
 /** What an import of the composition root binds that a contract may not. */
 function compositionBindingsBeyondFeatureApi(statement: ts.ImportDeclaration): string[] {
@@ -107,7 +107,7 @@ function kernelBindingViolations(api: string): ArchitectureViolation[] {
       violation(
         api,
         `A portable feature API may bind only the feature-API vocabulary from @langwatch/module; it binds ${bound.join(", ")}.`,
-        "Import moduleApi, ModuleApiToken or ModuleName and nothing else; the rest of the runtime root is a composition boundary.",
+        "Import moduleApi, ModuleApiToken, ModuleName or Named and nothing else; the rest of the runtime root is a composition boundary.",
       ),
     );
   }

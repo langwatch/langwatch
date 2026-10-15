@@ -15,18 +15,29 @@ export interface OrganizationSignals {
       properties?: Readonly<Record<string, unknown>>;
     }>,
   ): void;
-  // sendSlackSignupEvent, sendHubspotSignupForm and reportError below are
+  // announceNewOrganization, announceJoin, sendHubspotSignupForm and reportError below are
   // properties of function type rather than method shorthand: tests hold a
   // mock built to this interface and assert on these members via
   // `expect(...).toHaveBeenCalledWith`, which is unsafe against a
   // method-shorthand member under `unbound-method`.
-  sendSlackSignupEvent: (
+  announceNewOrganization: (
     input: Readonly<{
+      userId: string;
       userName?: string | null;
       userEmail: string | null;
+      organizationId: string;
       organizationName: string;
       phoneNumber?: string | undefined;
       signUpData?: Record<string, unknown> | undefined;
+    }>,
+  ) => Promise<void>;
+  announceJoin: (
+    input: Readonly<{
+      userId: string;
+      userName?: string | null;
+      userEmail: string | null;
+      organizationId: string;
+      organizationName: string;
     }>,
   ) => Promise<void>;
   sendHubspotSignupForm: (
@@ -70,7 +81,8 @@ export class OrganizationSignalsService {
 
     return {
       trackServerEvent: (input) => unsent(`the organization event "${input.event}"`),
-      sendSlackSignupEvent: (input) => signupAnnouncements.announce(input),
+      announceNewOrganization: (input) => signupAnnouncements.announceNewOrganization(input),
+      announceJoin: (input) => signupAnnouncements.announceJoin(input),
       sendHubspotSignupForm: async () => unsent("a sign-up form"),
       reportError: (error) => {
         logger.error({ error }, "an organization surface failed");

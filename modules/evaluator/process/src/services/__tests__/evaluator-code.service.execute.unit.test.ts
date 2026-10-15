@@ -71,14 +71,11 @@ describe("EvaluatorCodeService execute", () => {
     it("surfaces the exception message as the error result", async () => {
       const service = buildService({
         execute: async () => ({
-          ok: true,
-          statusText: "OK",
-          body: {
-            status: "error",
-            error: {
-              message: "intentional kaboom",
-              traceback: "Traceback (most recent call last): ...",
-            },
+          status: "error",
+          error: {
+            type: "python_error",
+            message: "intentional kaboom",
+            traceback: "Traceback (most recent call last): ...",
           },
         }),
       });

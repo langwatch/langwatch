@@ -80,8 +80,9 @@ export interface ChartGridProps {
   /**
    * Called once per finished drag or resize with the whole grid's new
    * placement, and only when something actually moved or changed size.
+   * Absent on a read-only grid, whose cards neither move nor resize.
    */
-  onPlacementsCommit: (placements: ChartGridPlacement[]) => void;
+  onPlacementsCommit?: (placements: ChartGridPlacement[]) => void;
   /** The card for one placement. */
   renderCard: (placement: ChartGridPlacement) => ReactNode;
   /**
@@ -89,6 +90,10 @@ export interface ChartGridProps {
    * container otherwise — tests render without layout and pass it.
    */
   width?: number;
+  /** The height of one grid row, where a surface uses a finer grid than the default. */
+  rowHeightPx?: number;
+  /** The fewest rows a resize may leave a card, where its content needs more than one. */
+  minRowSpan?: number;
 }
 
 export function ChartGrid({
@@ -96,20 +101,26 @@ export function ChartGrid({
   onPlacementsCommit,
   renderCard,
   width: fixedWidth,
+  rowHeightPx = CHART_GRID_ROW_HEIGHT_PX,
+  minRowSpan = 1,
 }: ChartGridProps) {
   const { width: measuredWidth, containerRef, mounted } = useContainerWidth();
   const width = fixedWidth ?? measuredWidth;
+  const isEditable = onPlacementsCommit !== void 0;
 
   const commit = useCallback(
     (layout: Layout) => {
       const next = layout.map(fromLayoutItem);
       if (samePlacements({ a: next, b: placements })) return;
-      onPlacementsCommit(next);
+      onPlacementsCommit?.(next);
     },
     [onPlacementsCommit, placements],
   );
 
-  const layout = reflowSingleColumnStack(placements).map(toLayoutItem);
+  const layout = reflowSingleColumnStack(placements).map((placement) => ({
+    ...toLayoutItem(placement),
+    minH: minRowSpan,
+  }));
 
   return (
     <Box ref={containerRef} width="100%" className="chart-grid">
@@ -119,12 +130,12 @@ export function ChartGrid({
           layout={layout}
           gridConfig={{
             cols: CHART_GRID_COLUMNS,
-            rowHeight: CHART_GRID_ROW_HEIGHT_PX,
+            rowHeight: rowHeightPx,
             margin: [CHART_GRID_MARGIN_PX, CHART_GRID_MARGIN_PX],
             containerPadding: [0, 0],
           }}
-          dragConfig={{ handle: `.${CHART_GRID_DRAG_HANDLE_CLASS}` }}
-          resizeConfig={{ handles: ["se"] }}
+          dragConfig={{ enabled: isEditable, handle: `.${CHART_GRID_DRAG_HANDLE_CLASS}` }}
+          resizeConfig={{ enabled: isEditable, handles: ["se"] }}
           onDragStop={commit}
           onResizeStop={commit}
         >

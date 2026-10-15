@@ -11,6 +11,7 @@ import { buildShimScript } from "../chart-frame-shim-source.ts";
 
 interface HookResult {
   data: unknown;
+  completeness: unknown;
   status: string;
   isError: boolean;
   isRefetchError: boolean;
@@ -115,6 +116,20 @@ describe("LW.useChartQuery, evaluated as the frame runs it", () => {
       expect(result.data).toEqual([{ n: 1 }]);
       expect(result).toMatchObject({ status: "success", isError: false, isRefetchError: true });
       expect(result.refetchError?.code).toBe("unknown");
+    });
+  });
+
+  describe("when the result carries a completeness report", () => {
+    /** @scenario "useChartQuery returns completeness with its rows" */
+    it("returns the report beside the rows, and null before the first load", async () => {
+      const { render, answer } = mountHook();
+      expect(render().completeness).toBeNull();
+      await vi.advanceTimersByTimeAsync(0);
+      const completeness = { state: "no_traffic", unit: "traces", total: 0, fields: [] };
+
+      await answer({ type: "lw:query-result", result: { rows: [], completeness } });
+
+      expect(render()).toMatchObject({ data: [], completeness });
     });
   });
 

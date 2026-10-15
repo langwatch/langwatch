@@ -30,6 +30,12 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
+      "path": "../../langy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../langy/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
@@ -49,6 +55,9 @@
     },
     {
       "path": "../../dashboard/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/csv/tsconfig.build.json"
     },
     {
       "path": "../../../packages/browser-host/tsconfig.build.json"

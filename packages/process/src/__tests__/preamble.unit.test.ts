@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { processConfig } from "../config.ts";
 import { Server } from "../preamble.ts";
-import { Server as ServerBoundary, type ServerOptions } from "../server.ts";
+import type { ServerOptions } from "../server.ts";
 
 const hostLines = vi.hoisted(() => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() }));
 const loggerNames = vi.hoisted(() => [] as string[]);
@@ -109,10 +109,16 @@ describe("given a process that composed no telemetry, as an api embedded beside 
   describe("when its server writes a line", () => {
     /** @scenario "A process that composed no telemetry still writes its server's lines" */
     it("writes it once through the process's logger under the process's name", async () => {
-      const created = vi.spyOn(ServerBoundary, "create");
-      const server = await Server.create("embedded-api")
+      // The package runs with isolate: false, so a file that ran earlier in this worker may have
+      // cached preamble.ts over the real logger; a fresh graph is what the mock applies to.
+      vi.resetModules();
+      const { Server: FreshServer } = await import("../preamble.ts");
+      const { Server: FreshBoundary } = await import("../server.ts");
+      const { processConfig: freshProcessConfig } = await import("../config.ts");
+      const created = vi.spyOn(FreshBoundary, "create");
+      const server = await FreshServer.create("embedded-api")
         .withEnvironment({})
-        .withConfig(processConfig([], "api"))
+        .withConfig(freshProcessConfig([], "api"))
         .withProcessOwnership(false)
         .start();
       const options = created.mock.calls[0]![0] as ServerOptions;

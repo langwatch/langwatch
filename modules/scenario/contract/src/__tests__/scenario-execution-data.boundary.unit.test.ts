@@ -52,6 +52,15 @@ function sourceFiles(directory: string): string[] {
   });
 }
 
+/** Uses a schema name without declaring its own of that name (ADR-178 `Named` interfaces). */
+function namesForeignSchema(source: string): boolean {
+  return SCHEMA_NAMES.some(
+    (name) =>
+      new RegExp(`\\b${name}\\b`).test(source) &&
+      !new RegExp(`\\b(?:interface|type|const)\\s+${name}\\b`).test(source),
+  );
+}
+
 function isAllowed(file: string): boolean {
   return ALLOWED_ROOTS.some(
     (root) => file === root.replace(/\/$/, "") || file.startsWith(root.replace(/\/$/, "") + "/"),
@@ -68,11 +77,10 @@ describe("the child execution contract's schemas", () => {
           "the schema-name scan itself must find schemas",
         ).toBeGreaterThan(0);
 
-        const pattern = new RegExp(`\\b(${SCHEMA_NAMES.join("|")})\\b`);
         const leaks = SCAN_ROOTS.flatMap(sourceFiles)
           .filter((file) => !isAllowed(file))
           .filter((file) => !file.includes("/__tests__/"))
-          .filter((file) => pattern.test(readFileSync(file, "utf8")))
+          .filter((file) => namesForeignSchema(readFileSync(file, "utf8")))
           .map((file) => file.replace(REPO_ROOT, ""));
 
         expect(leaks).toEqual([]);
@@ -85,8 +93,9 @@ describe("the child execution contract's schemas", () => {
       /** @scenario "The shared field mapping schema carries no framework dependency" */
       it("imports zod and nothing else", () => {
         const source = readFileSync(join(CONTRACT_SRC, "resolve-field-mappings.ts"), "utf8");
+        // A type-only import is erased at build time, so it carries no runtime dependency.
         const specifiers = [
-          ...source.matchAll(/^import\s+(?:type\s+)?[\s\S]*?\sfrom\s+["']([^"']+)["']/gm),
+          ...source.matchAll(/^import\s+(?!type\s)[\s\S]*?\sfrom\s+["']([^"']+)["']/gm),
         ].map((match) => match[1]);
 
         expect(

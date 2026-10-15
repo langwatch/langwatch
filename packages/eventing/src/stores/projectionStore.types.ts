@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { type TenantId, TenantIdSchema } from "../domain/tenantId.ts";
 import type { Projection } from "../domain/types.ts";
+import type { ReadTimeWindow } from "../projections/projectionStoreContext.ts";
 
 /**
  * Read context for the projection store.
@@ -23,6 +24,8 @@ export const ProjectionStoreReadContextSchema = z.object({
    * Use with caution - should not bypass security or validation.
    */
   raw: z.record(z.string(), z.unknown()).optional(),
+  /** See {@link ProjectionStoreReadContext.readWindow}. */
+  readWindow: z.object({ fromMs: z.number(), toMs: z.number() }).optional(),
 });
 
 export interface ProjectionStoreReadContext {
@@ -41,6 +44,12 @@ export interface ProjectionStoreReadContext {
    * Use with caution - should not bypass security or validation.
    */
   raw?: Record<string, unknown>;
+  /**
+   * The fold's declared read window, when the read is a fold read-back. A store
+   * may bound its time-partitioned read to it; the fold executor retries a miss
+   * without it, so the store applies it verbatim and adds no fallback of its own.
+   */
+  readWindow?: ReadTimeWindow;
 }
 
 /**

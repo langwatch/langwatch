@@ -1,17 +1,23 @@
-# The Nx task cache, carried between runs. Entries are keyed by task hash, so
-# restoring any older cache is safe: a stale entry is simply never looked up.
-# The key rotates with the commit so every run saves what it added; the suffix
-# keeps jobs that fill different entries (the prepare steps, the build) from
-# racing to save one key. The index (a SQLite file) travels with the cache: Nx
-# ignores artefacts it has no index rows for. Locally Nx shares ~/.nx (ADR-150).
+# The Nx task cache, carried between runs; entries are keyed by task hash, so
+# any older cache is safe to restore. Main saves under a key rotating with the
+# commit; a same-repository pull request saves its own after pruning its older
+# copy (one kept). Merge queues and forks only restore. The SQLite index
+# travels with it. Locally Nx shares ~/.nx (ADR-150).
 name: nx-cache
-description: Restore and save the Nx task cache under a key that rotates with the commit.
+description: Restore the Nx task cache; main and same-repository pull requests save it, a pull request keeping one copy.
 
 inputs:
   suffix:
     description: Separates jobs whose cached tasks differ, so each saves its own entries.
     required: false
     default: default
+  pr-save:
+    description: >-
+      "false" makes a pull request restore only. Set it in workflows whose job
+      can also run a fork's code (pull_request_target), which never get the
+      permission to prune.
+    required: false
+    default: "true"
 
 runs:
   using: composite
@@ -23,6 +29,19 @@ runs:
         echo "NX_WORKSPACE_DATA_DIRECTORY=$GITHUB_WORKSPACE/.nx/workspace-data" >> "$GITHUB_ENV"
 
     - name: Restore the Nx cache
+      if: ${{ !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && inputs.pr-save == 'true')) }}
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          .nx/cache
+          .nx/workspace-data/*.db*
+        key: ${{ runner.os }}-nx-${{ inputs.suffix }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-nx-${{ inputs.suffix }}-
+          ${{ runner.os }}-nx-
+
+    - name: Restore the Nx cache, saving it at the end of the job
+      if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && inputs.pr-save == 'true') }}
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
@@ -32,6 +51,11 @@ runs:
         restore-keys: |
           ${{ runner.os }}-nx-${{ inputs.suffix }}-
           ${{ runner.os }}-nx-
+
+    - uses: ./.github/actions/prune-pr-caches
+      if: inputs.pr-save == 'true'
+      with:
+        prefix: ${{ runner.os }}-nx-${{ inputs.suffix }}-
 
     - name: Adopt the restored cache index
       shell: bash

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import type { UpgradeRun, UpgradeStep, UpgradeStepStatus } from "../ledger.ts";
-import { compareReleases, releaseVersionSchema } from "../manifest/manifest.ts";
+import type { UpgradeStep, UpgradeStepStatus } from "../ledger.ts";
+import { releaseVersionSchema } from "../manifest/manifest.ts";
 
 /** What a refusal tells the operator to run (rethink 6.7). */
 export const UPGRADE_COMMAND = "pnpm task upgrade";

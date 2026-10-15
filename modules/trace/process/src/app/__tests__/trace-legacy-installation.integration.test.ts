@@ -21,6 +21,7 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceSpanCostSuggestion } from "../../features/span/services/span-cost-suggestion.service.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
@@ -119,6 +120,7 @@ function bootTraceApp(options: {
     requestBounds: createTraceTestRequestBounds(),
     exportBounds: null,
     protections,
+    authorizeRead: async ({ projectId }) => ownProof({ projectId }),
   });
 
   // The project door as the process opens it: absent and unresolvable keys are its refusals.

@@ -8,18 +8,22 @@ import {
   type McpSessionCipher,
   McpSessionRepository,
   type McpSessionRecordLookup,
-  type McpSessionTransport,
 } from "../mcp-session.repository.ts";
 
-/** Streamable records live as long as an OAuth bearer, SSE ones as long as their idle reap. */
-const LAYOUT: Record<McpSessionTransport, { record: string; byKey: string; ttlSeconds: number }> = {
-  streamable: { record: "mcp:session:", byKey: "mcp:sessions_by_key:", ttlSeconds: 30 * 24 * 3600 },
-  sse: { record: "mcp:sse:session:", byKey: "mcp:sse:sessions_by_key:", ttlSeconds: 30 * 60 },
-};
+/**
+ * A session lasts 30 days from when it opened; use never extends it. `activeByKey` is a sorted set
+ * of session ids scored by last activity, a new name because the set it replaced is another type.
+ */
+const LAYOUT = {
+  record: "mcp:session:",
+  activeByKey: "mcp:active_sessions_by_key:",
+  ttlSeconds: 30 * 24 * 3600,
+} as const;
 
 const storedSessionSchema = z.object({
   encryptedApiKey: z.string(),
   projectId: z.string().optional(),
+  userId: z.string().optional(),
 });
 
 /**
@@ -61,106 +65,92 @@ export class RedisMcpSessionRepository extends McpSessionRepository {
     return this.#redis !== null;
   }
 
-  async store({
-    transport,
-    sessionId,
-    apiKey,
-    projectId,
-  }: {
-    transport: McpSessionTransport;
+  async store(input: {
     sessionId: string;
     apiKey: string;
     projectId?: string;
+    userId?: string;
   }): Promise<void> {
     if (!this.#redis) return;
-    const encryptedApiKey = this.#cipher.encrypt(apiKey);
-    const layout = LAYOUT[transport];
-    const setKey = `${layout.byKey}${hashApiKey(apiKey)}`;
-    await this.#redis.set(
-      `${layout.record}${sessionId}`,
-      JSON.stringify({ encryptedApiKey, projectId, createdAt: nowInstant().epochMilliseconds }),
-      "EX",
-      layout.ttlSeconds,
-    );
-    await this.#redis.sadd(setKey, sessionId);
-    await this.#redis.expire(setKey, layout.ttlSeconds);
+    const recordKey = `${LAYOUT.record}${input.sessionId}`;
+    await this.#redis.set(recordKey, this.#serialize(input), "EX", LAYOUT.ttlSeconds, "NX");
+    await this.#markActive(input);
   }
 
-  async touch({
-    transport,
-    sessionId,
-    apiKey,
-  }: {
-    transport: McpSessionTransport;
+  async rewrite(input: {
     sessionId: string;
     apiKey: string;
+    projectId?: string;
+    userId?: string;
   }): Promise<void> {
     if (!this.#redis) return;
-    const layout = LAYOUT[transport];
-    await this.#redis.expire(`${layout.record}${sessionId}`, layout.ttlSeconds);
-    await this.#redis.expire(`${layout.byKey}${hashApiKey(apiKey)}`, layout.ttlSeconds);
+    const recordKey = `${LAYOUT.record}${input.sessionId}`;
+    // One conditional write, so a record removed in the meantime is not brought back.
+    const written = await this.#redis.set(recordKey, this.#serialize(input), "KEEPTTL", "XX");
+    if (written === "OK") await this.#markActive(input);
   }
 
-  async getRecord({
-    transport,
-    sessionId,
-  }: {
-    transport: McpSessionTransport;
-    sessionId: string;
-  }): Promise<McpSessionRecordLookup> {
+  #serialize(input: { apiKey: string; projectId?: string; userId?: string }): string {
+    return JSON.stringify({
+      encryptedApiKey: this.#cipher.encrypt(input.apiKey),
+      projectId: input.projectId,
+      userId: input.userId,
+      createdAt: nowInstant().epochMilliseconds,
+    });
+  }
+
+  async touch({ sessionId, apiKey }: { sessionId: string; apiKey: string }): Promise<void> {
+    if (!this.#redis) return;
+    await this.#markActive({ sessionId, apiKey });
+  }
+
+  async getRecord({ sessionId }: { sessionId: string }): Promise<McpSessionRecordLookup> {
     if (!this.#redis) return { kind: "missing" };
-    const data = await this.#redis.get(`${LAYOUT[transport].record}${sessionId}`);
+    const recordKey = `${LAYOUT.record}${sessionId}`;
+    const data = await this.#redis.get(recordKey);
     if (!data) return { kind: "missing" };
     const stored = storedSessionSchema.parse(JSON.parse(data));
+    const secondsLeft = await this.#redis.ttl(recordKey);
     return {
       kind: "found",
+      expiresAt:
+        nowInstant().epochMilliseconds + (secondsLeft > 0 ? secondsLeft : LAYOUT.ttlSeconds) * 1000,
       apiKey: this.#cipher.decrypt(stored.encryptedApiKey),
       projectId: stored.projectId,
+      userId: stored.userId,
     };
   }
 
-  async remove({
-    transport,
-    sessionId,
-    apiKey,
-  }: {
-    transport: McpSessionTransport;
-    sessionId: string;
-    apiKey?: string;
-  }): Promise<void> {
+  async remove({ sessionId, apiKey }: { sessionId: string; apiKey?: string }): Promise<void> {
     if (!this.#redis) return;
-    const layout = LAYOUT[transport];
-    await this.#redis.del(`${layout.record}${sessionId}`);
-    if (apiKey !== undefined) {
-      await this.#redis.srem(`${layout.byKey}${hashApiKey(apiKey)}`, sessionId);
-    }
+    await this.#redis.del(`${LAYOUT.record}${sessionId}`);
+    if (apiKey !== undefined) await this.forgetKey({ sessionId, apiKey });
   }
 
-  async countLive({ apiKey }: { apiKey: string }): Promise<number> {
-    const streamable = await this.#countLiveOf({ transport: "streamable", apiKey });
-    const sse = await this.#countLiveOf({ transport: "sse", apiKey });
-    return streamable + sse;
+  async forgetKey({ sessionId, apiKey }: { sessionId: string; apiKey: string }): Promise<void> {
+    if (!this.#redis) return;
+    await this.#redis.zrem(activeKeyOf(apiKey), sessionId);
   }
 
-  async #countLiveOf({
-    transport,
-    apiKey,
-  }: {
-    transport: McpSessionTransport;
-    apiKey: string;
-  }): Promise<number> {
+  /** Entries older than a record's whole life are pruned on the way, so the set stays bounded. */
+  async countActive({ apiKey, since }: { apiKey: string; since: number }): Promise<number> {
     const redis = this.#redis;
     if (!redis) return 0;
-    const layout = LAYOUT[transport];
-    const setKey = `${layout.byKey}${hashApiKey(apiKey)}`;
-    let liveCount = 0;
-    for (const id of await redis.smembers(setKey)) {
-      if (await redis.exists(`${layout.record}${id}`)) {
-        liveCount++;
-      } else {
-        await redis.srem(setKey, id);
-      }
-    }
-    return liveCount;
+    const setKey = activeKeyOf(apiKey);
+    const oldestLive = nowInstant().epochMilliseconds - LAYOUT.ttlSeconds * 1000;
+    await redis.zremrangebyscore(setKey, "-inf", `(${oldestLive}`);
+    return (await redis.zrangebyscore(setKey, since, "+inf")).length;
   }
+
+  async #markActive({ sessionId, apiKey }: { sessionId: string; apiKey: string }): Promise<void> {
+    const redis = this.#redis;
+    if (!redis) return;
+    const setKey = activeKeyOf(apiKey);
+    await redis.zadd(setKey, nowInstant().epochMilliseconds, sessionId);
+    await redis.expire(setKey, LAYOUT.ttlSeconds);
+  }
+}
+
+function activeKeyOf(apiKey: string): string {
+  return `${LAYOUT.activeByKey}${hashApiKey(apiKey)}`;
 }

@@ -42,6 +42,7 @@ import {
   assertUploadFileWithinLimit,
 } from "../rules/dataset-row-limits.rules.ts";
 import { stripNullBytes } from "../rules/dataset-sanitize.rules.ts";
+import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
 import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
 import { DatasetChunkService } from "./dataset-chunk.service.ts";
 import { DatasetFileReaderService, type DatasetFileRow } from "./dataset-file-reader.service.ts";
@@ -50,6 +51,7 @@ import {
   type InlineAttachmentScope,
 } from "./dataset-inline-attachment.service.ts";
 import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
+import type { DatasetSingleFileService } from "./dataset-single-file.service.ts";
 
 const IMPORTABLE_FILENAME = /\.(csv|json|jsonl)$/i;
 
@@ -69,6 +71,8 @@ type DatasetUploadServiceOptions = {
   requestBounds: Pick<DatasetRequestBoundsService, "limits">;
   /** Stores the files a row carries inline and leaves their references. */
   inlineAttachments: Pick<DatasetInlineAttachmentService, "store">;
+  /** Appends to the previous release's single-file datasets where that release kept them. */
+  singleFile?: Pick<DatasetSingleFileService, "appendRecords">;
 };
 
 /** Owns upload lifecycle behavior; routes only see DatasetService's contract. */
@@ -83,6 +87,7 @@ export class DatasetUploadService implements DatasetUpload {
   private readonly storedObjects: StoredObjectApi;
   private readonly requestBounds: Pick<DatasetRequestBoundsService, "limits">;
   private readonly inlineAttachments: Pick<DatasetInlineAttachmentService, "store">;
+  private readonly singleFile: Pick<DatasetSingleFileService, "appendRecords"> | undefined;
 
   private constructor(options: DatasetUploadServiceOptions) {
     this.datasets = options.datasets;
@@ -91,6 +96,7 @@ export class DatasetUploadService implements DatasetUpload {
     this.storedObjects = options.storedObjects;
     this.requestBounds = options.requestBounds;
     this.inlineAttachments = options.inlineAttachments;
+    this.singleFile = options.singleFile;
     this.chunks = DatasetChunkService.create({ datasets: options.datasets });
   }
 
@@ -153,7 +159,9 @@ export class DatasetUploadService implements DatasetUpload {
       id: `${nowInstant().epochMilliseconds}-${index}`,
       entry,
     }));
-    if (dataset.contentLayout === "s3_jsonl") {
+    if (isSingleFileDataset(dataset) && this.singleFile) {
+      await this.singleFile.appendRecords({ dataset, records: stamped });
+    } else if (dataset.contentLayout === "s3_jsonl") {
       await this.chunks.append({
         dataset,
         projectId,
