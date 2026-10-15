@@ -2,7 +2,6 @@ import type { Authorization } from "@langwatch/authorization";
 import {
   type ClickHouseQueryClient,
   type IdIndexFlags,
-  idIndexMissWindow,
   indexedRead,
   indexWindow,
   ownProjectIdOf,
@@ -52,8 +51,8 @@ export class ClickHouseTraceIdIndexReadRepository extends TraceIdIndexReadReposi
       index: `${source}_id_index`,
       key: { TraceId: [...traceIds] },
     });
-    // Unseen by a ready index: read the recent partitions only, like indexedRead's miss probe.
-    const { fromMs, toMs } = bounds.n === 0 ? idIndexMissWindow() : indexWindow(bounds);
+    if (bounds.n === 0) return [];
+    const { fromMs, toMs } = indexWindow(bounds);
     return [{ fromMs, toMs }];
   }
 
