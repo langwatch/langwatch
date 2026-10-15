@@ -7,17 +7,10 @@ import (
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 )
 
-// reasoningDataPrefix marks a redacted_thinking `data` value minted by the
-// translated /v1/messages lane: `lwrs:<reasoning item id>:<encrypted content>`.
-//
-// OpenAI binds a reasoning item's encrypted_content to the item id it was
-// issued under and refuses the pair when the id differs ("Encrypted content
-// item_id did not match the target item id"). An Anthropic redacted_thinking
-// block has no id field, and the vendored converter gives every incoming one a
-// fresh random `rs_` id, so the second turn of any conversation with reasoning
-// failed. The id travels inside `data` instead, which Anthropic clients treat
-// as opaque and send back verbatim. No base64 alphabet contains ':', so the
-// prefix cannot collide with data minted by Anthropic itself.
+// reasoningDataPrefix marks redacted_thinking data minted by the translated
+// lane: `lwrs:<reasoning item id>:<encrypted content>`. OpenAI only accepts
+// encrypted reasoning under the item id it was issued with, and the block has
+// no id field. Spec: specs/ai-gateway/messages-translation.feature
 const reasoningDataPrefix = "lwrs:"
 
 // sealReasoningData returns the redacted_thinking data that carries itemID
@@ -93,7 +86,7 @@ func sealResponseReasoningData(resp *bfschemas.BifrostResponsesResponse, content
 		ids[*reasoning.EncryptedContent] = *resp.Output[i].ID
 	}
 	for i := range content {
-		sealBlockReasoningData(&content[i], ids[blockData(&content[i])])
+		sealBlockReasoningData(&content[i], ids[blockData(&content[i])], blockData(&content[i]))
 	}
 }
 
@@ -119,20 +112,90 @@ func exposeEncryptedReasoning(resp *bfschemas.BifrostResponsesResponse) {
 	}
 }
 
-// sealStreamReasoningData seals the redacted_thinking block a stream event
-// opens, using the id of the reasoning item that produced the event.
-func sealStreamReasoningData(resp *bfschemas.BifrostResponsesStreamResponse, ev *bfanthropic.AnthropicStreamEvent) {
-	if resp == nil || resp.Item == nil || resp.Item.ID == nil || ev == nil || ev.ContentBlock == nil {
-		return
-	}
-	sealBlockReasoningData(ev.ContentBlock, *resp.Item.ID)
+// heldReasoning is a redacted_thinking block opened by output_item.added,
+// kept back until output_item.done brings the completed encrypted content.
+type heldReasoning struct {
+	itemID string
+	block  *bfanthropic.AnthropicContentBlock
+	events []*bfanthropic.AnthropicStreamEvent
 }
 
-func sealBlockReasoningData(block *bfanthropic.AnthropicContentBlock, itemID string) {
-	if block.Type != bfanthropic.AnthropicContentBlockTypeRedactedThinking || block.Data == nil {
+// forward pushes one upstream event's conversions through the framer. A
+// redacted_thinking block is held until its reasoning item completes, because
+// OpenAI replays only the encrypted content of the completed item.
+func (it *anthropicTranslatedStreamIterator) forward(
+	resp *bfschemas.BifrostResponsesStreamResponse,
+	events []*bfanthropic.AnthropicStreamEvent,
+) {
+	if it.held != nil {
+		it.queueBehindHeldReasoning(resp, events)
 		return
 	}
-	block.Data = bfschemas.Ptr(sealReasoningData(itemID, *block.Data))
+	if resp.Type == bfschemas.ResponsesStreamResponseTypeOutputItemAdded && itemID(resp) != "" {
+		if block := redactedThinkingStart(events); block != nil {
+			sealBlockReasoningData(block, itemID(resp), blockData(block))
+			it.held = &heldReasoning{itemID: itemID(resp), block: block, events: events}
+			return
+		}
+	}
+	for _, ev := range events {
+		it.emit(it.framer.push(ev))
+	}
+}
+
+// queueBehindHeldReasoning keeps stream order while a reasoning block is held,
+// and releases it once its item completes with the final encrypted content.
+func (it *anthropicTranslatedStreamIterator) queueBehindHeldReasoning(
+	resp *bfschemas.BifrostResponsesStreamResponse,
+	events []*bfanthropic.AnthropicStreamEvent,
+) {
+	it.held.events = append(it.held.events, events...)
+	if resp.Type != bfschemas.ResponsesStreamResponseTypeOutputItemDone || itemID(resp) != it.held.itemID {
+		return
+	}
+	if reasoning := encryptedReasoning(resp.Item); reasoning != nil {
+		sealBlockReasoningData(it.held.block, it.held.itemID, *reasoning.EncryptedContent)
+	}
+	it.flushHeldReasoning()
+}
+
+func redactedThinkingStart(events []*bfanthropic.AnthropicStreamEvent) *bfanthropic.AnthropicContentBlock {
+	for _, ev := range events {
+		if ev != nil && ev.ContentBlock != nil && ev.ContentBlock.Type == bfanthropic.AnthropicContentBlockTypeRedactedThinking {
+			return ev.ContentBlock
+		}
+	}
+	return nil
+}
+
+// flushHeldReasoning releases a held reasoning block and everything queued
+// behind it. Terminal paths call it so a block is never lost.
+func (it *anthropicTranslatedStreamIterator) flushHeldReasoning() {
+	if it.held == nil {
+		return
+	}
+	held := it.held
+	it.held = nil
+	for _, ev := range held.events {
+		it.emit(it.framer.push(ev))
+	}
+}
+
+func itemID(resp *bfschemas.BifrostResponsesStreamResponse) string {
+	if resp == nil || resp.Item == nil || resp.Item.ID == nil {
+		return ""
+	}
+	return *resp.Item.ID
+}
+
+func sealBlockReasoningData(block *bfanthropic.AnthropicContentBlock, itemID, encrypted string) {
+	if block.Type != bfanthropic.AnthropicContentBlockTypeRedactedThinking || encrypted == "" {
+		return
+	}
+	if _, bare, ok := openReasoningData(encrypted); ok {
+		encrypted = bare
+	}
+	block.Data = bfschemas.Ptr(sealReasoningData(itemID, encrypted))
 }
 
 func blockData(block *bfanthropic.AnthropicContentBlock) string {

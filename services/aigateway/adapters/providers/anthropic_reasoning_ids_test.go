@@ -14,19 +14,19 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// These tests run the full translated round trip on the codex lane, whose
-// backend speaks the OpenAI Responses dialect: turn one returns encrypted
-// reasoning to an Anthropic client, the client sends it back on turn two, and
-// the backend must receive the reasoning item under the id it issued. OpenAI
-// refuses any other id with "Encrypted content item_id did not match".
+// The full translated round trip on the codex lane (Responses dialect): turn
+// two must send reasoning back under the item id OpenAI issued it with.
 //
 // Spec: specs/ai-gateway/messages-translation.feature
 
 const (
-	reasoningItemID   = "rs_0e10fe1109ef8c67016ad0a575499c87d1b08fdb6545251911"
-	reasoningCipher   = "gAAAAABq0KV1mR1ErATlkl_2uZVTgTgx1ZbHFOIg4KNIVwZ5KKkWl-xTcAiAspAdoleBL4OwFbvF=="
-	reasoningToolUser = `{"role":"user","content":"What is the weather in Paris? Use the tool."}`
-	reasoningTools    = `[{"name":"get_weather","description":"get weather","input_schema":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}]`
+	reasoningItemID = "rs_0e10fe1109ef8c67016ad0a575499c87d1b08fdb6545251911"
+	reasoningCipher = "gAAAAABq0KV1mR1ErATlkl_2uZVTgTgx1ZbHFOIg4KNIVwZ5KKkWl-xTcAiAspAdoleBL4OwFbvF=="
+	// OpenAI sends a provisional encrypted_content on output_item.added that
+	// differs from the completed item's; only the completed one is replayed.
+	reasoningCipherAdded = "gAAAAABq0KV1provisional=="
+	reasoningToolUser    = `{"role":"user","content":"What is the weather in Paris? Use the tool."}`
+	reasoningTools       = `[{"name":"get_weather","description":"get weather","input_schema":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}]`
 )
 
 // The stream OpenAI sends for a reasoning turn that ends in a tool call: the
@@ -34,7 +34,7 @@ const (
 const reasoningToolCallScript = "event: response.created\n" +
 	`data: {"type":"response.created","response":{"id":"resp_1"}}` + "\n\n" +
 	"event: response.output_item.added\n" +
-	`data: {"type":"response.output_item.added","output_index":0,"item":{"id":"` + reasoningItemID + `","type":"reasoning","summary":[],"content":[],"encrypted_content":"` + reasoningCipher + `"}}` + "\n\n" +
+	`data: {"type":"response.output_item.added","output_index":0,"item":{"id":"` + reasoningItemID + `","type":"reasoning","summary":[],"content":[],"encrypted_content":"` + reasoningCipherAdded + `"}}` + "\n\n" +
 	"event: response.output_item.done\n" +
 	`data: {"type":"response.output_item.done","output_index":0,"item":{"id":"` + reasoningItemID + `","type":"reasoning","summary":[],"content":[],"encrypted_content":"` + reasoningCipher + `"}}` + "\n\n" +
 	"event: response.output_item.added\n" +
@@ -102,7 +102,7 @@ func assertReasoningReturnedUnderItsID(t *testing.T, outbound []byte) {
 	assert.Equal(t, reasoningItemID, reasoning.Get("id").String(),
 		"the reasoning item must keep the id the provider issued, or OpenAI rejects its encrypted content")
 	assert.Equal(t, reasoningCipher, reasoning.Get("encrypted_content").String(),
-		"the encrypted content must arrive unchanged")
+		"the completed item's encrypted content must arrive unchanged")
 }
 
 // @scenario "Reasoning from a previous turn returns to the provider under its own item id"
