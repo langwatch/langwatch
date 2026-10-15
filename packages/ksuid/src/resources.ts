@@ -31,6 +31,7 @@ export const KSUID_RESOURCES = {
   SCENARIO_RUN: "scenariorun",
   SCENARIO_TEST_SUITE: "suite",
   SPAN: "span",
+  STORED_OBJECT: "storedobject",
   TEAM: "team",
   THREAD: "thread",
   TRIGGER: "trigger",
