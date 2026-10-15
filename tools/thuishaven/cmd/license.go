@@ -33,7 +33,7 @@ func loginSpec() commandSpec {
 func logoutSpec() commandSpec {
 	return commandSpec{
 		name:    "logout",
-		summary: "forget haven's LangWatch Cloud sign-in on this machine",
+		summary: "revoke haven's LangWatch Cloud token on Cloud, then forget it on this machine",
 		run:     runLogout,
 	}
 }
@@ -205,15 +205,44 @@ func (s cloudSignIn) status(asJSON bool) error {
 	return nil
 }
 
-func runLogout(_ context.Context, _ deps, _ invocation) error {
-	state := havenCloudState()
-	for _, path := range []string{state.loginPath(), state.pendingPath()} {
-		if err := state.remove(path); err != nil {
+func runLogout(ctx context.Context, _ deps, _ invocation) error {
+	return newCloudSignIn().logout(ctx)
+}
+
+// logout revokes the stored token on Cloud, then forgets it here even when Cloud cannot be
+// reached, saying so. A service token in LANGWATCH_TESTING_LICENSE_TOKEN is never touched.
+func (s cloudSignIn) logout(ctx context.Context) error {
+	var login cloudLogin
+	found, err := s.state.read(s.state.loginPath(), &login)
+	if err != nil {
+		return err
+	}
+	revokeErr := errNotSignedIn
+	if found && login.Token != "" {
+		revokeErr = s.revokeOnCloud(ctx, login)
+	}
+	for _, path := range []string{s.state.loginPath(), s.state.pendingPath()} {
+		if err := s.state.remove(path); err != nil {
 			return err
 		}
 	}
-	fmt.Println("signed out: haven forgot its LangWatch Cloud token on this machine")
+	switch {
+	case !found || login.Token == "":
+		_, _ = fmt.Fprintln(s.out, "haven was not signed in to LangWatch Cloud on this machine")
+	case revokeErr == nil:
+		_, _ = fmt.Fprintf(s.out, "signed out: the token is revoked on %s and forgotten on this machine\n", login.CloudURL)
+	default:
+		_, _ = fmt.Fprintf(s.out, "signed out on this machine only: haven could not revoke the token on %s (%v); an ops manager can revoke it in the ops console\n", login.CloudURL, revokeErr)
+	}
 	return nil
+}
+
+func (s cloudSignIn) revokeOnCloud(ctx context.Context, login cloudLogin) error {
+	cloud, err := s.newCloud(login.CloudURL)
+	if err != nil {
+		return err
+	}
+	return cloud.revoke(ctx, login.Token)
 }
 
 func runLicense(ctx context.Context, d deps, inv invocation) error {

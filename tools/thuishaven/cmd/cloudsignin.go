@@ -248,11 +248,22 @@ func (c cloudClient) post(ctx context.Context, path, bearer string, body any) (i
 	if err != nil {
 		return 0, nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+path, bytes.NewReader(payload))
+	return c.send(ctx, http.MethodPost, path, bearer, payload)
+}
+
+// send makes one request; a nil payload sends no body.
+func (c cloudClient) send(ctx context.Context, method, path, bearer string, payload []byte) (int, []byte, error) {
+	var body io.Reader
+	if payload != nil {
+		body = bytes.NewReader(payload)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, c.base+path, body)
 	if err != nil {
 		return 0, nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	if bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
@@ -265,9 +276,18 @@ func (c cloudClient) post(ctx context.Context, path, bearer string, body any) (i
 	return res.StatusCode, raw, err
 }
 
+// clientInfo names this machine, so the approval page can say which device is asking.
+func clientInfo() map[string]any {
+	hostname, _ := os.Hostname()
+	return map[string]any{"device_label": "haven on " + hostname, "hostname": hostname, "platform": runtime.GOOS}
+}
+
 // startLogin opens a device flow for a testing-license token.
 func (c cloudClient) startLogin(ctx context.Context) (pendingLogin, error) {
-	status, raw, err := c.post(ctx, "/api/auth/cli/device-code", "", map[string]any{"credential_type": "testing_license"})
+	status, raw, err := c.post(ctx, "/api/auth/cli/device-code", "", map[string]any{
+		"credential_type": "testing_license",
+		"client_info":     clientInfo(),
+	})
 	if err != nil {
 		return pendingLogin{}, err
 	}
@@ -303,11 +323,7 @@ func (c cloudClient) startLogin(ctx context.Context) (pendingLogin, error) {
 // slowing down when told to. A refusal, a denial or an expiry ends it with its reason.
 func (c cloudClient) awaitLogin(ctx context.Context, p pendingLogin) (cloudLogin, error) {
 	interval := max(time.Duration(p.IntervalSeconds)*time.Second, minPollInterval)
-	hostname, _ := os.Hostname()
-	body := map[string]any{
-		"device_code": p.DeviceCode,
-		"client_info": map[string]any{"device_label": "haven on " + hostname, "hostname": hostname, "platform": runtime.GOOS},
-	}
+	body := map[string]any{"device_code": p.DeviceCode, "client_info": clientInfo()}
 	for {
 		if err := c.sleep(ctx, interval); err != nil {
 			return cloudLogin{}, err
@@ -350,6 +366,18 @@ func (c cloudClient) loginFrom(raw []byte, p pendingLogin) (cloudLogin, error) {
 		login.ExpiresAt = expires
 	}
 	return login, nil
+}
+
+// revoke ends the token on Cloud. A 401 means Cloud already refuses it, which is the goal.
+func (c cloudClient) revoke(ctx context.Context, token string) error {
+	status, raw, err := c.send(ctx, http.MethodDelete, "/api/licensing/testing-licenses/token", token, nil)
+	if err != nil {
+		return err
+	}
+	if (status >= 200 && status < 300) || status == http.StatusUnauthorized {
+		return nil
+	}
+	return refusalOf(status, raw, token)
 }
 
 // issueRequest is what a stack asks for: its instance and its local organization.

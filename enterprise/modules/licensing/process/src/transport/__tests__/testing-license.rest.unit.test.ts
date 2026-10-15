@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The testing-licence route behind its own door (ADR-180 section 2): a personal token's person
- * is asked for ops:manage on every call, a service token stands alone, and the token opens
- * nothing else. Spec: specs/self-hosting/connected-services/testing-licenses.feature
+ * The testing-licence routes (ADR-180 section 2): the person a token acts as, for a service token
+ * its maker, is asked ops:manage on every call; the token issues licences and revokes itself only.
+ * Spec: specs/self-hosting/connected-services/testing-licenses.feature
  */
 import { createCanonicalFamilyErrorHandler, createRestRuntime } from "@langwatch/api/rest";
 import {
@@ -27,7 +27,7 @@ const EXPIRED = "lwtl_expired";
 
 const ISSUERS: Readonly<Record<string, TestingLicenseIssuer>> = {
   [PERSONAL]: { kind: "personal", tokenId: "token-personal", userId: "dev-1" },
-  [SERVICE]: { kind: "service", tokenId: "token-service", name: "GitHub Actions" },
+  [SERVICE]: { kind: "service", tokenId: "token-service", userId: "ops-1" },
 };
 
 const issued = {
@@ -36,20 +36,38 @@ const issued = {
   expiresAt: "2026-01-06T00:00:00Z",
 };
 
-async function verifyTestingLicenseToken({
-  bearer,
-}: {
-  bearer: string | null;
-}): Promise<TestingLicenseIssuer> {
-  if (bearer === REVOKED) throw new TestingLicenseTokenRevokedError();
-  if (bearer === EXPIRED) throw new TestingLicenseTokenExpiredError();
-  const issuer = bearer === null ? undefined : ISSUERS[bearer];
-  if (!issuer) throw new TestingLicenseTokenInvalidError();
-  return issuer;
-}
-
 function mount({ operators }: { operators: Set<string> }) {
+  const revokedTokenIds = new Set<string>();
+  const verifyTestingLicenseToken = async ({
+    bearer,
+  }: {
+    bearer: string | null;
+  }): Promise<TestingLicenseIssuer> => {
+    if (bearer === REVOKED) throw new TestingLicenseTokenRevokedError();
+    if (bearer === EXPIRED) throw new TestingLicenseTokenExpiredError();
+    const issuer = bearer === null ? undefined : ISSUERS[bearer];
+    if (!issuer) throw new TestingLicenseTokenInvalidError();
+    if (revokedTokenIds.has(issuer.tokenId)) throw new TestingLicenseTokenRevokedError();
+    return issuer;
+  };
   const issueTestingLicense = vi.fn().mockResolvedValue(issued);
+  const revokeTestingLicenseToken = vi.fn(
+    async ({ id, operatorId }: { id: string; operatorId: string }) => {
+      revokedTokenIds.add(id);
+      return {
+        id,
+        kind: "personal" as const,
+        name: null,
+        ownerUserId: operatorId,
+        expiresAt: "2026-04-01T00:00:00Z",
+        revokedAt: "2026-01-01T00:00:00Z",
+        revokedById: operatorId,
+        lastUsedAt: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        status: "revoked" as const,
+      };
+    },
+  );
   const verifyTesting = vi.fn(verifyTestingLicenseToken);
   const verifiers = createApiFixture<LicensingApi>({
     verifyTestingLicenseToken: verifyTesting,
@@ -86,7 +104,7 @@ function mount({ operators }: { operators: Set<string> }) {
   });
   const recordLicenseSync = vi.fn();
   const testing = runtime.mount(testingLicenseRest.router(), {
-    app: () => createApiFixture<LicensingApi>({ issueTestingLicense }),
+    app: () => createApiFixture<LicensingApi>({ issueTestingLicense, revokeTestingLicenseToken }),
     credential: "testing_license_token",
     onError,
   });
@@ -106,7 +124,23 @@ function mount({ operators }: { operators: Set<string> }) {
         body: JSON.stringify(body),
       }),
     );
-  return { ask, connect, issueTestingLicense, recordLicenseSync, verifyTesting, asked };
+  const signOut = (bearer: string) =>
+    testing.fetch(
+      new Request("http://api.test/api/licensing/testing-licenses/token", {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${bearer}` },
+      }),
+    );
+  return {
+    ask,
+    signOut,
+    connect,
+    issueTestingLicense,
+    revokeTestingLicenseToken,
+    recordLicenseSync,
+    verifyTesting,
+    asked,
+  };
 }
 
 describe("asking for a testing licence", () => {
@@ -171,26 +205,34 @@ describe("asking for a testing licence", () => {
     });
   });
 
-  describe("given a service token", () => {
+  describe("given a service token whose maker holds ops permissions", () => {
     /** @scenario "CI gets a testing license through a service token" */
-    it("issues it with no person present, naming the service token", async () => {
-      const { ask, issueTestingLicense, asked } = mount({ operators: new Set() });
+    it("issues it with no person present, asking and naming the person who made it", async () => {
+      const { ask, issueTestingLicense, asked } = mount({ operators: new Set(["ops-1"]) });
 
       const response = await ask(SERVICE);
 
       expect(response.status).toBe(201);
-      expect(asked).toEqual([]);
+      expect(asked).toEqual(["ops-1"]);
       expect(issueTestingLicense).toHaveBeenCalledWith(
         expect.objectContaining({ issuer: ISSUERS[SERVICE] }),
       );
     });
+  });
 
-    /** @scenario "A service token outlives the person who made it" */
-    it("asks nothing of the person who made it", async () => {
-      const { ask, asked } = mount({ operators: new Set() });
-
+  describe("given a service token whose maker lost ops permissions after an earlier issue", () => {
+    /** @scenario "A service token stops when the person who made it loses ops permissions" */
+    it("refuses the token on the next ask, and nothing more is issued", async () => {
+      const operators = new Set(["ops-1"]);
+      const { ask, issueTestingLicense } = mount({ operators });
       expect((await ask(SERVICE)).status).toBe(201);
-      expect(asked).toEqual([]);
+
+      operators.delete("ops-1");
+      const response = await ask(SERVICE);
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: "permission_denied" });
+      expect(issueTestingLicense).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -211,7 +253,47 @@ describe("asking for a testing licence", () => {
   });
 });
 
+describe("signing a token out", () => {
+  describe("given a person's token", () => {
+    /** @scenario "Signing haven out revokes its token on Cloud" */
+    it("revokes that token as its person, and a later ask with it is refused", async () => {
+      const { ask, signOut, revokeTestingLicenseToken, issueTestingLicense } = mount({
+        operators: new Set(["dev-1"]),
+      });
+
+      const response = await signOut(PERSONAL);
+      const later = await ask(PERSONAL);
+
+      expect(response.status).toBe(200);
+      expect(revokeTestingLicenseToken).toHaveBeenCalledWith({
+        id: "token-personal",
+        operatorId: "dev-1",
+      });
+      expect(later.status).toBe(401);
+      expect(await later.json()).toMatchObject({ code: "testing_license_token_revoked" });
+      expect(issueTestingLicense).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("a testing licence token presented anywhere else", () => {
+  describe("given the sign-out route", () => {
+    /** @scenario "The signed-in token can only issue testing licenses" */
+    it("revokes only the token presented, never another", async () => {
+      const { signOut, revokeTestingLicenseToken } = mount({
+        operators: new Set(["dev-1", "ops-1"]),
+      });
+
+      await signOut(SERVICE);
+
+      expect(revokeTestingLicenseToken).toHaveBeenCalledTimes(1);
+      expect(revokeTestingLicenseToken).toHaveBeenCalledWith({
+        id: "token-service",
+        operatorId: "ops-1",
+      });
+    });
+  });
+
   describe("given the connect host's sync route", () => {
     /** @scenario "The signed-in token can only issue testing licenses" */
     it("is refused by that route's own door, which never asks the testing door", async () => {

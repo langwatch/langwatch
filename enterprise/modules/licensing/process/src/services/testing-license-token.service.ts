@@ -1,6 +1,7 @@
 /**
  * The tokens that can only ask for a testing licence (ADR-180 section 2): minted for a person
- * by the CLI sign-in, or for CI by an ops manager; verified by the door on every ask.
+ * by the CLI sign-in, or for CI by an ops manager. Every token acts as the person who made it,
+ * whom the door hands on and asks for ops permissions on every call.
  */
 
 import {
@@ -47,7 +48,7 @@ export class TestingLicenseTokenService {
     private readonly now: () => Instant,
   ) {}
 
-  /** Who holds a presented bearer; unknown, expired and revoked are each refused by code. */
+  /** The user a bearer belongs to; unknown, expired and revoked are each refused by code. */
   async verify({ bearer }: { bearer: string | null }): Promise<TestingLicenseIssuer> {
     if (!isTestingLicenseTokenShaped(bearer)) throw new TestingLicenseTokenInvalidError();
     const [row] = await this.repository.findByTokenHash(testingLicenseTokenHash(bearer));
@@ -57,9 +58,7 @@ export class TestingLicenseTokenService {
     if (status === "revoked") throw new TestingLicenseTokenRevokedError();
     if (status === "expired") throw new TestingLicenseTokenExpiredError();
 
-    return row.kind === "personal"
-      ? { kind: "personal", tokenId: row.id, userId: row.ownerUserId }
-      : { kind: "service", tokenId: row.id, name: row.name ?? "" };
+    return { kind: row.kind, tokenId: row.id, userId: row.ownerUserId };
   }
 
   /** A personal token for the person a CLI sign-in approved. */
@@ -77,7 +76,7 @@ export class TestingLicenseTokenService {
     return { token, expiresAt: row.expiresAt.toString() };
   }
 
-  /** A named CI token, standing on its own once made; past a year is refused. */
+  /** A named CI token acting as the ops manager who made it; past a year is refused. */
   async createService({
     name,
     expiresInDays,
@@ -111,7 +110,7 @@ export class TestingLicenseTokenService {
     return { tokens: rows.map((row) => this.view(row)), total };
   }
 
-  /** Any ops manager may revoke any token; revoking twice leaves the first revocation. */
+  /** Any ops manager may revoke any token, and its user their own; twice keeps the first. */
   async revoke({
     id,
     operatorId,

@@ -1,6 +1,6 @@
 /**
- * The testing-licence token door (ADR-180 section 2): a personal token is its person, asked the
- * route's platform permission on every call; a service token is no person and stands alone.
+ * The testing-licence token door (ADR-180 section 2): every token, personal or service, acts as
+ * the person who made it, asked the route's platform permission on every call.
  * Spec: packages/api/specs/transport-declaration-split.feature
  */
 import { HandledError } from "@langwatch/handled-error";
@@ -36,7 +36,7 @@ const Api = moduleApi<{
   verify(input: { bearer: string | null }): Promise<{
     tokenId: string;
     kind: "personal" | "service";
-    ownerUserId: string;
+    userId: string | null;
   }>;
 }>()("licensing");
 
@@ -75,15 +75,16 @@ const testingDoor = defineRestDoor("testing_license_token", {
     const token = await service.verify({ bearer });
     return {
       scope: null,
-      actor: token.kind === "personal" ? { type: "user", id: token.ownerUserId } : null,
+      actor: token.userId === null ? null : { type: "user", id: token.userId },
       session: { tokenId: token.tokenId, kind: token.kind },
     };
   },
 });
 
 const TOKENS = {
-  lwtl_personal: { tokenId: "token-personal", kind: "personal", ownerUserId: "user-ops" },
-  lwtl_service: { tokenId: "token-service", kind: "service", ownerUserId: "user-gone" },
+  lwtl_personal: { tokenId: "token-personal", kind: "personal", userId: "user-ops" },
+  lwtl_service: { tokenId: "token-service", kind: "service", userId: "user-maker" },
+  lwtl_userless: { tokenId: "token-userless", kind: "service", userId: null },
 } as const;
 
 function harness({ operators }: { operators: Set<string> }) {
@@ -114,7 +115,10 @@ function harness({ operators }: { operators: Set<string> }) {
       return input;
     },
     verify: async ({ bearer }: { bearer: string | null }) => {
-      const token = bearer === "lwtl_personal" || bearer === "lwtl_service" ? TOKENS[bearer] : null;
+      const token =
+        bearer === "lwtl_personal" || bearer === "lwtl_service" || bearer === "lwtl_userless"
+          ? TOKENS[bearer]
+          : null;
       if (!token) throw new TokenRefusedError();
       return token;
     },
@@ -134,7 +138,7 @@ function harness({ operators }: { operators: Set<string> }) {
 
 describe("the testing license token door", () => {
   describe("given a personal token whose person holds the platform permission", () => {
-    /** @scenario "The testing licence token door asks a person's platform grant and admits a service token alone" */
+    /** @scenario "The testing licence token door asks the token's user for the platform grant on every call" */
     it("asks that person on this call and runs the handler as them", async () => {
       const { post, asked } = harness({ operators: new Set(["user-ops"]) });
 
@@ -147,7 +151,7 @@ describe("the testing license token door", () => {
   });
 
   describe("given the person no longer holds it", () => {
-    /** @scenario "The testing licence token door asks a person's platform grant and admits a service token alone" */
+    /** @scenario "The testing licence token door asks the token's user for the platform grant on every call" */
     it("refuses the next call before the body is read, and the handler never runs", async () => {
       const operators = new Set(["user-ops"]);
       const { post, handled } = harness({ operators });
@@ -162,21 +166,51 @@ describe("the testing license token door", () => {
     });
   });
 
-  describe("given a service token the door verified", () => {
-    /** @scenario "The testing licence token door asks a person's platform grant and admits a service token alone" */
-    it("runs the handler with no actor and asks no person", async () => {
-      const { post, asked } = harness({ operators: new Set() });
+  describe("given a service token whose maker holds the platform permission", () => {
+    /** @scenario "The testing licence token door asks the token's user for the platform grant on every call" */
+    it("asks the person who made it, the same as a personal token, and runs as them", async () => {
+      const { post, asked } = harness({ operators: new Set(["user-maker"]) });
 
       const response = await post("lwtl_service");
 
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ tokenId: "token-service", actorId: null });
+      expect(await response.json()).toEqual({
+        tokenId: "token-service",
+        actorId: "user-maker",
+      });
+      expect(asked).toEqual(["user-maker"]);
+    });
+  });
+
+  describe("given a service token whose maker no longer holds the platform permission", () => {
+    /** @scenario "The testing licence token door asks the token's user for the platform grant on every call" */
+    it("refuses its token, and the handler never runs", async () => {
+      const { post, handled } = harness({ operators: new Set() });
+
+      const response = await post("lwtl_service");
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: "permission_denied" });
+      expect(handled).toEqual([]);
+    });
+  });
+
+  describe("given a token the door verified but handed no user for", () => {
+    /** @scenario "The testing licence token door asks the token's user for the platform grant on every call" */
+    it("refuses it without asking anyone, and the handler never runs", async () => {
+      const { post, asked, handled } = harness({ operators: new Set(["user-maker"]) });
+
+      const response = await post("lwtl_userless");
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: "permission_denied" });
       expect(asked).toEqual([]);
+      expect(handled).toEqual([]);
     });
   });
 
   describe("given a bearer the module refuses", () => {
-    /** @scenario "The testing licence token door asks a person's platform grant and admits a service token alone" */
+    /** @scenario "The testing licence token door asks the token's user for the platform grant on every call" */
     it("answers the module's refusal and runs nothing", async () => {
       const { post, handled } = harness({ operators: new Set(["user-ops"]) });
 
@@ -189,7 +223,7 @@ describe("the testing license token door", () => {
   });
 
   describe("given a route behind the door that declares no platform permission", () => {
-    /** @scenario "The testing licence token door asks a person's platform grant and admits a service token alone" */
+    /** @scenario "The testing licence token door asks the token's user for the platform grant on every call" */
     it("refuses the mount, naming the route", () => {
       const { server, service, bindings } = harness({ operators: new Set() });
 

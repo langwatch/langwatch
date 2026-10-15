@@ -1,6 +1,6 @@
 /**
  * Issues a testing licence to a caller the testing-licence token door let in (ADR-180 section 2).
- * The door already asked a personal token's person for ops permissions on this call.
+ * The door already asked the person the token acts as for ops permissions on this call.
  */
 
 import {
@@ -48,8 +48,8 @@ export class TestingLicenseIssueService {
       instanceId,
       organizationId,
       expiresAt: expiry.expiresAt,
-      // The registry names the person, or the service token whose row holds its name.
-      issuedById: issuer.kind === "personal" ? issuer.userId : issuer.tokenId,
+      // The registry names the person the token acts as, for a service token its maker.
+      issuedById: issuer.userId,
     });
     await this.tokens.recordUse({ tokenId: issuer.tokenId });
 

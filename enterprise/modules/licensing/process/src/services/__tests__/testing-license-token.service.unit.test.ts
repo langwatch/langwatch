@@ -1,6 +1,6 @@
 /**
  * The tokens that can only ask for a testing licence (ADR-180 section 2): created by an ops
- * manager for CI, refused once revoked or expired, standing alone from whoever made them.
+ * manager for CI, refused once revoked or expired, always verified as the person who made them.
  * Spec: specs/self-hosting/connected-services/testing-licenses.feature
  */
 import { HandledError } from "@langwatch/handled-error";
@@ -102,16 +102,16 @@ describe("a service token", () => {
     });
   });
 
-  describe("when the person who made it no longer holds ops permissions", () => {
-    /** @scenario "A service token outlives the person who made it" */
-    it("still verifies as the service token, naming no person", async () => {
+  describe("when it is verified", () => {
+    /** @scenario "A service token stops when the person who made it loses ops permissions" */
+    it("answers the person who made it, whom the door then asks for ops permissions", async () => {
       const { tokens } = harness();
-      const minted = await tokens.createService({ name: "GitHub Actions", operatorId: "ops-gone" });
+      const minted = await tokens.createService({ name: "GitHub Actions", operatorId: "ops-1" });
 
       await expect(tokens.verify({ bearer: minted.token })).resolves.toEqual({
         kind: "service",
         tokenId: minted.testingLicenseToken.id,
-        name: "GitHub Actions",
+        userId: "ops-1",
       });
     });
   });
@@ -170,6 +170,22 @@ describe("a personal token", () => {
 
       expect(issuer).toMatchObject({ kind: "personal", userId: "dev-1" });
       expect(minted.expiresAt).toBe("2026-04-01T00:00:00Z");
+    });
+  });
+
+  describe("when its person revokes it", () => {
+    /** @scenario "Signing haven out revokes its token on Cloud" */
+    it("is refused as revoked on the next ask, naming its person as the revoker", async () => {
+      const { tokens } = harness();
+      const minted = await tokens.mintPersonal({ userId: "dev-1" });
+      const issuer = await tokens.verify({ bearer: minted.token });
+
+      const revoked = await tokens.revoke({ id: issuer.tokenId, operatorId: issuer.userId });
+
+      expect(revoked).toMatchObject({ status: "revoked", revokedById: "dev-1" });
+      await expect(codeOf(tokens.verify({ bearer: minted.token }))).resolves.toBe(
+        "testing_license_token_revoked",
+      );
     });
   });
 });

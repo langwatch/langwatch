@@ -9,7 +9,7 @@ import type { Instant } from "@langwatch/time";
 export interface TestingLicenseTokenRecord {
   id: string;
   kind: TestingLicenseTokenKind;
-  /** The person a personal token acts as, or who created a service token. */
+  /** The person who made the token and whom it acts as. */
   ownerUserId: string;
   /** A service token's name; null on a personal token. */
   name: string | null;

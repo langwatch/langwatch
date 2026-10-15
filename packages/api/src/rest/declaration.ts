@@ -254,11 +254,11 @@ export const DOOR_SCOPE_TIER = {
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
 
 /**
- * The doors whose caller may be a service credential no person stands behind (ADR-180 §2). Their
- * routes declare a platform permission, asked of the person behind a personal token on every call;
- * a caller the door identified as no person is admitted on the door's word alone. No other door is.
+ * The doors whose token always belongs to a user (ADR-180 §2): the door hands that user as the
+ * actor, and their routes' declared platform permission is asked of that user on every call
+ * through the request's own decisions. One rule for every token; none is admitted unasked.
  */
-export const SERVICE_CALLER_DOORS: ReadonlySet<RestDoorCredential> = new Set<RestDoorCredential>([
+export const USER_TOKEN_DOORS: ReadonlySet<RestDoorCredential> = new Set<RestDoorCredential>([
   "testing_license_token",
 ]);
 

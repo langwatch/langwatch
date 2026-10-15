@@ -1487,15 +1487,15 @@ model ActivationCode {
 }
 
 /// A token that can do one thing: ask Cloud for a testing licence (ADR-180 section 2).
-/// A personal token acts as its person, whose ops permission is asked on every use; a
-/// service token stands alone until it expires or is revoked. Only its hash is stored.
+/// Every token, personal or service, acts as the person who made it, whose ops permission
+/// is asked on every use (ADR-180 section 2). Only its hash is stored.
 model TestingLicenseToken {
   id          String    @id
   /// SHA-256 of the token. Looked up on every testing licence asked for.
   tokenHash   String    @unique
   /// `personal` or `service`.
   kind        String
-  /// The person a personal token acts as, or the person who created a service token.
+  /// The person who made the token and whom it acts as (ADR-180 section 2).
   ownerUserId String
   /// A service token's name, such as "GitHub Actions". Null on a personal token.
   name        String?

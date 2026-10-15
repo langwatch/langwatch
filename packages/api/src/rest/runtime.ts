@@ -75,7 +75,7 @@ import {
 } from "./credential.ts";
 import {
   DOOR_SCOPE_TIER,
-  SERVICE_CALLER_DOORS,
+  USER_TOKEN_DOORS,
   permissionOf,
   routePermissions,
   type RestDeprecation,
@@ -506,20 +506,16 @@ function assertDoorQuestions({
   door: RestIdentity;
   credential: RestDoorCredential;
 }): void {
-  if (
-    route.permissionPlatform &&
-    !door.authorizePlatform &&
-    !SERVICE_CALLER_DOORS.has(credential)
-  ) {
+  if (route.permissionPlatform && !door.authorizePlatform && !USER_TOKEN_DOORS.has(credential)) {
     throw new Error(
       `REST ${address} asks "${route.permission}" at the platform, and this runtime supplied no ` +
         "identity.authorizePlatform",
     );
   }
 
-  if (SERVICE_CALLER_DOORS.has(credential) && !route.permissionPlatform) {
+  if (USER_TOKEN_DOORS.has(credential) && !route.permissionPlatform) {
     throw new Error(
-      `REST ${address} answers behind the "${credential}" door, whose personal caller is asked a ` +
+      `REST ${address} answers behind the "${credential}" door, whose token's user is asked a ` +
         'platform permission on every call: declare one with { at: "platform" }',
     );
   }
@@ -2234,16 +2230,14 @@ async function platformCallerOf({
       throw refused && platform.refusal === "hidden" ? platformRefusal(platform) : error;
     },
   );
-  const serviceDoor = SERVICE_CALLER_DOORS.has(credential);
+  const userTokenDoor = USER_TOKEN_DOORS.has(credential);
 
-  // A service credential is no person: its door verified it, and nothing is asked (ADR-180 §2).
-  if (serviceDoor && caller.actor === null) return caller;
-
+  // Every caller is asked, a token's user included: a door that hands no user is refused here.
   await decidePlatform({
     declaration: platform,
     actor: caller.actor,
     // A module-bound door answers no platform question; the request's own decisions do, fresh.
-    ask: serviceDoor
+    ask: userTokenDoor
       ? (input) => authorization.forRequest(request).getPlatformDecision(input)
       : ({ permission }) => requireAuthorizePlatform(door)({ caller, permission }),
   });
@@ -2442,7 +2436,7 @@ function doorActorOf({
   credential: RestDoorCredential;
   actor: Actor | null;
 }): Actor | null {
-  const vouchesForAPerson = credential === "browser" || SERVICE_CALLER_DOORS.has(credential);
+  const vouchesForAPerson = credential === "browser" || USER_TOKEN_DOORS.has(credential);
   return !vouchesForAPerson && DOOR_SCOPE_TIER[credential] === null ? null : actor;
 }
 

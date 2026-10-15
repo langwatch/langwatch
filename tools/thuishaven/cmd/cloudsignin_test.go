@@ -20,11 +20,13 @@ const (
 
 // loginCloud stands in for Cloud's device flow; exchange answers the script in order.
 type loginCloud struct {
-	srv    *httptest.Server
-	mu     sync.Mutex
-	script []string
-	polls  int
-	asked  map[string]any
+	srv          *httptest.Server
+	mu           sync.Mutex
+	script       []string
+	polls        int
+	asked        map[string]any
+	revoked      []string // bearers the sign-out route revoked
+	revokeStatus int      // what the sign-out route answers; 200 when unset
 }
 
 func newLoginCloud(t *testing.T, script ...string) *loginCloud {
@@ -35,6 +37,18 @@ func newLoginCloud(t *testing.T, script ...string) *loginCloud {
 		defer c.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
+		case "/api/licensing/testing-licenses/token":
+			if r.Method != http.MethodDelete {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			if c.revokeStatus != 0 && c.revokeStatus != http.StatusOK {
+				w.WriteHeader(c.revokeStatus)
+				_, _ = w.Write([]byte(`{"code":"internal_error","message":"try later"}`))
+				return
+			}
+			c.revoked = append(c.revoked, strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+			_, _ = w.Write([]byte(`{"status":"revoked"}`))
 		case "/api/auth/cli/device-code":
 			_ = json.NewDecoder(r.Body).Decode(&c.asked)
 			_, _ = w.Write([]byte(`{"device_code":"` + testDeviceCode + `","user_code":"` + testUserCode + `","verification_uri":"` + c.srv.URL + `/cli/auth","verification_uri_complete":"` + c.srv.URL + `/cli/auth?user_code=` + testUserCode + `","expires_in":600,"interval":5}`))
@@ -72,6 +86,12 @@ func newLoginCloud(t *testing.T, script ...string) *loginCloud {
 	}))
 	t.Cleanup(c.srv.Close)
 	return c
+}
+
+func (c *loginCloud) revokedTokens() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]string(nil), c.revoked...)
 }
 
 func (c *loginCloud) pollCount() int {
@@ -133,6 +153,10 @@ func TestLoginPollsAtTheServersPaceAndKeepsTheTokenPrivate(t *testing.T) {
 
 	if cloud.asked["credential_type"] != "testing_license" {
 		t.Errorf("the device flow asked for %v, want a testing license", cloud.asked)
+	}
+	device, _ := cloud.asked["client_info"].(map[string]any)
+	if label, _ := device["device_label"].(string); !strings.HasPrefix(label, "haven on ") || device["platform"] == "" || device["hostname"] == nil {
+		t.Errorf("the device-code request named the device as %v, want haven's label, hostname and platform", cloud.asked["client_info"])
 	}
 	want := []time.Duration{5 * time.Second, 5 * time.Second, 10 * time.Second}
 	if len(rig.sleeps) != len(want) || rig.sleeps[0] != want[0] || rig.sleeps[1] != want[1] || rig.sleeps[2] != want[2] {
@@ -257,4 +281,65 @@ func TestLoginStatusNeverShowsTheToken(t *testing.T) {
 		t.Errorf("status after login said %q", rig.out.String())
 	}
 	rig.mustNotLeak(t)
+}
+
+// @scenario "Signing haven out revokes its token on Cloud"
+func TestLogoutRevokesTheTokenOnCloudThenForgetsIt(t *testing.T) {
+	cloud := newLoginCloud(t)
+	rig := newSignInRig(t, cloud)
+	writeTestLogin(t, rig.flow.state, cloud.srv.URL, testCloudToken)
+
+	if err := rig.flow.logout(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	if revoked := cloud.revokedTokens(); len(revoked) != 1 || revoked[0] != testCloudToken {
+		t.Errorf("Cloud revoked %d tokens, want exactly the stored one", len(revoked))
+	}
+	if _, err := os.Stat(rig.flow.state.loginPath()); !os.IsNotExist(err) {
+		t.Errorf("the login outlived the sign-out: %v", err)
+	}
+	if _, err := rig.flow.state.token(func(string) string { return "" }, time.Now()); err == nil {
+		t.Error("haven still has a token to ask with after signing out")
+	}
+	if !strings.Contains(rig.out.String(), "revoked on") {
+		t.Errorf("sign-out said %q, want it to say the token was revoked on Cloud", rig.out.String())
+	}
+	rig.mustNotLeak(t)
+}
+
+// @scenario "Signing haven out revokes its token on Cloud"
+func TestLogoutForgetsLocallyWhenCloudCannotRevoke(t *testing.T) {
+	cloud := newLoginCloud(t)
+	cloud.revokeStatus = http.StatusServiceUnavailable
+	rig := newSignInRig(t, cloud)
+	writeTestLogin(t, rig.flow.state, cloud.srv.URL, testCloudToken)
+
+	if err := rig.flow.logout(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(rig.flow.state.loginPath()); !os.IsNotExist(err) {
+		t.Errorf("the login outlived the sign-out: %v", err)
+	}
+	if !strings.Contains(rig.out.String(), "on this machine only") {
+		t.Errorf("sign-out said %q, want it to say Cloud did not revoke the token", rig.out.String())
+	}
+	rig.mustNotLeak(t)
+}
+
+func TestLogoutWithNoSignInAsksNothingOfCloud(t *testing.T) {
+	cloud := newLoginCloud(t)
+	rig := newSignInRig(t, cloud)
+
+	if err := rig.flow.logout(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	if revoked := cloud.revokedTokens(); len(revoked) != 0 {
+		t.Errorf("Cloud was asked to revoke %d tokens with nobody signed in", len(revoked))
+	}
+	if !strings.Contains(rig.out.String(), "not signed in") {
+		t.Errorf("sign-out said %q", rig.out.String())
+	}
 }

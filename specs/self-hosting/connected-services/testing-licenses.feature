@@ -122,21 +122,15 @@ Feature: Developer testing licenses
     Then it is refused and no license is written
 
   @unit
-  Scenario: A service token outlives the person who made it
-    Given a service account and token made by someone whose ops permissions were later removed
+  Scenario: A service token stops when the person who made it loses ops permissions
+    Given a service token made by someone who later lost their ops permissions on Cloud
     When the token asks for a testing license
-    Then it is issued, because the service account still holds the ops role
-
-  @unit
-  Scenario: Removing a service account's ops role ends its tokens
-    Given a service account whose token issued testing licenses before
-    When its ops role is removed
-    Then its token is refused on the next ask
+    Then it is refused, because a service token acts as the person who made it
 
   @unit
   Scenario: Ops managers see every service token and when it was last used
     When an ops manager opens the service token list
-    Then each token shows its name, who made it, its expiry and when it last issued a license
+    Then each token shows its name, kind, the person it belongs to, its expiry and when it last issued a license
     And any ops manager can revoke it
 
   @unit
@@ -238,4 +232,4 @@ Feature: Developer testing licenses
     Given a CI job holding a service token in its protected secrets
     When the job starts a stack asking for a testing license
     Then it gets the license without a person present
-    And the registry names the service token as the issuer
+    And the registry names the person who made the token as the issuer

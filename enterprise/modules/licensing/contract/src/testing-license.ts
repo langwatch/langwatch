@@ -7,14 +7,17 @@ import type { Named } from "@langwatch/module";
  */
 import { z } from "zod";
 
+/** A label for the ops screen: from the CLI sign-in, or made for CI. Both act as their maker. */
 export const testingLicenseTokenKindSchema = z.enum(["personal", "service"]);
 export type TestingLicenseTokenKind = z.infer<typeof testingLicenseTokenKindSchema>;
 
-/** Who asked, as the testing-licence token door verified the bearer. */
-const testingLicenseIssuerSchemaDefinition = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("personal"), tokenId: z.string(), userId: z.string() }),
-  z.object({ kind: z.literal("service"), tokenId: z.string(), name: z.string() }),
-]);
+/** Who asked, as the door verified the bearer: always the person the token acts as. */
+const testingLicenseIssuerSchemaDefinition = z.object({
+  kind: testingLicenseTokenKindSchema,
+  tokenId: z.string(),
+  /** The person the token belongs to and acts as. */
+  userId: z.string(),
+});
 export interface TestingLicenseIssuerSchema extends Named<
   typeof testingLicenseIssuerSchemaDefinition
 > {}
@@ -60,7 +63,7 @@ const testingLicenseTokenViewSchemaDefinition = z.object({
   kind: testingLicenseTokenKindSchema,
   /** A service token's name; null on a personal token. */
   name: z.string().nullable(),
-  /** The person a personal token acts as, or who created a service token. */
+  /** The person who made the token and whom it acts as. */
   ownerUserId: z.string(),
   expiresAt: z.string(),
   revokedAt: z.string().nullable(),

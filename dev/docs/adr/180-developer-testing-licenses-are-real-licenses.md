@@ -43,22 +43,22 @@ running stack trusts any key but the embedded production one.
 | When does an instance ask | Only when a developer asks for a gated feature (a haven flag or command), never on every boot                                                                                                                                   |
 | How long it lasts         | Picked when asked; default 5 days, at most 30; haven renews it before expiry while signed in                                                                                                                                    |
 | What it covers            | One local organization on one instance; Enterprise features; 10 full and 10 Lite seats; no hosted services, commit or overage                                                                                                   |
-| CI                        | A service account: a user on Cloud that cannot sign in, holding the ops role, created with its token in the ops console (expiring: default 90 days, at most a year). Removing its role or the account ends every token it holds |
+| CI | A service token: a kind of token a person with ops permissions creates in the ops console, named and expiring (default 90 days, at most a year). It acts as the person who made it, so it stops when they lose ops permissions; any ops manager can revoke it |
 | New operations            | `LicensingApi.issueTestingLicense`; creating, listing and revoking service tokens through `EnterpriseOpsApi` (the ops door and audit)                                                                                           |
 | Which builds accept it    | Source and release builds alike, verifying the same way                                                                                                                                                                         |
 
 Everything else reuses existing operations: sync, reissue and revoke, and the list and detail
 reads.
 
-Every token is a testing-licence token that reaches only `issueTestingLicense`; no token carries
-`ops:manage`, so a leaked one can do nothing else. A token always belongs to a user, and on every
-call Cloud asks that user's ops permission at platform scope: one rule, no service exception
-(Alex, 2026-10-15). A person's token is minted through the existing CLI browser sign-in
-(`/api/auth/cli`), which shows the device's name and requires ops permissions. A service account is
-a user who cannot sign in, holding the ops role, so its token is the same kind of token. A person
-revokes their own token (`haven logout` does so on Cloud), and an ops manager can revoke any. The
-registry names the user, person or service account, as the issuer of every licence; ops screens
-show names, not ids.
+Every token is a testing-licence token that reaches only `issueTestingLicense` and its own
+revocation; no token carries `ops:manage`, so a leaked one can do nothing else. A token always
+belongs to the person who made it, and on every call Cloud asks that person's ops permission at
+platform scope: one rule, no exception (Alex, 2026-10-15). There are no service accounts: a service
+token is a kind of token, not an account. A personal token is minted through the existing CLI
+browser sign-in (`/api/auth/cli`), which shows the device's name and requires ops permissions; a
+service token is created in the ops console for CI. A person revokes their own token (`haven
+logout` does so on Cloud), and an ops manager can revoke any. The registry names the person as the
+issuer of every licence; ops screens show names, not ids.
 
 ### 3. How a testing licence is marked and bound
 

@@ -26,8 +26,8 @@ export type DoorContract = {
     session: unknown;
   };
   /**
-   * A testing-licence token (ADR-180 section 2): a personal one acts as its person, a service
-   * one as no person. It names no tenant; its routes ask a platform permission of the person.
+   * A testing-licence token (ADR-180 section 2): personal or service, it always acts as the
+   * person who made it. It names no tenant; its routes ask that person a platform permission.
    */
   testing_license_token: {
     tier: null;

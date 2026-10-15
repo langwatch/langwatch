@@ -1904,8 +1904,8 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   key, bound by trace; verified before the body and handed over as `session`, Alex 2026-10-10 W02-DOOR-SHAPE), `licence_token` (a
   connect-host bearer, bound by licensing: a licence token on sync, an activation code looked up unclaimed on
   activate, which `redeemActivationCode` claims; Alex 2026-10-10 W02-ACTIVATE-DOOR), `testing_license_token` (a
-  testing-licence token, bound by licensing: a personal token acts as its person, asked its platform permission on
-  every call; a service token acts as no person and is admitted by its door alone; ADR-180 section 2).
+  testing-licence token, bound by licensing: every token, personal or service, acts as the person who made it,
+  asked its platform permission on every call; Alex 2026-10-15, ADR-180 section 2).
 - A module-bound door is `defineRestDoor(credential, { needs, identify })` typed by `DoorContract`; the framework hands it `{ bearer, request }`, a module binds `.withDoors({...})` keyed exactly by its routes' module-bound credentials, and a route naming a credential nobody bound refuses the boot (Alex 2026-10-10 TYPED-DOORS, W02-DOOR-BEARER).
 - The CLI token door hands a handler `session` beside `actor` (Alex, 2026-10-01): the route declares
   `.withCredential("cli_token", { session: schema })`, the framework parses it (a mismatch answers 401) and types

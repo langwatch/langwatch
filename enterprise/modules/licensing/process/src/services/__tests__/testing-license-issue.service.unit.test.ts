@@ -134,18 +134,18 @@ describe("issuing a testing licence", () => {
 
   describe("given a service token", () => {
     /** @scenario "CI gets a testing license through a service token" */
-    it("names the service token as the issuer and stamps its last use", async () => {
+    it("names the person who made the token as the issuer and stamps its last use", async () => {
       const { issuing, registry, tokens } = harness();
       const minted = await tokens.createService({ name: "GitHub Actions", operatorId: "ops-1" });
       const tokenId = minted.testingLicenseToken.id;
 
       const issued = await issuing.issue({
         ...ask,
-        issuer: { kind: "service", tokenId, name: "GitHub Actions" },
+        issuer: { kind: "service", tokenId, userId: "ops-1" },
       });
 
       await expect(registry.getById({ id: issued.issuedLicenseId })).resolves.toMatchObject({
-        issuedById: tokenId,
+        issuedById: "ops-1",
       });
       const listed = await tokens.list({ page: 0, pageSize: 10 });
       expect(listed.tokens[0]).toMatchObject({ id: tokenId, lastUsedAt: "2026-01-01T00:00:00Z" });

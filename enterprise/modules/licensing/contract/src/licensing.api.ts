@@ -299,13 +299,13 @@ export interface LicensingApi {
     lifetimeHours?: number;
     issuer: TestingLicenseIssuer;
   }): Promise<IssuedTestingLicense>;
-  /** The door's check on a testing-licence token: who holds it, or its refusal thrown. */
+  /** The door's check on a testing-licence token: the user it belongs to, or its refusal thrown. */
   verifyTestingLicenseToken(input: { bearer: string | null }): Promise<TestingLicenseIssuer>;
   /** A personal token for the person a CLI sign-in approved; the token is shown once. */
   mintPersonalTestingLicenseToken(input: {
     userId: string;
   }): Promise<{ token: string; expiresAt: string }>;
-  /** A named service token for CI, created by an ops manager; the token is shown once. */
+  /** A named token for CI, acting as the ops manager who made it; the token is shown once. */
   createTestingLicenseServiceToken(input: {
     name: string;
     expiresInDays?: number;
@@ -316,6 +316,7 @@ export interface LicensingApi {
     page: number;
     pageSize: number;
   }): Promise<TestingLicenseTokenPage>;
+  /** `operatorId` revokes it: an ops manager, or the token's own user signing out. */
   revokeTestingLicenseToken(input: {
     id: string;
     operatorId: string;
