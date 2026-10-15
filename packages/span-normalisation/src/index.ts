@@ -23,6 +23,7 @@ export {
 } from "./claude-code/claudeCodeCanonicaliser.ts";
 export { ClaudeCodeRequestService } from "./claude-code/claudeCodeRequest.ts";
 export { ClaudeCodeResponseService } from "./claude-code/claudeCodeResponse.ts";
+export { ClaudePlatformCanonicaliserService } from "./claudePlatformCanonicaliser.ts";
 export { CodexCanonicaliserService } from "./codex/codexCanonicaliser.ts";
 export type { CodexScopes } from "./codex/codexSpan.ts";
 export { CopilotCanonicaliserService } from "./copilotCanonicaliser.ts";
