@@ -32,6 +32,8 @@ type anthropicTranslatedStreamIterator struct {
 	// drained marks that the upstream channel closed and the terminal frames
 	// have been queued, so Next stops pulling from a closed channel.
 	drained bool
+	// held is a reasoning block waiting for its completed item.
+	held *heldReasoning
 }
 
 func (it *anthropicTranslatedStreamIterator) RawFraming() bool { return true }
@@ -131,10 +133,12 @@ func (it *anthropicTranslatedStreamIterator) Next(ctx context.Context) bool {
 				// the message_delta + message_stop the client is waiting for
 				// instead of letting the connection stall.
 				it.drained = true
+				it.flushHeldReasoning()
 				it.emit(it.framer.finish())
 				continue
 			}
 			if chunk.BifrostError != nil {
+				it.flushHeldReasoning()
 				it.emit(it.framer.closeAllBlocks(nil))
 				it.err = anthropicErrorFromBifrost(chunk.BifrostError)
 				it.drained = true
@@ -184,6 +188,7 @@ func (it *anthropicTranslatedStreamIterator) consume(resp *bfschemas.BifrostResp
 		// cause and reporting it as max_tokens would invite the client to
 		// continue a turn the provider refused.
 		it.framer.setStopReason(anthropicStopReasonForIncomplete(resp))
+		it.flushHeldReasoning()
 		it.emit(it.framer.finish())
 		return
 	case bfschemas.ResponsesStreamResponseTypeFailed:
@@ -191,6 +196,7 @@ func (it *anthropicTranslatedStreamIterator) consume(resp *bfschemas.BifrostResp
 		if resp.Message != nil && *resp.Message != "" {
 			msg = *resp.Message
 		}
+		it.flushHeldReasoning()
 		it.emit(it.framer.closeAllBlocks(nil))
 		it.err = anthropicUpstreamError(http.StatusBadGateway, msg)
 		it.drained = true
@@ -200,9 +206,7 @@ func (it *anthropicTranslatedStreamIterator) consume(resp *bfschemas.BifrostResp
 		// to map, or one it deliberately ignores.
 	}
 
-	for _, ev := range bfanthropic.ToAnthropicResponsesStreamResponse(it.bfCtx, resp) {
-		it.emit(it.framer.push(ev))
-	}
+	it.forward(resp, bfanthropic.ToAnthropicResponsesStreamResponse(it.bfCtx, resp))
 }
 
 // anthropicSSEFrame serializes one Anthropic stream event into SSE wire bytes.
