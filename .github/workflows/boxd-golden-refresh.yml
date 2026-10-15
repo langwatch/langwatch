@@ -24,7 +24,7 @@ env:
   SNAPSHOT: langwatch-main
   # Re-pin when boxd ships a new installer:
   #   curl -fsSL https://boxd.sh/downloads/cli/install.sh | sha256sum
-  BOXD_INSTALLER_SHA256: 935d59706c090a6ed8276c6a8635b1e24b5d9748cf14625365bccd445ee16343
+  BOXD_INSTALLER_SHA256: ecfd89f9fb1bc7a3e57ff303d8dad6161022e1f3b8d16fcb4fcaf556055752cf
   # Poll budgets, in seconds. They must sum to less than timeout-minutes below,
   # with headroom for the gates and the snapshot save, so that a stuck refresh
   # ends in this workflow's own diagnostics instead of a bare job cancellation.
