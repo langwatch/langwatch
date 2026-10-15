@@ -20,26 +20,37 @@ class ClickHouseTraceFacetEventsRepository {
     return new ClickHouseTraceFacetEventsRepository(ClickHouseTraceFacetQueryRepository.create());
   }
 
-  /**
-   * Discovers event names and their metric value aggregates in one query.
-   */
+  /** Event names with counts, joined to the metric buckets of events carrying `event.metrics.*`
+   * keys. Names read `Events.Name` alone; the map is read only where its keys subcolumn holds
+   * a metric key, gated in PREWHERE, so a granule without one never opens the values. */
   buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = this.facetQueries.buildTimeWhere("StartTime", ctx);
     const prefixFilter = ctx.prefix ? "AND lower(name) ILIKE concat({prefix:String}, '%')" : "";
     return {
       sql: `
         SELECT
-          name AS facet_value,
-          cnt,
+          names.name AS facet_value,
+          names.cnt AS cnt,
           arraySlice(
-            arrayReverseSort(x -> x.2, arrayZip(metric_buckets.1, metric_buckets.2)),
+            arrayReverseSort(x -> x.2, arrayZip(metrics.metric_buckets.1, metrics.metric_buckets.2)),
             1, ${METRIC_VALUES_TOP_N}
           ) AS metric_values,
           count() OVER () AS total_distinct
         FROM (
+          SELECT name, count() AS cnt
+          FROM (
+            SELECT arrayJoin(\`Events.Name\`) AS name
+            FROM stored_spans
+            WHERE ${where}
+              AND length(\`Events.Name\`) > 0
+          )
+          WHERE name != ''
+            ${prefixFilter}
+          GROUP BY name
+        ) AS names
+        LEFT JOIN (
           SELECT
             name,
-            count() AS cnt,
             sumMap(
               arrayMap(x -> concat(x.1, char(31), x.2), metric_entries),
               arrayMap(x -> toUInt64(1), metric_entries)
@@ -54,15 +65,18 @@ class ClickHouseTraceFacetEventsRepository {
             FROM (
               SELECT arrayJoin(arrayZip(\`Events.Name\`, \`Events.Attributes\`)) AS ev
               FROM stored_spans
+              PREWHERE arrayExists(
+                keys -> arrayExists(k -> startsWith(k, '${EVENT_METRICS_PREFIX}'), keys),
+                \`Events.Attributes\`.keys
+              )
               WHERE ${where}
-                AND length(\`Events.Name\`) > 0
             )
             WHERE ev.1 != ''
           )
           WHERE 1 = 1
             ${prefixFilter}
           GROUP BY name
-        )
+        ) AS metrics ON names.name = metrics.name
         ORDER BY cnt DESC
         LIMIT {limit:UInt32} OFFSET {offset:UInt32}
       `,
@@ -70,10 +84,14 @@ class ClickHouseTraceFacetEventsRepository {
         ...this.facetQueries.baseParams(ctx),
         ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
       },
-      // Zipping + flattening Events.Attributes over the whole window is the
-      // same shape that tripped MEMORY_LIMIT_EXCEEDED for the key-discovery
-      // facets — the spill + memory-cap guard is mandatory here too.
-      settings: KEY_DISCOVERY_SETTINGS,
+      settings: {
+        // The metric-key gate keeps the read small; the spill (both GROUP BYs) and the cap
+        // stay as the backstop. The join cannot spill and needs not: one row per event name.
+        ...KEY_DISCOVERY_SETTINGS,
+        // A name with no metric-bearing event misses the join and must read as an empty
+        // bucket list, which is what the sidebar expects, not NULL.
+        join_use_nulls: "0",
+      },
     };
   }
 }
