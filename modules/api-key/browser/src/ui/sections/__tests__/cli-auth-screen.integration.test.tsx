@@ -634,3 +634,54 @@ describe("given the CLI asked for a testing-license sign-in", () => {
     expect(screen.getByText(/Only people with ops permissions on LangWatch Cloud/)).toBeVisible();
   });
 });
+
+describe("given the CLI sent a device label with the sign-in", () => {
+  const lookupFor = ({
+    credentialType,
+    deviceLabel = "haven on alice-mbp",
+  }: {
+    credentialType: "testing_license" | "device_session";
+    deviceLabel?: string | undefined;
+  }) => ({
+    outcome: "pending" as const,
+    userCode: "WDJB-MJHT",
+    status: "pending",
+    expiresAt: Date.now() + 600_000,
+    credentialType,
+    management: false,
+    ...(deviceLabel ? { deviceLabel } : {}),
+  });
+
+  /** @scenario The browser sign-in page names the device that asked */
+  it("names the device in a testing-license sign-in instead of the generic wording", async () => {
+    const host = hostFor({ lookup: lookupFor({ credentialType: "testing_license" }) });
+    renderWithApiKeyHost(<CliAuthScreen />, host);
+
+    expect(
+      await screen.findByText(
+        /haven on alice-mbp will be able to issue developer testing licenses/,
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText(/the device that showed this code/)).toBeNull();
+  });
+
+  /** @scenario The browser sign-in page names the device that asked */
+  it("names the device for a device-session sign-in too", async () => {
+    const host = hostFor({ lookup: lookupFor({ credentialType: "device_session" }) });
+    renderWithApiKeyHost(<CliAuthScreen />, host);
+
+    expect(await screen.findByText(/Requested by haven on alice-mbp\./)).toBeVisible();
+  });
+
+  /** @scenario The browser sign-in page names the device that asked */
+  it("keeps the generic wording when no label came with the code", async () => {
+    const host = hostFor({
+      lookup: lookupFor({ credentialType: "testing_license", deviceLabel: "" }),
+    });
+    renderWithApiKeyHost(<CliAuthScreen />, host);
+
+    expect(
+      await screen.findByText(/haven on the device that showed this code will be able to issue/),
+    ).toBeVisible();
+  });
+});

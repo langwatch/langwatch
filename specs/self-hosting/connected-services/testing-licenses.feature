@@ -163,6 +163,14 @@ Feature: Developer testing licenses
     Then the approval carries the organization they picked and no key selection
     And if the approval is refused the page says only people with ops permissions on Cloud can approve it
 
+  @unit
+  Scenario: The browser sign-in page names the device that asked
+    Given a sign-in whose device code came with a device label such as "haven on alice-mbp"
+    When the person opens the browser sign-in page
+    Then the page names that device in place of "the device that showed this code"
+    And the label is shown as plain text, shortened if it is long
+    And a sign-in that came with no label keeps the generic wording
+
   # ============================================================================
   # Ops pages
   # ============================================================================

@@ -59,9 +59,9 @@ function testingLicenseWorld({ holdsOpsManage }: { holdsOpsManage: boolean }) {
   });
   const flow = CliDeviceFlowService.create({ collaborators });
 
-  async function start() {
+  async function start({ clientInfo }: { clientInfo?: Record<string, string> } = {}) {
     const started = await flow.startDeviceCode({
-      raw: JSON.stringify({ credential_type: "testing_license" }),
+      raw: JSON.stringify({ credential_type: "testing_license", client_info: clientInfo }),
     });
 
     return startedSchema.parse(started.body);
@@ -78,7 +78,11 @@ function testingLicenseWorld({ holdsOpsManage }: { holdsOpsManage: boolean }) {
     return flow.exchangeDeviceCode({ raw: JSON.stringify({ device_code: deviceCode }) });
   }
 
-  return { permissions, sessions, mintedFor, start, approve, exchange };
+  function lookup({ userCode }: { userCode: string }) {
+    return flow.lookupDeviceCode({ input: { user_code: userCode }, headers: new Headers() });
+  }
+
+  return { permissions, sessions, mintedFor, start, approve, exchange, lookup };
 }
 
 describe("the CLI device flow for a testing-licence token", () => {
@@ -136,6 +140,35 @@ describe("the CLI device flow for a testing-licence token", () => {
         httpStatus: 408,
       });
       expect(world.mintedFor).toEqual([]);
+    });
+  });
+
+  describe("when the CLI named its device at device-code time", () => {
+    /** @scenario The browser sign-in page names the device that asked */
+    it("hands the page the label as plain, capped display text", async () => {
+      const world = testingLicenseWorld({ holdsOpsManage: true });
+      const { user_code } = await world.start({
+        clientInfo: { device_label: `haven on\u0007 alice\nmbp ${"x".repeat(100)}` },
+      });
+
+      const looked = await world.lookup({ userCode: user_code });
+
+      const label = z.object({ device_label: z.string() }).parse(looked.body).device_label;
+      expect(label.startsWith("haven on alice mbp x")).toBe(true);
+      expect(label).not.toMatch(/\p{Cc}/u);
+      expect(label.length).toBeLessThanOrEqual(80);
+    });
+
+    /** @scenario The browser sign-in page names the device that asked */
+    it("leaves the label out when the CLI sent none", async () => {
+      const world = testingLicenseWorld({ holdsOpsManage: true });
+      const { user_code } = await world.start();
+
+      const looked = await world.lookup({ userCode: user_code });
+
+      expect(
+        z.object({ device_label: z.string().optional() }).parse(looked.body).device_label,
+      ).toBeUndefined();
     });
   });
 });

@@ -1,6 +1,17 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+const clientInfoSchemaDefinition = z
+  .object({
+    device_label: z.string().max(128).optional(),
+    hostname: z.string().max(255).optional(),
+    uname: z.string().max(64).optional(),
+    platform: z.string().max(32).optional(),
+  })
+  .optional();
+export interface ClientInfoSchema extends Named<typeof clientInfoSchemaDefinition> {}
+export const clientInfoSchema: ClientInfoSchema = clientInfoSchemaDefinition;
+
 const deviceCodeRequestSchemaDefinition = z.object({
   scopes: z.array(z.string()).optional(),
   credential_type: z
@@ -12,20 +23,11 @@ const deviceCodeRequestSchemaDefinition = z.object({
    * the ones the approving person holds.
    */
   management: z.boolean().default(false),
+  /** Who is asking, so the browser page can name the device. Display text only. */
+  client_info: clientInfoSchema,
 });
 export interface DeviceCodeRequestSchema extends Named<typeof deviceCodeRequestSchemaDefinition> {}
 export const deviceCodeRequestSchema: DeviceCodeRequestSchema = deviceCodeRequestSchemaDefinition;
-
-const clientInfoSchemaDefinition = z
-  .object({
-    device_label: z.string().max(128).optional(),
-    hostname: z.string().max(255).optional(),
-    uname: z.string().max(64).optional(),
-    platform: z.string().max(32).optional(),
-  })
-  .optional();
-export interface ClientInfoSchema extends Named<typeof clientInfoSchemaDefinition> {}
-export const clientInfoSchema: ClientInfoSchema = clientInfoSchemaDefinition;
 
 const exchangeRequestSchemaDefinition = z.object({
   device_code: z.string().min(1),

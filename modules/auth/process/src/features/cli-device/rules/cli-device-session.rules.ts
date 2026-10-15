@@ -78,6 +78,8 @@ export interface CliDeviceCodeRecord {
    * Absent on records minted before the field, which read as not asked.
    */
   management?: boolean;
+  /** What the CLI said about its device when it asked; display text, never trusted. */
+  client_info?: CliClientInfo;
   /** Set after browser-side approval. */
   user_id?: string;
   organization_id?: string;

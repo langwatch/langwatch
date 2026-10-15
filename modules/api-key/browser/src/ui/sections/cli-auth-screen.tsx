@@ -74,6 +74,10 @@ function userCodeOf(reading: ApiKeyRouteReading): string {
   return reading.query.user_code ?? "";
 }
 
+function deviceLabelOf(lookup: DeviceCodeLookupState): string | undefined {
+  return lookup.kind === "ready" ? lookup.deviceLabel : undefined;
+}
+
 function expiryTextFor(lookup: DeviceCodeLookupState): string | null {
   if (lookup.kind !== "ready") return null;
   const seconds = Math.max(
@@ -84,8 +88,11 @@ function expiryTextFor(lookup: DeviceCodeLookupState): string | null {
   return minutes > 0 ? `Expires in ~${minutes} min` : `Expires in ${seconds}s`;
 }
 
-const TESTING_LICENSE_EXPLANATION =
-  "haven on the device that showed this code will be able to issue developer testing licenses in your name, for as long as you hold ops permissions on LangWatch Cloud.";
+const UNNAMED_DEVICE = "haven on the device that showed this code";
+
+function testingLicenseExplanation({ deviceLabel }: { deviceLabel: string | undefined }): string {
+  return `${deviceLabel ?? UNNAMED_DEVICE} will be able to issue developer testing licenses in your name, for as long as you hold ops permissions on LangWatch Cloud.`;
+}
 
 function subTitleFor({ credentialType }: { credentialType: CliCredentialType }): string {
   if (credentialType === "project_api_key") return "The CLI is requesting a project SDK API key";
@@ -95,12 +102,19 @@ function subTitleFor({ credentialType }: { credentialType: CliCredentialType }):
   return "Signs in this device for AI-tool wrappers and governance commands";
 }
 
-function introFor({ credentialType }: { credentialType: CliCredentialType }): string {
+function introFor({
+  credentialType,
+  deviceLabel,
+}: {
+  credentialType: CliCredentialType;
+  deviceLabel: string | undefined;
+}): string {
+  if (credentialType === "testing_license") return testingLicenseExplanation({ deviceLabel });
+  const requestedBy = deviceLabel ? ` Requested by ${deviceLabel}.` : "";
   if (credentialType === "project_api_key") {
-    return "Pick a project, its API key flows back to your terminal automatically, with no copy-paste.";
+    return `Pick a project, its API key flows back to your terminal automatically, with no copy-paste.${requestedBy}`;
   }
-  if (credentialType === "testing_license") return TESTING_LICENSE_EXPLANATION;
-  return "Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands.";
+  return `Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands.${requestedBy}`;
 }
 
 const TESTING_LICENSE_REFUSED_MESSAGE =
@@ -456,6 +470,7 @@ export default function CliAuthScreen() {
           <CodeConfirmation
             userCode={userCode}
             credentialType={credentialType}
+            deviceLabel={deviceLabelOf(lookup)}
             expiryText={expiryTextFor(lookup)}
             isSubmitting={isSubmitting}
             onConfirm={() => setConfirmedUserCode(userCode)}
@@ -597,6 +612,7 @@ function LookupStatus({ userCode, lookup }: { userCode: string; lookup: DeviceCo
 function CodeConfirmation({
   userCode,
   credentialType,
+  deviceLabel,
   expiryText,
   isSubmitting,
   onConfirm,
@@ -604,6 +620,7 @@ function CodeConfirmation({
 }: {
   userCode: string;
   credentialType: CliCredentialType;
+  deviceLabel: string | undefined;
   expiryText: string | null;
   isSubmitting: boolean;
   onConfirm: () => void;
@@ -612,7 +629,7 @@ function CodeConfirmation({
   return (
     <>
       <Text textStyle="sm" color="fg.muted" lineHeight="tall">
-        {introFor({ credentialType })}
+        {introFor({ credentialType, deviceLabel })}
       </Text>
       <Box
         bg="bg.subtle"

@@ -18,6 +18,7 @@ export type DeviceCodeLookupState =
       expiresAt: number;
       credentialType: CliCredentialType;
       management: boolean;
+      deviceLabel?: string;
     }
   | { kind: "error"; message: string }
   | { kind: "expired" };
@@ -47,6 +48,7 @@ function lookupStateFrom({
         expiresAt: result.expiresAt,
         credentialType: result.credentialType,
         management: result.management,
+        ...(result.deviceLabel ? { deviceLabel: result.deviceLabel } : {}),
       };
   }
 }

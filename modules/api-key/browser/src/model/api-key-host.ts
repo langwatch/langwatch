@@ -97,6 +97,8 @@ export type CliDeviceCodeLookup =
       credentialType: CliCredentialType;
       /** Whether the CLI asked for management access (`langwatch login --management`). */
       management: boolean;
+      /** What the CLI called its device; untrusted plain text, absent when it said nothing. */
+      deviceLabel?: string;
     }
   | { outcome: "expired" }
   | { outcome: "unknown" }

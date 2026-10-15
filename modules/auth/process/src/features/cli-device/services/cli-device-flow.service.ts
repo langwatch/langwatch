@@ -13,6 +13,7 @@ import type * as zodModule from "zod";
 import type { CliAccessProject } from "../../../services/api-rest-credentials.service.ts";
 import {
   answer,
+  displayDeviceLabel,
   expired,
   posted,
   type CliDeviceFlowAnswer,
@@ -203,6 +204,7 @@ async function startDeviceFlow({
   const record = await flow.sessions().startDeviceCode({
     credentialType: parsed.data.credential_type,
     management: parsed.data.management,
+    clientInfo: parsed.data.client_info,
   });
   const verificationUri = verificationUriOf(flow);
 
@@ -252,6 +254,8 @@ async function lookupDeviceFlow({
     // The approval screen adds management access to the key's default
     // permissions when the CLI asked for it with `--management`.
     management: record.management === true,
+    // Untrusted text the CLI sent; the page shows it as plain text only.
+    ...deviceLabelOf(record.client_info?.device_label),
   });
 }
 
@@ -275,4 +279,10 @@ async function denyDeviceFlow({
   await flow.sessions().denyDeviceCodeByUserCode(parsed.data.user_code);
 
   return answer({ ok: true });
+}
+
+/** The lookup names the device only when it sent a label with something left once cleaned. */
+function deviceLabelOf(raw: string | undefined): { device_label?: string } {
+  const label = displayDeviceLabel(raw);
+  return label === "" ? {} : { device_label: label };
 }
