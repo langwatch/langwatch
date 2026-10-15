@@ -112,6 +112,9 @@ describe("the coding-agent-cost skill", () => {
       expect(rendered).toContain(
         "adding `AND TenantId = '<id>'` when the report covers one project",
       );
+      expect(rendered).toContain(
+        "never received a Claude Code model call, so there is no cost data",
+      );
       expect(rendered).toContain("events = 0");
       expect(rendered).toMatch(/never received/i);
       expect(rendered).toContain("the newest Claude Code event is from <time>, <age> ago");
