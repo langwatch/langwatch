@@ -68,6 +68,9 @@ export const processOwner = {
      * outbound calls follow it holds in its own config slice.
      */
     outboundProxy,
+    /** The previous release's migrate skips: no longer honoured, so the worker warns at boot. */
+    skipPrismaMigrate: c.env("SKIP_PRISMA_MIGRATE", z.string().optional()),
+    skipClickHouseMigrate: c.env("SKIP_CLICKHOUSE_MIGRATE", z.string().optional()),
   })),
   secrets: {
     /**

@@ -29,7 +29,7 @@ import {
 } from "./ops-system-migrations.intent.ts";
 import {
   SYSTEM_MIGRATION_PASS_INITIAL_STATE,
-  SYSTEM_MIGRATION_REDRIVE_INTERVAL_MS,
+  SYSTEM_MIGRATION_WAKE_INTERVAL_MS,
   systemMigrationPassIntentSchema,
   systemMigrationPassRequested,
   systemMigrationPassStateSchema,
@@ -52,8 +52,9 @@ type SystemMigrationsPipelineDefinition = StaticPipelineDefinition<
 >;
 
 /**
- * The migration pass as one scheduled process: the hourly re-drive wakes it once across the fleet,
- * and an operator's kick is a command whose event asks the same intent. Only a worker hosts it.
+ * The migration pass as one scheduled process: a short wake once across the fleet runs a pass while
+ * one is pending and hourly once nothing is, and an operator's kick is a command whose event asks
+ * the same intent. Only a worker hosts it.
  */
 export function buildSystemMigrations({
   app,
@@ -72,7 +73,7 @@ export function buildSystemMigrations({
     .withProcessManager(SYSTEM_MIGRATION_PASS_PROCESS_NAME, (pm) =>
       pm
         .state(systemMigrationPassStateSchema, SYSTEM_MIGRATION_PASS_INITIAL_STATE)
-        .schedule({ everyMs: SYSTEM_MIGRATION_REDRIVE_INTERVAL_MS })
+        .schedule({ everyMs: SYSTEM_MIGRATION_WAKE_INTERVAL_MS })
         .onWake(systemMigrationRedriveWake)
         .intent(
           "runPass",

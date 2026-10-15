@@ -82,6 +82,16 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then the federated providers are "auth0", "google" and "github"
     And with no provider named the list is empty
 
+  # On cloud, Auth0 serves only organizations still on legacy Auth0 SSO; a
+  # normal account never connects to it (specs/identity/signin-router.feature).
+  @unit
+  Scenario: Cloud's Connect buttons offer the native providers, never Auth0
+    Given a SaaS deployment whose provider is "auth0"
+    And a Google client id is set
+    When the page's configuration is read
+    Then the federated providers are "google" only
+    And a self-hosted install naming "auth0" still lists it
+
   # ── One way in, said before it is too late ─────────────────────────────
 
   # The detach guard's own reasoning, read forwards. The guard refuses to

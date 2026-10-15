@@ -37,6 +37,7 @@ class CreateAgentBodyType1Config:
         outputs (list[CreateAgentBodyType1ConfigOutputsItem] | Unset):
         is_custom (bool | Unset):
         behave_as (Literal['evaluator'] | Unset):
+        timeout_ms (int | Unset):
         scenario_mappings (CreateAgentBodyType1ConfigScenarioMappings | Unset):
         scenario_output_field (str | Unset):
     """
@@ -50,6 +51,7 @@ class CreateAgentBodyType1Config:
     outputs: list[CreateAgentBodyType1ConfigOutputsItem] | Unset = UNSET
     is_custom: bool | Unset = UNSET
     behave_as: Literal["evaluator"] | Unset = UNSET
+    timeout_ms: int | Unset = UNSET
     scenario_mappings: CreateAgentBodyType1ConfigScenarioMappings | Unset = UNSET
     scenario_output_field: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -95,6 +97,8 @@ class CreateAgentBodyType1Config:
 
         behave_as = self.behave_as
 
+        timeout_ms = self.timeout_ms
+
         scenario_mappings: dict[str, Any] | Unset = UNSET
         if not isinstance(self.scenario_mappings, Unset):
             scenario_mappings = self.scenario_mappings.to_dict()
@@ -124,6 +128,8 @@ class CreateAgentBodyType1Config:
             field_dict["isCustom"] = is_custom
         if behave_as is not UNSET:
             field_dict["behave_as"] = behave_as
+        if timeout_ms is not UNSET:
+            field_dict["timeoutMs"] = timeout_ms
         if scenario_mappings is not UNSET:
             field_dict["scenarioMappings"] = scenario_mappings
         if scenario_output_field is not UNSET:
@@ -203,6 +209,8 @@ class CreateAgentBodyType1Config:
         if behave_as != "evaluator" and not isinstance(behave_as, Unset):
             raise ValueError(f"behave_as must match const 'evaluator', got '{behave_as}'")
 
+        timeout_ms = d.pop("timeoutMs", UNSET)
+
         _scenario_mappings = d.pop("scenarioMappings", UNSET)
         scenario_mappings: CreateAgentBodyType1ConfigScenarioMappings | Unset
         if isinstance(_scenario_mappings, Unset):
@@ -222,6 +230,7 @@ class CreateAgentBodyType1Config:
             outputs=outputs,
             is_custom=is_custom,
             behave_as=behave_as,
+            timeout_ms=timeout_ms,
             scenario_mappings=scenario_mappings,
             scenario_output_field=scenario_output_field,
         )

@@ -25,7 +25,6 @@ var SeededFeatureFlags = []string{
 	"release_es_graph_triggers_firing",          // event-sourced (vs cron) graph-trigger firing
 	"release_lwql_workbench",                    // LangWatchQL: /api/v1/query, the workbench, charts
 	"release_instant_evals",                     // LangWatchQL eval functions
-	"release_custom_chart_playground",           // the custom-chart playground and its widget routes
 	"release_ui_governance_billed_cost_enabled", // governance Costs and Platform preview pages
 	"release_voice_agents_enabled",              // voice agents, Talk to it and voice runs (voicesim)
 }

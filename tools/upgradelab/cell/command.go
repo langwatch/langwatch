@@ -96,6 +96,7 @@ func cellFlags(name string, options *Options) *flag.FlagSet {
 	flags.BoolVar(&options.Keep, "keep", false, "keep the cell's databases afterwards (kept anyway when a step fails)")
 	flags.DurationVar(&options.WalkEvery, "walk-every", 10*time.Second, "the browser walker's pause between rounds (one tab); longer cuts Chromium's CPU")
 	flags.BoolVar(&options.Shots, "shots", true, "screenshot each api phase and Ops > Upgrades (Playwright from head's apps/ui)")
+	flags.BoolVar(&options.ProfilingEnabled, "profile", false, "write node CPU profiles, process and Postgres samples and Redis, Postgres and ClickHouse totals under <run-dir>/profile")
 	flags.Float64Var(&options.MaxLoad, "max-load", 40, "refuse to start when the machine's 1-minute load average is above this (0: never refuse)")
 	flags.StringVar(&options.TestedBy, "tested-by", "", "who runs the cell, written to the ledger's Tested by: lane:<id> (model) or @handle")
 	return flags

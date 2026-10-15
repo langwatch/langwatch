@@ -140,7 +140,7 @@ export class MemoryConnectedAgentStateRepository extends ConnectedAgentStateRepo
     for (const [member, score] of set) {
       if (score <= cutoff) set.delete(member);
     }
-    return membersFrom(set, cutoff);
+    return membersScoredAtLeast(set, cutoff);
   }
 
   async countInflight({
@@ -293,7 +293,7 @@ export class MemoryConnectedAgentStateRepository extends ConnectedAgentStateRepo
     from: number;
   }): Promise<string[]> {
     const set = this.#live(this.#pending, keyOf(projectId, instanceId));
-    return set ? membersFrom(set, from) : [];
+    return set ? membersScoredAtLeast(set, from) : [];
   }
 
   async saveResult({
@@ -427,7 +427,7 @@ function keyOf(...parts: string[]): string {
 }
 
 /** Members scored at or above `min`, lowest score first. */
-function membersFrom(set: ScoredSet, min: number): string[] {
+function membersScoredAtLeast(set: ScoredSet, min: number): string[] {
   return [...set]
     .filter(([, score]) => score >= min)
     .toSorted(([, left], [, right]) => left - right)

@@ -41,3 +41,41 @@ export function buildCodeConfig(input: {
       : {}),
   };
 }
+
+/** The keys the code agent editor writes; every other stored key is the editor's to keep. */
+const CODE_EDITOR_KEYS = [
+  "name",
+  "description",
+  "parameters",
+  "inputs",
+  "outputs",
+  "scenarioMappings",
+  "scenarioOutputField",
+] as const;
+
+/**
+ * An edited code config over the stored one: what the editor wrote wins, and what it does not
+ * edit (a timeout, a library reference, a parameter other than the code) stays as stored.
+ */
+export function codeConfigKeepingStored({
+  stored,
+  edited,
+}: {
+  stored: CodeAgentConfig | undefined;
+  edited: CodeAgentConfig;
+}): CodeAgentConfig {
+  if (!stored) return edited;
+
+  const kept: Partial<CodeAgentConfig> = { ...stored };
+  for (const key of CODE_EDITOR_KEYS) delete kept[key];
+  const editedIds = new Set(edited.parameters.map((parameter) => parameter.identifier));
+  const otherParameters = stored.parameters.filter(
+    (parameter) => !editedIds.has(parameter.identifier),
+  );
+
+  return {
+    ...kept,
+    ...edited,
+    parameters: [...edited.parameters, ...otherParameters],
+  };
+}

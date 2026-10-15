@@ -52,6 +52,7 @@
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/insight-contract": "workspace:*",
     "@langwatch/instant-eval-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",

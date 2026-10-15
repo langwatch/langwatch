@@ -131,8 +131,8 @@ export class SystemMigrationRunnerService {
 
   /**
    * Whether an eligible tenant (this runner's source, inside the cohort) holds no finished row
-   * for `migrationName`. Read from state, never from a pass: a tenant claimed elsewhere, or by
-   * nobody while the lease store is down, counts until its row is finished.
+   * for `migrationName` (a steady step's `migrated` counts as finished). Read from state, never a
+   * pass: a tenant claimed elsewhere, or by nobody while the lease is down, counts until finished.
    */
   async hasUnfinishedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
     let cursor: string | null = null;
@@ -147,8 +147,16 @@ export class SystemMigrationRunnerService {
       }
       if (eligible.length === 0) continue;
       const records = await this.deps.state.findRecords({ migrationName, tenantIds: eligible });
+      const steady = this.deps.migrations.some(
+        (migration) => migration.name === migrationName && migration.migratedIsSteady,
+      );
       const finished = new Set(
-        records.filter((record) => isTerminalTenantStatus(record.status)).map((r) => r.tenantId),
+        records
+          .filter(
+            (record) =>
+              isTerminalTenantStatus(record.status) || (steady && record.status === "migrated"),
+          )
+          .map((r) => r.tenantId),
       );
       if (eligible.some((tenantId) => !finished.has(tenantId))) return true;
     }
@@ -505,7 +513,7 @@ export class SystemMigrationRunnerService {
         tenantId,
         status: outcome.status,
         report: outcome.report ?? null,
-        ...heldFields({ outcome, existing, now: this.deps.now }),
+        ...heldFields({ migration, outcome, existing, now: this.deps.now }),
       };
       const wasWritten = await state.upsertRecordUnlessRolledBack(record);
       if (!wasWritten) {
@@ -560,15 +568,18 @@ export function heldNoticeLevel({
 
 /** Held carries why and since when (the first moment, while still held); else neither. */
 function heldFields({
+  migration,
   outcome,
   existing,
   now,
 }: {
+  migration: SystemMigration;
   outcome: TenantMigrationOutcome;
   existing: TenantMigrationRecord | undefined;
   now: () => Instant;
 }): Pick<TenantMigrationRecord, "heldReason" | "heldSince"> {
-  if (outcome.status !== "migrated") return {};
+  // A steady step's `migrated` is its settled state, never a hold (`migratedIsSteady`).
+  if (outcome.status !== "migrated" || migration.migratedIsSteady) return {};
   const heldSince = existing?.status === "migrated" ? existing.heldSince : undefined;
   return { heldReason: outcome.heldReason ?? "proof", heldSince: heldSince ?? now() };
 }

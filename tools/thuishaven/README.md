@@ -22,14 +22,18 @@ Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 | `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                                                             |
 | `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database                                      |
 
-The nine simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`,
-`outbound`, `payment`, `telemetry`) each serve a console at `<name>.<slug>.langwatch.localhost`.
+The twelve simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`,
+`outbound`, `payment`, `telemetry`, `lambda`, `github`, `mcp`) each serve a console at `<name>.<slug>.langwatch.localhost`.
 `mail`, `idp`, `storage`, `payment` and `telemetry` run by default; the rest need `haven up +<name>`.
 `haven logs <name>` reads any of them. `haven sim --json` is the agent's entry:
 one row per simulator with whether it runs in this stack, its console URL, the
 `haven up +<name>` it needs if off, its verbs and its skill. `telemetry` sends
 OTLP traffic:
-`haven sim telemetry send|load|fuzz|status|stop`.
+`haven sim telemetry send|load|fuzz|status|stop`. `mcp` (mcpsim, `haven up +mcp`)
+stands in for Claude Desktop, Claude Code and Cursor against the app's hosted MCP
+endpoint (`/mcp`, `/sse`) with the seeded key or an OAuth grant:
+`haven sim mcp connect|stream|refresh|reconnect|idle|soak|oauth`, each exiting
+non-zero unless the run passed.
 
 Forced errors: `haven llm|analytics|mail|storage set --error <0|4xx|5xx>` makes that sim
 refuse calls (llm: generation; analytics: captures; mail: SMTP sends; storage: PUT/GET

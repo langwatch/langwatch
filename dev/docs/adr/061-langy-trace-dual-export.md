@@ -122,3 +122,28 @@ identity, ordinary customer traffic through the gateway is untouched, and the
 fold's "Langy outranks gateway" rule stays as the backstop for spans stamped
 before this change. The first span to fold now settles the trace's origin, so
 every reader of the first-trace flag sees a Langy trace as Langy's.
+
+## Amendment (2026-10-12): a read-only run is never mirrored
+
+A read-only (unattended) turn, such as a scheduled insights run, reads one
+person's trace text with nobody watching. None of it is copied into the
+mirror. The control plane already sends such a turn's envelope with the tier
+`skip`, so the relay's own lane copies nothing.
+
+The gateway leg could not follow. It tiers by virtual key, and a chat turn and
+a read-only run share the person's one Langy key. Setting that key to `skip`
+is no answer either. The gateway reads a non-skip tier as "this is a Langy
+call", both to stamp `langwatch.origin = langy` and to drop a call that lost
+the turn's traceparent (amendment above).
+
+So the withhold travels per call, apart from the tier. On every mediated model
+call the relay deletes `X-LangWatch-Langy-Mirror` and, when the turn's own
+tier normalises to `skip`, sets it to `skip`. The gateway's trace middleware
+lifts that value into the request context and deletes the header, so it never
+reaches a provider. The emitter still stamps Langy's origin and still drops an
+orphan call, but writes no mirror marker, so no mirror copy is made.
+
+The fail-closed rules hold. The header can only withhold a copy, never ask for
+one or raise a tier. The worker never sets it: the relay replaces whatever the
+worker sent, from the manager-held tier. An empty or unknown turn tier
+normalises to `skip`, so a version skew withholds rather than leaks.
