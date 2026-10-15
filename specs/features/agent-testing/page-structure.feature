@@ -150,14 +150,14 @@ Feature: The Agent Testing page
     Given the Agent Testing page is open on a wide window
     When the scenarios and the results are read one after the other
     Then the content of each is held to one readable column
-    And the column is centred on the whole page, not on the space beside the rail
-    And the column does not move when the tab changes
+    And the column is centred in the space beside the rail
+    And no blank strip is reserved on the right
 
   @integration
   Scenario: A surface with no rail takes the width the rail would have used
     Given the Agent Testing page is open on the Results tab
     Then the list of run plans reserves no space for a rail
-    And it is centred on the whole page
+    And it is centred on the page
     And it is held to a wider column than a surface that has a rail beside it
 
   # --- Addresses ---
