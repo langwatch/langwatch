@@ -2,6 +2,7 @@ import type { Authorization } from "@langwatch/authorization";
 import { type AuthorizedClickHouse, tenantScope, tenantSet } from "@langwatch/clickhouse-client";
 import { z } from "zod";
 
+import { TRACE_SUMMARY_TOTAL_TOKENS_SQL } from "../../rules/trace-token-total.rules.ts";
 import type {
   SessionGroupRow,
   SessionGroupSortColumn,
@@ -35,8 +36,7 @@ const SORT_EXPRESSIONS: Record<SessionGroupSortColumn, string> = {
   lastActivity: "toFloat64(max(toUnixTimestamp64Milli(OccurredAt)))",
   started: "toFloat64(min(toUnixTimestamp64Milli(OccurredAt)))",
   cost: "round(sum(coalesce(TotalCost, 0)), 9)",
-  tokens:
-    "toFloat64(sum(coalesce(TotalPromptTokenCount, 0) + coalesce(TotalCompletionTokenCount, 0)))",
+  tokens: `toFloat64(sum(${TRACE_SUMMARY_TOTAL_TOKENS_SQL}))`,
   duration: "round(sum(coalesce(TotalDurationMs, 0)), 6)",
   traces: "toFloat64(count())",
 };
@@ -186,7 +186,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
           ${CONVERSATION_ID_EXPR} AS ConversationId,
           count() AS TraceCount,
           ${SORT_EXPRESSIONS.cost} AS SessionCost,
-          sum(coalesce(TotalPromptTokenCount, 0) + coalesce(TotalCompletionTokenCount, 0)) AS SessionTokens,
+          sum(${TRACE_SUMMARY_TOTAL_TOKENS_SQL}) AS SessionTokens,
           sum(toUInt64OrZero(Attributes['langwatch.reserved.cache_read_tokens'])) AS SessionCacheReadTokens,
           sum(toUInt64OrZero(Attributes['langwatch.reserved.cache_creation_tokens'])) AS SessionCacheCreationTokens,
           max(toUInt64OrZero(Attributes['langwatch.reserved.context_size_tokens'])) AS MaxContextSizeTokens,

@@ -34,6 +34,7 @@ import {
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
   TRUNCATED_ATTRIBUTES_KEY,
+  traceTotalTokensOf,
 } from "@langwatch/trace-contract";
 
 import { readTruncatedAttributes } from "./trace-attribute-cap.rules.ts";
@@ -140,8 +141,7 @@ export function mapLegacySpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNod
 // ---------------------------------------------------------------------------
 
 export function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
-  const totalTokens =
-    (summary.totalPromptTokenCount ?? 0) + (summary.totalCompletionTokenCount ?? 0);
+  const totalTokens = traceTotalTokensOf(summary);
 
   const status = deriveTraceStatus(summary);
 

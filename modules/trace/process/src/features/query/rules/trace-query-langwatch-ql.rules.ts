@@ -17,6 +17,7 @@ import {
   type TranslationContext,
 } from "@langwatch/trace-contract";
 
+import { TRACE_SUMMARY_TOTAL_TOKENS_FILTER_SQL } from "../../../rules/trace-token-total.rules.ts";
 import {
   numericComparisonHandler,
   stringEqualityHandler,
@@ -85,7 +86,7 @@ const NUMBER_FIELDS: Readonly<Record<string, LangWatchQLTraceFilterField>> = {
   cost: { expression: "TotalCost", param: "cost", facetKey: "cost" },
   duration: { expression: "TotalDurationMs", param: "duration", facetKey: "duration" },
   tokens: {
-    expression: "TotalPromptTokenCount + TotalCompletionTokenCount",
+    expression: TRACE_SUMMARY_TOTAL_TOKENS_FILTER_SQL,
     param: "tokens",
     facetKey: "tokens",
   },

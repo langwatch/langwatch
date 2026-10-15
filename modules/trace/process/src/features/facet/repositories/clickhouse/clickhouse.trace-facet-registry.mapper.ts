@@ -5,9 +5,11 @@ import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   deriveTraceStatus,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
+  traceTotalTokensOf,
   UNSUPPORTED,
 } from "@langwatch/trace-contract";
 
+import { TRACE_SUMMARY_TOTAL_TOKENS_FILTER_SQL } from "../../../../rules/trace-token-total.rules.ts";
 import type {
   FacetCatalog,
   FacetDefinition,
@@ -263,14 +265,13 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     label: "Total tokens",
     group: "trace",
     table: "trace_summaries",
-    expression: "TotalPromptTokenCount + TotalCompletionTokenCount",
-    // Mirror the SQL sum's NULL propagation: a null operand makes the whole
+    expression: TRACE_SUMMARY_TOTAL_TOKENS_FILTER_SQL,
+    // Mirror the SQL sum's NULL propagation: a null input or output count makes the whole
     // sum null (excluded), rather than silently defaulting to zero.
-    read: (t) => {
-      const prompt = t.summary.totalPromptTokenCount;
-      const completion = t.summary.totalCompletionTokenCount;
-      return prompt == null || completion == null ? null : prompt + completion;
-    },
+    read: (t) =>
+      t.summary.totalPromptTokenCount == null || t.summary.totalCompletionTokenCount == null
+        ? null
+        : traceTotalTokensOf(t.summary),
   },
   {
     key: "ttft",

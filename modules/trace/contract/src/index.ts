@@ -36,6 +36,7 @@ export {
 export { trimAttributesForAnalytics } from "./features/analytics/trace-analytics-attribute-trim.ts";
 export * from "./features/list/trace-time-range-presets.ts";
 export * from "./features/analytics/trace-token-budget.ts";
+export * from "./features/analytics/trace-token-total.ts";
 export * from "./features/list/trace-explorer-url-state.ts";
 export * from "./explorer/actions/index.ts";
 export * from "./features/evaluation/trace-instant-eval-chips.ts";

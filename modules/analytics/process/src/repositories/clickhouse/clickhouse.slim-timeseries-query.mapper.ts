@@ -83,7 +83,6 @@ function slimColumnFor(metric: SlimTraceMetricKey): string {
     case "performance.reasoning_tokens":
       return `${ta}.ReasoningTokens`;
     case "performance.total_tokens":
-      return `(coalesce(${ta}.PromptTokens, 0) + coalesce(${ta}.CompletionTokens, 0))`;
     case "performance.total_processed_tokens":
       // Mirrors the rollup's `total_processed_tokens` shape (rollup-timeseries-
       // query.ts:80) by summing the SAME four typed columns, not the Attributes-map
