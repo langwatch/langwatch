@@ -2,6 +2,7 @@ import {
   AccessNotGrantedError,
   type AuthzPermission,
   isSealedAuthorization,
+  ProjectNotFoundError,
 } from "@langwatch/authorization";
 import type { AuthzScopeRef } from "@langwatch/authz-contract";
 import { Temporal } from "@langwatch/time";
@@ -319,7 +320,8 @@ describe("AuthorizationService.authorizeInternal", () => {
 
   describe("given a project that does not exist", () => {
     describe("when platform code asks for a proof on it", () => {
-      it("refuses it as not granted", async () => {
+      /** @scenario "Platform code asking for a proof on a deleted project is told the project was not found" */
+      it("refuses it as project not found, so a fold can drop the event", async () => {
         const { service } = door({ scope: null });
         await expect(
           service.authorizeInternal({
@@ -328,7 +330,7 @@ describe("AuthorizationService.authorizeInternal", () => {
             permission: "traces:view",
             purpose: { kind: "event", eventId: "evt_1" },
           }),
-        ).rejects.toBeInstanceOf(AccessNotGrantedError);
+        ).rejects.toBeInstanceOf(ProjectNotFoundError);
       });
     });
   });
