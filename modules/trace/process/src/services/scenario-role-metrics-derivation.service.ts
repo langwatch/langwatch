@@ -1,13 +1,8 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import { nowInstant } from "@langwatch/time";
 import type { ScenarioRoleMetrics, ScenarioRoleMetricsInput } from "@langwatch/trace-contract";
 
 import type { SpanCostService } from "../features/span/services/span-cost.service.ts";
 import type { TraceDerivationSpanReaderRepository } from "../repositories/trace-derivation-span-reader.repository.ts";
-import type {
-  TraceIdIndexReadRepository,
-  TraceIdIndexWindow,
-} from "../repositories/trace-id-index-read.repository.ts";
 import { deriveScenarioRoleMetricsFromSpans } from "../rules/scenario-role-metrics.rules.ts";
 
 /**
@@ -40,9 +35,6 @@ export class ScenarioRoleMetricsDerivationService {
      */
     spanCosts: SpanCostService;
     now?: () => number;
-    /** Trace's id-index readiness and its reads: with no time, the index names the window. */
-    idIndex?: IdIndexFlags | undefined;
-    idIndexReads?: TraceIdIndexReadRepository | undefined;
   }): ScenarioRoleMetricsDerivationService {
     return new ScenarioRoleMetricsDerivationService({
       ...options,
@@ -55,21 +47,15 @@ export class ScenarioRoleMetricsDerivationService {
   private readonly spans: TraceDerivationSpanReaderRepository;
   private readonly spanCosts: SpanCostService;
   private readonly now: () => number;
-  private readonly idIndex: IdIndexFlags | undefined;
-  private readonly idIndexReads: TraceIdIndexReadRepository | undefined;
 
   private constructor(options: {
     spans: TraceDerivationSpanReaderRepository;
     spanCosts: SpanCostService;
     now: () => number;
-    idIndex?: IdIndexFlags | undefined;
-    idIndexReads?: TraceIdIndexReadRepository | undefined;
   }) {
     this.spans = options.spans;
     this.spanCosts = options.spanCosts;
     this.now = options.now;
-    this.idIndex = options.idIndex;
-    this.idIndexReads = options.idIndexReads;
   }
 
   async derive(input: ScenarioRoleMetricsInput): Promise<ScenarioRoleMetrics> {
@@ -78,9 +64,7 @@ export class ScenarioRoleMetricsDerivationService {
         spans: await this.spans.findNormalizedSpansByTraceId({
           tenantId: input.tenantId,
           traceId: input.traceId,
-          ...(input.occurredAtMs === undefined
-            ? { window: await this.indexWindow(input) }
-            : { occurredAtMs: input.occurredAtMs }),
+          ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
         }),
         spanCostService: this.spanCosts,
       });
@@ -118,23 +102,5 @@ export class ScenarioRoleMetricsDerivationService {
 
       this.memo.delete(oldest.value);
     }
-  }
-
-  /** The stored_spans index's range for a trace read with no time; none when off or unseen. */
-  private async indexWindow({
-    tenantId,
-    traceId,
-  }: {
-    tenantId: string;
-    traceId: string;
-  }): Promise<TraceIdIndexWindow | undefined> {
-    if (this.idIndexReads === undefined) return undefined;
-    const [window] = await this.idIndexReads.findWindows({
-      tenantId,
-      traceIds: [traceId],
-      source: "stored_spans",
-      idIndex: this.idIndex,
-    });
-    return window;
   }
 }

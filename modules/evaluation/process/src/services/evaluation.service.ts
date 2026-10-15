@@ -1,6 +1,5 @@
 import { type Authorization, internalActor, narrowAuthorization } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   EvaluationNotFoundError,
   evaluationInputsQuerySchema,
@@ -41,8 +40,6 @@ type EvaluationServiceOptions = {
   traces: Pick<TraceApi, "resolveViewerProtections">;
   /** Mints the own-only proof the `*Api` run reads are fenced by (ruling AGG-EVAL-PROOF). */
   authz: Pick<AuthzApi, "authorizeInternal">;
-  /** Whether the run id index bounds a lookup with no time; absent reads as off. */
-  idIndex?: IdIndexFlags | undefined;
 };
 
 /** The internal actor the `*Api` run reads mint their proof as. */
@@ -107,7 +104,6 @@ export class EvaluationService {
         entry: "EvaluationService.getRunByEvaluationId",
       }),
       retention: this.options.retention,
-      idIndex: this.options.idIndex,
     });
   }
 
@@ -175,7 +171,6 @@ export class EvaluationService {
     const read = await this.options.repository.findInputs({
       authorization,
       evaluationId: query.evaluationId,
-      idIndex: this.options.idIndex,
     });
     if (read === null || read.inputs === null) return null;
 

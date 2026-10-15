@@ -11,6 +11,11 @@ export {
   partsAfterPartitionPruning,
   partsInExplain,
 } from "./partitionPruning.ts";
+export {
+  idIndexedClientDouble,
+  readyIdIndexedClientDouble,
+  type ScriptedStatements,
+} from "./idIndexedClientDouble.ts";
 
 /**
  * The ClickHouse image every container-backed test starts, here and in

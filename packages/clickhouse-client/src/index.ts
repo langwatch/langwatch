@@ -267,19 +267,28 @@ export type {
   IdIndexRetentionRaise,
   IdIndexStatements,
 } from "./idIndexFill.ts";
+export type { IdIndexKeyRange, IdIndexTenantSplit } from "./idIndexFill.ts";
 export {
   DEFAULT_ID_INDEX_BATCH_ROWS,
+  defineIdIndex,
   fillIdIndexes,
   fillOwnerIdIndexes,
+  fillReportOf,
   fillStatement,
   IdIndexFillIncompleteError,
   idIndexFillTargets,
+  sortKeyLeadsWith,
 } from "./idIndexFill.ts";
+export type { ClickHouseClientResolver, ReadResource } from "./authorized-reads.ts";
+export type { StatementScopeViolation } from "./statementScopeError.ts";
+export { ID_BOUND_PARAM_PREFIX, StatementScopeError } from "./statementScopeError.ts";
 export type {
-  ClickHouseClientResolver,
-  ReadResource,
-  StatementScopeViolation,
-} from "./authorized-reads.ts";
+  IdBound,
+  IdBoundOptions,
+  IdBoundResolved,
+  IdIndexRegistryStatements,
+} from "./idBound.ts";
+export { hasIdBound, ID_BOUND_MARKER, idBoundOf, IdIndexRegistry, readIdBound } from "./idBound.ts";
 export type { TenantScopeTimeColumn } from "@langwatch/clickhouse-markers";
 export { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
 export {
@@ -292,7 +301,6 @@ export {
   ownProjectIdOf,
   PROOF_BEARING_PERMISSIONS,
   singleTenantOf,
-  StatementScopeError,
   TenantReaderClientUnavailableError,
   TenantScopedReader,
   tenantScopeKey,

@@ -1,4 +1,4 @@
-import type { ClickHouseQueryClient, IdIndexFlags } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   RedisCachedFoldStore,
   RepositoryFoldStore,
@@ -46,17 +46,14 @@ export class RedisSuiteRunProcessingRepository implements SuiteRunProcessingRepo
 
   openRunStateFoldStore({
     defaultRetentionDays,
-    idIndex,
   }: {
     defaultRetentionDays: () => number;
-    idIndex?: IdIndexFlags | undefined;
   }): FoldProjectionStore<SuiteRunStateData> {
     return new RedisCachedFoldStore<SuiteRunStateData>(
       new RepositoryFoldStore<SuiteRunStateData>(
         ClickhouseSuiteEventingRepository.create({
           clickhouse: this.options.clickhouse,
           defaultRetentionDays,
-          idIndex,
         }).build().suiteRunState,
         SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
       ),

@@ -12,14 +12,12 @@ import {
   type RetentionCategory,
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
-import {
-  RETENTION_ID_INDEX_TABLES,
-  RETENTION_TABLE_CATEGORY_MAP,
-} from "@langwatch/data-retention-contract/retention-tables";
+import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
 import { EventLogRetention } from "@langwatch/eventing/server";
 import { z } from "zod";
 
 import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
+import { idIndexCategories } from "../../rules/id-index-categories.rules.ts";
 import {
   keepForeverRewriteSchema,
   type ClickHouseTarget,
@@ -65,14 +63,6 @@ const tenantFilterSql = "position(command, {tenantFilterNeedle:String}) > 0";
 const tableNameRowsSchema = z.array(z.object({ name: z.string() }));
 const tenantRowsSchema = z.array(z.object({ TenantId: z.string() }));
 
-/** Each id index this repository rewrites itself, with its source's category. */
-const ID_INDEX_CATEGORIES: ReadonlyMap<string, RetentionCategory> = new Map(
-  Object.entries(RETENTION_ID_INDEX_TABLES).map(([index, source]) => [
-    index,
-    RETENTION_TABLE_CATEGORY_MAP[source],
-  ]),
-);
-
 // ClickHouse stores the command as `WHERE (TenantId = '..')` (25.x), so the needle omits WHERE.
 function tenantFilterParams(projectId: string): Record<string, string> {
   const escapedProjectId = projectId.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
@@ -100,6 +90,17 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     private readonly eventLogRetention: EventLogRetention,
   ) {}
 
+  /**
+   * Each id index this repository rewrites itself, with its source's category: the client's
+   * declarations, which every installed module made at composition, read when asked.
+   */
+  private idIndexCategories(): ReadonlyMap<string, RetentionCategory> {
+    return idIndexCategories({
+      declarations: this.clickhouse.idIndexes().declarations(),
+      eventLogIndex: this.eventLogRetention.idIndexTable,
+    });
+  }
+
   private isEventingTable(table: string): boolean {
     return this.eventLogRetention.tables.includes(table);
   }
@@ -112,7 +113,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     const categoryTables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
       .filter(([, category]) => category === input.category)
       .map(([table]) => table);
-    const categoryIndexes = [...ID_INDEX_CATEGORIES]
+    const categoryIndexes = [...this.idIndexCategories()]
       .filter(([, category]) => category === input.category)
       .map(([index]) => index);
     // Eventing's tables are classified per row, so every category visits them.
@@ -318,7 +319,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
         );
         continue;
       }
-      const category = ID_INDEX_CATEGORIES.get(index);
+      const category = this.idIndexCategories().get(index);
       if (category === undefined) continue;
       await this.raiseCategoryIdIndex({ target, index, category, retentionByTenant });
       raised.push(index);
@@ -361,7 +362,8 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
   /** The named indexes this module raises, in the order named; any other name is dropped. */
   private governedIdIndexes(indexes: readonly string[]): string[] {
     return [...new Set(indexes)].filter(
-      (index) => index === this.eventLogRetention.idIndexTable || ID_INDEX_CATEGORIES.has(index),
+      (index) =>
+        index === this.eventLogRetention.idIndexTable || this.idIndexCategories().has(index),
     );
   }
 
@@ -459,7 +461,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
   private categoryForTable(table: string): RetentionCategory | null {
     return (
       Object.entries(RETENTION_TABLE_CATEGORY_MAP).find(([name]) => name === table)?.[1] ??
-      ID_INDEX_CATEGORIES.get(table) ??
+      this.idIndexCategories().get(table) ??
       null
     );
   }

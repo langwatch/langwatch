@@ -1,8 +1,7 @@
 import {
   type ClickHouseColumns,
   type ClickHouseQueryClient,
-  type IdIndexBounds,
-  type IdIndexLookup,
+  type IdBoundOptions,
 } from "@langwatch/clickhouse-client";
 
 import type {
@@ -36,23 +35,15 @@ export class ClickHouseExperimentSession implements ExperimentEventingClickHouse
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
+    idBound?: IdBoundOptions;
   }): Promise<ExperimentEventingClickHouseResult> {
     const request = {
       tenantId: this.tenantId,
       sql: input.query,
       params: input.query_params,
+      ...(input.idBound === undefined ? {} : { idBound: input.idBound }),
     };
     return { json: async <T>() => (await this.clickhouse.query<T>(request)).rows };
-  }
-
-  /** The target this session's tenant lands on, which keys the module's id-index readiness. */
-  targetOf(_input: { tenantId: string }): Promise<string> {
-    return this.clickhouse.targetOf({ tenantId: this.tenantId });
-  }
-
-  /** The time range one id's rows span, from this session's tenant's id index. */
-  indexBounds(input: IdIndexLookup & { tenantId: string }): Promise<IdIndexBounds> {
-    return this.clickhouse.indexBounds({ ...input, tenantId: this.tenantId });
   }
 
   /** A select list naming only the columns this tenant's target has, the rest as defaults. */

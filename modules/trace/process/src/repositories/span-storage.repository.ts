@@ -1,5 +1,4 @@
 import type { Authorization } from "@langwatch/authorization";
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type {
   DerivedTraceEvent,
   ModelSpanSampleRow,
@@ -83,8 +82,6 @@ export interface SpanLangwatchSignalsRow {
  */
 export interface OccurredAtHint {
   occurredAtMs?: number;
-  /** Trace's id-index readiness; with no time and the index ready, the index bounds the read. */
-  idIndex?: IdIndexFlags | undefined;
 }
 
 // @see ADR-069 — partition hint is REQUIRED here for windowed claim-check reads
@@ -94,8 +91,6 @@ export interface NormalizedSpanByIdParams {
   spanId: string;
   /** Centre of the partition window: the SPAN'S OWN start, epoch ms. */
   occurredAtMs: number;
-  /** Trace's id-index readiness; a miss in the window reads the index's range once it is ready. */
-  idIndex?: IdIndexFlags | undefined;
 }
 
 /**

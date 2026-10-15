@@ -3,7 +3,6 @@ import {
   narrowAuthorization,
   projectIdsReadBy,
 } from "@langwatch/authorization";
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 import { teaserOf, TraceNotFoundError } from "@langwatch/trace-contract";
 
@@ -39,14 +38,11 @@ export class TraceSummaryService {
   static create({
     repository,
     fullResolutionDeps,
-    idIndex,
   }: {
     repository: TraceSummaryRepository;
     fullResolutionDeps?: TraceSummaryFullResolutionDeps;
-    /** Trace's id-index readiness, handed to every read by trace id. */
-    idIndex?: IdIndexFlags | undefined;
   }): TraceSummaryService {
-    return new TraceSummaryService(repository, fullResolutionDeps, idIndex);
+    return new TraceSummaryService(repository, fullResolutionDeps);
   }
 
   private readonly logger = createLogger("langwatch:traces:trace-summary-service");
@@ -54,7 +50,6 @@ export class TraceSummaryService {
   private constructor(
     readonly repository: TraceSummaryRepository,
     private readonly fullResolutionDeps?: TraceSummaryFullResolutionDeps,
-    private readonly idIndex?: IdIndexFlags,
   ) {}
 
   /**
@@ -81,7 +76,6 @@ export class TraceSummaryService {
         await this.repository.findTenantIdsByTraceId({
           authorization,
           traceId,
-          idIndex: this.idIndex,
         })
       )[0];
     if (projectId === undefined) {
@@ -100,7 +94,7 @@ export class TraceSummaryService {
     full,
     ...read
   }: GetByTraceIdParams): Promise<TraceSummaryRead> {
-    const result = await this.repository.findByTraceId({ ...read, idIndex: this.idIndex });
+    const result = await this.repository.findByTraceId(read);
     if (!result) {
       throw new TraceNotFoundError(read.traceId);
     }
@@ -153,7 +147,6 @@ export class TraceSummaryService {
         authorization: narrowed,
         traceId: summary.traceId,
         occurredAtMs: summary.occurredAt,
-        idIndex: this.idIndex,
       });
       const { recomputedInput, recomputedOutput, anyResolved } =
         await TraceOffloadResolutionService.create().resolveOffloadedTraces({

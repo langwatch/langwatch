@@ -1,4 +1,4 @@
-import { ClickHouseColumns, type IdIndexFlags, indexedRead } from "@langwatch/clickhouse-client";
+import { ClickHouseColumns } from "@langwatch/clickhouse-client";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -100,19 +100,15 @@ export class ClickHouseExperimentRunStateRepository<
   private constructor(
     private readonly clickhouse: ExperimentClickHouseRepository,
     private readonly defaultRetentionDays: () => number,
-    private readonly idIndex: IdIndexFlags | undefined,
   ) {}
 
   static create<ProjectionType extends Projection = Projection>(options: {
     clickhouse: ExperimentClickHouseRepository;
     defaultRetentionDays: () => number;
-    /** The module's id-index readiness; absent reads the run with no time bound, as before. */
-    idIndex?: IdIndexFlags | undefined;
   }): ClickHouseExperimentRunStateRepository<ProjectionType> {
     return new ClickHouseExperimentRunStateRepository<ProjectionType>(
       options.clickhouse,
       options.defaultRetentionDays,
-      options.idIndex,
     );
   }
 
@@ -216,18 +212,8 @@ export class ClickHouseExperimentRunStateRepository<
       // table alias because it's also projected as `toUnixTimestamp64Milli(...) AS
       // UpdatedAt` — without the alias the IN-tuple comparison resolves to the
       // projected UInt64 instead of the raw DateTime64.
-      const rows = await indexedRead<ClickHouseExperimentRunRecord[]>({
-        client,
-        idIndex: this.idIndex,
-        tenantId: context.tenantId,
-        table: TABLE_NAME,
-        index: `${TABLE_NAME}_id_index`,
-        key: { RunId: runId },
-        fallback: "unbounded",
-        isEmpty: (found) => found.length === 0,
-        run: async (window) => {
-          const result = await client.query({
-            query: `
+      const result = await client.query({
+        query: `
           SELECT
             t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
             t.RunId AS RunId, t.ExperimentId AS ExperimentId,
@@ -252,24 +238,23 @@ export class ClickHouseExperimentRunStateRepository<
           WHERE t.TenantId = {tenantId:String}
             AND t.RunId = {runId:String}
             AND t.ExperimentId = {experimentId:String}
-            ${window?.sqlFor("t.StartedAt") ?? ""}
+            {{idBound:experiment_runs.RunId:runId:t}}
             AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
               SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
                 AND RunId = {runId:String}
                 AND ExperimentId = {experimentId:String}
-                ${window?.sqlFor("StartedAt") ?? ""}
+                {{idBound:experiment_runs.RunId:runId}}
               GROUP BY TenantId, RunId, ExperimentId
             )
           LIMIT 1
         `,
-            query_params: { tenantId: context.tenantId, runId, experimentId, ...window?.params },
-            format: "JSONEachRow",
-          });
-          return result.json<ClickHouseExperimentRunRecord>();
-        },
+        query_params: { tenantId: context.tenantId, runId, experimentId },
+        format: "JSONEachRow",
+        idBound: { fallback: "unbounded" },
       });
+      const rows = await result.json<ClickHouseExperimentRunRecord>();
       const row = rows[0];
       if (!row) return null;
 

@@ -9,12 +9,12 @@ import type {
   WorkbenchCredential,
 } from "@langwatch/experiment-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
-import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { ExperimentModule } from "#app/experiment.app";
 
 import { experimentLifecycleEventing } from "./eventing/experiment-lifecycle.pipeline.ts";
 import { experimentRunProcessingEventing } from "./eventing/experiment-run-processing.pipeline.ts";
+import { EXPERIMENT_ID_INDEXES } from "./repositories/clickhouse/clickhouse.experiment-id-indexes.database.ts";
 import { experimentRepositories } from "./repositories/experiment-repositories.registry.ts";
 import { batchRecordTrpcTransport } from "./transport/batch-record.trpc.ts";
 import { experimentBatchLogRest } from "./transport/experiment-batch-log.rest.ts";
@@ -87,16 +87,8 @@ export const experimentProcessModule: PublishedProcessModule<
   })
   .withEventing(experimentRunProcessingEventing)
   .withEventing(experimentLifecycleEventing)
-  .withMigrations(({ app }) => [
-    defineMigrationStep({
-      id: "experiment:fill-id-indexes",
-      after: ["analytics:fill-id-indexes"],
-      kind: "data",
-      mode: "background",
-      description:
-        "Fills the id indexes of experiment runs and DSPy steps from older rows, then marks them ready on each ClickHouse target.",
-      needsOldWritersGone: false,
-      // Level-triggered: a rerun merges the same ranges and resumes at the saved cursor.
-      run: ({ checkpoint, dryRun, signal }) => app.fillIdIndexes({ checkpoint, dryRun, signal }),
-    }),
-  ]);
+  .withIdIndexes(EXPERIMENT_ID_INDEXES, {
+    after: ["analytics:fill-id-indexes"],
+    description:
+      "Fills the id indexes of experiment runs and DSPy steps from older rows, then marks them ready on each ClickHouse target.",
+  });

@@ -1,5 +1,4 @@
 import type { Authorization } from "@langwatch/authorization";
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE,
   type CodingAgentPersonalPullRequestUsage,
@@ -93,7 +92,6 @@ export class CodingAgentFeatureService implements CodingAgentSessionService {
     projects: ProjectApi;
     billing: CodingAgentBillingPolicy;
     clock: CodingAgentClock;
-    idIndex?: IdIndexFlags | undefined;
   }): CodingAgentFeatureService {
     const sessionReads = CodingAgentSessionReadService.create({
       sessions: options.sessions,
@@ -101,7 +99,6 @@ export class CodingAgentFeatureService implements CodingAgentSessionService {
       metricSeries: options.metricSeries,
       sessionEvents: options.sessionEvents,
       clock: options.clock,
-      idIndex: options.idIndex,
     });
     const assignments = CodingAgentPullRequestAssignmentService.create();
     const shares = CodingAgentPullRequestShareService.create({ assignments });

@@ -2,7 +2,6 @@ import type { ScenarioRepositories } from "../scenario.repositories.ts";
 import { MemoryResultAtomsRepository } from "./memory.result-atoms.repository.ts";
 import { MemoryRunConfigurationsRepository } from "./memory.run-configurations.repository.ts";
 import { MemoryScenarioCancellationRepository } from "./memory.scenario-cancellation.repository.ts";
-import { MemoryScenarioIdIndexFillRepository } from "./memory.scenario-id-index-fill.repository.ts";
 import { MemoryScenarioRateLimitRepository } from "./memory.scenario-rate-limit.repository.ts";
 import { MemoryScenarioTabStoreRepository } from "./memory.scenario-tab-store.repository.ts";
 import { MemoryScenarioRepository } from "./memory.scenario.repository.ts";
@@ -30,7 +29,6 @@ export class MemoryScenarioRepositories {
       simulations: MemorySimulationRepository.create({ runs }),
       rateLimits: MemoryScenarioRateLimitRepository.create(),
       cancellations: MemoryScenarioCancellationRepository.create(),
-      idIndexFill: MemoryScenarioIdIndexFillRepository.create(),
     };
   }
 }

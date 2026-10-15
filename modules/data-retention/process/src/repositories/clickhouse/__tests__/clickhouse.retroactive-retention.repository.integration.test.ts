@@ -14,6 +14,7 @@ import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract
 import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { DECLARED_ID_INDEXES } from "../../../__tests__/support/declared-id-indexes.fixture.ts";
 import { ClickHouseRetroactiveRetentionRepository } from "../clickhouse.retroactive-retention.repository.ts";
 
 const clickHouseUrl = serverUrl(
@@ -56,7 +57,10 @@ function queryClient(client: ClickHouseClient): ClickHouseQueryClient {
       });
     },
   };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+  const routed = new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+  // The indexes the installed modules declare at composition, which retention reads at run time.
+  routed.declareIdIndexes({ indexes: DECLARED_ID_INDEXES });
+  return routed;
 }
 
 async function retentionByRow(): Promise<

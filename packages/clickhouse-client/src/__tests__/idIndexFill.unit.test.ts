@@ -69,6 +69,55 @@ function serverWith({ failFirstBatches }: { failFirstBatches: number }) {
   return { client, batches, markers };
 }
 
+/** One tenant's 23 span rows over 9 traces in one partition, as the source sorts them. */
+const traces = ["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9"];
+const rows = traces.flatMap((traceId, position) =>
+  Array.from({ length: position % 2 === 0 ? 3 : 2 }, () => traceId),
+);
+
+/** Answers the fill's reads from `rows`, and counts each source row an insert reads. */
+function sortedServer() {
+  let rowsRead = 0;
+  const indexed = new Set<string>();
+  const inRange = (traceId: string, params: Record<string, unknown> | undefined) => {
+    const after = params?.afterKey0;
+    const through = params?.throughKey0;
+    return (
+      (typeof after !== "string" || traceId > after) &&
+      (typeof through !== "string" || traceId <= through)
+    );
+  };
+  const execute = vi.fn<QueryDriver["execute"]>().mockImplementation(async (request) => {
+    if (request.sql.includes("system.parts")) {
+      return { rows: [{ partition_id: "202641", rows: String(rows.length) }] };
+    }
+    if (request.sql.includes("system.tables")) {
+      return { rows: [{ sorting_key: "TenantId, TraceId, SpanId" }] };
+    }
+    if (request.sql.includes("GROUP BY TenantId ORDER BY TenantId")) {
+      return { rows: [{ TenantId: "tenant_big", rows: String(rows.length) }] };
+    }
+    const offset = Number(/OFFSET (\d+)/.exec(request.sql)?.[1]);
+    const after = request.params?.afterKey0;
+    const remaining = rows.filter((traceId) => typeof after !== "string" || traceId > after);
+    const found = remaining[offset];
+    return { rows: found === undefined ? [] : [{ TraceId: found }] };
+  });
+  const command = vi.fn<QueryDriver["command"]>().mockImplementation(async (request) => {
+    if (request.params?.marker !== undefined) return;
+    expect(request.sql).not.toContain("cityHash64");
+    for (const traceId of rows.filter((each) => inRange(each, request.params))) {
+      rowsRead += 1;
+      indexed.add(traceId);
+    }
+  });
+  const client = new ClickHouseQueryClient({
+    driver: { execute, insert: async () => {}, command },
+    tenantGuard: new TenantGuard(),
+  });
+  return { client, rowsRead: () => rowsRead, indexed };
+}
+
 /** The ledger's checkpoint, in memory: the last saved report and every save. */
 function checkpointFrom(resumeFrom: IdIndexFillReport | null) {
   const saved: IdIndexFillReport[] = [];
@@ -293,7 +342,110 @@ describe("fillIdIndexes", () => {
     });
   });
 
+  describe("given a tenant bigger than one batch on a table sorted by its key", () => {
+    /** @scenario "a tenant bigger than a batch is split by key range and read once" */
+    it("splits it by key range, so the inserts read each source row once", async () => {
+      const server = sortedServer();
+      const run = checkpointFrom(null);
+
+      await fillIdIndexes({
+        statements: server.client,
+        targets: idIndexFillTargets({ privateRoutes: new Map() }),
+        indexes: [SPANS],
+        checkpoint: run.checkpoint,
+        signal: new AbortController().signal,
+        batchRows: 10,
+        beforeMarker: async () => {},
+      });
+
+      expect(server.rowsRead()).toBe(rows.length);
+      expect([...server.indexed].toSorted()).toEqual(traces);
+      expect(run.saved.map((report) => report.cursor?.throughKey)).toEqual([
+        ["t4"],
+        ["t8"],
+        undefined,
+        undefined,
+      ]);
+    });
+
+    it("resumes a stopped tenant after the last key it committed", async () => {
+      const server = sortedServer();
+      const run = checkpointFrom({
+        targetsDone: [],
+        targetsFailed: [],
+        cursor: {
+          target: "shared",
+          table: "stored_spans_id_index",
+          partition: "202641",
+          afterTenantId: "",
+          throughTenantId: "tenant_big",
+          slice: 0,
+          slices: 1,
+          throughKey: ["t4"],
+        },
+        done: 0,
+        total: 1,
+        batches: 1,
+        retries: 0,
+      });
+
+      await fillIdIndexes({
+        statements: server.client,
+        targets: idIndexFillTargets({ privateRoutes: new Map() }),
+        indexes: [SPANS],
+        checkpoint: run.checkpoint,
+        signal: new AbortController().signal,
+        batchRows: 10,
+        beforeMarker: async () => {},
+      });
+
+      expect([...server.indexed].toSorted()).toEqual(["t5", "t6", "t7", "t8", "t9"]);
+      expect(server.rowsRead()).toBe(rows.filter((traceId) => traceId > "t4").length);
+    });
+  });
+
   describe("when batches are planned", () => {
+    it("gives a tenant larger than a batch one key-split batch where the key is sorted", () => {
+      expect(
+        planBatches({
+          partition: { partition: "p", rows: 50 },
+          tenants: [
+            { tenantId: "a", rows: 5 },
+            { tenantId: "b", rows: 45 },
+            { tenantId: "c", rows: 5 },
+          ],
+          batchRows: 20,
+          split: "key",
+        }),
+      ).toEqual([
+        { afterTenantId: "", throughTenantId: "a", slice: 0, slices: 1 },
+        { afterTenantId: "a", throughTenantId: "b", slice: 0, slices: 1, byKey: true },
+        { afterTenantId: "b", throughTenantId: "c", slice: 0, slices: 1 },
+      ]);
+    });
+
+    it("bounds a key-split batch by its tenant and a lexicographic key range", () => {
+      const { sql, params } = fillStatement({
+        index: { ...SPANS, key: ["AggregateType", "AggregateId"] },
+        batch: { afterTenantId: "a", throughTenantId: "b", slice: 0, slices: 1, byKey: true },
+        keyRange: { after: ["trace", "x1"], through: ["trace", "x9"] },
+      });
+      expect(sql).toContain(
+        "WHERE _partition_id = {partition:String} AND TenantId = {throughTenantId:String} " +
+          "AND ((AggregateType > {afterKey0:String}) OR " +
+          "(AggregateType = {afterKey0:String} AND AggregateId > {afterKey1:String})) " +
+          "AND ((AggregateType < {throughKey0:String}) OR " +
+          "(AggregateType = {throughKey0:String} AND AggregateId <= {throughKey1:String}))",
+      );
+      expect(params).toEqual({
+        throughTenantId: "b",
+        afterKey0: "trace",
+        afterKey1: "x1",
+        throughKey0: "trace",
+        throughKey1: "x9",
+      });
+    });
+
     it("gives a tenant larger than a batch its own hash slices", () => {
       expect(
         planBatches({

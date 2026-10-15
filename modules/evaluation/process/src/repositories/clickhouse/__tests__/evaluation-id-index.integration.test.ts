@@ -6,20 +6,22 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
   AuthorizedClickHouse,
-  ClickHouseQueryClient,
-  type IdIndexFlags,
-  type QueryDriver,
+  type ClickHouseQueryClient,
   type QueryRequest,
   setWindowedReadMetrics,
-  TenantGuard,
   type WindowedReadOutcome,
 } from "@langwatch/clickhouse-client";
-import { partsAfterPartitionPruning } from "@langwatch/clickhouse-client/testing";
+import {
+  idIndexedClientDouble,
+  partsAfterPartitionPruning,
+  readyIdIndexedClientDouble,
+} from "@langwatch/clickhouse-client/testing";
 import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { startMigratedClickHouse } from "../../../__tests__/support/monitor-performance.fixtures.ts";
+import { EVALUATION_ID_INDEXES } from "../clickhouse.evaluation-id-indexes.database.ts";
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
 
 const clickHouseUrl =
@@ -35,34 +37,42 @@ const retention = {
   findRetentionDays: async () => [365],
   getPlatformDefaultRetentionDays: () => 365,
 };
-const flagsOn: IdIndexFlags = { isOn: () => true };
 
 let clickHouse: ClickHouseClient;
 let repository: EvaluationRunClickHouseReadRepository;
+let notReady: EvaluationRunClickHouseReadRepository;
 let statements: QueryRequest[] = [];
 const outcomes: { table: string; outcome: WindowedReadOutcome }[] = [];
 
-/** The routed client over the migrated test server, keeping every statement it is asked. */
-function recordingQueryClient(client: ClickHouseClient): ClickHouseQueryClient {
-  const driver: QueryDriver = {
-    async execute(request) {
-      statements.push(request);
-      const result = await client.query({
-        query: request.sql,
-        format: "JSONEachRow",
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-      return { rows: await result.json() };
-    },
-    async insert(request) {
-      await client.insert({ table: request.table, values: request.rows, format: "JSONEachRow" });
-    },
-    async command(request) {
-      await client.command({ query: request.sql });
-    },
-  };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+/**
+ * The routed client over the migrated test server, keeping every statement it is asked, with
+ * the run index read as filled when `ready` (no marker row is written to the shared server).
+ */
+function recordingQueryClient({
+  client,
+  ready,
+}: {
+  client: ClickHouseClient;
+  ready: boolean;
+}): Promise<ClickHouseQueryClient> {
+  const make = ready ? readyIdIndexedClientDouble : idIndexedClientDouble;
+  return Promise.resolve(
+    make({
+      indexes: EVALUATION_ID_INDEXES,
+      driver: {
+        async execute(request: QueryRequest) {
+          statements.push(request);
+          const result = await client.query({
+            query: request.sql,
+            format: "JSONEachRow",
+            ...(request.params === undefined ? {} : { query_params: request.params }),
+            ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+          });
+          return { rows: await result.json() };
+        },
+      },
+    }),
+  );
 }
 
 /** One query on the test server, its rows as JSONEachRow parses them. */
@@ -103,10 +113,13 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
   beforeAll(async () => {
     clickHouse = await startMigratedClickHouse();
     setWindowedReadMetrics({ record: (outcome) => void outcomes.push(outcome) });
+    const ready = recordingQueryClient({ client: clickHouse, ready: true });
+    const unready = recordingQueryClient({ client: clickHouse, ready: false });
     repository = EvaluationRunClickHouseReadRepository.create({
-      clickhouse: new AuthorizedClickHouse({
-        resolveClient: async () => recordingQueryClient(clickHouse),
-      }),
+      clickhouse: new AuthorizedClickHouse({ resolveClient: () => ready }),
+    });
+    notReady = EvaluationRunClickHouseReadRepository.create({
+      clickhouse: new AuthorizedClickHouse({ resolveClient: () => unready }),
     });
     await clickHouse.insert({
       table: "evaluation_runs",
@@ -138,7 +151,6 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
         authorization: ownProof({ projectId: tenantId }),
         evaluationId: targetId,
         retention,
-        idIndex: flagsOn,
       });
 
       expect(run.evaluationId).toBe(targetId);
@@ -146,11 +158,11 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
         (statement) => statement.sql.includes("FROM evaluation_runs AS t") && statement.params,
       );
       expect(read?.params).toMatchObject({
-        scheduledAtFrom: eightWeeksAgoMs - DAY_MS,
-        scheduledAtTo: eightWeeksAgoMs + DAY_MS,
+        idBound_fromMs: eightWeeksAgoMs - DAY_MS,
+        idBound_toMs: eightWeeksAgoMs + DAY_MS,
       });
       // Both the outer scope and the inner dedup subquery carry the bound.
-      expect(read?.sql.match(/scheduledAtFrom/g)).toHaveLength(2);
+      expect(read?.sql.match(/idBound_fromMs/g)).toHaveLength(2);
       expect(outcomes).toEqual([{ table: "evaluation_runs", outcome: "index_hit" }]);
       if (read === undefined) throw new Error("no source read of evaluation_runs was sent");
       const unbounded = {
@@ -164,10 +176,10 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
       );
     });
 
-    it("reads the same run through today's ladder when the flag is off", async () => {
+    it("reads the same run through today's ladder while the index is not ready", async () => {
       statements = [];
 
-      const run = await repository.getByEvaluationId({
+      const run = await notReady.getByEvaluationId({
         authorization: ownProof({ projectId: tenantId }),
         evaluationId: targetId,
         retention,

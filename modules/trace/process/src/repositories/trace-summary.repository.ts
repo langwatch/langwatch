@@ -2,7 +2,6 @@
 // repositories implement the interface as intentional no-ops.
 
 import type { Authorization } from "@langwatch/authorization";
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 export interface FindByTraceIdOptions {
@@ -19,9 +18,6 @@ export interface FindByTraceIdOptions {
    * with only a point hint who want the repo to widen it and recover a miss.
    */
   window?: { fromMs: number; toMs: number };
-
-  /** Trace's id-index readiness; with no time and the index ready, the index bounds the read. */
-  idIndex?: IdIndexFlags | undefined;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -61,6 +57,5 @@ export abstract class TraceSummaryRepository {
   abstract findTenantIdsByTraceId(params: {
     authorization: Authorization;
     traceId: string;
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<string[]>;
 }

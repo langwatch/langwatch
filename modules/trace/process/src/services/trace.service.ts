@@ -1,5 +1,4 @@
 import type { Authorization } from "@langwatch/authorization";
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type { FoldReadAuthorizer } from "@langwatch/eventing";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { nowInstant } from "@langwatch/time";
@@ -44,7 +43,6 @@ import type { TraceQueryFieldValuesRepository } from "../features/query/reposito
 import type { TraceQueryClassifier } from "../features/query/services/trace-query-classification.service.ts";
 import { TraceQueryFieldCatalogueService } from "../features/query/services/trace-query-field-catalogue.service.ts";
 import type { TraceFullRecordRepository } from "../repositories/trace-full-record.repository.ts";
-import type { TraceIdIndexReadRepository } from "../repositories/trace-id-index-read.repository.ts";
 import {
   type TraceProjectedReadRepository,
   type TraceSpanSummaryRecord,
@@ -69,10 +67,6 @@ type TraceComposition = {
   fullRecords: TraceFullRecordRepository;
   /** Mints the own-only proof for the reads whose `*Api` names a tenant, not a proof. */
   authorize: FoldReadAuthorizer;
-  /** Trace's id-index readiness, handed to every span read by trace id. */
-  idIndex?: IdIndexFlags | undefined;
-  /** The id index's range for reads on a plain client (the full record). */
-  idIndexReads?: TraceIdIndexReadRepository | undefined;
 };
 
 const DEFAULT_INGEST_WAIT_MS = 30_000;
@@ -109,17 +103,8 @@ export class TraceService {
 
   async getFullRecord(input: TraceFullReadInput): Promise<TraceFullRecord> {
     const parsed = traceFullReadInputSchema.parse(input);
-    const [window] =
-      parsed.occurredAtMs === undefined && this.composition.idIndexReads !== undefined
-        ? await this.composition.idIndexReads.findWindows({
-            tenantId: parsed.tenantId,
-            traceIds: [parsed.traceId],
-            source: "trace_summaries",
-            idIndex: this.composition.idIndex,
-          })
-        : [];
 
-    return this.composition.fullRecords.get(parsed, { window });
+    return this.composition.fullRecords.get(parsed);
   }
 
   async getFullThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {
@@ -139,7 +124,6 @@ export class TraceService {
 
     return this.composition.repository.findEvaluationSpans({
       ...read,
-      idIndex: this.composition.idIndex,
       authorization: await this.ownProof({
         projectId: tenantId,
         entry: "TraceService.getEvaluationSpans",
@@ -152,7 +136,6 @@ export class TraceService {
 
     return this.composition.repository.findEvaluationEvents({
       ...read,
-      idIndex: this.composition.idIndex,
       authorization: await this.ownProof({
         projectId: tenantId,
         entry: "TraceService.getEvaluationEvents",
@@ -171,7 +154,6 @@ export class TraceService {
       limit: parsed.limit,
       cursor: parsed.cursor,
       occurredAtMs: parsed.occurredAtMs,
-      idIndex: this.composition.idIndex,
     });
     const nodes = gateCosts(
       page.rows.map((row) => this.price(row)),

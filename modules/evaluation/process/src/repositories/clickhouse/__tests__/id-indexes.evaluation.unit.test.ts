@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { EVALUATION_ID_INDEXES } from "../evaluation.repository.ts";
+import { EVALUATION_ID_INDEXES } from "../clickhouse.evaluation-id-indexes.database.ts";
 
 const MIGRATIONS = resolve(
   import.meta.dirname,

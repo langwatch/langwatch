@@ -6,18 +6,19 @@
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
-  ClickHouseQueryClient,
-  type IdIndexFlags,
-  type QueryDriver,
+  type ClickHouseQueryClient,
+  type InsertRequest,
   type QueryRequest,
   setWindowedReadMetrics,
-  TenantGuard,
   type WindowedReadOutcome,
 } from "@langwatch/clickhouse-client";
 import {
+  idIndexedClientDouble,
   migrateTestClickHouseOnce,
-  startTestClickHouseEndpoints,
   partsAfterPartitionPruning,
+  readyIdIndexedClientDouble,
+  type ScriptedStatements,
+  startTestClickHouseEndpoints,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { nowInstant } from "@langwatch/time";
@@ -25,10 +26,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../../rules/gateway-spend-projection.rules.ts";
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
+import { GATEWAY_ID_INDEXES } from "../clickhouse.gateway-id-indexes.database.ts";
 import { ClickHouseGatewaySession } from "../clickhouse.gateway-session.store.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
 const DAY_MS = 86_400_000;
-const ON: IdIndexFlags = { isOn: () => true };
 const tenantId = `id-index-${Math.random().toString(36).slice(2, 10)}`;
 const eightWeeksAgoMs = nowInstant().epochMilliseconds - 56 * DAY_MS;
 // Each decoy partition holds ids on both sides of "req-old", in one part, so the planner
@@ -39,13 +40,18 @@ const decoyIds = ["!decoy", "~decoy"];
 let ch: ClickHouseClient;
 let statements: QueryRequest[] = [];
 let outcomes: { table: string; outcome: WindowedReadOutcome }[] = [];
+/** The indexes read as filled, and as not filled: the same server, with and without the bound. */
 let clickhouse: ClickHouseQueryClient;
+/** The spend repository over the not-ready client: the read as it ran before the index. */
+let unboundedSpend: ClickHouseGatewaySpendEventsRepository;
+let unready: ClickHouseQueryClient;
 let spend: ClickHouseGatewaySpendEventsRepository;
 let ledger: GatewayBudgetClickHouseRepository;
 
-function recordingClient(client: ClickHouseClient): ClickHouseQueryClient {
-  const driver: QueryDriver = {
-    async execute(request) {
+/** A recording driver, so the test can run the exact source statement through the planner. */
+function recordingDriver(client: ClickHouseClient): ScriptedStatements {
+  return {
+    async execute(request: QueryRequest) {
       statements.push(request);
       const result = await client.query({
         query: request.sql,
@@ -55,7 +61,7 @@ function recordingClient(client: ClickHouseClient): ClickHouseQueryClient {
       });
       return { rows: await result.json() };
     },
-    async insert(request) {
+    async insert(request: InsertRequest) {
       await client.insert({
         table: request.table,
         values: request.rows,
@@ -63,14 +69,7 @@ function recordingClient(client: ClickHouseClient): ClickHouseQueryClient {
         ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
       });
     },
-    async command(request) {
-      await client.command({
-        query: request.sql,
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-      });
-    },
   };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 async function partsReached(request: QueryRequest): Promise<number> {
@@ -142,11 +141,18 @@ beforeAll(async () => {
     url: endpoint.url,
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
-  clickhouse = recordingClient(ch);
+  clickhouse = await readyIdIndexedClientDouble({
+    indexes: GATEWAY_ID_INDEXES,
+    driver: recordingDriver(ch),
+  });
+  unready = idIndexedClientDouble({ indexes: GATEWAY_ID_INDEXES, driver: recordingDriver(ch) });
   const resolve = async (routed: string) =>
     ClickHouseGatewaySession.create({ clickhouse, tenantId: routed });
-  spend = ClickHouseGatewaySpendEventsRepository.create(resolve, { idIndexReader: clickhouse });
-  ledger = GatewayBudgetClickHouseRepository.create(resolve, { idIndexReader: clickhouse });
+  spend = ClickHouseGatewaySpendEventsRepository.create(resolve);
+  ledger = GatewayBudgetClickHouseRepository.create(resolve);
+  const resolveUnready = async (routed: string) =>
+    ClickHouseGatewaySession.create({ clickhouse: unready, tenantId: routed });
+  unboundedSpend = ClickHouseGatewaySpendEventsRepository.create(resolveUnready);
   setWindowedReadMetrics({ record: (entry) => outcomes.push(entry) });
 
   const decoys = decoyAgesInDays.flatMap((days) =>
@@ -210,18 +216,17 @@ describe("gateway lookups by request id with the id index", () => {
       const found = await spend.findForFold({
         tenantId,
         gatewayRequestId: "req-old",
-        idIndex: ON,
       });
 
       expect(found).not.toBeNull();
       expect(outcomes).toContainEqual({ table: "gateway_spend", outcome: "index_hit" });
       const bounded = sourceReadOf("gateway_spend");
       expect(bounded.params).toMatchObject({
-        fromMs: eightWeeksAgoMs - DAY_MS,
-        toMs: eightWeeksAgoMs + DAY_MS,
+        idBound_fromMs: eightWeeksAgoMs - DAY_MS,
+        idBound_toMs: eightWeeksAgoMs + DAY_MS,
       });
       statements = [];
-      await spend.findForFold({ tenantId, gatewayRequestId: "req-old" });
+      await unboundedSpend.findForFold({ tenantId, gatewayRequestId: "req-old" });
       expect(await partsReached(bounded)).toBeLessThan(
         await partsReached(sourceReadOf("gateway_spend")),
       );
@@ -233,14 +238,13 @@ describe("gateway lookups by request id with the id index", () => {
         tenantIds: [tenantId],
         gatewayRequestId: "req-old",
         statuses: ["confirmed"],
-        idIndex: ON,
       });
 
       expect(row?.gatewayRequestId).toBe("req-old");
       const bounded = sourceReadOf("gateway_spend");
-      expect(bounded.params).toMatchObject({ fromMs: eightWeeksAgoMs - DAY_MS });
+      expect(bounded.params).toMatchObject({ idBound_fromMs: eightWeeksAgoMs - DAY_MS });
       statements = [];
-      await spend.findSpendEventAcrossTenants({
+      await unboundedSpend.findSpendEventAcrossTenants({
         tenantIds: [tenantId],
         gatewayRequestId: "req-old",
         statuses: ["confirmed"],
@@ -254,38 +258,34 @@ describe("gateway lookups by request id with the id index", () => {
     });
 
     /** @scenario "a lookup by id reads only the partitions the index names" */
-    it("answers the ledger's replay probe from the index without reading the ledger", async () => {
-      await ledger.insertDebit(
-        [
-          {
-            tenantId,
-            budgetId: "budget-1",
-            scope: "VIRTUAL_KEY",
-            scopeId: "vk-1",
-            window: "MONTH",
-            virtualKeyId: "vk-1",
-            gatewayRequestId: "req-old",
-            amountNanoUsd: 1_000,
-            tokensInput: 1,
-            tokensOutput: 1,
-            tokensCacheRead: 0,
-            tokensCacheWrite: 0,
-            model: "gpt-x",
-            status: "SUCCESS",
-            occurredAt: nowInstant(),
-          },
-        ],
-        { idIndex: ON },
-      );
+    it("bounds the ledger's replay probe to the index's range", async () => {
+      await ledger.insertDebit([
+        {
+          tenantId,
+          budgetId: "budget-1",
+          scope: "VIRTUAL_KEY",
+          scopeId: "vk-1",
+          window: "MONTH",
+          virtualKeyId: "vk-1",
+          gatewayRequestId: "req-old",
+          amountNanoUsd: 1_000,
+          tokensInput: 1,
+          tokensOutput: 1,
+          tokensCacheRead: 0,
+          tokensCacheWrite: 0,
+          model: "gpt-x",
+          status: "SUCCESS",
+          occurredAt: nowInstant(),
+        },
+      ]);
 
       expect(statements.some((request) => request.sql.includes("_id_index"))).toBe(true);
-      expect(
-        statements.some(
-          (request) =>
-            request.sql.includes("FROM gateway_budget_ledger_events") &&
-            !request.sql.includes("_id_index"),
-        ),
-      ).toBe(false);
+      const probe = statements.find(
+        (request) =>
+          request.sql.includes("FROM gateway_budget_ledger_events") &&
+          !request.sql.includes("_id_index"),
+      );
+      expect(probe?.params).toHaveProperty("idBound_fromMs");
     });
   });
 });

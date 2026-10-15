@@ -1,5 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
-
 import type { buildExperimentRunProcessingPipeline } from "../eventing/experiment-run-processing.pipeline.ts";
 import type { ExperimentIdLookupRepository } from "./experiment-id-lookup.repository.ts";
 import type { ExperimentRunAbortRepository } from "./experiment-run-abort.repository.ts";
@@ -22,9 +20,5 @@ export interface ExperimentRunRepositories extends PipelineStores {
 
 /** A run's stores, opened once the platform's retention fallback, a peer's answer, is known. */
 export type ExperimentRunProcessingStores = Readonly<{
-  open(input: {
-    defaultRetentionDays: () => number;
-    /** Whether this module's id indexes are filled; absent reads runs with no time bound. */
-    idIndex?: IdIndexFlags | undefined;
-  }): ExperimentRunRepositories;
+  open(input: { defaultRetentionDays: () => number }): ExperimentRunRepositories;
 }>;

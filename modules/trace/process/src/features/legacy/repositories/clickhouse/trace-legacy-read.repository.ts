@@ -2108,6 +2108,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         : "";
     const runQuery = async (ids: string[]) => {
       const result = await clickHouseClient.query({
+        // ID_BOUND_SKIP: a list page, bounded by the list's own date range.
         query: `
           SELECT
             ts.TraceId AS ts_TraceId,
@@ -2258,6 +2259,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     } = buildEventOccurrenceWindows(occurredAts);
 
     const result = await reader.query({
+      // ID_BOUND_SKIP: bounded by the page's own trace occurrence windows.
       query: `
         SELECT
           t.TraceId AS TraceId,
@@ -2493,9 +2495,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         WHERE ${tenantScope("OccurredAt")}
           AND TraceId IN ({traceIds:Array(String)})
           AND OccurredAt > fromUnixTimestamp64Milli(0)
+          {{idBound:trace_summaries.TraceId:traceIds}}
       `,
       query_params: { traceIds },
       format: "JSONEachRow",
+      // A trace the index has never seen is resolved over every partition, as before the index.
+      idBound: { onMiss: "unbounded" },
     });
     const rows = occurredAtRangeRowsSchema.parse(await result.json());
     const row = rows[0];
@@ -2763,6 +2768,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         const summaryTimeFilterOuter = window ? window.sqlFor("t.OccurredAt") : "";
         const summaryTimeFilterInner = window ? window.sqlFor("OccurredAt") : "";
         const summaryResult = await reader.query({
+          // ID_BOUND_SKIP: bounded by the occurred range the index-bounded resolver found.
           query: `
         SELECT
           TraceId AS ts_TraceId,
@@ -2878,6 +2884,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         const spanTimeFilterOuter = window ? window.sqlFor("t.StartTime") : "";
         const spanTimeFilterInner = window ? window.sqlFor("StartTime") : "";
         const spansResult = await reader.query({
+          // ID_BOUND_SKIP: bounded by the summaries' own occurred times read just above.
           query: `
         SELECT
           SpanId,

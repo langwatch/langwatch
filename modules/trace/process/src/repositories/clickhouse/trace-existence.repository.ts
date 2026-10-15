@@ -6,7 +6,6 @@ import type { TraceCost, TraceUsageCount } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 import { TraceExistenceRepository } from "../trace-existence.repository.ts";
-import type { TraceIdIndexWindow } from "../trace-id-index-read.repository.ts";
 import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
 import { chNumber, chString } from "./stored-span-row.mapper.ts";
 
@@ -32,11 +31,9 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
   async findExistingTraceIds({
     projectId,
     traceIds,
-    window,
   }: {
     projectId: string;
     traceIds: readonly string[];
-    window?: TraceIdIndexWindow | undefined;
   }): Promise<string[]> {
     if (traceIds.length === 0) return [];
     const client = await this.resolveClient(projectId);
@@ -47,18 +44,12 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
                 AND TraceId IN ({traceIds:Array(String)})
-                ${
-                  window === undefined
-                    ? ""
-                    : "AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
-                }
+                {{idBound:trace_summaries.TraceId:traceIds}}
             `,
-        query_params: {
-          tenantId: projectId,
-          traceIds: [...traceIds],
-          ...(window === undefined ? {} : { fromMs: window.fromMs, toMs: window.toMs }),
-        },
+        query_params: { tenantId: projectId, traceIds: [...traceIds] },
         format: "JSONEachRow",
+        // Existence is confirmed on the source: a miss reads it unbounded, as before the index.
+        idBound: { onMiss: "unbounded" },
       });
       const rows = traceIdRowsSchema.parse(await result.json());
       return rows.map((row) => row.TraceId);
@@ -87,6 +78,7 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
     if (traceIds.length === 0) return [];
     const client = await this.resolveClient(projectId);
     const result = await client.query({
+      // ID_BOUND_SKIP: bounded by the caller's own occurred-time range, not by id.
       query: `
           SELECT TraceId, TotalCost
           FROM trace_summaries

@@ -1,7 +1,13 @@
 import "@langwatch/time/polyfill";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { classifyEventLogRowRetention } from "@langwatch/data-retention-contract/event-log-retention-policy";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
-import { processConfig, Server, type ProcessServer } from "@langwatch/process";
+import {
+  type IdIndexRetention,
+  processConfig,
+  Server,
+  type ProcessServer,
+} from "@langwatch/process";
 import { servingUpgradeGate } from "@langwatch/upgrade/gate";
 
 import { processEnvironment } from "./config.ts";
@@ -16,6 +22,12 @@ export type WorkerStartOptions = Readonly<{
   ownsTelemetry?: boolean;
 }>;
 
+/** Each module's id-index fill raises its indexes' retention through data-retention. */
+const raiseThroughDataRetention: IdIndexRetention =
+  ({ api }) =>
+  (input) =>
+    api(DataRetentionApi).raiseIdIndexRetention(input);
+
 function workerPreamble({ ownsProcess }: { ownsProcess: boolean }) {
   return Server.create("langwatch-worker")
     .withEnvironment(processEnvironment)
@@ -24,6 +36,7 @@ function workerPreamble({ ownsProcess }: { ownsProcess: boolean }) {
       secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
     )
     .withProcessOwnership(ownsProcess)
+    .withIdIndexRetention(raiseThroughDataRetention)
     .withUpgradeGate({ role: "worker", gate: servingUpgradeGate });
 }
 

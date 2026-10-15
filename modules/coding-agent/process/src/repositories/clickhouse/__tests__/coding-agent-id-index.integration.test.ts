@@ -8,18 +8,19 @@ import { randomUUID } from "node:crypto";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
-  ClickHouseQueryClient,
-  type IdIndexFlags,
-  type QueryDriver,
+  type ClickHouseQueryClient,
+  type InsertRequest,
   type QueryRequest,
   setWindowedReadMetrics,
-  TenantGuard,
   type WindowedReadOutcome,
 } from "@langwatch/clickhouse-client";
 import {
+  idIndexedClientDouble,
   migrateTestClickHouseOnce,
-  startTestClickHouseEndpoints,
   partsAfterPartitionPruning,
+  readyIdIndexedClientDouble,
+  type ScriptedStatements,
+  startTestClickHouseEndpoints,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { nowInstant } from "@langwatch/time";
@@ -31,11 +32,11 @@ import {
   TestClock,
 } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { NoopCodingAgentReadMetricsService } from "../../../__tests__/support/coding-agent-read-metrics-noop.service.ts";
+import { CODING_AGENT_ID_INDEXES } from "../clickhouse.coding-agent-id-indexes.database.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionClickHouseRepository } from "../clickhouse.coding-agent-trace-session.repository.ts";
 const DAY_MS = 86_400_000;
-const ON: IdIndexFlags = { isOn: () => true };
 
 const tenantId = `${randomUUID()}-id-index`;
 const eightWeeksAgoMs = nowInstant().epochMilliseconds - 56 * DAY_MS;
@@ -47,15 +48,23 @@ const decoyIds = ["!decoy", "~decoy"];
 let ch: ClickHouseClient;
 let statements: QueryRequest[] = [];
 let outcomes: { table: string; outcome: WindowedReadOutcome }[] = [];
+/** The indexes read as filled, and as not filled: the same server, with and without the bound. */
 let clickhouse: ClickHouseQueryClient;
+let unready: ClickHouseQueryClient;
 let sessions: CodingAgentSessionClickHouseRepository;
 let events: CodingAgentSessionEventsClickHouseRepository;
 let traceSessions: CodingAgentTraceSessionClickHouseRepository;
+/** The same repositories over the not-ready client: the read as it ran before the index. */
+let unbounded: {
+  sessions: CodingAgentSessionClickHouseRepository;
+  events: CodingAgentSessionEventsClickHouseRepository;
+  traceSessions: CodingAgentTraceSessionClickHouseRepository;
+};
 
 /** A recording driver, so the test can run the exact source statement through the planner. */
-function recordingClient(client: ClickHouseClient): ClickHouseQueryClient {
-  const driver: QueryDriver = {
-    async execute(request) {
+function recordingDriver(client: ClickHouseClient): ScriptedStatements {
+  return {
+    async execute(request: QueryRequest) {
       statements.push(request);
       const result = await client.query({
         query: request.sql,
@@ -65,7 +74,7 @@ function recordingClient(client: ClickHouseClient): ClickHouseQueryClient {
       });
       return { rows: await result.json() };
     },
-    async insert(request) {
+    async insert(request: InsertRequest) {
       await client.insert({
         table: request.table,
         values: request.rows,
@@ -73,15 +82,7 @@ function recordingClient(client: ClickHouseClient): ClickHouseQueryClient {
         ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
       });
     },
-    async command(request) {
-      await client.command({
-        query: request.sql,
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-    },
   };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 /** The parts the planner reaches for one statement, summed over the tables it names. */
@@ -140,7 +141,14 @@ beforeAll(async () => {
     url: endpoint.url,
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
-  clickhouse = recordingClient(ch);
+  clickhouse = await readyIdIndexedClientDouble({
+    indexes: CODING_AGENT_ID_INDEXES,
+    driver: recordingDriver(ch),
+  });
+  unready = idIndexedClientDouble({
+    indexes: CODING_AGENT_ID_INDEXES,
+    driver: recordingDriver(ch),
+  });
   sessions = CodingAgentSessionClickHouseRepository.create({
     clickhouse,
     defaultTraceRetentionDays: 308,
@@ -155,6 +163,22 @@ beforeAll(async () => {
     clickhouse,
     defaultTraceRetentionDays: 308,
   });
+  unbounded = {
+    sessions: CodingAgentSessionClickHouseRepository.create({
+      clickhouse: unready,
+      defaultTraceRetentionDays: 308,
+      metrics: NoopCodingAgentReadMetricsService.create(),
+      clock: new TestClock(),
+    }),
+    events: CodingAgentSessionEventsClickHouseRepository.create({
+      clickhouse: unready,
+      defaultTraceRetentionDays: 308,
+    }),
+    traceSessions: CodingAgentTraceSessionClickHouseRepository.create({
+      clickhouse: unready,
+      defaultTraceRetentionDays: 308,
+    }),
+  };
   setWindowedReadMetrics({ record: (entry) => outcomes.push(entry) });
 
   const sessionId = `${tenantId}-session`;
@@ -229,17 +253,17 @@ describe("coding-agent lookups by id with the id index", () => {
     it("finds it by session id alone and reads fewer parts than the unbounded read", async () => {
       const sessionId = `${tenantId}-session`;
 
-      const found = await sessions.findBySessionId({ tenantId, sessionId, idIndex: ON });
+      const found = await sessions.findBySessionId({ tenantId, sessionId });
 
       expect(found?.sessionId).toBe(sessionId);
       expect(outcomes).toContainEqual({ table: "coding_agent_sessions", outcome: "index_hit" });
       const bounded = sourceReadOf("coding_agent_sessions");
       expect(bounded.params).toMatchObject({
-        fromMs: eightWeeksAgoMs - DAY_MS,
-        toMs: eightWeeksAgoMs + DAY_MS,
+        idBound_fromMs: eightWeeksAgoMs - DAY_MS,
+        idBound_toMs: eightWeeksAgoMs + DAY_MS,
       });
       statements = [];
-      await sessions.findBySessionId({ tenantId, sessionId });
+      await unbounded.sessions.findBySessionId({ tenantId, sessionId });
       expect(await partsReached(bounded)).toBeLessThan(
         await partsReached(sourceReadOf("coding_agent_sessions")),
       );
@@ -249,7 +273,7 @@ describe("coding-agent lookups by id with the id index", () => {
     it("lists its events by session id alone inside the index's range", async () => {
       const sessionId = `${tenantId}-session`;
 
-      const page = await events.listBySessionId({ tenantId, sessionId, limit: 10, idIndex: ON });
+      const page = await events.listBySessionId({ tenantId, sessionId, limit: 10 });
 
       expect(page.events).toHaveLength(1);
       expect(outcomes).toContainEqual({
@@ -258,11 +282,11 @@ describe("coding-agent lookups by id with the id index", () => {
       });
       const bounded = sourceReadOf("coding_agent_session_events");
       expect(bounded.params).toMatchObject({
-        fromMs: eightWeeksAgoMs - DAY_MS,
-        toMs: eightWeeksAgoMs + DAY_MS,
+        idBound_fromMs: eightWeeksAgoMs - DAY_MS,
+        idBound_toMs: eightWeeksAgoMs + DAY_MS,
       });
       statements = [];
-      await events.listBySessionId({ tenantId, sessionId, limit: 10 });
+      await unbounded.events.listBySessionId({ tenantId, sessionId, limit: 10 });
       expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
         await partsAfterPartitionPruning({
           query: queryRows,
@@ -275,7 +299,7 @@ describe("coding-agent lookups by id with the id index", () => {
     it("finds its trace mapping by trace id alone inside the index's range", async () => {
       const traceId = `${tenantId}-trace`;
 
-      const mapping = await traceSessions.findByTraceId({ tenantId, traceId, idIndex: ON });
+      const mapping = await traceSessions.findByTraceId({ tenantId, traceId });
 
       expect(mapping?.traceId).toBe(traceId);
       expect(outcomes).toContainEqual({
@@ -284,11 +308,11 @@ describe("coding-agent lookups by id with the id index", () => {
       });
       const bounded = sourceReadOf("coding_agent_trace_sessions");
       expect(bounded.params).toMatchObject({
-        fromMs: eightWeeksAgoMs - DAY_MS,
-        toMs: eightWeeksAgoMs + DAY_MS,
+        idBound_fromMs: eightWeeksAgoMs - DAY_MS,
+        idBound_toMs: eightWeeksAgoMs + DAY_MS,
       });
       statements = [];
-      await traceSessions.findByTraceId({ tenantId, traceId });
+      await unbounded.traceSessions.findByTraceId({ tenantId, traceId });
       expect(await partsReached(bounded)).toBeLessThan(
         await partsReached(sourceReadOf("coding_agent_trace_sessions")),
       );

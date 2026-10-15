@@ -1,4 +1,3 @@
-import type { CodingAgentIdIndexFillRepository } from "./coding-agent-id-index-fill.repository.ts";
 import type { CodingAgentSessionEventRepository } from "./coding-agent-session-event.repository.ts";
 import type { CodingAgentSessionFoldCacheRepository } from "./coding-agent-session-fold-cache.repository.ts";
 import type { CodingAgentSessionRepository } from "./coding-agent-session.repository.ts";
@@ -17,7 +16,6 @@ export interface CodingAgentProjectionRepositories {
 
 /** The projections plus the fold's own scratch (its context memo and cache) and the index fill. */
 export interface CodingAgentRepositories extends CodingAgentProjectionRepositories {
-  readonly idIndexFill: CodingAgentIdIndexFillRepository;
   readonly sessionContextMemo: CodingAgentSessionContextMemoRepository;
   readonly sessionFoldCache: CodingAgentSessionFoldCacheRepository;
 }

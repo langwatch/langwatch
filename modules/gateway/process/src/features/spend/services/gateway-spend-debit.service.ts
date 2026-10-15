@@ -1,4 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   budgetAppliesToProvider,
   type GatewayBudgetDebitRow,
@@ -29,8 +28,6 @@ type GatewaySpendDebitCollaborators = Readonly<{
   dedupe: BudgetChangeEventDedupeService;
   changes: Pick<GatewayChangeEventsRepository, "append">;
   crossings: Pick<GatewayBudgetCrossingService, "detect">;
-  /** Whether the ledger's id index answers the replay probe; absent reads the ledger. */
-  idIndex?: IdIndexFlags | undefined;
 }>;
 
 export class GatewaySpendDebitService {
@@ -56,7 +53,6 @@ export class GatewaySpendDebitService {
     try {
       await this.collaborators.spend.insertDebitsForBudgets(
         this.debitRows(payload, budgets, providerKey),
-        { idIndex: this.collaborators.idIndex },
       );
     } catch (error) {
       logger.error(

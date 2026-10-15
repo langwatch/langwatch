@@ -11,6 +11,7 @@ import { resolve } from "node:path";
 
 import {
   ClickHouseQueryClient,
+  fillOwnerIdIndexes,
   type QueryDriver,
   type QueryRequest,
   TenantGuard,
@@ -27,7 +28,7 @@ import { EventingClickHouseEventRepository } from "../../adapters/clickhouse/eve
 import { EventingClickHouseReplayEventSource } from "../../adapters/clickhouse/replay-event-source.clickhouse.ts";
 import type { EventingClickHouseClientResolver } from "../../clickhouse-client-resolver.ts";
 import {
-  EventingClickHouseEventLogIdIndexFill,
+  EVENT_LOG_ID_INDEX,
   type EventLogIdIndex,
   eventLogIdIndexReadiness,
   eventLogOccurredRange,
@@ -342,7 +343,9 @@ describe("the event log's aggregate index", () => {
       expect(await readiness.check({ target: "shared" })).toBe(false);
       expect(await rangeOf()).toBeNull();
 
-      await EventingClickHouseEventLogIdIndexFill.create({ clickhouse }).fill({
+      await fillOwnerIdIndexes({
+        clickhouse,
+        indexes: [EVENT_LOG_ID_INDEX],
         checkpoint: { resumeFrom: null, save: async () => undefined },
         signal: new AbortController().signal,
         raiseRetention: async () => undefined,

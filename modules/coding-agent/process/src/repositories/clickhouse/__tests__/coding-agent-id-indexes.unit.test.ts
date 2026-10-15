@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { CODING_AGENT_ID_INDEXES } from "../clickhouse.coding-agent-id-index-fill.repository.ts";
+import { CODING_AGENT_ID_INDEXES } from "../clickhouse.coding-agent-id-indexes.database.ts";
 
 const MIGRATIONS_DIR = join(
   dirname(createRequire(import.meta.url).resolve("@langwatch/clickhouse-migrations")),

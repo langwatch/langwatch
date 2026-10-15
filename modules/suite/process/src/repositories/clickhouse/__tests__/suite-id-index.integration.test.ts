@@ -9,16 +9,17 @@ import { randomUUID } from "node:crypto";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
-  ClickHouseQueryClient,
-  type IdIndexFlags,
-  type QueryDriver,
+  type ClickHouseQueryClient,
+  type InsertRequest,
   type QueryRequest,
   setWindowedReadMetrics,
-  TenantGuard,
   type WindowedReadOutcome,
 } from "@langwatch/clickhouse-client";
 import {
+  idIndexedClientDouble,
   migrateTestClickHouseOnce,
+  readyIdIndexedClientDouble,
+  type ScriptedStatements,
   startTestClickHouseEndpoints,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
@@ -26,10 +27,10 @@ import { createTenantId } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { SUITE_ID_INDEXES } from "../clickhouse.suite-id-indexes.database.ts";
 import { ClickHouseSuiteRunRepository } from "../clickhouse.suite-run.repository.ts";
 
 const DAY_MS = 86_400_000;
-const ON: IdIndexFlags = { isOn: () => true };
 
 const tenantId = `${randomUUID()}-suite-id-index`;
 const now = nowInstant().epochMilliseconds;
@@ -42,12 +43,14 @@ const decoyIds = ["!decoy", "~decoy"];
 let ch: ClickHouseClient;
 let statements: QueryRequest[] = [];
 let outcomes: { table: string; outcome: WindowedReadOutcome }[] = [];
+/** The indexes read as filled, and as not filled: the same server, with and without the bound. */
 let clickhouse: ClickHouseQueryClient;
+let unready: ClickHouseQueryClient;
 
 /** A recording driver, so the test can run the exact source statement through the planner. */
-function recordingClient(client: ClickHouseClient): ClickHouseQueryClient {
-  const driver: QueryDriver = {
-    async execute(request) {
+function recordingDriver(client: ClickHouseClient): ScriptedStatements {
+  return {
+    async execute(request: QueryRequest) {
       statements.push(request);
       const result = await client.query({
         query: request.sql,
@@ -57,7 +60,7 @@ function recordingClient(client: ClickHouseClient): ClickHouseQueryClient {
       });
       return { rows: await result.json() };
     },
-    async insert(request) {
+    async insert(request: InsertRequest) {
       await client.insert({
         table: request.table,
         values: request.rows,
@@ -65,15 +68,7 @@ function recordingClient(client: ClickHouseClient): ClickHouseQueryClient {
         ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
       });
     },
-    async command(request) {
-      await client.command({
-        query: request.sql,
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-    },
   };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 /** The parts the planner reaches for one statement, summed over the tables it names. */
@@ -131,7 +126,11 @@ beforeAll(async () => {
     url: endpoint.url,
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
-  clickhouse = recordingClient(ch);
+  clickhouse = await readyIdIndexedClientDouble({
+    indexes: SUITE_ID_INDEXES,
+    driver: recordingDriver(ch),
+  });
+  unready = idIndexedClientDouble({ indexes: SUITE_ID_INDEXES, driver: recordingDriver(ch) });
   setWindowedReadMetrics({ record: (entry) => outcomes.push(entry) });
 
   const groups = [
@@ -181,7 +180,6 @@ describe("suite lookups by id with the id index", () => {
       const repository = ClickHouseSuiteRunRepository.create({
         clickhouse,
         defaultRetentionDays: () => 308,
-        idIndex: ON,
       });
 
       const projection = await repository.findProjection(batchRunId, {
@@ -192,12 +190,12 @@ describe("suite lookups by id with the id index", () => {
       expect(outcomes).toContainEqual({ table: "suite_runs", outcome: "index_hit" });
       const bounded = sourceReadOf("suite_runs");
       expect(bounded.params).toMatchObject({
-        fromMs: eightWeeksAgoMs - DAY_MS,
-        toMs: eightWeeksAgoMs + DAY_MS,
+        idBound_fromMs: eightWeeksAgoMs - DAY_MS,
+        idBound_toMs: eightWeeksAgoMs + DAY_MS,
       });
       statements = [];
       await ClickHouseSuiteRunRepository.create({
-        clickhouse,
+        clickhouse: unready,
         defaultRetentionDays: () => 308,
       }).findProjection(batchRunId, { tenantId: createTenantId(tenantId) });
       expect(await partsReached(bounded)).toBeLessThan(

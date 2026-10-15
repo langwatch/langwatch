@@ -5,7 +5,6 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import { ResultAtomsClickHouseRepository } from "../clickhouse/clickhouse.result-atoms.repository.ts";
 import { RunConfigurationsClickHouseRepository } from "../clickhouse/clickhouse.run-configurations.repository.ts";
-import { ScenarioIdIndexFillClickHouseRepository } from "../clickhouse/clickhouse.scenario-id-index-fill.repository.ts";
 import { ClickHouseScenarioSession } from "../clickhouse/clickhouse.scenario-session.store.ts";
 import { ClickHouseSimulationSession } from "../clickhouse/clickhouse.simulation-session.store.ts";
 import { ClickHouseStalledSimulationRunRepository } from "../clickhouse/clickhouse.stalled-simulation-run.repository.ts";
@@ -55,7 +54,6 @@ export class LiveScenarioRepositories {
       ),
       rateLimits: RedisScenarioRateLimitRepository.create(rateLimiter),
       cancellations: RedisScenarioCancellationRepository.create(redis),
-      idIndexFill: ScenarioIdIndexFillClickHouseRepository.create({ clickhouse }),
     };
   }
 }

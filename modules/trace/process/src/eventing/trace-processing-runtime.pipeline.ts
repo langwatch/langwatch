@@ -62,7 +62,6 @@ export interface TraceProcessingPipelineInput {
     | "analyticsRollup"
     | "summaryFoldCache"
     | "analyticsFoldCache"
-    | "idIndexFill"
   >;
   canonicalisation: TraceCanonicalisationService;
   commands: TraceProcessingCommandsService;
@@ -101,8 +100,6 @@ export class TraceProcessingRuntimeAdapter {
     const { peers, repositories, canonicalisation, authorizeFoldRead } = this.input;
     const defaultRetentionDays = (): number =>
       peers.dataRetention.getPlatformDefaultRetentionDays();
-    // Fold read-backs with no window are bounded by trace's id index once it is ready.
-    const idIndex = repositories.idIndexFill.readiness;
     return EventingTracePipelineAdapter.create({
       spanStore: SpanStorageStore.create({
         storage: repositories.spanStorage,
@@ -113,7 +110,6 @@ export class TraceProcessingRuntimeAdapter {
           storage: repositories.summaryProjection,
           defaultRetentionDays,
           authorize: authorizeFoldRead,
-          idIndex,
         }),
       ),
       derivedStore: repositories.analyticsFoldCache.cached(
@@ -121,7 +117,6 @@ export class TraceProcessingRuntimeAdapter {
           storage: repositories.analyticsProjection,
           defaultRetentionDays,
           authorize: authorizeFoldRead,
-          idIndex,
         }),
       ),
       rollupStore: TraceAnalyticsRollupStore.create({

@@ -1,4 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   type FoldProjectionStore,
   type ProjectionStoreContext,
@@ -19,26 +18,21 @@ export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> 
   private readonly storage: TraceSummaryProjectionRepository;
   private readonly defaultRetentionDays: () => number;
   private readonly authorize: FoldReadAuthorizer;
-  private readonly idIndex: IdIndexFlags | undefined;
 
   private constructor(options: {
     storage: TraceSummaryProjectionRepository;
     defaultRetentionDays: () => number;
     authorize: FoldReadAuthorizer;
-    idIndex?: IdIndexFlags | undefined;
   }) {
     this.storage = options.storage;
     this.defaultRetentionDays = options.defaultRetentionDays;
     this.authorize = options.authorize;
-    this.idIndex = options.idIndex;
   }
 
   static create(options: {
     storage: TraceSummaryProjectionRepository;
     defaultRetentionDays: () => number;
     authorize: FoldReadAuthorizer;
-    /** Trace's id-index readiness: a read with no window is bounded by the index once ready. */
-    idIndex?: IdIndexFlags | undefined;
   }): TraceSummaryStore {
     return new TraceSummaryStore(options);
   }
@@ -96,7 +90,6 @@ export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> 
       }),
       traceId: aggregateId,
       window: context.readWindow,
-      idIndex: this.idIndex,
     });
     return folded === null ? { kind: "empty" } : { kind: "folded", state: folded };
   }

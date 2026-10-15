@@ -27,7 +27,6 @@ import {
   withoutEventReferences,
 } from "../../rules/trace-full-record.rules.ts";
 import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
-import type { TraceIdIndexWindow } from "../trace-id-index-read.repository.ts";
 import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
 import type {
   TraceClickHouseClient,
@@ -115,19 +114,13 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
     return new ClickHouseTraceFullRecordRepository(clickhouse, payloads, io);
   }
 
-  async get(
-    input: TraceFullReadInput,
-    options: { window?: TraceIdIndexWindow | undefined } = {},
-  ): Promise<TraceFullRecord> {
+  async get(input: TraceFullReadInput): Promise<TraceFullRecord> {
     EventUtils.validateTenantId(
       { tenantId: input.tenantId },
       "ClickHouseTraceFullRecordRepository.get",
     );
     const client = await this.clickhouse.resolve(input.tenantId);
-    // Inside the id index's range first; a miss there reads as today, unbounded.
-    const summary =
-      (options.window === undefined ? null : await this.summary(client, input, options.window)) ??
-      (await this.summary(client, input));
+    const summary = await this.summary(client, input);
     if (!summary) throw new TraceNotFoundError(input.traceId);
 
     const rows = await this.spans(client, input, input.occurredAtMs ?? summary.OccurredAtMs);
@@ -212,28 +205,21 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
     );
   }
 
+  /** Bounded by the id index once ready; an id it has never seen reads unbounded, as before. */
   private async summary(
     client: TraceClickHouseClient,
     input: TraceFullReadInput,
-    window?: TraceIdIndexWindow,
   ): Promise<SummaryRow | null> {
-    const bound =
-      window === undefined
-        ? ""
-        : "AND OccurredAt BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
     const result = await client.query({
       query: `SELECT TraceId, Attributes, ComputedInput, ComputedOutput, ContainsErrorStatus, ErrorMessage,
         TimeToFirstTokenMs, TotalDurationMs, TotalPromptTokenCount, TotalCompletionTokenCount, TotalCost, TokensEstimated,
         toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs, toUnixTimestamp64Milli(CreatedAt) AS CreatedAtMs,
         toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs FROM trace_summaries WHERE TenantId = {tenantId:String}
-        AND TraceId = {traceId:String} ${bound} AND (TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM trace_summaries WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String} ${bound} GROUP BY TenantId, TraceId) LIMIT 1`,
-      query_params: {
-        tenantId: input.tenantId,
-        traceId: input.traceId,
-        ...(window === undefined ? {} : { fromMs: window.fromMs, toMs: window.toMs }),
-      },
+        AND TraceId = {traceId:String} {{idBound:trace_summaries.TraceId:traceId}} AND (TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM trace_summaries WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String} {{idBound:trace_summaries.TraceId:traceId}} GROUP BY TenantId, TraceId) LIMIT 1`,
+      query_params: { tenantId: input.tenantId, traceId: input.traceId },
       format: "JSONEachRow",
+      idBound: { occurredAtHint: input.occurredAtMs ?? null, onMiss: "unbounded" },
     });
     return summaryRowsSchema.parse(await result.json())[0] ?? null;
   }
@@ -248,6 +234,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
         ? "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})"
         : "";
       const result = await client.query({
+        // ID_BOUND_SKIP: bounded by the summary's own occurred time, which the read above found.
         query: `SELECT SpanId, TraceId, TenantId, ParentSpanId, ParentTraceId, ParentIsRemote, Sampled,
           toUnixTimestamp64Milli(StartTime) AS StartTimeMs, toUnixTimestamp64Milli(EndTime) AS EndTimeMs, DurationMs,
           SpanName, SpanKind, ResourceAttributes, SpanAttributes, StatusCode, StatusMessage, ScopeName, ScopeVersion,

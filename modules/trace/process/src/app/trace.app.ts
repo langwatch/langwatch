@@ -7,7 +7,6 @@ import { internalActor, narrowAuthorization, projectIdsReadBy } from "@langwatch
  */
 import type { Authorization, AuthorizationPurpose, PrincipalRef } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   type CodingAgentTranscript,
   shouldFilterCodingAgentSpan,
@@ -342,7 +341,6 @@ import type { TraceAttributeSpendRepository } from "../repositories/trace-attrib
 import type { TraceAttributedRollupRepository } from "../repositories/trace-attributed-rollup.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
-import type { TraceIdIndexReadRepository } from "../repositories/trace-id-index-read.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "../repositories/trace-payload-reader.repository.ts";
 import type { TraceProjectedReadRepository } from "../repositories/trace-projected-read.repository.ts";
@@ -879,8 +877,6 @@ type TraceLegacyReadCompositionOptions = {
   blobResolutionDeps?: BlobResolutionDeps | undefined;
   /** The tenant's retention policy; absent, the span read floors at the platform default. */
   retentionResolver?: DataRetentionApi | undefined;
-  idIndex?: IdIndexFlags | undefined;
-  idIndexReads?: TraceIdIndexReadRepository | undefined;
 };
 
 type TraceTreeCompositionOptions = {
@@ -896,8 +892,6 @@ type TraceTreeCompositionOptions = {
   payloads: TracePayloadReaderRepository;
   fullIo: TraceFullIo;
   authorize: FoldReadAuthorizer;
-  idIndex?: IdIndexFlags | undefined;
-  idIndexReads?: TraceIdIndexReadRepository | undefined;
 };
 
 /** Trace implements its public API and the collector's internal transport seam. */
@@ -1025,8 +1019,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     const ioExtractionService = TraceIOExtractionService.create(options.canonicalisation);
     const blobResolutionDeps = { blobStore: options.blobStore, ioExtractionService };
     const spanStorageRepository = options.repositories.spanStorage;
-    // Trace's id-index readiness, answered from memory so no lookup waits on it (id-index §2).
-    const idIndex = options.repositories.idIndexFill.readiness;
     const editOverlay = TraceEditOverlayService.create(options.repositories.editOverlay);
     const ingestSourceBilling = TraceIngestSourceBillingService.create({
       repository: options.repositories.ingestSourceBilling,
@@ -1061,8 +1053,6 @@ export class TraceModule implements TraceApi, CollectorApp {
         traceCanonicalisation: options.canonicalisation,
         retentionResolver: options.dataRetention,
         blobResolutionDeps,
-        idIndex,
-        idIndexReads: options.repositories.idIndexReads,
       }),
       editOverlay,
       logRecordStorage: logRecords,
@@ -1088,7 +1078,6 @@ export class TraceModule implements TraceApi, CollectorApp {
       TraceSummaryStore.create({
         storage: options.repositories.summaryProjection,
         defaultRetentionDays: () => options.dataRetention.getPlatformDefaultRetentionDays(),
-        idIndex,
         authorize: foldReadAuthorizer({
           authz: options.protections.authz,
           codePath: FOLD_READ_CODE_PATH,
@@ -1105,8 +1094,6 @@ export class TraceModule implements TraceApi, CollectorApp {
             evaluation: TraceModule.#composeQuery().evaluation,
           }),
           summaryReader: FoldedTraceSummaryReader.create(summaryStore),
-          idIndex,
-          idIndexReads: options.repositories.idIndexReads,
           records: {
             getById: async ({ projectId, traceId }) => {
               const resolved = await protections.resolve({
@@ -1132,8 +1119,6 @@ export class TraceModule implements TraceApi, CollectorApp {
           },
           eventDerivation: TraceEventDerivationService.create({
             spans: options.repositories.derivationSpans,
-            idIndex,
-            idIndexReads: options.repositories.idIndexReads,
             authorize: foldReadAuthorizer({
               authz: options.protections.authz,
               codePath: FOLD_READ_CODE_PATH,
@@ -1152,8 +1137,6 @@ export class TraceModule implements TraceApi, CollectorApp {
         existence: options.repositories.existence,
         existenceReads: TraceExistenceService.create({
           existence: options.repositories.existence,
-          idIndexReads: options.repositories.idIndexReads,
-          idIndex,
         }),
         read,
         list,
@@ -1163,12 +1146,10 @@ export class TraceModule implements TraceApi, CollectorApp {
         spans: SpanStorageService.create({
           repository: spanStorageRepository,
           blobResolutionDeps,
-          idIndex,
         }),
         summary: TraceSummaryService.create({
           repository: options.repositories.summary,
           fullResolutionDeps: { spanStorageRepository, ...blobResolutionDeps },
-          idIndex,
         }),
         tree,
         logRecords,
@@ -1235,8 +1216,6 @@ export class TraceModule implements TraceApi, CollectorApp {
       publicBaseUrl: options.publicBaseUrl,
       scenarioRoleMetrics: ScenarioRoleMetricsDerivationService.create({
         spans: options.repositories.derivationSpans,
-        idIndex,
-        idIndexReads: options.repositories.idIndexReads,
         spanCosts: SpanCostService.create({ modelCosts: TraceModelCostService.create() }),
       }),
       topicClustering: TraceTopicClusteringReadService.create({
@@ -1303,8 +1282,6 @@ export class TraceModule implements TraceApi, CollectorApp {
         options.fullIo,
       ),
       authorize: options.authorize,
-      idIndex: options.idIndex,
-      idIndexReads: options.idIndexReads,
     });
   }
 

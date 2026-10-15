@@ -1,5 +1,6 @@
 import { ClientAddress } from "@langwatch/api/policy";
 import { bindRestCredential, browserSessionOfRequest } from "@langwatch/api/rest";
+import { EVENT_LOG_ID_INDEX } from "@langwatch/eventing/server";
 import type { OpsApi, OpsServerConfig } from "@langwatch/ops-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { type CodeStepId, defineMigrationStep } from "@langwatch/upgrade/step";
@@ -17,7 +18,6 @@ import { CheckupCanaryProjectService } from "#features/checkup/services/checkup-
 import { upgradeAlertsEventing } from "#features/upgrades/eventing/ops-upgrade-alerts.pipeline";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
 import { MOVED_TO_OWNERS } from "#rules/system-migration-support.rules";
-import { EventLogIdIndexFillService } from "#services/event-log-id-index-fill.service";
 import { CredentialsResealTask, credentialsResealCiphers } from "#tasks/credentials-reseal.task";
 import { GrantPlatformOperatorTask } from "#tasks/grant-platform-operator.task";
 import { ProcessManagerPurgeTask } from "#tasks/process-manager-purge.task";
@@ -189,19 +189,11 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
           return dryRun ? { wouldGrant: granted } : { granted };
         },
       }),
-      // Ops hosts operator work over the event tables (§7); the fill itself is eventing's.
-      defineMigrationStep({
-        id: "ops:fill-event-log-id-index",
-        after: ["gateway:fill-id-indexes"],
-        kind: "data",
-        mode: "background",
-        description:
-          "Fills the event log's aggregate index from older events, then marks it ready on each ClickHouse target.",
-        needsOldWritersGone: false,
-        run: ({ checkpoint, dryRun, signal }) =>
-          EventLogIdIndexFillService.create({
-            fills: repositories.eventLogIdIndexFill,
-            retention: dependencies.retention,
-          }).fill({ checkpoint, dryRun, signal }),
-      }),
-    ]);
+    ])
+    // Ops hosts operator work over the event tables (§7); the index itself is eventing's.
+    .withIdIndexes([EVENT_LOG_ID_INDEX], {
+      step: "fill-event-log-id-index",
+      after: ["gateway:fill-id-indexes"],
+      description:
+        "Fills the event log's aggregate index from older events, then marks it ready on each ClickHouse target.",
+    });

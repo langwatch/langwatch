@@ -7,6 +7,7 @@ import { RetroactiveMutationInProgressError } from "@langwatch/data-retention-co
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
+import { DECLARED_ID_INDEXES } from "../../../__tests__/support/declared-id-indexes.fixture.ts";
 import { MemoryRetroactiveRetentionRepository } from "../../memory/memory.retroactive-retention.repository.ts";
 import { ClickHouseRetroactiveRetentionRepository } from "../clickhouse.retroactive-retention.repository.ts";
 
@@ -25,6 +26,7 @@ function createRepository(
   const commands: QueryRequest[] = [];
   const queries: QueryRequest[] = [];
   const clickhouse = clickHouseQueryClientDouble({
+    idIndexes: () => ({ declarations: () => [...DECLARED_ID_INDEXES] }),
     async command(request: QueryRequest): Promise<void> {
       commands.push(request);
     },

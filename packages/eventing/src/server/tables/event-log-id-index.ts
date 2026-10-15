@@ -1,13 +1,12 @@
 /**
  * The event log's aggregate index (goose 00111; dev/docs/plans/id-index-2026-10-10.md §4): per
- * aggregate, its events' occurred-time span. Ops hosts its fill (`ops:fill-event-log-id-index`).
+ * aggregate, its events' occurred-time span. Ops declares it, so the framework fills it
+ * (`ops:fill-event-log-id-index`).
  */
 import {
-  fillOwnerIdIndexes,
+  defineIdIndex,
   type IdIndexDeclaration,
   type IdIndexFillClient,
-  type IdIndexFillReport,
-  type IdIndexOwnerFill,
   type IdIndexReader,
   IdIndexReadiness,
   idIndexReadinessTargets,
@@ -19,15 +18,13 @@ import type { EventTable } from "./event-table-declarations.ts";
 const EVENT_LOG_ID_INDEX_TABLE = "event_log_id_index" satisfies EventTable["table"];
 
 /** What the fill walks: rows with no occurred time (0) stay out, as in the view. */
-export const EVENT_LOG_ID_INDEX: IdIndexDeclaration = {
+export const EVENT_LOG_ID_INDEX: IdIndexDeclaration = defineIdIndex({
   source: "event_log",
-  index: EVENT_LOG_ID_INDEX_TABLE,
   key: ["AggregateType", "AggregateId"],
   time: "EventOccurredAt",
-  retentionAnchor: "EventOccurredAt",
-  retention: "copied",
   filter: "EventOccurredAt > 0",
-};
+  timeFormat: "epoch_ms",
+});
 
 /**
  * Whether the index is filled on a ClickHouse target, answered from memory: one port the
@@ -102,29 +99,4 @@ export async function eventLogOccurredRange({
   });
   incrementEventLogIndexRead({ read, outcome: bounds.n === 0 ? "index_miss" : "index_hit" });
   return bounds.n === 0 ? null : { fromMs: bounds.fromMs, toMs: bounds.toMs };
-}
-
-/** The statements and routes the fill runs over: the routed ClickHouse member. */
-export type EventLogIdIndexFillClient = IdIndexFillClient;
-
-/** Fills the index on the shared server and every private one from rows older than its view. */
-export class EventingClickHouseEventLogIdIndexFill {
-  static create({
-    clickhouse,
-  }: {
-    clickhouse: EventLogIdIndexFillClient;
-  }): EventingClickHouseEventLogIdIndexFill {
-    return new EventingClickHouseEventLogIdIndexFill(clickhouse);
-  }
-
-  private constructor(private readonly clickhouse: EventLogIdIndexFillClient) {}
-
-  /** Fills the index on every target, raises its retention there, then writes its marker. */
-  fill(input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
-    return fillOwnerIdIndexes({
-      ...input,
-      clickhouse: this.clickhouse,
-      indexes: [EVENT_LOG_ID_INDEX],
-    });
-  }
 }

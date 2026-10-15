@@ -11,7 +11,6 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import { MemorySuiteIdIndexFillRepository } from "../../repositories/memory/memory.suite-id-index-fill.repository.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRunProcessingRepository } from "../../repositories/memory/memory.suite.repositories.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
@@ -40,7 +39,6 @@ export function createSuiteTestRepositories(database?: MemorySuiteDatabase): Sui
   return {
     suites: MemorySuiteRepository.create({ database: database ?? MemorySuiteDatabase.create() }),
     runProcessing: MemorySuiteRunProcessingRepository.create(),
-    idIndexFill: MemorySuiteIdIndexFillRepository.create(),
   };
 }
 

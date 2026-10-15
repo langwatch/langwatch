@@ -1,8 +1,4 @@
-import {
-  type ClickHouseQueryClient,
-  type IdIndexFlags,
-  indexedRead,
-} from "@langwatch/clickhouse-client";
+import { type ClickHouseQueryClient, type IdBoundOptions } from "@langwatch/clickhouse-client";
 import type {
   CodingAgentSessionEvent,
   CodingAgentSessionEventRecord,
@@ -17,8 +13,6 @@ import { clickHouseMomentOf, routingTenantOf, type ClickHouseMoment } from "./cl
 const TABLE_NAME = "coding_agent_session_events" as const;
 
 /** A time predicate spliced into a statement, with the parameters it names. */
-type TimeBound = { sql: string; params: Record<string, number> };
-
 const logger = createLogger("langwatch:app-layer:coding-agent:session-events-repository");
 
 /**
@@ -234,7 +228,6 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     occurredAt,
     cursor,
     limit,
-    idIndex,
   }: {
     tenantId: string;
     sessionId: string;
@@ -242,7 +235,6 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     occurredAt?: { fromMs: number; toMs: number };
     cursor?: SessionEventsCursor;
     limit: number;
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<{
     events: CodingAgentSessionEventRow[];
     nextCursor: SessionEventsCursor | null;
@@ -251,29 +243,23 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       { tenantId },
       "CodingAgentSessionEventsClickHouseRepository.findBySessionId",
     );
-    const read = (bound: TimeBound) =>
-      this.readSessionEvents({ tenantId, sessionId, kinds, bound, cursor, limit });
-    const rows =
-      occurredAt !== undefined
-        ? await read({
-            sql: "AND TimeUnixMs BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})",
-            params: { fromMs: occurredAt.fromMs, toMs: occurredAt.toMs },
-          })
-        : await indexedRead<ClickHouseReadRow[]>({
-            client: this.clickhouse,
-            idIndex,
-            tenantId,
-            table: TABLE_NAME,
-            index: `${TABLE_NAME}_id_index`,
-            key: { SessionId: sessionId },
-            fallback: "unbounded",
-            isEmpty: (found) => found.length === 0,
-            run: (fragment) =>
-              read({
-                sql: fragment?.sqlFor("TimeUnixMs") ?? "",
-                params: fragment?.params ?? {},
-              }),
-          });
+    // A caller's range reads as it always did, never widening; with none, the id index bounds it.
+    const idBound: IdBoundOptions =
+      occurredAt === undefined
+        ? { fallback: "unbounded" }
+        : {
+            occurredAtHint: (occurredAt.fromMs + occurredAt.toMs) / 2,
+            windowMs: (occurredAt.toMs - occurredAt.fromMs) / 2,
+            fallback: "none",
+          };
+    const rows = await this.readSessionEvents({
+      tenantId,
+      sessionId,
+      kinds,
+      idBound,
+      cursor,
+      limit,
+    });
 
     const events = rows.map((row) => CodingAgentSessionEventsClickHouseRepository.mapRow(row));
     const last = events[events.length - 1];
@@ -290,14 +276,14 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     tenantId,
     sessionId,
     kinds,
-    bound,
+    idBound,
     cursor,
     limit,
   }: {
     tenantId: string;
     sessionId: string;
     kinds: string[] | undefined;
-    bound: TimeBound;
+    idBound: IdBoundOptions;
     cursor: SessionEventsCursor | undefined;
     limit: number;
   }): Promise<ClickHouseReadRow[]> {
@@ -321,7 +307,8 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       sql: `
         SELECT ${READ_COLUMNS}
         FROM ${TABLE_NAME}
-        WHERE ${conditions.join(" AND ")} ${bound.sql}
+        WHERE ${conditions.join(" AND ")}
+          {{idBound:coding_agent_session_events.SessionId:sessionId}}
         ORDER BY TimeUnixMs ASC, RecordId ASC, UpdatedAt DESC
         LIMIT 1 BY TimeUnixMs, RecordId
         LIMIT {limit:UInt32}
@@ -329,12 +316,12 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       params: {
         tenantId,
         sessionId,
-        ...bound.params,
         kinds,
         cursorTimeMs: cursor?.timeUnixMs,
         cursorRecordId: cursor?.recordId,
         limit,
       },
+      idBound,
     });
     return rows;
   }
@@ -377,6 +364,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       table: TABLE_NAME,
       kind: "read",
       tenantIds,
+      // ID_BOUND_SKIP: a page of sessions' totals, bounded from below by the caller's own time.
       sql: `
         SELECT
           TenantId,

@@ -1,4 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type { PulledUsagePricedEventData } from "@langwatch/enterprise-governance-contract";
 import type { GatewayBudgetChangeInput, GatewayBudgetDebitRow } from "@langwatch/gateway-contract";
 import { Temporal } from "@langwatch/time";
@@ -13,25 +12,22 @@ export class GatewayBudgetLedgerService {
       | Pick<GatewayBudgetSpendRepository, "insertDebit" | "insertPulledUsageRows">
       | undefined,
     private readonly changes: Pick<GatewayChangeEventsRepository, "append">,
-    private readonly idIndex: IdIndexFlags | undefined,
   ) {}
 
   static create({
     spend,
     changes,
-    idIndex,
   }: {
     spend: Pick<GatewayBudgetSpendRepository, "insertDebit" | "insertPulledUsageRows"> | undefined;
     changes: Pick<GatewayChangeEventsRepository, "append">;
-    idIndex?: IdIndexFlags | undefined;
   }): GatewayBudgetLedgerService {
-    return new GatewayBudgetLedgerService(spend, changes, idIndex);
+    return new GatewayBudgetLedgerService(spend, changes);
   }
 
   async insertDebit(rows: readonly GatewayBudgetDebitRow[]): Promise<void> {
     if (!this.spend) throw new Error("This deployment composed no budget ledger to debit");
 
-    await this.spend.insertDebit([...rows], { idIndex: this.idIndex });
+    await this.spend.insertDebit([...rows]);
   }
 
   /** Debits governance's priced pulled-usage fact under the ledger's pulled scope (Q208C). */

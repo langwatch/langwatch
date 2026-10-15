@@ -7,7 +7,6 @@ import { ExperimentRunAbortRepository } from "../experiment-run-abort.repository
 import { ExperimentWorkflowVersionRepository } from "../experiment-workflow-version.repository.ts";
 import type { ExperimentRepositories } from "../experiment.repositories.ts";
 import { MemoryExperimentDspyRepository } from "./memory.experiment-dspy.repository.ts";
-import { MemoryExperimentIdIndexFillRepository } from "./memory.experiment-id-index-fill.repository.ts";
 import { MemoryExperimentIdLookupRepository } from "./memory.experiment-id-lookup.repository.ts";
 import { MemoryExperimentRunEventStreamRepository } from "./memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "./memory.experiment-run-fold.repository.ts";
@@ -88,7 +87,6 @@ export class MemoryExperimentRepositories {
       }),
       dspySteps: MemoryExperimentDspyRepository.create(),
       people: MemoryExperimentPeopleRepository.create(),
-      idIndexFill: MemoryExperimentIdIndexFillRepository.create(),
       runProcessing: {
         open: ({ defaultRetentionDays }) => ({
           folds,

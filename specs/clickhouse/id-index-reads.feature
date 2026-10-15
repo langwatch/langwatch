@@ -205,3 +205,25 @@ Feature: A lookup by id reads only the partitions its id index names
     Given a legacy event id that is not a KSUID
     When it is looked up by tenant and event id
     Then the lookup uses the existing path rather than a time from the id
+
+  @unit
+  Scenario: a tenant bigger than a batch is split by key range and read once
+    Given a tenant with more rows in one partition than a fill batch holds
+    And a source table whose sort key starts with the tenant and the index key
+    When the fill walks that partition
+    Then each batch reads one range of that tenant's keys
+    And every source row is read exactly once
+
+  @unit
+  Scenario: a read names its id and the reader adds the index bound
+    Given a statement that names its table, key and id with an id-bound marker
+    When the index is ready on the tenant's target
+    Then the reader reads the index for that id and bounds the statement by its range
+    And a marker naming a table with no declared id index is refused
+
+  @unit
+  Scenario: a module declares its id indexes once and the framework fills them
+    Given a module that declares its id indexes beside its goose migration
+    When the process boots
+    Then the declarations reach the ClickHouse client
+    And one background fill step is built for them under the module's step id

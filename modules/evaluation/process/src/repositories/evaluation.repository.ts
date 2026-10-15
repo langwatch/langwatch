@@ -1,10 +1,5 @@
 import type { Authorization } from "@langwatch/authorization";
-import type {
-  IdIndexFillReport,
-  IdIndexFlags,
-  IdIndexOwnerFill,
-  RetentionDaysProvider,
-} from "@langwatch/clickhouse-client";
+import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
 import type { EvaluationRunData, EvaluationRunLookup } from "@langwatch/evaluation-contract";
 
 /** A run lookup fenced by a proof instead of a bare tenant id (ruling AGG-EVAL-PROOF). */
@@ -13,11 +8,7 @@ export type EvaluationRunProofLookup = Omit<EvaluationRunLookup, "tenantId"> &
 
 /** A fenced run lookup with the tenant retention its unbounded fallback is floored at. */
 export type EvaluationRunFloorLookup = EvaluationRunProofLookup &
-  Readonly<{
-    retention: EvaluationRetentionLookup;
-    /** Whether the run id index may bound a lookup with no time; absent reads as off. */
-    idIndex?: IdIndexFlags | undefined;
-  }>;
+  Readonly<{ retention: EvaluationRetentionLookup }>;
 
 /** Private persistence port for the Evaluation server package. */
 export abstract class EvaluationRunRepository {
@@ -39,12 +30,7 @@ export abstract class EvaluationRunRepository {
   abstract findInputs(input: {
     authorization: Authorization;
     evaluationId: string;
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<EvaluationInputsRead | null>;
-  /** Fills the run id index from rows older than its view, on every ClickHouse target. */
-  abstract fillIdIndexes(input: IdIndexOwnerFill): Promise<IdIndexFillReport>;
-  /** Whether the run id index is ready on a target, answered from its marker rows in memory. */
-  abstract readonly readiness: IdIndexFlags;
 }
 
 /** One run's inputs and the project its row was read from (the member, on an aggregate). */

@@ -1,4 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -13,8 +12,6 @@ import { CodingAgentTraceSessionClickHouseRepository } from "../clickhouse.codin
 const DAY_MS = 86_400_000;
 const FROM_MS = Date.parse("2026-08-03T10:00:00Z");
 const TO_MS = Date.parse("2026-08-05T10:00:00Z");
-const ON: IdIndexFlags = { isOn: () => true };
-const OFF: IdIndexFlags = { isOn: () => false };
 
 const endpoints: TestClickHouseEndpoint[] = [];
 
@@ -23,7 +20,7 @@ afterEach(async () => {
 });
 
 async function endpointWith(bounds: { n: number }) {
-  const endpoint = await TestClickHouseEndpoint.create();
+  const endpoint = await TestClickHouseEndpoint.create({ idIndexReady: true });
   endpoints.push(endpoint);
   endpoint.queryRows.push([{ ...bounds, fromMs: FROM_MS, toMs: TO_MS }]);
   return endpoint;
@@ -50,18 +47,18 @@ describe("coding-agent lookups by id with the id index", () => {
         clock: new TestClock(),
       });
 
-      await repository.findBySessionId({ tenantId: "project-1", sessionId: "s-1", idIndex: ON });
+      await repository.findBySessionId({ tenantId: "project-1", sessionId: "s-1" });
 
       const [read] = sourceReads(endpoint);
       expect(read?.body).toContain("StartedAt >= fromUnixTimestamp64Milli");
       expect(countOf(read?.body ?? "", "StartedAt >=")).toBe(2);
-      expect(paramOf(read!, "fromMs")).toBe(String(FROM_MS - DAY_MS));
-      expect(paramOf(read!, "toMs")).toBe(String(TO_MS + DAY_MS));
+      expect(paramOf(read!, "idBound_fromMs")).toBe(String(FROM_MS - DAY_MS));
+      expect(paramOf(read!, "idBound_toMs")).toBe(String(TO_MS + DAY_MS));
     });
 
-    it("reads as before while the flag is off, with no index read and no bound", async () => {
-      const endpoint = await endpointWith({ n: 2 });
-      endpoint.queryRows.length = 0;
+    it("reads as before while the index is not ready, with no index read and no bound", async () => {
+      const endpoint = await TestClickHouseEndpoint.create();
+      endpoints.push(endpoint);
       endpoint.queryRows.push([]);
       const repository = CodingAgentSessionClickHouseRepository.create({
         clickhouse: endpoint.clickhouse,
@@ -70,7 +67,7 @@ describe("coding-agent lookups by id with the id index", () => {
         clock: new TestClock(),
       });
 
-      await repository.findBySessionId({ tenantId: "project-1", sessionId: "s-1", idIndex: OFF });
+      await repository.findBySessionId({ tenantId: "project-1", sessionId: "s-1" });
 
       expect(endpoint.requests).toHaveLength(1);
       expect(endpoint.requests[0]?.body).not.toContain("StartedAt >=");
@@ -87,11 +84,12 @@ describe("coding-agent lookups by id with the id index", () => {
         clock: new TestClock(),
       });
 
-      await repository.findBySessionId({ tenantId: "project-1", sessionId: "s-1", idIndex: ON });
+      await repository.findBySessionId({ tenantId: "project-1", sessionId: "s-1" });
 
       expect(sourceReads(endpoint)).toHaveLength(1);
       const [read] = sourceReads(endpoint);
-      const spanMs = Number(paramOf(read!, "toMs")) - Number(paramOf(read!, "fromMs"));
+      const spanMs =
+        Number(paramOf(read!, "idBound_toMs")) - Number(paramOf(read!, "idBound_fromMs"));
       expect(spanMs).toBeLessThan(40 * DAY_MS);
     });
   });
@@ -112,7 +110,6 @@ describe("coding-agent lookups by id with the id index", () => {
         tenantId: "project-1",
         sessionId: "s-1",
         window: { fromMs: FROM_MS, toMs: TO_MS },
-        idIndex: ON,
       });
 
       expect(endpoint.requests).toHaveLength(1);
@@ -134,12 +131,11 @@ describe("coding-agent lookups by id with the id index", () => {
         tenantId: "project-1",
         sessionId: "s-1",
         limit: 10,
-        idIndex: ON,
       });
 
       const [read] = sourceReads(endpoint);
       expect(read?.body).toContain("TimeUnixMs >= fromUnixTimestamp64Milli");
-      expect(paramOf(read!, "fromMs")).toBe(String(FROM_MS - DAY_MS));
+      expect(paramOf(read!, "idBound_fromMs")).toBe(String(FROM_MS - DAY_MS));
     });
 
     it("keeps an explicit window as the caller gave it", async () => {
@@ -156,11 +152,11 @@ describe("coding-agent lookups by id with the id index", () => {
         sessionId: "s-1",
         occurredAt: { fromMs: FROM_MS, toMs: TO_MS },
         limit: 10,
-        idIndex: ON,
       });
 
       expect(endpoint.requests).toHaveLength(1);
-      expect(endpoint.requests[0]?.body).toContain("TimeUnixMs BETWEEN");
+      expect(paramOf(endpoint.requests[0]!, "idBound_fromMs")).toBe(String(FROM_MS));
+      expect(paramOf(endpoint.requests[0]!, "idBound_toMs")).toBe(String(TO_MS));
     });
   });
 
@@ -173,14 +169,14 @@ describe("coding-agent lookups by id with the id index", () => {
         defaultTraceRetentionDays: 30,
       });
 
-      await repository.findByTraceId({ tenantId: "project-1", traceId: "t-1", idIndex: ON });
+      await repository.findByTraceId({ tenantId: "project-1", traceId: "t-1" });
 
       const [read] = sourceReads(endpoint);
       expect(countOf(read?.body ?? "", "OccurredAt >=")).toBe(2);
-      expect(paramOf(read!, "toMs")).toBe(String(TO_MS + DAY_MS));
+      expect(paramOf(read!, "idBound_toMs")).toBe(String(TO_MS + DAY_MS));
     });
 
-    it("reads unbounded while the flag is off", async () => {
+    it("reads unbounded while the index is not ready", async () => {
       const endpoint = await TestClickHouseEndpoint.create();
       endpoints.push(endpoint);
       endpoint.queryRows.push([]);
@@ -189,7 +185,7 @@ describe("coding-agent lookups by id with the id index", () => {
         defaultTraceRetentionDays: 30,
       });
 
-      await repository.findByTraceId({ tenantId: "project-1", traceId: "t-1", idIndex: OFF });
+      await repository.findByTraceId({ tenantId: "project-1", traceId: "t-1" });
 
       expect(endpoint.requests).toHaveLength(1);
       expect(endpoint.requests[0]?.body).not.toContain("OccurredAt >=");

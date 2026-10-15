@@ -10,13 +10,9 @@ import {
   type AnalyticsEvaluationRow,
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
-import type { IdIndexFillReport, IdIndexOwnerFill } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 
-import {
-  AnalyticsEvaluationRepository,
-  EMPTY_ID_INDEX_FILL_REPORT,
-} from "../analytics-persistence.repository.ts";
+import { AnalyticsEvaluationRepository } from "../analytics-persistence.repository.ts";
 
 type StoredEvaluation = Readonly<{ row: AnalyticsEvaluationRow; appliedEventIds: string[] }>;
 
@@ -98,11 +94,6 @@ export class MemoryAnalyticsEvaluationRepository extends AnalyticsEvaluationRepo
 
     validateTenant(tenantId, "appendRollupBatch");
     refuseMixedTenants({ tenantId, rows: parsed.rows, operation: "appendRollupBatch" });
-  }
-
-  /** A map has no partitions to index, so there is nothing to fill. */
-  async fillIdIndexes(_input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
-    return { ...EMPTY_ID_INDEX_FILL_REPORT };
   }
 
   #keep(

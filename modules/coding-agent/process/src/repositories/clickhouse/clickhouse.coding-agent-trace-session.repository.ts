@@ -1,8 +1,4 @@
-import {
-  type ClickHouseQueryClient,
-  type IdIndexFlags,
-  indexedRead,
-} from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { CodingAgentTraceSessionRecord } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
@@ -104,52 +100,37 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
   async findByTraceId({
     tenantId,
     traceId,
-    idIndex,
   }: {
     tenantId: string;
     traceId: string;
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<CodingAgentTraceSessionRecord | null> {
     EventUtils.validateTenantId(
       { tenantId },
       "CodingAgentTraceSessionClickHouseRepository.findByTraceId",
     );
-    const rows = await indexedRead<TraceSessionReadRow[]>({
-      client: this.clickhouse,
-      idIndex,
+    const { rows } = await this.clickhouse.query<TraceSessionReadRow>({
       tenantId,
       table: TABLE_NAME,
-      index: `${TABLE_NAME}_id_index`,
-      key: { TraceId: traceId },
-      fallback: "unbounded",
-      isEmpty: (found) => found.length === 0,
-      run: async (window) => {
-        const bound = window?.sqlFor("OccurredAt") ?? "";
-        const { rows: found } = await this.clickhouse.query<TraceSessionReadRow>({
-          tenantId,
-          table: TABLE_NAME,
-          kind: "read",
-          sql: `
+      kind: "read",
+      sql: `
         SELECT TraceId, SessionId, OccurredAt
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND TraceId = {traceId:String}
-          ${bound}
+          {{idBound:coding_agent_trace_sessions.TraceId:traceId}}
           AND (TenantId, TraceId, UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               AND TraceId = {traceId:String}
-              ${bound}
+              {{idBound:coding_agent_trace_sessions.TraceId:traceId}}
             GROUP BY TenantId, TraceId
           )
         ORDER BY SessionId != TraceId DESC, OccurredAt DESC, SessionId ASC
         LIMIT 1
       `,
-          params: { tenantId, traceId, ...window?.params },
-        });
-        return found;
-      },
+      params: { tenantId, traceId },
+      idBound: { fallback: "unbounded" },
     });
 
     const first = rows[0];

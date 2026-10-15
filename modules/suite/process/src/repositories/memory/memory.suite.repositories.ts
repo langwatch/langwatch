@@ -5,7 +5,6 @@ import { isOpenSuiteRun } from "#rules/suite-run-open.rules";
 
 import type { SuiteRunProcessingRepository } from "../suite-run-processing.repository.ts";
 import type { SuiteRepositories } from "../suite.repositories.ts";
-import { MemorySuiteIdIndexFillRepository } from "./memory.suite-id-index-fill.repository.ts";
 import { MemorySuiteRunRepository } from "./memory.suite-run.repository.ts";
 import { MemorySuiteDatabase } from "./memory.suite.database.ts";
 import { MemorySuiteRepository } from "./memory.suite.repository.ts";
@@ -37,7 +36,6 @@ export class MemorySuiteRepositories {
     return {
       suites: MemorySuiteRepository.create({ database: MemorySuiteDatabase.create() }),
       runProcessing: MemorySuiteRunProcessingRepository.create(),
-      idIndexFill: MemorySuiteIdIndexFillRepository.create(),
     };
   }
 }

@@ -1,5 +1,4 @@
 import type { Authorization } from "@langwatch/authorization";
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 export type TraceSummaryReadWindow = {
@@ -26,7 +25,5 @@ export abstract class TraceSummaryProjectionRepository {
     authorization: Authorization;
     traceId: string;
     window?: TraceSummaryReadWindow;
-    /** Trace's id-index readiness: with no window and the index ready, it bounds the read. */
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<TraceSummaryData | null>;
 }

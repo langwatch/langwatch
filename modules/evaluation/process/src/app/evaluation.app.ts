@@ -1,11 +1,6 @@
 import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { internalActor } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
-import type {
-  IdIndexFillCheckpoint,
-  IdIndexFillReport,
-  IdIndexFlags,
-} from "@langwatch/clickhouse-client";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import {
@@ -97,7 +92,6 @@ import type { EvaluationRetentionLookup } from "../repositories/evaluation.repos
 import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
 import { EvaluationCommandDispatcherService } from "../services/evaluation-command-dispatcher.service.ts";
 import { EvaluationDatasetLookupService } from "../services/evaluation-dataset-lookup.service.ts";
-import { EvaluationIdIndexFillService } from "../services/evaluation-id-index-fill.service.ts";
 import { EvaluationLifecycleService } from "../services/evaluation-lifecycle.service.ts";
 import { EvaluationRetentionDaysService } from "../services/evaluation-retention-days.service.ts";
 import { EvaluationRunProjectionService } from "../services/evaluation-run-projection.service.ts";
@@ -305,7 +299,6 @@ export class EvaluationModule implements EvaluationApiContract {
   readonly #eventing: EvaluationProcessingStoresAdapter;
   readonly #lifecycle: EvaluationLifecycleService | undefined;
   readonly #traceReactions: EvaluationTraceReactions;
-  readonly #idIndexFill: EvaluationIdIndexFillService | undefined;
 
   private constructor({
     service,
@@ -317,7 +310,6 @@ export class EvaluationModule implements EvaluationApiContract {
     executionIntent,
     eventing,
     lifecycle,
-    idIndexFill,
   }: {
     service: EvaluationService;
     dependencies: EvaluationSetup["dependencies"];
@@ -328,10 +320,8 @@ export class EvaluationModule implements EvaluationApiContract {
     executionIntent: Pick<EvaluationExecutionIntentService, "execute">;
     eventing: EvaluationProcessingStoresAdapter;
     lifecycle: EvaluationLifecycleService | undefined;
-    idIndexFill: EvaluationIdIndexFillService | undefined;
   }) {
     this.#service = service;
-    this.#idIndexFill = idIndexFill;
     this.#monitorTrend = MonitorTrendService.create({
       monitors: dependencies.monitors,
       performance: service,
@@ -398,7 +388,6 @@ export class EvaluationModule implements EvaluationApiContract {
     environment: EvaluatorEnvironmentService,
   ): EvaluationModule {
     const commands = EvaluationCommandDispatcherService.create();
-    const idIndex = repositories.runs.readiness;
     const lifecycle = EvaluationLifecycleService.create({
       retention: {
         resolve: (tenantId) =>
@@ -493,11 +482,6 @@ export class EvaluationModule implements EvaluationApiContract {
       repositories,
       commands,
       lifecycle,
-      idIndex,
-      idIndexFill: EvaluationIdIndexFillService.create({
-        repository: repositories.runs,
-        retention: dependencies.retention,
-      }),
       clustering: LangevalsClusteringService.create({
         endpoint: config.langevalsEndpoint,
         langevals,
@@ -526,7 +510,6 @@ export class EvaluationModule implements EvaluationApiContract {
         runs: EvaluationRunProjectionService.create({
           repository: repositories.runs,
           retention: EvaluationRetentionDaysService.create(dependencies.retention),
-          idIndex,
         }),
         analytics: dependencies.analytics,
         analyticsFoldCache: repositories.analyticsFoldCache,
@@ -553,10 +536,6 @@ export class EvaluationModule implements EvaluationApiContract {
     commands?: EvaluationCommandDispatcherService;
     /** Absent where a suite composes none; the app then holds no lifecycle pipeline. */
     lifecycle?: EvaluationLifecycleService;
-    /** Absent where nothing reads the run id index; lookups then take today's path. */
-    idIndex?: IdIndexFlags;
-    /** Absent where no step fills the run id index. */
-    idIndexFill?: EvaluationIdIndexFillService;
     clustering: LangevalsClusteringService;
     piiDetection: LangevalsPiiDetectionService;
     executionIntent: Pick<EvaluationExecutionIntentService, "execute">;
@@ -568,8 +547,6 @@ export class EvaluationModule implements EvaluationApiContract {
       repositories,
       commands,
       lifecycle,
-      idIndex,
-      idIndexFill,
       clustering,
       piiDetection,
       executionIntent,
@@ -586,30 +563,16 @@ export class EvaluationModule implements EvaluationApiContract {
         workflows: dependencies.workflows,
         traces: dependencies.traces,
         authz: dependencies.authz,
-        idIndex,
       }),
       dependencies,
       members,
       commands,
       lifecycle,
-      idIndexFill,
       clustering,
       piiDetection,
       executionIntent,
       eventing,
     });
-  }
-
-  /** The `evaluation:fill-id-indexes` step's body: the run id index, then each target's marker. */
-  fillIdIndexes(input: {
-    checkpoint: IdIndexFillCheckpoint;
-    dryRun: boolean;
-    signal: AbortSignal;
-  }): Promise<IdIndexFillReport> {
-    if (!this.#idIndexFill) {
-      throw new Error("This evaluation app was composed without an id index fill");
-    }
-    return this.#idIndexFill.fill(input);
   }
 
   /** evaluation_processing: run and analytics folds, execute intent, automation reactions. */

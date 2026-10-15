@@ -53,9 +53,7 @@ export type {
 export type { EventingProcessPersistenceDatabase } from "./process-persistence.database.ts";
 export {
   EVENT_LOG_ID_INDEX,
-  EventingClickHouseEventLogIdIndexFill,
   type EventLogIdIndex,
-  type EventLogIdIndexFillClient,
   type EventLogIndexReadiness,
   type EventLogOccurredRange,
   eventLogOccurredRange,

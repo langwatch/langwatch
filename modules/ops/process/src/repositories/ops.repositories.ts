@@ -18,7 +18,6 @@ import type {
   RedisHealthRepository,
 } from "./datastore-health.repository.ts";
 import type { EventExplorerRepository } from "./event-explorer.repository.ts";
-import type { EventLogIdIndexFillRepository } from "./event-log-id-index-fill.repository.ts";
 import type { GroupQueueReaperRepository } from "./group-queue-reaper.repository.ts";
 import type { ImpersonationRepository } from "./impersonation.repository.ts";
 import type { InstanceAdminRepository } from "./instance-admin.repository.ts";
@@ -94,8 +93,6 @@ export interface OpsRepositories {
   readonly redisHealth: RedisHealthRepository;
   readonly clickhouseHealth: ClickHouseHealthRepository;
   readonly events: EventExplorerRepository;
-  /** The event log's aggregate index fill only the `ops:fill-event-log-id-index` step runs. */
-  readonly eventLogIdIndexFill: EventLogIdIndexFillRepository;
   readonly storageFootprint: StorageFootprintRepository;
   readonly upgradeLedger: UpgradeLedgerRepository;
   /** Every declared tenant step's per-tenant state: the framework's table beside the ledger. */

@@ -8,18 +8,21 @@ import { randomUUID } from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AnalyticsEvaluationRow } from "@langwatch/analytics-contract";
 import {
-  ClickHouseQueryClient,
-  type IdIndexFlags,
-  type QueryDriver,
+  type ClickHouseQueryClient,
+  type InsertRequest,
   type QueryRequest,
   setWindowedReadMetrics,
-  TenantGuard,
   type WindowedReadOutcome,
 } from "@langwatch/clickhouse-client";
-import { partsAfterPartitionPruning } from "@langwatch/clickhouse-client/testing";
+import {
+  idIndexedClientDouble,
+  partsAfterPartitionPruning,
+  readyIdIndexedClientDouble,
+} from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { startMigratedClickHouse } from "../../../__tests__/migrated-clickhouse.harness.ts";
+import { ANALYTICS_ID_INDEXES } from "../clickhouse.analytics-id-indexes.database.ts";
 import { ClickHouseAnalyticsEvaluationRepository } from "../clickhouse.analytics-persistence.repository.ts";
 import { ClickHouseAnalyticsSessionRepository } from "../clickhouse.analytics-session.repository.ts";
 
@@ -32,7 +35,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const tenantId = `test-analytics-id-index-${randomUUID()}`;
 const nowMs = Date.now();
 const eightWeeksAgoMs = nowMs - 56 * DAY_MS;
-const flagsOn: IdIndexFlags = { isOn: () => true };
 
 let clickHouse: ClickHouseClient;
 let repository: ClickHouseAnalyticsEvaluationRepository;
@@ -40,10 +42,19 @@ let unflagged: ClickHouseAnalyticsEvaluationRepository;
 let statements: QueryRequest[] = [];
 const outcomes: { table: string; outcome: WindowedReadOutcome }[] = [];
 
-/** The routed client over the migrated test server, keeping every statement it is asked. */
-function recordingQueryClient(client: ClickHouseClient): ClickHouseQueryClient {
-  const driver: QueryDriver = {
-    async execute(request) {
+/**
+ * The routed client over the migrated test server, keeping every statement it is asked, with
+ * the evaluation index read as filled when `ready` (no marker row is written to the server).
+ */
+function recordingQueryClient({
+  client,
+  ready,
+}: {
+  client: ClickHouseClient;
+  ready: boolean;
+}): Promise<ClickHouseQueryClient> {
+  const driver = {
+    async execute(request: QueryRequest) {
       statements.push(request);
       const result = await client.query({
         query: request.sql,
@@ -53,7 +64,7 @@ function recordingQueryClient(client: ClickHouseClient): ClickHouseQueryClient {
       });
       return { rows: await result.json() };
     },
-    async insert(request) {
+    async insert(request: InsertRequest) {
       await client.insert({
         table: request.table,
         values: request.rows,
@@ -61,11 +72,10 @@ function recordingQueryClient(client: ClickHouseClient): ClickHouseQueryClient {
         ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
       });
     },
-    async command(request) {
-      await client.command({ query: request.sql });
-    },
   };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+  return ready
+    ? readyIdIndexedClientDouble({ indexes: ANALYTICS_ID_INDEXES, driver })
+    : Promise.resolve(idIndexedClientDouble({ indexes: ANALYTICS_ID_INDEXES, driver }));
 }
 
 /** One query on the test server, its rows as JSONEachRow parses them. */
@@ -119,15 +129,18 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation's analytics row by id
   beforeAll(async () => {
     ({ client: clickHouse } = await startMigratedClickHouse());
     setWindowedReadMetrics({ record: (outcome) => void outcomes.push(outcome) });
-    const queryClient = recordingQueryClient(clickHouse);
-    const options = {
-      resolveClient: async (tenant: string) =>
-        ClickHouseAnalyticsSessionRepository.create({ clickhouse: queryClient, tenantId: tenant }),
-      defaultRetentionDays: () => 365,
-      clickhouse: queryClient,
-    };
-    repository = ClickHouseAnalyticsEvaluationRepository.create({ ...options, idIndex: flagsOn });
-    unflagged = ClickHouseAnalyticsEvaluationRepository.create(options);
+    const over = (queryClient: ClickHouseQueryClient) =>
+      ClickHouseAnalyticsEvaluationRepository.create({
+        resolveClient: async (tenant: string) =>
+          ClickHouseAnalyticsSessionRepository.create({
+            clickhouse: queryClient,
+            tenantId: tenant,
+          }),
+        defaultRetentionDays: () => 365,
+        clickhouse: queryClient,
+      });
+    repository = over(await recordingQueryClient({ client: clickHouse, ready: true }));
+    unflagged = over(await recordingQueryClient({ client: clickHouse, ready: false }));
     await repository.upsertBatch([
       {
         row: evaluationRow({ evaluationId: targetId, occurredAtMs: eightWeeksAgoMs }),
@@ -162,10 +175,10 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation's analytics row by id
         statement.sql.includes("SELECT * FROM evaluation_analytics"),
       );
       expect(read?.params).toMatchObject({
-        fromMs: eightWeeksAgoMs - DAY_MS,
-        toMs: eightWeeksAgoMs + DAY_MS,
+        idBound_fromMs: eightWeeksAgoMs - DAY_MS,
+        idBound_toMs: eightWeeksAgoMs + DAY_MS,
       });
-      expect(read?.sql.match(/\{fromMs:Int64\}/g)).toHaveLength(2);
+      expect(read?.sql.match(/\{idBound_fromMs:Int64\}/g)).toHaveLength(2);
       expect(outcomes).toEqual([{ table: "evaluation_analytics", outcome: "index_hit" }]);
       if (read === undefined) throw new Error("no source read of evaluation_analytics was sent");
       statements = [];

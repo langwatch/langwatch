@@ -1,3 +1,4 @@
+import type { IdIndexDeclaration } from "@langwatch/clickhouse-client";
 import {
   RetroactiveMutationInProgressError,
   retentionCategories,
@@ -5,27 +6,17 @@ import {
   type RetentionCategory,
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
-import {
-  RETENTION_ID_INDEX_TABLES,
-  RETENTION_TABLE_CATEGORY_MAP,
-} from "@langwatch/data-retention-contract/retention-tables";
+import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
 import { EventLogRetention } from "@langwatch/eventing/server";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
+import { idIndexCategories } from "../../rules/id-index-categories.rules.ts";
 import type {
   ClickHouseTarget,
   KeepForeverRewrite,
   RetroactiveRetentionRepository,
 } from "../retroactive-retention.repository.ts";
-
-/** Each id index retention rewrites itself, with its source's category. */
-const ID_INDEX_CATEGORIES: ReadonlyMap<string, RetentionCategory> = new Map(
-  Object.entries(RETENTION_ID_INDEX_TABLES).map(([index, source]) => [
-    index,
-    RETENTION_TABLE_CATEGORY_MAP[source],
-  ]),
-);
 
 /**
  * A real twin, not a null object: mutations track in-progress rewrites and
@@ -50,6 +41,17 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
     classification: EVENT_LOG_RETENTION_CLASSIFICATION,
   });
 
+  /** The id indexes the process declared, as the live client holds them; tests set it. */
+  idIndexDeclarations: readonly IdIndexDeclaration[] = [];
+
+  /** Each declared id index this twin rewrites itself, with its source's category. */
+  #idIndexCategories(): ReadonlyMap<string, RetentionCategory> {
+    return idIndexCategories({
+      declarations: this.idIndexDeclarations,
+      eventLogIndex: this.#eventLogRetention.idIndexTable,
+    });
+  }
+
   /** The id indexes this twin's targets hold, with the tenants that have rows; tests set it. */
   idIndexTenants: ReadonlyMap<string, readonly string[]> = new Map();
   /** The retention each id index row was raised to, keyed `index/tenant/category`. */
@@ -70,7 +72,7 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
     const categoryTables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
       .filter(([, category]) => category === input.category)
       .map(([table]) => table);
-    const categoryIndexes = [...ID_INDEX_CATEGORIES]
+    const categoryIndexes = [...this.#idIndexCategories()]
       .filter(([, category]) => category === input.category)
       .map(([index]) => index);
     const eventingTables: readonly string[] = this.#eventLogRetention.tables;
@@ -181,7 +183,7 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
       const categories =
         index === this.#eventLogRetention.idIndexTable
           ? retentionCategories
-          : [ID_INDEX_CATEGORIES.get(index)].filter((category) => category !== undefined);
+          : [this.#idIndexCategories().get(index)].filter((category) => category !== undefined);
       for (const [tenantId, retention] of input.retentionByTenant) {
         for (const category of categories) {
           this.#raise({ index, tenantId, category, retentionDays: retention[category] });
@@ -210,7 +212,8 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
 
   #governedIdIndexes(indexes: readonly string[]): string[] {
     return [...new Set(indexes)].filter(
-      (index) => index === this.#eventLogRetention.idIndexTable || ID_INDEX_CATEGORIES.has(index),
+      (index) =>
+        index === this.#eventLogRetention.idIndexTable || this.#idIndexCategories().has(index),
     );
   }
 }

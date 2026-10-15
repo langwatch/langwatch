@@ -13,14 +13,17 @@ import {
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { type Authorization, sealAuthorization } from "@langwatch/authorization";
 import {
-  ClickHouseQueryClient,
+  type ClickHouseQueryClient,
   fenceFor,
-  TenantGuard,
   type InsertRequest,
   type QueryDriver,
   type QueryRequest,
   type QueryResult,
 } from "@langwatch/clickhouse-client";
+import {
+  idIndexedClientDouble,
+  readyIdIndexedClientDouble,
+} from "@langwatch/clickhouse-client/testing";
 import { createServer, type Server } from "node:http";
 import {
   type GithubApi,
@@ -36,6 +39,7 @@ import type { Instant } from "@langwatch/time";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { CodingAgentBillingPolicy } from "../../services/coding-agent-cost-attribution.service.ts";
 import type { CodingAgentClock } from "../../services/coding-agent-clock.service.ts";
+import { CODING_AGENT_ID_INDEXES } from "../../repositories/clickhouse/clickhouse.coding-agent-id-indexes.database.ts";
 import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository.ts";
 import { CodingAgentSessionRepository } from "../../repositories/coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionRepository } from "../../repositories/coding-agent-trace-session.repository.ts";
@@ -62,14 +66,18 @@ export class TestClickHouseEndpoint {
     private readonly client: ClickHouseClient,
     readonly requests: ClickHouseRequest[],
     readonly queryRows: Record<string, unknown>[][],
+    clickhouse: ClickHouseQueryClient,
   ) {
-    this.clickhouse = new ClickHouseQueryClient({
-      driver: singleEndpointDriver(client),
-      tenantGuard: new TenantGuard(),
-    });
+    this.clickhouse = clickhouse;
   }
 
-  static async create(): Promise<TestClickHouseEndpoint> {
+  /**
+   * An endpoint whose client declares coding-agent's id indexes: not filled by default, so a
+   * read by id takes today's path; `idIndexReady` reads them as filled, without asking the server.
+   */
+  static async create({
+    idIndexReady = false,
+  }: { idIndexReady?: boolean } = {}): Promise<TestClickHouseEndpoint> {
     const requests: ClickHouseRequest[] = [];
     const queryRows: Record<string, unknown>[][] = [];
     const server = createServer(async (request, response) => {
@@ -85,13 +93,12 @@ export class TestClickHouseEndpoint {
     if (address === null || typeof address === "string") {
       throw new Error("test ClickHouse endpoint did not bind a TCP port");
     }
-    const endpoint = new TestClickHouseEndpoint(
-      server,
-      createClient({ url: `http://127.0.0.1:${address.port}` }),
-      requests,
-      queryRows,
-    );
-    return endpoint;
+    const client = createClient({ url: `http://127.0.0.1:${address.port}` });
+    const driver = singleEndpointDriver(client);
+    const clickhouse = idIndexReady
+      ? await readyIdIndexedClientDouble({ indexes: CODING_AGENT_ID_INDEXES, driver })
+      : idIndexedClientDouble({ indexes: CODING_AGENT_ID_INDEXES, driver });
+    return new TestClickHouseEndpoint(server, client, requests, queryRows, clickhouse);
   }
 
   async close(): Promise<void> {

@@ -1,6 +1,5 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -101,8 +100,6 @@ type ExperimentRunDeps = Readonly<{
   experiments: ExperimentService;
   /** The run's stores from this module's registry, opened once retention's fallback is known. */
   runStores: ExperimentRunProcessingStores;
-  /** Whether this module's id indexes are filled; absent reads runs with no time bound. */
-  idIndex?: IdIndexFlags | undefined;
   peers: ExperimentRunPeers;
   config: Pick<
     ExperimentServerConfig,
@@ -120,7 +117,7 @@ type ExperimentRunDeps = Readonly<{
 /** The run machinery: folds, stop signal, frames, cells, board write-back and the run pipeline. */
 export class ExperimentRunService {
   static create(deps: ExperimentRunDeps): ExperimentRunService {
-    const { commands, experiments, runStores, idIndex, peers, config, role } = deps;
+    const { commands, experiments, runStores, peers, config, role } = deps;
     const { baseUrl: publicBaseUrl, deprecated } = runLinkBaseOf(config);
     if (deprecated) {
       createLogger("langwatch:experiment:run").warn(
@@ -131,7 +128,6 @@ export class ExperimentRunService {
     const { retention } = peers;
     const repositories = runStores.open({
       defaultRetentionDays: () => retention.getPlatformDefaultRetentionDays(),
-      idIndex,
     });
     const { folds, abort, stream } = repositories;
     const refusals = runRefusalsOf({

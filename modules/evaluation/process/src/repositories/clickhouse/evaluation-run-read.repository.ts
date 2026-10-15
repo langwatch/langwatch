@@ -1,8 +1,8 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
-  type IdIndexFlags,
-  indexedRead,
+  type IdBoundOptions,
+  type IdBoundResolved,
   ownProjectIdOf,
   RetentionFloorService,
   singleTenantOf,
@@ -29,12 +29,10 @@ import type {
 import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repository.ts";
 
 const TABLE_NAME = "evaluation_runs" as const;
-const ID_INDEX = "evaluation_runs_id_index" as const;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
 const RUNS = "runs" as const;
 const inputsRowSchema = z.object({ TenantId: z.string(), Inputs: z.string().nullable() });
 const inputsRowsSchema = z.array(inputsRowSchema);
-type InputsRow = z.infer<typeof inputsRowSchema>;
 const logger = createLogger("langwatch:evaluation:clickhouse.evaluation-run-read");
 
 /** The tenant an unhinted read's retention floor is read for: the one it reads, else its own. */
@@ -119,47 +117,27 @@ export class EvaluationRunClickHouseReadRepository {
     return this.fromClickHouseRecord(row);
   }
 
-  /** A caller's `scheduledAt` bounds the read as it always did; without one the index does. */
-  private async findRunRow(
+  /**
+   * A caller's `scheduledAt` bounds the read within its slack, never widening; without one the
+   * id index does once ready, and before that the floor-and-probe ladder resolves the range.
+   */
+  private findRunRow(
     input: EvaluationRunFloorLookup,
   ): Promise<ClickHouseEvaluationRunRecord | undefined> {
-    if (input.scheduledAt) {
-      return this.readRunRow({ input, range: await this.resolveScheduledAtRange(input) });
-    }
-    const reader = this.options.clickhouse.as(input.authorization, { reads: "traces" });
-    return indexedRead<ClickHouseEvaluationRunRecord | undefined>({
-      client: reader,
-      idIndex: input.idIndex,
-      tenantId: ownProjectIdOf({ authorization: input.authorization, reads: "traces" }),
-      table: TABLE_NAME,
-      index: ID_INDEX,
-      key: { EvaluationId: input.evaluationId },
-      // Flag off, `null` below is today's floor-and-probe ladder, unchanged.
-      fallback: "unbounded",
-      isEmpty: (row) => row === undefined,
-      run: async (window) =>
-        this.readRunRow({
-          input,
-          range:
-            window === null
-              ? await this.resolveScheduledAtRange(input)
-              : { scheduledAtFrom: window.fromMs, scheduledAtTo: window.toMs },
-        }),
-    });
+    const slackMs = input.scheduledAtSlackMs ?? DEFAULT_SCHEDULED_AT_SLACK_MS;
+    const idBound: IdBoundOptions = input.scheduledAt
+      ? { occurredAtHint: input.scheduledAt.getTime(), windowMs: slackMs, fallback: "none" }
+      : { fallback: "none", resolveHint: () => this.resolveScheduledAtWindow(input) };
+    return this.readRunRow({ input, idBound });
   }
 
   private async readRunRow({
     input,
-    range: { scheduledAtFrom, scheduledAtTo },
+    idBound,
   }: {
     input: EvaluationRunFloorLookup;
-    range: ScheduledAtRange;
+    idBound: IdBoundOptions;
   }): Promise<ClickHouseEvaluationRunRecord | undefined> {
-    const bounds = (column: string): string =>
-      `AND ${column} >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64})` +
-      (scheduledAtTo === undefined
-        ? ""
-        : ` AND ${column} <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})`);
     const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
     // The outer scope's bare `ScheduledAt` is the UInt64 alias below, so the windowed fence
     // reads the raw column in the dedup subquery; the outer scope takes the tenant set alone.
@@ -187,20 +165,17 @@ export class EvaluationRunClickHouseReadRepository {
           FROM ${TABLE_NAME}
           WHERE ${tenantScope("ScheduledAt")}
             AND EvaluationId = {evaluationId:String}
-            ${bounds("ScheduledAt")}
+            {{idBound:evaluation_runs.EvaluationId:evaluationId}}
           GROUP BY TenantId, EvaluationId
         )
         WHERE ${tenantSet()}
           AND t.EvaluationId = {evaluationId:String}
-          ${bounds("t.ScheduledAt")}
+          {{idBound:evaluation_runs.EvaluationId:evaluationId:t}}
         LIMIT 1
       `,
-      query_params: {
-        evaluationId: input.evaluationId,
-        scheduledAtFrom,
-        ...(scheduledAtTo === undefined ? {} : { scheduledAtTo }),
-      },
+      query_params: { evaluationId: input.evaluationId },
       format: "JSONEachRow",
+      idBound,
     });
     return (await result.json())[0];
   }
@@ -258,38 +233,26 @@ export class EvaluationRunClickHouseReadRepository {
   async findInputs(input: {
     authorization: Authorization;
     evaluationId: string;
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<EvaluationInputsRead | null> {
     try {
       const reader = this.options.clickhouse.as(input.authorization, { reads: "traces" });
-      const row = await indexedRead<InputsRow | undefined>({
-        client: reader,
-        idIndex: input.idIndex,
-        tenantId: ownProjectIdOf({ authorization: input.authorization, reads: "traces" }),
-        table: TABLE_NAME,
-        index: ID_INDEX,
-        key: { EvaluationId: input.evaluationId },
-        // Today's read has no time bound at all; only the index narrows it.
-        fallback: "unbounded",
-        isEmpty: (found) => found === undefined,
-        run: async (window) => {
-          const result = await reader.query({
-            query: `
-              SELECT TenantId, argMax(Inputs, UpdatedAt) AS Inputs
-              FROM ${TABLE_NAME}
-              WHERE ${tenantScope("ScheduledAt")}
-                AND EvaluationId = {evaluationId:String}
-                ${window?.sqlFor("ScheduledAt") ?? ""}
-              GROUP BY TenantId
-              ORDER BY TenantId
-              LIMIT 1
-            `,
-            query_params: { evaluationId: input.evaluationId, ...window?.params },
-            format: "JSONEachRow",
-          });
-          return inputsRowsSchema.parse(await result.json())[0];
-        },
+      // Today's read has no time bound at all; only the index narrows it.
+      const result = await reader.query({
+        query: `
+          SELECT TenantId, argMax(Inputs, UpdatedAt) AS Inputs
+          FROM ${TABLE_NAME}
+          WHERE ${tenantScope("ScheduledAt")}
+            AND EvaluationId = {evaluationId:String}
+            {{idBound:evaluation_runs.EvaluationId:evaluationId}}
+          GROUP BY TenantId
+          ORDER BY TenantId
+          LIMIT 1
+        `,
+        query_params: { evaluationId: input.evaluationId },
+        format: "JSONEachRow",
+        idBound: { fallback: "unbounded" },
       });
+      const row = inputsRowsSchema.parse(await result.json())[0];
       return row ? { tenantId: row.TenantId, inputs: parseObject(row.Inputs) } : null;
     } catch (error) {
       // An unreachable cluster or the memory ceiling answers no inputs (bound scenario);
@@ -309,16 +272,21 @@ export class EvaluationRunClickHouseReadRepository {
     }
   }
 
+  /**
+   * The not-ready ladder: the run's ScheduledAt within the recent probe, else above the
+   * retention floor; with neither, every row above the floor, open above.
+   */
+  private async resolveScheduledAtWindow(
+    input: EvaluationRunFloorLookup,
+  ): Promise<IdBoundResolved> {
+    const range = await this.resolveScheduledAtRange(input);
+    return { fromMs: range.scheduledAtFrom, toMs: range.scheduledAtTo };
+  }
+
   private async resolveScheduledAtRange(
     input: EvaluationRunFloorLookup,
   ): Promise<ScheduledAtRange> {
     const slackMs = input.scheduledAtSlackMs ?? DEFAULT_SCHEDULED_AT_SLACK_MS;
-    if (input.scheduledAt) {
-      return {
-        scheduledAtFrom: input.scheduledAt.getTime() - slackMs,
-        scheduledAtTo: input.scheduledAt.getTime() + slackMs,
-      };
-    }
 
     const floorMs = await this.floorOver(input.retention).getFloorMs({
       table: TABLE_NAME,
@@ -349,6 +317,7 @@ export class EvaluationRunClickHouseReadRepository {
   }): Promise<number | undefined> {
     const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
     const result = await client.query<{ scheduledAtMs: number | string | null }>({
+      // ID_BOUND_SKIP: the not-ready ladder's probe; the index path never runs it.
       query: `
         SELECT toUnixTimestamp64Milli(argMax(ScheduledAt, UpdatedAt)) AS scheduledAtMs
         FROM ${TABLE_NAME}

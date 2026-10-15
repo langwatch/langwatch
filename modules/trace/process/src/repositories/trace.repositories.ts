@@ -21,8 +21,6 @@ import type { TraceAttributedRollupRepository } from "./trace-attributed-rollup.
 import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-span-reader.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "./trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
-import type { TraceIdIndexFillRepository } from "./trace-id-index-fill.repository.ts";
-import type { TraceIdIndexReadRepository } from "./trace-id-index-read.repository.ts";
 import type { TraceIndexMaterialisationRepository } from "./trace-index-materialisation.repository.ts";
 import type { TraceInstantEvalRunsReadRepository } from "./trace-instant-eval-runs.repository.ts";
 import type { TraceModelSpendRepository } from "./trace-model-spend.repository.ts";
@@ -75,10 +73,6 @@ export interface TraceRepositories {
   readonly usageCount: TraceUsageCountRepository;
   /** Goose 00103's `idx_updated_at` materialisation, which a background step waits on. */
   readonly indexMaterialisation: TraceIndexMaterialisationRepository;
-  /** Goose 00110's id indexes over rows older than their views, which a background step fills. */
-  readonly idIndexFill: TraceIdIndexFillRepository;
-  /** The time range trace's id indexes name, for reads on a plain client. */
-  readonly idIndexReads: TraceIdIndexReadRepository;
   readonly modelSpend: TraceModelSpendRepository;
   readonly attributeSpend: TraceAttributeSpendRepository;
   /** Other modules' rollups over attributed traces (Q207: they read through TraceApi). */

@@ -1,9 +1,4 @@
-import {
-  ClickHouseColumns,
-  type IdIndexFlags,
-  queryWindowed,
-  indexedRead,
-} from "@langwatch/clickhouse-client";
+import { ClickHouseColumns, queryWindowed } from "@langwatch/clickhouse-client";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -127,8 +122,6 @@ export class ClickHouseSimulationRunStateRepository<
   static create<ProjectionType extends Projection = Projection>(options: {
     resolveClient: SimulationClickHouseClientResolver;
     defaultRetentionDays: () => number;
-    /** The module's id-index readiness; absent reads the run with no time bound, as before. */
-    idIndex?: IdIndexFlags | undefined;
   }): ClickHouseSimulationRunStateRepository<ProjectionType> {
     return new ClickHouseSimulationRunStateRepository(options);
   }
@@ -137,7 +130,6 @@ export class ClickHouseSimulationRunStateRepository<
     private readonly options: {
       resolveClient: SimulationClickHouseClientResolver;
       defaultRetentionDays: () => number;
-      idIndex?: IdIndexFlags | undefined;
     },
   ) {}
 
@@ -309,22 +301,7 @@ export class ClickHouseSimulationRunStateRepository<
                 window: fragment ? window : undefined,
               }),
           })
-        : await indexedRead<ClickHouseSimulationRunRecord | null>({
-            client: await this.options.resolveClient(context.tenantId),
-            idIndex: this.options.idIndex,
-            tenantId: context.tenantId,
-            table: TABLE_NAME,
-            index: `${TABLE_NAME}_id_index`,
-            key: { ScenarioRunId: scenarioRunId },
-            fallback: "unbounded",
-            isEmpty: (result) => result === null,
-            run: (indexWindow) =>
-              this.#findLatestRow({
-                tenantId: context.tenantId,
-                scenarioRunId,
-                window: indexWindow ?? undefined,
-              }),
-          });
+        : await this.#findLatestRowById({ tenantId: context.tenantId, scenarioRunId });
       if (!row) return null;
 
       const projection: SimulationRunState = {
@@ -364,13 +341,74 @@ export class ClickHouseSimulationRunStateRepository<
   }): Promise<ClickHouseSimulationRunRecord | null> {
     const bounds = ClickHouseSimulationRunStateRepository.startedAtBounds({ window });
     const client = await this.options.resolveClient(tenantId);
-    const input = { table: TABLE_NAME, alias: "t", columns: CRITERIA_COLUMNS };
-    const criteria = (await client.select?.(input)) ?? ClickHouseColumns.named(input);
+    const columns = await this.#latestRowColumns(client);
     // Latest-version read via scalar equality on UpdatedAt (PREWHERE-able for heavy columns).
     // IN-tuple form causes OOM on runs with many snapshots; scalar is better for single-row gets.
     const result = await client.query({
+      // ID_BOUND_SKIP: a fold read-back's own window, applied verbatim (ADR-066).
       query: `
-          SELECT
+          SELECT ${columns}
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.ScenarioRunId = {scenarioRunId:String}
+            ${bounds.row}
+            AND t.UpdatedAt = (
+              SELECT max(s.UpdatedAt)
+              FROM ${TABLE_NAME} AS s
+              WHERE s.TenantId = {tenantId:String}
+                AND s.ScenarioRunId = {scenarioRunId:String}
+                ${bounds.latestVersion}
+            )
+          LIMIT 1
+        `,
+      query_params: { tenantId, scenarioRunId, ...bounds.params },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<ClickHouseSimulationRunRecord>();
+    return rows[0] ?? null;
+  }
+
+  /** The run's latest row by id, bounded by the run id index once ready, else every partition. */
+  async #findLatestRowById({
+    tenantId,
+    scenarioRunId,
+  }: {
+    tenantId: string;
+    scenarioRunId: string;
+  }): Promise<ClickHouseSimulationRunRecord | null> {
+    const client = await this.options.resolveClient(tenantId);
+    const columns = await this.#latestRowColumns(client);
+    const result = await client.query({
+      query: `
+          SELECT ${columns}
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.ScenarioRunId = {scenarioRunId:String}
+            {{idBound:simulation_runs.ScenarioRunId:scenarioRunId:t}}
+            AND t.UpdatedAt = (
+              SELECT max(s.UpdatedAt)
+              FROM ${TABLE_NAME} AS s
+              WHERE s.TenantId = {tenantId:String}
+                AND s.ScenarioRunId = {scenarioRunId:String}
+                {{idBound:simulation_runs.ScenarioRunId:scenarioRunId:s}}
+            )
+          LIMIT 1
+        `,
+      query_params: { tenantId, scenarioRunId },
+      format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
+    });
+    const rows = await result.json<ClickHouseSimulationRunRecord>();
+    return rows[0] ?? null;
+  }
+
+  /** The latest-row select list, criteria columns named as this tenant's target holds them. */
+  async #latestRowColumns(
+    client: Awaited<ReturnType<SimulationClickHouseClientResolver>>,
+  ): Promise<string> {
+    const input = { table: TABLE_NAME, alias: "t", columns: CRITERIA_COLUMNS };
+    const criteria = (await client.select?.(input)) ?? ClickHouseColumns.named(input);
+    return `
             t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
             t.ScenarioRunId AS ScenarioRunId, t.ScenarioId AS ScenarioId,
             t.BatchRunId AS BatchRunId, t.ScenarioSetId AS ScenarioSetId,
@@ -400,26 +438,7 @@ export class ClickHouseSimulationRunStateRepository<
             toUnixTimestamp64Milli(t.ArchivedAt) AS ArchivedAt,
             if(t.CancellationRequestedAt IS NOT NULL, toUnixTimestamp64Milli(t.CancellationRequestedAt), NULL) AS CancellationRequestedAt,
             toUnixTimestamp64Milli(t.LastSnapshotOccurredAt) AS LastSnapshotOccurredAt,
-            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
-          FROM ${TABLE_NAME} AS t
-          WHERE t.TenantId = {tenantId:String}
-            AND t.ScenarioRunId = {scenarioRunId:String}
-            ${bounds.row}
-            AND t.UpdatedAt = (
-              SELECT max(s.UpdatedAt)
-              FROM ${TABLE_NAME} AS s
-              WHERE s.TenantId = {tenantId:String}
-                AND s.ScenarioRunId = {scenarioRunId:String}
-                ${bounds.latestVersion}
-            )
-          LIMIT 1
-        `,
-      query_params: { tenantId, scenarioRunId, ...bounds.params },
-      format: "JSONEachRow",
-    });
-
-    const rows = await result.json<ClickHouseSimulationRunRecord>();
-    return rows[0] ?? null;
+            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt`;
   }
 
   async storeProjection(

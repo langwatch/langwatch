@@ -1,6 +1,5 @@
 import { TupleParam } from "@clickhouse/client";
-import { indexedRead } from "@langwatch/clickhouse-client";
-import type { IdIndexFlags, IdIndexReader } from "@langwatch/clickhouse-client";
+import type { IdBoundOptions } from "@langwatch/clickhouse-client";
 import type {
   ExperimentRun,
   ExperimentRunAggregate,
@@ -36,15 +35,14 @@ type ExperimentClickHouseClient = {
     query: string;
     query_params: Record<string, unknown>;
     format: "JSONEachRow";
+    idBound?: IdBoundOptions;
   }): Promise<QueryResult>;
-} & Partial<IdIndexReader>;
+};
 
 type ClickHouseExperimentRunRepositoryOptions = {
   workflowVersions: ExperimentWorkflowVersionRepository;
   resolveClient: (projectId: string) => Promise<ExperimentClickHouseClient | null>;
   tupleParam: (values: string[]) => unknown;
-  /** With it on, a run is read only in the weeks its id index names. */
-  idIndex?: IdIndexFlags | undefined;
   telemetry: {
     trace<T>(
       input: {
@@ -354,45 +352,33 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         if (!client) return null;
 
         try {
-          const runRows = await indexedRead<RunRow[]>({
-            client,
-            idIndex: this.options.idIndex,
-            tenantId: input.projectId,
-            table: "experiment_runs",
-            index: "experiment_runs_id_index",
-            key: { RunId: input.runId },
-            fallback: "unbounded",
-            isEmpty: (found) => found.length === 0,
-            run: async (window) => {
-              const result = await client.query({
-                query: `
+          const result = await client.query({
+            query: `
             SELECT *
             FROM experiment_runs
             WHERE TenantId = {tenantId:String}
               AND ExperimentId = {experimentId:String}
               AND RunId = {runId:String}
-              ${window?.sqlFor("StartedAt") ?? ""}
+              {{idBound:experiment_runs.RunId:runId}}
               AND UpdatedAt = (
                 SELECT max(UpdatedAt)
                 FROM experiment_runs
                 WHERE TenantId = {tenantId:String}
                   AND ExperimentId = {experimentId:String}
                   AND RunId = {runId:String}
-                  ${window?.sqlFor("StartedAt") ?? ""}
+                  {{idBound:experiment_runs.RunId:runId}}
               )
             LIMIT 1
           `,
-                query_params: {
-                  tenantId: input.projectId,
-                  experimentId: input.experimentId,
-                  runId: input.runId,
-                  ...window?.params,
-                },
-                format: "JSONEachRow",
-              });
-              return result.json<RunRow>();
+            query_params: {
+              tenantId: input.projectId,
+              experimentId: input.experimentId,
+              runId: input.runId,
             },
+            format: "JSONEachRow",
+            idBound: { fallback: "unbounded" },
           });
+          const runRows = await result.json<RunRow>();
           const run = runRows[0];
           if (!run) return null;
 

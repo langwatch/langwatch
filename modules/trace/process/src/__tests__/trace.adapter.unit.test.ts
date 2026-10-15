@@ -1,5 +1,8 @@
 import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import {
+  idIndexedClientDouble,
+  type ScriptedStatements,
+} from "@langwatch/clickhouse-client/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceModule } from "#app/trace.app";
@@ -8,6 +11,7 @@ import { TracePayloadReaderRepository } from "#repositories/trace-payload-reader
 import { TraceSummaryReaderRepository } from "#repositories/trace-summary-reader.repository";
 
 import type { TraceFullIo } from "../features/read/services/trace-read-full-io.service.ts";
+import { TRACE_ID_INDEXES } from "../repositories/clickhouse/clickhouse.trace-id-indexes.database.ts";
 // From the port that defines them: an in-package test does not need the
 // package's public surface, and `index.ts` publishes what CONSUMERS import.
 import type { TraceClickHouseResolver } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
@@ -93,21 +97,14 @@ function fencedClickHouse(
   calls: FencedCall[],
   rowsFor: (callIndex: number) => unknown[],
 ): AuthorizedClickHouse {
-  const client = clickHouseQueryClientDouble({
-    query: vi.fn(
-      async ({
-        sql,
-        params,
-        tenantId,
-      }: {
-        sql: string;
-        params?: Record<string, unknown>;
-        tenantId: string;
-      }) => {
+  const client = idIndexedClientDouble({
+    indexes: TRACE_ID_INDEXES,
+    driver: {
+      execute: vi.fn<ScriptedStatements["execute"]>(async ({ sql, params, tenantId }) => {
         calls.push({ tenantId, sql, params: params ?? {} });
         return { rows: rowsFor(calls.length) };
-      },
-    ),
+      }),
+    },
   });
   return new AuthorizedClickHouse({ resolveClient: async () => client });
 }
@@ -407,8 +404,8 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     });
 
     expect(calls).toHaveLength(2);
-    expect(calls[0]?.sql).toContain("fromUnixTimestamp64Milli({fromMs:Int64})");
-    expect(calls[1]?.sql).not.toContain("fromUnixTimestamp64Milli({fromMs:Int64})");
+    expect(calls[0]?.sql).toContain("fromUnixTimestamp64Milli({idBound_fromMs:Int64})");
+    expect(calls[1]?.sql).not.toContain("fromUnixTimestamp64Milli({idBound_fromMs:Int64})");
     expect(page.rows).toHaveLength(1);
   });
 

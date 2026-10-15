@@ -3,7 +3,6 @@ import type { GatewayServerConfig } from "@langwatch/gateway-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import { GatewayBudgetClickHouseRepository } from "../clickhouse/clickhouse.gateway-budget.repository.ts";
-import { GatewayIdIndexFillClickHouseRepository } from "../clickhouse/clickhouse.gateway-id-index-fill.repository.ts";
 import {
   ClickHouseGatewayOpenAdmissionsSweepRepository,
   type GatewayClickHouseInstance,
@@ -63,18 +62,13 @@ export class LiveGatewayRepositories {
     // `Promise.resolve`: there is nothing to open, the routing client already exists.
     const resolveClickHouse: GatewayClickHouseResolver = (tenantId) =>
       Promise.resolve(ClickHouseGatewaySession.create({ clickhouse, tenantId }));
-    const budgetSpend = GatewayBudgetClickHouseRepository.create(resolveClickHouse, {
-      idIndexReader: clickhouse,
-    });
+    const budgetSpend = GatewayBudgetClickHouseRepository.create(resolveClickHouse);
 
     return {
       ...PostgresGatewayRepositories.create({ prisma, budgetSpend, encryption }),
       budgetSpend,
       principalSpend: ClickHouseGatewayPrincipalSpendRepository.create(resolveClickHouse),
-      spendEvents: ClickHouseGatewaySpendEventsRepository.create(resolveClickHouse, {
-        idIndexReader: clickhouse,
-      }),
-      idIndexFill: GatewayIdIndexFillClickHouseRepository.create({ clickhouse }),
+      spendEvents: ClickHouseGatewaySpendEventsRepository.create(resolveClickHouse),
       openAdmissions: ClickHouseGatewayOpenAdmissionsSweepRepository.create(() =>
         Promise.resolve(everyClickHouseServer(clickhouse)),
       ),

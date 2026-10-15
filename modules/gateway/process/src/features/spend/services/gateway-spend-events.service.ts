@@ -1,4 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type {
   GatewayConfirmedSpendPage,
   GatewaySpendDay,
@@ -16,16 +15,10 @@ import type {
 } from "../../../repositories/gateway-spend-events.repository.ts";
 
 export class GatewaySpendEventsService {
-  private constructor(
-    private readonly repository: GatewaySpendEventsRepository,
-    private readonly idIndex: IdIndexFlags | undefined,
-  ) {}
+  private constructor(private readonly repository: GatewaySpendEventsRepository) {}
 
-  static create(
-    repository: GatewaySpendEventsRepository,
-    options: { idIndex?: IdIndexFlags | undefined } = {},
-  ): GatewaySpendEventsService {
-    return new GatewaySpendEventsService(repository, options.idIndex);
+  static create(repository: GatewaySpendEventsRepository): GatewaySpendEventsService {
+    return new GatewaySpendEventsService(repository);
   }
 
   getSpendEventsPage(input: {
@@ -70,7 +63,7 @@ export class GatewaySpendEventsService {
     gatewayRequestId: string;
     statuses: string[];
   }): Promise<SpendEventRow | null> {
-    return this.repository.findSpendEventAcrossTenants({ ...input, idIndex: this.idIndex });
+    return this.repository.findSpendEventAcrossTenants(input);
   }
 
   walkSpendEvents(input: {

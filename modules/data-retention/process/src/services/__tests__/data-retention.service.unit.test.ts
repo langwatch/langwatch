@@ -2,6 +2,7 @@ import type { ResolvedRetention } from "@langwatch/data-retention-contract";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
+import { DECLARED_ID_INDEXES } from "../../__tests__/support/declared-id-indexes.fixture.ts";
 import {
   createDataRetentionTestProjectScopes,
   retentionTestGraph,
@@ -434,6 +435,7 @@ describe("given a ClickHouse target whose id indexes were filled", () => {
       retentionDays: 63,
     });
     const retroactive = MemoryRetroactiveRetentionRepository.create();
+    retroactive.idIndexDeclarations = DECLARED_ID_INDEXES;
     retroactive.idIndexTenants = new Map([
       ["stored_spans_id_index", [PROJECT, "project-gone"]],
       ["event_log_id_index", [PROJECT]],

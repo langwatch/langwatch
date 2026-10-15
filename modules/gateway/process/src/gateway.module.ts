@@ -11,7 +11,6 @@ import type {
 } from "@langwatch/gateway-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { GatewayModule } from "./app/gateway.app.ts";
 import { gatewayChannels } from "./channels/gateway-channels.registry.ts";
@@ -25,6 +24,7 @@ import {
   GatewayBudgetChangeDedupeService,
   type BudgetChangeEventDedupeService,
 } from "./features/budget/services/gateway-budget-change-dedupe.service.ts";
+import { GATEWAY_ID_INDEXES } from "./repositories/clickhouse/clickhouse.gateway-id-indexes.database.ts";
 import { gatewayRepositories } from "./repositories/gateway-repositories.registry.ts";
 import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
 import { TraceDestinationReportTask } from "./tasks/trace-destination-report.task.ts";
@@ -105,19 +105,11 @@ export const gatewayProcessModule: PublishedProcessModule<
       signature: request.headers.get("elevenlabs-signature") ?? undefined,
     }),
   })
-  .withMigrations(({ app }) => [
-    defineMigrationStep({
-      id: "gateway:fill-id-indexes",
-      after: ["coding-agent:fill-id-indexes"],
-      kind: "data",
-      mode: "background",
-      description:
-        "Fills the id indexes of gateway spend and the budget ledger from older rows, then marks them ready on each ClickHouse target.",
-      needsOldWritersGone: false,
-      // Level-triggered: a rerun merges the same ranges and resumes at the saved cursor.
-      run: ({ checkpoint, dryRun, signal }) => app.fillIdIndexes({ checkpoint, dryRun, signal }),
-    }),
-  ]);
+  .withIdIndexes(GATEWAY_ID_INDEXES, {
+    after: ["coding-agent:fill-id-indexes"],
+    description:
+      "Fills the id indexes of gateway spend and the budget ledger from older rows, then marks them ready on each ClickHouse target.",
+  });
 
 /**
  * The advisory dedupe window a spend graph debits through: without it

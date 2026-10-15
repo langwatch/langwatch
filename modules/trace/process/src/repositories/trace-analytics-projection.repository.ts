@@ -1,5 +1,4 @@
 import type { Authorization } from "@langwatch/authorization";
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 
 import type { TraceAnalyticsRow } from "../eventing/trace-derived.projection.ts";
 
@@ -27,7 +26,5 @@ export abstract class TraceAnalyticsProjectionRepository {
     authorization: Authorization;
     traceId: string;
     window?: { fromMs: number; toMs: number };
-    /** Trace's id-index readiness: with no window and the index ready, it bounds the read. */
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<TraceAnalyticsProjectionRead | null>;
 }

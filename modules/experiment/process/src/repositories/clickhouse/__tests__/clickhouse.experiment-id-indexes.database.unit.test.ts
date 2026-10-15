@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { EXPERIMENT_ID_INDEXES } from "../clickhouse.experiment-id-index-fill.repository.ts";
+import { EXPERIMENT_ID_INDEXES } from "../clickhouse.experiment-id-indexes.database.ts";
 
 const GOOSE = resolve(
   import.meta.dirname,

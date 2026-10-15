@@ -2,11 +2,9 @@ import { Buffer } from "node:buffer";
 
 import {
   ClickHouseColumns,
-  type IdIndexFlags,
-  type IdIndexReader,
+  type IdBoundOptions,
   queryWindowed,
   type WindowFragment,
-  indexedRead,
 } from "@langwatch/clickhouse-client";
 import {
   AGENT_TEST_SET_SUFFIX,
@@ -236,10 +234,12 @@ export type SimulationClickHouseClient = {
     tenantIds?: readonly string[];
     /** Set when the read must walk every partition; see the member's cold-scan warning. */
     SKIP_COLD_SCAN_CHECK?: true | undefined;
+    /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
+    idBound?: IdBoundOptions;
   }): Promise<{ json<Result>(): Promise<Result[]> }>;
   /** Absent on a bare driver client (tests): every column is then named. */
   select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
-} & Partial<IdIndexReader>;
+};
 
 type SimulationClickHouseClientResolver = (tenantId: string) => Promise<SimulationClickHouseClient>;
 
@@ -405,11 +405,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   async findScenarioRunData({
     projectId,
     scenarioRunId,
-    idIndex,
   }: {
     projectId: string;
     scenarioRunId: string;
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<SimulationRunData | null> {
     // Uses a scalar subquery to find the latest UpdatedAt, avoiding the old
     // pattern that read all heavy columns (Messages, RoleCosts, etc.) across
@@ -417,38 +415,27 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // payloads.
     const criteria = await this.criteriaColumns(projectId);
     const client = await this.getClient(projectId);
-    const rows = await indexedRead<(ClickHouseSimulationRunRow & { ExportSortKey: string })[]>({
-      client,
-      idIndex,
-      tenantId: projectId,
-      table: TABLE_NAME,
-      index: `${TABLE_NAME}_id_index`,
-      key: { ScenarioRunId: scenarioRunId },
-      fallback: "unbounded",
-      isEmpty: (found) => found.length === 0,
-      run: async (window) => {
-        const result = await client.query({
-          query: `SELECT ${runColumns(criteria)},
+    const result = await client.query({
+      query: `SELECT ${runColumns(criteria)},
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          AND t.ScenarioRunId = {scenarioRunId:String}
          AND t.ArchivedAt IS NULL
-         ${window?.sqlFor("t.StartedAt") ?? ""}
+         {{idBound:simulation_runs.ScenarioRunId:scenarioRunId:t}}
          AND t.UpdatedAt = (
            SELECT max(s.UpdatedAt)
            FROM ${TABLE_NAME} AS s
            WHERE s.TenantId = {tenantId:String}
              AND s.ScenarioRunId = {scenarioRunId:String}
-             ${window?.sqlFor("s.StartedAt") ?? ""}
+             {{idBound:simulation_runs.ScenarioRunId:scenarioRunId:s}}
          )
        LIMIT 1`,
-          query_params: { tenantId: projectId, scenarioRunId, ...window?.params },
-          format: "JSONEachRow",
-        });
-        return result.json<ClickHouseSimulationRunRow & { ExportSortKey: string }>();
-      },
+      query_params: { tenantId: projectId, scenarioRunId },
+      format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
     });
+    const rows = await result.json<ClickHouseSimulationRunRow & { ExportSortKey: string }>();
 
     const row = rows[0];
     if (!row) return null;

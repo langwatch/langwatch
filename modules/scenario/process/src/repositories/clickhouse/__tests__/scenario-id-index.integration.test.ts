@@ -9,31 +9,32 @@ import { randomUUID } from "node:crypto";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
-  ClickHouseQueryClient,
-  type IdIndexFlags,
-  type QueryDriver,
+  type ClickHouseQueryClient,
+  type InsertRequest,
   type QueryRequest,
   setWindowedReadMetrics,
-  TenantGuard,
   type WindowedReadOutcome,
 } from "@langwatch/clickhouse-client";
 import {
+  idIndexedClientDouble,
   migrateTestClickHouseOnce,
-  startTestClickHouseEndpoints,
   partsAfterPartitionPruning,
+  readyIdIndexedClientDouble,
+  type ScriptedStatements,
+  startTestClickHouseEndpoints,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { createTenantId } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { SCENARIO_ID_INDEXES } from "../clickhouse.scenario-id-indexes.database.ts";
 import { ClickHouseScenarioSession } from "../clickhouse.scenario-session.store.ts";
 import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository.ts";
 import { ClickHouseSimulationSession } from "../clickhouse.simulation-session.store.ts";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
 
 const DAY_MS = 86_400_000;
-const ON: IdIndexFlags = { isOn: () => true };
 
 const tenantId = `${randomUUID()}-scenario-id-index`;
 const now = nowInstant().epochMilliseconds;
@@ -46,12 +47,14 @@ const decoyIds = ["!decoy", "~decoy"];
 let ch: ClickHouseClient;
 let statements: QueryRequest[] = [];
 let outcomes: { table: string; outcome: WindowedReadOutcome }[] = [];
+/** The indexes read as filled, and as not filled: the same server, with and without the bound. */
 let clickhouse: ClickHouseQueryClient;
+let unready: ClickHouseQueryClient;
 
 /** A recording driver, so the test can run the exact source statement through the planner. */
-function recordingClient(client: ClickHouseClient): ClickHouseQueryClient {
-  const driver: QueryDriver = {
-    async execute(request) {
+function recordingDriver(client: ClickHouseClient): ScriptedStatements {
+  return {
+    async execute(request: QueryRequest) {
       statements.push(request);
       const result = await client.query({
         query: request.sql,
@@ -61,7 +64,7 @@ function recordingClient(client: ClickHouseClient): ClickHouseQueryClient {
       });
       return { rows: await result.json() };
     },
-    async insert(request) {
+    async insert(request: InsertRequest) {
       await client.insert({
         table: request.table,
         values: request.rows,
@@ -69,15 +72,7 @@ function recordingClient(client: ClickHouseClient): ClickHouseQueryClient {
         ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
       });
     },
-    async command(request) {
-      await client.command({
-        query: request.sql,
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-    },
   };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 /** One query on the test server, its rows as JSONEachRow parses them. */
@@ -134,7 +129,11 @@ beforeAll(async () => {
     url: endpoint.url,
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
-  clickhouse = recordingClient(ch);
+  clickhouse = await readyIdIndexedClientDouble({
+    indexes: SCENARIO_ID_INDEXES,
+    driver: recordingDriver(ch),
+  });
+  unready = idIndexedClientDouble({ indexes: SCENARIO_ID_INDEXES, driver: recordingDriver(ch) });
   setWindowedReadMetrics({ record: (entry) => outcomes.push(entry) });
 
   const groups = [
@@ -187,18 +186,19 @@ describe("scenario lookups by id with the id index", () => {
       const found = await repository.findScenarioRunData({
         projectId: tenantId,
         scenarioRunId,
-        idIndex: ON,
       });
 
       expect(found?.scenarioRunId).toBe(scenarioRunId);
       expect(outcomes).toContainEqual({ table: "simulation_runs", outcome: "index_hit" });
       const bounded = sourceReadOf("simulation_runs");
       expect(bounded.params).toMatchObject({
-        fromMs: eightWeeksAgoMs - DAY_MS,
-        toMs: eightWeeksAgoMs + DAY_MS,
+        idBound_fromMs: eightWeeksAgoMs - DAY_MS,
+        idBound_toMs: eightWeeksAgoMs + DAY_MS,
       });
       statements = [];
-      await repository.findScenarioRunData({ projectId: tenantId, scenarioRunId });
+      await SimulationClickHouseRepository.create(
+        ClickHouseScenarioSession.resolverOver(unready),
+      ).findScenarioRunData({ projectId: tenantId, scenarioRunId });
       expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
         await partsAfterPartitionPruning({
           query: queryRows,
@@ -212,7 +212,6 @@ describe("scenario lookups by id with the id index", () => {
       const repository = ClickHouseSimulationRunStateRepository.create({
         resolveClient: ClickHouseSimulationSession.resolver(clickhouse),
         defaultRetentionDays: () => 308,
-        idIndex: ON,
       });
 
       const projection = await repository.findProjection(scenarioRunId, {
@@ -223,12 +222,12 @@ describe("scenario lookups by id with the id index", () => {
       expect(outcomes).toContainEqual({ table: "simulation_runs", outcome: "index_hit" });
       const bounded = sourceReadOf("simulation_runs");
       expect(bounded.params).toMatchObject({
-        fromMs: eightWeeksAgoMs - DAY_MS,
-        toMs: eightWeeksAgoMs + DAY_MS,
+        idBound_fromMs: eightWeeksAgoMs - DAY_MS,
+        idBound_toMs: eightWeeksAgoMs + DAY_MS,
       });
       statements = [];
       await ClickHouseSimulationRunStateRepository.create({
-        resolveClient: ClickHouseSimulationSession.resolver(clickhouse),
+        resolveClient: ClickHouseSimulationSession.resolver(unready),
         defaultRetentionDays: () => 308,
       }).findProjection(scenarioRunId, { tenantId: createTenantId(tenantId) });
       expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(

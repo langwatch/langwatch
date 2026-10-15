@@ -1,4 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type {
   GatewaySpendDay,
   SpendBucket,
@@ -76,8 +75,6 @@ export abstract class GatewaySpendEventsRepository {
   abstract findForFold(input: {
     tenantId: string;
     gatewayRequestId: string;
-    /** Once it is ready, the id index bounds the read to the request's partitions. */
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<GatewaySpendState | null>;
 
   abstract readSpendEventsPage(input: {
@@ -102,7 +99,6 @@ export abstract class GatewaySpendEventsRepository {
     tenantIds: string[];
     gatewayRequestId: string;
     statuses: string[];
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<SpendEventRow | null>;
 
   abstract walkSpendEvents(input: {

@@ -8,7 +8,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-index-fill.repository.ts";
+import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 
 const GOOSE = readFileSync(
   resolve(

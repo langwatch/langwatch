@@ -1,13 +1,15 @@
 import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import {
-  clickHouseClientDouble,
-  clickHouseQueryClientDouble,
-} from "@langwatch/test-harness/client-doubles/clickhouse";
+  idIndexedClientDouble,
+  type ScriptedStatements,
+} from "@langwatch/clickhouse-client/testing";
+import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
 import { ownProofAuthorizer } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { FoldedTraceSummaryReader } from "../../../app/trace.app.ts";
 import { TraceSummaryStore } from "../../../eventing/trace-summary.store.ts";
+import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import { TraceSummaryProjectionClickHouseRepository } from "../trace-summary.repository.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -66,14 +68,19 @@ function storeOver({ storedAtMs }: { storedAtMs: number }) {
     HasAnnotation: null,
     TraceName: "",
   };
-  const client = clickHouseQueryClientDouble({
-    query: vi.fn(async ({ sql, params }: { sql: string; params?: Record<string, unknown> }) => {
-      reads.push({ sql, params: params ?? {} });
-      if (isResolve(sql)) return { rows: [{ rowCount: "1", occurredAtMs: String(storedAtMs) }] };
-      if (!isBounded(sql)) return { rows: [row] };
-      const covers = Number(params?.fromMs) <= storedAtMs && storedAtMs <= Number(params?.toMs);
-      return { rows: covers ? [row] : [] };
-    }),
+  const client = idIndexedClientDouble({
+    indexes: TRACE_ID_INDEXES,
+    driver: {
+      execute: vi.fn<ScriptedStatements["execute"]>(async ({ sql, params }) => {
+        reads.push({ sql, params: params ?? {} });
+        if (isResolve(sql)) return { rows: [{ rowCount: "1", occurredAtMs: String(storedAtMs) }] };
+        if (!isBounded(sql)) return { rows: [row] };
+        const covers =
+          Number(params?.idBound_fromMs) <= storedAtMs &&
+          storedAtMs <= Number(params?.idBound_toMs);
+        return { rows: covers ? [row] : [] };
+      }),
+    },
   });
   const store = TraceSummaryStore.create({
     storage: TraceSummaryProjectionClickHouseRepository.create({
@@ -87,7 +94,7 @@ function storeOver({ storedAtMs }: { storedAtMs: number }) {
 }
 
 const readBack = (sql: string, params: Record<string, unknown>) =>
-  isBounded(sql) ? Math.round((NOW_MS - Number(params.fromMs)) / DAY_MS) : null;
+  isBounded(sql) ? Math.round((NOW_MS - Number(params.idBound_fromMs)) / DAY_MS) : null;
 
 describe("given a trace summary lookup anchored on its event's time", () => {
   describe("when the trace sits in the narrowest window", () => {
@@ -104,8 +111,8 @@ describe("given a trace summary lookup anchored on its event's time", () => {
       expect(summary).not.toBeNull();
       expect(reads).toHaveLength(1);
       expect(reads[0]!.params).toMatchObject({
-        fromMs: NOW_MS - 3 * DAY_MS,
-        toMs: NOW_MS + DAY_MS,
+        idBound_fromMs: NOW_MS - 3 * DAY_MS,
+        idBound_toMs: NOW_MS + DAY_MS,
       });
     });
   });
@@ -123,8 +130,8 @@ describe("given a trace summary lookup anchored on its event's time", () => {
 
       expect(summary).not.toBeNull();
       expect(reads.map(({ sql, params }) => readBack(sql, params))).toEqual([3, 7, 21]);
-      expect(reads.slice(1).map(({ params }) => Number(params.toMs))).toEqual(
-        reads.slice(0, -1).map(({ params }) => Number(params.fromMs) - 1),
+      expect(reads.slice(1).map(({ params }) => Number(params.idBound_toMs))).toEqual(
+        reads.slice(0, -1).map(({ params }) => Number(params.idBound_fromMs) - 1),
       );
     });
   });
@@ -143,7 +150,7 @@ describe("given a trace summary lookup anchored on its event's time", () => {
       expect(summary).toBeNull();
       expect(reads.map(({ sql, params }) => readBack(sql, params))).toEqual([3, 7, 21, 30]);
       const coveredMs = reads.reduce(
-        (sum, { params }) => sum + Number(params.toMs) - Number(params.fromMs) + 1,
+        (sum, { params }) => sum + Number(params.idBound_toMs) - Number(params.idBound_fromMs) + 1,
         0,
       );
       expect(coveredMs).toBe(31 * DAY_MS + 1);
@@ -165,7 +172,9 @@ describe("given a trace summary lookup anchored on its event's time", () => {
 
       expect(summary).not.toBeNull();
       expect(reads.every(({ sql }) => isBounded(sql))).toBe(true);
-      expect(reads.every(({ params }) => Number(params.toMs) < NOW_MS - 200 * DAY_MS)).toBe(true);
+      expect(reads.every(({ params }) => Number(params.idBound_toMs) < NOW_MS - 200 * DAY_MS)).toBe(
+        true,
+      );
     });
   });
 
@@ -184,9 +193,9 @@ describe("given a trace summary lookup anchored on its event's time", () => {
 
         expect(reads.length).toBeLessThanOrEqual(4);
         expect(reads.every(({ sql }) => isBounded(sql))).toBe(true);
-        expect(reads.every(({ params }) => Number(params.fromMs) >= NOW_MS - 30 * DAY_MS)).toBe(
-          true,
-        );
+        expect(
+          reads.every(({ params }) => Number(params.idBound_fromMs) >= NOW_MS - 30 * DAY_MS),
+        ).toBe(true);
       },
     );
   });
@@ -206,8 +215,8 @@ describe("given a trace summary lookup anchored on its event's time", () => {
       expect(summary).toBeNull();
       expect(reads).toHaveLength(1);
       expect(reads[0]!.params).toMatchObject({
-        fromMs: NOW_MS - 3 * DAY_MS,
-        toMs: NOW_MS + DAY_MS,
+        idBound_fromMs: NOW_MS - 3 * DAY_MS,
+        idBound_toMs: NOW_MS + DAY_MS,
       });
     });
   });

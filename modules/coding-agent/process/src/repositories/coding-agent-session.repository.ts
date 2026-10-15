@@ -1,5 +1,4 @@
 import type { Authorization } from "@langwatch/authorization";
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
@@ -37,16 +36,12 @@ export abstract class CodingAgentSessionRepository {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
-    /** Without a window, the id index (once ready) bounds the read. */
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<CodingAgentSession | null>;
 
   abstract findBySessionIdWithApplied(input: {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
-    /** Without a window, the id index (once ready) bounds the read. */
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<{
     row: CodingAgentSession;
     appliedEventIds: string[];

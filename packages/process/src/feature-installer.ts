@@ -8,6 +8,11 @@ import {
   type MiddlewareContextBinding,
   type RestDoorDefinition,
 } from "@langwatch/api/rest";
+import {
+  ClickHouseQueryClient,
+  type IdIndexDeclaration,
+  type IdIndexRetentionRaise,
+} from "@langwatch/clickhouse-client";
 import type { ConfigOf, ConfigSlice } from "@langwatch/config";
 import {
   type FeatureEventing,
@@ -39,6 +44,7 @@ import {
 } from "./channel-registry.ts";
 import { trackedForRole } from "./delivery-progress.ts";
 /** One feature installer. A feature declares its config, the contract services */
+import { type IdIndexFillOptions, idIndexFillStep } from "./migration/id-index-fill-step.ts";
 import { processProjectionReplayer } from "./migration/projection-replayer.ts";
 import { withAnotherPipeline } from "./module-eventing.ts";
 import { snapshotRepositories, type FeatureRepositories } from "./repository-ownership.ts";
@@ -443,6 +449,8 @@ export interface FeatureInstallArguments {
    * the modules whose tenant steps it drives (S6-FEED). Absent where the root composed none.
    */
   readonly declaredMigrationSteps?: () => readonly unknown[];
+  /** Raises an id index's retention before its ready markers; absent where none was composed. */
+  readonly idIndexRetention?: IdIndexRetentionRaise;
   /** The process's listed queue runs; absent where no queue runs them. */
   readonly runListedWork?: <Result>(input: ListedWork<Result>) => Promise<Result>;
   /** The instance the graph resolved for one token. */
@@ -1450,6 +1458,35 @@ class RepositoryAppBuilder<
     >({ declaration: bindingMigrations(this.build(), () => steps), workers: [], tasks: [] });
   }
 
+  /**
+   * The id indexes this module owns: declared on its ClickHouse client at install, so every
+   * `{{idBound}}` read is bounded by them, and filled by one background step.
+   */
+  withIdIndexes(indexes: readonly IdIndexDeclaration[], options: IdIndexFillOptions = {}) {
+    return withContributions<
+      ReturnType<
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Config,
+          App,
+          Created,
+          Registry
+        >["build"]
+      >,
+      ModuleRepositories<Live, Memory>,
+      App,
+      Dependencies,
+      Created
+    >({
+      declaration: bindingIdIndexes(this.build(), { indexes, options }),
+      workers: [],
+      tasks: [],
+    });
+  }
+
   build(): ServerFeatureDeclaration<
     Config,
     Dependencies,
@@ -1698,6 +1735,18 @@ class ConfiguredAppBuilder<
     });
   }
 
+  /**
+   * The id indexes this module owns: declared on its ClickHouse client at install, so every
+   * `{{idBound}}` read is bounded by them, and filled by one background step.
+   */
+  withIdIndexes(indexes: readonly IdIndexDeclaration[], options: IdIndexFillOptions = {}) {
+    return withContributions({
+      declaration: bindingIdIndexes(this.build(), { indexes, options }),
+      workers: [],
+      tasks: [],
+    });
+  }
+
   /** This module's event sourcing, built over the app above. */
   withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
     return withContributions({
@@ -1828,6 +1877,18 @@ class UnconfiguredAppBuilder<
   withMigrations(...steps: readonly unknown[]) {
     return withContributions({
       declaration: bindingMigrations(this.build(), () => steps),
+      workers: [],
+      tasks: [],
+    });
+  }
+
+  /**
+   * The id indexes this module owns: declared on its ClickHouse client at install, so every
+   * `{{idBound}}` read is bounded by them, and filled by one background step.
+   */
+  withIdIndexes(indexes: readonly IdIndexDeclaration[], options: IdIndexFillOptions = {}) {
+    return withContributions({
+      declaration: bindingIdIndexes(this.build(), { indexes, options }),
       workers: [],
       tasks: [],
     });
@@ -1972,6 +2033,20 @@ export type ModuleContributions<
     >;
     withMigrations(
       ...steps: readonly unknown[]
+    ): ModuleContributions<
+      Declaration,
+      Repositories,
+      App,
+      Dependencies,
+      Created,
+      Named,
+      Module,
+      Needs
+    >;
+    /** The id indexes this module owns, declared on its client and filled by one step. */
+    withIdIndexes(
+      indexes: readonly IdIndexDeclaration[],
+      options?: IdIndexFillOptions,
     ): ModuleContributions<
       Declaration,
       Repositories,
@@ -2137,6 +2212,43 @@ function bindingMigrations<Declaration extends object>(
   };
 }
 
+/**
+ * Declares a module's id indexes on its live ClickHouse client at install, in every role, and
+ * adds their fill step beside its other migration steps (dev/docs/plans/id-index-2026-10-10.md).
+ */
+function bindingIdIndexes<Declaration extends object>(
+  declaration: Declaration,
+  { indexes, options }: { indexes: readonly IdIndexDeclaration[]; options: IdIndexFillOptions },
+): Declaration {
+  const installable = declaration as Declaration & InstallableDeclaration;
+
+  return {
+    ...declaration,
+    install: async (args: FeatureInstallArguments): Promise<InstalledFeatureState> => {
+      const state = await installable.install(args);
+      const clickhouse = liveClickHouseOf(args.repositorySelection);
+      clickhouse?.declareIdIndexes({ indexes });
+      const step = idIndexFillStep({
+        module: installable.name,
+        indexes,
+        options,
+        clickhouse,
+        raise: args.idIndexRetention,
+      });
+      return { ...state, migrationSteps: [...(state.migrationSteps ?? []), step] };
+    },
+  };
+}
+
+/** The routed ClickHouse client of a live tier; memory stores open none. */
+function liveClickHouseOf(
+  selection: RepositorySelection | undefined,
+): ClickHouseQueryClient | undefined {
+  if (selection?.tier !== "live") return undefined;
+  const clickhouse = selection.members.clickhouse;
+  return clickhouse instanceof ClickHouseQueryClient ? clickhouse : undefined;
+}
+
 /** Adds the worker, task, middleware and eventing halves to a built declaration. */
 function withContributions<
   Declaration extends object,
@@ -2196,6 +2308,13 @@ function withContributions<
         eventing,
       });
     },
+    withIdIndexes: (indexes: readonly IdIndexDeclaration[], options: IdIndexFillOptions = {}) =>
+      withContributions({
+        declaration: bindingIdIndexes(declaration, { indexes, options }),
+        workers,
+        tasks,
+        eventing,
+      }),
     provideMiddlewareBindings: (bind: ModuleMiddlewareBindings<TokenMap, never>) =>
       withContributions({
         declaration: bindingMiddleware(declaration, bind),

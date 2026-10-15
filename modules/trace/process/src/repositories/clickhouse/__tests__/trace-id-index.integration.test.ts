@@ -1,24 +1,25 @@
 /**
  * Trace's id indexes against the production schema (goose 00110): the views fill them inside
- * each insert, and with trace's flag on a lookup by trace id with no time is bounded to the
+ * each insert, and once marked ready a lookup by trace id with no time is bounded to the
  * index's range. Spec: specs/clickhouse/id-index-reads.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
   AuthorizedClickHouse,
-  ClickHouseQueryClient,
   ID_INDEX_WIDEN_MS,
-  type IdIndexFlags,
-  type QueryDriver,
+  type QueryRequest,
   setWindowedReadMetrics,
-  TenantGuard,
   type WindowedReadOutcome,
 } from "@langwatch/clickhouse-client";
-import { partsAfterPartitionPruning } from "@langwatch/clickhouse-client/testing";
+import {
+  partsAfterPartitionPruning,
+  readyIdIndexedClientDouble,
+} from "@langwatch/clickhouse-client/testing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
 import {
@@ -28,7 +29,6 @@ import {
 
 const clickHouseConfigured = testClickHouseConfigured();
 const DAY_MS = 24 * 60 * 60 * 1000;
-const FLAG_ON: IdIndexFlags = { isOn: () => true };
 
 const tenantId = `test-trace-id-index-${nanoid()}`;
 const eightWeeksAgo = Date.now() - 56 * DAY_MS;
@@ -40,26 +40,27 @@ type Statement = { sql: string; params: Record<string, unknown> };
 let statements: Statement[];
 let outcomes: { table: string; outcome: WindowedReadOutcome }[];
 
-/** The test ClickHouse behind the fence, recording every statement the reads send. */
-function recordingAuthorizedClickHouse(client: ClickHouseClient): AuthorizedClickHouse {
-  const driver: QueryDriver = {
-    async execute(request) {
-      statements.push({ sql: request.sql, params: request.params ?? {} });
-      const result = await client.query({
-        query: request.sql,
-        format: "JSONEachRow",
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-      });
-      return { rows: await result.json() };
+/**
+ * The test ClickHouse behind the fence, recording every statement the reads send, with trace's
+ * indexes read as filled (no marker row is written to the shared server).
+ */
+async function recordingAuthorizedClickHouse(
+  client: ClickHouseClient,
+): Promise<AuthorizedClickHouse> {
+  const queryClient = await readyIdIndexedClientDouble({
+    indexes: TRACE_ID_INDEXES,
+    driver: {
+      async execute(request: QueryRequest) {
+        statements.push({ sql: request.sql, params: request.params ?? {} });
+        const result = await client.query({
+          query: request.sql,
+          format: "JSONEachRow",
+          ...(request.params === undefined ? {} : { query_params: request.params }),
+        });
+        return { rows: await result.json() };
+      },
     },
-    async insert(request) {
-      await client.insert({ table: request.table, values: request.rows, format: "JSONEachRow" });
-    },
-    async command(request) {
-      await client.command({ query: request.sql });
-    },
-  };
-  const queryClient = new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+  });
   return new AuthorizedClickHouse({ resolveClient: async () => queryClient });
 }
 
@@ -145,9 +146,20 @@ async function indexRange({ index, traceId }: { index: string; traceId: string }
 /** The bound the last source read of `table` ran with. */
 function lastBound({ table }: { table: string }) {
   const read = statements.findLast(
-    (statement) => statement.sql.includes(`FROM ${table}`) && "fromMs" in statement.params,
+    (statement) => statement.sql.includes(`FROM ${table}`) && "idBound_fromMs" in statement.params,
   );
-  return { fromMs: Number(read?.params.fromMs), toMs: Number(read?.params.toMs) };
+  return { fromMs: Number(read?.params.idBound_fromMs), toMs: Number(read?.params.idBound_toMs) };
+}
+
+/** The same statement with its index bound taken out: what the read cost before the index. */
+function withoutBound(statement: Statement): Statement {
+  return {
+    sql: statement.sql.replace(
+      /AND (?:\w+\.)?\w+ >= fromUnixTimestamp64Milli\(\{idBound_fromMs:Int64\}\)(?: AND (?:\w+\.)?\w+ <= fromUnixTimestamp64Milli\(\{idBound_toMs:Int64\}\))?/g,
+      "",
+    ),
+    params: statement.params,
+  };
 }
 
 /** The last statement that read `table`'s source rows, not its index. */
@@ -186,7 +198,7 @@ beforeAll(async () => {
     await insertSpans([spanRow({ traceId, startMs: Date.now() - daysAgo * DAY_MS })]);
     await insertSummary({ traceId, occurredAtMs: Date.now() - daysAgo * DAY_MS });
   }
-  const clickhouse = recordingAuthorizedClickHouse(ch);
+  const clickhouse = await recordingAuthorizedClickHouse(ch);
   spans = SpanStorageClickHouseRepository.create({ resolveClient: async () => ch, clickhouse });
   summaries = TraceSummaryClickHouseRepository.create({
     resolveClient: async () => ch,
@@ -220,7 +232,6 @@ describe.skipIf(!clickHouseConfigured)("trace id indexes", () => {
       const found = await spans.findSpansByTraceId({
         authorization: ownProof({ projectId: tenantId }),
         traceId,
-        idIndex: FLAG_ON,
       });
 
       expect(found).toHaveLength(1);
@@ -231,9 +242,7 @@ describe.skipIf(!clickHouseConfigured)("trace id indexes", () => {
       });
       expect(outcomes).toContainEqual({ table: "stored_spans", outcome: "index_hit" });
       const bounded = lastRead({ table: "stored_spans" });
-      statements = [];
-      await spans.findSpansByTraceId({ authorization: ownProof({ projectId: tenantId }), traceId });
-      const parts = await prunedParts({ bounded, unbounded: lastRead({ table: "stored_spans" }) });
+      const parts = await prunedParts({ bounded, unbounded: withoutBound(bounded) });
       expect(parts.bounded).toBeLessThan(parts.unbounded);
     });
 
@@ -244,8 +253,8 @@ describe.skipIf(!clickHouseConfigured)("trace id indexes", () => {
       await insertSummary({ traceId, occurredAtMs: eightWeeksAgo });
       const authorization = ownProof({ projectId: tenantId });
 
-      const summary = await summaries.findByTraceId({ authorization, traceId, idIndex: FLAG_ON });
-      const found = await spans.findSpansByTraceId({ authorization, traceId, idIndex: FLAG_ON });
+      const summary = await summaries.findByTraceId({ authorization, traceId });
+      const found = await spans.findSpansByTraceId({ authorization, traceId });
 
       expect(summary?.traceId).toBe(traceId);
       expect(found).toHaveLength(1);
@@ -288,7 +297,6 @@ describe.skipIf(!clickHouseConfigured)("trace id indexes", () => {
       const found = await spans.findSpansByTraceId({
         authorization: ownProof({ projectId: tenantId }),
         traceId,
-        idIndex: FLAG_ON,
       });
 
       expect(range).toMatchObject({ fromMs: monday, toMs: thursday });
@@ -305,7 +313,6 @@ describe.skipIf(!clickHouseConfigured)("trace id indexes", () => {
       const found = await spans.findSpansByTraceId({
         authorization: ownProof({ projectId: tenantId }),
         traceId,
-        idIndex: FLAG_ON,
       });
 
       expect((await indexRange({ index: "trace_summaries_id_index", traceId })).n).toBe(0);

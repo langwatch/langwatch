@@ -1,5 +1,4 @@
-import type { IdIndexFlags, IdIndexReader } from "@langwatch/clickhouse-client";
-import { indexedRead } from "@langwatch/clickhouse-client";
+import type { IdBoundOptions } from "@langwatch/clickhouse-client";
 import {
   experimentDspyStepSchema,
   experimentDspyStepSummarySchema,
@@ -47,8 +46,9 @@ export type ExperimentDspyClickHouseClient = {
     query: string;
     query_params: Record<string, unknown>;
     format: "JSONEachRow";
+    idBound?: IdBoundOptions;
   }): Promise<ExperimentDspyClickHouseResult>;
-} & Partial<IdIndexReader>;
+};
 
 type ExperimentDspyClickHouseResolver = (
   tenantId: string,
@@ -101,8 +101,6 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
   static create(options: {
     resolveClient: ExperimentDspyClickHouseResolver;
     telemetry: ExperimentDspyTelemetry;
-    /** With it on, an experiment's steps are read only in the weeks its id index names. */
-    idIndex?: IdIndexFlags | undefined;
   }): ClickHouseExperimentDspyRepository {
     return new ClickHouseExperimentDspyRepository(options);
   }
@@ -111,7 +109,6 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     private readonly options: {
       resolveClient: ExperimentDspyClickHouseResolver;
       telemetry: ExperimentDspyTelemetry;
-      idIndex?: IdIndexFlags | undefined;
     },
   ) {
     super();
@@ -175,18 +172,8 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return [];
-      const found = await indexedRead<unknown[]>({
-        client,
-        idIndex: this.options.idIndex,
-        tenantId: input.tenantId,
-        table: TABLE_NAME,
-        index: `${TABLE_NAME}_id_index`,
-        key: { ExperimentId: input.experimentId },
-        fallback: "unbounded",
-        isEmpty: (rows) => rows.length === 0,
-        run: async (window) => {
-          const result = await client.query({
-            query: `
+      const result = await client.query({
+        query: `
           SELECT
             TenantId,
             ExperimentId,
@@ -203,17 +190,16 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
           FROM ${TABLE_NAME} AS t
           WHERE t.TenantId = {tenantId:String}
             AND t.ExperimentId = {experimentId:String}
-            ${window?.sqlFor("t.CreatedAt") ?? ""}
+            {{idBound:dspy_steps.ExperimentId:experimentId:t}}
           GROUP BY TenantId, ExperimentId, RunId, StepIndex
           ORDER BY CreatedAt ASC
           LIMIT 10000
         `,
-            query_params: { ...input, ...window?.params },
-            format: "JSONEachRow",
-          });
-          return result.json();
-        },
+        query_params: { ...input },
+        format: "JSONEachRow",
+        idBound: { fallback: "unbounded" },
       });
+      const found = await result.json();
       const rows = dspySummaryRowsSchema.parse(found);
       return experimentDspyStepSummariesSchema.parse(
         rows.map((row) => ({
@@ -263,18 +249,8 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     input: ExperimentDspyStepLookup;
   }): Promise<ExperimentDspyStep | null> {
     const { tenantId, experimentId, runId, stepIndex } = input;
-    const found = await indexedRead<unknown[]>({
-      client,
-      idIndex: this.options.idIndex,
-      tenantId,
-      table: TABLE_NAME,
-      index: `${TABLE_NAME}_id_index`,
-      key: { ExperimentId: experimentId, RunId: runId },
-      fallback: "unbounded",
-      isEmpty: (rows) => rows.length === 0,
-      run: async (window) => {
-        const result = await client.query({
-          query: `
+    const result = await client.query({
+      query: `
         SELECT
           t.TenantId AS TenantId,
           t.ExperimentId AS ExperimentId,
@@ -299,7 +275,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
           AND t.ExperimentId = {experimentId:String}
           AND t.RunId = {runId:String}
           AND t.StepIndex = {stepIndex:String}
-          ${window?.sqlFor("t.CreatedAt") ?? ""}
+          {{idBound:dspy_steps.ExperimentId,RunId:experimentId,runId:t}}
           AND (t.TenantId, t.ExperimentId, t.RunId, t.StepIndex, t.UpdatedAt) IN (
             SELECT TenantId, ExperimentId, RunId, StepIndex, max(UpdatedAt)
             FROM ${TABLE_NAME}
@@ -307,17 +283,16 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
               AND ExperimentId = {experimentId:String}
               AND RunId = {runId:String}
               AND StepIndex = {stepIndex:String}
-              ${window?.sqlFor("CreatedAt") ?? ""}
+              {{idBound:dspy_steps.ExperimentId,RunId:experimentId,runId}}
             GROUP BY TenantId, ExperimentId, RunId, StepIndex
           )
         LIMIT 1
       `,
-          query_params: { tenantId, experimentId, runId, stepIndex, ...window?.params },
-          format: "JSONEachRow",
-        });
-        return result.json();
-      },
+      query_params: { tenantId, experimentId, runId, stepIndex },
+      format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
     });
+    const found = await result.json();
     const row = dspyRowsSchema.parse(found)[0];
     if (!row) return null;
     return {

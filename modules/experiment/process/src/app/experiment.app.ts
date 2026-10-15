@@ -4,7 +4,6 @@
 import { AgentApi } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { IdIndexFillCheckpoint, IdIndexFillReport } from "@langwatch/clickhouse-client";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   DatasetApi,
@@ -145,7 +144,6 @@ import { ExperimentCopyService } from "../services/experiment-copy.service.ts";
 import { ExperimentDatasetEvaluationService } from "../services/experiment-dataset-evaluation.service.ts";
 import { ExperimentDspyRetentionService } from "../services/experiment-dspy-retention.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
-import { ExperimentIdIndexFillService } from "../services/experiment-id-index-fill.service.ts";
 import { ExperimentListingService } from "../services/experiment-listing.service.ts";
 import { ExperimentTargetEntityNamesService } from "../services/experiment-target-entity-names.service.ts";
 import {
@@ -194,8 +192,6 @@ export interface ExperimentAppDependencies {
   batchLog?: Pick<ExperimentBatchLogService, "assertWithinLimit" | "log">;
   /** The SDK's dataset evaluation; absent where a suite builds none. */
   datasetEvaluation?: Pick<ExperimentDatasetEvaluationService, "evaluate">;
-  /** Fills the id indexes from older rows; absent where a suite builds no step. */
-  idIndexFill?: ExperimentIdIndexFillService;
 }
 
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
@@ -243,7 +239,6 @@ export class ExperimentModule implements ExperimentApi {
     const logger = createLogger("langwatch:experiment");
     const { workflows, dataset, agents, evaluators, prompts, retention } = dependencies;
     const commands = ExperimentRunCommandDispatcherService.create();
-    const idIndex = repositories.idIndexFill.readiness;
     const senders: { commands?: EventingCommands<ExperimentLifecyclePipeline> } = {};
     const experiments = ExperimentService.create({
       repository: repositories.experiments,
@@ -264,7 +259,6 @@ export class ExperimentModule implements ExperimentApi {
       commands,
       experiments,
       runStores: repositories.runProcessing,
-      idIndex,
       peers: dependencies,
       config,
       // A start's refusal names the role; a suite that builds by hand names none.
@@ -291,10 +285,6 @@ export class ExperimentModule implements ExperimentApi {
       workbenchObserver: ExperimentWorkbenchObserverService.create({ logger, senders }),
       lifecycle: { pipeline: buildExperimentLifecyclePipeline(), senders },
       runProcessing: runs.processing,
-      idIndexFill: ExperimentIdIndexFillService.create({
-        fills: repositories.idIndexFill,
-        retention,
-      }),
       batchLog: ExperimentBatchLogService.create({
         runLookup,
         runs: experiments,
@@ -488,17 +478,6 @@ export class ExperimentModule implements ExperimentApi {
   /** The runs of each named experiment, keyed by experiment id. */
   listRuns(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>> {
     return this.#dependencies.experiments.listRuns(input);
-  }
-
-  /** The `experiment:fill-id-indexes` step's body: the id indexes, then each target's marker. */
-  fillIdIndexes(input: {
-    checkpoint: IdIndexFillCheckpoint;
-    dryRun: boolean;
-    signal: AbortSignal;
-  }): Promise<IdIndexFillReport> {
-    const fill = this.#dependencies.idIndexFill;
-    if (!fill) throw new Error("This experiment app was composed without an id index fill");
-    return fill.fillIdIndexes(input);
   }
 
   /** One run of one experiment. A missing run reads as null. */

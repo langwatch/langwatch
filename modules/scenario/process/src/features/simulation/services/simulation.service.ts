@@ -1,4 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   SimulationService as SimulationServiceContract,
   simulationCancelRunSchema,
@@ -58,15 +57,13 @@ export class SimulationService extends SimulationServiceContract {
   static create(
     repository: SimulationRepository,
     execution: SimulationExecutionRepository,
-    options: { idIndex?: IdIndexFlags | undefined } = {},
   ): SimulationService {
-    return new SimulationService(repository, execution, options.idIndex);
+    return new SimulationService(repository, execution);
   }
 
   private constructor(
     private readonly repository: SimulationRepository,
     private readonly execution: SimulationExecutionRepository,
-    private readonly idIndex: IdIndexFlags | undefined,
   ) {
     super();
   }
@@ -76,7 +73,7 @@ export class SimulationService extends SimulationServiceContract {
   }
 
   findScenarioRunData(input: SimulationScenarioRunInput): Promise<SimulationRunData | null> {
-    return this.repository.findScenarioRunData({ ...input, idIndex: this.idIndex });
+    return this.repository.findScenarioRunData(input);
   }
 
   getBatchHistoryForScenarioSet(

@@ -1,4 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type {
   GatewayBudgetDebitRow,
   GatewayBudgetScopeType,
@@ -85,12 +84,9 @@ export type PulledUsageTotals = {
   tokensOutput: number;
 };
 
-/** The flags a ledger idempotency probe consults; absent reads the ledger as before. */
-export type IdIndexReadOptions = { idIndex?: IdIndexFlags | undefined };
-
 export interface GatewayBudgetSpendRepository {
   /** The id index (once ready) answers whether the request is already in the ledger. */
-  insertDebit(rows: BudgetDebitRow[], options?: IdIndexReadOptions): Promise<void>;
+  insertDebit(rows: BudgetDebitRow[]): Promise<void>;
   insertPulledUsageRows(rows: PulledUsageRow[]): Promise<void>;
   readPulledUsageTotals(input: {
     tenantId: string;
@@ -98,7 +94,7 @@ export interface GatewayBudgetSpendRepository {
     from: Instant;
     to: Instant;
   }): Promise<PulledUsageTotals>;
-  insertDebitsForBudgets(rows: BudgetDebitRow[], options?: IdIndexReadOptions): Promise<void>;
+  insertDebitsForBudgets(rows: BudgetDebitRow[]): Promise<void>;
   findSpendForBudgets(
     tenantId: string,
     budgets: GatewayBudgetSpendRecord[] | BudgetSpendTarget[],

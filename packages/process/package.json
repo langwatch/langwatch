@@ -44,6 +44,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/authorization": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

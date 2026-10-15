@@ -1,15 +1,5 @@
 import type { Authorization } from "@langwatch/authorization";
-import {
-  AuthorizedClickHouse,
-  type ClickHouseClientResolver,
-  fillOwnerIdIndexes,
-  type IdIndexDeclaration,
-  type IdIndexFillReport,
-  type IdIndexFlags,
-  type IdIndexOwnerFill,
-  IdIndexReadiness,
-  idIndexReadinessTargets,
-} from "@langwatch/clickhouse-client";
+import { AuthorizedClickHouse, type ClickHouseClientResolver } from "@langwatch/clickhouse-client";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 
 import {
@@ -20,21 +10,6 @@ import {
 import type { EvaluationClickHouseResolver } from "./clickhouse.evaluation-session.store.ts";
 import { EvaluationRunClickHouseReadRepository } from "./evaluation-run-read.repository.ts";
 import { EvaluationRunClickHouseWriteRepository } from "./evaluation-run-write.repository.ts";
-
-/**
- * The id indexes Evaluation fills (goose 00112; id-index plan §1). `evaluation_runs` expires on
- * `UpdatedAt`, not on its partition column `ScheduledAt`, so the index retains on `UpdatedAt`.
- */
-export const EVALUATION_ID_INDEXES: readonly IdIndexDeclaration[] = [
-  {
-    source: "evaluation_runs",
-    index: "evaluation_runs_id_index",
-    key: ["EvaluationId"],
-    time: "ScheduledAt",
-    retentionAnchor: "UpdatedAt",
-    retention: "copied",
-  },
-];
 
 /** Composes the read and write adapters for the evaluation_runs table. */
 export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
@@ -48,7 +23,6 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
 
   private readonly reader: EvaluationRunClickHouseReadRepository;
   private readonly writer: EvaluationRunClickHouseWriteRepository;
-  readonly readiness: IdIndexReadiness;
 
   private constructor(
     private readonly options: {
@@ -62,17 +36,6 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
     });
     this.writer = EvaluationRunClickHouseWriteRepository.create({
       resolveClient: options.resolveClient,
-    });
-    // The routed client is one per process; the marker statements route by target themselves.
-    const routed = () => options.resolveQueryClient("");
-    this.readiness = IdIndexReadiness.create({
-      statements: {
-        query: async (request) => (await routed()).query(request),
-        command: async (request) => (await routed()).command(request),
-      },
-      indexes: EVALUATION_ID_INDEXES,
-      watch: async () =>
-        idIndexReadinessTargets({ privateRoutes: (await routed()).privateRoutes() }),
     });
   }
 
@@ -108,14 +71,7 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
   findInputs(input: {
     authorization: Authorization;
     evaluationId: string;
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<EvaluationInputsRead | null> {
     return this.reader.findInputs(input);
-  }
-
-  async fillIdIndexes(input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
-    // The routed client is one per process and the fill visits every target itself.
-    const clickhouse = await this.options.resolveQueryClient("");
-    return fillOwnerIdIndexes({ ...input, clickhouse, indexes: EVALUATION_ID_INDEXES });
   }
 }

@@ -16,14 +16,7 @@ import {
 } from "@langwatch/analytics-contract";
 import {
   type ClickHouseQueryClient,
-  fillOwnerIdIndexes,
-  type IdIndexDeclaration,
-  type IdIndexFillReport,
-  type IdIndexFlags,
-  type IdIndexOwnerFill,
-  IdIndexReadiness,
-  idIndexReadinessTargets,
-  indexedRead,
+  type IdBoundOptions,
   queryWindowed,
   type WindowFragment,
 } from "@langwatch/clickhouse-client";
@@ -35,7 +28,9 @@ import { AnalyticsEvaluationRepository } from "../analytics-persistence.reposito
 
 const SLIM_TABLE = "evaluation_analytics";
 const ROLLUP_TABLE = "evaluation_analytics_rollup";
-const ID_INDEX = "evaluation_analytics_id_index";
+/** The newest version first; a tie keeps the one with the most applied events. */
+const LATEST_ORDER = `ORDER BY OccurredAt DESC, CompletedAt DESC, StartedAt DESC,
+          length(AppliedEventIds) DESC`;
 const INSERT_SETTINGS = {
   async_insert: 1,
   wait_for_async_insert: 1,
@@ -73,37 +68,14 @@ function readOutcome({
   return hasRecord ? "hit" : "windowed_empty";
 }
 
-/** The id indexes Analytics fills (goose 00113; id-index plan §1). */
-export const ANALYTICS_ID_INDEXES: readonly IdIndexDeclaration[] = [
-  {
-    source: "evaluation_analytics",
-    index: "evaluation_analytics_id_index",
-    key: ["EvaluationId"],
-    time: "OccurredAt",
-    retentionAnchor: "OccurredAt",
-    retention: "copied",
-  },
-];
-
 type AnalyticsEvaluationRepositoryOptions = {
   resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
   /** Read per stamp: the owner of the default answers it, not this module. */
   defaultRetentionDays: () => number;
   readMetrics?: AnalyticsEvaluationReadMetrics;
-  /** The routed client the id index is read and filled through; absent means no index. */
+  /** The routed client every read by id goes through, bounded by the evaluation id index. */
   clickhouse?: ClickHouseQueryClient;
-  /** Whether the evaluation id index may bound a lookup with no window; absent, its markers say. */
-  idIndex?: IdIndexFlags;
 };
-
-/** The evaluation id index's readiness over the routed client, every target checked at boot. */
-function readinessOver(clickhouse: ClickHouseQueryClient): IdIndexReadiness {
-  return IdIndexReadiness.create({
-    statements: clickhouse,
-    indexes: ANALYTICS_ID_INDEXES,
-    watch: () => idIndexReadinessTargets({ privateRoutes: clickhouse.privateRoutes() }),
-  });
-}
 
 export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluationRepository {
   static create(
@@ -116,7 +88,6 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
   private readonly defaultRetentionDays: () => number;
   private readonly readMetrics: AnalyticsEvaluationReadMetrics | undefined;
   private readonly clickhouse: ClickHouseQueryClient | undefined;
-  private readonly idIndex: IdIndexFlags | undefined;
 
   private constructor(options: AnalyticsEvaluationRepositoryOptions) {
     super();
@@ -124,9 +95,6 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
     this.defaultRetentionDays = options.defaultRetentionDays;
     this.readMetrics = options.readMetrics;
     this.clickhouse = options.clickhouse;
-    this.idIndex =
-      options.idIndex ??
-      (options.clickhouse === undefined ? undefined : readinessOver(options.clickhouse));
   }
 
   async upsert(input: AnalyticsEvaluationUpsertInput): Promise<void> {
@@ -220,48 +188,38 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
   }
 
   /**
-   * The caller's window reads as it always did; only when it finds nothing, or there is none,
-   * does the evaluation id index bound the read, inner dedup subquery included.
+   * The caller's window reads as it always did, the outer read only (ADR-071); only when it
+   * finds nothing, or there is none, does the evaluation id index bound the read, inner dedup
+   * subquery included. A caller's window miss reads nothing more while the index is not ready.
    */
   private async findLatestRows(
     parsed: AnalyticsEvaluationReadInput,
   ): Promise<Record<string, unknown>[]> {
-    const { clickhouse, idIndex } = this;
     const caller = parsed.window;
-    const isCallers = (window: WindowFragment | null): boolean =>
-      window !== null && window.fromMs === caller?.fromMs && window.toMs === caller.toMs;
-    const options = {
+    if (caller === undefined) return this.readById({ parsed, idBound: { fallback: "unbounded" } });
+    const rows = await queryWindowed({
       table: SLIM_TABLE,
       // The caller's [from, to], as the centre and half-width the windowed read takes.
-      hintMs: caller ? (caller.fromMs + caller.toMs) / 2 : null,
-      windowMs: caller ? (caller.toMs - caller.fromMs) / 2 : undefined,
-      fallback: caller ? ("none" as const) : ("unbounded" as const),
-      isEmpty: (rows: Record<string, unknown>[]) => rows.length === 0,
-      run: (window: WindowFragment | null) =>
-        this.readLatest({ parsed, window, boundInner: window !== null && !isCallers(window) }),
-    };
-    if (clickhouse === undefined || idIndex === undefined) return queryWindowed(options);
-    return indexedRead({
-      ...options,
-      client: clickhouse,
-      idIndex,
-      tenantId: parsed.tenantId,
-      index: ID_INDEX,
-      key: { EvaluationId: parsed.evaluationId },
+      hintMs: (caller.fromMs + caller.toMs) / 2,
+      windowMs: (caller.toMs - caller.fromMs) / 2,
+      fallback: "none",
+      isEmpty: (found: Record<string, unknown>[]) => found.length === 0,
+      run: (window) => this.readInWindow({ parsed, window }),
     });
+    if (rows.length > 0) return rows;
+    return this.readById({ parsed, idBound: { onlyWhenReady: true } });
   }
 
-  private async readLatest({
+  private async readInWindow({
     parsed,
     window,
-    boundInner,
   }: {
     parsed: AnalyticsEvaluationReadInput;
     window: WindowFragment | null;
-    boundInner: boolean;
   }): Promise<Record<string, unknown>[]> {
     const client = await this.clientFor(parsed.tenantId);
     const result = await client.query({
+      // ID_BOUND_SKIP: a fold read-back's own window, on the outer read only (ADR-071).
       query: `
         SELECT * FROM ${SLIM_TABLE}
         WHERE TenantId = {tenantId:String}
@@ -272,11 +230,9 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
             FROM ${SLIM_TABLE}
             WHERE TenantId = {tenantId:String}
               AND EvaluationId = {evaluationId:String}
-              ${boundInner ? (window?.sqlFor("OccurredAt") ?? "") : ""}
             GROUP BY TenantId, EvaluationId
           )
-        ORDER BY OccurredAt DESC, CompletedAt DESC, StartedAt DESC,
-          length(AppliedEventIds) DESC
+        ${LATEST_ORDER}
         LIMIT 1
       `,
       query_params: {
@@ -289,12 +245,44 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
     return result.json();
   }
 
-  async fillIdIndexes(input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
-    const { clickhouse } = this;
-    if (clickhouse === undefined) {
+  /** The latest row by id, bounded by the evaluation id index once ready (id-index plan §4). */
+  private async readById({
+    parsed,
+    idBound,
+  }: {
+    parsed: AnalyticsEvaluationReadInput;
+    idBound: IdBoundOptions;
+  }): Promise<Record<string, unknown>[]> {
+    const { rows } = await this.routed().query<Record<string, unknown>>({
+      tenantId: parsed.tenantId,
+      sql: `
+        SELECT * FROM ${SLIM_TABLE}
+        WHERE TenantId = {tenantId:String}
+          AND EvaluationId = {evaluationId:String}
+          {{idBound:evaluation_analytics.EvaluationId:evaluationId}}
+          AND (TenantId, EvaluationId, UpdatedAt) IN (
+            SELECT TenantId, EvaluationId, max(UpdatedAt)
+            FROM ${SLIM_TABLE}
+            WHERE TenantId = {tenantId:String}
+              AND EvaluationId = {evaluationId:String}
+              {{idBound:evaluation_analytics.EvaluationId:evaluationId}}
+            GROUP BY TenantId, EvaluationId
+          )
+        ${LATEST_ORDER}
+        LIMIT 1
+      `,
+      params: { tenantId: parsed.tenantId, evaluationId: parsed.evaluationId },
+      table: SLIM_TABLE,
+      idBound,
+    });
+    return rows;
+  }
+
+  private routed(): ClickHouseQueryClient {
+    if (this.clickhouse === undefined) {
       throw new Error("This analytics repository was composed without a routed ClickHouse client");
     }
-    return fillOwnerIdIndexes({ ...input, clickhouse, indexes: ANALYTICS_ID_INDEXES });
+    return this.clickhouse;
   }
 
   async appendRollup(input: AnalyticsEvaluationRollupAppendInput): Promise<void> {

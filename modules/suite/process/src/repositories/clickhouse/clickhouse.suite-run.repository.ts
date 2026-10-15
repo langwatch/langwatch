@@ -1,9 +1,4 @@
-import {
-  type ClickHouseQueryClient,
-  type IdIndexFlags,
-  indexedRead,
-  type WindowFragment,
-} from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   classifyClickHouseError,
   createTenantId,
@@ -30,8 +25,6 @@ type SuiteRunClickHouseRepositoryOptions = {
   clickhouse: ClickHouseQueryClient;
   /** Read at write time: the owner answers only once the process is running. */
   defaultRetentionDays: () => number;
-  /** The module's id-index readiness; absent reads a run with no time bound, as before. */
-  idIndex?: IdIndexFlags | undefined;
 };
 
 const TABLE_NAME = "suite_runs" as const;
@@ -54,25 +47,13 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
     EventUtils.validateTenantId(context, "SuiteRunStateRepositoryClickHouse.findProjection");
     try {
       const tenantId = String(context.tenantId);
-      const rows = await indexedRead<Record<string, unknown>[]>({
-        client: this.options.clickhouse,
-        idIndex: this.options.idIndex,
+      const { rows } = await this.options.clickhouse.query<Record<string, unknown>>({
         tenantId,
+        sql: ClickHouseSuiteRunRepository.projectionQuery(),
+        params: { tenantId, batchRunId: aggregateId },
         table: TABLE_NAME,
-        index: `${TABLE_NAME}_id_index`,
-        key: { BatchRunId: aggregateId },
-        fallback: "unbounded",
-        isEmpty: (found) => found.length === 0,
-        run: async (window) =>
-          (
-            await this.options.clickhouse.query<Record<string, unknown>>({
-              tenantId,
-              sql: ClickHouseSuiteRunRepository.projectionQuery(window),
-              params: { tenantId, batchRunId: aggregateId, ...window?.params },
-              table: TABLE_NAME,
-              kind: "read",
-            })
-          ).rows,
+        kind: "read",
+        idBound: { fallback: "unbounded" },
       });
       const row = rows[0];
       if (!row) return null;
@@ -243,7 +224,8 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
     });
   }
 
-  private static projectionQuery(window: WindowFragment | null): string {
+  /** The latest run row by batch id, bounded by the run id index once ready. */
+  private static projectionQuery(): string {
     return `
       SELECT
         t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
@@ -262,13 +244,13 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
       FROM suite_runs AS t
       WHERE t.TenantId = {tenantId:String}
         AND t.BatchRunId = {batchRunId:String}
-        ${window?.sqlFor("t.StartedAt") ?? ""}
+        {{idBound:suite_runs.BatchRunId:batchRunId:t}}
         AND (t.TenantId, t.BatchRunId, t.UpdatedAt) IN (
           SELECT TenantId, BatchRunId, max(UpdatedAt)
           FROM suite_runs
           WHERE TenantId = {tenantId:String}
             AND BatchRunId = {batchRunId:String}
-            ${window?.sqlFor("StartedAt") ?? ""}
+            {{idBound:suite_runs.BatchRunId:batchRunId}}
           GROUP BY TenantId, BatchRunId
         )
       LIMIT 1

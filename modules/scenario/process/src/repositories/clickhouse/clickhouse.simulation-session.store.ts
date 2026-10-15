@@ -2,9 +2,7 @@ import type { ClickHouseSettings } from "@clickhouse/client";
 import {
   type ClickHouseColumns,
   type ClickHouseQueryClient,
-  type IdIndexBounds,
-  type IdIndexLookup,
-  type IdIndexReader,
+  type IdBoundOptions,
 } from "@langwatch/clickhouse-client";
 
 type SimulationEventingClickHouseClient = {
@@ -13,6 +11,8 @@ type SimulationEventingClickHouseClient = {
     query_params: Record<string, unknown>;
     format: "JSONEachRow";
     clickhouse_settings?: ClickHouseSettings;
+    /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
+    idBound?: IdBoundOptions;
   }): Promise<{ json<Row>(): Promise<Row[]> }>;
   insert(input: {
     table: string;
@@ -22,7 +22,7 @@ type SimulationEventingClickHouseClient = {
   }): Promise<unknown>;
   /** Absent on a bare driver client (tests): every column is then named. */
   select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
-} & Partial<IdIndexReader>;
+};
 
 export type SimulationEventingClickHouseResolver = (
   tenantId: string,
@@ -47,19 +47,10 @@ export class ClickHouseSimulationSession implements SimulationEventingClickHouse
       sql: input.query,
       params: input.query_params,
       ...(input.clickhouse_settings ? { settings: settingsOf(input.clickhouse_settings) } : {}),
+      ...(input.idBound === undefined ? {} : { idBound: input.idBound }),
     };
 
     return { json: async <Row>() => (await this.clickhouse.query<Row>(request)).rows };
-  }
-
-  /** The target this session's tenant lands on, which keys the module's id-index readiness. */
-  targetOf(_input: { tenantId: string }): Promise<string> {
-    return this.clickhouse.targetOf({ tenantId: this.tenantId });
-  }
-
-  /** The time range one id's rows span, from this session's tenant's id index. */
-  indexBounds(input: IdIndexLookup & { tenantId: string }): Promise<IdIndexBounds> {
-    return this.clickhouse.indexBounds({ ...input, tenantId: this.tenantId });
   }
 
   /** A select list naming only the columns this tenant's target has, the rest as defaults. */

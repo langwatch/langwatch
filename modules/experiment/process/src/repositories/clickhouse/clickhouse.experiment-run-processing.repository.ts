@@ -1,4 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type { AppendStore } from "@langwatch/eventing";
 
 import { ExperimentRunItemStore } from "../../eventing/experiment-run-item.store.ts";
@@ -20,22 +19,16 @@ import { ClickHouseExperimentRunStateRepository } from "./clickhouse.experiment-
  * pipeline reads and writes through.
  */
 export class ClickHouseExperimentRunProcessingRepository {
-  private constructor(
-    private readonly clickhouse: ExperimentClickHouseRepository | null,
-    private readonly idIndex: IdIndexFlags | undefined,
-  ) {}
+  private constructor(private readonly clickhouse: ExperimentClickHouseRepository | null) {}
 
   static create(input: {
     resolveClient: ExperimentEventingClickHouseResolver;
     clickhouseEnabled: boolean;
-    /** The module's id-index readiness; absent reads runs with no time bound, as before. */
-    idIndex?: IdIndexFlags | undefined;
   }): ClickHouseExperimentRunProcessingRepository {
     return new ClickHouseExperimentRunProcessingRepository(
       input.clickhouseEnabled
         ? ClickhouseExperimentClickHouseRepository.create(input.resolveClient)
         : null,
-      input.idIndex,
     );
   }
 
@@ -44,7 +37,6 @@ export class ClickHouseExperimentRunProcessingRepository {
       ? ClickHouseExperimentRunStateRepository.create({
           clickhouse: this.clickhouse,
           defaultRetentionDays: input.defaultRetentionDays,
-          idIndex: this.idIndex,
         })
       : MemoryExperimentRunStateRepository.create();
   }
@@ -53,7 +45,6 @@ export class ClickHouseExperimentRunProcessingRepository {
     return this.clickhouse
       ? ClickHouseExperimentIdLookupRepository.create({
           clickhouse: this.clickhouse,
-          idIndex: this.idIndex,
         })
       : MemoryExperimentIdLookupRepository.create();
   }

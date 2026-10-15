@@ -1,13 +1,18 @@
 import { ForgedAuthorizationError } from "@langwatch/authorization";
-import { AuthorizedClickHouse, type QueryRequest } from "@langwatch/clickhouse-client";
+import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
+import {
+  idIndexedClientDouble,
+  type ScriptedStatements,
+} from "@langwatch/clickhouse-client/testing";
 import { createTenantId, SecurityError } from "@langwatch/eventing";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import type { SpanInsertData } from "@langwatch/trace-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { createTestSpan } from "../../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { SpanStorageStore } from "../../../eventing/span-storage.store.ts";
+import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
@@ -404,15 +409,18 @@ class QueryingClickHouse {
   readonly authorized = new AuthorizedClickHouse({
     resolveClient: async (tenantId?: string) => {
       this.resolvedTenants.push(tenantId);
-      return clickHouseQueryClientDouble({
-        query: async (request: QueryRequest) => {
-          if (this.refuseWith) throw this.refuseWith;
-          this.queries.push({
-            query: request.sql,
-            params: request.params ?? {},
-            settings: request.settings,
-          });
-          return { rows: this.rows };
+      return idIndexedClientDouble({
+        indexes: TRACE_ID_INDEXES,
+        driver: {
+          execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
+            if (this.refuseWith) throw this.refuseWith;
+            this.queries.push({
+              query: request.sql,
+              params: request.params ?? {},
+              settings: request.settings,
+            });
+            return { rows: this.rows };
+          }),
         },
       });
     },
@@ -472,9 +480,11 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
 
       expect(clickhouse.queries).toHaveLength(1);
       const [read] = clickhouse.queries;
-      expect(read?.query).toContain("StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})");
-      expect(read?.params.fromMs).toBe(1_700_000_000_000 - 2 * 24 * 60 * 60 * 1000);
-      expect(read?.params.toMs).toBe(1_700_000_000_000 + 2 * 24 * 60 * 60 * 1000);
+      expect(read?.query).toContain(
+        "StartTime >= fromUnixTimestamp64Milli({idBound_fromMs:Int64})",
+      );
+      expect(read?.params.idBound_fromMs).toBe(1_700_000_000_000 - 2 * 24 * 60 * 60 * 1000);
+      expect(read?.params.idBound_toMs).toBe(1_700_000_000_000 + 2 * 24 * 60 * 60 * 1000);
     });
 
     /** @scenario "The referenced span is read back inside its own partition window" */
@@ -578,7 +588,7 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       expect(foundSpan).toBeNull();
       expect(clickhouse.queries).toHaveLength(1);
       expect(clickhouse.queries[0]?.query).toContain(
-        "StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})",
+        "StartTime >= fromUnixTimestamp64Milli({idBound_fromMs:Int64})",
       );
     });
   });

@@ -1,4 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   RepositoryFoldStore,
   type FoldProjectionStore,
@@ -85,8 +84,6 @@ export class SimulationRunStateStore implements ProjectionStore {
           type: "clickhouse";
           resolveClient: SimulationEventingClickHouseResolver;
           defaultRetentionDays: () => number;
-          /** The module's id-index readiness; absent reads the run with no time bound. */
-          idIndex?: IdIndexFlags | undefined;
         }
       | { type: "memory"; runs?: MemorySimulationRunStateRepository<SimulationRunState> },
   ): SimulationRunStateStore {

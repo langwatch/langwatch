@@ -1,7 +1,6 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
-  type IdIndexFlags,
   queryWindowed,
   type TenantScopedReader,
   tenantScope,
@@ -17,11 +16,7 @@ import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionRead,
 } from "../trace-analytics-projection.repository.ts";
-import { TRACE_ANALYTICS_ID_INDEX } from "./clickhouse.trace-id-index-fill.repository.ts";
-import { ClickHouseTraceIdIndexReadRepository } from "./clickhouse.trace-id-index-read.repository.ts";
 import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
-
-const TRACE_ID_INDEX_READS = ClickHouseTraceIdIndexReadRepository.create();
 
 const analyticsRecordRowsSchema = z.array(z.record(z.string(), z.unknown()));
 
@@ -225,35 +220,16 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
     authorization,
     traceId,
     window,
-    idIndex,
   }: {
     authorization: Authorization;
     traceId: string;
     window?: { fromMs: number; toMs: number };
-    idIndex?: IdIndexFlags | undefined;
   }): Promise<TraceAnalyticsProjectionRead | null> {
     try {
       // No window: the index's range (once ready) bounds the inner dedup too, since it covers every
       // version's OccurredAt; flag off, this is today's unbounded read.
       if (window === undefined) {
-        return await TRACE_ID_INDEX_READS.read<TraceAnalyticsProjectionRead | null>({
-          authorization,
-          reader: this.reader(authorization),
-          idIndex,
-          table: TABLE_NAME,
-          index: TRACE_ANALYTICS_ID_INDEX,
-          traceId,
-          occurredAtMs: undefined,
-          fallback: "none",
-          isEmpty: (result) => result === null,
-          run: (fragment) =>
-            this.queryLatestVersion({
-              authorization,
-              traceId,
-              window: fragment ? { fromMs: fragment.fromMs, toMs: fragment.toMs } : undefined,
-              boundInner: true,
-            }),
-        });
+        return await this.queryLatestVersionById({ authorization, traceId });
       }
       return await queryWindowed<{
         row: TraceAnalyticsRow;
@@ -300,20 +276,56 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
           toString(AppliedEventIds) DESC`;
 
   /**
+   * {@link findByTraceId} with no window: the trace_analytics index's range bounds the inner
+   * dedup too, since it covers every version's OccurredAt; before it is ready, today's unbounded
+   * read. The fold executor owns the miss retry, so nothing widens here.
+   */
+  private async queryLatestVersionById({
+    authorization,
+    traceId,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<TraceAnalyticsProjectionRead | null> {
+    const result = await this.reader(authorization).query({
+      query: `
+        SELECT *
+        FROM ${TABLE_NAME}
+        WHERE ${tenantScope("OccurredAt")}
+          AND TraceId = {traceId:String}
+          {{idBound:trace_analytics.TraceId:traceId}}
+          AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE ${tenantScope("OccurredAt")}
+              AND TraceId = {traceId:String}
+              {{idBound:trace_analytics.TraceId:traceId}}
+            GROUP BY TenantId, TraceId
+          )
+        ${TraceAnalyticsClickHouseRepository.LATEST_VERSION_ORDER}
+        LIMIT 1
+      `,
+      query_params: { traceId },
+      format: "JSONEachRow",
+      idBound: { fallback: "none" },
+    });
+    return TraceAnalyticsClickHouseRepository.latestOf(
+      analyticsRecordRowsSchema.parse(await result.json()),
+    );
+  }
+
+  /**
    * One ClickHouse attempt for {@link findByTraceId}. Dedups with the IN-tuple pattern, never
-   * FINAL. A caller's `window` bounds the outer read only (ADR-071); `boundInner` bounds the
-   * inner dedup too, for a window known to hold every version (an id-index range).
+   * FINAL. A caller's `window` bounds the outer read only (ADR-071).
    */
   private async queryLatestVersion({
     authorization,
     traceId,
     window,
-    boundInner = false,
   }: {
     authorization: Authorization;
     traceId: string;
     window?: { fromMs: number; toMs: number };
-    boundInner?: boolean;
   }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null> {
     const client = this.reader(authorization);
 
@@ -321,9 +333,9 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       window !== undefined
         ? "AND OccurredAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})"
         : "";
-    const innerFilter = boundInner ? partitionFilter : "";
 
     const result = await client.query({
+      // ID_BOUND_SKIP: a fold read-back's own window, on the outer read only (ADR-071).
       query: `
         SELECT *
         FROM ${TABLE_NAME}
@@ -335,7 +347,6 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
             FROM ${TABLE_NAME}
             WHERE ${tenantScope("OccurredAt")}
               AND TraceId = {traceId:String}
-              ${innerFilter}
             GROUP BY TenantId, TraceId
           )
         ${TraceAnalyticsClickHouseRepository.LATEST_VERSION_ORDER}
@@ -348,7 +359,14 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       format: "JSONEachRow",
     });
 
-    const rows = analyticsRecordRowsSchema.parse(await result.json());
+    return TraceAnalyticsClickHouseRepository.latestOf(
+      analyticsRecordRowsSchema.parse(await result.json()),
+    );
+  }
+
+  private static latestOf(
+    rows: readonly Record<string, unknown>[],
+  ): { row: TraceAnalyticsRow; appliedEventIds: string[] } | null {
     const record = rows[0];
     if (!record) return null;
     return {

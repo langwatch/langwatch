@@ -1,4 +1,4 @@
-import type { ClickHouseQueryClient, IdIndexFlags } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 import type {
   SuiteEventingCapabilities,
@@ -10,7 +10,6 @@ type ClickHouseSuiteEventingRepositoryOptions = {
   /** The process's one ClickHouse client, which routes each statement itself. */
   clickhouse: ClickHouseQueryClient;
   defaultRetentionDays: () => number;
-  idIndex?: IdIndexFlags | undefined;
 };
 
 /** Builds Suite's ClickHouse projection capability for replay processes. */
@@ -28,7 +27,6 @@ export class ClickhouseSuiteEventingRepository implements SuiteEventingRepositor
       suiteRunState: ClickHouseSuiteRunRepository.create({
         clickhouse: this.options.clickhouse,
         defaultRetentionDays: this.options.defaultRetentionDays,
-        idIndex: this.options.idIndex,
       }),
     };
   }

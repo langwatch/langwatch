@@ -13,8 +13,8 @@ import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts
 import { traceProjectMilestonesEventing } from "./eventing/trace-project-milestones.pipeline.ts";
 import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing/trace-collector-evaluations.pipeline.ts";
 import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
+import { TRACE_ID_INDEXES } from "./repositories/clickhouse/clickhouse.trace-id-indexes.database.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
-import { TraceIdIndexFillService } from "./services/trace-id-index-fill.service.ts";
 import { TraceIndexMaterialisationService } from "./services/trace-index-materialisation.service.ts";
 import { traceMonthIdsReportSchema } from "./services/trace-month-ids-migration.service.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
@@ -81,7 +81,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
     .withEventing(traceProjectMilestonesEventing)
     .withEventing(traceCollectorEvaluationsEventing)
     .withEventing(traceIngestSourceBillingEventing)
-    .withMigrations(({ app, repositories, dependencies }) => [
+    .withMigrations(({ app, repositories }) => [
       defineMigrationStep({
         id: "trace:track-updated-at-index-materialisation",
         kind: "data",
@@ -116,18 +116,8 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
           });
         },
       }),
-      defineMigrationStep({
-        id: "trace:fill-id-indexes",
-        kind: "data",
-        mode: "background",
-        description:
-          "Fills the trace id indexes from rows older than their views, then marks them ready.",
-        // Old releases fire the server-side views too, so no writer has to be gone.
-        needsOldWritersGone: false,
-        run: ({ checkpoint, dryRun, signal }) =>
-          TraceIdIndexFillService.create({
-            indexes: repositories.idIndexFill,
-            dataRetention: dependencies.dataRetention,
-          }).fill({ checkpoint, dryRun, signal }),
-      }),
-    ]);
+    ])
+    .withIdIndexes(TRACE_ID_INDEXES, {
+      description:
+        "Fills the trace id indexes from rows older than their views, then marks them ready.",
+    });

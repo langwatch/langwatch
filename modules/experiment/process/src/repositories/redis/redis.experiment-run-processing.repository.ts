@@ -1,4 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   type AppendStore,
   type FoldProjectionStore,
@@ -32,8 +31,6 @@ type ClickHouseExperimentRunProcessingAdapterOptions = {
    * The cache's consistency TTL, as the process resolved it.
    */
   foldCacheTtlSeconds?: number;
-  /** The module's id-index readiness; absent reads a run's state with no time bound, as before. */
-  idIndex?: IdIndexFlags | undefined;
 };
 
 /**
@@ -56,7 +53,6 @@ export class RedisExperimentRunProcessingRepository {
         repository: ClickHouseExperimentRunStateRepository.create({
           clickhouse: this.clickHouse(),
           defaultRetentionDays: this.options.defaultRetentionDays,
-          idIndex: this.options.idIndex,
         }),
       }),
       this.options.redis,

@@ -3,7 +3,6 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SuiteServerConfig } from "@langwatch/suite-contract";
 import type { Cluster, Redis } from "ioredis";
 
-import { SuiteIdIndexFillClickHouseRepository } from "../clickhouse/clickhouse.suite-id-index-fill.repository.ts";
 import { RedisSuiteRunProcessingRepository } from "../redis/redis.suite-run-processing.repository.ts";
 import type { SuiteRepositories } from "../suite.repositories.ts";
 import { PrismaSuiteRepository } from "./prisma.suite.repository.ts";
@@ -30,7 +29,6 @@ export const PostgresSuiteRepositories = {
         redis,
         foldCacheTtlSeconds: config.foldCacheTtlSeconds,
       }),
-      idIndexFill: SuiteIdIndexFillClickHouseRepository.create({ clickhouse }),
     };
   },
 };

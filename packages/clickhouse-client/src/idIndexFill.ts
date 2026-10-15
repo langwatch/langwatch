@@ -3,7 +3,11 @@
  * §3): per target, table and partition newest first, one `INSERT … SELECT` per (partition,
  * tenant range) batch, a cursor saved after each. Knows nothing of the upgrade system.
  */
-import { assertIdentifier, SHARED_CLICKHOUSE_TARGET } from "./idIndexFlags.ts";
+import {
+  assertIdentifier,
+  type IdIndexTimeFormat,
+  SHARED_CLICKHOUSE_TARGET,
+} from "./idIndexFlags.ts";
 import { writeIdIndexMarker } from "./idIndexReadiness.ts";
 import type { QueryRequest, QueryResult } from "./query.ts";
 
@@ -20,7 +24,43 @@ export type IdIndexDeclaration = Readonly<{
   retentionAnchor: string;
   retention: "copied" | "none";
   filter?: string | undefined;
+  /** How the source's `time` and the index's `FromAt`/`ToAt` are stored; `DateTime64` default. */
+  timeFormat?: IdIndexTimeFormat | undefined;
 }>;
+
+/**
+ * Declares one id index the way its goose file creates it: named `<source>_id_index`, expiring
+ * on `time` and copying the source's `_retention_days` unless told otherwise.
+ */
+export function defineIdIndex({
+  source,
+  key,
+  time,
+  retentionAnchor = time,
+  retention = "copied",
+  filter,
+  timeFormat,
+}: {
+  source: string;
+  key: readonly string[];
+  time: string;
+  retentionAnchor?: string | undefined;
+  retention?: "copied" | "none" | undefined;
+  filter?: string | undefined;
+  timeFormat?: IdIndexTimeFormat | undefined;
+}): IdIndexDeclaration {
+  if (key.length === 0) throw new Error(`The id index over ${source} names no key column.`);
+  return {
+    source: assertIdentifier({ name: source }),
+    index: `${source}_id_index`,
+    key: key.map((column) => assertIdentifier({ name: column })),
+    time: assertIdentifier({ name: time }),
+    retentionAnchor: assertIdentifier({ name: retentionAnchor }),
+    retention,
+    ...(filter === undefined ? {} : { filter }),
+    ...(timeFormat === undefined ? {} : { timeFormat }),
+  };
+}
 
 /** A ClickHouse server the fill visits: one per URL; its markers serve each organisation on it. */
 export type IdIndexFillTarget = Readonly<{
@@ -42,7 +82,10 @@ export interface IdIndexFillCheckpoint {
   save(args: { report: IdIndexFillReport }): Promise<void>;
 }
 
-/** The last committed batch. A whole-partition batch has no upper tenant bound. */
+/**
+ * The last committed batch. A whole-partition batch has no upper tenant bound; `throughKey` is
+ * set while a tenant split by key range is part way, and absent once all of it is committed.
+ */
 export type IdIndexFillCursor = {
   target: string;
   table: string;
@@ -51,6 +94,7 @@ export type IdIndexFillCursor = {
   throughTenantId: string | null;
   slice: number;
   slices: number;
+  throughKey?: string[] | undefined;
 };
 
 /** The step's report, replaced whole on each save; `done`/`total` count partitions. */
@@ -82,7 +126,7 @@ export type FillIdIndexesOptions = {
   sleep?: ((ms: number) => Promise<void>) | undefined;
 };
 
-export const DEFAULT_ID_INDEX_BATCH_ROWS = 20_000_000;
+export const DEFAULT_ID_INDEX_BATCH_ROWS = 5_000_000;
 const MIN_ID_INDEX_BATCH_ROWS = 250_000;
 /** A partition with parts on the cold volume starts at a quarter of the batch: S3 reads slower. */
 const COLD_BATCH_DIVISOR = 4;
@@ -99,8 +143,22 @@ const FILL_SETTINGS = {
   max_bytes_before_external_group_by: 2_000_000_000,
 } as const;
 
-/** One batch of one partition: a tenant range, and a hash slice of a tenant above the size. */
-type Batch = Pick<IdIndexFillCursor, "afterTenantId" | "throughTenantId" | "slice" | "slices">;
+/**
+ * One batch of one partition: a tenant range; for a tenant above the size, either a hash slice
+ * of it or (`byKey`, where the key leads the source's sort key) its rows in key ranges.
+ */
+type Batch = Pick<IdIndexFillCursor, "afterTenantId" | "throughTenantId" | "slice" | "slices"> & {
+  byKey?: true | undefined;
+};
+
+/** How a tenant above the batch size is split: key ranges read each row once, hash slices not. */
+export type IdIndexTenantSplit = "key" | "hash";
+
+/** One `byKey` batch's key range: after the last committed key, through the next boundary. */
+export type IdIndexKeyRange = {
+  after: readonly string[] | null;
+  through: readonly string[] | null;
+};
 
 type Partition = { partition: string; rows: number; cold?: boolean | undefined };
 
@@ -126,27 +184,34 @@ export function planBatches({
   partition,
   tenants,
   batchRows,
+  split = "hash",
 }: {
   partition: Partition;
   tenants: readonly { tenantId: string; rows: number }[] | null;
   batchRows: number;
+  split?: IdIndexTenantSplit;
 }): Batch[] {
   if (tenants === null || partition.rows <= batchRows) {
     return [{ afterTenantId: "", throughTenantId: null, slice: 0, slices: 1 }];
   }
-  const packer = new TenantPacker(batchRows);
+  const packer = new TenantPacker({ batchRows, split });
   for (const tenant of tenants) packer.add(tenant);
   return packer.finish();
 }
 
-/** Consecutive tenants share a range; a tenant above the size gets hash slices of its own. */
+/** Consecutive tenants share a range; a tenant above the size is split on its own. */
 class TenantPacker {
   private readonly batches: Batch[] = [];
   private after = "";
   private pending = 0;
   private last: string | undefined;
+  private readonly batchRows: number;
+  private readonly split: IdIndexTenantSplit;
 
-  constructor(private readonly batchRows: number) {}
+  constructor({ batchRows, split }: { batchRows: number; split: IdIndexTenantSplit }) {
+    this.batchRows = batchRows;
+    this.split = split;
+  }
 
   add({ tenantId, rows }: { tenantId: string; rows: number }): void {
     if (rows > this.batchRows) {
@@ -165,6 +230,18 @@ class TenantPacker {
 
   private slice({ tenantId, rows }: { tenantId: string; rows: number }): void {
     this.close();
+    if (this.split === "key") {
+      this.batches.push({
+        afterTenantId: this.after,
+        throughTenantId: tenantId,
+        slice: 0,
+        slices: 1,
+        byKey: true,
+      });
+      this.after = tenantId;
+      this.last = tenantId;
+      return;
+    }
     const slices = Math.ceil(rows / this.batchRows);
     for (let slice = 0; slice < slices; slice += 1) {
       this.batches.push({ afterTenantId: this.after, throughTenantId: tenantId, slice, slices });
@@ -186,18 +263,140 @@ class TenantPacker {
   }
 }
 
-/** Whether `batch` was committed at or before `cursor` in the same partition's walk. */
+/**
+ * Whether `batch` was committed at or before `cursor` in the same partition's walk. A key-split
+ * tenant is committed once its last range is; a cursor from the other split redoes the tenant,
+ * which changes no range (`min`/`max` merge).
+ */
 function isCommitted({ batch, cursor }: { batch: Batch; cursor: IdIndexFillCursor }): boolean {
   if (cursor.throughTenantId === null) return true;
   if (batch.throughTenantId === null) return false;
   if (batch.throughTenantId !== cursor.throughTenantId) {
     return batch.throughTenantId < cursor.throughTenantId;
   }
-  return batch.slices === cursor.slices && batch.slice <= cursor.slice;
+  if (batch.byKey === true) return cursor.slices === 1 && cursor.throughKey === undefined;
+  return (
+    cursor.throughKey === undefined && batch.slices === cursor.slices && batch.slice <= cursor.slice
+  );
+}
+
+/** Where a key-split tenant resumes: after the last key its cursor committed, else its start. */
+function resumeKeyOf({
+  batch,
+  cursor,
+}: {
+  batch: Batch;
+  cursor: IdIndexFillCursor | null;
+}): readonly string[] | null {
+  if (cursor === null || cursor.throughTenantId !== batch.throughTenantId) return null;
+  return cursor.throughKey ?? null;
+}
+
+/**
+ * The lexicographic comparison of the key columns with bound values, spelt column by column so
+ * the primary index prunes on it: `>` past `after`, `<=` up to `through`.
+ */
+function keyComparison({
+  key,
+  values,
+  op,
+  param,
+}: {
+  key: readonly string[];
+  values: readonly string[];
+  op: ">" | "<=";
+  param: string;
+}): { sql: string; params: Record<string, unknown> } {
+  if (values.length !== key.length) {
+    throw new Error(`A key range names ${values.length} values for ${key.length} key columns.`);
+  }
+  const params: Record<string, unknown> = {};
+  const slot = (position: number) => `{${param}${position}:String}`;
+  key.forEach((_column, position) => {
+    params[`${param}${position}`] = values[position];
+  });
+  const strict = op === ">" ? ">" : "<";
+  const branches = key.map((column, position) => {
+    const equal = key.slice(0, position).map((prefix, at) => `${prefix} = ${slot(at)}`);
+    const last = position === key.length - 1 && op === "<=" ? "<=" : strict;
+    return [...equal, `${column} ${last} ${slot(position)}`].join(" AND ");
+  });
+  return { sql: `(${branches.map((branch) => `(${branch})`).join(" OR ")})`, params };
+}
+
+/** A batch's partition and tenant predicate, and for a key-split tenant its key range. */
+function batchRange({
+  key,
+  batch,
+  keyRange,
+}: {
+  key: readonly string[];
+  batch: Batch;
+  keyRange: IdIndexKeyRange | undefined;
+}): { where: string[]; params: Record<string, unknown> } {
+  const where = ["_partition_id = {partition:String}"];
+  const params: Record<string, unknown> = {};
+  if (keyRange === undefined || batch.throughTenantId === null) {
+    where.push("TenantId > {afterTenantId:String}");
+    params.afterTenantId = batch.afterTenantId;
+    if (batch.throughTenantId !== null) {
+      where.push("TenantId <= {throughTenantId:String}");
+      params.throughTenantId = batch.throughTenantId;
+    }
+    return { where, params };
+  }
+  where.push("TenantId = {throughTenantId:String}");
+  params.throughTenantId = batch.throughTenantId;
+  const ranges = [
+    { values: keyRange.after, op: ">" as const, param: "afterKey" },
+    { values: keyRange.through, op: "<=" as const, param: "throughKey" },
+  ];
+  for (const { values, op, param } of ranges) {
+    if (values === null) continue;
+    const comparison = keyComparison({ key, values, op, param });
+    where.push(comparison.sql);
+    Object.assign(params, comparison.params);
+  }
+  return { where, params };
+}
+
+/** The cursor a committed batch leaves; a key range not yet at its tenant's end keeps its key. */
+function cursorAfter({
+  target,
+  index,
+  partition,
+  batch,
+  keyRange,
+}: {
+  target: IdIndexFillTarget;
+  index: IdIndexDeclaration;
+  partition: Partition;
+  batch: Batch;
+  keyRange: IdIndexKeyRange | undefined;
+}): IdIndexFillCursor {
+  const through = keyRange?.through ?? null;
+  return {
+    target: target.key,
+    table: index.index,
+    partition: partition.partition,
+    afterTenantId: batch.afterTenantId,
+    throughTenantId: batch.throughTenantId,
+    slice: batch.slice,
+    slices: batch.slices,
+    ...(through === null ? {} : { throughKey: [...through] }),
+  };
 }
 
 /** The `INSERT … SELECT` one batch runs: the index rows of its tenants in one partition. */
-export function fillStatement({ index, batch }: { index: IdIndexDeclaration; batch: Batch }): {
+export function fillStatement({
+  index,
+  batch,
+  keyRange,
+}: {
+  index: IdIndexDeclaration;
+  batch: Batch;
+  keyRange?: IdIndexKeyRange | undefined;
+}): {
   sql: string;
   params: Record<string, unknown>;
 } {
@@ -219,12 +418,7 @@ export function fillStatement({ index, batch }: { index: IdIndexDeclaration; bat
   }
   columns.push("_retention_days");
   selected.push(`max(${retention}) AS _retention_days`);
-  const where = ["_partition_id = {partition:String}", "TenantId > {afterTenantId:String}"];
-  const params: Record<string, unknown> = { afterTenantId: batch.afterTenantId };
-  if (batch.throughTenantId !== null) {
-    where.push("TenantId <= {throughTenantId:String}");
-    params.throughTenantId = batch.throughTenantId;
-  }
+  const { where, params } = batchRange({ key, batch, keyRange });
   if (batch.slices > 1) {
     where.push(`cityHash64(${lastKey}) % {slices:UInt32} = {slice:UInt32}`);
     params.slices = batch.slices;
@@ -236,6 +430,18 @@ export function fillStatement({ index, batch }: { index: IdIndexDeclaration; bat
     `SELECT ${selected.join(", ")} FROM ${name(index.source)} ` +
     `WHERE ${where.join(" AND ")} GROUP BY ${["TenantId", ...key].join(", ")}`;
   return { sql, params };
+}
+
+/** Whether a `system.tables.sorting_key` (`TenantId, TraceId, SpanId`) starts with `columns`. */
+export function sortKeyLeadsWith({
+  sortingKey,
+  columns,
+}: {
+  sortingKey: string;
+  columns: readonly string[];
+}): boolean {
+  const sorted = sortingKey.split(",").map((column) => column.trim());
+  return columns.every((column, position) => sorted[position] === column);
 }
 
 const timer = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -282,6 +488,7 @@ function cursorOf(value: unknown): IdIndexFillCursor | null {
   if (partition === undefined || afterTenantId === undefined || throughTenantId === undefined) {
     return null;
   }
+  const throughKey = stringsOf(field("throughKey"));
   return {
     target,
     table,
@@ -290,6 +497,7 @@ function cursorOf(value: unknown): IdIndexFillCursor | null {
     throughTenantId,
     slice: numberOf(field("slice")),
     slices: Math.max(1, numberOf(field("slices"))),
+    ...(throughKey.length === 0 ? {} : { throughKey }),
   };
 }
 
@@ -446,19 +654,33 @@ class IdIndexFill {
     let batchRows = partition.cold
       ? Math.max(this.minBatchRows, Math.ceil(this.batchRows / COLD_BATCH_DIVISOR))
       : this.batchRows;
-    let tenants: { tenantId: string; rows: number }[] | null = null;
+    let sizing: {
+      tenants: { tenantId: string; rows: number }[];
+      split: IdIndexTenantSplit;
+    } | null = null;
     let committed = cursor;
     let failures = 0;
     for (;;) {
-      if (partition.rows > batchRows && tenants === null) {
-        tenants = await this.tenantsOf({ target, index, partition });
+      if (partition.rows > batchRows && sizing === null) {
+        sizing = await this.sizingOf({ target, index, partition });
       }
-      const next = planBatches({ partition, tenants, batchRows }).find(
-        (batch) => committed === null || !isCommitted({ batch, cursor: committed }),
-      );
+      const next = planBatches({
+        partition,
+        tenants: sizing?.tenants ?? null,
+        batchRows,
+        split: sizing?.split,
+      }).find((batch) => committed === null || !isCommitted({ batch, cursor: committed }));
       if (next === undefined) return true;
       if (this.options.signal.aborted) return false;
-      const attempt = await this.insertBatch({ target, index, partition, batch: next });
+      const keyRange = await this.keyRangeOf({
+        target,
+        index,
+        partition,
+        batch: next,
+        committed,
+        batchRows,
+      });
+      const attempt = await this.insertBatch({ target, index, partition, batch: next, keyRange });
       if (!attempt.ok) {
         const smaller = this.smallerBatch({ error: attempt.error, batchRows });
         // A halved batch is a fresh attempt; retries run out only at the floor.
@@ -467,12 +689,7 @@ class IdIndexFill {
         await this.backOff({ error: attempt.error, failures });
         continue;
       }
-      committed = {
-        target: target.key,
-        table: index.index,
-        partition: partition.partition,
-        ...next,
-      };
+      committed = cursorAfter({ target, index, partition, batch: next, keyRange });
       this.report.cursor = committed;
       this.report.batches += 1;
       failures = 0;
@@ -486,13 +703,15 @@ class IdIndexFill {
     index,
     partition,
     batch,
+    keyRange,
   }: {
     target: IdIndexFillTarget;
     index: IdIndexDeclaration;
     partition: Partition;
     batch: Batch;
+    keyRange: IdIndexKeyRange | undefined;
   }): Promise<{ ok: true } | { ok: false; error: unknown }> {
-    const statement = fillStatement({ index, batch });
+    const statement = fillStatement({ index, batch, keyRange });
     try {
       await this.options.statements.command({
         ...this.route(target),
@@ -560,6 +779,118 @@ class IdIndexFill {
       rows: Number(row.rows),
       cold: Number(row.cold ?? 0) > 0,
     }));
+  }
+
+  /** A partition's tenants by row count, and how one above the batch size is split. */
+  private async sizingOf({
+    target,
+    index,
+    partition,
+  }: {
+    target: IdIndexFillTarget;
+    index: IdIndexDeclaration;
+    partition: Partition;
+  }): Promise<{ tenants: { tenantId: string; rows: number }[]; split: IdIndexTenantSplit }> {
+    const tenants = await this.tenantsOf({ target, index, partition });
+    return { tenants, split: await this.splitOf({ target, index }) };
+  }
+
+  /** The key range a `byKey` batch reads next, resuming after its cursor; none for the others. */
+  private async keyRangeOf({
+    target,
+    index,
+    partition,
+    batch,
+    committed,
+    batchRows,
+  }: {
+    target: IdIndexFillTarget;
+    index: IdIndexDeclaration;
+    partition: Partition;
+    batch: Batch;
+    committed: IdIndexFillCursor | null;
+    batchRows: number;
+  }): Promise<IdIndexKeyRange | undefined> {
+    if (batch.byKey !== true) return undefined;
+    const after = resumeKeyOf({ batch, cursor: committed });
+    return this.nextKeyRange({ target, index, partition, batch, after, batchRows });
+  }
+
+  /** Key ranges where the key leads the source's sort key after `TenantId`; hash slices else. */
+  private async splitOf({
+    target,
+    index,
+  }: {
+    target: IdIndexFillTarget;
+    index: IdIndexDeclaration;
+  }): Promise<IdIndexTenantSplit> {
+    const result = await this.options.statements.query<{ sorting_key?: unknown }>({
+      ...this.route(target),
+      sql:
+        "SELECT sorting_key FROM system.tables " +
+        "WHERE database = currentDatabase() AND name = {source:String}",
+      params: { source: assertIdentifier({ name: index.source }) },
+      table: "system.tables",
+      // The table list describes the server, which no tenant owns.
+      SKIP_TENANT_CHECK: true,
+    });
+    const sortingKey = result.rows[0]?.sorting_key;
+    return typeof sortingKey === "string" &&
+      sortKeyLeadsWith({ sortingKey, columns: ["TenantId", ...index.key] })
+      ? "key"
+      : "hash";
+  }
+
+  /**
+   * The next key range of a key-split tenant: after the last committed key, through the key
+   * `batchRows` rows on, read in sort order so only the key column of those rows is read. The
+   * last range is open: fewer than `batchRows` rows remain.
+   */
+  private async nextKeyRange({
+    target,
+    index,
+    partition,
+    batch,
+    after,
+    batchRows,
+  }: {
+    target: IdIndexFillTarget;
+    index: IdIndexDeclaration;
+    partition: Partition;
+    batch: Batch;
+    after: readonly string[] | null;
+    batchRows: number;
+  }): Promise<IdIndexKeyRange> {
+    const key = index.key.map((column) => assertIdentifier({ name: column }));
+    const where = ["_partition_id = {partition:String}", "TenantId = {tenantId:String}"];
+    const params: Record<string, unknown> = {
+      partition: partition.partition,
+      tenantId: batch.throughTenantId,
+    };
+    if (after !== null) {
+      const comparison = keyComparison({ key, values: after, op: ">", param: "afterKey" });
+      where.push(comparison.sql);
+      Object.assign(params, comparison.params);
+    }
+    const result = await this.options.statements.query<Record<string, unknown>>({
+      ...this.route(target),
+      sql:
+        `SELECT ${key.join(", ")} FROM ${assertIdentifier({ name: index.source })} ` +
+        `WHERE ${where.join(" AND ")} ORDER BY ${key.join(", ")} LIMIT 1 OFFSET ${Math.max(0, Math.floor(batchRows) - 1)}`,
+      params,
+      table: index.source,
+      // Sizes one tenant's next batch in a partition the fill reads for every tenant anyway.
+      SKIP_TENANT_CHECK: true,
+      // One partition's rows, named by its id rather than by time.
+      SKIP_COLD_SCAN_CHECK: true,
+    });
+    const [row] = result.rows;
+    if (row === undefined) return { after, through: null };
+    const through = key.map((column) => {
+      const value = row[column];
+      return typeof value === "string" ? value : "";
+    });
+    return { after, through };
   }
 
   private async tenantsOf({

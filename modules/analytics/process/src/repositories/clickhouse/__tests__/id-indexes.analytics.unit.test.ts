@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { ANALYTICS_ID_INDEXES } from "../clickhouse.analytics-persistence.repository.ts";
+import { ANALYTICS_ID_INDEXES } from "../clickhouse.analytics-id-indexes.database.ts";
 
 const MIGRATIONS = resolve(
   import.meta.dirname,

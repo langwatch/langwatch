@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 
 /**
- * Suite's declared id indexes against the goose file that creates them (goose 00116): each index
+ * Scenario's declared id indexes against the goose file that creates them (goose 00115): each index
  * the fill visits has a table keyed as declared, and a view that feeds it from the source's
  * own time column.
  */
@@ -10,11 +10,11 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { SUITE_ID_INDEXES } from "../clickhouse.suite-id-index-fill.repository.ts";
+import { SCENARIO_ID_INDEXES } from "../clickhouse.scenario-id-indexes.database.ts";
 
 const GOOSE = resolve(
   import.meta.dirname,
-  "../../../../../../../packages/clickhouse-migrations/migrations/00116_suite_id_indexes.sql",
+  "../../../../../../../packages/clickhouse-migrations/migrations/00115_scenario_id_indexes.sql",
 );
 
 /** The statement block that creates `name`, from its CREATE to its StatementEnd. */
@@ -25,12 +25,12 @@ function blockOf({ migration, create }: { migration: string; create: string }): 
   return migration.slice(start, end < 0 ? undefined : end);
 }
 
-describe("Suite id index declarations", () => {
+describe("Scenario id index declarations", () => {
   const migration = readFileSync(GOOSE, "utf8");
 
   describe("given the goose file that creates the indexes", () => {
     it("declares one table per index, keyed by tenant then the declared id columns", () => {
-      for (const declaration of SUITE_ID_INDEXES) {
+      for (const declaration of SCENARIO_ID_INDEXES) {
         const table = blockOf({
           migration,
           create: `CREATE TABLE IF NOT EXISTS \${CLICKHOUSE_DATABASE}.${declaration.index}\n`,
@@ -47,7 +47,7 @@ describe("Suite id index declarations", () => {
     });
 
     it("feeds each index from its source's own time column, grouped by the declared key", () => {
-      for (const declaration of SUITE_ID_INDEXES) {
+      for (const declaration of SCENARIO_ID_INDEXES) {
         const view = blockOf({
           migration,
           create: `CREATE MATERIALIZED VIEW IF NOT EXISTS \${CLICKHOUSE_DATABASE}.${declaration.index}_mv`,
@@ -74,7 +74,7 @@ describe("Suite id index declarations", () => {
         .toSorted((left, right) => left.localeCompare(right));
 
       expect(
-        SUITE_ID_INDEXES.map((declaration) => declaration.index).toSorted((left, right) =>
+        SCENARIO_ID_INDEXES.map((declaration) => declaration.index).toSorted((left, right) =>
           left.localeCompare(right),
         ),
       ).toEqual(created);
@@ -83,7 +83,7 @@ describe("Suite id index declarations", () => {
 
   describe("given each declared index", () => {
     it("copies its source's retention, so the fill raises it per target before the flag", () => {
-      expect(SUITE_ID_INDEXES.every((index) => index.retention === "copied")).toBe(true);
+      expect(SCENARIO_ID_INDEXES.every((index) => index.retention === "copied")).toBe(true);
     });
   });
 });
