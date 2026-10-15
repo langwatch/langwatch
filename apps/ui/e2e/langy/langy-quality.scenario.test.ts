@@ -17,9 +17,15 @@ import type { AgentAdapter, AgentInput, AgentReturnTypes } from "@langwatch/scen
 import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { deleteMonitor, listMonitors, seedApplicationTraces } from "./langwatch-api";
+import {
+  deleteMonitor,
+  listMonitors,
+  seedApplicationTraces,
+  seedStaleTraces,
+} from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import {
+  LANGY_EMPTY_WINDOW_CRITERIA,
   LANGY_NO_PHANTOM_CHECKOUT_CRITERIA,
   LANGY_OWNS_ITS_TOOLS_CRITERIA,
   LANGY_POLICY_BOUNDARY_CRITERIA,
@@ -355,6 +361,43 @@ describe("Langy quality bar", () => {
           .join(", ")}).`,
       ).toBeLessThan(SIMPLE_QUESTION_BUDGET_MS);
 
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+    }, 600_000);
+  });
+
+  /**
+   * #8735 — an empty time-bounded result answered "No X in last 24h.", which the
+   * user cannot tell from a broken Langy. Langy must look up the newest row in
+   * any window and say how old it is.
+   */
+  describe("when a time-bounded question finds nothing but older data exists", () => {
+    it("states how old the newest matching trace is and names a likely cause", async () => {
+      const label = `e2e-stale-${randomUUID().slice(0, 8)}`;
+      await seedStaleTraces({ label, ageMs: 8 * 60 * 60 * 1000 });
+
+      const langy = makeLangyAdapter();
+      const result = await runScenarioAndLog({
+        config: {
+          setId: SET_ID,
+          name: "empty window states the age of the newest data",
+          description:
+            "The project has traces under a unique label, all about 8 hours old. The user asks how many arrived in the last hour. The honest answer is none, plus when the newest one arrived and one likely cause. A bare 'none' or a claim that Langy cannot see the data is the failure under test.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({ model, criteria: LANGY_EMPTY_WINDOW_CRITERIA }),
+          ],
+          script: [
+            scenario.user(`how many traces labelled ${label} did I get in the last hour?`),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
+      });
+
+      const text = lastAssistantText(result);
+      expect(text).toMatch(/8\s*h|8 hours|eight hours/i);
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
     }, 600_000);

@@ -54,6 +54,28 @@ func TestAgentsTemplate_SaysHowToCount(t *testing.T) {
 	}
 }
 
+// A time-bounded query that finds nothing used to get the bare reply
+// "No X in last 24h.", which the user cannot tell from a broken Langy. The
+// empty-results rule now sends the agent to the newest matching row in any
+// window so the reply states its age, or says the data never arrived.
+//
+// @scenario "The prompt no longer answers an empty window with a bare line"
+func TestAgentsTemplate_EmptyWindowStatesDataAge(t *testing.T) {
+	tmpl, err := AgentsTemplate()
+	if err != nil {
+		t.Fatalf("AgentsTemplate: %v", err)
+	}
+	if strings.Contains(tmpl, `"No X in last 24h."`) {
+		t.Errorf(`AGENTS.md still tells the agent to answer an empty time-bounded result with the bare "No X in last 24h."`)
+	}
+	lower := strings.ToLower(tmpl)
+	for _, phrase := range []string{"newest", "never received"} {
+		if !strings.Contains(lower, phrase) {
+			t.Errorf("AGENTS.md empty-results rule never says %q, so an empty window cannot be told from a broken pipeline", phrase)
+		}
+	}
+}
+
 // The prompt has a byte budget so it cannot silently grow back into a rule
 // pile. It once reached 52,795 bytes by accreting one rule per observed
 // failure. A fix that needs the ceiling raised is a fix at the wrong layer:

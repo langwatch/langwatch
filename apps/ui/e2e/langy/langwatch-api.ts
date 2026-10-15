@@ -335,3 +335,56 @@ export async function seedApplicationTraces(count = 8): Promise<void> {
       "data scenarios would have graded an empty index as a wrong answer.",
   );
 }
+
+/**
+ * Seeds traces carrying `label` whose `started_at` is `ageMs` in the past, so a
+ * time-bounded question over a recent window finds nothing while the data
+ * exists. Resolves once every trace is queryable.
+ */
+export async function seedStaleTraces({
+  label,
+  ageMs,
+  count = 3,
+}: {
+  label: string;
+  ageMs: number;
+  count?: number;
+}): Promise<void> {
+  const now = Date.now();
+  const traceIds = Array.from({ length: count }, (_, i) => `trace_e2e_stale_${now}_${i}`);
+  await Promise.all(
+    traceIds.map((traceId, i) => {
+      const startedAt = now - ageMs - i * 60_000;
+      return lwPost({
+        path: "/api/collector",
+        body: {
+          spans: [
+            {
+              trace_id: traceId,
+              span_id: `span_e2e_stale_${now}_${i}`,
+              type: "llm",
+              model: "gpt-5-mini",
+              input: { type: "text", value: `stale question #${i}` },
+              output: { type: "text", value: `stale answer #${i}` },
+              timestamps: { started_at: startedAt, finished_at: startedAt + 800 },
+            },
+          ],
+          metadata: { labels: [label] },
+        },
+      });
+    }),
+  );
+
+  const deadline = Date.now() + INGESTION_VISIBILITY_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const visible = await Promise.all(traceIds.map(traceExists));
+    if (visible.every(Boolean)) return;
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+
+  throw new Error(
+    `Stale traces labelled ${label} were still not queryable after ${
+      INGESTION_VISIBILITY_TIMEOUT_MS / 1_000
+    }s. This is ingestion lag in the environment, NOT a Langy defect.`,
+  );
+}
