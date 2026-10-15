@@ -172,6 +172,8 @@ export class GenAiSpanService {
       ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
     ]);
 
+    this.canonicaliseCacheWrite(ctx);
+
     const cachedInputTokens = asNumber(attrs.get(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS));
     if (cachedInputTokens !== null) {
       attrs.delete(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS);
@@ -201,6 +203,38 @@ export class GenAiSpanService {
       ctx.setAttr(ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN, timeToFirstChunkSeconds * 1000);
       ctx.recordRule(`${GEN_AI_RULE_PREFIX}:response.time_to_first_chunk`);
     }
+  }
+
+  /**
+   * `cache_write.input_tokens` marks the GenAI conventions' usage shape, whose input count
+   * includes the cache reads and writes. The canonical input count is the fresh remainder, so it
+   * is restated; an input count smaller than its cache buckets cannot include them and is left.
+   */
+  private canonicaliseCacheWrite(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
+    const cacheWrite = asNumber(
+      takeAttribute(attrs, ATTR_KEYS.GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS),
+    );
+    if (cacheWrite === null) {
+      return;
+    }
+
+    if (cacheWrite > 0) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cacheWrite);
+      ctx.recordRule(`${GEN_AI_RULE_PREFIX}:usage.cache_write->cache_creation`);
+    }
+
+    const readCanonical = (key: string): number | null =>
+      asNumber(ctx.out[key] !== void 0 ? ctx.out[key] : attrs.get(key));
+    const input = readCanonical(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS);
+    const cacheRead = readCanonical(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS) ?? 0;
+    const cached = Math.max(0, cacheRead) + Math.max(0, cacheWrite);
+    if (input === null || cached === 0 || input < cached) {
+      return;
+    }
+
+    ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, input - cached);
+    ctx.recordRule(`${GEN_AI_RULE_PREFIX}:usage.input_tokens(fresh)`);
   }
 
   /** The OpenInference invocation parameters, each under its canonical numeric attribute. */

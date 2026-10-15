@@ -1,3 +1,4 @@
+import { AnthropicCanonicaliserService } from "./anthropic/anthropicCanonicaliser.ts";
 import {
   type AttributeCanonicaliser,
   canonicalLogRecordStore,
@@ -79,6 +80,8 @@ export function orderedSpanCanonicalisers({
   return [
     LangWatchCanonicaliserService.create(),
     GenAICanonicaliserService.create(),
+    // Reads the usage the GenAI pass canonicalised.
+    AnthropicCanonicaliserService.create(),
     VertexAdkCanonicaliserService.create(),
     MastraCanonicaliserService.create(),
     OpenInferenceCanonicaliserService.create(),

@@ -239,6 +239,19 @@ export const ATTR_KEYS = {
   GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS: "gen_ai.usage.cache_creation_5m.input_tokens",
   GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS: "gen_ai.usage.cache_creation_1h.input_tokens",
   GEN_AI_USAGE_CACHED_INPUT_TOKENS: "gen_ai.usage.cached_input_tokens", // Mastra non-standard
+  // The GenAI conventions' cache-write count. Emitters that send it report the
+  // input count with the cache reads and writes included.
+  GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS: "gen_ai.usage.cache_write.input_tokens",
+
+  // Claude SDK and Claude API spans (platform.claude.com OpenTelemetry reference)
+  ANTHROPIC_REQUEST_ID: "anthropic.request.id",
+  ANTHROPIC_TOOL_RESULT_CONTENT: "anthropic.tool_result.content",
+  ANTHROPIC_USAGE_COMPACTION_INPUT_TOKENS: "anthropic.usage.compaction.input_tokens",
+  ANTHROPIC_USAGE_COMPACTION_OUTPUT_TOKENS: "anthropic.usage.compaction.output_tokens",
+  ANTHROPIC_USAGE_CACHE_CREATION_5M_INPUT_TOKENS:
+    "anthropic.usage.cache_creation.ephemeral_5m_input_tokens",
+  ANTHROPIC_USAGE_CACHE_CREATION_1H_INPUT_TOKENS:
+    "anthropic.usage.cache_creation.ephemeral_1h_input_tokens",
 
   // Audio usage measures the gateway emits: characters synthesized by a
   // TTS call and seconds of audio transcribed by an STT call — the units
