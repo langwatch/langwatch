@@ -59,7 +59,6 @@
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/upgrade": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@trpc/server": "catalog:",

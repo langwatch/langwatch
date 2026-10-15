@@ -14,6 +14,7 @@ import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-pris
 import { BudgetOverviewService } from "../features/budget/services/gateway-budget-overview.service.ts";
 import {
   createTestClickHouseClient,
+  gatewayClickHouseOver,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -149,7 +150,9 @@ const overviewService = (): BudgetOverviewService =>
 
 describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", () => {
   beforeAll(async () => {
-    chRepo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
+    chRepo = new GatewayBudgetClickHouseRepository(
+      gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
+    );
     budgetDecisions = PrismaGatewayAdapter.create({
       database: prisma,
       organizations: organizationApiOver(prisma),

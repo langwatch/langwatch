@@ -36,7 +36,7 @@ export const ID_INDEX_WIDEN_MS = 24 * 60 * 60 * 1000;
 /** What a miss reads by default: one probe of the recent, hot partitions, never unbounded. */
 export const ID_INDEX_MISS_PROBE: WindowFallback = { lookbackMs: RESOLVER_RECENT_WINDOW_MS };
 
-export interface IndexedReadOptions<T> {
+export interface IndexedReadOptions<Row> {
   /** Asks the target and the index; a client lacking either (a test driver) reads as not ready. */
   client: Partial<IdIndexReader>;
   /** The owner's readiness; absent reads as not ready, so call sites move one at a time. */
@@ -54,10 +54,12 @@ export interface IndexedReadOptions<T> {
   windowMs?: number | undefined;
   /** Today's fallback, kept whenever the index is not trusted. */
   fallback: WindowFallback;
-  /** What an id the index has never seen reads: the recent probe unless told otherwise. */
+  /** What an id the index has never seen reads: the recent probe, unbounded, or nothing. */
   onMiss?: WindowFallback | undefined;
-  isEmpty: (result: T) => boolean;
-  run: (window: WindowFragment | null) => Promise<T>;
+  /** A window the caller's rows must lie in: a ready index may narrow it, never widen it. */
+  within?: WindowFragment | undefined;
+  isEmpty: (rows: Row[]) => boolean;
+  run: (window: WindowFragment | null) => Promise<Row[]>;
 }
 
 /** The bound a hit reads with: the index range widened a day each side, clamped to valid ms. */
@@ -81,10 +83,10 @@ function canReadIdIndex(client: Partial<IdIndexReader>): client is IdIndexReader
 
 /**
  * Reads by id: a given time first; then, once ready, the index's range (`index_hit`) or, for an
- * unseen id, the miss probe (`index_miss`, or `index_miss_found` when the probe finds rows the
- * index lacks); not ready, today's windowed read unchanged. Every path counts exactly one outcome.
+ * unseen id, the miss read (`index_miss`, or `index_miss_found` when it finds rows the index
+ * lacks); not ready, today's windowed read unchanged. Every path counts exactly one outcome.
  */
-export async function indexedRead<T>(options: IndexedReadOptions<T>): Promise<T> {
+export async function indexedRead<Row>(options: IndexedReadOptions<Row>): Promise<Row[]> {
   const { client, idIndex, tenantId, table, fallback, isEmpty, run } = options;
   const hintMs = options.hintMs ?? null;
   const windowMs = options.windowMs ?? DEFAULT_PARTITION_WINDOW_MS;
@@ -112,22 +114,57 @@ export async function indexedRead<T>(options: IndexedReadOptions<T>): Promise<T>
       key: options.key,
       timeFormat: options.timeFormat,
     });
-    if (bounds.n === 0) {
-      const probed = await run(fallbackFragment(options.onMiss ?? ID_INDEX_MISS_PROBE, windowMs));
-      if (isEmpty(probed)) {
-        incrementWindowedReadCount(table, "index_miss");
-      } else {
-        reportIndexMissFound({ table, tenantId });
-      }
-      return probed;
-    }
-    const result = await run(indexWindow(bounds));
+    if (bounds.n === 0) return await readMiss({ options, windowMs });
+    const window = narrowed({ window: indexWindow(bounds), within: options.within });
+    const result = window.empty ? [] : await run(window.window);
     incrementWindowedReadCount(table, "index_hit");
     return result;
   } catch (error) {
     incrementWindowedReadCount(table, "error");
     throw error;
   }
+}
+
+/** An unseen id: `"none"` reads nothing, else the miss window inside the caller's own. */
+async function readMiss<Row>({
+  options,
+  windowMs,
+}: {
+  options: IndexedReadOptions<Row>;
+  windowMs: number;
+}): Promise<Row[]> {
+  const { table, tenantId, isEmpty, run } = options;
+  const onMiss = options.onMiss ?? ID_INDEX_MISS_PROBE;
+  const window =
+    onMiss === "none"
+      ? NOTHING
+      : narrowed({ window: fallbackFragment(onMiss, windowMs), within: options.within });
+  const probed = window.empty ? [] : await run(window.window);
+  if (isEmpty(probed)) {
+    incrementWindowedReadCount(table, "index_miss");
+  } else {
+    reportIndexMissFound({ table, tenantId });
+  }
+  return probed;
+}
+
+type Narrowed = { empty: true } | { empty: false; window: WindowFragment | null };
+
+const NOTHING: Narrowed = { empty: true };
+
+/** `window` (`null` is unbounded) cut to `within`; empty when the two do not overlap. */
+function narrowed({
+  window,
+  within,
+}: {
+  window: WindowFragment | null;
+  within: WindowFragment | undefined;
+}): Narrowed {
+  if (within === undefined) return { empty: false, window };
+  if (window === null) return { empty: false, window: within };
+  const fromMs = Math.max(window.fromMs, within.fromMs);
+  const toMs = Math.min(window.toMs, within.toMs);
+  return fromMs > toMs ? NOTHING : { empty: false, window: windowFragment({ fromMs, toMs }) };
 }
 
 /**

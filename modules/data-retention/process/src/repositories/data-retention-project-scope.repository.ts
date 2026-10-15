@@ -16,6 +16,10 @@ export abstract class DataRetentionProjectScopeRepository {
   abstract findProjectPlacement(input: {
     projectId: string;
   }): Promise<DataRetentionProjectPlacement | null>;
+  /** Many projects' placements in one read; a project with no row is left out. */
+  abstract findProjectPlacements(input: {
+    projectIds: readonly string[];
+  }): Promise<DataRetentionProjectPlacement[]>;
   /** The organisation a team sits in, archived teams included; null when no team has the id. */
   abstract findTeamOrganizationId(input: { teamId: string }): Promise<string | null>;
   /** Every project under the organisation, or under one team of it; archived included. */

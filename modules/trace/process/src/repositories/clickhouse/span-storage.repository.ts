@@ -568,9 +568,10 @@ const signalsRowSchema = z.looseObject({ SpanId: chString, Signals: z.array(chSt
 
 const signalsRowsSchema = z.array(signalsRowSchema);
 
-const totalRowSchema = z.looseObject({ Total: numeric });
-
-const totalRowsSchema = z.array(totalRowSchema);
+/** A trace's distinct span count and the StartTime range its spans lie in, epoch ms. */
+const spanRangeRowsSchema = z.array(
+  z.looseObject({ Total: numeric, FromMs: numeric, ToMs: numeric }),
+);
 
 const modelUsageRowSchema = z.looseObject({
   Model: chString,
@@ -1594,49 +1595,56 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       { authorization, traceId, occurredAtMs },
       async (idBound) => {
         const client = this.reader(authorization);
-        // Parallel queries: page reads full spans, count reads only dedup keys for efficiency.
-        const [pageResult, countResult] = await Promise.all([
-          client.query({
-            query: `
-              SELECT ${FULL_SPAN_SELECT}
-              FROM ${TABLE_NAME}
-              WHERE ${tenantScope("StartTime")}
-                AND TraceId = {traceId:String}
-                ${STORED_SPANS_ID_BOUND}
-                AND ${dedupInTuple(STORED_SPANS_ID_BOUND)}
-              ORDER BY StartTime ASC
-              LIMIT {limit:UInt32}
-              OFFSET {offset:UInt32}
-            `,
-            query_params: {
-              traceId,
-              limit,
-              offset,
-            },
-            format: "JSONEachRow",
-            idBound,
-          }),
-          client.query({
-            query: `
-              SELECT count(DISTINCT SpanId) AS Total
-              FROM ${TABLE_NAME}
-              WHERE ${tenantScope("StartTime")}
-                AND TraceId = {traceId:String}
-                ${STORED_SPANS_ID_BOUND}
-            `,
-            query_params: { traceId },
-            format: "JSONEachRow",
-            idBound,
-          }),
-        ]);
+        // One bounded read counts the spans and finds their range, so the page reads that range.
+        const rangeResult = await client.query({
+          query: `
+            SELECT
+              count(DISTINCT SpanId) AS Total,
+              toUnixTimestamp64Milli(min(StartTime)) AS FromMs,
+              toUnixTimestamp64Milli(max(StartTime)) AS ToMs
+            FROM ${TABLE_NAME}
+            WHERE ${tenantScope("StartTime")}
+              AND TraceId = {traceId:String}
+              ${STORED_SPANS_ID_BOUND}
+            HAVING count() > 0
+          `,
+          query_params: { traceId },
+          format: "JSONEachRow",
+          idBound,
+        });
+        const [range] = spanRangeRowsSchema.parse(await rangeResult.json());
+        if (range === undefined) return { spans: [], total: 0 };
 
+        const spanRange =
+          "AND StartTime >= fromUnixTimestamp64Milli({spanFromMs:Int64}) " +
+          "AND StartTime <= fromUnixTimestamp64Milli({spanToMs:Int64})";
+        const pageResult = await client.query({
+          // ID_BOUND_SKIP: bounded by the exact span range the index-bounded read above found.
+          query: `
+            SELECT ${FULL_SPAN_SELECT}
+            FROM ${TABLE_NAME}
+            WHERE ${tenantScope("StartTime")}
+              AND TraceId = {traceId:String}
+              ${spanRange}
+              AND ${dedupInTuple(spanRange)}
+            ORDER BY StartTime ASC
+            LIMIT {limit:UInt32}
+            OFFSET {offset:UInt32}
+          `,
+          query_params: {
+            traceId,
+            limit,
+            offset,
+            spanFromMs: Number(range.FromMs),
+            spanToMs: Number(range.ToMs),
+          },
+          format: "JSONEachRow",
+        });
         const pageRows = fullSpanRowsSchema.parse(await pageResult.json());
-        const countRows = totalRowsSchema.parse(await countResult.json());
-        const total = countRows.length > 0 ? Number(countRows[0]!.Total) : 0;
 
         return {
           spans: mapNormalizedSpansToSpans(pageRows.map(mapChRowToNormalized)),
-          total,
+          total: Number(range.Total),
         };
       },
     );

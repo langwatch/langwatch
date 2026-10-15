@@ -188,8 +188,8 @@ export class EventingClickHouseEventRepository implements EventRepository {
   }
 
   /**
-   * The lower bound an aggregate's read takes: the index's earliest occurred time, else the
-   * caller's own. A miss keeps today's unbounded read: a fold reads its whole history, and rows
+   * The lower bound an aggregate's read takes: the caller's own, else the index's earliest
+   * occurred time. A miss keeps today's unbounded read: a fold reads its whole history, and rows
    * with no occurred time are not in the index (the `EventOccurredAt = 0` arm keeps them).
    */
   private async occurredAtFloor({
@@ -203,6 +203,8 @@ export class EventingClickHouseEventRepository implements EventRepository {
     aggregateId: string;
     occurredAtFromMs: number | undefined;
   }): Promise<number | undefined> {
+    // The caller's own lower bound already prunes: no index round trip on the fold's hot path.
+    if (occurredAtFromMs !== undefined && occurredAtFromMs > 0) return occurredAtFromMs;
     const range = await eventLogOccurredRange({
       index: this.eventLogIndex,
       read: "aggregate",
@@ -263,7 +265,13 @@ export class EventingClickHouseEventRepository implements EventRepository {
 
     const record = records[0];
     if (!record) {
-      throw new EventNotFoundError({ eventId, aggregateId, aggregateType });
+      // The indexed span holds every event of the aggregate, so the caller's fallback is moot.
+      throw new EventNotFoundError({
+        eventId,
+        aggregateId,
+        aggregateType,
+        wholeStream: indexed !== null,
+      });
     }
 
     return record;

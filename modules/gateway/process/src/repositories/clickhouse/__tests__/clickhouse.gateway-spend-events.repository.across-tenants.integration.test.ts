@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { GatewayClickHouseResolver } from "../clickhouse.gateway-session.store.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
+import { gatewayClickHouseOver } from "./support/clickhouse-endpoint.support.ts";
 
 const tenantId = `test-webhook-events-${Math.random().toString(36).slice(2, 10)}`;
 const baseTime = Date.UTC(2026, 6, 20, 12, 0, 0);
@@ -85,15 +86,19 @@ function spendRow(input: {
 
 /** The routed member's contract: one statement reads the one tenant it is routed by. */
 function tenantRoutedClickHouse(raw: () => ClickHouseClient): GatewayClickHouseResolver {
-  return async (routed) => ({
-    async query({ query, query_params }) {
-      if (!/TenantId = \{tenantId:String\}/.test(query) || query_params?.tenantId !== routed) {
-        throw new Error(`statement is not scoped to its routed tenant ${routed}`);
-      }
-      return raw().query({ query, query_params, format: "JSONEachRow" });
-    },
-    insert: async () => undefined,
-  });
+  return async (routed) => {
+    const session = await gatewayClickHouseOver(raw())(routed);
+    return {
+      async query(input) {
+        const { query, query_params } = input;
+        if (!/TenantId = \{tenantId:String\}/.test(query) || query_params?.tenantId !== routed) {
+          throw new Error(`statement is not scoped to its routed tenant ${routed}`);
+        }
+        return session.query(input);
+      },
+      insert: async () => undefined,
+    };
+  };
 }
 
 let client: ClickHouseClient;
@@ -109,7 +114,7 @@ beforeAll(async () => {
   // The endpoint is reused across runs, so start from an empty table.
   await client.command({ query: "DROP TABLE IF EXISTS gateway_spend SYNC" });
   await client.command({ query: CREATE_TABLE });
-  eventsRepo = ClickHouseGatewaySpendEventsRepository.create(async () => client as never);
+  eventsRepo = ClickHouseGatewaySpendEventsRepository.create(gatewayClickHouseOver(client));
 }, 120_000);
 
 afterAll(async () => {

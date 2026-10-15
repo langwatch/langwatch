@@ -188,16 +188,15 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
   }
 
   /**
-   * The caller's window reads as it always did, the outer read only (ADR-071); only when it
-   * finds nothing, or there is none, does the evaluation id index bound the read, inner dedup
-   * subquery included. A caller's window miss reads nothing more while the index is not ready.
+   * The caller's window reads as it always did, the outer read only (ADR-071), and its miss is
+   * final; with no window the evaluation id index bounds the read, inner dedup subquery included.
    */
   private async findLatestRows(
     parsed: AnalyticsEvaluationReadInput,
   ): Promise<Record<string, unknown>[]> {
     const caller = parsed.window;
     if (caller === undefined) return this.readById({ parsed, idBound: { fallback: "unbounded" } });
-    const rows = await queryWindowed({
+    return queryWindowed({
       table: SLIM_TABLE,
       // The caller's [from, to], as the centre and half-width the windowed read takes.
       hintMs: (caller.fromMs + caller.toMs) / 2,
@@ -206,8 +205,6 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
       isEmpty: (found: Record<string, unknown>[]) => found.length === 0,
       run: (window) => this.readInWindow({ parsed, window }),
     });
-    if (rows.length > 0) return rows;
-    return this.readById({ parsed, idBound: { onlyWhenReady: true } });
   }
 
   private async readInWindow({

@@ -2496,10 +2496,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           AND TraceId IN ({traceIds:Array(String)})
           AND OccurredAt > fromUnixTimestamp64Milli(0)
           {{idBound:trace_summaries.TraceId:traceIds}}
+        HAVING count() > 0
       `,
       query_params: { traceIds },
       format: "JSONEachRow",
       // A trace the index has never seen is resolved over every partition, as before the index.
+      // No match answers no row (`HAVING`), so emptiness, the fallback and the miss count hold.
       idBound: { onMiss: "unbounded" },
     });
     const rows = occurredAtRangeRowsSchema.parse(await result.json());

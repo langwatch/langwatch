@@ -1,16 +1,12 @@
 /**
- * The id index's point read, on the client and in the fence, and the target that keys its flag.
+ * The id index's point read, for one tenant or a fenced tenant set, and the target keying it.
  * Plan: dev/docs/plans/id-index-2026-10-10.md §2 and §6 question 2.
  */
-import { sealAuthorization } from "@langwatch/authorization";
 import { describe, expect, it, vi } from "vitest";
 
-import { AuthorizedClickHouse } from "../authorized-reads.ts";
 import { ClickHouseQueryClient } from "../client.ts";
 import type { QueryDriver, QueryRequest } from "../query.ts";
 import { TenantGuard } from "../tenantGuard.ts";
-
-const NOW = 1_800_000_000_000;
 
 function clientWith({
   privateRoutes,
@@ -36,34 +32,14 @@ function clientWith({
   return { client, execute, sent };
 }
 
-const proof = sealAuthorization({
-  actor: { type: "user", id: "ana" },
-  principal: { type: "user", id: "ana" },
-  scope: { organizationId: "org_acme" },
-  grants: [
-    { projectId: "proj_own", permissions: ["traces:view"], via: [], kind: "own" },
-    {
-      projectId: "proj_shared",
-      permissions: ["traces:view"],
-      via: ["grant_a"],
-      kind: "shared",
-      condition: { type: "trace", from: NOW - 1000, until: null },
-    },
-  ],
-  expiresAt: NOW + 60_000,
-  purpose: { kind: "route", route: "tracesV2.list" },
-});
-
 describe("the id index's point read", () => {
-  describe("when the fence reads an index", () => {
-    it("binds the proof's tenant set itself and answers only n, fromMs and toMs", async () => {
+  describe("when a fenced read asks the index for its tenant set", () => {
+    it("binds the tenant set itself and answers only n, fromMs and toMs", async () => {
       const { client, sent } = clientWith();
-      const reader = new AuthorizedClickHouse({
-        resolveClient: async () => client,
-        now: () => NOW,
-      }).as(proof, { reads: "traces" });
 
-      const bounds = await reader.indexBounds({
+      const bounds = await client.indexBounds({
+        tenantId: "proj_own",
+        tenantIds: ["proj_own", "proj_shared"],
         index: "trace_summaries_id_index",
         key: { TraceId: ["t1"] },
       });
@@ -72,24 +48,24 @@ describe("the id index's point read", () => {
       expect(sent().sql).toBe(
         "SELECT count() AS n, toUnixTimestamp64Milli(min(FromAt)) AS fromMs, " +
           "toUnixTimestamp64Milli(max(ToAt)) AS toMs FROM trace_summaries_id_index " +
-          "WHERE (TenantId IN ({tenantScope_all:Array(String)})) AND TraceId IN ({idIndexKey0:Array(String)})",
+          "WHERE TenantId IN ({idBound_tenants:Array(String)}) AND TraceId IN ({idIndexKey0:Array(String)})",
       );
       expect(sent().tenantIds).toEqual(["proj_own", "proj_shared"]);
       expect(sent().params).toEqual({
         idIndexKey0: ["t1"],
-        tenantScope_all: ["proj_own", "proj_shared"],
+        idBound_tenants: ["proj_own", "proj_shared"],
       });
     });
 
     it("refuses a name that is not a plain identifier", async () => {
       const { client, execute } = clientWith();
-      const reader = new AuthorizedClickHouse({
-        resolveClient: async () => client,
-        now: () => NOW,
-      }).as(proof, { reads: "traces" });
 
       await expect(
-        reader.indexBounds({ index: "x; DROP TABLE y", key: { TraceId: "t1" } }),
+        client.indexBounds({
+          tenantId: "proj_own",
+          index: "x; DROP TABLE y",
+          key: { TraceId: "t1" },
+        }),
       ).rejects.toThrow(/plain ClickHouse identifier/);
       expect(execute).not.toHaveBeenCalled();
     });

@@ -48,8 +48,8 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
             `,
         query_params: { tenantId: projectId, traceIds: [...traceIds] },
         format: "JSONEachRow",
-        // Existence is confirmed on the source: a miss reads it unbounded, as before the index.
-        idBound: { onMiss: "unbounded" },
+        // A ready index's miss means absent; a hit is still confirmed on the source.
+        idBound: { onMiss: "none" },
       });
       const rows = traceIdRowsSchema.parse(await result.json());
       return rows.map((row) => row.TraceId);

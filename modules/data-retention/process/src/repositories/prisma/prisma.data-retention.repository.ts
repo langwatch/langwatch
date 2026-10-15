@@ -46,6 +46,17 @@ export class PrismaDataRetentionRepository
     return rows.map((row) => retentionPolicySchema.parse(row));
   }
 
+  async findAllInOrganizations(input: {
+    organizationIds: readonly string[];
+  }): Promise<RetentionPolicy[]> {
+    if (input.organizationIds.length === 0) return [];
+    const rows = await this.prisma.retentionPolicy.findMany({
+      where: { organizationId: { in: [...input.organizationIds] } },
+    });
+
+    return rows.map((row) => retentionPolicySchema.parse(row));
+  }
+
   async upsertForScope(input: {
     organizationId: string;
     scope: ScopeAssignment;

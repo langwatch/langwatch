@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import {
   createTestClickHouseClient,
+  gatewayClickHouseOver,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -193,8 +194,8 @@ describe.skipIf(!databaseUrl || !chUrl)(
         },
       });
 
-      chRepo = new GatewayBudgetClickHouseRepository(async () =>
-        createTestClickHouseClient(chUrl!),
+      chRepo = new GatewayBudgetClickHouseRepository(
+        gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
       );
       service = PrismaGatewayAdapter.create({
         database: prisma,

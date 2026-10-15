@@ -213,6 +213,30 @@ describe("fillIdIndexes", () => {
       ).rejects.toMatchObject({ name: "IdIndexFillIncompleteError" });
       expect(saved.at(-1)?.targetsFailed.map((each) => each.target)).toEqual(["shared"]);
     });
+
+    /** @scenario "a fill retried after a failed first batch counts each partition once" */
+    it("counts the target's partitions once however often the ledger retries it", async () => {
+      const run = async (resumeFrom: IdIndexFillReport | null) => {
+        const server = serverWith({ failFirstBatches: 100 });
+        const { saved, checkpoint } = checkpointFrom(resumeFrom);
+        await fillIdIndexes({
+          statements: server.client,
+          targets: idIndexFillTargets({ privateRoutes: new Map() }),
+          indexes: [SPANS],
+          checkpoint,
+          signal: new AbortController().signal,
+          beforeMarker: async () => {},
+          sleep: async () => {},
+        }).catch(() => undefined);
+        return saved.at(-1) ?? null;
+      };
+
+      const first = await run(null);
+      const retried = await run(await run(first));
+
+      expect(first?.total).toBe(2);
+      expect(retried?.total).toBe(2);
+    });
   });
 
   describe("given a target whose batches time out at every size", () => {

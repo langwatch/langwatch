@@ -180,6 +180,70 @@ describe("a read carrying {{idBound}}", () => {
       expect(outcomes).toEqual([{ table: "stored_spans", outcome: "hit" }]);
     });
 
+    /** @scenario "a caller's own time range stays hard once the index is ready" */
+    it("reads only the overlap of the caller's range and the index's range", async () => {
+      const server = serverWith({
+        ready: true,
+        index: { n: 1, fromMs: NOW - 3 * DAY, toMs: NOW - 3 * DAY },
+        rows: [{ SpanId: "s1" }],
+      });
+      await server.client.idIndexes().check({ source: "stored_spans", target: "shared" });
+
+      await server.client.query({
+        tenantId: "p1",
+        sql: READ,
+        params: { tenantId: "p1", traceId: "t1" },
+        idBound: { occurredAtHint: NOW, windowMs: 3 * DAY, fallback: "none" },
+      });
+
+      const [lookup, read] = server.reads();
+      expect(lookup?.sql).toContain("FROM stored_spans_id_index");
+      expect(read?.params).toMatchObject({
+        idBound_fromMs: NOW - 3 * DAY,
+        idBound_toMs: NOW - 2 * DAY,
+      });
+      expect(server.reads()).toHaveLength(2);
+      expect(outcomes).toEqual([{ table: "stored_spans", outcome: "index_hit" }]);
+    });
+
+    /** @scenario "a caller's own time range stays hard once the index is ready" */
+    it("reads nothing when the index's range lies outside the caller's range", async () => {
+      const server = serverWith({
+        ready: true,
+        index: { n: 1, fromMs: NOW - 90 * DAY, toMs: NOW - 80 * DAY },
+        rows: [{ SpanId: "s1" }],
+      });
+      await server.client.idIndexes().check({ source: "stored_spans", target: "shared" });
+
+      const { rows } = await server.client.query({
+        tenantId: "p1",
+        sql: READ,
+        params: { tenantId: "p1", traceId: "t1" },
+        idBound: { occurredAtHint: NOW, windowMs: DAY, fallback: "none" },
+      });
+
+      expect(rows).toEqual([]);
+      expect(server.reads()).toHaveLength(1);
+    });
+
+    /** @scenario "an id the index has never seen reads nothing when the read asks for nothing" */
+    it("sends no source read for an unseen id when the miss reads nothing", async () => {
+      const server = serverWith({ ready: true, rows: [{ SpanId: "s1" }] });
+      await server.client.idIndexes().check({ source: "stored_spans", target: "shared" });
+
+      const { rows } = await server.client.query({
+        tenantId: "p1",
+        sql: READ,
+        params: { tenantId: "p1", traceId: "t1" },
+        idBound: { onMiss: "none" },
+      });
+
+      expect(rows).toEqual([]);
+      expect(server.reads()).toHaveLength(1);
+      expect(server.reads()[0]?.sql).toContain("FROM stored_spans_id_index");
+      expect(outcomes).toEqual([{ table: "stored_spans", outcome: "index_miss" }]);
+    });
+
     /** @scenario "a read names its id and the reader adds the index bound" */
     it("bounds the aliased column where the marker names an alias", async () => {
       const server = serverWith({ ready: true, index: { n: 1, fromMs: NOW, toMs: NOW } });
@@ -220,6 +284,42 @@ describe("a read carrying {{idBound}}", () => {
       expect(lookup?.params).toMatchObject({ idBound_tenants: ["p1", "p2"] });
       expect(lookup?.tenantIds).toEqual(["p1", "p2"]);
       expect(read?.params).toMatchObject({ idBound_fromMs: NOW - ID_INDEX_WIDEN_MS });
+    });
+  });
+
+  describe("when a statement carrying the marker is sent another way than a read", () => {
+    /** @scenario "a marker never reaches ClickHouse unexpanded" */
+    it("refuses a command that still carries it", async () => {
+      const server = serverWith({ ready: true });
+
+      const refused = await server.client
+        .command({ tenantId: "p1", sql: READ, params: { tenantId: "p1", traceId: "t1" } })
+        .then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+
+      expect(refused).toMatchObject({
+        code: "store_statement_scope",
+        violation: { kind: "unexpanded-id-bound" },
+      });
+    });
+
+    /** @scenario "a marker never reaches ClickHouse unexpanded" */
+    it("answers a streamed read through the bounded read, with the marker expanded", async () => {
+      const server = serverWith({ ready: false, rows: [{ SpanId: "s1" }] });
+
+      const batches: unknown[][] = [];
+      for await (const batch of server.client.stream({
+        tenantId: "p1",
+        sql: READ,
+        params: { tenantId: "p1", traceId: "t1" },
+      })) {
+        batches.push(batch);
+      }
+
+      expect(batches).toEqual([[{ SpanId: "s1" }]]);
+      expect(server.reads().every((request) => !request.sql.includes("{{idBound"))).toBe(true);
     });
   });
 

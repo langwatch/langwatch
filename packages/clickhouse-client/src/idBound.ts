@@ -48,9 +48,12 @@ export type IdBoundOptions = {
   occurredAtHint?: number | null | undefined;
   /** Half-width of the hinted window; two days by default. */
   windowMs?: number | undefined;
-  /** What a read does while the index is not ready: unbounded by default, as before the index. */
+  /**
+   * What a read does while the index is not ready: unbounded by default, as before the index.
+   * `"none"` with a hint is a hard range: a ready index only narrows it.
+   */
   fallback?: WindowFallback | undefined;
-  /** What an id the index has never seen reads: the 35-day probe unless told otherwise. */
+  /** What an id the index has never seen reads: the 35-day probe, `"unbounded"`, or nothing. */
   onMiss?: WindowFallback | undefined;
   /** Bounds the read from below only: a live trace runs past any upper bound. */
   openEnded?: boolean | undefined;
@@ -60,8 +63,6 @@ export type IdBoundOptions = {
    * and `null` says the id has no row, so nothing more is read.
    */
   resolveHint?: (() => Promise<IdBoundResolved>) | undefined;
-  /** Reads nothing while the index is not ready: the caller already read its own window. */
-  onlyWhenReady?: boolean | undefined;
   /** Consults `resolveHint` after a hinted window misses too, not only when no hint was given. */
   resolveOnHintMiss?: boolean | undefined;
 };
@@ -297,10 +298,10 @@ export async function readIdBound<Row>({
   const read = (window: WindowFragment | null, openEnded?: boolean) =>
     run(bound.render(window, openEnded));
   if (!registry.isReady({ source, target })) {
-    if (options?.onlyWhenReady === true) return [];
     return readNotReady({ source, options, read });
   }
-  return indexedRead<Row[]>({
+  const within = hardWindowOf({ options });
+  return indexedRead<Row>({
     client: {
       targetOf: async () => target,
       indexBounds: (lookup) =>
@@ -312,13 +313,31 @@ export async function readIdBound<Row>({
     index: bound.lookup.index,
     key: bound.lookup.key,
     timeFormat: bound.lookup.timeFormat,
-    hintMs: options?.occurredAtHint ?? null,
+    hintMs: within === undefined ? (options?.occurredAtHint ?? null) : null,
     windowMs: options?.windowMs,
     fallback: options?.fallback ?? "unbounded",
     onMiss: options?.onMiss,
+    within,
     isEmpty: (rows) => rows.length === 0,
     run: (window) => read(window),
   });
+}
+
+/**
+ * A hint with fallback `"none"` is the caller's hard range, which a ready index may only narrow;
+ * a hint the caller resolves past on a miss stays a hint.
+ */
+function hardWindowOf({
+  options,
+}: {
+  options: IdBoundOptions | undefined;
+}): WindowFragment | undefined {
+  const hintMs = options?.occurredAtHint ?? null;
+  if (hintMs === null || options?.fallback !== "none" || options.resolveOnHintMiss === true) {
+    return undefined;
+  }
+  const windowMs = options.windowMs ?? DEFAULT_PARTITION_WINDOW_MS;
+  return windowFragment({ fromMs: hintMs - windowMs, toMs: hintMs + windowMs });
 }
 
 /**

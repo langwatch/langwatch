@@ -4,7 +4,11 @@ import {
   EventingClickHouseEventRepository,
   type EventingClickHouseClient,
 } from "@langwatch/eventing/server";
+import { generate } from "@langwatch/ksuid";
 import { describe, expect, it, vi } from "vitest";
+
+import { EventNotFoundError } from "../../../../services/errorHandling.ts";
+import { readEventRecord } from "../../../../stores/eventReadSeat.ts";
 
 const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
 
@@ -276,6 +280,69 @@ describe("EventRepositoryClickHouse full-scan declarations", () => {
       const query = await readAllThree({ occurredAtFromMs: 1700000000000 });
       expect(query).toHaveBeenCalledTimes(3);
       expect(query).not.toHaveBeenCalledWith(declared);
+    });
+  });
+});
+
+describe("EventRepositoryClickHouse over a ready event log index", () => {
+  /** An index ready on every target, answering one range for every aggregate it is asked. */
+  function indexedRepository({ rows }: { rows: unknown[] }) {
+    const query = vi.fn(async () => ({ json: vi.fn().mockResolvedValue(rows) }));
+    const client: EventingClickHouseClient = { query, insert: vi.fn() };
+    const indexBounds = vi.fn(async () => ({
+      n: 1,
+      fromMs: 1_600_000_000_000,
+      toMs: 1_700_000_000_000,
+    }));
+    const repository = EventingClickHouseEventRepository.create({
+      resolveClient: async () => client,
+      retention,
+      eventLogIndex: {
+        reader: { targetOf: async () => "shared", indexBounds },
+        readiness: { isReady: () => true },
+      },
+    });
+    return { repository, query, indexBounds };
+  }
+
+  describe("given a read that names its own lower bound", () => {
+    /** @scenario "a read that already has a lower bound skips the index" */
+    it("reads with that bound and never asks the index", async () => {
+      const { repository, query, indexBounds } = indexedRepository({ rows: [] });
+
+      await repository.getEventRecords({
+        tenantId: "tenant",
+        aggregateType: "trace",
+        aggregateId: "trace-1",
+        occurredAtFromMs: 1_650_000_000_000,
+      });
+
+      expect(indexBounds).not.toHaveBeenCalled();
+      expect(query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query_params: expect.objectContaining({ occurredAtFromMs: 1_650_000_000_000 }),
+        }),
+      );
+    });
+  });
+
+  describe("given an event the indexed stream does not hold", () => {
+    /** @scenario "an event missing from its aggregate's indexed stream is read for once" */
+    it("answers not found from one index read and one source read, with no fallback", async () => {
+      const { repository, query, indexBounds } = indexedRepository({ rows: [] });
+
+      await expect(
+        readEventRecord({
+          repository,
+          tenantId: "tenant",
+          aggregateType: "trace",
+          aggregateId: "trace-1",
+          eventId: generate("event").toString(),
+        }),
+      ).rejects.toBeInstanceOf(EventNotFoundError);
+
+      expect(indexBounds).toHaveBeenCalledTimes(1);
+      expect(query).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -50,6 +50,9 @@ type DataRetentionServiceOptions = Readonly<{
   storageMeter: StorageMeterService;
 }>;
 
+/** Projects whose placements one retention lookup reads at once. */
+const RETENTION_LOOKUP_CHUNK = 1_000;
+
 export class DataRetentionService {
   static create(options: DataRetentionServiceOptions): DataRetentionService {
     return new DataRetentionService({
@@ -264,18 +267,14 @@ export class DataRetentionService {
     const held = await this.options.retroactive.findHeldIdIndexes({ ...target, indexes });
     if (held.length === 0) return { tables: [] };
 
-    const retentionByTenant = new Map<string, ResolvedRetention>();
     const tenantIds = await this.options.retroactive.findIdIndexTenantIds({
       ...target,
       indexes: held,
     });
-    for (const tenantId of tenantIds) {
-      try {
-        retentionByTenant.set(tenantId, await this.getResolvedForProject({ projectId: tenantId }));
-      } catch (error) {
-        if (!(error instanceof ProjectNotFoundError)) throw error;
-      }
-    }
+    // The marker rows sit under the empty tenant, which is no project.
+    const retentionByTenant = await this.resolveForProjects({
+      projectIds: tenantIds.filter((tenantId) => tenantId !== ""),
+    });
     const tables = await this.options.retroactive.raiseIdIndexRetention({
       ...target,
       indexes: held,
@@ -290,6 +289,46 @@ export class DataRetentionService {
 
   getTotalStorageBytesForTenants(input: { tenantIds: string[] }): Promise<number> {
     return this.options.storageMeter.getTotalStorageBytesForTenants(input);
+  }
+
+  /**
+   * Many projects' retention from batched reads, a chunk of projects at a time: their placements,
+   * then their organisations' rules. A project with no row is left out, as `getResolvedForProject`
+   * refuses it.
+   */
+  private async resolveForProjects({
+    projectIds,
+  }: {
+    projectIds: readonly string[];
+  }): Promise<Map<string, ResolvedRetention>> {
+    const resolved = new Map<string, ResolvedRetention>();
+    for (let start = 0; start < projectIds.length; start += RETENTION_LOOKUP_CHUNK) {
+      const placements = await this.options.projectScopes.findProjectPlacements({
+        projectIds: projectIds.slice(start, start + RETENTION_LOOKUP_CHUNK),
+      });
+      const policies = await this.options.policies.findAllInOrganizations({
+        organizationIds: [...new Set(placements.map((each) => each.organizationId))],
+      });
+      for (const placement of placements) {
+        const chain = resolveScopeChain(placement);
+        const rows = policies.filter(
+          (policy) =>
+            policy.organizationId === placement.organizationId &&
+            chain.some(
+              (scope) => scope.scopeType === policy.scopeType && scope.scopeId === policy.scopeId,
+            ),
+        );
+        resolved.set(
+          placement.projectId,
+          resolveRetention({
+            rows,
+            chain,
+            defaultRetentionDays: this.options.defaultRetentionDays,
+          }),
+        );
+      }
+    }
+    return resolved;
   }
 
   private defaultRetention(): ResolvedRetention {

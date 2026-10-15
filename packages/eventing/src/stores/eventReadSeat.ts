@@ -87,7 +87,8 @@ export class EventLogReadSeat<EventType extends Event = Event> implements EventR
 
 /**
  * One event by id: first within the window its KSUID's time names, then, on a miss, today's read
- * of the whole stream, counted as a fallback. An id carrying no time takes today's read at once.
+ * of the whole stream, counted as a fallback, unless the first read already covered the stream.
+ * An id carrying no time takes today's read at once.
  */
 export async function readEventRecord({
   repository,
@@ -113,7 +114,7 @@ export async function readEventRecord({
     incrementEventLogIndexRead({ read: "event", outcome: "window_hit" });
     return record;
   } catch (error) {
-    if (!(error instanceof EventNotFoundError)) throw error;
+    if (!(error instanceof EventNotFoundError) || error.wholeStream) throw error;
     incrementEventLogIndexRead({ read: "event", outcome: "window_fallback" });
     return repository.getEventRecord(stream);
   }

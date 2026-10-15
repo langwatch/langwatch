@@ -13,6 +13,7 @@ import {
   type CachedRetentionLookup,
   DataRetentionCacheRepository,
 } from "../../repositories/data-retention-cache.repository.ts";
+import { DataRetentionProjectScopeRepository } from "../../repositories/data-retention-project-scope.repository.ts";
 import { MemoryDataRetentionProjectScopeRepository } from "../../repositories/memory/memory.data-retention-project-scope.repository.ts";
 import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
 import { MemoryPinnedTraceRepository } from "../../repositories/memory/memory.pinned-trace.repository.ts";
@@ -55,11 +56,38 @@ class RecordingCache extends DataRetentionCacheRepository {
   }
 }
 
+/** The memory placements, recording which read each lookup took. */
+class CountingProjectScopes extends DataRetentionProjectScopeRepository {
+  readonly reads: string[] = [];
+
+  constructor(private readonly inner: DataRetentionProjectScopeRepository) {
+    super();
+  }
+
+  findProjectPlacement(input: { projectId: string }) {
+    this.reads.push("findProjectPlacement");
+    return this.inner.findProjectPlacement(input);
+  }
+
+  findProjectPlacements(input: { projectIds: readonly string[] }) {
+    this.reads.push("findProjectPlacements");
+    return this.inner.findProjectPlacements(input);
+  }
+
+  findTeamOrganizationId(input: { teamId: string }) {
+    return this.inner.findTeamOrganizationId(input);
+  }
+
+  findProjectIds(input: { organizationId: string; teamId?: string }) {
+    return this.inner.findProjectIds(input);
+  }
+}
+
 function createService(
   input: Readonly<{
     policies?: MemoryDataRetentionRepository;
     cache?: DataRetentionCacheRepository;
-    projectScopes?: MemoryDataRetentionProjectScopeRepository;
+    projectScopes?: DataRetentionProjectScopeRepository;
     retroactive?: MemoryRetroactiveRetentionRepository;
   }> = {},
 ) {
@@ -474,6 +502,37 @@ describe("given a ClickHouse target whose id indexes were filled", () => {
         service.raiseIdIndexRetention({ indexes: ["experiment_runs_id_index"] }),
       ).resolves.toEqual({ tables: [] });
       expect(retroactive.idIndexRetention.size).toBe(0);
+    });
+
+    /** @scenario "a retention raise is one statement per index, never lowering a row" */
+    it("resolves every tenant in one batched read and leaves the marker row's tenant out", async () => {
+      const policies = MemoryDataRetentionRepository.create();
+      await policies.upsertForScope({
+        organizationId: ORGANIZATION,
+        scope: { scopeType: "PROJECT", scopeId: "project-2" },
+        category: "traces",
+        retentionDays: 364,
+      });
+      const retroactive = MemoryRetroactiveRetentionRepository.create();
+      retroactive.idIndexDeclarations = DECLARED_ID_INDEXES;
+      retroactive.idIndexTenants = new Map([["stored_spans_id_index", ["", PROJECT, "project-2"]]]);
+      const projectScopes = new CountingProjectScopes(
+        createDataRetentionTestProjectScopes(retentionTestGraph, ["project-2"]),
+      );
+      const service = createService({ policies, retroactive, projectScopes });
+
+      await service.raiseIdIndexRetention({ indexes: ["stored_spans_id_index"] });
+
+      expect(projectScopes.reads).toEqual(["findProjectPlacements"]);
+      expect(retroactive.idIndexRetention.get(`stored_spans_id_index/${PROJECT}/traces`)).toBe(
+        DEFAULT_DAYS,
+      );
+      expect(retroactive.idIndexRetention.get("stored_spans_id_index/project-2/traces")).toBe(364);
+      expect(
+        [...retroactive.idIndexRetention.keys()].some((key) =>
+          key.startsWith("stored_spans_id_index//"),
+        ),
+      ).toBe(false);
     });
 
     it("refuses an empty list of indexes", async () => {

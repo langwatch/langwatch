@@ -366,7 +366,6 @@ import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-read
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
-import { TraceExistenceService } from "../services/trace-existence.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import {
   TraceMetadataWriteService,
@@ -697,8 +696,6 @@ export interface TraceAppDependencies {
   annotationCommands?: TraceAnnotationCommands;
   traces: Readonly<{
     existence: TraceExistenceRepository;
-    /** Existence bounded by trace's id index, confirmed on the source; absent, `existence`. */
-    existenceReads?: TraceExistenceService | undefined;
     /** The legacy trace read the `traces.*` and `spans.*` surfaces call. */
     read: TraceLegacyRead;
     list: TracesListReader;
@@ -1135,9 +1132,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     return {
       traces: {
         existence: options.repositories.existence,
-        existenceReads: TraceExistenceService.create({
-          existence: options.repositories.existence,
-        }),
         read,
         list,
         sessionGroups: SessionGroupsService.create({
@@ -2326,8 +2320,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     projectId: string;
     traceIds: readonly string[];
   }): Promise<string[]> {
-    const { existence, existenceReads } = this.#dependencies.traces;
-    return (existenceReads ?? existence).findExistingTraceIds(input);
+    return this.#dependencies.traces.existence.findExistingTraceIds(input);
   }
 
   findTraceCosts(input: {

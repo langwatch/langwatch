@@ -13,6 +13,7 @@ import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-pris
 import { VirtualKeyDirectBudgetService } from "../features/virtual-key/services/virtual-key-direct-budget.service.ts";
 import {
   createTestClickHouseClient,
+  gatewayClickHouseOver,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -64,7 +65,9 @@ const load = () =>
 
 describe.skipIf(!databaseUrl || !chUrl)("direct budget per virtual key (real PG + real CH)", () => {
   beforeAll(async () => {
-    chRepo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
+    chRepo = new GatewayBudgetClickHouseRepository(
+      gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
+    );
     await seedFixture(prisma, chRepo);
   }, 120_000);
 

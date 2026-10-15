@@ -61,7 +61,6 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/upgrade": "workspace:*",
     "@langwatch/webhook-contract": "workspace:*",
     "@trpc/server": "catalog:",
     "hono": "catalog:",

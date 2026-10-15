@@ -100,6 +100,8 @@ export type IdIndexFillCursor = {
 /** The step's report, replaced whole on each save; `done`/`total` count partitions. */
 export type IdIndexFillReport = {
   targetsDone: string[];
+  /** Targets whose partitions `total` already counts, so a retried target is counted once. */
+  targetsCounted: string[];
   targetsFailed: { target: string; error: string }[];
   cursor: IdIndexFillCursor | null;
   done: number;
@@ -509,6 +511,7 @@ export function fillReportOf({
 }): IdIndexFillReport {
   return {
     targetsDone: stringsOf(resumeFrom?.targetsDone),
+    targetsCounted: stringsOf(resumeFrom?.targetsCounted),
     // A failed target is unfinished: every run tries it again.
     targetsFailed: [],
     cursor: cursorOf(resumeFrom?.cursor),
@@ -608,8 +611,13 @@ class IdIndexFill {
         partitions: await this.partitionsOf({ target, index }),
       })),
     );
-    if (cursor === null)
-      this.report.total += listed.reduce((sum, each) => sum + each.partitions.length, 0);
+    // A resumed cursor was counted when its target started, before the report kept the list.
+    if (!this.report.targetsCounted.includes(target.key)) {
+      if (cursor === null) {
+        this.report.total += listed.reduce((sum, each) => sum + each.partitions.length, 0);
+      }
+      this.report.targetsCounted.push(target.key);
+    }
     for (const [position, { index, partitions }] of listed.entries()) {
       if (position < tableAt) continue;
       const resumed = position === tableAt ? cursor : null;

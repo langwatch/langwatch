@@ -21,12 +21,6 @@ import { nowInstant } from "@langwatch/time";
 
 import type { ClickHouseQueryClient } from "./client.ts";
 import type { IdBoundOptions } from "./idBound.ts";
-import {
-  type IdIndexBounds,
-  idIndexBoundsOf,
-  idIndexBoundsStatement,
-  type IdIndexLookup,
-} from "./idIndexFlags.ts";
 import { StatementScopeError, TENANT_SCOPE_PARAM_PREFIX } from "./statementScopeError.ts";
 
 /** Resolves the routed client a project's reads are sent through. */
@@ -301,9 +295,7 @@ export class TenantScopedReader {
       queryParams: params.query_params ?? {},
       fence: this.deps.fence,
     });
-    const client = await this.deps.client().catch((cause: unknown) => {
-      throw new TenantReaderClientUnavailableError({ cause });
-    });
+    const client = await this.resolvedClient();
     // The client expands an `{{idBound}}` marker, reading the index under this fence's tenants.
     const result = await client.query<Row>({
       tenantId: this.deps.tenantId,
@@ -315,30 +307,6 @@ export class TenantScopedReader {
       ...(params.idBound === undefined ? {} : { idBound: params.idBound }),
     });
     return { json: async () => result.rows };
-  }
-
-  /** The ClickHouse target this reader's statements land on, which keys an id index's readiness. */
-  async targetOf(): Promise<string> {
-    return (await this.resolvedClient()).targetOf({ tenantId: this.deps.tenantId });
-  }
-
-  /**
-   * The fence-owned point read of an id index: binds the proof's tenant set itself and answers
-   * only `{ n, fromMs, toMs }`, never rows. The source read keeps its windowed marker, so a
-   * shared grant's window still filters what is returned (id-index plan, question 2).
-   */
-  async indexBounds(lookup: IdIndexLookup): Promise<IdIndexBounds> {
-    const fence = setExpression(this.deps.fence);
-    const statement = idIndexBoundsStatement({ ...lookup, tenantPredicate: fence.sql });
-    const client = await this.resolvedClient();
-    const result = await client.query<unknown>({
-      tenantId: this.deps.tenantId,
-      tenantIds: tenantsOf(this.deps.fence),
-      sql: statement.sql,
-      params: { ...statement.params, ...fence.params },
-      table: lookup.index,
-    });
-    return idIndexBoundsOf({ rows: result.rows });
   }
 
   private resolvedClient(): Promise<ClickHouseQueryClient> {

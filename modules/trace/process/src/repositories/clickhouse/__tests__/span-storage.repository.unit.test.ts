@@ -647,3 +647,70 @@ describe("SpanStorageClickHouseRepository.findLangwatchSignalsByTraceId", () => 
     expect(clickhouse.queries[0]?.query).toContain("StartTime >= fromUnixTimestamp64Milli");
   });
 });
+
+describe("SpanStorageClickHouseRepository.listSpansPaginated", () => {
+  const SPAN_MS = 1_700_000_000_000;
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  /** A source holding one span at SPAN_MS, answering each statement only inside its bound. */
+  function pagedRepository() {
+    const statements: { sql: string; params: Record<string, unknown> }[] = [];
+    const reaches = (params: Record<string, unknown>) => {
+      const from = params.idBound_fromMs ?? params.spanFromMs;
+      const to = params.idBound_toMs ?? params.spanToMs;
+      return (
+        (typeof from !== "number" || from <= SPAN_MS) && (typeof to !== "number" || SPAN_MS <= to)
+      );
+    };
+    const execute = vi.fn<ScriptedStatements["execute"]>(async (request) => {
+      const params = request.params ?? {};
+      statements.push({ sql: request.sql, params });
+      if (request.sql.includes("occurredAtMs")) return { rows: [{ occurredAtMs: SPAN_MS }] };
+      if (request.sql.includes("count(DISTINCT SpanId)")) {
+        if (reaches(params)) return { rows: [{ Total: "1", FromMs: SPAN_MS, ToMs: SPAN_MS }] };
+        // `count()` with no GROUP BY answers one row of zeroes unless HAVING drops it.
+        return { rows: request.sql.includes("HAVING") ? [] : [{ Total: "0" }] };
+      }
+      return { rows: reaches(params) ? [storedRow()] : [] };
+    });
+    const repo = SpanStorageClickHouseRepository.create({
+      resolveClient: new RecordingClickHouse().resolve,
+      clickhouse: new AuthorizedClickHouse({
+        resolveClient: async () =>
+          idIndexedClientDouble({ indexes: TRACE_ID_INDEXES, driver: { execute } }),
+      }),
+    });
+    return { repo, statements };
+  }
+
+  describe("given a hint whose window misses the trace's spans", () => {
+    /** @scenario "a paged span read counts and pages within one bound" */
+    it("answers the true total with the page, both from the one widened bound", async () => {
+      const { repo, statements } = pagedRepository();
+
+      const page = await repo.listSpansPaginated({
+        authorization,
+        traceId: "trace-1",
+        limit: 10,
+        offset: 0,
+        occurredAtMs: SPAN_MS - 30 * DAY_MS,
+      });
+
+      expect(page.total).toBe(1);
+      expect(page.spans).toHaveLength(1);
+      const pageRead = statements.at(-1);
+      expect(pageRead?.params).toMatchObject({ spanFromMs: SPAN_MS, spanToMs: SPAN_MS });
+    });
+  });
+
+  describe("given no time for the trace while its index is not ready", () => {
+    /** @scenario "a paged span read counts and pages within one bound" */
+    it("looks the trace's time up once for both the count and the page", async () => {
+      const { repo, statements } = pagedRepository();
+
+      await repo.listSpansPaginated({ authorization, traceId: "trace-1", limit: 10, offset: 0 });
+
+      expect(statements.filter((each) => each.sql.includes("occurredAtMs"))).toHaveLength(1);
+    });
+  });
+});

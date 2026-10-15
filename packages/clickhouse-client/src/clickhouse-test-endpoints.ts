@@ -16,6 +16,7 @@ export {
   readyIdIndexedClientDouble,
   type ScriptedStatements,
 } from "./idIndexedClientDouble.ts";
+export { type VendorStatements, vendorQueryClient } from "./vendorQueryClient.ts";
 
 /**
  * The ClickHouse image every container-backed test starts, here and in

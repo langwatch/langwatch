@@ -22,7 +22,7 @@ import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./qu
 import { TRANSIENT_NETWORK_CODES } from "./resilience.ts";
 import type { RetryPolicy } from "./retry.ts";
 import type { StatementOperation, StatementReporter } from "./statementReporting.ts";
-import { ID_BOUND_PARAM_PREFIX } from "./statementScopeError.ts";
+import { ID_BOUND_PARAM_PREFIX, StatementScopeError } from "./statementScopeError.ts";
 import { extractQueryType, extractTableName } from "./statementShape.ts";
 import type { PrivateRouteVariable } from "./tenancy.ts";
 import type { TenantGuard } from "./tenantGuard.ts";
@@ -258,6 +258,7 @@ export class ClickHouseQueryClient {
    */
   private async statement<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
     this.tenantGuard.assert(request);
+    refuseUnexpandedIdBound({ request });
 
     const runOnce = () => this.driver.execute<Row>(request);
     const withRetries = () =>
@@ -303,7 +304,8 @@ export class ClickHouseQueryClient {
    */
   async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
     this.tenantGuard.assert(request);
-    if (this.driver.stream === undefined) {
+    // A bounded read expands its marker per window, so it is answered whole, as one batch.
+    if (this.driver.stream === undefined || hasIdBound(request)) {
       yield (await this.query<Row>(request)).rows;
       return;
     }
@@ -316,6 +318,7 @@ export class ClickHouseQueryClient {
    */
   async command(request: QueryRequest): Promise<void> {
     this.tenantGuard.assert(request);
+    refuseUnexpandedIdBound({ request });
 
     const runOnce = () => this.driver.command(request);
     const withRetries = () =>
@@ -385,4 +388,9 @@ export class ClickHouseQueryClient {
       throw error;
     }
   }
+}
+
+/** The last check before a statement leaves: an unexpanded marker never reaches the server. */
+function refuseUnexpandedIdBound({ request }: { request: QueryRequest }): void {
+  if (hasIdBound(request)) throw new StatementScopeError({ kind: "unexpanded-id-bound" });
 }

@@ -227,3 +227,50 @@ Feature: A lookup by id reads only the partitions its id index names
     When the process boots
     Then the declarations reach the ClickHouse client
     And one background fill step is built for them under the module's step id
+
+  @unit
+  Scenario: a caller's own time range stays hard once the index is ready
+    Given a read that names its own time range and asks never to widen it
+    When the index is ready and names a range for the id
+    Then the read covers only where the two ranges overlap
+    And it reads nothing when they do not overlap
+
+  @unit
+  Scenario: an id the index has never seen reads nothing when the read asks for nothing
+    Given the index is ready and has no row for the ids
+    When a read that treats a miss as absent looks them up
+    Then it answers nothing without reading the source
+
+  @unit
+  Scenario: a paged span read counts and pages within one bound
+    Given a trace whose spans lie outside the window of the time a caller gave
+    When a page of its spans is read
+    Then the total and the page come from the same bound
+    And the trace's time is looked up at most once
+
+  @unit
+  Scenario: a read that already has a lower bound skips the index
+    Given the event log index is ready
+    When an aggregate's events are read with a lower bound of the caller's own
+    Then the index is not asked
+    And the read is bounded by the caller's lower bound
+
+  @unit
+  Scenario: an event missing from its aggregate's indexed stream is read for once
+    Given the event log index is ready and names the aggregate's range
+    When an event the aggregate does not hold is looked up by id
+    Then one index read and one source read answer that it is not found
+    And no wider read follows
+
+  @unit
+  Scenario: a fill retried after a failed first batch counts each partition once
+    Given a fill whose target fails before its first batch is written
+    When the ledger retries the fill
+    Then the report's partition total counts that target's partitions once
+
+  @unit
+  Scenario: a marker never reaches ClickHouse unexpanded
+    Given a statement that carries an id-bound marker
+    When it is sent as a command, or streamed
+    Then a command is refused before it reaches the server
+    And a streamed read is answered through the bounded read, its marker expanded

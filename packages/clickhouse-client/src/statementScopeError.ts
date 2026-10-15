@@ -17,7 +17,8 @@ export type StatementScopeViolation =
   | { kind: "unknown-id-index"; table: string }
   | { kind: "id-index-key-mismatch"; table: string; columns: string }
   | { kind: "missing-id-param"; param: string }
-  | { kind: "mixed-id-bounds" };
+  | { kind: "mixed-id-bounds" }
+  | { kind: "unexpanded-id-bound" };
 
 /** A statement the reader will not send. Named so a test can tell which
  *  refusal fired without reading prose. */
@@ -47,5 +48,7 @@ function describe(violation: StatementScopeViolation): string {
       return `An {{idBound}} marker names parameter "${violation.param}", which is not bound to a String or an Array(String).`;
     case "mixed-id-bounds":
       return "Statement carries {{idBound}} markers for different ids; one statement is bounded by one id lookup.";
+    case "unexpanded-id-bound":
+      return "Statement still carries an {{idBound}} marker; only a read through the client's query expands one.";
   }
 }

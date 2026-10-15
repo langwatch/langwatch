@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
 import {
   databaseUrl,
+  scenarioClickHouseOver,
   simulationRunRow,
   useSimulationClickHouse,
 } from "./simulation-clickhouse-rows.fixture.ts";
@@ -287,7 +288,9 @@ describe.skipIf(databaseUrl === null)("the cost of reading the note", () => {
           return Reflect.get(target, prop, receiver);
         },
       });
-      const recordingRepo = SimulationClickHouseRepository.create(async () => recordingClient);
+      const recordingRepo = SimulationClickHouseRepository.create(
+        scenarioClickHouseOver(recordingClient),
+      );
 
       const result = await recordingRepo.listBatchHistoryForScenarioSet({
         projectId: tenantId,

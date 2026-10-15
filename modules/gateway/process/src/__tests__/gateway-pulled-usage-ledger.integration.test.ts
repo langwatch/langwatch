@@ -21,6 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import { GatewayBudgetLedgerService } from "../features/budget/services/gateway-budget-ledger.service.ts";
+import { gatewayClickHouseOver } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
@@ -261,7 +262,7 @@ describe.skipIf(!databaseUrl)(
         },
       });
 
-      budgets = GatewayBudgetClickHouseRepository.create(async () => clickhouse as never);
+      budgets = GatewayBudgetClickHouseRepository.create(gatewayClickHouseOver(clickhouse));
       gateway = PrismaGatewayAdapter.create({
         database: prisma,
         projects: suiteProjects(),
