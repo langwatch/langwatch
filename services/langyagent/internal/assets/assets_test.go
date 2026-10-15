@@ -80,6 +80,9 @@ func TestAgentsTemplate_EmptyWindowStatesDataAge(t *testing.T) {
 			t.Errorf("AGENTS.md list-question rule never says %q, so an empty window cannot be told from a broken pipeline or zero errors from a fault", phrase)
 		}
 	}
+	if !strings.Contains(tmpl, "a skill's telemetry env var names (key as `<key>`)") {
+		t.Errorf("AGENTS.md no longer lets the agent name a skill's telemetry env vars with the key as a placeholder, so the Claude Code telemetry setup gets dropped")
+	}
 }
 
 // The prompt has a byte budget so it cannot silently grow back into a rule

@@ -44,6 +44,7 @@ Feature: Langy tells an idle project from a broken pipeline
     When I ask about that data in a time window
     Then Langy says the project has never received that data
     And Langy does not invent a time for a newest row
+    And Langy names one likely cause
 
   @e2e
   Scenario: Langy does not claim it cannot see data after a query succeeded
