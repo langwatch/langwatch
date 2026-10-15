@@ -7200,3 +7200,107 @@ model SignInProviderMount {
   lastAppliedEventId String
   updatedAt          DateTime @default(now()) @updatedAt
 }
+
+// ── Weekly digest (enterprise/modules/digest) ────────────────────────────────
+// Ids and numbers only: names and addresses are read from the user module when
+// an email is rendered, never stored here.
+
+/// An organization enrolled in the weekly digest. No row: not enrolled, so nothing sends.
+model DigestCohortOrganization {
+  organizationId String   @id
+  enrolledBy     String
+  enrolledAt     DateTime @default(now())
+}
+
+/// A person who unsubscribed from the digest. No row: subscribed.
+model DigestSubscription {
+  userId                 String    @id
+  unsubscribedAt         DateTime?
+  unsubscribedFromSendId String?
+  updatedAt              DateTime  @updatedAt
+}
+
+/// A project's ISO week, folded from its owners' events. The id is the fold's aggregate key.
+model DigestProjectWeek {
+  id                String   @id
+  projectId         String
+  organizationId    String
+  isoWeek           String
+  /// The fold state: counts, sums, a fixed-bucket latency histogram, capped model and evaluator maps.
+  state             Json
+  occurredAt        DateTime
+  lastEventId       String
+  acceptedAt        DateTime
+  projectionVersion String
+  createdAt         DateTime
+  updatedAt         DateTime
+
+  @@index([organizationId, isoWeek])
+  @@index([isoWeek])
+}
+
+/// A person's ISO week of coding-agent activity, folded from the agents' facts.
+model DigestUserWeek {
+  id                String   @id
+  userId            String
+  organizationId    String
+  isoWeek           String
+  /// Sessions (a capped set of ids) and the agents' metric series, converged last-write-wins.
+  state             Json
+  occurredAt        DateTime
+  lastEventId       String
+  acceptedAt        DateTime
+  projectionVersion String
+  createdAt         DateTime
+  updatedAt         DateTime
+
+  @@index([organizationId, isoWeek])
+  @@index([isoWeek])
+}
+
+/// One person's digest for one ISO week. Unique per (user, week), so a redelivery sends nothing.
+model DigestSend {
+  id             String    @id
+  userId         String
+  organizationId String
+  isoWeek        String
+  templateId     String
+  /// `{ linkKey: url }`: a click token names a key, and the redirect reads the address here.
+  links          Json
+  messageId      String?
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@unique([userId, isoWeek])
+  @@index([isoWeek, templateId])
+}
+
+/// One followed link of a sent digest.
+model DigestClick {
+  id      String   @id
+  sendId  String
+  linkKey String
+  at      DateTime @default(now())
+
+  @@index([sendId])
+}
+
+/// The "what's new" card for one ISO week.
+model DigestUpdate {
+  isoWeek   String   @id
+  title     String
+  body      String
+  gradient  String
+  linkLabel String
+  linkUrl   String
+  updatedBy String
+  updatedAt DateTime @updatedAt
+}
+
+/// The digest's one settings row. `armed` is the weekly send's master switch; it starts off.
+model DigestSettings {
+  id              String   @id @default("singleton")
+  armed           Boolean  @default(false)
+  lastPlannedWeek String?
+  updatedAt       DateTime @updatedAt
+}
