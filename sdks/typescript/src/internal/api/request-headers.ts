@@ -21,7 +21,7 @@ export function buildSdkIdentityHeaders({
   };
 }
 
-/** A command that builds its own request still names the project the resolver chose (`--project`). */
+/** A command building its own request still names the project the resolver chose (`--project`). */
 export function buildRequestHeaders(
   credentials: LangWatchAuthHeadersInput,
 ): Record<string, string> {

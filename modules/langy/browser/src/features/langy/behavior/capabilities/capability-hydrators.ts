@@ -31,7 +31,10 @@ export type CapabilityTrpcUtils = {
     header: Pick<ApiUtils["traces"]["header"], "fetch">;
     list: Pick<ApiUtils["traces"]["list"], "fetch">;
   };
-  dataset: { getAll: Pick<ApiUtils["dataset"]["getAll"], "fetch"> };
+  dataset: {
+    getAll: Pick<ApiUtils["dataset"]["getAll"], "fetch">;
+    recordCounts: Pick<ApiUtils["dataset"]["recordCounts"], "fetch">;
+  };
   prompts: {
     getAllPromptsForProject: Pick<ApiUtils["prompts"]["getAllPromptsForProject"], "fetch">;
   };
@@ -202,17 +205,22 @@ async function datasetByIds({
   ids: string[];
 }): Promise<CapabilityHydration> {
   const datasets = await utils.dataset.getAll.fetch({ projectId });
-  const rows: CapabilityHydratedRow[] = [];
-  for (const id of ids) {
-    const dataset = datasets.find((candidate) => matchesId(candidate, id, ["id", "slug"]));
-    if (!dataset) continue;
-    const records = dataset.recordCount;
-    rows.push({
+  const matched = ids
+    .map((id) => datasets.find((candidate) => matchesId(candidate, id, ["id", "slug"])))
+    .filter((dataset) => dataset !== undefined);
+  const counts = await utils.dataset.recordCounts
+    .fetch({ projectId, datasetIds: matched.map((dataset) => dataset.id) })
+    .catch(() => []);
+  const rows: CapabilityHydratedRow[] = matched.map((dataset) => {
+    const records = counts.find((count) => count.datasetId === dataset.id)?.recordCount;
+    return {
       id: dataset.id,
       primary: dataset.name,
-      secondary: `${records.toLocaleString()} ${records === 1 ? "record" : "records"}`,
-    });
-  }
+      ...(records === undefined
+        ? {}
+        : { secondary: `${records.toLocaleString()} ${records === 1 ? "record" : "records"}` }),
+    };
+  });
   return { rows };
 }
 

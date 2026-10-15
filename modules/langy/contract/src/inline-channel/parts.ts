@@ -9,6 +9,7 @@ import * as z from "zod";
 import {
   langyDerivedCardSchema,
   langyCardHintSchema,
+  type LangyDerivedInsightsCard,
   RENDERED_CARD_KINDS,
 } from "../cards/derived-safe.ts";
 import { langyChoiceSelectionSchema } from "./choices.ts";
@@ -26,6 +27,8 @@ const langyCardPartSchemaDefinition = z
     provenance: z.literal("derived"),
     card: langyDerivedCardSchema,
     hints: z.array(langyCardHintSchema).optional(),
+    /** The fence's JSON was damaged and repaired before it validated (ADR-060 §2). */
+    repaired: z.literal(true).optional(),
   })
   .refine((part) => part.kind === part.card.kind && part.blockId === part.card.blockId, {
     message: "part identity must match the stamped card",
@@ -63,6 +66,21 @@ export type LangyChoiceSelectionPart = z.infer<typeof langyChoiceSelectionPartSc
 export function parseLangyCardPart(part: unknown): LangyCardPart | null {
   const parsed = langyCardPartSchema.safeParse(part);
   return parsed.success ? parsed.data : null;
+}
+
+/** A stamped card part that holds findings. */
+export type LangyInsightsCardPart = LangyCardPart & { card: LangyDerivedInsightsCard };
+
+/**
+ * The insights cards among a message's parts, in the answer's own order: the typed findings
+ * a reader takes from a settled turn, never from its prose.
+ */
+export function langyInsightsCardPartsOf(parts: readonly unknown[]): LangyInsightsCardPart[] {
+  return parts.flatMap((part) => {
+    const stamped = parseLangyCardPart(part);
+    if (stamped?.card.kind !== "insights") return [];
+    return [{ ...stamped, card: stamped.card }];
+  });
 }
 
 /** Parse an opaque message part as a failed-card part, or null. */

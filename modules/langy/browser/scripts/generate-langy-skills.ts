@@ -50,6 +50,11 @@ export interface GeneratedSkill {
    * `lwql-charts` uses it so the two chart skills are mutually exclusive.
    */
   excludedByFlag?: string;
+  /**
+   * A skill only a module's own brief names (`internal: true` in front-matter), such as the
+   * daily insights run's. The worker installs it; the palette never offers it.
+   */
+  internal?: true;
 }
 
 /**
@@ -110,6 +115,7 @@ function readSkill(dir: string): GeneratedSkill | null {
   const userPrompt = frontmatter["user-prompt"]?.replace(/^["']|["']$/g, "");
   const featureFlag = frontmatter["feature-flag"];
   const excludedByFlag = frontmatter["exclude-when-flag"];
+  const isInternal = frontmatter.internal === "true";
 
   return {
     id,
@@ -119,6 +125,7 @@ function readSkill(dir: string): GeneratedSkill | null {
     ...(userPrompt ? { userPrompt } : {}),
     ...(featureFlag ? { featureFlag } : {}),
     ...(excludedByFlag ? { excludedByFlag } : {}),
+    ...(isInternal ? { internal: true as const } : {}),
   };
 }
 

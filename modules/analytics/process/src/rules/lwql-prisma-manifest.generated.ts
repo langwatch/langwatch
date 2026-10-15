@@ -104,6 +104,14 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly IdentitySignInSwitch: {
+    readonly userId: "String";
+    readonly onIdentifiers: "Boolean";
+    readonly pinned: "Boolean";
+    readonly switchedAt: "DateTime";
+    readonly lastAppliedEventId: "String?";
+    readonly updatedAt: "DateTime";
+  };
   readonly IdentifierReservation: {
     readonly normalizedValue: "String";
     readonly userId: "String";
@@ -720,8 +728,96 @@ export interface LwqlPrismaRows {
     readonly projectId: "String";
     readonly name: "String";
     readonly order: "Int";
+    readonly description: "String?";
+    readonly createdById: "String?";
+    readonly scope: "DashboardScope";
+    readonly organizationId: "String?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+  };
+  readonly DashboardFavourite: {
+    readonly id: "String";
+    readonly userId: "String";
+    readonly dashboardId: "String?";
+    readonly templateId: "String?";
+    readonly projectId: "String";
+    readonly position: "Int";
+    readonly createdAt: "DateTime";
+  };
+  readonly InsightProjection: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly title: "String";
+    readonly body: "String";
+    readonly tone: "String";
+    readonly topic: "String?";
+    readonly validDays: "Int";
+    readonly lwql: "String?";
+    readonly sourceConversationId: "String?";
+    readonly sourceMessageId: "String?";
+    readonly filedByUserId: "String?";
+    readonly filedAt: "Float";
+    readonly renewedAt: "Float?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
+    readonly boardId: "String?";
+    readonly boardName: "String?";
+    readonly widgetId: "String?";
+    readonly widgetName: "String?";
+    readonly filedVia: "String";
+    readonly replayStart: "Float?";
+    readonly replayEnd: "Float?";
+    readonly replayGranularitySeconds: "Int?";
+    readonly replayContext: "Json?";
+    readonly ownerUserId: "String?";
+    readonly findingKey: "String?";
+  };
+  readonly InsightReaderProjection: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly insightId: "String";
+    readonly userId: "String";
+    readonly seenAt: "Float?";
+    readonly archivedAt: "Float?";
+    readonly keptAt: "Float?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
+  };
+  readonly InsightDailyScheduleProjection: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly userId: "String";
+    readonly boardKind: "String";
+    readonly boardId: "String";
+    readonly boardName: "String";
+    readonly state: "String";
+    readonly offReason: "String?";
+    readonly hour: "Int?";
+    readonly timezone: "String?";
+    readonly maxInsights: "Int?";
+    readonly lastRunId: "String?";
+    readonly lastRunAt: "Float?";
+    readonly lastRunOutcome: "String?";
+    readonly lastRunReason: "String?";
+    readonly lastRunFiled: "Int?";
+    readonly lastRunRenewed: "Int?";
+    readonly lastRunConversationId: "String?";
+    readonly consecutiveSkips: "Int";
+    readonly skipStreakSlot: "Float?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
   };
   readonly SavedView: {
     readonly id: "String";
@@ -1018,6 +1114,7 @@ export interface LwqlPrismaRows {
     readonly UserId: "String";
     readonly Title: "String?";
     readonly TitleSource: "LangyProjectionTitleSource";
+    readonly Origin: "String";
     readonly Status: "String";
     readonly IsShared: "Boolean";
     readonly SharedAt: "Float?";
@@ -1548,6 +1645,14 @@ export interface LwqlPrismaRows {
     readonly deactivatedAt: "DateTime?";
     readonly erasedAt: "DateTime?";
     readonly standingChangedAt: "DateTime";
+  };
+  readonly AuthzEngineSwitch: {
+    readonly organizationId: "String";
+    readonly onEngine: "Boolean";
+    readonly pinned: "Boolean";
+    readonly switchedAt: "DateTime";
+    readonly lastAppliedEventId: "String?";
+    readonly updatedAt: "DateTime";
   };
   readonly RoleBinding: {
     readonly id: "String";

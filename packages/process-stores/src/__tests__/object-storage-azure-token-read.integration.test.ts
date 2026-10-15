@@ -17,8 +17,6 @@ vi.mock("@azure/identity", () => ({
   AzureCliCredential: class {},
 }));
 
-import { buildObjectStorage } from "../object-storage-member.ts";
-
 const clock = { now: () => Temporal.Instant.from("2026-09-24T12:00:00Z") };
 const directory = { organizationForTenant: () => Promise.resolve("organization-1") };
 const accountKey = Buffer.from("an account key of some length").toString("base64");
@@ -74,6 +72,9 @@ describe("given objects were written to Azure Blob under shared-key auth", () =>
   describe("when the deployment moves to a token-based mode and reads them back", () => {
     /** @scenario "Reads of previously persisted azure-blob URIs succeed in a token-based mode" */
     it("resolves the recorded location through the Azure driver with a bearer token", async () => {
+      // The package runs with isolate: false, so the identity SDK may already be cached unmocked.
+      vi.resetModules();
+      const { buildObjectStorage } = await import("../object-storage-member.ts");
       const azure = { accountName: "devstoreaccount1", container: "objects", endpoint };
       const sharedKey = buildObjectStorage({
         config: { backend: "azure", azure: { ...azure, accountKey } },

@@ -24,7 +24,7 @@ describe("the SDK dataset evaluation REST family", () => {
           route.operation,
           route.permission,
           route.response?.kind,
-          route.rawBody?.form,
+          route.inputMediaType,
           route.sharedPath?.owner,
         ]),
       ).toEqual([
@@ -34,7 +34,7 @@ describe("the SDK dataset evaluation REST family", () => {
           "postApiDatasetEvaluate",
           "evaluations:manage",
           "protocol",
-          "text",
+          { mediaType: "application/json", mismatch: "malformed_request" },
           "dataset",
         ],
       ]);

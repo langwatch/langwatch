@@ -12,6 +12,7 @@ import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
 import {
   registerChunkReloadListener,
   reloadOnBundleSwap,
+  signalUiMounted,
 } from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
 import {
@@ -41,7 +42,7 @@ import { saasWeb } from "@langwatch/enterprise-saas-browser/declaration";
 import { applyFeatureFlagOverridesFromSearch } from "@langwatch/feature-flag-client";
 import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
 import posthog from "posthog-js";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { useLocation } from "react-router";
 
@@ -91,6 +92,8 @@ function UiAttributionCapture({ children }: { children: ReactNode }) {
 
 /** The last resort: plain, for when even the branded error page cannot draw. */
 function UiBootPageError() {
+  // The app answered: the boot recovery must not reload over its message.
+  useEffect(signalUiMounted, []);
   return (
     <div role="alert" style={{ padding: "3rem", textAlign: "center" }}>
       <h1 style={{ fontSize: `${TYPE_SCALE_PX.pageTitle}px`, marginBottom: "0.5rem" }}>
