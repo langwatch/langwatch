@@ -26,6 +26,12 @@ Feature: Migration compatibility gates
     Then the job passes only if every suite file passed at least one test
 
   @unit
+  Scenario: Base's worker takes jobs while base's suites run
+    Given each base suite's upgrade waits for a worker to take the system-migrations pass request
+    When base's worker is started on head's schema before the suites
+    Then the suites wait only until it answers ready, and the job fails if it exits or never does
+
+  @unit
   Scenario: A base suite that silently skips fails the job
     Given base's live suites skip themselves when they cannot see the live stores
     When a suite file reports no passed test

@@ -191,8 +191,6 @@ import {
 import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
-import { OutboxAggregateReconcile } from "../eventing/aggregate-reconcile.intent.ts";
-import { enqueueMemberAggregates } from "../eventing/aggregate-reconcile.subscriber.ts";
 import {
   OutboxAnomalyAlertDelivery,
   requestAnomalyAlertDelivery,
@@ -241,10 +239,7 @@ import { GovernanceCostBreakdownService } from "../features/cost/services/govern
 import { GovernanceCostNoticesService } from "../features/cost/services/governance-cost-notices.service.ts";
 import { GovernanceCostSummaryService } from "../features/cost/services/governance-cost-summary.service.ts";
 import { DatabricksGeniePullerService } from "../features/databricks-genie/services/databricks-genie-puller.service.ts";
-import {
-  DepartmentService,
-  type MemberDepartmentAssigned,
-} from "../features/identity/services/department.service.ts";
+import { DepartmentService } from "../features/identity/services/department.service.ts";
 import { DirectoryDepartmentSyncService } from "../features/identity/services/directory-department-sync.service.ts";
 import { ErasureSuppressionService } from "../features/identity/services/erasure-suppression.service.ts";
 import { GovernancePeopleScreenService } from "../features/identity/services/governance-people-screen.service.ts";
@@ -354,7 +349,6 @@ interface GovernanceAppDependencies {
     | "findIdentity"
     | "findAggregate"
     | "findLiveAggregateIds"
-    | "findAllLiveAggregates"
     | "findPersonalProjectIds"
     | "findReadableProjectIds"
   >;
@@ -662,9 +656,6 @@ export class GovernanceModule implements GovernanceRestApi {
       repository: repositories.departments,
       organizations: dependencies.organizations,
       projects: dependencies.projects,
-      // ponytail: no outbox in this process -> organization's member_department_changed fact and the sweep reconcile.
-      onMemberDepartmentAssigned: (fact) =>
-        this.#memberAggregateReconcile?.(fact) ?? Promise.resolve(),
     });
     this.erasureSuppression = erasureSuppression;
     // One instance: the erasure refreshes the very snapshot the cost fold reads (ADR-128 §9 step 5).
@@ -1083,21 +1074,6 @@ export class GovernanceModule implements GovernanceRestApi {
   /** Main's `spendSpikeAnomalyWorker` tick: every active spend_spike rule against `governance_kpis`. */
   evaluateSpendSpikes(): Promise<SpendSpikeEvaluationSummary> {
     return this.spendSpikes.evaluateAll();
-  }
-
-  #memberAggregateReconcile: MemberDepartmentAssigned | undefined;
-
-  /** A built pipeline means an outbox: this module's own department writes enqueue reconciles. */
-  connectAggregateReconcileOutbox({
-    processStore,
-  }: {
-    processStore: Pick<ProcessStore, "appendIntents">;
-  }): void {
-    this.#memberAggregateReconcile = enqueueMemberAggregates({
-      reconciler: this.aggregateReconciler,
-      outbox: OutboxAggregateReconcile.create(processStore),
-      trigger: "department-write",
-    });
   }
 
   #anomalyAlertOutbox: OutboxAnomalyAlertDelivery | undefined;

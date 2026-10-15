@@ -11,6 +11,21 @@ import { z } from "zod";
 
 const positiveInteger = z.coerce.number().int().positive();
 
+/** Evaluator inputs up to this many bytes stay inline; larger ones go to a stored object. */
+export const EVAL_INPUTS_INLINE_MAX_BYTES = 1024 * 1024;
+/** Above this many bytes only the preview is kept: the full inputs are never uploaded. */
+export const EVAL_INPUTS_HARD_CEILING_BYTES = 50 * 1024 * 1024;
+
+/** A byte budget as the previous release read it: blank, under 1 or unusable keeps the default. */
+const byteBudget = (fallback: number) =>
+  z
+    .string()
+    .optional()
+    .transform((raw) => {
+      const parsed = Number(raw ?? "");
+      return Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : fallback;
+    });
+
 /**
  * Where this deployment's langevals answers. Evaluation owns the leaf; data-privacy holds the same
  * instance to reach Presidio itself (R5, Alex 2026-10-06), so the one variable has one meaning.
@@ -32,6 +47,14 @@ export const evaluationConfig = Config.define((c) => ({
   topicClusteringMaxPayloadBytes: c.env(
     "TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES",
     positiveInteger.default(180_000_000),
+  ),
+  inputsInlineMaxBytes: c.env(
+    "LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES",
+    byteBudget(EVAL_INPUTS_INLINE_MAX_BYTES),
+  ),
+  inputsHardCeilingBytes: c.env(
+    "LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES",
+    byteBudget(EVAL_INPUTS_HARD_CEILING_BYTES),
   ),
   azureContentSafetyEndpoint: c.env("AZURE_CONTENT_SAFETY_ENDPOINT", z.string().optional()),
   enablePresidio: c.env("LANGWATCH_ENABLE_PRESIDIO", z.string().optional()),

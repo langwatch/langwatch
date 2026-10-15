@@ -249,6 +249,15 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then 2 runs execute and 2 runs wait in the queue with status "Queued"
 
   # AC22
+  @unit
+  Scenario: The voice run concurrency cap is VOICE_RUNS_MAX_CONCURRENT, 2 when unset
+    Given a worker that executes voice runs
+    When VOICE_RUNS_MAX_CONCURRENT is unset, blank or not a positive whole number
+    Then each project may run 2 voice runs at once on that worker
+    When VOICE_RUNS_MAX_CONCURRENT is a positive whole number
+    Then that number is the per-project cap
+
+  # AC22
   @integration
   Scenario: A voice run that fails before its call starts frees its concurrency slot
     Given the project's voice run concurrency cap is reached

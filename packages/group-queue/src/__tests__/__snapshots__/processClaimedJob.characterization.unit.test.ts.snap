@@ -100,22 +100,11 @@ exports[`given a claimed job > completes a job whose handler succeeds 1`] = `
     [
       {
         "claimToken": "claim-1",
+        "endsRetryChain": true,
         "groupId": "project_1/g1",
         "jobName": "job",
         "stagedJobId": "job-1",
       },
-    ],
-  ],
-  [
-    "scripts.clearGroupFailures",
-    [
-      "project_1/g1",
-    ],
-  ],
-  [
-    "redis.del",
-    [
-      "{test/gq/characterize}:gq:group:project_1/g1:attempt",
     ],
   ],
   [
@@ -715,22 +704,11 @@ exports[`given a claimed job that coalesces its siblings > processes the batch a
     [
       {
         "claimToken": "claim-1",
+        "endsRetryChain": true,
         "groupId": "project_1/g1",
         "jobName": "job",
         "stagedJobId": "job-1",
       },
-    ],
-  ],
-  [
-    "scripts.clearGroupFailures",
-    [
-      "project_1/g1",
-    ],
-  ],
-  [
-    "redis.del",
-    [
-      "{test/gq/characterize}:gq:group:project_1/g1:attempt",
     ],
   ],
   [

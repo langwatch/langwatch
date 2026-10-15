@@ -128,6 +128,9 @@ export interface TraceAnalyticsRow {
   // Metric scalars.
   totalCost: number | null;
   nonBilledCost: number | null;
+  /** Spans whose model had no price, and those models sorted (trace_summaries' twins). */
+  unpricedSpanCount: number;
+  unpricedModels: string[];
   totalDurationMs: number;
   timeToFirstTokenMs: number | null;
   tokensPerSecond: number | null;
@@ -216,6 +219,8 @@ export interface TraceAnalyticsData {
   totalDurationMs: number;
   totalCost: number | null;
   nonBilledCost: number | null;
+  unpricedSpanCount: number;
+  unpricedModels: string[];
   totalPromptTokenCount: number | null;
   totalCompletionTokenCount: number | null;
   timeToFirstTokenMs: number | null;
@@ -348,6 +353,8 @@ export class TraceAnalyticsFoldProjection
       totalDurationMs: 0,
       totalCost: null,
       nonBilledCost: null,
+      unpricedSpanCount: 0,
+      unpricedModels: [],
       totalPromptTokenCount: null,
       totalCompletionTokenCount: null,
       timeToFirstTokenMs: null,
@@ -607,6 +614,8 @@ export class TraceAnalyticsFoldProjection
       models: state.models,
       totalCost: state.totalCost,
       nonBilledCost: state.nonBilledCost,
+      unpricedSpanCount: state.unpricedSpanCount,
+      unpricedModels: state.unpricedModels,
       tokensEstimated: false,
       totalPromptTokenCount: state.totalPromptTokenCount,
       totalCompletionTokenCount: state.totalCompletionTokenCount,
@@ -781,6 +790,8 @@ export class TraceAnalyticsFoldProjection
 
       totalCost: state.totalCost,
       nonBilledCost: state.nonBilledCost,
+      unpricedSpanCount: state.unpricedSpanCount ?? 0,
+      unpricedModels: state.unpricedModels ?? [],
       totalDurationMs: state.totalDurationMs,
       timeToFirstTokenMs: state.timeToFirstTokenMs,
       tokensPerSecond: state.tokensPerSecond,
@@ -856,6 +867,8 @@ export class TraceAnalyticsFoldProjection
       totalDurationMs: row.totalDurationMs,
       totalCost: row.totalCost,
       nonBilledCost: row.nonBilledCost,
+      unpricedSpanCount: row.unpricedSpanCount,
+      unpricedModels: row.unpricedModels,
       totalPromptTokenCount: row.promptTokens,
       totalCompletionTokenCount: row.completionTokens,
       timeToFirstTokenMs: row.timeToFirstTokenMs,
@@ -901,10 +914,12 @@ export class TraceAnalyticsFoldProjection
       return state;
     }
 
+    const spanCost = runtime.spanCost.estimateAccumulatedSpanCost(span);
     const next = foldSpanIntoTraceAnalytics({
       state: TraceAnalyticsFoldProjection.asTraceSummaryStateView(state),
       span,
-      spanCost: runtime.spanCost.estimateAccumulatedSpanCost(span),
+      spanCost,
+      spanUnpriced: spanCost <= 0 && runtime.spanCost.isAccumulatedSpanUnpriced(span),
     });
 
     return {
@@ -920,6 +935,8 @@ export class TraceAnalyticsFoldProjection
       rootSpanStartTimeMs: next.rootSpanStartTimeMs,
       totalCost: next.totalCost,
       nonBilledCost: next.nonBilledCost,
+      unpricedSpanCount: next.unpricedSpanCount ?? 0,
+      unpricedModels: next.unpricedModels ?? [],
       totalPromptTokenCount: next.totalPromptTokenCount,
       totalCompletionTokenCount: next.totalCompletionTokenCount,
       timeToFirstTokenMs: next.timeToFirstTokenMs,

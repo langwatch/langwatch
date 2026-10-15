@@ -41,3 +41,14 @@ Feature: Coding agent cost and context skill
     Given the rendered skill
     Then it warns that a settings.json env value overrides a shell export
     And every query it runs reads the coding agent views through langwatch query run
+
+  # A login can read many projects; an org admin's reaches every team's
+  # sessions. A server without PR #8550 ignores --project on queries, so the
+  # skill narrows inside the statement, which every server honours.
+  @unit
+  Scenario: One project is narrowed with a TenantId filter in the query
+    Given the rendered skill
+    Then it tells the agent to add a TenantId filter to every query for one project
+    And it names personal_project.id from langwatch whoami as the user's own project id
+    And it tells the agent to ask for the project id when whoami has no personal_project
+    And its one-project instruction no longer tells the agent to pass --project

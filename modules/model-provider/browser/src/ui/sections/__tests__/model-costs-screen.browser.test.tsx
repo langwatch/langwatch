@@ -112,7 +112,7 @@ describe("given the Model Costs screen in a real browser", () => {
     it("shows the empty state, and Clear filters restores every row", async () => {
       await userEvent.fill(page.getByLabelText("Search model costs"), "no-such-model");
 
-      await waitFor(() => expect(screen.getByText("No models match")).toBeVisible());
+      await waitFor(() => expect(screen.getByText(/^No models match\./)).toBeVisible());
       await countLine("Showing 0 of 3 models.");
 
       await userEvent.click(page.getByRole("button", { name: "Clear filters" }).first());

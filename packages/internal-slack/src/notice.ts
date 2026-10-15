@@ -1,5 +1,5 @@
 import { Temporal } from "@langwatch/time";
-import type { Button, KnownBlock, MrkdwnElement } from "@slack/types";
+import type { Button, CardBlock, KnownBlock, MrkdwnElement } from "@slack/types";
 import { z } from "zod";
 
 /** The one status emoji a notice's header opens with. */
@@ -10,6 +10,8 @@ export const NOTICE_TONES = {
   warning: "⚠️",
   loss: "📉",
   failure: "🚨",
+  organization: "🏢",
+  directory: "📇",
 } as const;
 
 export type NoticeTone = keyof typeof NOTICE_TONES;
@@ -31,6 +33,16 @@ export type NoticeLayout = Readonly<{
   summary?: NoticeText;
   fields: readonly NoticeField[];
   note?: string;
+  actions?: readonly NoticeAction[];
+}>;
+
+/** The compact card look: a title, a subtitle, a body and up to three buttons. */
+export type CardLayout = Readonly<{
+  kind: "card";
+  tone: NoticeTone;
+  title: NoticeText;
+  subtitle?: NoticeText;
+  body?: NoticeText;
   actions?: readonly NoticeAction[];
 }>;
 
@@ -63,6 +75,10 @@ export interface SlackNotice<Schema extends z.ZodType> extends RegisteredNotice 
 const HEADER_LIMIT = 150;
 const TEXT_LIMIT = 2_000;
 const FIELDS_PER_SECTION = 10;
+const CARD_TITLE_LIMIT = 150;
+const CARD_SUBTITLE_LIMIT = 150;
+const CARD_BODY_LIMIT = 200;
+const CARD_ACTION_LIMIT = 3;
 
 export const bold = (text: string): Mrkdwn => ({ mrkdwn: `*${escapeMrkdwn(text)}*`, plain: text });
 
@@ -140,6 +156,76 @@ function actionButtons({
   }));
 }
 
+const footerBlock = (origin: NoticeOrigin): KnownBlock => ({
+  type: "context",
+  elements: [
+    mrkdwnElement(`${escapeMrkdwn(origin.environment)} · ${moment(origin.sentAt).mrkdwn}`),
+  ],
+});
+
+/** Clips before escaping, so a cut never splits an entity; a mrkdwn part that won't fit drops. */
+function clipMrkdwn({ text, limit }: { text: NoticeText; limit: number }): string {
+  const whole = toMrkdwn(text);
+  if (whole.length <= limit) return whole;
+  let out = "";
+  for (const part of parts(text)) {
+    const room = limit - 1 - out.length;
+    const rendered = typeof part === "string" ? escapeMrkdwn(part) : part.mrkdwn;
+    if (rendered.length <= room) {
+      out += rendered;
+      continue;
+    }
+    if (typeof part === "string") {
+      let kept = "";
+      for (const char of part) {
+        if (escapeMrkdwn(kept + char).length > room) break;
+        kept += char;
+      }
+      out += escapeMrkdwn(kept);
+    }
+    break;
+  }
+  return `${out}…`;
+}
+
+const cardText = ({ text, limit }: { text: NoticeText; limit: number }): MrkdwnElement => ({
+  type: "mrkdwn",
+  text: clipMrkdwn({ text, limit }),
+});
+
+function composeCard({
+  noticeId,
+  layout,
+  origin,
+}: {
+  noticeId: string;
+  layout: CardLayout;
+  origin: NoticeOrigin;
+}): SlackNoticeMessage {
+  const emoji = NOTICE_TONES[layout.tone];
+  const title = [`${emoji} `, ...parts(layout.title)];
+  const actions = (layout.actions ?? []).slice(0, CARD_ACTION_LIMIT);
+  const card: CardBlock = {
+    type: "card",
+    title: cardText({ text: title, limit: CARD_TITLE_LIMIT }),
+    ...(layout.subtitle !== undefined
+      ? { subtitle: cardText({ text: layout.subtitle, limit: CARD_SUBTITLE_LIMIT }) }
+      : {}),
+    ...(layout.body !== undefined
+      ? { body: cardText({ text: layout.body, limit: CARD_BODY_LIMIT }) }
+      : {}),
+    ...(actions.length > 0 ? { actions: actionButtons({ noticeId, actions }) } : {}),
+  };
+  const plain = [title, layout.subtitle, layout.body]
+    .filter((part): part is NoticeText => part !== undefined)
+    .map(toPlain)
+    .join(" · ");
+  return {
+    text: escapeMrkdwn(clip({ text: plain, limit: TEXT_LIMIT })),
+    blocks: [card, footerBlock(origin)],
+  };
+}
+
 /** The one look every notice shares: header, summary, fields, note, buttons, footer. */
 export function composeMessage({
   noticeId,
@@ -147,9 +233,10 @@ export function composeMessage({
   origin,
 }: {
   noticeId: string;
-  layout: NoticeLayout;
+  layout: NoticeLayout | CardLayout;
   origin: NoticeOrigin;
 }): SlackNoticeMessage {
+  if ("kind" in layout) return composeCard({ noticeId, layout, origin });
   const heading = `${NOTICE_TONES[layout.tone]} ${layout.title}`;
   const blocks: KnownBlock[] = [
     {
@@ -171,12 +258,7 @@ export function composeMessage({
       elements: actionButtons({ noticeId, actions: layout.actions }),
     });
   }
-  blocks.push({
-    type: "context",
-    elements: [
-      mrkdwnElement(`${escapeMrkdwn(origin.environment)} · ${moment(origin.sentAt).mrkdwn}`),
-    ],
-  });
+  blocks.push(footerBlock(origin));
 
   const details = layout.summary !== undefined ? [toPlain(layout.summary)] : [];
   details.push(...layout.fields.map((field) => `${field.label}: ${toPlain(field.value)}`));
@@ -194,7 +276,7 @@ export const defineNotice = <Schema extends z.ZodType>(spec: {
   title: string;
   sentWhen: string;
   schema: Schema;
-  compose: (props: z.output<Schema>) => NoticeLayout;
+  compose: (props: z.output<Schema>) => NoticeLayout | CardLayout;
   fixtures: Readonly<Record<string, z.input<Schema>>>;
 }): SlackNotice<Schema> => {
   const renderUnknown = ({ props, origin }: { props: unknown; origin: NoticeOrigin }) =>

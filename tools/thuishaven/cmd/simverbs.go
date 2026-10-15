@@ -49,6 +49,7 @@ var simPublicVerbs = map[string]string{
 	"storage":   "list|buckets|objects|object|presign|delete|clear|seed|fault",
 	"voice":     "status|list|get|clear",
 	"telemetry": "status|list|get|send|load|fuzz|post|fixtures|fixture|stop|console",
+	"mcp":       "status|list|get|connect|stream|refresh|double-refresh|reconnect|idle|soak|oauth|grant|forget|stop|clear|console",
 }
 
 // simCommand turns one simulator's command into `haven sim <name>`.

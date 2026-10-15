@@ -121,6 +121,7 @@ describe("directory sync event aggregate type", () => {
       const declared = defineScimSyncPipeline({
         scimSyncProjectionStore: {} as never,
         scimSyncGuards: {} as never,
+        postSyncSummary: async () => undefined,
       }).metadata.aggregateType;
       const events = await handler.handle(command(data) as never);
 

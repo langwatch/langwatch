@@ -100,7 +100,7 @@ export class StoredObjectUploadSignerService {
     );
     const query = new URLSearchParams({ sig: seal });
 
-    return `/api/stored-objects/${encodeURIComponent(input.objectId)}/content?${query}`;
+    return `/api/stored-objects/${encodeURIComponent(input.objectId)}/content?${query.toString()}`;
   }
 
   /** A read seal that opens, names this object and has not lapsed; anything else is a 401. */
