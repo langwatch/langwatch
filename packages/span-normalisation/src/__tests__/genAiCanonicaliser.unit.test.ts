@@ -440,7 +440,7 @@ describe("GenAICanonicaliserService", () => {
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(500);
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(2000);
       expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS)).toBe(500);
-      expect(ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS)).toBe(false);
+      expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS)).toBe(2000);
     });
 
     it("restates the input when only cache reads happened", () => {

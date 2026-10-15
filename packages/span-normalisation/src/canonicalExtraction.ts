@@ -380,3 +380,25 @@ export const normaliseModelFromAiModelObject = (aiModel: unknown): string | null
 
   return [provider, id].filter(Boolean).join("/") || id;
 };
+
+/**
+ * Restates an input count that includes the cache reads and writes as the fresh remainder, the
+ * canonical shape. An input count smaller than its cache buckets cannot include them and is left.
+ */
+export function restateInputAsFresh(
+  ctx: ExtractorContext,
+  { cacheWrite, ruleId }: { cacheWrite: number; ruleId: string },
+): void {
+  const read = (key: string): number | null =>
+    asNumber(ctx.out[key] !== void 0 ? ctx.out[key] : ctx.bag.attrs.get(key));
+  const input = read(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS);
+  const cached =
+    Math.max(0, read(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS) ?? 0) +
+    Math.max(0, cacheWrite);
+  if (input === null || cached === 0 || input < cached) {
+    return;
+  }
+
+  ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, input - cached);
+  ctx.recordRule(ruleId);
+}
