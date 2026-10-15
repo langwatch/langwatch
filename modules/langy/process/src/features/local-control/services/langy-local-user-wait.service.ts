@@ -24,14 +24,11 @@ import { nowInstant } from "@langwatch/time";
 
 import { LANGY_ID_RESOURCES } from "../../../eventing/langy-conversation-process.schemas.ts";
 import type { LangyLocalUserWaitRepository } from "../../../repositories/langy-local-user-wait.repository.ts";
-import { LANGY_LIVENESS } from "../../../rules/langy-streaming-constants.rules.ts";
 
 const logger = createLogger("langwatch:langy:local-control:waits");
 import {
   blankUserWait,
   given,
-  permissionCardEntry,
-  questionCardEntry,
   refuseSettled,
   toPollResponse,
   type StoredUserWait,
@@ -39,6 +36,7 @@ import {
   type UserWaitEvents,
   type UserWaitQuestion,
 } from "../../../rules/langy-local-user-wait-record.rules.ts";
+import { UserWaitCardsService } from "./langy-local-user-wait-cards.service.ts";
 
 interface UserWaitServiceOptions {
   waits: LangyLocalUserWaitRepository;
@@ -64,7 +62,7 @@ type UserWaitPoll = { outcome: "polled"; answer: PollWaitResponse } | { outcome:
 export class UserWaitService {
   private readonly waits: LangyLocalUserWaitRepository;
   private readonly events: UserWaitEvents;
-  private readonly buffer: UserWaitBuffer;
+  private readonly cards: UserWaitCardsService;
   private readonly sendPermission: NonNullable<UserWaitServiceOptions["sendPermission"]>;
   private readonly pollIntervalMs: number;
   private readonly keepaliveMs: number;
@@ -77,11 +75,11 @@ export class UserWaitService {
   private constructor(options: UserWaitServiceOptions) {
     this.waits = options.waits;
     this.events = options.events;
-    this.buffer = options.buffer;
     this.sendPermission = options.sendPermission ?? (async () => undefined);
     this.now = options.now ?? (() => nowInstant().epochMilliseconds);
     this.pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
     this.keepaliveMs = options.keepaliveMs ?? LIVE_STREAM_KEEPALIVE_MS;
+    this.cards = UserWaitCardsService.create({ buffer: options.buffer, now: this.now });
   }
 
   /** Raises a permission card for one local command. */
@@ -110,7 +108,7 @@ export class UserWaitService {
     await this.persist(wait);
     // The live entry first, so the card is on screen while the event store
     // catches up. Same order as `end` below, and for the same reason.
-    await this.publishPermission(wait);
+    await this.cards.publishPermission(wait);
     await this.events.startUserWait({
       tenantId: wait.projectId,
       occurredAt: wait.createdAt,
@@ -152,7 +150,7 @@ export class UserWaitService {
       budgetMs: QUESTION_WAIT_BUDGET_MS,
     });
     await this.persist(wait);
-    await this.publishQuestion(wait);
+    await this.cards.publishQuestion(wait);
     await this.events.startUserWait({
       tenantId: wait.projectId,
       occurredAt: wait.createdAt,
@@ -183,7 +181,7 @@ export class UserWaitService {
     signal?: AbortSignal;
   }): Promise<UserWaitPoll> {
     const until = this.now() + holdMs;
-    const beat = this.beater();
+    const beat = this.cards.beater();
     const look = async (): Promise<StoredUserWait | null> => {
       const wait = await this.readSettlingExpiry(waitId);
       if (wait?.state === "pending") {
@@ -198,30 +196,6 @@ export class UserWaitService {
       wait = await look();
     }
     return wait ? { outcome: "polled", answer: toPollResponse(wait) } : { outcome: "gone" };
-  }
-
-  /**
-   * The liveness gate of one poll request: it refreshes on the first pass,
-   * then once per heartbeat interval for as long as the request holds. The
-   * request is the worker's own, so a worker that stopped stops refreshing.
-   */
-  private beater(): (wait: StoredUserWait) => Promise<void> {
-    let lastBeatAt: number | null = null;
-
-    return async (wait) => {
-      const now = this.now();
-      const due = lastBeatAt === null || now - lastBeatAt >= LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS;
-      if (!due) {
-        return;
-      }
-
-      lastBeatAt = now;
-      await this.buffer.heartbeat({
-        conversationId: wait.conversationId,
-        turnId: wait.turnId,
-        now,
-      });
-    };
   }
 
   /**
@@ -398,9 +372,9 @@ export class UserWaitService {
     outcome: "answered" | "expired" | "cancelled",
   ): Promise<void> {
     if (wait.kind === "permission") {
-      await this.publishPermission(wait);
+      await this.cards.publishPermission(wait);
     } else {
-      await this.publishQuestion(wait);
+      await this.cards.publishQuestion(wait);
     }
 
     await this.events.endUserWait({
@@ -444,34 +418,7 @@ export class UserWaitService {
     }
 
     await this.persist({ ...wait, lastKeepaliveAt: now });
-    await this.buffer.appendStatus({
-      conversationId: wait.conversationId,
-      turnId: wait.turnId,
-      status:
-        wait.kind === "permission"
-          ? "Waiting for your answer on the permission card"
-          : "Waiting for your answer",
-    });
-  }
-
-  private async publishPermission(wait: StoredUserWait): Promise<void> {
-    if (!wait.callId) {
-      return;
-    }
-
-    await this.buffer.appendLocalPermission({
-      conversationId: wait.conversationId,
-      turnId: wait.turnId,
-      entry: permissionCardEntry({ wait, callId: wait.callId }),
-    });
-  }
-
-  private async publishQuestion(wait: StoredUserWait): Promise<void> {
-    await this.buffer.appendQuestion({
-      conversationId: wait.conversationId,
-      turnId: wait.turnId,
-      entry: questionCardEntry(wait),
-    });
+    await this.cards.appendWaitingStatus(wait);
   }
 
   private async persist(wait: StoredUserWait): Promise<void> {

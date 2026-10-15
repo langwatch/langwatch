@@ -46,8 +46,10 @@ describe("the toast stack interactions", () => {
     await waitFor(() => expect(getComputedStyle(front()).opacity).toBe("1"));
     const collapsed = tops();
     await userEvent.hover(front());
-    await waitFor(() => expect(collapsed[1]! - tops()[1]!).toBeCloseTo(14, 0));
-    expect(collapsed[2]! - tops()[2]!).toBeCloseTo(28, 0);
+    await waitFor(() => {
+      expect(collapsed[1]! - tops()[1]!).toBeCloseTo(14, 0);
+      expect(collapsed[2]! - tops()[2]!).toBeCloseTo(28, 0);
+    });
     expect(tops()[0]).toBeCloseTo(collapsed[0]!, 0);
     for (const root of roots()) {
       expect(root.hasAttribute("data-overlap")).toBe(true);

@@ -28,6 +28,7 @@ describe("given a browser that installs auth", () => {
             passkeys: true,
             identityFrontDoor: false,
             emailPasswordEnabled: true,
+            federatedProviders: ["google"],
             signUpMode: "open",
           },
         }))
@@ -35,7 +36,12 @@ describe("given a browser that installs auth", () => {
 
       expect(installed.modules).toContain(authWeb);
       expect(installed.config).toEqual({
-        auth: { passkeysEnabled: true, emailPasswordEnabled: true, signUpMode: "open" },
+        auth: {
+          passkeysEnabled: true,
+          emailPasswordEnabled: true,
+          federatedProviders: ["google"],
+          signUpMode: "open",
+        },
       });
     });
   });

@@ -1,4 +1,4 @@
-import { auth0BridgeRailIds } from "../../auth0-bridge.ts";
+import { namedProviderServesOnlyLegacySso } from "../../auth0-bridge.ts";
 import type { SignInMethod, SignInMethodPolicy } from "./signin-routing.ts";
 
 /**
@@ -120,23 +120,21 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
     // a provider typo lands in email mode and must not lock credential users out (ADR-027).
     const social =
       federated.length === 0 ? [] : this.inputs.mountedSocialMethodIds().map(federatedMethod);
-    // The Auth0 connection bridge leads on SaaS (D09); a native provider takes its own slot.
-    const bridge =
-      federated[0]?.id === "auth0" && !this.inputs.selfHosted()
-        ? auth0BridgeRailIds({ mountedSocialMethodIds: social.map(({ id }) => id) }).map(
-            federatedMethod,
-          )
-        : [];
-    const federatedMethods = dedupeById([...bridge, ...federated, ...social]);
+    // Cloud's Auth0 is reached only by a legacy SSO organization's domain, never from the rail.
+    const brokerOnly = namedProviderServesOnlyLegacySso({
+      authProvider: federated[0]?.id,
+      selfHosted: this.inputs.selfHosted(),
+    });
+    const federatedMethods = dedupeById([...(brokerOnly ? [] : federated), ...social]);
     // Offered alongside whatever else answers, never instead of it: somebody
     // without a passkey on THIS device must still find the way they used last
     // time. It is appended, so the order the screen renders does not move.
     const passkeys = this.inputs.offersPasskeys() ? [PASSKEY_METHOD] : [];
 
-    // A deployment that federates AND issues its own passwords offers both:
-    // the federated method leads, and the password stands behind it (D09).
+    // Email mode (a typo or an unmountable provider lands there too) always offers the password;
+    // a federating deployment offers it behind its methods only when it issues its own (D09).
     const local =
-      federatedMethods.length === 0 || this.inputs.issuesOwnPasswords() ? LOCAL_METHOD_SET : [];
+      federated.length === 0 || this.inputs.issuesOwnPasswords() ? LOCAL_METHOD_SET : [];
 
     return {
       defaultMethods: [...federatedMethods, ...local, ...passkeys],

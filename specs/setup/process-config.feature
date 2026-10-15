@@ -38,6 +38,13 @@ Feature: One generated Zod parse per process
     Then the refusal names the module root, the field and the environment variable
 
   @unit
+  Scenario: A blank value on an optional leaf reads as unset
+    Given an installed module whose optional leaves the environment sets to blank strings
+    When the process configuration is parsed
+    Then each blank leaf takes the value it takes when unset
+    And a blank required leaf still refuses by name
+
+  @unit
   Scenario: A module config schema may not declare a credential
     Given an installed module whose schema binds a variable classified as a secret
     When the process configuration is declared

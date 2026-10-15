@@ -1,6 +1,6 @@
 /**
  * A listed dataset's record count comes from one grouped count over the page's
- * datasets, not a per-row `_count`.
+ * datasets, not a per-row `_count`, and the list read itself counts nothing.
  * @vitest-environment node
  */
 import { randomUUID } from "node:crypto";
@@ -14,6 +14,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { PrismaDatasetRecordRepository } from "../prisma.dataset-record.repository.ts";
 import { PrismaDatasetRepository } from "../prisma.dataset.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -32,6 +33,7 @@ describe.skipIf(!DB_URL)("PrismaDatasetRepository record counts", () => {
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
   const repository = PrismaDatasetRepository.create({ prisma });
+  const records = PrismaDatasetRecordRepository.create({ prisma });
 
   beforeAll(async () => {
     await prisma.organization.create({
@@ -75,14 +77,16 @@ describe.skipIf(!DB_URL)("PrismaDatasetRepository record counts", () => {
     await connection.closeOnce();
   });
 
-  describe("when a page of datasets is listed", () => {
-    it("counts each dataset's records, and zero for a dataset holding none", async () => {
+  describe("when a page of datasets is listed and then counted", () => {
+    it("lists without counts, then counts in one read, leaving out a dataset holding none", async () => {
       const listed = await repository.findAll({ projectId, page: 1, limit: 10 });
+      const counted = await records.countByDataset({
+        projectId,
+        datasetIds: listed.map(({ id }) => id),
+      });
 
-      expect(listed.map(({ id, recordCount }) => ({ id, recordCount }))).toEqual([
-        { id: fullId, recordCount: 3 },
-        { id: emptyId, recordCount: 0 },
-      ]);
+      expect(listed.map(({ id }) => id)).toEqual([fullId, emptyId]);
+      expect(counted).toEqual([{ datasetId: fullId, recordCount: 3 }]);
     });
   });
 });

@@ -17,6 +17,7 @@ function toRow(row: Row): LangyConversationRow {
     userId: row.UserId,
     title: row.Title,
     isShared: row.IsShared,
+    origin: row.Origin,
     status: row.Status,
     currentTurnId: row.CurrentTurnId,
     lastError: row.LastError,

@@ -2,7 +2,7 @@ import { Button } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, Clipboard } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { copyToClipboard } from "../../../behavior/shared/copy-to-clipboard.ts";
 
@@ -17,6 +17,16 @@ export function InlineCopyButton({
   onCopied?: () => void;
 }): React.ReactElement {
   const [copied, setCopied] = useState(false);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      clearTimeout(resetTimer.current);
+    };
+  }, []);
 
   async function handleCopy(): Promise<void> {
     const ok = await copyToClipboard({
@@ -25,7 +35,8 @@ export function InlineCopyButton({
     });
     if (ok) {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      clearTimeout(resetTimer.current);
+      if (mounted.current) resetTimer.current = setTimeout(() => setCopied(false), 2000);
       onCopied?.();
     }
   }

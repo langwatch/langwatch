@@ -8,6 +8,10 @@
 
 > One-line: when an Auth0 profile's `sub` starts with **`samlp|`**, `mapProfileToUser` returns **`emailVerified: true`**, because the email was **asserted by the organization's own identity provider** — restoring account linking for existing users, and nothing else changes.
 
+> v3 (Alex, 2026-10-14): only when the organization that proved the address's domain holds a
+> live legacy route pinning that exact connection (`samlp|<connection>`); otherwise the mapped
+> address is unverified. Identity answers through `SsoAssertionApi.isBrokeredAddressProved`.
+
 ## Context
 
 Enterprise SAML sign-in runs customer IdP → Auth0 (SAML connection) → LangWatch
@@ -149,7 +153,8 @@ while the change was live — those would need manual review.
 
 ## Open questions
 
-- **Bind the trust to the org's pinned connection?** A stricter rule —
+- **Bind the trust to the org's pinned connection?** Resolved in v3: connections now hold every
+  proved domain, so the binding no longer locks out secondary domains. Original text: a stricter rule —
   only upgrade `samlp|{conn}|…` when the asserted email's domain belongs
   to the org whose `ssoProvider` is pinned to that exact connection —
   would close the spoofed-out-of-domain-email and stray-connection cases.
@@ -184,3 +189,8 @@ while the change was live — those would need manual review.
   Per-connection allowlist re-asked and rejected (see Rejected
   alternatives). Boundary decision: document + code-comment, keep
   prefix-only. Scope unchanged from v1.
+- **v3 (2026-10-14, Alex):** a `samlp|` subject is verified only when the organization that
+  proved the address's domain (proved, or carried by its legacy route's imported set, as the
+  sign-in gate reads it) holds a live legacy route whose pin names that connection. A pin naming
+  only the broker or the strategy names no connection. A profile without an address, or with no
+  identity answer composed, is unverified. Spec: `specs/identity/sso-brokered-saml-address.feature`.

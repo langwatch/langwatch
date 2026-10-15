@@ -117,10 +117,9 @@ export const BACKGROUND_STEP_MAX_OUTSTANDING_JOBS = 1_000;
 type StepOutcome = "done" | "failed" | "retrying" | "held" | "waiting" | "skipped";
 
 /**
- * Runs the background steps the worker's modules declare (ADR-173 §1, round 14: the framework
- * runs). A few steps side by side, each under its own lease, only while the process serves; a step
- * that runs `after` others waits for them, and a step that needs old writers gone waits for the
- * serving roster. Spec: background-steps.feature.
+ * Runs the background steps the worker's modules declare (ADR-173 §1), a few side by side under
+ * their own leases while the process serves; an `after` step waits for its predecessors, and one
+ * needing old writers gone waits for the serving roster. Spec: background-steps.feature.
  */
 export class BackgroundStepsService {
   /** This worker's failed attempts per step, and when the next may start. */
@@ -469,7 +468,7 @@ export class BackgroundStepsService {
   }
 }
 
-/** Runs `each` over the items in order, at most `width` at once, taking none once `stop` says so. */
+/** Runs `each` over the items in order, at most `width` at once, taking none once `stop` says. */
 async function eachInLanes<Item>({
   items,
   width,

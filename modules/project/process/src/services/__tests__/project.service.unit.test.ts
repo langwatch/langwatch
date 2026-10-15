@@ -126,8 +126,8 @@ class StubRepository implements ProjectRepository {
   assignProjectDepartment = vi.fn(async () => false);
   existing: InternalProject | null = null;
   findInternalByOrganization = vi.fn(async () => this.existing);
-  findInternalBySlug = vi.fn(async () => null);
-  findLiveInternalIds = vi.fn(async () => []);
+  findInternalBySlug = vi.fn(async (_slug: string): Promise<InternalProject | null> => null);
+  findLiveInternalIds = vi.fn(async (_input: { kind: string }): Promise<string[]> => []);
   createInternalOrFindWinner = vi.fn(async () => project);
   isPresenceEnabled = vi.fn(async () => true);
   findBySlugInTeam = vi.fn(async () => null);
@@ -204,6 +204,10 @@ class StubOrganizationService {
   >(async () => ({ id: "team_1", isPersonal: false }));
   readonly createdTeams: CreateOrganizationTeamInput[] = [];
   readonly addedTeamMembers: AddOrganizationTeamMemberInput[] = [];
+  findMemberTeamIds = vi.fn<
+    (input: { organizationId: string; userId: string }) => Promise<string[]>
+  >(async () => []);
+
   readonly staffedTeams: {
     input: Parameters<OrganizationApi["createTeamWithMembers"]>[0];
     by: Parameters<OrganizationApi["createTeamWithMembers"]>[1];
@@ -462,6 +466,7 @@ const createService = (
       getOldestTeamId: () => organizations.getOldestTeamId(),
       createTeam: (input) => organizations.createTeam(input),
       addTeamMember: (input) => organizations.addTeamMember(input),
+      findMemberTeamIds: (input) => organizations.findMemberTeamIds(input),
       createTeamWithMembers: (input, by) => organizations.staffNewTeam(input, by),
       getTeam: async (input) => {
         const team = await organizations.findActiveTeam(input);
@@ -654,6 +659,85 @@ describe("ProjectService", () => {
         framework: "checkup",
       }),
     );
+  });
+
+  describe("given the organization has no internal project of the kind but its slug is held", () => {
+    /** @scenario "A feature ensures an internal project" */
+    it("reuses the project holding the slug when it is of the same kind", async () => {
+      const repository = new StubRepository();
+      repository.findInternalBySlug.mockResolvedValue(project);
+
+      await expect(
+        createService(repository).ensureInternal({
+          organizationId: "org",
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        }),
+      ).resolves.toBe(project);
+      expect(repository.findInternalBySlug).toHaveBeenCalledWith("governance-org");
+      expect(repository.createInternalOrFindWinner).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A feature ensures an internal project" */
+    it("hands a slug held by a different kind to the repository's create-or-find-winner", async () => {
+      const repository = new StubRepository();
+      repository.findInternalBySlug.mockResolvedValue({
+        ...project,
+        kind: PROJECT_KIND.INTERNAL_CHECKUP,
+      });
+
+      await expect(
+        createService(repository).ensureInternal({
+          organizationId: "org",
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        }),
+      ).resolves.toEqual(project);
+      expect(repository.createInternalOrFindWinner).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slug: "governance-org",
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        }),
+      );
+    });
+  });
+
+  describe("when a feature reads internal projects", () => {
+    /** @scenario "A feature reads an internal project" */
+    it("finds the organization's internal project of the kind", async () => {
+      const repository = new StubRepository();
+      repository.existing = project;
+
+      await expect(
+        createService(repository).findInternal({
+          organizationId: "org",
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        }),
+      ).resolves.toBe(project);
+      expect(repository.findInternalByOrganization).toHaveBeenCalledWith({
+        organizationId: "org",
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+      });
+    });
+
+    it("answers null when the organization has none", async () => {
+      await expect(
+        createService(new StubRepository()).findInternal({
+          organizationId: "org",
+          kind: PROJECT_KIND.INTERNAL_CHECKUP,
+        }),
+      ).resolves.toBeNull();
+    });
+
+    it("lists the live internal project ids of a kind", async () => {
+      const repository = new StubRepository();
+      repository.findLiveInternalIds.mockResolvedValue(["p1", "p2"]);
+
+      await expect(
+        createService(repository).findInternalIds({ kind: PROJECT_KIND.INTERNAL_CHECKUP }),
+      ).resolves.toEqual(["p1", "p2"]);
+      expect(repository.findLiveInternalIds).toHaveBeenCalledWith({
+        kind: PROJECT_KIND.INTERNAL_CHECKUP,
+      });
+    });
   });
 
   /** @scenario "A feature ensures an internal project" */
@@ -1406,6 +1490,59 @@ describe("ProjectService", () => {
     };
     expect(repository.touchCodingAgentSessionSeen).toHaveBeenCalledWith(expected);
     expect(repository.touchCodingAgentPullRequestSeen).toHaveBeenCalledWith(expected);
+  });
+
+  describe("when asked isTeamMember", () => {
+    describe("given an unknown project", () => {
+      it("reports false without asking the organisation roster", async () => {
+        const repository = new StubRepository();
+        const organizations = new StubOrganizationService();
+
+        await expect(
+          createService(repository, organizations).isTeamMember({
+            projectId: "missing",
+            userId: "user_1",
+          }),
+        ).resolves.toBe(false);
+        expect(organizations.findMemberTeamIds).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the user belongs to another team in the same organisation", () => {
+      it("reports false", async () => {
+        const repository = new StubRepository();
+        repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_1" }));
+        const organizations = new StubOrganizationService();
+        organizations.findMemberTeamIds.mockResolvedValue(["team_other"]);
+
+        await expect(
+          createService(repository, organizations).isTeamMember({
+            projectId: applicationProject.id,
+            userId: "user_1",
+          }),
+        ).resolves.toBe(false);
+      });
+    });
+
+    describe("when the user belongs to the project's team", () => {
+      it("reports true and asks the roster for that organisation and user", async () => {
+        const repository = new StubRepository();
+        repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_1" }));
+        const organizations = new StubOrganizationService();
+        organizations.findMemberTeamIds.mockResolvedValue(["team_other", "team_1"]);
+
+        await expect(
+          createService(repository, organizations).isTeamMember({
+            projectId: applicationProject.id,
+            userId: "user_1",
+          }),
+        ).resolves.toBe(true);
+        expect(organizations.findMemberTeamIds).toHaveBeenCalledWith({
+          organizationId: "org",
+          userId: "user_1",
+        });
+      });
+    });
   });
 });
 

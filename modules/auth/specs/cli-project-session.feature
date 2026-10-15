@@ -54,7 +54,38 @@ Feature: A project login is a person's session capped at one project
     Given a CLI holding a project session
     When the same refresh token is presented twice at the same moment
     Then one presentation rotates the session
-    And the other is answered 401 as a spent token
+    And the other waits up to 10 seconds for that rotation and is answered the same new pair
+    And a presentation whose wait ends with no pair is answered 401 "invalid_grant"
+
+  # A rotated refresh token answers the pair it minted for 60 seconds, so a
+  # retry after a lost response, or a second window of the same client, keeps
+  # its session instead of being sent back to sign in.
+  @unit
+  Scenario: A retried refresh inside the replay window is answered the same pair
+    Given a CLI that rotated its refresh token but never received the answer
+    When it presents the same refresh token again within 60 seconds
+    Then it is answered the pair the first rotation minted
+    And that pair keeps rotating as usual
+
+  @unit
+  Scenario: A refresh token presented after the replay window is refused
+    Given a refresh token that was rotated more than 60 seconds ago
+    When it is presented again
+    Then it is answered 401 "invalid_grant"
+
+  @unit
+  Scenario: The replay window never brings back a session that was ended
+    Given a refresh token that was rotated less than 60 seconds ago
+    And the session was since logged out, revoked, outlived the organization's maximum session duration, or its person left the organization
+    When the old refresh token is presented again
+    Then it is answered 401 "invalid_grant"
+
+  @unit
+  Scenario: The replay window re-proves the project the pair is bound to
+    Given a project session whose refresh token was rotated less than 60 seconds ago
+    And the person can no longer view that project
+    When the old refresh token is presented again
+    Then it is answered 403 "forbidden"
 
   @integration
   Scenario: A session consented to one project cannot be re-scoped to another

@@ -4,7 +4,7 @@
  * Behaviour is main's my-queue page; see modules/annotation/specs.
  */
 
-import { Alert, Box, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Box, Text, VStack } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
