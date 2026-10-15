@@ -6,7 +6,7 @@
 
 import type { AbortSignalLike } from "./query.ts";
 import { runWithRetry } from "./retry.ts";
-import { VIEW_DEDUP } from "./routingDriver.ts";
+import { turnsAsyncInsertOff, VIEW_DEDUP } from "./routingDriver.ts";
 import {
   StatementReporter,
   type StatementLogSink,
@@ -276,14 +276,7 @@ function withInsertSettings(params: unknown): unknown {
   const own = "clickhouse_settings" in params ? params.clickhouse_settings : undefined;
   const settings: Record<string, unknown> =
     own !== null && typeof own === "object" ? { ...own } : {};
-  const asyncInsert = settings.async_insert;
-  const text =
-    typeof asyncInsert === "string" ||
-    typeof asyncInsert === "number" ||
-    typeof asyncInsert === "boolean"
-      ? String(asyncInsert).trim().toLowerCase()
-      : undefined;
-  if (text !== "0" && text !== "false") return params;
+  if (!turnsAsyncInsertOff(settings.async_insert)) return params;
   return { ...params, clickhouse_settings: { ...VIEW_DEDUP, ...settings } };
 }
 

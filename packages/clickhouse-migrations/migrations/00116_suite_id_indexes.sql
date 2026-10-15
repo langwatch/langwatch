@@ -36,6 +36,8 @@ GROUP BY TenantId, BatchRunId;
 
 -- +goose Down
 
+-- IRREVERSIBLE: down is manual by house rule; the owner's fill step rebuilds the index.
+
 -- Down migrations are intentionally commented out to prevent accidental data
 -- loss. To roll back, uncomment and run manually. The indexes are rebuildable
 -- by the owner's background step.

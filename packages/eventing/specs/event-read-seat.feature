@@ -46,11 +46,11 @@ Feature: One event is read by id through a narrow seat beside the event store
       Then the read is refused as invalid before anything is queried
 
     @unit
-    Scenario: The event log read is bounded to two days either side of the id's time
+    Scenario: The event log read is bounded to seven days either side of the id's time
       Given the seat composed over the ClickHouse event log
       When it is asked for an event whose id is a KSUID
       Then the statement names the tenant first and the whole stream key
-      And it keeps rows with no occurred time and rows within two days either side of the id's time
+      And it keeps rows with no occurred time and rows within seven days either side of the id's time
 
   Rule: The seat answers one aggregate's stream for identity's history panels (WEB-9103)
 

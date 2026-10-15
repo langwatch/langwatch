@@ -1,4 +1,4 @@
-import { ClickHouseColumns, type IdIndexFlags } from "@langwatch/clickhouse-client";
+import { ClickHouseColumns, type IdIndexFlags, indexedRead } from "@langwatch/clickhouse-client";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -25,7 +25,6 @@ import {
 } from "../../rules/experiment-run-key.rules.ts";
 import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
 import type { ExperimentRunStateRepository } from "../experiment-run-state.repository.ts";
-import { readByIdIndex } from "./clickhouse.experiment-session.store.ts";
 
 /**
  * The `DateTime64(3)` columns. The ClickHouse client serialises a `Date`; an
@@ -217,7 +216,7 @@ export class ClickHouseExperimentRunStateRepository<
       // table alias because it's also projected as `toUnixTimestamp64Milli(...) AS
       // UpdatedAt` — without the alias the IN-tuple comparison resolves to the
       // projected UInt64 instead of the raw DateTime64.
-      const rows = await readByIdIndex<ClickHouseExperimentRunRecord[]>({
+      const rows = await indexedRead<ClickHouseExperimentRunRecord[]>({
         client,
         idIndex: this.idIndex,
         tenantId: context.tenantId,

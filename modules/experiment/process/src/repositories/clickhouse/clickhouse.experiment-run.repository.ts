@@ -1,4 +1,5 @@
 import { TupleParam } from "@clickhouse/client";
+import { indexedRead } from "@langwatch/clickhouse-client";
 import type { IdIndexFlags, IdIndexReader } from "@langwatch/clickhouse-client";
 import type {
   ExperimentRun,
@@ -28,7 +29,6 @@ import {
   computeOccurredAtRangeForRuns,
   WARN_OLD_RUN_AGE_MS,
 } from "./clickhouse.experiment-run.mapper.ts";
-import { readByIdIndex } from "./clickhouse.experiment-session.store.ts";
 
 type QueryResult = { json<T>(): Promise<T[]> };
 type ExperimentClickHouseClient = {
@@ -354,7 +354,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         if (!client) return null;
 
         try {
-          const runRows = await readByIdIndex<RunRow[]>({
+          const runRows = await indexedRead<RunRow[]>({
             client,
             idIndex: this.options.idIndex,
             tenantId: input.projectId,

@@ -580,6 +580,7 @@ export type EventLogIndexReadOutcome =
   | "window_fallback"
   | "not_ksuid";
 
+/** Counts one event log read by how its time bound was chosen. */
 export const incrementEventLogIndexRead = ({
   read,
   outcome,

@@ -37,8 +37,8 @@ export const ID_INDEX_WIDEN_MS = 24 * 60 * 60 * 1000;
 export const ID_INDEX_MISS_PROBE: WindowFallback = { lookbackMs: RESOLVER_RECENT_WINDOW_MS };
 
 export interface IndexedReadOptions<T> {
-  /** Asks the target and the index: the routed client, or the fence's reader. */
-  client: IdIndexReader;
+  /** Asks the target and the index; a client lacking either (a test driver) reads as not ready. */
+  client: Partial<IdIndexReader>;
   /** The owner's readiness; absent reads as not ready, so call sites move one at a time. */
   idIndex?: IdIndexFlags | undefined;
   /** The project whose target decides readiness: its own, never a shared grant's. */
@@ -62,10 +62,10 @@ export interface IndexedReadOptions<T> {
 
 /** The bound a hit reads with: the index range widened a day each side, clamped to valid ms. */
 export function indexWindow({ fromMs, toMs }: { fromMs: number; toMs: number }): WindowFragment {
-  return windowFragment(
-    Math.max(0, fromMs - ID_INDEX_WIDEN_MS),
-    Math.min(Number.MAX_SAFE_INTEGER, toMs + ID_INDEX_WIDEN_MS),
-  );
+  return windowFragment({
+    fromMs: Math.max(0, fromMs - ID_INDEX_WIDEN_MS),
+    toMs: Math.min(Number.MAX_SAFE_INTEGER, toMs + ID_INDEX_WIDEN_MS),
+  });
 }
 
 /** The recent window a miss confirms against: the miss probe's frame, ending a little past now. */
@@ -73,6 +73,10 @@ export function idIndexMissWindow(): WindowFragment {
   const window = fallbackFragment(ID_INDEX_MISS_PROBE, DEFAULT_PARTITION_WINDOW_MS);
   if (window === null) throw new Error("The id index miss probe is always bounded.");
   return window;
+}
+
+function canReadIdIndex(client: Partial<IdIndexReader>): client is IdIndexReader {
+  return typeof client.targetOf === "function" && typeof client.indexBounds === "function";
 }
 
 /**
@@ -85,12 +89,18 @@ export async function indexedRead<T>(options: IndexedReadOptions<T>): Promise<T>
   const hintMs = options.hintMs ?? null;
   const windowMs = options.windowMs ?? DEFAULT_PARTITION_WINDOW_MS;
   const trusted =
-    idIndex !== undefined && idIndex.isOn({ target: await client.targetOf({ tenantId }) });
-  if (!trusted) return queryWindowed({ table, hintMs, windowMs, fallback, isEmpty, run });
+    idIndex !== undefined &&
+    canReadIdIndex(client) &&
+    idIndex.isOn({ target: await client.targetOf({ tenantId }) });
+  if (!trusted || !canReadIdIndex(client)) {
+    return queryWindowed({ table, hintMs, windowMs, fallback, isEmpty, run });
+  }
 
   try {
     if (hintMs !== null) {
-      const hinted = await run(windowFragment(hintMs - windowMs, hintMs + windowMs));
+      const hinted = await run(
+        windowFragment({ fromMs: hintMs - windowMs, toMs: hintMs + windowMs }),
+      );
       if (!isEmpty(hinted)) {
         incrementWindowedReadCount(table, "hit");
         return hinted;

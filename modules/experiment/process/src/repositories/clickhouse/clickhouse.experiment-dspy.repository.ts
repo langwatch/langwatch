@@ -1,4 +1,5 @@
 import type { IdIndexFlags, IdIndexReader } from "@langwatch/clickhouse-client";
+import { indexedRead } from "@langwatch/clickhouse-client";
 import {
   experimentDspyStepSchema,
   experimentDspyStepSummarySchema,
@@ -15,7 +16,6 @@ import { z } from "zod";
 import { llmSummary, mergeByHash } from "../../rules/experiment-dspy-step.rules.ts";
 import type { ExperimentDspyRetentionRepository } from "../experiment-dspy-retention.repository.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
-import { readByIdIndex } from "./clickhouse.experiment-session.store.ts";
 
 /**
  * Epoch millis as the value the ClickHouse client binds to a `DateTime64(3)`.
@@ -175,7 +175,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return [];
-      const found = await readByIdIndex<unknown[]>({
+      const found = await indexedRead<unknown[]>({
         client,
         idIndex: this.options.idIndex,
         tenantId: input.tenantId,
@@ -263,7 +263,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     input: ExperimentDspyStepLookup;
   }): Promise<ExperimentDspyStep | null> {
     const { tenantId, experimentId, runId, stepIndex } = input;
-    const found = await readByIdIndex<unknown[]>({
+    const found = await indexedRead<unknown[]>({
       client,
       idIndex: this.options.idIndex,
       tenantId,

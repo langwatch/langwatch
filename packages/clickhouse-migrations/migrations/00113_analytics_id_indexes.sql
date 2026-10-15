@@ -46,6 +46,8 @@ GROUP BY TenantId, EvaluationId;
 -- +goose StatementEnd
 
 -- +goose Down
+
+-- IRREVERSIBLE: down is manual by house rule; the owner's fill step rebuilds the index.
 -- To roll back, uncomment and run manually (the view first, then its table):
 -- DROP VIEW IF EXISTS ${CLICKHOUSE_DATABASE}.evaluation_analytics_id_index_mv;
 -- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.evaluation_analytics_id_index;

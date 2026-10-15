@@ -91,7 +91,7 @@ export function incrementWindowedReadCount(table: string, outcome: WindowedReadO
 }
 
 /** The inclusive `[fromMs, toMs]` time predicate one read attempt runs with. */
-export function windowFragment(fromMs: number, toMs: number): WindowFragment {
+export function windowFragment({ fromMs, toMs }: { fromMs: number; toMs: number }): WindowFragment {
   return {
     fromMs,
     toMs,
@@ -114,7 +114,7 @@ export function fallbackFragment(
   if (typeof fallback === "object") {
     const now = nowInstant().epochMilliseconds;
 
-    return windowFragment(now - fallback.lookbackMs, now + windowMs);
+    return windowFragment({ fromMs: now - fallback.lookbackMs, toMs: now + windowMs });
   }
 
   return null;
@@ -137,7 +137,9 @@ export async function queryWindowed<T>(opts: QueryWindowedOptions<T>): Promise<T
       return result;
     }
 
-    const hinted = await run(windowFragment(hintMs - windowMs, hintMs + windowMs));
+    const hinted = await run(
+      windowFragment({ fromMs: hintMs - windowMs, toMs: hintMs + windowMs }),
+    );
 
     // `none` treats the hinted window as authoritative (empty means genuinely
     // absent within the window), so it never widens — which also means an empty

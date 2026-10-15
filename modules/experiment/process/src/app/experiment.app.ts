@@ -490,7 +490,6 @@ export class ExperimentModule implements ExperimentApi {
     return this.#dependencies.experiments.listRuns(input);
   }
 
-  /** One run of one experiment. A missing run reads as null. */
   /** The `experiment:fill-id-indexes` step's body: the id indexes, then each target's marker. */
   fillIdIndexes(input: {
     checkpoint: IdIndexFillCheckpoint;
@@ -502,6 +501,7 @@ export class ExperimentModule implements ExperimentApi {
     return fill.fillIdIndexes(input);
   }
 
+  /** One run of one experiment. A missing run reads as null. */
   findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
     return this.#dependencies.experiments.findRun(input);
   }

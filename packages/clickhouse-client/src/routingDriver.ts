@@ -41,10 +41,13 @@ async function serverFor<Client extends RoutableStatementClient>(
   return request.tenantId === "" ? connection.shared() : connection.resolve(request.tenantId);
 }
 
-function isSettingOn(value: string | number | undefined): boolean {
-  if (value === undefined) return false;
+/** Whether an insert's `async_insert` turns async off: the one rule both insert paths use. */
+export function turnsAsyncInsertOff(value: unknown): boolean {
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
+    return false;
+  }
   const text = String(value).trim().toLowerCase();
-  return text !== "0" && text !== "false" && text !== "";
+  return text === "0" || text === "false";
 }
 
 export const VIEW_DEDUP = { deduplicate_blocks_in_dependent_materialized_views: 1 } as const;
@@ -56,8 +59,7 @@ export const VIEW_DEDUP = { deduplicate_blocks_in_dependent_materialized_views: 
 export function insertSettings(
   settings: Record<string, string | number> | undefined,
 ): Record<string, string | number> {
-  const asyncInsert = settings?.async_insert;
-  if (asyncInsert === undefined || isSettingOn(asyncInsert)) return { ...settings };
+  if (!turnsAsyncInsertOff(settings?.async_insert)) return { ...settings };
   return { ...VIEW_DEDUP, ...settings };
 }
 

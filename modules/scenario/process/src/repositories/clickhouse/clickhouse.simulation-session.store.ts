@@ -5,11 +5,6 @@ import {
   type IdIndexBounds,
   type IdIndexLookup,
   type IdIndexReader,
-  type IdIndexFlags,
-  type IdIndexKey,
-  type WindowFallback,
-  type WindowFragment,
-  indexedRead,
 } from "@langwatch/clickhouse-client";
 
 type SimulationEventingClickHouseClient = {
@@ -28,41 +23,6 @@ type SimulationEventingClickHouseClient = {
   /** Absent on a bare driver client (tests): every column is then named. */
   select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
 } & Partial<IdIndexReader>;
-
-/** Never asked: a read through it carries no readiness, so `indexedRead` takes today's path. */
-const NO_ID_INDEX: IdIndexReader = {
-  targetOf: () => Promise.reject(new Error("This client cannot name a ClickHouse target")),
-  indexBounds: () => Promise.reject(new Error("This client cannot read an id index")),
-};
-
-function canReadIdIndex(client: Partial<IdIndexReader>): client is IdIndexReader {
-  return typeof client.targetOf === "function" && typeof client.indexBounds === "function";
-}
-
-/**
- * `indexedRead` over a session client. A client that cannot answer the index (a bare driver in a
- * test) reads as the flag off, so a repository never branches on what it was handed.
- */
-export function readByIdIndex<T>({
-  client,
-  idIndex,
-  ...options
-}: {
-  client: Partial<IdIndexReader>;
-  idIndex?: IdIndexFlags | undefined;
-  tenantId: string;
-  table: string;
-  index: string;
-  key: IdIndexKey;
-  fallback: WindowFallback;
-  isEmpty: (result: T) => boolean;
-  run: (window: WindowFragment | null) => Promise<T>;
-}): Promise<T> {
-  if (!canReadIdIndex(client)) {
-    return indexedRead({ ...options, client: NO_ID_INDEX, idIndex: undefined });
-  }
-  return indexedRead({ ...options, client, idIndex });
-}
 
 export type SimulationEventingClickHouseResolver = (
   tenantId: string,

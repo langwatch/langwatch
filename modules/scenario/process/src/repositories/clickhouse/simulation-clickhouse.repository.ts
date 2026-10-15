@@ -6,6 +6,7 @@ import {
   type IdIndexReader,
   queryWindowed,
   type WindowFragment,
+  indexedRead,
 } from "@langwatch/clickhouse-client";
 import {
   AGENT_TEST_SET_SUFFIX,
@@ -28,7 +29,6 @@ import {
   EVALUATION_LIST_COLUMNS_SQL,
 } from "../../rules/simulation-evaluation-columns.rules.ts";
 import { SimulationRepository } from "../simulation.repository.ts";
-import { readByIdIndex } from "./clickhouse.simulation-session.store.ts";
 import { CRITERIA_COLUMNS } from "./simulation-criteria.mapper.ts";
 import {
   type ClickHouseSimulationRunRow,
@@ -417,7 +417,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // payloads.
     const criteria = await this.criteriaColumns(projectId);
     const client = await this.getClient(projectId);
-    const rows = await readByIdIndex<(ClickHouseSimulationRunRow & { ExportSortKey: string })[]>({
+    const rows = await indexedRead<(ClickHouseSimulationRunRow & { ExportSortKey: string })[]>({
       client,
       idIndex,
       tenantId: projectId,

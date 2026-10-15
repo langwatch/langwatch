@@ -92,6 +92,8 @@ GROUP BY TenantId, TraceId;
 -- +goose StatementEnd
 
 -- +goose Down
+
+-- IRREVERSIBLE: down is manual by house rule; the owner's fill step rebuilds the index.
 -- To roll back, uncomment and run manually (views first, then their tables):
 -- DROP VIEW IF EXISTS ${CLICKHOUSE_DATABASE}.trace_summaries_id_index_mv;
 -- DROP VIEW IF EXISTS ${CLICKHOUSE_DATABASE}.stored_spans_id_index_mv;

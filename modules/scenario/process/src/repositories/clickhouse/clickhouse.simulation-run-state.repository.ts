@@ -1,4 +1,9 @@
-import { ClickHouseColumns, type IdIndexFlags, queryWindowed } from "@langwatch/clickhouse-client";
+import {
+  ClickHouseColumns,
+  type IdIndexFlags,
+  queryWindowed,
+  indexedRead,
+} from "@langwatch/clickhouse-client";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -27,10 +32,7 @@ import {
   evaluationsToColumns,
 } from "../../rules/simulation-evaluation-columns.rules.ts";
 import type { SimulationRunStateRepository } from "../simulation-run-state.repository.ts";
-import {
-  readByIdIndex,
-  type SimulationEventingClickHouseResolver,
-} from "./clickhouse.simulation-session.store.ts";
+import { type SimulationEventingClickHouseResolver } from "./clickhouse.simulation-session.store.ts";
 import {
   type ClickHouseCriteriaColumns,
   columnsToCriteria,
@@ -307,7 +309,7 @@ export class ClickHouseSimulationRunStateRepository<
                 window: fragment ? window : undefined,
               }),
           })
-        : await readByIdIndex<ClickHouseSimulationRunRecord | null>({
+        : await indexedRead<ClickHouseSimulationRunRecord | null>({
             client: await this.options.resolveClient(context.tenantId),
             idIndex: this.options.idIndex,
             tenantId: context.tenantId,

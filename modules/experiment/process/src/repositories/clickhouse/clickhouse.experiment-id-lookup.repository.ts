@@ -1,8 +1,8 @@
 import type { IdIndexFlags } from "@langwatch/clickhouse-client";
+import { indexedRead } from "@langwatch/clickhouse-client";
 
 import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
 import { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository.ts";
-import { readByIdIndex } from "./clickhouse.experiment-session.store.ts";
 
 const TABLE_NAME = "experiment_runs" as const;
 
@@ -35,7 +35,7 @@ export class ClickHouseExperimentIdLookupRepository extends ExperimentIdLookupRe
     runId: string;
   }): Promise<string | null> {
     const client = await this.clickhouse.resolveClient(tenantId);
-    const rows = await readByIdIndex<{ ExperimentId: string }[]>({
+    const rows = await indexedRead<{ ExperimentId: string }[]>({
       client,
       idIndex: this.idIndex,
       tenantId,
