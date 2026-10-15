@@ -132,6 +132,16 @@ describe("explainHandledError", () => {
       expect(description).toContain("Remove them");
     });
 
+    /** @scenario "An unavailable analytics SQL layer says what failed and who can retry it" */
+    it("says what failed and who can retry it, not that the workspace switched it off", () => {
+      const { description } = explainHandledError(shape({ code: "lwql_unavailable" }));
+
+      expect(description).toContain("isn't ready");
+      expect(description).toContain("Ops > Upgrades");
+      expect(description).toContain("contact support");
+      expect(description).not.toContain("switched on for this workspace");
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("still says something useful when the supplied names are absent", () => {
       const { title, description } = explainHandledError(
