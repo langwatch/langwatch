@@ -16,6 +16,12 @@ Feature: Langy tells an idle project from a broken pipeline
     And that rule tells the agent to state how old that row is
     And that rule tells the agent to say when the project never received the data
 
+  @unit
+  Scenario: The prompt lets Langy name a skill's telemetry env vars
+    When the prompt asset is checked
+    Then it lets the agent name the telemetry env vars a skill gives
+    And it has the agent write the key as a placeholder, never a real key
+
   @e2e
   Scenario: An empty window is followed by the age of the newest row
     Given the project has traces, the newest of them about 8 hours old

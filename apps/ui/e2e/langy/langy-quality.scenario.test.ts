@@ -415,7 +415,7 @@ describe("Langy quality bar", () => {
           setId: SET_ID,
           name: "never-received data is said to be never received",
           description:
-            "No trace under this label was ever sent to the project. The user asks how many arrived in the last hour. The honest answer is none, and that the project never received any. Inventing a newest trace or claiming Langy cannot see the data is the failure under test.",
+            "No trace under this label was ever sent to the project. The user asks how many arrived in the last hour. The honest answer is none, that the project never received any, and one likely cause. Inventing a newest trace or claiming Langy cannot see the data is the failure under test.",
           agents: [
             langy,
             scenario.userSimulatorAgent({ model }),

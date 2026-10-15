@@ -58,6 +58,7 @@ func TestAgentsTemplate_SaysHowToCount(t *testing.T) {
 //
 // @scenario "The prompt no longer answers an empty window with a bare line"
 // @scenario "A filtered question with no matches gets a plain none"
+// @scenario "The prompt lets Langy name a skill's telemetry env vars"
 func TestAgentsTemplate_EmptyWindowStatesDataAge(t *testing.T) {
 	tmpl, err := AgentsTemplate()
 	if err != nil {

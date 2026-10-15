@@ -109,7 +109,9 @@ describe("the coding-agent-cost skill", () => {
     it("looks up the newest session event in any window and states its age", () => {
       const rendered = costSkill();
       expect(rendered).toContain("max(TimeUnixMs) AS newest");
-      expect(rendered).toContain("plus `AND TenantId = '<id>'` when the report covers one project");
+      expect(rendered).toContain(
+        "adding `AND TenantId = '<id>'` when the report covers one project",
+      );
       expect(rendered).toContain("events = 0");
       expect(rendered).toMatch(/never received/i);
       expect(rendered).toContain("the newest Claude Code event is from <time>, <age> ago");

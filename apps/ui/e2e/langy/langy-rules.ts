@@ -176,7 +176,7 @@ export const LANGY_EMPTY_WINDOW_CRITERIA = [
   "Langy says there were no matching traces in the last hour.",
   'Langy states how long ago the newest matching trace arrived, about 7 to 9 hours, from a follow-up lookup not limited to the last hour. A clock time is fine alongside the age, but a clock time or "this morning" alone fails, and so does a bare "none in the last hour".',
   "Langy names one likely cause of the gap, such as export having stopped, a wrong project or API key, or the app not being instrumented yet.",
-  "The likely cause comes after the stated age of the newest trace and fits data that stopped arriving hours ago (export stopped, a key or project changed), not a problem with the query.",
+  "The likely cause comes after the stated age of the newest trace and is about how data reaches the project, not a problem with the query.",
   "Langy never says or implies that it cannot see or access the data. The query succeeded and found nothing; that is an answer, not an access problem.",
 ];
 
