@@ -143,7 +143,7 @@ The setup follows this general pattern across all languages:
                         .AddService(serviceName: "my-service"))
                     .AddOtlpExporter(opts =>
                     {
-                        // The .NET exporter defaults to gRPC, which LangWatch does not accept.
+                        // Most .NET targets default to gRPC, which LangWatch does not accept.
                         opts.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
                         opts.Endpoint = new Uri("https://app.langwatch.ai/api/otel/v1/traces");
                         opts.Headers = "Authorization=Bearer " + Environment.GetEnvironmentVariable("LANGWATCH_API_KEY");

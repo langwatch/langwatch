@@ -168,6 +168,8 @@ In LangWatch you then see the API spans for the request nested under the SDK spa
 You can also skip `langwatch.setup()` and point your own OpenTelemetry SDK at LangWatch with environment variables:
 
 ```bash
+export LANGWATCH_API_KEY="<your project API key>"
+export OTEL_EXPORTER_OTLP_TRACES_PROTOCOL="http/protobuf"
 export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="https://app.langwatch.ai/api/otel/v1/traces"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${LANGWATCH_API_KEY}"
 export ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE="content"
