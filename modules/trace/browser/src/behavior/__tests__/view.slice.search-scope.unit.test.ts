@@ -21,6 +21,7 @@ async function load() {
 function search(store: Awaited<ReturnType<typeof load>>["useExplorerStore"], text: string) {
   store.getState().applyQueryText(text);
   store.getState().setFilterDraft(store.getState().queryText);
+  store.getState().commitDebounced();
 }
 
 beforeEach(() => {
@@ -46,10 +47,10 @@ describe("a search typed on the All lens", () => {
       /** @scenario "A search does not follow the user into another project" */
       it("leaves the bar on the lens's own filter with no run held", () => {
         useExplorerStore.getState().setProject("project-b");
-        useExplorerStore.getState().selectLens("all-traces", { persist: false });
 
         const state = useExplorerStore.getState();
         expect(state.queryText).toBe("");
+        expect(state.debouncedQueryText).toBe("");
         expect(state.evalRuns).toEqual({});
         expect(state.draftState.get("all-traces")?.filter).toBeUndefined();
       });
@@ -71,10 +72,14 @@ describe("a search typed on the All lens", () => {
       useExplorerStore.getState().setProject("project-a");
       search(useExplorerStore, EVAL_SEARCH);
 
-      storage.setUiStorageReader("reader-b");
-      useExplorerStore.getState().selectLens("all-traces", { persist: false });
+      useExplorerStore.getState().registerEvalRun({ key: "run-key", runId: "run-1" });
 
-      expect(useExplorerStore.getState().queryText).toBe("");
+      storage.setUiStorageReader("reader-b");
+
+      const state = useExplorerStore.getState();
+      expect(state.queryText).toBe("");
+      expect(state.debouncedQueryText).toBe("");
+      expect(state.evalRuns).toEqual({});
     });
   });
 

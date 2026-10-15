@@ -87,11 +87,18 @@ const DIMMED_PROPS = {
 
 export const TracesPage: React.FC = () => {
   const { project } = useOrganizationTeamProject();
+  // The address is applied only once the page knows its project, so a late project
+  // never forgets the search a shared link carried (specs/traces-v2/search-scope.feature).
+  if (!project?.id) return null;
+  return <ProjectTracesPage projectId={project.id} />;
+};
+
+const ProjectTracesPage: React.FC<{ projectId: string }> = ({ projectId }) => {
+  const { project } = useOrganizationTeamProject();
   const setProject = useExplorerStore((s) => s.setProject);
   // Before every passive effect, so the URL apply never meets another project's search.
-  const projectId = project?.id;
   useLayoutEffect(() => {
-    if (projectId) setProject(projectId);
+    setProject(projectId);
   }, [projectId, setProject]);
 
   useURLSync();
@@ -156,8 +163,8 @@ export const TracesPage: React.FC = () => {
   const closeDrawerOnSwitch = useDismissTraceDrawer();
   useEffect(() => {
     const prev = prevProjectIdRef.current;
-    prevProjectIdRef.current = projectId ?? null;
-    if (!isProjectSwitch(prev, projectId ?? null)) return;
+    prevProjectIdRef.current = projectId;
+    if (!isProjectSwitch(prev, projectId)) return;
     closeDrawerOnSwitch();
   }, [projectId, closeDrawerOnSwitch]);
 

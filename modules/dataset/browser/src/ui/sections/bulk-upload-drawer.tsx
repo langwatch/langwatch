@@ -658,19 +658,20 @@ export function BulkUploadDrawer({
   open,
   onClose,
   onUploaded,
+  onOpenDataset,
   onCreateFromScratch,
 }: {
   open: boolean;
   onClose: () => void;
   /** Called as files reach `ready` so the host can refresh the datasets list. */
   onUploaded?: () => void;
+  /** Opens an uploaded dataset; omit and ready rows are not links. */
+  onOpenDataset?: (datasetId: string) => void;
   /** Escape hatch out of the upload flow: create an empty dataset by hand
    *  instead. Omit to hide the "Skip" affordance. */
   onCreateFromScratch?: () => void;
 }) {
-  const host = useDatasetHost();
-  const projectId = host.project()?.id;
-  const projectSlug = host.project()?.slug;
+  const projectId = useDatasetHost().project()?.id;
   const importTransport = useDatasetImportTransport();
   const retryNormalize = datasetClient.dataset.retryNormalize.useMutation();
   const bulkTransport: BulkUploadTransport = useMemo(
@@ -705,8 +706,8 @@ export function BulkUploadDrawer({
   const unavailableReason = unavailableReasonOf({ hasUploadable: bulk.hasUploadable, projectId });
 
   const openDataset = (datasetId: string | undefined) => {
-    if (!datasetId || !projectSlug) return;
-    host.navigate(`/${projectSlug}/datasets/${datasetId}`);
+    if (!datasetId || !onOpenDataset) return;
+    onOpenDataset(datasetId);
     onClose();
   };
 
@@ -814,7 +815,8 @@ export function BulkUploadDrawer({
               onReady={() => {
                 bulk.markReady(file.id);
                 onUploaded?.();
-                if (bulk.files.length === 1) openDataset(file.datasetId);
+                // Closed mid-upload, the user has moved on: never pull them away.
+                if (open && bulk.files.length === 1) openDataset(file.datasetId);
               }}
               onOpen={() => openDataset(file.datasetId)}
               onFailed={(error) => bulk.markFailed(file.id, error)}

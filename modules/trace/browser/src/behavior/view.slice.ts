@@ -10,6 +10,7 @@ import {
   reconcileSort,
 } from "../model/lens-capabilities.ts";
 import type { ExplorerStore } from "./explorer.store.ts";
+import { freshSearchState } from "./query.slice.ts";
 
 export type GroupingMode = "flat" | "by-conversation" | "by-service" | "by-user" | "by-model";
 
@@ -556,10 +557,11 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
   projectId: null,
 
   // Another reader is another person, as impersonation makes: their search starts empty.
-  restoreRememberedView: () => {
-    set((s) => rememberedViewState(s));
-    set((s) => forgottenSearchState(s));
-  },
+  restoreRememberedView: () =>
+    set((s) => {
+      const remembered = rememberedViewState(s);
+      return { ...remembered, ...forgottenSearchState({ ...s, ...remembered }) };
+    }),
   setProject: (projectId) =>
     set((s) => {
       if (s.projectId === projectId) return s;
@@ -832,15 +834,14 @@ function filterDraftState(s: ViewSlice, text: string): Partial<ViewSlice> {
  * The bar back on the active lens's own filter, with every draft filter, Instant
  * Eval run and AI note dropped: a search belongs to one project and one person.
  */
-function forgottenSearchState(s: ExplorerStore): Partial<ViewSlice> {
-  s.clearAll();
-  s.setFilterFromLens(s.allLenses.find((l) => l.id === s.activeLensId)?.filterText ?? "");
+function forgottenSearchState(s: ExplorerStore): Partial<ExplorerStore> {
+  const lensFilter = s.allLenses.find((l) => l.id === s.activeLensId)?.filterText ?? "";
   const draftState = new Map<string, DraftLensState>();
   for (const [lensId, draft] of s.draftState) {
     const kept = draftWithoutFilter(draft);
     if (Object.keys(kept).length > 0) draftState.set(lensId, kept);
   }
-  return { draftState };
+  return { ...freshSearchState(lensFilter), draftState };
 }
 
 /** The state that adopting a lens puts on screen. */

@@ -4,8 +4,9 @@ import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
  * Integration tests for bulk upload drawer. User-visible behavior of spec
  * scenarios (rows, confirm, prep, failure/retry, cancel).
  */
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithDatasetHost } from "../../../testing.tsx";
@@ -226,35 +227,69 @@ describe("given the bulk upload drawer", () => {
       expect(createFromStoredObject).toHaveBeenCalledTimes(2);
     });
 
+    /** @scenario A single uploaded file opens its dataset once ready */
     it("opens the dataset and closes the drawer when a single file becomes ready", async () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
-      const { host } = renderWithDatasetHost(<BulkUploadDrawer open onClose={onClose} />, {
-        project: { id: "proj_1", slug: "proj" },
-      });
+      const onOpenDataset = vi.fn();
+      renderWithDatasetHost(
+        <BulkUploadDrawer open onClose={onClose} onOpenDataset={onOpenDataset} />,
+        { project: { id: "proj_1", slug: "proj" } },
+      );
       await user.upload(fileInput(), [csv("one.csv")]);
       await waitFor(() => expect(screen.getByText("one")).toBeInTheDocument());
 
       await user.click(uploadButton());
 
-      await waitFor(() => expect(host.navigations).toEqual(["/proj/datasets/dataset_1"]));
+      await waitFor(() => expect(onOpenDataset).toHaveBeenCalledWith("dataset_1"));
       expect(onClose).toHaveBeenCalled();
     });
 
+    /** @scenario A ready row opens its dataset */
     it("opens a ready dataset when its row is clicked among several files", async () => {
       const user = userEvent.setup();
-      const { host } = renderWithDatasetHost(<BulkUploadDrawer open onClose={vi.fn()} />, {
-        project: { id: "proj_1", slug: "proj" },
-      });
+      const onOpenDataset = vi.fn();
+      renderWithDatasetHost(
+        <BulkUploadDrawer open onClose={vi.fn()} onOpenDataset={onOpenDataset} />,
+        { project: { id: "proj_1", slug: "proj" } },
+      );
       await user.upload(fileInput(), [csv("one.csv"), csv("two.csv")]);
       await waitFor(() => expect(screen.getByText("one")).toBeInTheDocument());
       await user.click(uploadButton());
 
       const open = await screen.findAllByTestId("dataset-bulk-open");
-      expect(host.navigations).toEqual([]);
+      expect(onOpenDataset).not.toHaveBeenCalled();
       await user.click(open[0]!);
 
-      expect(host.navigations).toEqual(["/proj/datasets/dataset_1"]);
+      expect(onOpenDataset).toHaveBeenCalledWith("dataset_1");
+    });
+
+    /** @scenario A single upload finishing after I closed the drawer stays put */
+    it("does not open the dataset when the drawer was closed before it was ready", async () => {
+      const user = userEvent.setup();
+      const onOpenDataset = vi.fn();
+      let finishUpload: (v: unknown) => void = () => {};
+      uploadStoredObject.mockReset().mockReturnValue(
+        new Promise((resolve) => {
+          finishUpload = resolve;
+        }),
+      );
+      let closeDrawer = () => {};
+      function ClosableDrawer() {
+        const [open, setOpen] = useState(true);
+        closeDrawer = () => setOpen(false);
+        return <BulkUploadDrawer open={open} onClose={vi.fn()} onOpenDataset={onOpenDataset} />;
+      }
+      renderWithDatasetHost(<ClosableDrawer />, { project: { id: "proj_1", slug: "proj" } });
+      await user.upload(fileInput(), [csv("one.csv")]);
+      await waitFor(() => expect(screen.getByText("one")).toBeInTheDocument());
+      await user.click(uploadButton());
+
+      act(() => closeDrawer());
+      finishUpload({ id: "so_1" });
+
+      await waitFor(() => expect(createFromStoredObject).toHaveBeenCalled());
+      expect(onOpenDataset).not.toHaveBeenCalled();
     });
 
     /** @scenario The types I confirmed are applied to that file's dataset */
