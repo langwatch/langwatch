@@ -14,6 +14,12 @@ const SCANNERS = {
   "@langwatch/handled-error": "packages/handled-error",
   "@langwatch/csv": "packages/csv",
   "@langwatch/scenario-contract": "modules/scenario/contract",
+  "@langwatch/design-system": "packages/design-system",
+  "@langwatch/authz-process": "modules/authz/process",
+  "@langwatch/entitlement-process": "modules/entitlement/process",
+  "@langwatch/identity-process": "modules/identity/process",
+  "@langwatch/workflow-process": "modules/workflow/process",
+  "@langwatch/stored-object-process": "modules/stored-object/process",
 };
 const repoFile = (path) => readFileSync(new URL(`../../../${path}`, import.meta.url), "utf8");
 const nxJson = JSON.parse(repoFile("nx.json"));
@@ -27,6 +33,7 @@ void describe("Nx reruns", () => {
       const { scripts } = JSON.parse(repoFile(`${root}/package.json`));
       assert.equal(scripts["test:repo"], "vitest run --config vitest.repo.config.ts", name);
       assert.equal(hashes({ name, path: "packages/process/src/server.ts" }), false, name);
+      assert.equal(hashes({ name, path: "modules/trace/process/src/server.ts" }), false, name);
     }
   });
 

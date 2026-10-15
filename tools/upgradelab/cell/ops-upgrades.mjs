@@ -1,7 +1,7 @@
 // One screenshot for an upgradelab cell: the holding page, or Ops > Upgrades after signing in.
 // Run with cwd = <head>/apps/ui (where @playwright/test resolves); argv[2] is JSON
-// { url, email, password, out, signIn, path?, open?, expect? }: path defaults to /ops/upgrades; open is
-// text to click there (a row), expect the text to wait for after it. Prints { url, text } as JSON.
+// { url, email, password, out, signIn, path?, open?, expect? }: path defaults to /ops/upgrades;
+// open is text to click there (a row), expect the text to wait for after it. Prints { url, text }.
 import { createRequire } from "node:module";
 
 const { chromium } = createRequire(`${process.cwd()}/package.json`)("@playwright/test");
@@ -15,7 +15,9 @@ const {
   open,
   expect,
 } = JSON.parse(process.argv[2]);
-const browser = await chromium.launch();
+const browser = await chromium.launch({
+  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--disable-webgl"],
+});
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   // The lab has no internet: web fonts answer empty CSS so a stalled DNS lookup never holds

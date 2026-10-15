@@ -4,7 +4,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { ExternalImageResponse } from "../../channels/external-image.channel.ts";
+import {
+  type ExternalImageResponse,
+  ExternalImageTooLargeError,
+} from "../../channels/external-image.channel.ts";
 import { MemoryExternalImageChannel } from "../../channels/memory/memory.external-image.channel.ts";
 import { ImageProxyService } from "../image-proxy.service.ts";
 
@@ -65,6 +68,25 @@ describe("ImageProxyService.proxy", () => {
         const response = await proxied("https://host.test/", "image/png");
 
         expect(response.headers.get("content-disposition")).toBe('inline; filename="image"');
+      });
+    });
+  });
+
+  describe("given an upstream host that answers with a picture over the size limit", () => {
+    describe("when a browser loads that image through the proxy", () => {
+      /** @scenario "A picture over the size limit is refused rather than relayed" */
+      it("answers 413 with the read headers", async () => {
+        const response = await ImageProxyService.create({
+          images: {
+            fetch: async () => {
+              throw new ExternalImageTooLargeError();
+            },
+          },
+        }).proxy({ url: "https://host.test/huge.png" });
+
+        expect(response.status).toBe(413);
+        expect(await response.json()).toEqual({ error: "Image is too large" });
+        expect(response.headers.get("x-content-type-options")).toBe("nosniff");
       });
     });
   });

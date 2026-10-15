@@ -86,9 +86,12 @@ describe("given an admin on the Inventory page", () => {
       const subtleSmall = screen.getByText("reference subtle small").className;
       const solidSmall = screen.getByText("reference solid small").className;
 
-      // The references must differ or the comparisons below prove nothing.
-      expect(refs.primary).not.toBe(refs.outline);
-      expect(refs.primaryTrigger).not.toBe(refs.outlineTrigger);
+      // The references must differ or the comparisons below prove nothing. The
+      // header draws even its primary button outline, so solid is the one to avoid.
+      expect(refs.outline).not.toBe(solidSmall);
+      expect(refs.outline).not.toBe(ghostSmall);
+      expect(refs.primary).toBe(refs.outline);
+      expect(refs.primaryTrigger).toBe(refs.outlineTrigger);
       // The create action is the house header button, outline, and the toggle
       // beside it is ghost: the toggle changes what the page shows rather than
       // anything about the organization.
@@ -103,14 +106,7 @@ describe("given an admin on the Inventory page", () => {
           (button) => button.className === refs.outline || button.className === refs.outlineTrigger,
         ),
       ).toHaveLength(1);
-      expect(
-        headerButtons.filter(
-          (button) =>
-            button.className === refs.primary ||
-            button.className === refs.primaryTrigger ||
-            button.className === solidSmall,
-        ),
-      ).toHaveLength(0);
+      expect(headerButtons.filter((button) => button.className === solidSmall)).toHaveLength(0);
 
       // Pressed, the kit draws the toggle subtle rather than ghost, so that a
       // page showing invented figures says so in the control that caused it.

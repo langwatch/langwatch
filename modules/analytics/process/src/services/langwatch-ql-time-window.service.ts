@@ -19,6 +19,7 @@ import {
   isLangWatchQLTimeWindowParameter,
   type LangWatchQLTimeWindow,
   type LangWatchQLTimeWindowParameter,
+  LWQL_ACCEPTED_GRANULARITY_STEPS,
   LWQL_GRANULARITY_MAX_BUCKETS,
   LWQL_GRANULARITY_STEPS,
   LWQL_PERIOD_END_PARAMETER,
@@ -108,9 +109,9 @@ export interface LangWatchQLGranularityResolution {
 }
 
 /**
- * The finest offered step whose bucket count fits the ceiling, for a surface
- * that coarsens instead of refusing. Undefined when even the coarsest step
- * overflows, which the caller must refuse.
+ * The finest sub-day step whose bucket count fits the ceiling, for a surface
+ * that coarsens instead of refusing. Undefined when even the hour overflows,
+ * which the caller must refuse: the ladder is unchanged by day and week.
  */
 function findFinestFittingStep(windowSeconds: number): number | undefined {
   for (const step of LWQL_GRANULARITY_STEPS) {
@@ -122,9 +123,9 @@ function findFinestFittingStep(windowSeconds: number): number | undefined {
   return undefined;
 }
 
-/** Whether a step is one the surface offers. */
+/** Whether a step is one any door accepts, day and week included. */
 function isOfferedStep(stepSeconds: number): boolean {
-  return (LWQL_GRANULARITY_STEPS as readonly number[]).includes(stepSeconds);
+  return (LWQL_ACCEPTED_GRANULARITY_STEPS as readonly number[]).includes(stepSeconds);
 }
 
 /**

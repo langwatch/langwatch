@@ -63,6 +63,19 @@ describe("user app installation", () => {
     }
   });
 
+  /** @scenario "The address step lower-cases every stored address" */
+  it("declares the address step as a background step that runs as soon as the upgrade starts", async () => {
+    const runtime = await process("worker").boot();
+    try {
+      const step = runtime
+        .migrationSteps(isMigrationStep)
+        .find(({ id }) => id === "user:lower-case-stored-addresses");
+      expect(step).toMatchObject({ kind: "data", mode: "background", needsOldWritersGone: false });
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
     const runtime = await process(role).boot();
 

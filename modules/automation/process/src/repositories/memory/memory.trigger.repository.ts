@@ -10,7 +10,13 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
 
-import { TriggerRepository, type ReportScheduleTarget } from "../trigger.repository.ts";
+import {
+  TriggerRepository,
+  type ReportScheduleTarget,
+  type TriggerJsonColumn,
+  type TriggerJsonText,
+  type TriggerJsonTextOutcome,
+} from "../trigger.repository.ts";
 import type { MemoryAutomationStore } from "./memory.automation.store.ts";
 
 const EMPTY_TEMPLATES = {
@@ -174,6 +180,51 @@ export class MemoryTriggerRepository extends TriggerRepository {
     return Promise.resolve(unchanged);
   }
 
+  findJsonTextPage({
+    after,
+    limit,
+  }: {
+    after?: string;
+    limit: number;
+  }): Promise<TriggerJsonText[]> {
+    return Promise.resolve(
+      [...this.memory.triggerJsonText.entries()]
+        .flatMap(([id, text]) => {
+          const row = this.memory.triggers.get(id);
+          if (!row || (text.filters === undefined && text.actionParams === undefined)) return [];
+          return [
+            {
+              id,
+              projectId: row.projectId,
+              filters: text.filters ?? null,
+              actionParams: text.actionParams ?? null,
+            },
+          ];
+        })
+        .filter((row) => after === undefined || row.id > after)
+        .toSorted((left, right) => Number(left.id > right.id) - Number(left.id < right.id))
+        .slice(0, limit),
+    );
+  }
+
+  unwrapJsonText(input: {
+    triggerId: string;
+    projectId: string;
+    column: TriggerJsonColumn;
+    text: string;
+  }): Promise<TriggerJsonTextOutcome> {
+    const row = this.memory.triggers.get(input.triggerId);
+    const stored = this.memory.triggerJsonText.get(input.triggerId);
+    if (row?.projectId !== input.projectId || stored?.[input.column] !== input.text) {
+      return Promise.resolve("changed");
+    }
+    // Postgres's jsonb refuses a NUL escape; the live tier reports it and leaves the text.
+    if (/\\u0000/i.test(input.text)) return Promise.resolve("unparseable");
+    this.dropJsonText({ triggerId: input.triggerId, columns: [input.column] });
+    this.write({ ...row, [input.column]: JSON.parse(input.text) as Record<string, unknown> });
+    return Promise.resolve("unwrapped");
+  }
+
   findAllByProjectId(input: { projectId: string }): Promise<Trigger[]> {
     return Promise.resolve(
       this.rows()
@@ -241,6 +292,12 @@ export class MemoryTriggerRepository extends TriggerRepository {
     });
     const row = triggerSchema.parse({ ...stored, ...changes, updatedAt: toDate(nowInstant()) });
     this.write(row);
+    this.dropJsonText({
+      triggerId: row.id,
+      columns: (["filters", "actionParams"] as const).filter(
+        (column) => input[column] !== undefined,
+      ),
+    });
     return row;
   }
 
@@ -251,6 +308,21 @@ export class MemoryTriggerRepository extends TriggerRepository {
         send.traceId === input.traceId &&
         send.projectId === input.projectId,
     );
+  }
+
+  /** A write stores an object, as the live tier does, so the column no longer holds text. */
+  private dropJsonText({
+    triggerId,
+    columns,
+  }: {
+    triggerId: string;
+    columns: readonly TriggerJsonColumn[];
+  }): void {
+    const text = this.memory.triggerJsonText.get(triggerId);
+    if (!text) return;
+    const rest = { ...text };
+    for (const column of columns) delete rest[column];
+    this.memory.triggerJsonText.set(triggerId, rest);
   }
 
   private rows(): Trigger[] {

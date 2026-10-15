@@ -19,6 +19,7 @@ import {
 } from "../rules/cli-device-flow.rules.ts";
 import type { AuthDirectoryProject } from "./cli-device-directory.service.ts";
 import type { CliDeviceFlowCollaborators } from "./cli-device-flow.service.ts";
+import type { CliRotationOutcome } from "./cli-device-rotation-replay.service.ts";
 import { type CliRefreshTokenRecord, type CliMintedSession } from "./cli-device-session.service.ts";
 
 const logger = createLogger("langwatch:auth-cli");
@@ -69,7 +70,7 @@ export type CliRotatedSession = CliMintedSession &
 /** One rotation of a refresh token, for the CLI's `/refresh` and for any peer holding a pair. */
 async function rotateRefreshToken({
   flow,
-  refreshToken: refresh_token,
+  refreshToken,
   projectRef,
 }: {
   flow: CliDeviceFlowCollaborators;
@@ -77,23 +78,49 @@ async function rotateRefreshToken({
   /** A project id or slug to re-scope the rotated pair to; the person's access is checked. */
   projectRef?: string | undefined;
 }): Promise<CliRotatedSession> {
-  const record = await flow.sessions().getRefreshToken(refresh_token);
+  const { session, replayed } = await flow.sessions().rotateOnce({
+    refreshToken,
+    rotate: async (remember) => {
+      const record = await flow.sessions().getRefreshToken(refreshToken);
+      return rotateClaimed({ flow, refreshToken, record, projectRef, remember });
+    },
+  });
 
-  // One rotation per token: a concurrent second presentation is refused as spent.
-  if (!(await flow.sessions().claimRotation(refresh_token))) {
+  return replayed ? getReplayedRotation({ flow, remembered: session, projectRef }) : session;
+}
+
+/**
+ * The pair a spent token's rotation minted, while in its window, asked for the same project,
+ * and its session still live: a logout, revocation or offboarding since then refuses it.
+ */
+async function getReplayedRotation({
+  flow,
+  remembered,
+  projectRef,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  remembered: CliRotatedSession;
+  projectRef: string | undefined;
+}): Promise<CliRotatedSession> {
+  const { project } = remembered;
+  if (projectRef !== undefined && projectRef !== project?.id && projectRef !== project?.slug) {
     throw refused("invalid_grant", "Refresh token is invalid or revoked", 401);
   }
 
-  try {
-    return await rotateClaimed({ flow, refreshToken: refresh_token, record, projectRef });
-  } catch (error) {
-    // Any failure hands the claim back: a dropped token stays dropped, a live one stays usable.
-    await flow.sessions().releaseRotationClaim(refresh_token);
-    throw error;
-  }
+  // The pair's own refresh token is the session's liveness: logout and revocation drop it. The
+  // pair is admitted, and its project re-proved, exactly as presenting that pair would be.
+  const record = await flow.sessions().getRefreshToken(remembered.refreshToken);
+  await assertSessionAdmitted({ flow, refreshToken: remembered.refreshToken, record });
+  if (project !== undefined) await reScopedProjectOf({ flow, record, projectRef: project.id });
+
+  logger.info(
+    { userId: record.user_id, organizationId: record.organization_id },
+    "answering a repeated refresh with the pair its rotation minted",
+  );
+
+  return remembered;
 }
 
-/** The rotation a held claim buys: re-proves the session, then rotates or forks it. */
 /** Refuses a rotation the session may no longer make; answers the anchor and policy it used. */
 async function assertSessionAdmitted({
   flow,
@@ -232,17 +259,21 @@ async function retireSessionKey({
   }
 }
 
+/** The rotation a held claim buys: re-proves the session, then rotates or forks it. */
 async function rotateClaimed({
   flow,
   refreshToken: refresh_token,
   record,
   projectRef,
+  remember,
 }: {
   flow: CliDeviceFlowCollaborators;
   refreshToken: string;
   record: CliRefreshTokenRecord;
   projectRef: string | undefined;
-}): Promise<CliRotatedSession> {
+  /** Shares the rotated pair for the replay window, before the old token is dropped. */
+  remember: (rotated: CliRotatedSession) => Promise<void>;
+}): Promise<CliRotationOutcome> {
   const { sessionAnchorMs, maxDurationDays } = await assertSessionAdmitted({
     flow,
     refreshToken: refresh_token,
@@ -269,9 +300,9 @@ async function rotateClaimed({
       clientInfo: record.client_info,
       parentFamilyId: await flow.sessions().familyOf({ refreshToken: refresh_token, record }),
     });
-    await flow.sessions().releaseRotationClaim(refresh_token);
 
-    return { ...child, project };
+    // Never shared: the parent stays live, so its retry simply forks again.
+    return { forked: { ...child, project } };
   }
 
   // `session_started_at` and the CLI key id are carried across so the devices
@@ -289,9 +320,12 @@ async function rotateClaimed({
 
   await extendKeyExpiry({ flow, record, sessionAnchorMs, maxDurationDays });
 
+  // Shared before the drop, so a retry never finds the token gone and its pair not yet held.
+  const answered = project ? { ...rotated, project } : rotated;
+  await remember(answered);
   await flow.sessions().dropRefreshToken(refresh_token);
 
-  return project ? { ...rotated, project } : rotated;
+  return { rotated: answered };
 }
 
 /** The project a rotation re-scopes to, refused unless the person can view it. */

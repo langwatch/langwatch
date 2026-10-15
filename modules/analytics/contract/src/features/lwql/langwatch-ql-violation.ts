@@ -117,4 +117,10 @@ export interface LangWatchQLViolation {
   readonly availableColumns?: readonly string[];
   /** The row cap a `LIMIT_TOO_HIGH` or `LIMIT_REQUIRED_PER_BRANCH` refusal names. */
   readonly maxRows?: number;
+  /**
+   * What the caller lacks, on a `GATED_COLUMN` field or an `APP_FUNCTION_GATED` call they would
+   * be allowed with it: a permission ("cost:view") or a content kind ("input"). Absent on a
+   * refusal about the query's shape (see `findLangWatchQLMissingGates`).
+   */
+  readonly missingGates?: readonly string[];
 }

@@ -1,3 +1,7 @@
+import {
+  EVAL_INPUTS_HARD_CEILING_BYTES,
+  EVAL_INPUTS_INLINE_MAX_BYTES,
+} from "@langwatch/evaluation-contract";
 import type * as Observability from "@langwatch/observability";
 import { memoryObjectStorage } from "@langwatch/process-stores";
 import type { ObjectStorage } from "@langwatch/process-stores/members";
@@ -8,8 +12,6 @@ import { ObjectStorageEvaluationInputRepository } from "../../../../repositories
 import { legacyEvaluationInputKey } from "../../../../rules/evaluation-input-object.rules.ts";
 import {
   EvaluationInputsOffloadService,
-  EVAL_INPUTS_HARD_CEILING_BYTES,
-  EVAL_INPUTS_INLINE_MAX_BYTES,
   EVAL_INPUTS_PREVIEW_BYTES,
   STORED_OBJECT_MARKER_KEY,
 } from "../evaluation-inputs-offload.service.ts";

@@ -12,10 +12,10 @@ async function projected(environment: Readonly<Record<string, string | undefined
 
 describe("rum's browser config", () => {
   describe("given nothing sets the switch", () => {
-    /** @scenario "RUM is on by default" */
-    it("enables browser tracing for every session once a collector is configured", async () => {
+    /** @scenario "RUM is off by default" */
+    it("keeps browser tracing off even with a collector configured", async () => {
       expect(await projected({ RUM_COLLECTOR_ENDPOINT: COLLECTOR })).toEqual({
-        enabled: true,
+        enabled: false,
         sampleRatio: 1,
       });
     });
@@ -26,6 +26,23 @@ describe("rum's browser config", () => {
     it("disables browser tracing even with a collector configured", async () => {
       const off = await projected({ RUM_ENABLED: "false", RUM_COLLECTOR_ENDPOINT: COLLECTOR });
       expect(off.enabled).toBe(false);
+    });
+  });
+
+  describe("given the switch written off the previous release's way", () => {
+    /** @scenario "A setting written the way the previous release read it keeps that meaning" */
+    it("keeps browser tracing off for 0, a capitalised false, a blank or any other non-on word", async () => {
+      for (const value of ["0", "FALSE", "off", "no", ""]) {
+        const off = await projected({ RUM_ENABLED: value, RUM_COLLECTOR_ENDPOINT: COLLECTOR });
+        expect(off.enabled).toBe(false);
+      }
+    });
+
+    it("reads 1 and a capitalised true as on", async () => {
+      for (const value of ["1", "TRUE"]) {
+        const on = await projected({ RUM_ENABLED: value, RUM_COLLECTOR_ENDPOINT: COLLECTOR });
+        expect(on.enabled).toBe(true);
+      }
     });
   });
 

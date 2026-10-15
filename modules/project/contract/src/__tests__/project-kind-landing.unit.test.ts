@@ -31,9 +31,10 @@ describe("the project the app lands on", () => {
   });
 
   describe("given the filter a home-page query applies", () => {
-    it("names exactly the aggregate and governance kinds", () => {
+    it("names exactly the aggregate, governance and checkup kinds", () => {
       expect([...NEVER_LANDED_ON_PROJECT_KINDS].toSorted()).toEqual([
         "aggregate",
+        "internal_checkup",
         "internal_governance",
       ]);
     });

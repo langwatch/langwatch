@@ -48,6 +48,9 @@
       "path": "../../langy/contract/tsconfig.build.json"
     },
     {
+      "path": "../../insight/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../identity/contract/tsconfig.build.json"
     },
     {
@@ -79,6 +82,9 @@
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../analytics/client/tsconfig.build.json"
     },
     {
       "path": "../../agent/contract/tsconfig.build.json"

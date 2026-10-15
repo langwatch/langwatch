@@ -1,12 +1,14 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { nowInstant } from "@langwatch/time";
 
 import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
+import { translateClickHouseQueryError } from "./clickhouse.query-error-translation.mapper.ts";
 
 /**
- * Adapts the process's one routing `clickhouse` member to the per-tenant session
- * shape Analytics' repositories expect. Not a second connection — the member already
- * routes and guards every statement by `tenantId`; this just carries that tenant on.
+ * Adapts the process's routing `clickhouse` member to the per-tenant session Analytics'
+ * repositories read through. Every analytics read passes `query`, so a failed read is
+ * translated here once the client's retries are spent; inserts keep the raw error.
  */
 export class ClickHouseAnalyticsSessionRepository implements EvaluationAnalyticsClickHouseClient {
   static create({
@@ -30,13 +32,18 @@ export class ClickHouseAnalyticsSessionRepository implements EvaluationAnalytics
     format: "JSONEachRow";
     clickhouse_settings?: ClickHouseSettings;
   }): Promise<{ json(): Promise<Record<string, unknown>[]> }> {
-    const { rows } = await this.clickhouse.query<Record<string, unknown>>({
-      tenantId: this.tenantId,
-      sql: input.query,
-      params: input.query_params,
-      settings: input.clickhouse_settings as Record<string, string | number> | undefined,
-    });
-    return { json: () => Promise.resolve(rows) };
+    const startedAt = nowInstant().epochMilliseconds;
+    try {
+      const { rows } = await this.clickhouse.query<Record<string, unknown>>({
+        tenantId: this.tenantId,
+        sql: input.query,
+        params: input.query_params,
+        settings: input.clickhouse_settings as Record<string, string | number> | undefined,
+      });
+      return { json: () => Promise.resolve(rows) };
+    } catch (error) {
+      throw translateClickHouseQueryError(error, nowInstant().epochMilliseconds - startedAt);
+    }
   }
 
   async insert(input: {

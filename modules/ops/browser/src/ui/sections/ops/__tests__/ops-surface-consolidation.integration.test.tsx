@@ -21,6 +21,9 @@ vi.mock("../../../../features/event-store/ui/sections/upcoming-work-panel.tsx", 
 vi.mock("../../../../features/event-store/ui/sections/scheduler-panel.tsx", () => ({
   SchedulerContent: () => <div>scheduler-content</div>,
 }));
+vi.mock("../../../../features/event-store/ui/sections/insight-schedules-panel.tsx", () => ({
+  InsightSchedulesContent: () => <div>insight-schedules-content</div>,
+}));
 vi.mock("../../../../features/event-store/ui/sections/replay-history-panel.tsx", () => ({
   ReplayHistorySection: () => <div>replay-history-section</div>,
 }));
@@ -70,6 +73,16 @@ describe("ops surface consolidation", () => {
 
         expect(screen.getByText("upcoming-work-card")).toBeTruthy();
         expect(screen.getByText("scheduler-content")).toBeTruthy();
+      });
+
+      it("lists the daily insights schedules under the report schedules", () => {
+        withHost(<OpsSchedulesPage />);
+
+        const reports = screen.getByText("scheduler-content");
+        const insights = screen.getByText("insight-schedules-content");
+        expect(
+          reports.compareDocumentPosition(insights) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
       });
     });
   });

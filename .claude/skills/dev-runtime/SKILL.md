@@ -28,7 +28,7 @@ questions at the foot of the ADR that remain are Alex's, not answered.
   `ui` (only `--hmr`), `go`, `langy`, then `backend`. It runs the upgrade
   (`start:prepare:db`, `pnpm task upgrade`) once before any lane starts, and without
   `--hmr` builds the UI once (`@langwatch/ui:build:local`, copied to
-  `apps/ui/dist/client.dev`, served through `LANGWATCH_UI_DIST_DIR`). Run it from the root.
+  the UI build folder as `client.dev`, served through `LANGWATCH_UI_DIST_DIR`). Run it from the root.
 - Under haven a still or `--watch` stack names the backend lane `app`; an `--hmr` stack
   names it `api` beside a `ui` lane. `LANGWATCH_DEV_ONE_PROCESS=0` now only splits the
   simulators out of the `go` lane (`LANGWATCH_GO_ONE_PROCESS` is its deprecated alias).

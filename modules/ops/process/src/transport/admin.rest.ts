@@ -49,7 +49,8 @@ export const adminRest = defineRestRouter(OpsApi)
   .withAudit("ops.stopImpersonation")
   .withInput(adminEmptyRequestSchema)
   .withCredential("browser")
-  .withPermission("ops:manage", { at: "platform", refusal: "hidden" })
+  // ops:view, because ops:manage is not answered while impersonating and this is the way out.
+  .withPermission("ops:view", { at: "platform", refusal: "hidden" })
   .withOutput(adminImpersonationStoppedSchema)
   .withMiddlewareContext(browserSessionContext, adminAuditRequest)
   .handle(({ app, actor }, ...[session, req]) =>
