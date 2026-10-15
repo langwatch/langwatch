@@ -369,10 +369,26 @@ export class DashboardModule implements DashboardApi {
     return this.#stars.reorderStars(input);
   }
 
-  /** Where a reader opens each of these dashboards. */
-  async getDashboardLinks(input: {
+  /** Where a reader opens each of these Reports boards. */
+  getDashboardLinks(input: {
     projectId: string;
     dashboardIds: string[];
+  }): Promise<Record<string, string>> {
+    return this.#links({ ...input, pathOf: (id) => `/analytics/reports?dashboard=${id}` });
+  }
+
+  /** Where a reader opens each of these Dashboards boards. */
+  getBoardLinks(input: {
+    projectId: string;
+    dashboardIds: string[];
+  }): Promise<Record<string, string>> {
+    return this.#links({ ...input, pathOf: (id) => `/dashboards/${id}` });
+  }
+
+  async #links(input: {
+    projectId: string;
+    dashboardIds: string[];
+    pathOf: (dashboardId: string) => string;
   }): Promise<Record<string, string>> {
     const project = await this.#projects.findSummaryById(input.projectId);
     if (!project) throw new Error(`Project ${input.projectId} has no summary to link against`);
@@ -383,7 +399,7 @@ export class DashboardModule implements DashboardApi {
         dashboardPlatformUrl({
           publicBaseUrl: this.#publicBaseUrl,
           projectSlug: project.slug,
-          path: `/analytics/reports?dashboard=${dashboardId}`,
+          path: input.pathOf(dashboardId),
         }),
       ]),
     );

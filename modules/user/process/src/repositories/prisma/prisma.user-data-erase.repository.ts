@@ -51,6 +51,9 @@ type GdprUserDataEraseDatabase = {
   dataset: Delegate<"dataset", "deleteMany">;
   customGraph: Delegate<"customGraph", "deleteMany">;
   dashboard: Delegate<"dashboard", "deleteMany">;
+  dashboardsV2: Delegate<"dashboardsV2", "findMany" | "updateMany" | "deleteMany">;
+  dashboardWidget: Delegate<"dashboardWidget", "deleteMany">;
+  dashboardFavourite: Delegate<"dashboardFavourite", "deleteMany">;
   trigger: Delegate<"trigger", "deleteMany">;
   topic: Delegate<"topic", "deleteMany">;
   cost: Delegate<"cost", "deleteMany">;
@@ -221,6 +224,7 @@ export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepos
           data: { userId: "[deleted]", ipAddress: null, userAgent: null },
         });
         await tx.annotationQueueMembers.deleteMany({ where: { userId } });
+        await eraseDashboardsOf({ tx, userId });
 
         if (projectIds.length > 0) {
           const configIds = (
@@ -263,6 +267,9 @@ export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepos
 
           await tx.customGraph.deleteMany({ where: { projectId: { in: projectIds } } });
           await tx.dashboard.deleteMany({ where: { projectId: { in: projectIds } } });
+          await tx.dashboardWidget.deleteMany({ where: { projectId: { in: projectIds } } });
+          await tx.dashboardFavourite.deleteMany({ where: { projectId: { in: projectIds } } });
+          await tx.dashboardsV2.deleteMany({ where: { projectId: { in: projectIds } } });
           await tx.trigger.deleteMany({ where: { projectId: { in: projectIds } } });
           await tx.annotation.deleteMany({ where: { projectId: { in: projectIds } } });
           await tx.shareLink.deleteMany({ where: { projectId: { in: projectIds } } });
@@ -316,4 +323,31 @@ export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepos
       { timeout: 120_000, maxWait: 30_000 },
     );
   }
+}
+
+/**
+ * The person's Dashboards rows in projects that outlive them: their Only me boards with the
+ * widgets and stars on them, and their own stars. A board others can see stays, authorless,
+ * like an annotation; an Only me board with no author would be no one's.
+ */
+async function eraseDashboardsOf({
+  tx,
+  userId,
+}: {
+  tx: Pick<GdprUserDataEraseDatabase, "dashboardsV2" | "dashboardWidget" | "dashboardFavourite">;
+  userId: string;
+}): Promise<void> {
+  const privateBoardIds = (
+    await tx.dashboardsV2.findMany({
+      where: { createdById: userId, scope: "PRIVATE" },
+      select: { id: true },
+    })
+  ).map((board) => board.id);
+  if (privateBoardIds.length > 0) {
+    await tx.dashboardWidget.deleteMany({ where: { dashboardId: { in: privateBoardIds } } });
+    await tx.dashboardFavourite.deleteMany({ where: { dashboardId: { in: privateBoardIds } } });
+    await tx.dashboardsV2.deleteMany({ where: { id: { in: privateBoardIds } } });
+  }
+  await tx.dashboardsV2.updateMany({ where: { createdById: userId }, data: { createdById: null } });
+  await tx.dashboardFavourite.deleteMany({ where: { userId } });
 }

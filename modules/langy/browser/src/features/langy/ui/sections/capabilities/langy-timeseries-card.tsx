@@ -335,9 +335,10 @@ function ComparisonHeadline({
 function SaveToDashboard({ graph, title }: { graph: unknown; title?: string }) {
   const { project } = useOrganizationTeamProject();
   const [saving, setSaving] = useState(false);
-  // A builder chart on a Dashboards board would turn it into a Reports board (AC199c).
+  // `dashboards.getAll` lists the Reports boards alone: a builder chart has no place on a
+  // Dashboards board (AC199c).
   const dashboards = api.dashboards.getAll.useQuery(
-    { projectId: project?.id ?? "", onlyLegacy: true },
+    { projectId: project?.id ?? "" },
     { enabled: !!project?.id && !!graph },
   );
   const createGraph = api.graphs.create.useMutation();

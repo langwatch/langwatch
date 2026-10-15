@@ -23,6 +23,17 @@ Feature: Erasing a user removes their personal data everywhere
     When a user of one is erased
     Then the other organization's records are unchanged
 
+  # Dashboards split (2026-10-15): DashboardsV2, DashboardWidget and DashboardFavourite hold a
+  # person's boards, widgets and stars apart from the Analytics Reports tables.
+  @integration
+  Scenario: Erasing a user removes their Only me boards and their stars, and keeps shared boards
+    Given a user with an Only me board holding a widget, a Project board another member starred,
+      and stars of their own
+    When their erasure runs
+    Then the Only me board, its widgets and every star on it are gone, and so are the user's stars
+    And the Project board and its widgets stay with no author, with the other member's star
+    And the boards, widgets and stars of a project only the user owned go with that project
+
   @unit
   Scenario: Erasing a user with no blockers runs the erase transaction for the resolved user
     Given a user with no erasure blockers

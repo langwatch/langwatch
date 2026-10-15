@@ -92,6 +92,11 @@ export interface DashboardApi {
     viewer?: DashboardViewer;
     includeOrganization?: boolean;
   }): Promise<DashboardSummary[]>;
+  /** Where a reader opens each of these Dashboards boards, keyed by board id. */
+  getBoardLinks(input: {
+    projectId: string;
+    dashboardIds: string[];
+  }): Promise<Record<string, string>>;
   /** One Dashboards board the viewer may open here: the project's own, or the organization's. */
   getBoard(input: {
     projectId: string;

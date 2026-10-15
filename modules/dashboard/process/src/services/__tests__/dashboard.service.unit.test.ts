@@ -1,13 +1,15 @@
 /**
  * The Analytics Reports boards and the graphs placed on them, over the memory
  * repository the Prisma one is the twin of. Spec: dashboard-service.feature,
- * dashboards-v2.feature AC199 to AC199j.
+ * dashboards-v2.feature AC199 to AC199k.
  */
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import {
   DashboardNotFoundError,
   DashboardReorderUnknownIdsError,
   GraphNotFoundError,
 } from "@langwatch/dashboard-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -23,6 +25,8 @@ import { BoardService } from "../board.service.ts";
 import { DashboardAccessService } from "../dashboard-access.service.ts";
 import type { WorkbenchAccess } from "../dashboard.service.ts";
 import { DashboardService } from "../dashboard.service.ts";
+import { SavedWorkbenchChartPolicyService } from "../saved-workbench-chart-policy.service.ts";
+import { SavedWorkbenchChartService } from "../saved-workbench-chart.service.ts";
 
 class FixedWorkbenchAccess implements WorkbenchAccess {
   constructor(private readonly enabled: boolean) {}
@@ -432,6 +436,36 @@ describe("DashboardService", () => {
       expect({ name: first?.name, isMoved: first?.id === moved.id }).toEqual({
         name: "Reports",
         isMoved: false,
+      });
+    });
+
+    /** @scenario "AC199k Split: a saved workbench chart is placed only on a Reports board" */
+    it("places a saved workbench chart on a Reports board and not on one only Dashboards holds", async () => {
+      const { repository, reports, moved } = await threeBoards();
+      const analytics = createApiFixture<AnalyticsApi>({});
+      const charts = SavedWorkbenchChartService.create({
+        repository,
+        policy: SavedWorkbenchChartPolicyService.create({ analytics }),
+        analytics,
+      });
+      await repository.createSavedWorkbenchChart({
+        id: "chart_2",
+        projectId: PROJECT,
+        name: "Errors",
+        definition: { version: 1, sql: "SELECT 1", parameters: {} },
+      });
+      const placedOn = (dashboardId: string) =>
+        charts.place({ projectId: PROJECT, chartId: "chart_2", dashboardId }).then(
+          (chart) => chart.dashboardId,
+          (error: { code: string }) => error.code,
+        );
+
+      expect({
+        dashboards: await placedOn(moved.id),
+        reports: await placedOn(reports.id),
+      }).toEqual({
+        dashboards: "saved_workbench_chart_dashboard_not_found",
+        reports: reports.id,
       });
     });
 

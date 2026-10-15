@@ -543,7 +543,7 @@ describe("given a chart Langy can save onto a board", () => {
       });
 
       expect(screen.getByText("Save to dashboard")).toBeTruthy();
-      expect(boardListInputs.at(-1)).toEqual({ projectId: "p_demo", onlyLegacy: true });
+      expect(boardListInputs.at(-1)).toEqual({ projectId: "p_demo" });
     });
   });
 });
