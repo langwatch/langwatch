@@ -472,9 +472,10 @@ export class PrismaUserRepository
   }
 
   async updateProfile(input: StoredProfileChange): Promise<UserProfile> {
-    const data: { name?: string; email?: string } = {};
+    const data: { name?: string; email?: string; emailVerified?: boolean } = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.email !== undefined) data.email = input.email;
+    if (input.emailVerified !== undefined) data.emailVerified = input.emailVerified;
 
     return userProfileSchema.parse(
       await this.prisma.user.update({

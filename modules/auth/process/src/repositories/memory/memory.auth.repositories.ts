@@ -1,4 +1,5 @@
 import type { IdentityStorageAdapterInput } from "@langwatch/identity-contract";
+import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { UserNotFoundError } from "@langwatch/user-contract";
 import { memoryAdapter } from "better-auth/adapters/memory";
 
@@ -62,6 +63,7 @@ export class MemoryAuthRepositories {
 
   readonly sessions: AuthRepositories["sessions"];
   readonly cliSessions: MemoryCliDeviceSessionRepository;
+  readonly cliRotations = MemorySharedCredentialStore.create();
   readonly signUpTokens: AuthRepositories["signUpTokens"];
   readonly signInLocks: MemorySignInAttemptLockRepository;
   readonly rateLimits: MemoryAuthRateLimitRepository;

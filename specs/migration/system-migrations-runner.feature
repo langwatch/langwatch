@@ -469,6 +469,14 @@ Feature: Running system migrations across organizations
     When a later pass finalizes it
     Then its record carries no held reason
 
+  # A step whose `migrated` is its steady state never finalizes by design (Alex, 2026-10-12).
+  @unit
+  Scenario: A step that never finalizes by design keeps its tenants settled, not held
+    Given a migration declaring migratedIsSteady that reports "org_acme" migrated
+    When a pass records it
+    Then its record carries no held reason and no held-since moment
+    And the migration has no unfinished tenant
+
   # ═══ Re-driving after startup ═════════════════════════════════════════
   # The preflight converges once and then stops. Every stored status but
   # `finalized` and `rolled_back` is re-entrant, so a tenant that parks an

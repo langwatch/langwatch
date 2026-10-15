@@ -5,6 +5,10 @@ import { chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 
+// The orb's glow rule lives here; without it the glow span becomes a grid row
+// and pushes the mark off-centre until the panel's chunk loads the sheet.
+import "@langwatch/design-system/langy-theme.css";
+
 import { useLangyOrbProximity } from "../../../../behavior/use-langy-orb-proximity.ts";
 import { useLingeringDodge } from "../../../../behavior/use-lingering-dodge.ts";
 import { LANGY_DODGE_STAGGER_MS } from "../../../../model/langy-panel-layout.ts";
