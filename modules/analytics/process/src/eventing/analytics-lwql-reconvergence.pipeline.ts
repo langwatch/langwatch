@@ -33,10 +33,11 @@ import {
 
 const LWQL_RECONVERGENCE_PIPELINE_NAME = "lwql_reconvergence";
 
-/** The operations this pipeline calls; absent LangWatchQL or rendered mode, all are no-ops. */
+/** The operations this pipeline calls; absent LangWatchQL, all are no-ops. */
 interface LwqlReconvergenceApp {
   probeLwqlAccessModelOwner(): Promise<LwqlAccessModelOwner>;
   convergeLwqlAccessModel(): Promise<void>;
+  convergeLwqlAppOwnedObjects(): Promise<void>;
   syncLwqlKeyMapRow(input: { projectId: string }): Promise<void>;
   fillLwqlProjectKeys(input: { dryRun: boolean }): Promise<unknown>;
 }
@@ -69,6 +70,7 @@ export function buildLwqlReconvergence({
           runLwqlReconvergence({
             probe: () => app.probeLwqlAccessModelOwner(),
             converge: () => app.convergeLwqlAccessModel(),
+            convergeAppOwned: () => app.convergeLwqlAppOwnedObjects(),
             fillKeyMap: () => app.fillLwqlProjectKeys({ dryRun: false }),
           }),
         )
@@ -84,6 +86,7 @@ function isReconvergenceApp(app: unknown): app is LwqlReconvergenceApp {
     app !== null &&
     "probeLwqlAccessModelOwner" in app &&
     "convergeLwqlAccessModel" in app &&
+    "convergeLwqlAppOwnedObjects" in app &&
     "syncLwqlKeyMapRow" in app &&
     "fillLwqlProjectKeys" in app
   );

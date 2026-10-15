@@ -1025,6 +1025,42 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the worker begins draining for shutdown
     Then the intent resolves only once the re-provision has finished
 
+  # Rendered mode: a config store owns the access entities, but the app owns the rest
+  # (structural objects, PostgreSQL engine tables, views, the PostgreSQL reader role). A
+  # deploy's converge can fail while ClickHouse pods are still re-mounting the access config
+  # (named collection missing, a replica terminating), and the upgrade gate does not run it
+  # again, so the watch converges those objects too, retrying on its existing backoff.
+  @unit
+  Scenario: In rendered mode the reconvergence watch converges the app-owned LangWatchQL objects
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    When the reconvergence watch wakes
+    Then it converges the rendered statement set and the PostgreSQL reader role
+    And it leaves the user, settings profile, row policies and named collection to the config store
+    And it never runs the sql-mode re-provision of the access model
+
+  @unit
+  Scenario: A failed app-owned converge is retried on the next wake and stops once converged
+    Given the reconvergence watch's converge of the app-owned objects failed
+    When the watch wakes again within its budget
+    Then it converges again, without crashing the worker, until one converge succeeds
+    And once one succeeds later wakes in that worker converge nothing until the next boot
+
+  @integration
+  Scenario: A rendered install whose named collection appears late converges on a later wake
+    Given a rendered-mode ClickHouse whose config store has not mounted the named collection yet
+    When the watch wakes and its converge fails at the PostgreSQL engine tables
+    And the named collection then appears
+    Then the next wake creates every PostgreSQL engine table
+    And a later wake converges nothing
+
+  @unit
+  Scenario: A failed provisioning statement logs the ClickHouse error code and name
+    Given a provisioning statement fails on the ClickHouse server
+    When the runner logs the failure
+    Then the log carries the numeric ClickHouse code and its name, such as 669 and NAMED_COLLECTION_DOESNT_EXIST
+    And a failure that never reached the server, such as a timeout, logs no code
+    And the log never carries the statement text or a secret
+
   # The re-provision gate is only as trustworthy as the probe behind it, so the
   # ownership classification is split from its I/O and unit-tested directly: a
   # pure classifier over two counts (config-store entities, SQL-store users) and

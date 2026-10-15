@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 
 import {
   classifyLwqlAccessModelOwner,
+  clickHouseErrorCodeFields,
   clickHouseErrorSummary,
   type ConfigStoreLwqlEntity,
   configStoreEntitiesFromRows,
@@ -48,6 +49,7 @@ async function runClickHouseStatements({
         logger.error(
           {
             error: clickHouseErrorSummary(error),
+            ...clickHouseErrorCodeFields(error),
             statement: position,
             kind,
             targets,

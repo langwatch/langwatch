@@ -75,9 +75,10 @@ describe("given the access-model reconvergence watch", () => {
       const converge = vi.fn(() => Promise.resolve());
       const probe = () => (owner instanceof Error ? Promise.reject(owner) : Promise.resolve(owner));
       const fillKeyMap = () => Promise.resolve();
+      const convergeAppOwned = () => Promise.resolve();
       return {
         converge,
-        done: runLwqlReconvergence({ probe, converge, fillKeyMap })({
+        done: runLwqlReconvergence({ probe, converge, convergeAppOwned, fillKeyMap })({
           final: false,
           fillKeyMap: false,
         }),
@@ -109,6 +110,7 @@ describe("given the access-model reconvergence watch", () => {
       await runLwqlReconvergence({
         probe: () => Promise.resolve("none"),
         converge,
+        convergeAppOwned: () => Promise.resolve(),
         fillKeyMap: () => Promise.resolve(),
       })({ final: false, fillKeyMap: false });
       order.push("intent resolved");
@@ -119,6 +121,63 @@ describe("given the access-model reconvergence watch", () => {
       const { converge, done } = run(new Error("ECONNREFUSED"));
       await done;
       expect(converge).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a rendered install's config store owns the access entities", () => {
+    const wakeOnce = { final: false, fillKeyMap: false };
+    const namedCollectionMissing = () =>
+      Object.assign(new Error("Code: 669. DB::Exception: There is no named collection"), {
+        code: "669",
+      });
+
+    /** @scenario "In rendered mode the reconvergence watch converges the app-owned LangWatchQL objects" */
+    it("converges the app-owned objects and leaves the access model to the config store", async () => {
+      const convergeAppOwned = vi.fn(() => Promise.resolve());
+      const converge = vi.fn(() => Promise.resolve());
+      await runLwqlReconvergence({
+        probe: () => Promise.resolve("config_store"),
+        converge,
+        convergeAppOwned,
+        fillKeyMap: () => Promise.resolve(),
+      })(wakeOnce);
+
+      expect(convergeAppOwned).toHaveBeenCalledTimes(1);
+      expect(converge).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A failed app-owned converge is retried on the next wake and stops once converged" */
+    it("retries a failed converge on each later wake and stops once one succeeds", async () => {
+      const convergeAppOwned = vi
+        .fn<() => Promise<void>>()
+        .mockRejectedValueOnce(namedCollectionMissing())
+        .mockRejectedValueOnce(new Error("Timeout error."))
+        .mockResolvedValue(undefined);
+      const reconverge = runLwqlReconvergence({
+        probe: () => Promise.resolve("config_store"),
+        converge: () => Promise.resolve(),
+        convergeAppOwned,
+        fillKeyMap: () => Promise.resolve(),
+      });
+
+      for (let wakes = 0; wakes < 5; wakes++) {
+        await expect(reconverge(wakeOnce)).resolves.toBeUndefined();
+      }
+
+      expect(convergeAppOwned).toHaveBeenCalledTimes(3);
+    });
+
+    /** @scenario "A failed app-owned converge is retried on the next wake and stops once converged" */
+    it("still probes the access model when the app-owned converge fails", async () => {
+      const converge = vi.fn(() => Promise.resolve());
+      await runLwqlReconvergence({
+        probe: () => Promise.resolve("none"),
+        converge,
+        convergeAppOwned: () => Promise.reject(namedCollectionMissing()),
+        fillKeyMap: () => Promise.resolve(),
+      })({ final: true, fillKeyMap: false });
+
+      expect(converge).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -145,14 +204,15 @@ describe("given the access-model reconvergence watch", () => {
         order.push("filled");
       });
       const converge = vi.fn(() => Promise.resolve());
-      await runLwqlReconvergence({ probe, converge, fillKeyMap })({
+      const convergeAppOwned = () => Promise.resolve();
+      await runLwqlReconvergence({ probe, converge, convergeAppOwned, fillKeyMap })({
         final: false,
         fillKeyMap: true,
       });
       expect(order).toEqual(["filled", "probed"]);
 
       const failing = vi.fn(() => Promise.reject(new Error("ECONNREFUSED")));
-      await runLwqlReconvergence({ probe, converge, fillKeyMap: failing })({
+      await runLwqlReconvergence({ probe, converge, convergeAppOwned, fillKeyMap: failing })({
         final: false,
         fillKeyMap: true,
       });
@@ -164,6 +224,7 @@ describe("given the access-model reconvergence watch", () => {
       await runLwqlReconvergence({
         probe: () => Promise.resolve("config_store"),
         converge: () => Promise.resolve(),
+        convergeAppOwned: () => Promise.resolve(),
         fillKeyMap,
       })({ final: false, fillKeyMap: false });
       expect(fillKeyMap).not.toHaveBeenCalled();

@@ -130,6 +130,7 @@ describe("analytics' key-map reaction to a created project", () => {
           app: {
             probeLwqlAccessModelOwner: async () => "none",
             convergeLwqlAccessModel: async () => void 0,
+            convergeLwqlAppOwnedObjects: async () => void 0,
             syncLwqlKeyMapRow: (input) => service.syncProject(input),
             fillLwqlProjectKeys: async () => void 0,
           },

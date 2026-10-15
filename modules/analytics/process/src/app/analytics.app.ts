@@ -53,6 +53,7 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { OverloadedRefusal, StatementBoundTelemetry } from "@langwatch/process-stores";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -119,6 +120,7 @@ import { WorkbenchProtectionsService } from "../services/workbench-protections.s
 import {
   convergeLwqlAccessModel,
   fillLwqlProjectKeys,
+  type LwqlConvergencePlan,
   type LwqlProjectKeyFillReport,
 } from "../tasks/lwql-provision.task.ts";
 import type {
@@ -126,6 +128,8 @@ import type {
   AnalyticsLegacyTimeseriesAnswer,
 } from "../transport/analytics-legacy.rest.ts";
 import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
+
+const logger = createLogger("langwatch:analytics:lwql:provisioning");
 
 /** ADR-034: runs the legacy read beside the routed one and logs a divergence. */
 const ANALYTICS_READ_TRIPWIRE_FLAG = "release_event_sourced_analytics_read_tripwire";
@@ -217,12 +221,14 @@ type AnalyticsDependencies = Readonly<{
 type LwqlProvisioningOperations = Readonly<{
   probeOwner: () => Promise<LwqlAccessModelOwner>;
   converge: () => Promise<void>;
+  convergeAppOwned: () => Promise<void>;
   fillProjectKeys: (input: { dryRun: boolean }) => Promise<LwqlProjectKeyFillReport>;
 }>;
 
 const LWQL_UNAVAILABLE: LwqlProvisioningOperations = {
   probeOwner: () => Promise.resolve("none"),
   converge: () => Promise.resolve(),
+  convergeAppOwned: () => Promise.resolve(),
   fillProjectKeys: () => Promise.resolve({ inserted: 0, blankKeys: 0 }),
 };
 
@@ -247,37 +253,51 @@ function lwqlProvisioningOperations({
   const names = LangWatchQLProductionProvisioningService.create().names({ connection });
   const openRepository = () =>
     ClickHouseLangWatchQLProvisioningRepository.create({ statements: admin.statements });
+  const plan = (postgresReaderPassword: string): LwqlConvergencePlan => ({
+    request: {
+      requested: true,
+      complete: true,
+      connection,
+      postgresReaderPassword,
+      endpoint: {
+        host: settings.postgresHost || postgres.host,
+        port: postgres.port,
+        database: postgres.database,
+      },
+    },
+    names,
+    sourceDatabase: () => admin.target.database,
+    schema: postgres.schema,
+    ...(postgres.connectionLimit === undefined
+      ? {}
+      : { connectionLimit: postgres.connectionLimit }),
+    settings: {
+      LWQL_ACCESS_MODEL_MODE: settings.accessModelMode,
+      LWQL_ACCESS_MODEL_SQL_SINGLE_NODE: settings.sqlSingleNode,
+    },
+    openRepository,
+  });
   return {
     probeOwner: () => openRepository().probeOwner({ names }),
     converge: async () => {
-      // Main arms the watch only in SQL mode; a config store owns the rest.
+      // SQL mode only: in rendered mode a config store owns the access entities.
       if (settings.accessModelMode !== "sql" || readerPassword === undefined) return;
+      await convergeLwqlAccessModel({ database: database(), plan: plan(readerPassword) });
+    },
+    convergeAppOwned: async () => {
+      // SQL mode converges these with the access model; rendered mode has only this run.
+      if (settings.accessModelMode === "sql") return;
+      if (readerPassword === undefined) {
+        logger.warn(
+          { missing: "LWQL_POSTGRES_READER_PASSWORD" },
+          "LangWatchQL is partially configured; the reconvergence watch converges nothing until the configuration is complete",
+        );
+        return;
+      }
       await convergeLwqlAccessModel({
         database: database(),
-        plan: {
-          request: {
-            requested: true,
-            complete: true,
-            connection,
-            postgresReaderPassword: readerPassword,
-            endpoint: {
-              host: settings.postgresHost || postgres.host,
-              port: postgres.port,
-              database: postgres.database,
-            },
-          },
-          names,
-          sourceDatabase: () => admin.target.database,
-          schema: postgres.schema,
-          ...(postgres.connectionLimit === undefined
-            ? {}
-            : { connectionLimit: postgres.connectionLimit }),
-          settings: {
-            LWQL_ACCESS_MODEL_MODE: settings.accessModelMode,
-            LWQL_ACCESS_MODEL_SQL_SINGLE_NODE: settings.sqlSingleNode,
-          },
-          openRepository,
-        },
+        plan: plan(readerPassword),
+        failOnError: true,
       });
     },
     fillProjectKeys: ({ dryRun }) =>
@@ -497,6 +517,11 @@ export class AnalyticsModule
   /** Re-provisions the access model once a config store released it (SQL mode only). */
   convergeLwqlAccessModel(): Promise<void> {
     return this.#dependencies.lwqlProvisioning.converge();
+  }
+
+  /** Rendered mode's app-owned objects, never the config store's entities; throws on failure. */
+  convergeLwqlAppOwnedObjects(): Promise<void> {
+    return this.#dependencies.lwqlProvisioning.convergeAppOwned();
   }
 
   /** The `analytics:fill-lwql-project-keys` step's body: each project's missing key-map row. */
