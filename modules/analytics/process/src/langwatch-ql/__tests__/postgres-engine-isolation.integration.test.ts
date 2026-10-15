@@ -845,4 +845,70 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
       }
     }, 60_000);
   });
+
+  describe("when a project has an Only me board and a Project board", () => {
+    /** The generic seed's board is the Project one; only the Only me board is seeded here. */
+    const projectBoardId = () => `${harness.tenantA.tenantId}-DashboardsV2-1`;
+    const onlyMeBoardId = () => `${harness.tenantA.tenantId}-only-me-board`;
+    const onlyMeWidgetId = () => `${harness.tenantA.tenantId}-only-me-widget`;
+    const projectWidgetId = () => `${harness.tenantA.tenantId}-project-board-widget`;
+
+    const boardSeedStatements = (): string[] => {
+      const tenantId = harness.tenantA.tenantId;
+      return [
+        `INSERT INTO "DashboardsV2" (id, "projectId", name, scope) VALUES (` +
+          `'${onlyMeBoardId()}', '${tenantId}', 'Only me board', 'PRIVATE')`,
+        `INSERT INTO "DashboardWidget" (id, "projectId", "dashboardId", name, definition) VALUES ` +
+          `('${onlyMeWidgetId()}', '${tenantId}', '${onlyMeBoardId()}', 'Only me widget', '{}'::jsonb), ` +
+          `('${projectWidgetId()}', '${tenantId}', '${projectBoardId()}', 'Project widget', '{}'::jsonb)`,
+      ];
+    };
+
+    const deleteBoardSeed = async (): Promise<void> => {
+      await postgres.asAdmin(
+        `DELETE FROM "DashboardWidget" WHERE id IN ('${onlyMeWidgetId()}', '${projectWidgetId()}')`,
+      );
+      await postgres.asAdmin(`DELETE FROM "DashboardsV2" WHERE id = '${onlyMeBoardId()}'`);
+    };
+
+    /** @scenario "Per-user visibility is enforced at the approved view" */
+    it("hides the Only me board and its widgets, and shows the Project board and its widgets", async () => {
+      for (const sql of boardSeedStatements()) {
+        const result = await postgres.asAdmin(sql);
+        expect(result.exitCode, `seeding failed: ${sql}\n${result.stderr}`).toBe(0);
+      }
+
+      try {
+        const boardIds = (
+          await selectRows<{ DashboardId: string }>(
+            tenantA,
+            `SELECT DashboardId FROM ${database}.dashboards_v2`,
+          )
+        ).map((row) => row.DashboardId);
+        expect(boardIds, "dashboards_v2: the Only me board reached the caller").not.toContain(
+          onlyMeBoardId(),
+        );
+        expect(boardIds, "dashboards_v2: the Project board never reached the caller").toContain(
+          projectBoardId(),
+        );
+
+        const widgetIds = (
+          await selectRows<{ DashboardWidgetId: string }>(
+            tenantA,
+            `SELECT DashboardWidgetId FROM ${database}.dashboard_widgets`,
+          )
+        ).map((row) => row.DashboardWidgetId);
+        expect(
+          widgetIds,
+          "dashboard_widgets: a widget on the Only me board reached the caller",
+        ).not.toContain(onlyMeWidgetId());
+        expect(
+          widgetIds,
+          "dashboard_widgets: a widget on the Project board never reached the caller",
+        ).toContain(projectWidgetId());
+      } finally {
+        await deleteBoardSeed();
+      }
+    }, 60_000);
+  });
 });
