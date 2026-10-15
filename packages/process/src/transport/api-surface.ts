@@ -24,7 +24,7 @@ import {
   SessionReader,
   type TransportSelection,
 } from "@langwatch/api/hosting";
-import { ClientAddress, SecurityHeaders, type StorageEndpoints } from "@langwatch/api/policy";
+import { ClientAddress, SecurityHeaders } from "@langwatch/api/policy";
 import {
   BrowserSessionIdentity,
   canonicalErrorAnswer,
@@ -53,7 +53,6 @@ export type ApiSurfaceComposition = Readonly<{
   logger: Logger;
   stores: Readonly<{ database: boolean; redis: boolean }>;
   bundle: ApiUiBundle | undefined;
-  storage: StorageEndpoints;
   instanceAdmin: RestIdentity;
   trustedProxies: readonly string[] | undefined;
   executionProxyBaseUrl: string | undefined;
