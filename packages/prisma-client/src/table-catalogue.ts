@@ -674,6 +674,8 @@ export const prismaModelFieldCatalogue = {
     "expiresAt",
     "source",
     "issuedById",
+    "kind",
+    "testingOrganizationId",
     "revokedAt",
     "revokedById",
     "revokedReason",

@@ -7,6 +7,8 @@ import {
   LicensingService as LicensingServiceContract,
   OrganizationNotFoundError,
   resolvePlanDefaults,
+  type LicenseData,
+  type LicenseError,
   type LicensePlanLimits,
   type LicenseStatus,
   type PlanInfo,
@@ -25,6 +27,12 @@ import type {
   StoredLicense,
 } from "../repositories/organization-license.repository.ts";
 import { connectServicesNamedBy } from "../rules/connect-entitlement.rules.ts";
+import {
+  isTestingLicense,
+  testingLicenseCacheUntilMs,
+  testingLicenseVerdict,
+  type TestingLicenseVerdict,
+} from "../rules/testing-license.rules.ts";
 import { LicensePlanSourceService } from "./license-plan-source.service.ts";
 
 /** An organization that no longer exists holds no licence: the status read answers unlicensed. */
@@ -86,6 +94,16 @@ export type LicenseServiceOptions = {
   configuration?: LicenseServiceConfiguration;
   /** `LANGWATCH_LICENSE_KEY`, which licensing alone claims; absent where none is set. */
   instanceLicenseKey?: string | undefined;
+  /** `LicensingApi.getInstanceId`; where none is wired, every testing licence is refused. */
+  instanceId?: () => Promise<string>;
+  /** `LANGWATCH_CONNECT_INSTANCE_ID` is set: every testing licence is refused (ADR-180). */
+  instanceIdOverridden?: boolean;
+};
+
+/** One licence judged for the platform gate, and when a testing licence's allow ends. */
+type PlatformLicenseVerdict = {
+  inspection: PlatformLicenseInspection;
+  allowedUntil?: string;
 };
 
 type LicenseResourceCounts = {
@@ -115,23 +133,32 @@ export class LicenseService extends LicensingServiceContract {
   /** When the memo resolved to a deny; an allow is kept for the process. */
   private platformSsoDeniedAt: number | undefined;
   private platformSsoAllowedForProcess = false;
+  /** Epoch ms a testing licence's allow ends: its expiry, at most a minute on (ADR-180). */
+  private platformSsoAllowedUntil: number | undefined;
   /** Bumped by every license this process stores or removes. */
   private storedRevision = 0;
   private readonly instanceLicenseKey: string | undefined;
+  private readonly instanceId: (() => Promise<string>) | undefined;
+  private readonly instanceIdOverridden: boolean;
 
   private constructor(options: LicenseServiceOptions) {
     super();
     this.repository = options.repository;
     this.cryptography = options.cryptography;
     this.instanceLicenseKey = options.instanceLicenseKey;
-    this.plans = LicensePlanSourceService.create({
-      licenses: options.repository,
-      cryptography: options.cryptography,
-    });
+    this.instanceId = options.instanceId;
+    this.instanceIdOverridden = options.instanceIdOverridden ?? false;
     this.usage = options.usage;
     this.retention = options.retention;
     this.logger = options.logger ?? new SilentLicenseLogger();
     this.configuration = options.configuration ?? LicenseServiceConfiguration.create();
+    this.plans = LicensePlanSourceService.create({
+      licenses: options.repository,
+      cryptography: options.cryptography,
+      ...(options.instanceId ? { instanceId: options.instanceId } : {}),
+      instanceIdOverridden: this.instanceIdOverridden,
+      now: this.configuration.now,
+    });
   }
 
   static create(options: LicenseServiceOptions): LicenseService {
@@ -156,63 +183,110 @@ export class LicenseService extends LicensingServiceContract {
     permitting?: string;
   }> {
     const inspections: PlatformLicenseInspection[] = [];
-    const permits = (
+    const now = this.configuration.now();
+    // Read once a scan, and only once a testing licence is met.
+    let instanceId: Promise<string | undefined> | undefined;
+    const findInstanceId = () => (instanceId ??= this.findInstanceId());
+    const permits = async (
       licenseKey: string,
       source: Pick<PlatformLicenseInspection, "source" | "organizationId">,
-    ): boolean => {
-      const inspection = this.inspectPlatformLicense(licenseKey, source);
-      inspections.push(inspection);
-      return inspection.valid;
+    ): Promise<{ access: PlatformLicenseAccess; permitting: string } | undefined> => {
+      const verdict = await this.inspectPlatformLicense({
+        licenseKey,
+        source,
+        now,
+        instanceId: findInstanceId,
+      });
+      inspections.push(verdict.inspection);
+      if (!verdict.inspection.valid) return undefined;
+      const allowedUntil = verdict.allowedUntil ? { allowedUntil: verdict.allowedUntil } : {};
+      return { access: { allowed: true, inspections, ...allowedUntil }, permitting: licenseKey };
     };
-    if (this.instanceLicenseKey && permits(this.instanceLicenseKey, { source: "instance" })) {
-      return { access: { allowed: true, inspections }, permitting: this.instanceLicenseKey };
+    if (this.instanceLicenseKey) {
+      const permitted = await permits(this.instanceLicenseKey, { source: "instance" });
+      if (permitted) return permitted;
     }
 
     const candidates = await this.repository.findOrganizationsWithLicense();
     for (const candidate of candidates) {
       const source = { source: "organization" as const, organizationId: candidate.organizationId };
-      if (permits(candidate.licenseKey, source)) {
-        return { access: { allowed: true, inspections }, permitting: candidate.licenseKey };
-      }
+      const permitted = await permits(candidate.licenseKey, source);
+      if (permitted) return permitted;
     }
 
     return { access: { allowed: false, inspections } };
   }
 
+  /** A failed identity read refuses a testing licence rather than failing the read. */
+  private findInstanceId(): Promise<string | undefined> {
+    return this.instanceId ? this.instanceId().catch(() => undefined) : Promise.resolve(undefined);
+  }
+
+  /** Every standard licence passes; a testing one must be unexpired, here, for `organizationId`. */
+  private async judgeTestingLicense({
+    license,
+    organizationId,
+  }: {
+    license: LicenseData;
+    organizationId: string;
+  }): Promise<TestingLicenseVerdict> {
+    if (!isTestingLicense(license)) return { honoured: true };
+    return testingLicenseVerdict({
+      license,
+      instanceId: await this.findInstanceId(),
+      instanceIdOverridden: this.instanceIdOverridden,
+      organizationId,
+      now: this.configuration.now(),
+    });
+  }
+
   /**
-   * Whether a signed license anywhere on this deployment permits platform single
-   * sign-on (ADR-027 v9). An allow is kept for the process, a deny is read again
-   * after `DENIED_SSO_GATE_TTL_MS` or a store here, and a failed scan is not kept.
+   * Whether a signed license here permits platform single sign-on (ADR-027 v9). An allow is kept
+   * for the process (a testing licence's until it ends), a deny is read again after
+   * `DENIED_SSO_GATE_TTL_MS` or a store here, and a failed scan is not kept.
    */
   async isPlatformSsoLicensed({ isSaas }: { isSaas: boolean }): Promise<boolean> {
     if (isSaas) return true;
-    const deniedAt = this.platformSsoDeniedAt;
-    if (deniedAt !== undefined && this.nowMs() - deniedAt >= DENIED_SSO_GATE_TTL_MS) {
-      this.invalidatePlatformSsoGate();
-    }
-    if (!this.platformSsoGate) {
-      const pending: Promise<boolean> = this.inspectPlatformAccess().then(
-        (access) => {
-          // An invalidation while this scan was in flight already replaced the memo.
-          if (this.platformSsoGate === pending) {
-            this.platformSsoDeniedAt = access.allowed ? undefined : this.nowMs();
-            this.platformSsoAllowedForProcess = access.allowed;
-          }
-          return access.allowed;
-        },
-        (error: unknown) => {
-          if (this.platformSsoGate === pending) this.platformSsoGate = undefined;
-          throw error;
-        },
-      );
-      this.platformSsoGate = pending;
-    }
+    if (this.platformSsoMemoLapsed()) this.invalidatePlatformSsoGate();
+    const gate = this.platformSsoGate ?? this.startPlatformSsoScan();
     try {
-      return await this.withinSsoGateTimeout(this.platformSsoGate);
+      return await this.withinSsoGateTimeout(gate);
     } catch (error) {
       logScanFailure({ logger: this.logger, error });
       return false;
     }
+  }
+
+  /** A kept deny is read again after its TTL; a testing licence's allow ends at its time. */
+  private platformSsoMemoLapsed(): boolean {
+    const now = this.nowMs();
+    const deniedAt = this.platformSsoDeniedAt;
+    const allowedUntil = this.platformSsoAllowedUntil;
+    return (
+      (deniedAt !== undefined && now - deniedAt >= DENIED_SSO_GATE_TTL_MS) ||
+      (allowedUntil !== undefined && now >= allowedUntil)
+    );
+  }
+
+  /** Scans once and keeps the answer, unless an invalidation replaced the memo meanwhile. */
+  private startPlatformSsoScan(): Promise<boolean> {
+    const pending: Promise<boolean> = this.inspectPlatformAccess().then(
+      (access) => {
+        if (this.platformSsoGate === pending) {
+          this.platformSsoDeniedAt = access.allowed ? undefined : this.nowMs();
+          this.platformSsoAllowedUntil =
+            access.allowedUntil === undefined ? undefined : toEpochMs(access.allowedUntil);
+          this.platformSsoAllowedForProcess = access.allowed && access.allowedUntil === undefined;
+        }
+        return access.allowed;
+      },
+      (error: unknown) => {
+        if (this.platformSsoGate === pending) this.platformSsoGate = undefined;
+        throw error;
+      },
+    );
+    this.platformSsoGate = pending;
+    return pending;
   }
 
   /** A stuck store denies this request in time; the scan in flight stays the memo. */
@@ -242,6 +316,7 @@ export class LicenseService extends LicensingServiceContract {
     if (this.platformSsoAllowedForProcess) return;
     this.platformSsoGate = undefined;
     this.platformSsoDeniedAt = undefined;
+    this.platformSsoAllowedUntil = undefined;
   }
 
   private nowMs(): number {
@@ -267,6 +342,13 @@ export class LicenseService extends LicensingServiceContract {
     if (!result.valid) {
       return { success: false, error: result.error };
     }
+
+    // A testing licence activates only unexpired, on its instance, for its organization.
+    const testing = await this.judgeTestingLicense({
+      license: result.licenseData,
+      organizationId,
+    });
+    if (!testing.honoured) return { success: false, error: testing.error };
 
     // A key that names an organization activates on that organization only.
     // A key minted before the claim existed carries none, and stays a bearer
@@ -305,7 +387,11 @@ export class LicenseService extends LicensingServiceContract {
     }
 
     const validation = this.cryptography.validateLicense({ licenseKey });
-    if (validation.valid) {
+    const honoured =
+      validation.valid &&
+      (await this.judgeTestingLicense({ license: validation.licenseData, organizationId }))
+        .honoured;
+    if (validation.valid && honoured) {
       return {
         hasLicense: true,
         valid: true,
@@ -324,13 +410,15 @@ export class LicenseService extends LicensingServiceContract {
     }
 
     const { data } = signedLicense;
+    // A testing licence's term is read on the injected clock, as its refusal was.
+    const expiredAt = isTestingLicense(data) ? this.configuration.now() : undefined;
 
     return {
       hasLicense: true,
       valid: false,
       expired:
         this.cryptography.verifySignature(signedLicense) &&
-        this.cryptography.isExpired(data.expiresAt),
+        this.cryptography.isExpired(data.expiresAt, expiredAt),
       plan: data.plan.type,
       planName: data.plan.name,
       expiresAt: data.expiresAt,
@@ -373,17 +461,24 @@ export class LicenseService extends LicensingServiceContract {
     });
   }
 
-  private inspectPlatformLicense(
-    licenseKey: string,
-    source: Pick<PlatformLicenseInspection, "source" | "organizationId">,
-  ): PlatformLicenseInspection {
+  private async inspectPlatformLicense({
+    licenseKey,
+    source,
+    now,
+    instanceId,
+  }: {
+    licenseKey: string;
+    source: Pick<PlatformLicenseInspection, "source" | "organizationId">;
+    now: Instant;
+    instanceId: () => Promise<string | undefined>;
+  }): Promise<PlatformLicenseVerdict> {
     const signedLicense = this.cryptography.parseLicenseKey(licenseKey);
     if (!signedLicense) {
-      return { ...source, valid: false, reason: "invalid_format" };
+      return { inspection: { ...source, valid: false, reason: "invalid_format" } };
     }
 
     if (!this.cryptography.verifySignature(signedLicense)) {
-      return { ...source, valid: false, reason: "invalid_signature" };
+      return { inspection: { ...source, valid: false, reason: "invalid_signature" } };
     }
 
     // A stored key that names another organization is not this organization's
@@ -394,15 +489,35 @@ export class LicenseService extends LicensingServiceContract {
       source.organizationId !== void 0 &&
       claimed !== source.organizationId
     ) {
-      return { ...source, valid: false, reason: "organization_mismatch" };
+      return { inspection: { ...source, valid: false, reason: "organization_mismatch" } };
     }
 
-    return {
+    const genuine = {
       ...source,
-      valid: true,
       expiresAt: signedLicense.data.expiresAt,
       organizationName: signedLicense.data.organizationName,
-      expired: this.cryptography.isExpired(signedLicense.data.expiresAt),
+    };
+    if (!isTestingLicense(signedLicense.data)) {
+      const expired = this.cryptography.isExpired(genuine.expiresAt);
+      return { inspection: { ...genuine, valid: true, expired } };
+    }
+
+    const verdict = testingLicenseVerdict({
+      license: signedLicense.data,
+      instanceId: await instanceId(),
+      instanceIdOverridden: this.instanceIdOverridden,
+      organizationId: source.organizationId,
+      now,
+    });
+    if (!verdict.honoured) {
+      return {
+        inspection: { ...source, valid: false, reason: platformInspectionReasonOf(verdict.error) },
+      };
+    }
+    const until = testingLicenseCacheUntilMs({ license: signedLicense.data, now });
+    return {
+      inspection: { ...genuine, valid: true, expired: false },
+      allowedUntil: Temporal.Instant.fromEpochMilliseconds(until).toString(),
     };
   }
 
@@ -444,6 +559,16 @@ export class LicenseService extends LicensingServiceContract {
       );
     }
   }
+}
+
+/** Why the platform gate refused a testing licence, in the inspection's own words. */
+function platformInspectionReasonOf(
+  error: LicenseError,
+): "expired" | "instance_mismatch" | "instance_override" | "organization_mismatch" {
+  if (error === LICENSE_ERRORS.EXPIRED) return "expired";
+  if (error === LICENSE_ERRORS.TESTING_INSTANCE_OVERRIDE) return "instance_override";
+  if (error === LICENSE_ERRORS.TESTING_WRONG_INSTANCE) return "instance_mismatch";
+  return "organization_mismatch";
 }
 
 /** Before the worker creates the license table (install, upgrade) a failed scan is expected. */

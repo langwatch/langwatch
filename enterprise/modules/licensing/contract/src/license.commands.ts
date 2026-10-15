@@ -34,6 +34,8 @@ const generateLicenseInputSchemaDefinition = z.object({
   connectServices: z.array(z.string()).optional(),
   privateKey: z.string().min(1),
   now: z.date().optional(),
+  /** A testing licence (ADR-180): signed only by the registry, with `organizationId`. */
+  testing: z.object({ instanceId: z.string().min(1) }).optional(),
 });
 export interface GenerateLicenseInputSchema extends Named<
   typeof generateLicenseInputSchemaDefinition
@@ -45,6 +47,7 @@ export type GenerateLicenseInput = z.infer<typeof generateLicenseInputSchema>;
 /** What a caller asks licensing to sign: licensing signs with its own key. */
 const generateLicenseKeyInputSchemaDefinition = generateLicenseInputSchema.omit({
   privateKey: true,
+  testing: true,
 });
 export interface GenerateLicenseKeyInputSchema extends Named<
   typeof generateLicenseKeyInputSchemaDefinition

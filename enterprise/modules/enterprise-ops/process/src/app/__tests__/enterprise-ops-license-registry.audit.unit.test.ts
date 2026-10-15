@@ -52,6 +52,8 @@ const license: IssuedLicenseView = {
   issuedAt: "2026-09-01T00:00:00.000Z",
   expiresAt: "2027-09-01T00:00:00.000Z",
   source: "BACKOFFICE",
+  kind: "standard",
+  testingOrganizationId: null,
   issuedById: "user_olive",
   revokedAt: null,
   revokedById: null,

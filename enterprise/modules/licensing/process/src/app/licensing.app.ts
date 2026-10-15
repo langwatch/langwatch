@@ -293,19 +293,29 @@ export class LicensingModule implements LicensingApiContract {
       cryptography,
       logger,
     });
-    const service = LicenseService.create({
-      repository,
-      cryptography,
-      logger,
-      configuration: LicenseServiceConfiguration.create(),
-      instanceLicenseKey: signedInstanceKey,
-    });
     const connectInfrastructure = connectInstallOver({
       repositories,
       config,
       cryptography,
       version: releaseVersionOf(config),
       instanceLicenseKey: signedInstanceKey,
+    });
+    // Built before the licence service: a testing licence is checked against it (ADR-180).
+    const identity = InstanceIdentityService.create({
+      repository: connectInfrastructure.identity,
+      newInstanceId: connectInfrastructure.newInstanceId,
+      ...(connectInfrastructure.instanceIdOverride
+        ? { instanceIdOverride: connectInfrastructure.instanceIdOverride }
+        : {}),
+    });
+    const service = LicenseService.create({
+      repository,
+      cryptography,
+      logger,
+      configuration: LicenseServiceConfiguration.create(),
+      instanceLicenseKey: signedInstanceKey,
+      instanceId: () => identity.getInstanceId(),
+      instanceIdOverridden: Boolean(config.connectInstanceId),
     });
     const app = new LicensingModule({
       customerFacts,
@@ -318,6 +328,7 @@ export class LicensingModule implements LicensingApiContract {
       registry: registryParts,
       install: connectInstallParts({
         infrastructure: connectInfrastructure,
+        identity,
         customerFacts,
         cryptography,
         seats: repository,
@@ -981,6 +992,7 @@ function connectInstallOver({
 
 function connectInstallParts({
   infrastructure,
+  identity,
   customerFacts,
   cryptography,
   seats,
@@ -990,6 +1002,7 @@ function connectInstallParts({
   logger,
 }: {
   infrastructure: ConnectInstallInfrastructure;
+  identity: InstanceIdentityService;
   customerFacts: LicensingCustomerFactsService;
   cryptography: LicenseCryptography;
   seats: LicenseStorage;
@@ -999,13 +1012,6 @@ function connectInstallParts({
   publicKey: string | undefined;
   logger?: LicenseLogger;
 }): ConnectInstallParts {
-  const identity = InstanceIdentityService.create({
-    repository: infrastructure.identity,
-    newInstanceId: infrastructure.newInstanceId,
-    ...(infrastructure.instanceIdOverride
-      ? { instanceIdOverride: infrastructure.instanceIdOverride }
-      : {}),
-  });
   const install = ConnectInstallService.create({
     organizations: infrastructure.organizations,
     facts: customerFacts,

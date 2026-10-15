@@ -3,7 +3,7 @@
  * Each error is a named cause the caller can act on (pick org, paste key, renew).
  */
 
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
 import { LICENSE_ERRORS } from "./license-constants.ts";
 
@@ -51,6 +51,48 @@ export class LicenseExpiredError extends HandledError {
       fault: "customer",
     });
     this.name = "LicenseExpiredError";
+  }
+}
+
+/** A testing licence names another instance than this one (ADR-180 section 3). */
+export class TestingLicenseWrongInstanceError extends HandledError {
+  declare readonly code: "testing_license_wrong_instance";
+
+  constructor() {
+    super("testing_license_wrong_instance", "This testing license is for a different instance", {
+      httpStatus: 400,
+      fault: "customer",
+      ...remediation("testing_license_wrong_instance"),
+    });
+    this.name = "TestingLicenseWrongInstanceError";
+  }
+}
+
+/** Configuration names this install's instance id, so no testing licence can prove where it is. */
+export class TestingLicenseInstanceOverrideError extends HandledError {
+  declare readonly code: "testing_license_instance_override";
+
+  constructor() {
+    super(
+      "testing_license_instance_override",
+      "Testing licenses cannot be used while this instance's id is set by configuration",
+      { httpStatus: 400, fault: "customer", ...remediation("testing_license_instance_override") },
+    );
+    this.name = "TestingLicenseInstanceOverrideError";
+  }
+}
+
+/** A testing licence names another organization than the one it is used for. */
+export class TestingLicenseWrongOrganizationError extends HandledError {
+  declare readonly code: "testing_license_wrong_organization";
+
+  constructor() {
+    super(
+      "testing_license_wrong_organization",
+      "This testing license is for a different organization",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "TestingLicenseWrongOrganizationError";
   }
 }
 
@@ -121,7 +163,14 @@ export class LicenseSigningFailedError extends HandledError {
  * "invalid".
  */
 export function licenseValidationError(verdict: string | undefined): HandledError {
-  return verdict === LICENSE_ERRORS.EXPIRED
-    ? new LicenseExpiredError()
-    : new LicenseKeyInvalidError();
+  if (verdict === LICENSE_ERRORS.EXPIRED) return new LicenseExpiredError();
+  if (verdict === LICENSE_ERRORS.TESTING_WRONG_INSTANCE)
+    return new TestingLicenseWrongInstanceError();
+  if (verdict === LICENSE_ERRORS.TESTING_WRONG_ORGANIZATION) {
+    return new TestingLicenseWrongOrganizationError();
+  }
+  if (verdict === LICENSE_ERRORS.TESTING_INSTANCE_OVERRIDE) {
+    return new TestingLicenseInstanceOverrideError();
+  }
+  return new LicenseKeyInvalidError();
 }

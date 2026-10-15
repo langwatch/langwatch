@@ -1359,6 +1359,11 @@ model IssuedLicense {
   /// The operator who issued or registered it. Null for the purchase flow and the script.
   issuedById String?
 
+  /// `standard` or `testing` (ADR-180). A testing licence is bound to `instanceId` when issued.
+  kind                  String  @default("standard")
+  /// The local organization a testing licence is for; `organizationId` names the customer.
+  testingOrganizationId String?
+
   revokedAt     DateTime?
   revokedById   String?
   revokedReason String?

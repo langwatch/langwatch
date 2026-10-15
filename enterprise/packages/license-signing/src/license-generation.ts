@@ -36,11 +36,18 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
     connectServices,
     privateKey,
     now = toDate(nowInstant()),
+    testing,
   }: GenerateLicenseInput): GenerateLicenseOutput {
     const template = getPlanTemplate(planType);
     if (!template) {
       throw new Error(`Unknown plan type: ${planType}`);
     }
+    if (testing && !organizationId) {
+      throw new Error("A testing license names the organization it is for");
+    }
+    const testingClaims: Pick<LicenseData, "kind" | "instanceId"> = testing
+      ? { kind: "testing", instanceId: testing.instanceId }
+      : {};
 
     const seats = maxMembers > 0 ? maxMembers : 1;
     const oneYearOut = toDate(fromDate(now));
@@ -78,6 +85,8 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
       // Signed last and only when there is one, so a license naming no hosted
       // service re-serializes exactly as it did before ADR-156 existed.
       ...(connectServices?.length ? { connectServices } : {}),
+      // After `devStack`, in schema order, so it re-serializes to the signed bytes.
+      ...testingClaims,
     };
     const signedLicense = this.cryptography.signLicense(licenseData, privateKey);
 

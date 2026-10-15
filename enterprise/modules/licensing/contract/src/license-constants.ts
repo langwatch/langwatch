@@ -35,6 +35,9 @@ export const LICENSE_ERRORS = {
   INVALID_SIGNATURE: "Invalid signature",
   EXPIRED: "License expired",
   ORGANIZATION_MISMATCH: "License was issued for a different organization",
+  TESTING_WRONG_INSTANCE: "Testing license was issued for a different instance",
+  TESTING_WRONG_ORGANIZATION: "Testing license was issued for a different organization",
+  TESTING_INSTANCE_OVERRIDE: "Testing licenses are refused while configuration names the instance",
 } as const;
 
 export type LicenseError = (typeof LICENSE_ERRORS)[keyof typeof LICENSE_ERRORS];

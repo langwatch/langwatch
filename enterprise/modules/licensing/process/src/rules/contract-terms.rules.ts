@@ -11,7 +11,7 @@ import {
 import { Temporal, type Instant } from "@langwatch/time";
 
 import type { IssuedLicenseRecord } from "../repositories/issued-license.repository.ts";
-import { statusOfIssuedLicense } from "./issued-license.rules.ts";
+import { isStandardLicenseRow, statusOfIssuedLicense } from "./issued-license.rules.ts";
 
 /**
  * A license counts while it is active and has not been reissued. A reissued
@@ -31,7 +31,10 @@ export function contractTermsOf({
       .map((license) => license.replacesId),
   );
   const counted = licenses.filter(
-    (license) => statusOfIssuedLicense(license, now) === "active" && !replaced.has(license.id),
+    (license) =>
+      isStandardLicenseRow(license) &&
+      statusOfIssuedLicense(license, now) === "active" &&
+      !replaced.has(license.id),
   );
 
   const commitUsdCents = sum(counted.map((license) => license.commitUsdCents));

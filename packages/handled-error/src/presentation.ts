@@ -6189,6 +6189,28 @@ const presentations = {
     title: "License already reissued",
     describe: () => "This license was already reissued. Reissue its replacement instead.",
   },
+  testing_license_binding_reset_refused: {
+    title: "A testing license stays on its instance",
+    describe: () => "A testing license cannot be moved. A new instance needs a new license.",
+  },
+  testing_license_binding_missing: {
+    title: "This license cannot be reissued",
+    describe: () =>
+      "It is not a standard license and names no instance or organization. Issue a new one instead.",
+  },
+  testing_license_instance_override: {
+    title: "Testing licenses are off on this instance",
+    describe: () =>
+      "This instance's id is set by its configuration, so a testing license cannot be used here.",
+  },
+  testing_license_wrong_instance: {
+    title: "This testing license is for a different instance",
+    describe: () => "Ask for a testing license from this instance.",
+  },
+  testing_license_wrong_organization: {
+    title: "This testing license is for a different organization",
+    describe: () => "Activate it on the organization it was approved for.",
+  },
   license_overage_max_requires_overage: {
     title: "Overage maximum needs overage enabled",
     describe: () =>

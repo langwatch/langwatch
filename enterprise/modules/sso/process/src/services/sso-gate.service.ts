@@ -5,6 +5,7 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
+import { toEpochMs } from "@langwatch/time";
 
 /**
  * Where the gate says what it decided. An operator whose single sign-on is off
@@ -43,11 +44,26 @@ class SsoGateTimeoutError extends Error {
  * process, a deny is read again after `DENIED_SSO_GATE_TTL_MS` or as soon as
  * this process stores a license, and a failed read is never kept.
  */
+const inspectionRefusalMessages: Record<
+  Extract<PlatformLicenseInspection, { valid: false }>["reason"],
+  string
+> = {
+  invalid_format: "Inspected a license candidate: could not be parsed (invalid format)",
+  invalid_signature: "Inspected a license candidate: signature failed",
+  organization_mismatch: "Inspected a license candidate: signature failed",
+  instance_mismatch: "Inspected a license candidate: a testing license for another instance",
+  instance_override:
+    "Inspected a license candidate: a testing license, refused while the instance id is configured",
+  expired: "Inspected a license candidate: an expired testing license",
+};
+
 export class SsoGateService {
   private memoizedGate: Promise<boolean> | null = null;
   /** When the memo resolved to a deny, and the license revision it read. */
   private denied: { at: number; revision: number | null } | null = null;
   private allowedForProcess = false;
+  /** Epoch ms a testing licence's allow ends (ADR-180 section 4); unset for any other allow. */
+  private allowedUntil: number | null = null;
   private warnedEmailMode = false;
 
   private readonly configuration: SsoConfiguration;
@@ -97,6 +113,7 @@ export class SsoGateService {
     }
 
     if (this.denied && (await this.denyIsStale(this.denied))) this.forgetDeny();
+    if (this.allowedUntil !== null && this.now() >= this.allowedUntil) this.forgetDeny();
     if (!this.memoizedGate) this.memoizedGate = this.startComputation();
 
     try {
@@ -149,6 +166,7 @@ export class SsoGateService {
     if (this.allowedForProcess) return;
     this.memoizedGate = null;
     this.denied = null;
+    this.allowedUntil = null;
   }
 
   /** A deny is stale after the TTL, or once this process stored a license since. */
@@ -170,11 +188,13 @@ export class SsoGateService {
   private startComputation(): Promise<boolean> {
     const pending: Promise<boolean> = this.readRevision()
       .then(async (revision) => {
-        const allowed = await this.computeGate();
+        const { allowed, allowedUntil } = await this.computeGate();
         // An invalidation while this read was in flight already replaced the memo.
         if (this.memoizedGate === pending) {
           this.denied = allowed ? null : { at: this.now(), revision };
-          this.allowedForProcess = allowed;
+          this.allowedUntil =
+            allowed && allowedUntil !== undefined ? toEpochMs(allowedUntil) : null;
+          this.allowedForProcess = allowed && this.allowedUntil === null;
         }
         if (!allowed) this.warnEmailModeOnce();
         return allowed;
@@ -197,7 +217,7 @@ export class SsoGateService {
     );
   }
 
-  private async computeGate(): Promise<boolean> {
+  private async computeGate(): Promise<{ allowed: boolean; allowedUntil?: string }> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const result = await Promise.race([
@@ -214,7 +234,9 @@ export class SsoGateService {
         this.logInspection(inspection);
       }
 
-      return result.allowed;
+      return result.allowedUntil === undefined
+        ? { allowed: result.allowed }
+        : { allowed: result.allowed, allowedUntil: result.allowedUntil };
     } finally {
       if (timer) {
         clearTimeout(timer);
@@ -228,10 +250,7 @@ export class SsoGateService {
       organizationId: inspection.organizationId,
     };
     if (!inspection.valid) {
-      const message =
-        inspection.reason === "invalid_format"
-          ? "Inspected a license candidate: could not be parsed (invalid format)"
-          : "Inspected a license candidate: signature failed";
+      const message = inspectionRefusalMessages[inspection.reason];
       this.logger.info({ ...context, signatureOk: false }, message);
 
       return;
