@@ -919,6 +919,21 @@ describe("TraceIOExtractionService", () => {
       );
     });
 
+    /** @scenario "A span input of LangChain messages gives the trace the last user message as input" */
+    it("does not take a system prompt as the input text when no user message has text", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.input": {
+            messages: [
+              [dumpd("SystemMessage", { content: "You are a helpful agent.", type: "system" })],
+            ],
+          },
+        },
+      });
+
+      expect(service.extractRichIOFromSpan(span, "input")).toBeNull();
+    });
+
     /** @scenario "A span output of LangChain messages gives the trace the last assistant reply as output" */
     it("reads the last assistant message with text as the output text", () => {
       const span = createTestSpan({

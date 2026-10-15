@@ -298,15 +298,15 @@ export class TraceIOExtractionService implements TraceIoExtraction {
   /**
    * The text of a payload no wrapper heuristic recognised that still reads as
    * chat messages, such as serialised LangChain messages: the last user message
-   * for an input, the last assistant message with text for an output.
+   * with text for an input, the last assistant message with text for an output.
    */
   #chatMessagesText(value: unknown, type: "input" | "output"): string | null {
     const messages = coerceToChatMessages(value);
     if (!messages) return null;
-    if (type === "input") return convertMessagesToText(messages, type, this.traceCanonicalisation);
-    const replies = messages.filter((message) => message.role === "assistant");
-    for (const reply of replies.toReversed()) {
-      const text = convertMessagesToText([reply], type, this.traceCanonicalisation);
+    const role = type === "input" ? "user" : "assistant";
+    const candidates = messages.filter((message) => message.role === role);
+    for (const message of candidates.toReversed()) {
+      const text = convertMessagesToText([message], type, this.traceCanonicalisation);
       if (text) return text;
     }
     return null;

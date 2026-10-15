@@ -46,7 +46,10 @@ function coerceMessageList(items: unknown[]): ChatMessage[] | null {
 }
 
 function isDeclaredChatMessage(item: unknown): item is ChatMessage {
-  return typeof item === "object" && item !== null && ("role" in item || "content" in item);
+  if (!isRecord(item)) return false;
+  const content = item.content;
+  const hasContent = content === null || typeof content === "string" || Array.isArray(content);
+  return typeof item.role === "string" || hasContent;
 }
 
 function coerceDeclaredChatMessages(value: unknown[]): ChatMessage[] | null {

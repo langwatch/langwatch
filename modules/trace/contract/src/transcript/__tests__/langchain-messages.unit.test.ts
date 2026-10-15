@@ -311,6 +311,18 @@ describe("coerceToChatMessages with LangChain serialised messages", () => {
     });
   });
 
+  describe("given a chat_messages typed value with an item of no valid role or content", () => {
+    /** @scenario "A typed chat_messages envelope holding LangChain messages reads as chat" */
+    it("drops that item and keeps the rest", () => {
+      const messages = coerceToChatMessages({
+        type: "chat_messages",
+        value: [{ content: 5 }, { role: 7 }, { role: "user", content: "hello" }],
+      });
+
+      expect(messages).toEqual([{ role: "user", content: "hello" }]);
+    });
+  });
+
   describe("given a dumpd object that is not a message", () => {
     /** @scenario "A dumpd object that is not a message is not read as chat" */
     it("does not read a prompt template as chat", () => {

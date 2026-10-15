@@ -21,14 +21,10 @@ T = TypeVar("T")
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
     def default(self, o):
-        try:
-            import langchain_core.messages
+        if _is_langchain_message(o):
             from langwatch.langchain import langchain_message_to_chat_message
 
-            if isinstance(o, langchain_core.messages.BaseMessage):
-                return langchain_message_to_chat_message(o)
-        except ImportError:
-            pass
+            return langchain_message_to_chat_message(o)
 
         try:
             from langchain_core.load.serializable import Serializable
