@@ -309,10 +309,12 @@ export class TenantScopedReader {
     return { json: async () => result.rows };
   }
 
-  private resolvedClient(): Promise<ClickHouseQueryClient> {
-    return this.deps.client().catch((cause: unknown) => {
+  private async resolvedClient(): Promise<ClickHouseQueryClient> {
+    try {
+      return await this.deps.client();
+    } catch (cause: unknown) {
       throw new TenantReaderClientUnavailableError({ cause });
-    });
+    }
   }
 }
 
