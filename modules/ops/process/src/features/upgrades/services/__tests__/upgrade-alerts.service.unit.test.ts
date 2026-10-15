@@ -1,3 +1,4 @@
+import type { MailRender, UpgradeAlertEmailProps } from "@langwatch/mail";
 import type {
   NotificationService as NotificationApi,
   SendEmailCommand,
@@ -28,7 +29,15 @@ function setup({
   leaseExpiresAt = null,
 }: { failedAt?: string | null; leaseExpiresAt?: string | null } = {}) {
   const failed = failedAt
-    ? [stepOf({ id: "ops:backfill", status: "failed", lastError: "boom", updatedAt: failedAt })]
+    ? [
+        stepOf({
+          id: "ops:backfill",
+          status: "failed",
+          mode: "background",
+          lastError: "boom",
+          updatedAt: failedAt,
+        }),
+      ]
     : [];
   const status = statusOf({
     lease: leaseExpiresAt
@@ -43,6 +52,7 @@ function setup({
       : null,
   });
   const sent: SendEmailCommand[] = [];
+  const rendered: UpgradeAlertEmailProps[] = [];
   const service = UpgradeAlertsService.create({
     ledger: MemoryUpgradeLedgerRepository.create({
       reader: createApiFixture<UpgradeReader>({
@@ -56,9 +66,15 @@ function setup({
     mail: createApiFixture<Pick<NotificationApi, "sendEmail">>({
       sendEmail: async (command) => void sent.push(command),
     }),
+    renderer: createApiFixture<Pick<MailRender, "renderUpgradeAlert">>({
+      renderUpgradeAlert: async (input) => {
+        rendered.push(input);
+        return { subject: "subject", html: "html" };
+      },
+    }),
     upgradesUrl: "https://app.example.com/ops/upgrades",
   });
-  return { service, sent };
+  return { service, sent, rendered };
 }
 
 describe("UpgradeAlertsService", () => {
@@ -66,7 +82,15 @@ describe("UpgradeAlertsService", () => {
   it("alerts a step that failed inside the window", async () => {
     const { service } = setup({ failedAt: ago(10) });
     expect(await service.check({ since: SINCE, until: UNTIL })).toEqual([
-      { kind: "step-failed", stepId: "ops:backfill", error: "boom" },
+      {
+        kind: "step-failed",
+        stepId: "ops:backfill",
+        error: "boom",
+        description: null,
+        release: "3.21.0",
+        mode: "background",
+        attempt: 1,
+      },
     ]);
   });
 
@@ -104,5 +128,29 @@ describe("UpgradeAlertsService", () => {
     const { service, sent } = setup();
     await service.check({ since: SINCE, until: UNTIL });
     expect(sent).toEqual([]);
+  });
+
+  /** @scenario "The alert email links each failed step to its own page" */
+  it("renders each failed step with a direct link and names the installation", async () => {
+    const { service, rendered } = setup({ failedAt: ago(10), leaseExpiresAt: ago(5) });
+    await service.check({ since: SINCE, until: UNTIL });
+    expect(rendered).toEqual([
+      {
+        installation: "app.example.com",
+        upgradesUrl: "https://app.example.com/ops/upgrades",
+        failedSteps: [
+          {
+            id: "ops:backfill",
+            description: null,
+            release: "3.21.0",
+            mode: "background",
+            attempt: 1,
+            error: "boom",
+            url: "https://app.example.com/ops/upgrades?upgradeStep=ops%3Abackfill",
+          },
+        ],
+        runnerStopped: { owner: "pod-a", host: "h" },
+      },
+    ]);
   });
 });
