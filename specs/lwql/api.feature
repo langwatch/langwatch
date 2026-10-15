@@ -878,7 +878,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And provisioning against a database name that differs from the connection URL's is refused
 
   # P1 (#6635): every app pod runs the convergence at boot, and it is
-  # destructive (CREATE USER OR REPLACE, drop/recreate the PostgreSQL-engine
+  # destructive (CREATE USER OR REPLACE, replace the PostgreSQL-engine
   # tables, grants, row policies). Two pods running it at once race — one
   # recreating the restricted identity while another queries through it
   # mid-drop. A single global Postgres advisory lock gates entry so the
@@ -995,28 +995,23 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # config-store-owned (495). Moments later the pod rolls to the new chart, which
   # renders no access model — the XML identity is gone and, without this, nothing
   # re-provisions until the next app boot. The deploy task is a short-lived
-  # process, so the long-running app server watches instead: it polls a stateless
-  # ownership probe on a backoff and decides from each snapshot alone, never
-  # inferring from history. The probe reports which store owns the model right
-  # now — the config store (the old pod still rendering it), the SQL store (the
-  # app-owned model is already live), or neither. Config store → keep waiting;
-  # SQL store → nothing to do; neither → re-provision the app-owned model once.
-  # A probe that throws (ClickHouse mid-roll) is treated as still-waiting and
-  # never re-provisions on the failure alone, so a transient error can never fire
-  # a re-provision against a healthy install. The first poll fires within seconds
-  # so a pod that rolled before the server listened is still caught, and a config
-  # store that never releases gives up at a ~30-minute budget with a warning.
+  # process, so the worker checks instead: a stateless ownership probe decides
+  # from each snapshot alone, never inferring from history. The probe reports
+  # which store owns the model right now — the config store (the old pod still
+  # rendering it), the SQL store (the app-owned model is already live), or
+  # neither. Config store → keep waiting; SQL store → nothing to do; neither →
+  # re-provision the app-owned model. A probe that throws (ClickHouse mid-roll) is
+  # treated as still-waiting and never re-provisions on the failure alone.
   @unit
   Scenario: The app re-provisions once the ClickHouse config store releases the LangWatchQL access model
-    Given the worker's scheduled reconvergence process polls a stateless LangWatchQL ownership probe after a chart upgrade
+    Given the worker's reconvergence check probes a stateless LangWatchQL ownership probe after a chart upgrade
     When a probe finds the model is owned by neither the config store nor the SQL store
     Then the app re-provisions the app-owned access model, and later probes find the SQL store and do nothing
-    And while the config store still owns the model the process keeps probing on a backoff
+    And while the config store still owns the model each later check probes again
     And when the SQL store already owns the model the probe does nothing
-    And a probe error alone never re-provisions — the process keeps probing until a snapshot is authoritative
-    And a config store that never releases the model gives up at the budget with a warning
+    And a probe error alone never re-provisions — the next check probes again
 
-  # Shutdown: the watch is a worker-hosted process manager, and the worker drains
+  # Shutdown: the check is a worker-hosted process manager, and the worker drains
   # its outbox before it closes the app, so a re-provision is never left running
   # against a torn-down app — the intent awaits the whole convergence.
   @unit
@@ -1025,33 +1020,86 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the worker begins draining for shutdown
     Then the intent resolves only once the re-provision has finished
 
-  # Rendered mode: a config store owns the access entities, but the app owns the rest
-  # (structural objects, PostgreSQL engine tables, views, the PostgreSQL reader role). A
-  # deploy's converge can fail while ClickHouse pods are still re-mounting the access config
-  # (named collection missing, a replica terminating), and the upgrade gate does not run it
-  # again, so the watch converges those objects too, retrying on its existing backoff.
+  # Issue #8726: a deploy's converge can fail while ClickHouse pods are still
+  # re-mounting the access config (named collection missing, a replica terminating),
+  # and ClickHouse can keep rolling for hours. The upgrade gate does not run the
+  # converge again, so the worker checks, level-triggered and with no end: every
+  # 5 minutes one check across the fleet reads the system tables (and the
+  # PostgreSQL catalog) for the app-owned objects the catalog expects, and
+  # converges only what is missing or stale. Rendered mode never touches the
+  # config-store-owned entities; sql mode keeps the owner probe above. An operator
+  # who will not wait for the next check uses Ops > Upgrades Retry.
   @unit
-  Scenario: In rendered mode the reconvergence watch converges the app-owned LangWatchQL objects
-    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
-    When the reconvergence watch wakes
-    Then it converges the rendered statement set and the PostgreSQL reader role
-    And it leaves the user, settings profile, row policies and named collection to the config store
-    And it never runs the sql-mode re-provision of the access model
+  Scenario: The reconvergence check runs every 5 minutes with no end and no per-worker state
+    Given the worker's scheduled reconvergence process
+    When its wake fires, slot after slot, on whichever worker holds the schedule
+    Then each slot asks for exactly one check, keyed by the slot so a repeat dedupes
+    And no budget ends the checks
+    And a check run by any worker decides from what the databases hold, never from what an earlier check did
 
   @unit
-  Scenario: A failed app-owned converge is retried on the next wake and stops once converged
-    Given the reconvergence watch's converge of the app-owned objects failed
-    When the watch wakes again within its budget
-    Then it converges again, without crashing the worker, until one converge succeeds
-    And once one succeeds later wakes in that worker converge nothing until the next boot
+  Scenario: The reconvergence check converges nothing while every app-owned LangWatchQL object is in place
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    And the key map, the PostgreSQL engine tables, the views and the app functions exist with the catalog's columns
+    And the reader role may select every approved PostgreSQL view
+    When the reconvergence check runs
+    Then it runs catalog reads only and no DDL
+
+  @unit
+  Scenario: The reconvergence check converges the app-owned LangWatchQL objects it finds missing or stale
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    And an app-owned object is missing, or holds columns the catalog no longer declares
+    When the reconvergence check runs
+    Then it converges the halves that drifted, ClickHouse, PostgreSQL or both
+    And it leaves the user, settings profile, row policies and named collection to the config store
+    And a ClickHouse that cannot be read converges nothing, and the next check reads again
+
+  @unit
+  Scenario: The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place
+    Given the reader role may select every approved view, each with the catalog's columns
+    When the reconvergence check converges a ClickHouse drift
+    Then it runs no PostgreSQL statement
+    And a drift in PostgreSQL alone runs no ClickHouse DDL
+
+  @unit
+  Scenario: A PostgreSQL failure does not stop the ClickHouse objects converging
+    Given PostgreSQL refuses the reader role, as a managed server without CREATEROLE does
+    When a converge runs
+    Then the refusal is logged with its own message, its SQLSTATE and no secret
+    And the ClickHouse objects still converge
+    And the run then fails, so the upgrade names it
+
+  @unit
+  Scenario: The PostgreSQL reader's grants change in one transaction
+    Given the reader role's grants are converged
+    When the revokes and the grants run
+    Then they run as one statement, revokes first, so a live read never sees the role without its grants
+
+  # The alert keeps the deploy runner's signature, "lwql provisioning failed creating
+  # ClickHouse objects", with the ClickHouse code and name. Each worker logs it at error
+  # on its first failure and when the failure changes, and at warn while it repeats.
+  @unit
+  Scenario: A failed converge is retried by the next check and alerts once per change of failure
+    Given the reconvergence check's converge of the app-owned objects failed
+    When later checks fail the same way
+    Then each logs a warning that the check retries, without crashing the worker
+    And the error-level alert is logged on the first failure and again only when the failure changes
+    And the converge's own statement failure is logged at warn on the check's path and at error on a deploy's
 
   @integration
-  Scenario: A rendered install whose named collection appears late converges on a later wake
+  Scenario: A failed converge never removes a working engine table
+    Given a rendered install whose PostgreSQL engine tables exist and answer
+    When the named collection disappears and a converge runs and fails
+    Then every engine table still exists and still answers
+    And each engine table is replaced in one statement, never dropped first
+
+  @integration
+  Scenario: A rendered install whose named collection appears late converges on a later check
     Given a rendered-mode ClickHouse whose config store has not mounted the named collection yet
-    When the watch wakes and its converge fails at the PostgreSQL engine tables
+    When checks run and their converges fail at the PostgreSQL engine tables, the PostgreSQL half converging regardless
     And the named collection then appears
-    Then the next wake creates every PostgreSQL engine table
-    And a later wake converges nothing
+    Then the next check, on any worker and with no boot, creates every engine table and view
+    And a later check converges nothing
 
   @unit
   Scenario: A failed provisioning statement logs the ClickHouse error code and name
@@ -1068,7 +1116,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # wins whenever it still renders an entity; else the app-owned SQL-store user
   # if present; else neither. Connectivity is proven first, so an unreachable
   # ClickHouse makes the probe throw rather than report a spurious "neither" the
-  # watch would re-provision against. The SQL-store count excludes the config
+  # check would re-provision against. The SQL-store count excludes the config
   # store's `users_xml` rather than pinning one storage kind.
   @unit
   Scenario: The ownership probe classifies who owns the LangWatchQL access model

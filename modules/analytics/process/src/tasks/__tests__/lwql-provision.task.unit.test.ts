@@ -1,10 +1,115 @@
-import { describe, expect, it, vi } from "vitest";
+import type * as Observability from "@langwatch/observability";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { LwqlAppOwnedDrift } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
-import { LwqlProvisionTask } from "../lwql-provision.task.ts";
+import {
+  convergeLwqlAccessModel,
+  type LwqlConvergencePlan,
+  LwqlProvisionTask,
+} from "../lwql-provision.task.ts";
+
+const { logCalls } = vi.hoisted(() => ({
+  logCalls: [] as { level: string; fields: unknown; message: unknown }[],
+}));
+vi.mock("@langwatch/observability", async (importActual) => {
+  const actual = await importActual<typeof Observability>();
+  const at =
+    (level: string) =>
+    (...args: unknown[]) => {
+      logCalls.push({ level, fields: args.length > 1 ? args[0] : undefined, message: args.at(-1) });
+    };
+  return {
+    ...actual,
+    createLogger: () => ({
+      info: at("info"),
+      warn: at("warn"),
+      error: at("error"),
+      debug: at("debug"),
+    }),
+  };
+});
+
+const READER_PASSWORD = "reader-unit-secret";
+const NAMES = {
+  database: "langwatch",
+  restrictedUser: "langwatch_lwql",
+  settingsProfile: "lwql_restricted",
+  keyMapTable: "api_key_tenants",
+  tenantSetting: "custom_api_key_hash",
+};
+
+/** A PostgreSQL that records each statement, or refuses each as one without CREATEROLE does. */
+function postgresThat({ refuses }: { refuses: boolean }) {
+  const ran: string[] = [];
+  const database: LwqlProvisioningDatabase = {
+    $executeRawUnsafe: async (statement) => {
+      if (refuses) {
+        throw Object.assign(
+          new Error("Raw query failed. Code: `42501`. Message: `permission denied`"),
+          {
+            code: "P2010",
+            meta: { code: "42501" },
+          },
+        );
+      }
+      ran.push(statement);
+      return 0;
+    },
+    $queryRawUnsafe: async () => [],
+    $transaction: (fn) => fn({ $executeRawUnsafe: async () => 0 }),
+  };
+  return { ran, database };
+}
+
+/** A ClickHouse that records each DDL statement and fails the one that matches `failing`. */
+function clickHouseThat({ failing }: { failing?: RegExp } = {}) {
+  const ran: string[] = [];
+  const plan: LwqlConvergencePlan = {
+    request: {
+      requested: true,
+      complete: true,
+      connection: {
+        url: "http://127.0.0.1:8123",
+        username: NAMES.restrictedUser,
+        password: "restricted-unit-secret",
+        database: NAMES.database,
+        tenantSetting: NAMES.tenantSetting,
+      },
+      postgresReaderPassword: READER_PASSWORD,
+      endpoint: { host: "postgres", port: 5432, database: "langwatch" },
+    },
+    names: NAMES,
+    sourceDatabase: () => NAMES.database,
+    schema: "public",
+    settings: { LWQL_ACCESS_MODEL_MODE: "rendered" },
+    openRepository: () =>
+      ClickHouseLangWatchQLProvisioningRepository.create({
+        statements: {
+          async command(statement) {
+            if (failing?.test(statement)) {
+              throw Object.assign(new Error("Code: 669. DB::Exception: no named collection"), {
+                code: "669",
+                type: "NAMED_COLLECTION_DOESNT_EXIST",
+              });
+            }
+            ran.push(statement);
+          },
+          rows: async () => [],
+          insert: async () => undefined,
+        },
+      }),
+  };
+  return { ran, plan };
+}
+
+beforeEach(() => {
+  logCalls.length = 0;
+});
 
 function untouchedDatabase(): LwqlProvisioningDatabase {
-  return { $executeRawUnsafe: vi.fn(), $transaction: vi.fn() };
+  return { $executeRawUnsafe: vi.fn(), $queryRawUnsafe: vi.fn(), $transaction: vi.fn() };
 }
 
 describe("LwqlProvisionTask", () => {
@@ -94,6 +199,96 @@ describe("LwqlProvisionTask", () => {
 
       await expect(task.run({ args: [], signal: new AbortController().signal })).rejects.toThrow(
         'Invalid database name: "bad-db!"',
+      );
+    });
+  });
+});
+
+describe("convergeLwqlAccessModel", () => {
+  describe("when PostgreSQL refuses the reader role, as a managed server without CREATEROLE does", () => {
+    /** @scenario "A PostgreSQL failure does not stop the ClickHouse objects converging" */
+    it("logs its own message, still converges ClickHouse, then fails the run", async () => {
+      const postgres = postgresThat({ refuses: true });
+      const clickHouse = clickHouseThat();
+
+      await expect(
+        convergeLwqlAccessModel({
+          database: postgres.database,
+          plan: clickHouse.plan,
+          failOnError: true,
+        }),
+      ).rejects.toMatchObject({ code: "P2010" });
+
+      expect(clickHouse.ran.some((statement) => statement.includes("ENGINE = PostgreSQL"))).toBe(
+        true,
+      );
+      expect(logCalls).toContainEqual(
+        expect.objectContaining({
+          level: "error",
+          fields: expect.objectContaining({ code: "P2010", sqlState: "42501" }),
+          message: expect.stringContaining("PostgreSQL reader role"),
+        }),
+      );
+      expect(JSON.stringify(logCalls)).not.toContain(READER_PASSWORD);
+    });
+  });
+
+  describe("when the reconvergence check names only the drift it found", () => {
+    const only = (drift: Partial<LwqlAppOwnedDrift>): LwqlAppOwnedDrift => ({
+      clickHouse: [],
+      postgres: [],
+      keyMap: false,
+      ...drift,
+    });
+
+    /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
+    it("skips the PostgreSQL half when no approved view drifted", async () => {
+      const postgres = postgresThat({ refuses: false });
+      const clickHouse = clickHouseThat();
+
+      await convergeLwqlAccessModel({
+        database: postgres.database,
+        plan: clickHouse.plan,
+        failOnError: true,
+        only: only({ clickHouse: ["agents_pg"] }),
+      });
+
+      expect(postgres.ran).toEqual([]);
+      expect(clickHouse.ran.length).toBeGreaterThan(0);
+    });
+
+    /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
+    it("runs no ClickHouse DDL when only PostgreSQL drifted", async () => {
+      const postgres = postgresThat({ refuses: false });
+      const clickHouse = clickHouseThat();
+
+      await convergeLwqlAccessModel({
+        database: postgres.database,
+        plan: clickHouse.plan,
+        failOnError: true,
+        only: only({ postgres: ["lwql_agents"] }),
+      });
+
+      expect(postgres.ran.length).toBeGreaterThan(0);
+      expect(clickHouse.ran).toEqual([]);
+    });
+
+    /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
+    it("logs its own failure at warn, leaving the alert to the check, where a deploy logs error", async () => {
+      const failing = /ENGINE = PostgreSQL/;
+      const errorsOf = async (drift: LwqlAppOwnedDrift | undefined) => {
+        logCalls.length = 0;
+        await convergeLwqlAccessModel({
+          database: postgresThat({ refuses: false }).database,
+          plan: clickHouseThat({ failing }).plan,
+          ...(drift ? { only: drift } : {}),
+        });
+        return logCalls.filter((call) => call.level === "error").map((call) => call.message);
+      };
+
+      expect(await errorsOf(only({ clickHouse: ["agents_pg"] }))).toEqual([]);
+      expect(await errorsOf(undefined)).toContain(
+        "lwql provisioning failed creating ClickHouse objects",
       );
     });
   });

@@ -233,3 +233,85 @@ describe("given the self-provisioned access model whose DDL embeds passwords", (
     });
   });
 });
+
+describe("given the rendered-mode statements a converge runs", () => {
+  /** @scenario "A failed converge never removes a working engine table" */
+  it("replaces each engine table in one statement and drops no app-owned table or view", () => {
+    const statements = selfProvisioning.clickHouseStatements({
+      names: NAMES,
+      restrictedPassword: "restricted-secret",
+      sourceDatabase: SOURCE_DATABASE,
+      postgres: POSTGRES,
+      mode: "rendered",
+    });
+    const engineTables = statements.filter((s) => s.includes("ENGINE = PostgreSQL"));
+
+    expect(engineTables.length).toBeGreaterThan(0);
+    for (const table of engineTables) expect(table).toMatch(/^CREATE OR REPLACE TABLE /);
+    expect(statements.filter((s) => /^\s*DROP\s+(TABLE|VIEW)\b/i.test(s))).toEqual([]);
+  });
+});
+
+describe("given what the reconvergence check finds in ClickHouse", () => {
+  const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
+  const everything = new Map(relations.map((relation) => [relation.name, relation.columns]));
+  const drift = (found: Map<string, readonly string[]>, functions: string[] = ["lwql_trace"]) =>
+    selfProvisioning.findDrift({
+      names: NAMES,
+      relations,
+      functions: ["lwql_trace"],
+      found: { relations: found, functions },
+    });
+
+  /** @scenario "The reconvergence check converges nothing while every app-owned LangWatchQL object is in place" */
+  it("finds nothing when every relation holds its columns, in any order, and every function exists", () => {
+    const reordered = new Map(
+      [...everything].map(([name, columns]) => [name, columns.toReversed()]),
+    );
+    expect(drift(reordered)).toEqual({ objects: [], keyMap: false });
+  });
+
+  /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing or stale" */
+  it("names a missing engine table, a view whose columns changed, a missing function and the key map", () => {
+    const [engineTable] = relations.filter((relation) => relation.name.endsWith("_pg"));
+    const view = relations.at(-1);
+    if (!engineTable || !view) throw new Error("the catalog maps no PostgreSQL dataset");
+    const found = new Map(everything);
+    found.delete(engineTable.name);
+    found.delete(NAMES.keyMapTable);
+    found.set(view.name, [...view.columns.slice(1), "RenamedColumn"]);
+
+    expect(drift(found, [])).toEqual({
+      objects: [NAMES.keyMapTable, engineTable.name, view.name, "lwql_trace"],
+      keyMap: true,
+    });
+  });
+});
+
+describe("given what the reconvergence check finds in PostgreSQL", () => {
+  const views = selfProvisioning.approvedPostgresViews();
+  const found = views.map((view) => ({ view: view.name, columns: view.columns, granted: true }));
+
+  /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
+  it("finds no gap when every approved view exists with its columns and the reader may select it", () => {
+    expect(selfProvisioning.findPostgresGaps({ found })).toEqual([]);
+  });
+
+  /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing or stale" */
+  it("names a view that is missing, ungranted, or whose columns changed", () => {
+    const [missing, ungranted, changed] = views;
+    if (!missing || !ungranted || !changed) throw new Error("the catalog maps too few datasets");
+    const drifted = found
+      .filter((view) => view.view !== missing.name)
+      .map((view) => (view.view === ungranted.name ? { ...view, granted: false } : view))
+      .map((view) =>
+        view.view === changed.name ? { ...view, columns: view.columns.slice(1) } : view,
+      );
+
+    expect(selfProvisioning.findPostgresGaps({ found: drifted })).toEqual([
+      missing.name,
+      ungranted.name,
+      changed.name,
+    ]);
+  });
+});

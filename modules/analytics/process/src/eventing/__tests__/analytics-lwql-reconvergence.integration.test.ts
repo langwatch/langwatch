@@ -1,39 +1,57 @@
 /**
- * The reconvergence watch in rendered mode against a real ClickHouse: a converge that fails
- * because the config store has not mounted the named collection yet is retried on the next
- * wake, and that wake creates the PostgreSQL engine tables once the collection appears.
+ * The reconvergence check in rendered mode on a real ClickHouse and PostgreSQL: while the named
+ * collection is absent each check fails without crashing, and the first after it appears
+ * converges everything. No boot; each check is a fresh worker's, sharing only the databases.
  * @see specs/lwql/api.feature
  * @vitest-environment node
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "@langwatch/prisma-client";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { LangWatchQLSelfProvisioningService } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import { LWQL_POSTGRES_READER_ROLE } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
+import {
+  type LwqlAppOwnedDrift,
+  LangWatchQLSelfProvisioningService,
+} from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import {
   type LangWatchQLClickHouseHarness,
+  type LangWatchQLPostgresHarness,
   startLangWatchQLClickHouse,
+  startLangWatchQLPostgres,
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
+import { PrismaLangWatchQLPostgresRepository } from "../../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import type { LangWatchQLNames } from "../../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   convergeLwqlAccessModel,
+  findLwqlAppOwnedDrift,
   type LwqlConvergencePlan,
 } from "../../tasks/lwql-provision.task.ts";
 import { runLwqlReconvergence } from "../analytics-lwql-reconvergence.intent.ts";
+
+class AllowTestQueries extends PrismaQueryGuard {
+  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
+    return next(context.args);
+  }
+}
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 const ENGINE_TABLES = LangWatchQLCatalogShapesService.create()
   .postgresViews(LWQL_VIEW_CATALOG)
   .map((view) => view.sourceTable);
-
-/** The Postgres half (views, reader role, lock) is not this suite's subject. */
-const noPostgres: LwqlProvisioningDatabase = {
-  $executeRawUnsafe: async () => 0,
-  $transaction: (fn) => fn({ $executeRawUnsafe: async () => 0 }),
-};
+const READER_PASSWORD = "reader-reconvergence-secret";
+const converged: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], keyMap: false };
 
 function repositoryOver(client: ClickHouseClient) {
   return ClickHouseLangWatchQLProvisioningRepository.create({
@@ -56,15 +74,17 @@ function repositoryOver(client: ClickHouseClient) {
   });
 }
 
-/** The plan the worker's rendered-mode converge runs, over the suite's own database. */
-function renderedPlan({
-  client,
-  names,
-}: {
-  client: ClickHouseClient;
-  names: LangWatchQLNames;
-}): LwqlConvergencePlan {
-  return {
+describe("given a rendered install whose config store has not mounted the named collection", () => {
+  let harness: LangWatchQLClickHouseHarness;
+  let postgres: LangWatchQLPostgresHarness;
+  let connection: ReturnType<ReturnType<typeof PrismaConnectionService.create>["connect"]>;
+  let names: LangWatchQLNames;
+  let collection: string;
+
+  const database = (): LwqlProvisioningDatabase => connection.client;
+
+  /** The plan the worker's rendered-mode converge runs, over the suite's own databases. */
+  const plan = (): LwqlConvergencePlan => ({
     request: {
       requested: true,
       complete: true,
@@ -75,80 +95,136 @@ function renderedPlan({
         database: names.database,
         tenantSetting: names.tenantSetting,
       },
-      postgresReaderPassword: "reader-rendered-secret",
-      endpoint: { host: "host.docker.internal", port: 5432, database: "lwql_rendered" },
+      postgresReaderPassword: READER_PASSWORD,
+      endpoint: { host: "unused-in-rendered-mode", port: 5432, database: "unused" },
     },
     names,
     sourceDatabase: () => names.database,
     schema: "public",
     settings: { LWQL_ACCESS_MODEL_MODE: "rendered" },
-    openRepository: () => repositoryOver(client),
-  };
-}
+    openRepository: () => repositoryOver(harness.admin),
+  });
 
-describe("given a rendered-mode ClickHouse whose config store has not mounted the named collection", () => {
-  let harness: LangWatchQLClickHouseHarness;
-  let names: LangWatchQLNames;
-  let collection: string;
+  /** A worker that has just started: the check it runs carries nothing from any other. */
+  const freshWorkerCheck = (convergeAppOwned = vi.fn(convergeOnly)) => ({
+    convergeAppOwned,
+    check: runLwqlReconvergence({
+      probe: () => Promise.resolve("config_store"),
+      converge: () => Promise.resolve(),
+      findDrift: () => findLwqlAppOwnedDrift({ database: database(), plan: plan() }),
+      convergeAppOwned,
+      fillKeyMap: () => Promise.resolve(),
+    }),
+  });
 
-  async function engineTablesPresent(): Promise<string[]> {
-    const result = await harness.admin.query({
-      query:
-        "SELECT name FROM system.tables WHERE database = {database:String} AND engine = 'PostgreSQL'",
-      query_params: { database: names.database },
-      format: "JSONEachRow",
+  function convergeOnly(drift: LwqlAppOwnedDrift): Promise<void> {
+    return convergeLwqlAccessModel({
+      database: database(),
+      plan: plan(),
+      failOnError: true,
+      only: drift,
     });
-    return (await result.json<{ name: string }>()).map((row) => row.name);
+  }
+
+  async function answers(): Promise<number[]> {
+    return Promise.all(
+      ENGINE_TABLES.map(async (table) => {
+        const result = await harness.admin.query({
+          query: `SELECT count() AS n FROM ${names.database}.${table}`,
+          format: "JSONEachRow",
+        });
+        const [row] = await result.json<{ n: string }>();
+        return Number(row?.n);
+      }),
+    );
   }
 
   beforeAll(async () => {
-    harness = await startLangWatchQLClickHouse({
-      suite: "rendered-reconvergence",
-      facts: "migrated",
-    });
+    [harness, postgres] = await Promise.all([
+      startLangWatchQLClickHouse({ suite: "rendered-reconvergence", facts: "migrated" }),
+      startLangWatchQLPostgres(),
+    ]);
+    connection = PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("lwql-reconvergence-test"),
+    }).connect(
+      PrismaConfigService.create().resolve({
+        databaseUrl: postgres.container.getConnectionUri(),
+        log: ["error"],
+      }),
+    );
     // Production provisions into the application's own database, which holds the fact tables.
     names = { ...harness.names, database: harness.factDatabase };
     collection = selfProvisioning.namedCollection({ names });
-    await harness.applyAsAdmin([`DROP NAMED COLLECTION IF EXISTS ${collection}`]);
+    // A reused container keeps the facts database, so the app-owned objects go first.
+    await harness.applyAsAdmin([
+      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
+      ...LWQL_VIEW_CATALOG.map((view) => `DROP VIEW IF EXISTS ${names.database}.${view.name}`),
+      ...ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
+    ]);
   }, 600_000);
 
   afterAll(async () => {
     await harness?.applyAsAdmin([`DROP NAMED COLLECTION IF EXISTS ${collection}`]);
-    await harness?.stop();
+    await connection?.closeOnce();
+    await Promise.all([harness?.stop(), postgres?.stop()]);
   });
 
-  describe("when the watch wakes before and after the collection appears", () => {
-    /** @scenario "A rendered install whose named collection appears late converges on a later wake" */
-    it("fails without crashing, then creates the PostgreSQL engine tables on the next wake", async () => {
-      let converges = 0;
-      const wake = runLwqlReconvergence({
-        probe: () => Promise.resolve("config_store"),
-        converge: () => Promise.resolve(),
-        convergeAppOwned: async () => {
-          converges += 1;
-          await convergeLwqlAccessModel({
-            database: noPostgres,
-            plan: renderedPlan({ client: harness.admin, names }),
-            failOnError: true,
-          });
-        },
-        fillKeyMap: () => Promise.resolve(),
-      });
+  describe("when checks run before and after the collection appears", () => {
+    /** @scenario "A rendered install whose named collection appears late converges on a later check" */
+    it("fails without crashing while it is absent, then converges on the next check and then does nothing", async () => {
+      const before = await findLwqlAppOwnedDrift({ database: database(), plan: plan() });
+      expect(before.clickHouse).toEqual(expect.arrayContaining(ENGINE_TABLES));
+      expect(before.postgres.length).toBeGreaterThan(0);
 
-      await expect(wake({ final: false, fillKeyMap: false })).resolves.toBeUndefined();
-      expect(await engineTablesPresent()).toEqual([]);
+      for (let checks = 0; checks < 2; checks++) {
+        await expect(freshWorkerCheck().check({ fillKeyMap: false })).resolves.toBeUndefined();
+      }
+      // The PostgreSQL half converged on the first check even though ClickHouse could not.
+      const absent = await findLwqlAppOwnedDrift({ database: database(), plan: plan() });
+      expect(absent.postgres).toEqual([]);
+      expect(absent.clickHouse).toEqual(expect.arrayContaining(ENGINE_TABLES));
 
-      // The pod re-mounts config.d; the SQL stand-in gives the engine tables the same name.
+      // The pod re-mounts config.d; the SQL stand-in reads PostgreSQL as the converged reader.
       await harness.applyAsAdmin([
-        `CREATE NAMED COLLECTION ${collection} AS host = 'host.docker.internal', port = 5432, ` +
-          `database = 'lwql_rendered', user = 'lwql_ro', password = 'reader-rendered-secret'`,
+        `CREATE NAMED COLLECTION ${collection} AS host = '${postgres.container.getIpAddress("bridge")}', ` +
+          `port = 5432, database = '${postgres.container.getDatabase()}', ` +
+          `user = '${LWQL_POSTGRES_READER_ROLE}', password = '${READER_PASSWORD}'`,
       ]);
+      await freshWorkerCheck().check({ fillKeyMap: false });
 
-      await expect(wake({ final: false, fillKeyMap: false })).resolves.toBeUndefined();
-      expect((await engineTablesPresent()).toSorted()).toEqual(ENGINE_TABLES.toSorted());
+      expect(await findLwqlAppOwnedDrift({ database: database(), plan: plan() })).toEqual(
+        converged,
+      );
+      expect(await answers()).toHaveLength(ENGINE_TABLES.length);
 
-      await wake({ final: false, fillKeyMap: false });
-      expect(converges).toBe(2);
+      const later = freshWorkerCheck();
+      await later.check({ fillKeyMap: false });
+      expect(later.convergeAppOwned).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the PostgreSQL catalog is read for the reader's approved views", () => {
+    /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
+    it("finds no gap for a role granted every view, and every view a gap for a role that does not exist", async () => {
+      const views = selfProvisioning.approvedPostgresViews().map((view) => view.name);
+      const repository = PrismaLangWatchQLPostgresRepository.create(database());
+
+      const granted = await repository.findApprovedViews({
+        schema: "public",
+        role: postgres.readerRole,
+        views,
+      });
+      expect(selfProvisioning.findPostgresGaps({ found: granted })).toEqual([]);
+
+      const absent = await repository.findApprovedViews({
+        schema: "public",
+        role: "lwql_role_that_does_not_exist",
+        views,
+      });
+      expect(selfProvisioning.findPostgresGaps({ found: absent }).toSorted()).toEqual(
+        views.toSorted(),
+      );
     });
   });
 });

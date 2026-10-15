@@ -8,13 +8,18 @@
 import { createHash } from "node:crypto";
 
 import type { LangWatchQLConnection } from "../../../repositories/langwatch-ql-executor.repository.ts";
+import type { LwqlPostgresViewFound } from "../../../repositories/langwatch-ql-postgres.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../../services/langwatch-ql-access-model-definition.service.ts";
 import {
+  KEY_MAP_COLUMNS,
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
 } from "../../../services/langwatch-ql-access-model.service.ts";
-import { LangWatchQLCatalogShapesService } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
+import {
+  LangWatchQLCatalogShapesService,
+  type LangWatchQLViewDefinition,
+} from "../../../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   LangWatchQLConnectionService,
   LWQL_CONNECTION_DEFAULTS,
@@ -63,6 +68,37 @@ export type LwqlSelfProvisionRequest =
 
 /** `rendered`: a config store owns user, profile, policies and collection; `sql`: the app does. */
 export type LwqlAccessModelMode = "rendered" | "sql";
+
+/** A table or view the app creates, by name, with the column names it must carry. */
+interface LwqlExpectedRelation {
+  readonly name: string;
+  readonly columns: readonly string[];
+}
+
+/** What the app-owned ClickHouse objects lack; names only, never DDL. */
+interface LwqlClickHouseDrift {
+  /** Each object absent, or holding columns the catalog no longer declares. */
+  readonly objects: readonly string[];
+  /** The key map was among them, so a converge that repairs it is followed by a fill. */
+  readonly keyMap: boolean;
+}
+
+/** What the reconvergence check found missing in each store; both empty means converged. */
+export interface LwqlAppOwnedDrift {
+  readonly clickHouse: readonly string[];
+  readonly postgres: readonly string[];
+  readonly keyMap: boolean;
+}
+
+const columnNames = (view: LangWatchQLViewDefinition): string[] =>
+  view.columns.map((column) => column.name);
+
+/** Order-blind: a reordered column list still serves every query by name. */
+function sameColumns(found: readonly string[] | undefined, expected: readonly string[]): boolean {
+  if (found === undefined || found.length !== expected.length) return false;
+  const held = new Set(found);
+  return expected.every((column) => held.has(column));
+}
 
 /** The endpoint must be reachable from the ClickHouse server; the chart's cluster DNS is. */
 function postgresEndpoints({
@@ -129,9 +165,9 @@ export class LangWatchQLSelfProvisioningService {
   }
 
   /**
-   * Every ClickHouse statement a self-provisioning boot runs: the access model,
-   * the PostgreSQL bridge, then the views with their grants and policies. The
-   * engine tables are dropped and recreated so a changed catalog converges.
+   * Every ClickHouse statement a self-provisioning boot runs: the access model, the PostgreSQL
+   * bridge, then the views. Each app-owned object is created or replaced in one statement,
+   * never dropped first, so a failed run leaves the working objects in place (issue #8726).
    */
   clickHouseStatements({
     names,
@@ -170,12 +206,7 @@ export class LangWatchQLSelfProvisioningService {
       sourceDatabase,
     });
     const structural = accessModel.setupStatements({ names, sourceDatabase, includeAppFunctions });
-    const engineTables = [
-      ...catalogShapes
-        .postgresViews(LWQL_VIEW_CATALOG)
-        .map((view) => `DROP TABLE IF EXISTS ${accessModel.qualified(names, view.sourceTable)}`),
-      ...postgresViews.engineTableStatements({ names, collection }),
-    ];
+    const engineTables = postgresViews.engineTableStatements({ names, collection });
     const views = viewProvisioning.setupStatements({
       names,
       sourceDatabase,
@@ -209,6 +240,60 @@ export class LangWatchQLSelfProvisioningService {
         statementTimeout: DEFAULT_POSTGRES_READER_LIMITS.statementTimeout,
       },
     });
+  }
+
+  /** The relations a rendered-mode converge creates: the key map, engine tables and views. */
+  appOwnedRelations({ names }: { names: LangWatchQLNames }): LwqlExpectedRelation[] {
+    return [
+      { name: names.keyMapTable, columns: [KEY_MAP_COLUMNS.keyHash, KEY_MAP_COLUMNS.tenantId] },
+      ...catalogShapes
+        .postgresViews(LWQL_VIEW_CATALOG)
+        .map((view) => ({ name: view.sourceTable, columns: columnNames(view) })),
+      ...LWQL_VIEW_CATALOG.map((view) => ({ name: view.name, columns: columnNames(view) })),
+    ];
+  }
+
+  /** Each expected relation absent or holding other columns, then each absent app function. */
+  findDrift({
+    names,
+    relations,
+    functions,
+    found,
+  }: {
+    names: LangWatchQLNames;
+    relations: readonly LwqlExpectedRelation[];
+    /** The app functions to expect; empty where a `CREATE FUNCTION` cannot reach every replica. */
+    functions: readonly string[];
+    found: {
+      relations: ReadonlyMap<string, readonly string[]>;
+      functions: readonly string[];
+    };
+  }): LwqlClickHouseDrift {
+    const objects = [
+      ...relations
+        .filter((relation) => !sameColumns(found.relations.get(relation.name), relation.columns))
+        .map((relation) => relation.name),
+      ...functions.filter((name) => !found.functions.includes(name)),
+    ];
+    return { objects, keyMap: objects.includes(names.keyMapTable) };
+  }
+
+  /** The approved views the reader role must select from, with their exposed columns. */
+  approvedPostgresViews(): LwqlExpectedRelation[] {
+    return catalogShapes
+      .postgresViews(LWQL_VIEW_CATALOG)
+      .map((view) => ({ name: view.postgres.approvedView, columns: columnNames(view) }));
+  }
+
+  /** Each approved view absent, holding other columns, or not selectable by the reader role. */
+  findPostgresGaps({ found }: { found: readonly LwqlPostgresViewFound[] }): string[] {
+    const byName = new Map(found.map((view) => [view.view, view]));
+    return this.approvedPostgresViews()
+      .filter((expected) => {
+        const view = byName.get(expected.name);
+        return !view?.granted || !sameColumns(view.columns, expected.columns);
+      })
+      .map((expected) => expected.name);
   }
 
   /** A failed statement echoes its DDL, which embeds passwords; every logged error passes here. */

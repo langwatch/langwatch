@@ -1,23 +1,48 @@
 import type { JsonValue } from "@langwatch/eventing";
 import { intentAccessorOf } from "@langwatch/eventing/testing";
-/** Spec: specs/lwql/access-model.feature */
-import { describe, expect, it, vi } from "vitest";
+import type * as Observability from "@langwatch/observability";
+/** Spec: specs/lwql/api.feature, modules/analytics/specs/analytics-lwql-project-keys.feature */
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { LwqlAppOwnedDrift } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import type { LwqlAccessModelOwner } from "../../rules/langwatch-ql-config-store.rules.ts";
 import {
   LWQL_RECONVERGENCE_PROCESS_NAME,
   runLwqlReconvergence,
 } from "../analytics-lwql-reconvergence.intent.ts";
 import {
-  LWQL_RECONVERGENCE_BUDGET_MS,
-  LWQL_RECONVERGENCE_INITIAL_DELAY_MS,
+  LWQL_KEY_MAP_REFILL_MS,
   LWQL_RECONVERGENCE_INITIAL_STATE,
-  LWQL_RECONVERGENCE_MAX_DELAY_MS,
+  LWQL_RECONVERGENCE_INTERVAL_MS,
   type LwqlReconvergenceState,
+  lwqlReconvergenceSchema,
+  lwqlReconvergenceStateSchema,
   lwqlReconvergenceWake,
 } from "../analytics-lwql-reconvergence.process.ts";
 
-const BOOTED_AT = 1_700_000_000_000;
+const { logCalls } = vi.hoisted(() => ({ logCalls: [] as { level: string; message: unknown }[] }));
+vi.mock("@langwatch/observability", async (importActual) => {
+  const actual = await importActual<typeof Observability>();
+  const at =
+    (level: string) =>
+    (...args: unknown[]) => {
+      logCalls.push({ level, message: args.at(-1) });
+    };
+  return {
+    ...actual,
+    createLogger: () => ({
+      info: at("info"),
+      warn: at("warn"),
+      error: at("error"),
+      debug: at("debug"),
+    }),
+  };
+});
+
+const ALERT = "lwql provisioning failed creating ClickHouse objects";
+const FIRST_SLOT = 1_700_000_000_000;
+const healthy: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], keyMap: false };
+const wakeOnce = { fillKeyMap: false };
 
 function wake(state: LwqlReconvergenceState, at: number) {
   const reconverge = vi.fn((messageKey: string, payload: JsonValue) => ({
@@ -25,7 +50,7 @@ function wake(state: LwqlReconvergenceState, at: number) {
     intentType: "reconverge",
     payload,
   }));
-  const evolution = lwqlReconvergenceWake({ bootedAt: BOOTED_AT })(state, {
+  const evolution = lwqlReconvergenceWake(state, {
     at,
     now: at,
     key: LWQL_RECONVERGENCE_PROCESS_NAME,
@@ -35,199 +60,270 @@ function wake(state: LwqlReconvergenceState, at: number) {
   return { evolution, reconverge };
 }
 
-describe("given the access-model reconvergence watch", () => {
-  describe("when the process has just come up", () => {
-    it("probes first after the initial delay, then backs off to the cap", () => {
-      const early = wake(LWQL_RECONVERGENCE_INITIAL_STATE, BOOTED_AT + 1_000);
-      expect(early.reconverge).not.toHaveBeenCalled();
+/** A ClickHouse whose objects a converge creates only once the named collection is mounted. */
+function clickHouseWorld({ missing }: { missing: string[] }) {
+  const world = {
+    missing: new Set(missing),
+    collectionMounted: false,
+    ddlRuns: 0,
+    async findDrift(): Promise<LwqlAppOwnedDrift> {
+      const objects = [...world.missing];
+      return { clickHouse: objects, postgres: [], keyMap: objects.includes("api_key_tenants") };
+    },
+    async convergeAppOwned(): Promise<void> {
+      world.ddlRuns += 1;
+      if (!world.collectionMounted) {
+        throw Object.assign(new Error("Code: 669. DB::Exception: There is no named collection"), {
+          code: "669",
+          type: "NAMED_COLLECTION_DOESNT_EXIST",
+        });
+      }
+      world.missing.clear();
+    },
+  };
+  return world;
+}
 
-      let state = early.evolution.state;
-      let at = BOOTED_AT + LWQL_RECONVERGENCE_INITIAL_DELAY_MS;
-      const delays: number[] = [];
-      for (let i = 0; i < 8; i++) {
+/** One worker's check over the world: nothing it holds is shared with any other worker. */
+function workerOver(
+  world: ReturnType<typeof clickHouseWorld>,
+  overrides: Partial<Parameters<typeof runLwqlReconvergence>[0]> = {},
+) {
+  const converge = vi.fn(() => Promise.resolve());
+  const fillKeyMap = vi.fn(() => Promise.resolve());
+  const check = runLwqlReconvergence({
+    probe: () => Promise.resolve("config_store"),
+    converge,
+    findDrift: () => world.findDrift(),
+    convergeAppOwned: () => world.convergeAppOwned(),
+    fillKeyMap,
+    ...overrides,
+  });
+  return { check, converge, fillKeyMap };
+}
+
+beforeEach(() => {
+  logCalls.length = 0;
+});
+
+describe("given the reconvergence check's schedule", () => {
+  describe("when the fleet's one scheduled wake fires, slot after slot", () => {
+    /** @scenario "The reconvergence check runs every 5 minutes with no end and no per-worker state" */
+    it("asks for exactly one check per slot for a whole week, never giving up", () => {
+      let state = LWQL_RECONVERGENCE_INITIAL_STATE;
+      const keys = new Set<string>();
+      const slots = (7 * 24 * 60 * 60_000) / LWQL_RECONVERGENCE_INTERVAL_MS;
+      for (let slot = 0; slot < slots; slot++) {
+        const at = FIRST_SLOT + slot * LWQL_RECONVERGENCE_INTERVAL_MS;
         const next = wake(state, at);
         expect(next.reconverge).toHaveBeenCalledTimes(1);
+        keys.add(next.reconverge.mock.calls[0]?.[0] ?? "");
         state = next.evolution.state;
-        delays.push(state.delayMs);
-        at = state.nextAt;
       }
-      expect(delays.at(-1)).toBe(LWQL_RECONVERGENCE_MAX_DELAY_MS);
+      expect(keys.size).toBe(slots);
     });
 
-    it("gives up once the budget would be exceeded", () => {
-      let state = wake(LWQL_RECONVERGENCE_INITIAL_STATE, BOOTED_AT).evolution.state;
-      let at = state.nextAt;
-      let probes = 0;
-      while (!state.gaveUp) {
-        const next = wake(state, at);
-        probes += next.reconverge.mock.calls.length;
-        state = next.evolution.state;
-        at = state.nextAt;
-      }
-      expect(state.elapsedMs).toBeLessThanOrEqual(LWQL_RECONVERGENCE_BUDGET_MS);
-      expect(wake(state, at + LWQL_RECONVERGENCE_BUDGET_MS).reconverge).not.toHaveBeenCalled();
-      expect(probes).toBeGreaterThan(0);
+    /** @scenario "The reconvergence check runs every 5 minutes with no end and no per-worker state" */
+    it("gives two workers waking the same slot the same message key, so the outbox keeps one", () => {
+      const a = wake(LWQL_RECONVERGENCE_INITIAL_STATE, FIRST_SLOT);
+      const b = wake(LWQL_RECONVERGENCE_INITIAL_STATE, FIRST_SLOT);
+      expect(a.reconverge.mock.calls[0]?.[0]).toBe(b.reconverge.mock.calls[0]?.[0]);
+    });
+
+    it("reads the state and payload the earlier boot-scoped watch stored", () => {
+      const stored = { bootedAt: 1, nextAt: 2, delayMs: 5_000, elapsedMs: 0, gaveUp: true };
+      expect(lwqlReconvergenceStateSchema.parse(stored)).toEqual({ keyMapFillAskedAt: null });
+      expect(
+        lwqlReconvergenceSchema.parse({ scheduledFor: 1, final: true, fillKeyMap: true }),
+      ).toEqual({ scheduledFor: 1, fillKeyMap: true });
     });
   });
 
-  describe("when a probe answers", () => {
-    const run = (owner: LwqlAccessModelOwner | Error) => {
-      const converge = vi.fn(() => Promise.resolve());
-      const probe = () => (owner instanceof Error ? Promise.reject(owner) : Promise.resolve(owner));
-      const fillKeyMap = () => Promise.resolve();
-      const convergeAppOwned = () => Promise.resolve();
-      return {
-        converge,
-        done: runLwqlReconvergence({ probe, converge, convergeAppOwned, fillKeyMap })({
-          final: false,
-          fillKeyMap: false,
-        }),
-      };
-    };
-
-    /** @scenario "The app re-provisions once the ClickHouse config store releases the LangWatchQL access model" */
-    it("re-provisions only once neither store owns the model", async () => {
-      for (const owner of ["config_store", "sql_store"] as const) {
-        const { converge, done } = run(owner);
-        await done;
-        expect(converge).not.toHaveBeenCalled();
+  describe("when deciding which checks also fill the key map", () => {
+    /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
+    it("asks the first check and the first check a day after the last fill, and no other", () => {
+      const fills: boolean[] = [];
+      let state = LWQL_RECONVERGENCE_INITIAL_STATE;
+      const slots = (LWQL_KEY_MAP_REFILL_MS / LWQL_RECONVERGENCE_INTERVAL_MS) * 2 + 1;
+      for (let slot = 0; slot < slots; slot++) {
+        const next = wake(state, FIRST_SLOT + slot * LWQL_RECONVERGENCE_INTERVAL_MS);
+        fills.push(lwqlReconvergenceSchema.parse(next.reconverge.mock.calls[0]?.[1]).fillKeyMap);
+        state = next.evolution.state;
       }
-      const released = run("none");
-      await released.done;
-      expect(released.converge).toHaveBeenCalledTimes(1);
-    });
-
-    /** @scenario "A re-provision in flight finishes before the worker lets the app close" */
-    it("resolves only once the re-provision has finished", async () => {
-      const order: string[] = [];
-      const converge = () =>
-        new Promise<void>((resolve) => {
-          setTimeout(() => {
-            order.push("converged");
-            resolve();
-          }, 5);
-        });
-      await runLwqlReconvergence({
-        probe: () => Promise.resolve("none"),
-        converge,
-        convergeAppOwned: () => Promise.resolve(),
-        fillKeyMap: () => Promise.resolve(),
-      })({ final: false, fillKeyMap: false });
-      order.push("intent resolved");
-      expect(order).toEqual(["converged", "intent resolved"]);
-    });
-
-    it("keeps waiting when ClickHouse cannot be read", async () => {
-      const { converge, done } = run(new Error("ECONNREFUSED"));
-      await done;
-      expect(converge).not.toHaveBeenCalled();
+      const filledAt = fills.flatMap((fill, slot) => (fill ? [slot] : []));
+      const perDay = LWQL_KEY_MAP_REFILL_MS / LWQL_RECONVERGENCE_INTERVAL_MS;
+      expect(filledAt).toEqual([0, perDay, perDay * 2]);
     });
   });
+});
 
-  describe("when a rendered install's config store owns the access entities", () => {
-    const wakeOnce = { final: false, fillKeyMap: false };
-    const namedCollectionMissing = () =>
-      Object.assign(new Error("Code: 669. DB::Exception: There is no named collection"), {
-        code: "669",
-      });
-
-    /** @scenario "In rendered mode the reconvergence watch converges the app-owned LangWatchQL objects" */
-    it("converges the app-owned objects and leaves the access model to the config store", async () => {
+describe("given a check over the app-owned objects", () => {
+  describe("when every app-owned object is in place", () => {
+    /** @scenario "The reconvergence check converges nothing while every app-owned LangWatchQL object is in place" */
+    it("runs no DDL and converges nothing", async () => {
+      const world = clickHouseWorld({ missing: [] });
       const convergeAppOwned = vi.fn(() => Promise.resolve());
+      const { check, converge } = workerOver(world, { convergeAppOwned });
+
+      for (let checks = 0; checks < 3; checks++) await check(wakeOnce);
+
+      expect(convergeAppOwned).not.toHaveBeenCalled();
+      expect(converge).not.toHaveBeenCalled();
+      expect(world.ddlRuns).toBe(0);
+    });
+  });
+
+  describe("when an engine table is missing", () => {
+    /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing or stale" */
+    it("converges with the drift it read and leaves the access model to the config store", async () => {
+      const drift: LwqlAppOwnedDrift = { clickHouse: ["agents_pg"], postgres: [], keyMap: false };
+      const convergeAppOwned = vi.fn((_drift: LwqlAppOwnedDrift) => Promise.resolve());
       const converge = vi.fn(() => Promise.resolve());
       await runLwqlReconvergence({
         probe: () => Promise.resolve("config_store"),
         converge,
+        findDrift: () => Promise.resolve(drift),
         convergeAppOwned,
         fillKeyMap: () => Promise.resolve(),
       })(wakeOnce);
 
-      expect(convergeAppOwned).toHaveBeenCalledTimes(1);
+      expect(convergeAppOwned).toHaveBeenCalledWith(drift);
       expect(converge).not.toHaveBeenCalled();
     });
 
-    /** @scenario "A failed app-owned converge is retried on the next wake and stops once converged" */
-    it("retries a failed converge on each later wake and stops once one succeeds", async () => {
-      const convergeAppOwned = vi
-        .fn<() => Promise<void>>()
-        .mockRejectedValueOnce(namedCollectionMissing())
-        .mockRejectedValueOnce(new Error("Timeout error."))
-        .mockResolvedValue(undefined);
-      const reconverge = runLwqlReconvergence({
+    /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing or stale" */
+    it("converges nothing when ClickHouse cannot be read, and checks again next time", async () => {
+      const convergeAppOwned = vi.fn(() => Promise.resolve());
+      await runLwqlReconvergence({
         probe: () => Promise.resolve("config_store"),
         converge: () => Promise.resolve(),
+        findDrift: () => Promise.reject(new Error("ECONNREFUSED")),
         convergeAppOwned,
         fillKeyMap: () => Promise.resolve(),
-      });
+      })(wakeOnce);
 
-      for (let wakes = 0; wakes < 5; wakes++) {
-        await expect(reconverge(wakeOnce)).resolves.toBeUndefined();
-      }
-
-      expect(convergeAppOwned).toHaveBeenCalledTimes(3);
-    });
-
-    /** @scenario "A failed app-owned converge is retried on the next wake and stops once converged" */
-    it("still probes the access model when the app-owned converge fails", async () => {
-      const converge = vi.fn(() => Promise.resolve());
-      await runLwqlReconvergence({
-        probe: () => Promise.resolve("none"),
-        converge,
-        convergeAppOwned: () => Promise.reject(namedCollectionMissing()),
-        fillKeyMap: () => Promise.resolve(),
-      })({ final: true, fillKeyMap: false });
-
-      expect(converge).toHaveBeenCalledTimes(1);
+      expect(convergeAppOwned).not.toHaveBeenCalled();
+      expect(logCalls.map((call) => call.level)).not.toContain("error");
     });
   });
 
-  describe("when the worker has just booted", () => {
-    /** @scenario "Each worker boot fills the key-map rows a project lacks" */
-    it("asks the first probe of the boot, and only that one, to fill the key map", () => {
-      const first = wake(
-        LWQL_RECONVERGENCE_INITIAL_STATE,
-        BOOTED_AT + LWQL_RECONVERGENCE_INITIAL_DELAY_MS,
-      );
-      expect(first.reconverge.mock.calls[0]?.[1]).toMatchObject({ fillKeyMap: true });
-      const state = first.evolution.state;
-      const second = wake(state, state.nextAt);
-      expect(second.reconverge.mock.calls[0]?.[1]).toMatchObject({ fillKeyMap: false });
+  describe("when the named collection is absent for a while and then mounted", () => {
+    /** @scenario "The reconvergence check runs every 5 minutes with no end and no per-worker state" */
+    it("converges on whichever worker checks after it appears, with no state between workers", async () => {
+      const world = clickHouseWorld({ missing: ["agents_pg", "agents"] });
+      const workers = [workerOver(world), workerOver(world), workerOver(world)];
+
+      for (const worker of workers.slice(0, 2)) await worker.check(wakeOnce);
+      expect(world.missing.size).toBe(2);
+
+      world.collectionMounted = true;
+      await workers[2]?.check(wakeOnce);
+      expect(world.missing.size).toBe(0);
+
+      const runsBefore = world.ddlRuns;
+      for (const worker of workers) await worker.check(wakeOnce);
+      expect(world.ddlRuns).toBe(runsBefore);
     });
 
-    it("fills before probing, and still probes when the fill fails", async () => {
-      const order: string[] = [];
-      const probe = vi.fn(async (): Promise<LwqlAccessModelOwner> => {
-        order.push("probed");
-        return "none";
-      });
-      const fillKeyMap = vi.fn(async () => {
-        order.push("filled");
-      });
-      const converge = vi.fn(() => Promise.resolve());
-      const convergeAppOwned = () => Promise.resolve();
-      await runLwqlReconvergence({ probe, converge, convergeAppOwned, fillKeyMap })({
-        final: false,
-        fillKeyMap: true,
-      });
-      expect(order).toEqual(["filled", "probed"]);
+    /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
+    it("logs the alert at error on the first failure and on a change, and warns while it repeats", async () => {
+      const world = clickHouseWorld({ missing: ["agents_pg"] });
+      const { check } = workerOver(world);
+      const alerts = () => logCalls.filter((call) => call.level === "error");
 
-      const failing = vi.fn(() => Promise.reject(new Error("ECONNREFUSED")));
-      await runLwqlReconvergence({ probe, converge, convergeAppOwned, fillKeyMap: failing })({
-        final: false,
-        fillKeyMap: true,
-      });
-      expect(converge).toHaveBeenCalledTimes(2);
+      for (let checks = 0; checks < 4; checks++) {
+        await expect(check(wakeOnce)).resolves.toBeUndefined();
+      }
+      expect(alerts().map((call) => call.message)).toEqual([ALERT]);
+      expect(logCalls.filter((call) => call.level === "warn").length).toBeGreaterThanOrEqual(3);
+
+      world.convergeAppOwned = () => Promise.reject(new Error("Timeout error."));
+      await check(wakeOnce);
+      expect(alerts()).toHaveLength(2);
     });
+  });
 
-    it("does not fill on a later probe", async () => {
-      const fillKeyMap = vi.fn(() => Promise.resolve());
-      await runLwqlReconvergence({
-        probe: () => Promise.resolve("config_store"),
-        converge: () => Promise.resolve(),
-        convergeAppOwned: () => Promise.resolve(),
-        fillKeyMap,
-      })({ final: false, fillKeyMap: false });
+  describe("when the key map itself is missing", () => {
+    /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
+    it("fills only once a converge has repaired it, then on the next asked-for fill", async () => {
+      const world = clickHouseWorld({ missing: ["api_key_tenants"] });
+      const { check, fillKeyMap } = workerOver(world);
+
+      await check({ fillKeyMap: true });
       expect(fillKeyMap).not.toHaveBeenCalled();
+
+      world.collectionMounted = true;
+      await check(wakeOnce);
+      expect(fillKeyMap).toHaveBeenCalledTimes(1);
+
+      await check(wakeOnce);
+      expect(fillKeyMap).toHaveBeenCalledTimes(1);
+      await check({ fillKeyMap: true });
+      expect(fillKeyMap).toHaveBeenCalledTimes(2);
     });
+
+    /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
+    it("still probes when the fill fails", async () => {
+      const probe = vi.fn(() => Promise.resolve<LwqlAccessModelOwner>("sql_store"));
+      await runLwqlReconvergence({
+        probe,
+        converge: () => Promise.resolve(),
+        findDrift: () => Promise.resolve(healthy),
+        convergeAppOwned: () => Promise.resolve(),
+        fillKeyMap: () => Promise.reject(new Error("ECONNREFUSED")),
+      })({ fillKeyMap: true });
+
+      expect(probe).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given the SQL-mode owner probe", () => {
+  const run = (owner: LwqlAccessModelOwner | Error) => {
+    const converge = vi.fn(() => Promise.resolve());
+    const probe = () => (owner instanceof Error ? Promise.reject(owner) : Promise.resolve(owner));
+    return {
+      converge,
+      done: runLwqlReconvergence({
+        probe,
+        converge,
+        findDrift: () => Promise.resolve(healthy),
+        convergeAppOwned: () => Promise.resolve(),
+        fillKeyMap: () => Promise.resolve(),
+      })(wakeOnce),
+    };
+  };
+
+  /** @scenario "The app re-provisions once the ClickHouse config store releases the LangWatchQL access model" */
+  it("re-provisions only once neither store owns the model, and never on a probe error", async () => {
+    for (const owner of ["config_store", "sql_store", new Error("ECONNREFUSED")] as const) {
+      const { converge, done } = run(owner);
+      await done;
+      expect(converge).not.toHaveBeenCalled();
+    }
+    const released = run("none");
+    await released.done;
+    expect(released.converge).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "A re-provision in flight finishes before the worker lets the app close" */
+  it("resolves only once the re-provision has finished", async () => {
+    const order: string[] = [];
+    const converge = () =>
+      new Promise<void>((resolve) => {
+        setTimeout(() => {
+          order.push("converged");
+          resolve();
+        }, 5);
+      });
+    await runLwqlReconvergence({
+      probe: () => Promise.resolve("none"),
+      converge,
+      findDrift: () => Promise.resolve(healthy),
+      convergeAppOwned: () => Promise.resolve(),
+      fillKeyMap: () => Promise.resolve(),
+    })(wakeOnce);
+    order.push("intent resolved");
+    expect(order).toEqual(["converged", "intent resolved"]);
   });
 });

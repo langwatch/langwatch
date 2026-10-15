@@ -18,7 +18,9 @@ import {
 import {
   type ClickHouseAdminStatements,
   LangWatchQLProvisioningRepository,
+  type LwqlClickHouseInventory,
   type LwqlKeyMapInsertRow,
+  type ProvisioningFailureLevel,
   type RunClickHouseStatementsResult,
   type SkippedProvisioningStatement,
 } from "../langwatch-ql-provisioning.repository.ts";
@@ -31,10 +33,12 @@ async function runClickHouseStatements({
   client,
   statements,
   configStoreEntities = [],
+  failureLevel = "error",
 }: {
   client: ClickHouseAdminStatements;
   statements: readonly string[];
   configStoreEntities?: readonly ConfigStoreLwqlEntity[];
+  failureLevel?: ProvisioningFailureLevel;
 }): Promise<RunClickHouseStatementsResult> {
   const skipped: SkippedProvisioningStatement[] = [];
   for (const [index, statement] of statements.entries()) {
@@ -46,7 +50,7 @@ async function runClickHouseStatements({
       const targets = findStatementTargets(statement);
       const tolerance = decideConfigStoreTolerance({ error, statement, configStoreEntities });
       if (!tolerance.tolerated) {
-        logger.error(
+        logger[failureLevel](
           {
             error: clickHouseErrorSummary(error),
             ...clickHouseErrorCodeFields(error),
@@ -68,6 +72,42 @@ async function runClickHouseStatements({
     }
   }
   return { skipped };
+}
+
+/** The named relations' columns and the named SQL functions, from two `system` tables. */
+async function readClickHouseInventory({
+  client,
+  database,
+  relations,
+  functions,
+}: {
+  client: ClickHouseAdminStatements;
+  database: string;
+  relations: readonly string[];
+  functions: readonly string[];
+}): Promise<LwqlClickHouseInventory> {
+  const columns = await client.rows(
+    "SELECT table, groupArray(name) AS columns FROM system.columns " +
+      "WHERE database = {database:String} AND has({relations:Array(String)}, table) GROUP BY table",
+    { database, relations: [...relations] },
+  );
+  const held =
+    functions.length === 0
+      ? []
+      : await client.rows(
+          "SELECT name FROM system.functions " +
+            "WHERE origin = 'SQLUserDefined' AND has({functions:Array(String)}, name)",
+          { functions: [...functions] },
+        );
+  return {
+    relations: new Map(
+      columns.map((row) => [
+        String(row.table),
+        Array.isArray(row.columns) ? row.columns.map(String) : [],
+      ]),
+    ),
+    functions: held.map((row) => String(row.name)),
+  };
 }
 
 /** An unreadable inventory degrades to "none owned", so the statements then fail loudly. */
@@ -173,8 +213,17 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
   runStatements(input: {
     statements: readonly string[];
     configStoreEntities?: readonly ConfigStoreLwqlEntity[];
+    failureLevel?: ProvisioningFailureLevel;
   }): Promise<RunClickHouseStatementsResult> {
     return runClickHouseStatements({ client: this.client, ...input });
+  }
+
+  readInventory(input: {
+    database: string;
+    relations: readonly string[];
+    functions: readonly string[];
+  }): Promise<LwqlClickHouseInventory> {
+    return readClickHouseInventory({ client: this.client, ...input });
   }
 
   inventoryConfigStore({

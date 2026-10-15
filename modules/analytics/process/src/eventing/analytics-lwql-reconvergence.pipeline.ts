@@ -1,8 +1,8 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 /**
- * Analytics' LangWatchQL pipeline, with no events of its own: the access-model reconvergence
- * watch, `global` because one ClickHouse access model serves every tenant (ADR-159), and the
- * key-map row it writes when project records a created project (§9).
+ * Analytics' LangWatchQL pipeline, with no events of its own: the reconvergence check, `global`
+ * because one ClickHouse access model serves every tenant (ADR-159), and the key-map row it
+ * writes when project records a created project (§9).
  */
 import {
   defineAggregate,
@@ -15,8 +15,8 @@ import {
   PROJECT_CREATED_EVENT_TYPE,
   projectCreatedEventDataSchema,
 } from "@langwatch/project-contract";
-import { nowInstant } from "@langwatch/time";
 
+import type { LwqlAppOwnedDrift } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import type { AnalyticsRepositories } from "../repositories/analytics.repositories.ts";
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import {
@@ -24,8 +24,8 @@ import {
   runLwqlReconvergence,
 } from "./analytics-lwql-reconvergence.intent.ts";
 import {
-  LWQL_RECONVERGENCE_INITIAL_DELAY_MS,
   LWQL_RECONVERGENCE_INITIAL_STATE,
+  LWQL_RECONVERGENCE_INTERVAL_MS,
   lwqlReconvergenceStateSchema,
   lwqlReconvergenceSchema,
   lwqlReconvergenceWake,
@@ -37,17 +37,16 @@ const LWQL_RECONVERGENCE_PIPELINE_NAME = "lwql_reconvergence";
 interface LwqlReconvergenceApp {
   probeLwqlAccessModelOwner(): Promise<LwqlAccessModelOwner>;
   convergeLwqlAccessModel(): Promise<void>;
-  convergeLwqlAppOwnedObjects(): Promise<void>;
+  findLwqlAppOwnedDrift(): Promise<LwqlAppOwnedDrift>;
+  convergeLwqlAppOwnedObjects(drift: LwqlAppOwnedDrift): Promise<void>;
   syncLwqlKeyMapRow(input: { projectId: string }): Promise<void>;
   fillLwqlProjectKeys(input: { dryRun: boolean }): Promise<unknown>;
 }
 
 export function buildLwqlReconvergence({
   app,
-  bootedAt = nowInstant().epochMilliseconds,
 }: {
   app: LwqlReconvergenceApp;
-  bootedAt?: number;
 }): StaticPipelineDefinition<never> {
   return definePipeline({
     name: LWQL_RECONVERGENCE_PIPELINE_NAME,
@@ -62,19 +61,20 @@ export function buildLwqlReconvergence({
     .withProcessManager(LWQL_RECONVERGENCE_PROCESS_NAME, (pm) =>
       pm
         .state(lwqlReconvergenceStateSchema, LWQL_RECONVERGENCE_INITIAL_STATE)
-        .schedule({ everyMs: LWQL_RECONVERGENCE_INITIAL_DELAY_MS })
-        .onWake(lwqlReconvergenceWake({ bootedAt }))
+        .schedule({ everyMs: LWQL_RECONVERGENCE_INTERVAL_MS })
+        .onWake(lwqlReconvergenceWake)
         .intent(
           "reconverge",
           lwqlReconvergenceSchema,
           runLwqlReconvergence({
             probe: () => app.probeLwqlAccessModelOwner(),
             converge: () => app.convergeLwqlAccessModel(),
-            convergeAppOwned: () => app.convergeLwqlAppOwnedObjects(),
+            findDrift: () => app.findLwqlAppOwnedDrift(),
+            convergeAppOwned: (drift) => app.convergeLwqlAppOwnedObjects(drift),
             fillKeyMap: () => app.fillLwqlProjectKeys({ dryRun: false }),
           }),
         )
-        // One convergence at a time; a retry repeats a probe, which is idempotent.
+        // One check at a time; a failed check is not retried, the next one reads afresh.
         .outbox({ maxAttempts: 1, concurrency: 1, batchSize: 1, leaseDurationMs: 10 * 60 * 1000 }),
     )
     .build();
@@ -86,6 +86,7 @@ function isReconvergenceApp(app: unknown): app is LwqlReconvergenceApp {
     app !== null &&
     "probeLwqlAccessModelOwner" in app &&
     "convergeLwqlAccessModel" in app &&
+    "findLwqlAppOwnedDrift" in app &&
     "convergeLwqlAppOwnedObjects" in app &&
     "syncLwqlKeyMapRow" in app &&
     "fillLwqlProjectKeys" in app

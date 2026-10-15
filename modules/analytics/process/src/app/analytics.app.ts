@@ -53,7 +53,6 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
-import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { OverloadedRefusal, StatementBoundTelemetry } from "@langwatch/process-stores";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -74,6 +73,7 @@ import {
 } from "../features/hydration/services/langwatch-ql-hydration-read.service.ts";
 import { LangWatchQLHydrationService } from "../features/hydration/services/langwatch-ql-hydration.service.ts";
 import { LangWatchQLProductionProvisioningService } from "../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
+import type { LwqlAppOwnedDrift } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import type { AnalyticsRecencyRepository } from "../repositories/analytics-recency.repository.ts";
 import type {
   AnalyticsRepositories,
@@ -120,6 +120,7 @@ import { WorkbenchProtectionsService } from "../services/workbench-protections.s
 import {
   convergeLwqlAccessModel,
   fillLwqlProjectKeys,
+  findLwqlAppOwnedDrift,
   type LwqlConvergencePlan,
   type LwqlProjectKeyFillReport,
 } from "../tasks/lwql-provision.task.ts";
@@ -128,8 +129,6 @@ import type {
   AnalyticsLegacyTimeseriesAnswer,
 } from "../transport/analytics-legacy.rest.ts";
 import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
-
-const logger = createLogger("langwatch:analytics:lwql:provisioning");
 
 /** ADR-034: runs the legacy read beside the routed one and logs a divergence. */
 const ANALYTICS_READ_TRIPWIRE_FLAG = "release_event_sourced_analytics_read_tripwire";
@@ -221,13 +220,17 @@ type AnalyticsDependencies = Readonly<{
 type LwqlProvisioningOperations = Readonly<{
   probeOwner: () => Promise<LwqlAccessModelOwner>;
   converge: () => Promise<void>;
-  convergeAppOwned: () => Promise<void>;
+  findAppOwnedDrift: () => Promise<LwqlAppOwnedDrift>;
+  convergeAppOwned: (drift: LwqlAppOwnedDrift) => Promise<void>;
   fillProjectKeys: (input: { dryRun: boolean }) => Promise<LwqlProjectKeyFillReport>;
 }>;
+
+const NO_DRIFT: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], keyMap: false };
 
 const LWQL_UNAVAILABLE: LwqlProvisioningOperations = {
   probeOwner: () => Promise.resolve("none"),
   converge: () => Promise.resolve(),
+  findAppOwnedDrift: () => Promise.resolve(NO_DRIFT),
   convergeAppOwned: () => Promise.resolve(),
   fillProjectKeys: () => Promise.resolve({ inserted: 0, blankKeys: 0 }),
 };
@@ -284,20 +287,18 @@ function lwqlProvisioningOperations({
       if (settings.accessModelMode !== "sql" || readerPassword === undefined) return;
       await convergeLwqlAccessModel({ database: database(), plan: plan(readerPassword) });
     },
-    convergeAppOwned: async () => {
-      // SQL mode converges these with the access model; rendered mode has only this run.
-      if (settings.accessModelMode === "sql") return;
-      if (readerPassword === undefined) {
-        logger.warn(
-          { missing: "LWQL_POSTGRES_READER_PASSWORD" },
-          "LangWatchQL is partially configured; the reconvergence watch converges nothing until the configuration is complete",
-        );
-        return;
-      }
+    // Rendered mode only: SQL mode keeps its owner-probe re-provision, unchanged.
+    findAppOwnedDrift: async () => {
+      if (settings.accessModelMode === "sql" || readerPassword === undefined) return NO_DRIFT;
+      return findLwqlAppOwnedDrift({ database: database(), plan: plan(readerPassword) });
+    },
+    convergeAppOwned: async (drift) => {
+      if (settings.accessModelMode === "sql" || readerPassword === undefined) return;
       await convergeLwqlAccessModel({
         database: database(),
         plan: plan(readerPassword),
         failOnError: true,
+        only: drift,
       });
     },
     fillProjectKeys: ({ dryRun }) =>
@@ -519,9 +520,14 @@ export class AnalyticsModule
     return this.#dependencies.lwqlProvisioning.converge();
   }
 
-  /** Rendered mode's app-owned objects, never the config store's entities; throws on failure. */
-  convergeLwqlAppOwnedObjects(): Promise<void> {
-    return this.#dependencies.lwqlProvisioning.convergeAppOwned();
+  /** What rendered mode's app-owned objects lack now, from catalog reads; empty in SQL mode. */
+  findLwqlAppOwnedDrift(): Promise<LwqlAppOwnedDrift> {
+    return this.#dependencies.lwqlProvisioning.findAppOwnedDrift();
+  }
+
+  /** Converges the halves the drift names, never the config store's entities; throws on failure. */
+  convergeLwqlAppOwnedObjects(drift: LwqlAppOwnedDrift): Promise<void> {
+    return this.#dependencies.lwqlProvisioning.convergeAppOwned(drift);
   }
 
   /** The `analytics:fill-lwql-project-keys` step's body: each project's missing key-map row. */
