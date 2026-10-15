@@ -7,8 +7,7 @@ import {
 
 const dedupKey = (span: SpanDedupRef): string => `${span.tenantId}:${span.traceId}:${span.spanId}`;
 
-const usageKey = (record: UsageRecordRef): string =>
-  `${record.tenantId}:${record.traceId}:${record.recordId}`;
+const usageKey = (record: UsageRecordRef): string => `${record.tenantId}:${record.recordId}`;
 
 /** The claim in this process only, without expiry: a claimed span id is held until released. */
 export class MemoryTraceSpanDedupRepository extends TraceSpanDedupRepository {

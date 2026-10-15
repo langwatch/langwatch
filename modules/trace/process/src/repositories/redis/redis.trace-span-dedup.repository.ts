@@ -27,7 +27,7 @@ const USAGE_DEDUP_KEY_PREFIX = "usage_dedup:";
 const USAGE_RECORD_TTL_SECONDS = 24 * 60 * 60;
 
 const usageKey = (record: UsageRecordRef): string =>
-  `${USAGE_DEDUP_KEY_PREFIX}${record.tenantId}:${record.traceId}:${record.recordId}`;
+  `${USAGE_DEDUP_KEY_PREFIX}${record.tenantId}:${record.recordId}`;
 
 /**
  * The claim, over the process's Redis. Every failure is a warning and an

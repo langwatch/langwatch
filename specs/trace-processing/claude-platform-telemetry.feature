@@ -7,7 +7,7 @@ Feature: Claude SDK and Claude API OpenTelemetry spans
   an `anthropic.compaction` child for each compaction. Every one of these spans
   carries token usage, so summing them all counts one request two or three times.
 
-  A request is counted once, by its `anthropic.request.id`: the first
+  A request is counted once per project, by its `anthropic.request.id`: the first
   `anthropic.messages.create` span to arrive for a request id carries the usage,
   and any later one for the same id is marked as counted elsewhere. Both spans
   report the usage of the same response, so the total is the same whichever
@@ -52,6 +52,13 @@ Feature: Claude SDK and Claude API OpenTelemetry spans
     Given the SDK span and the API spans for the same request have been received
     When the API sends the same spans again
     Then the trace totals 1200 prompt tokens and 85 completion tokens
+
+  @bdd @trace-processing @claude-platform @integration
+  Scenario: An API span sent without the SDK's trace context still counts the request once
+    Given the SDK span for a request in the application's trace
+    And the API spans for the same request in a trace of their own, because no traceparent header was sent
+    When both traces are processed
+    Then the request's usage counts once across the two traces
 
   @bdd @trace-processing @claude-platform @integration
   Scenario: A request traced only by the SDK counts its messages.create span

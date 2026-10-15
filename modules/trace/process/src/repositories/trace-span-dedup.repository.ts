@@ -14,10 +14,12 @@ export type SpanDedupClaim =
   | Readonly<{ outcome: "held" }>
   | Readonly<{ outcome: "unknown" }>;
 
-/** A usage record two spans of one trace can both report, and the span claiming it. */
+/**
+ * A usage record two spans can both report, and the span claiming it. It is keyed by project
+ * alone: the spans that share one need not share a trace.
+ */
 export type UsageRecordRef = {
   tenantId: string;
-  traceId: string;
   recordId: string;
   spanId: string;
 };

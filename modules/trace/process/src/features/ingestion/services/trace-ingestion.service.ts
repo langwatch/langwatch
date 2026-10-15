@@ -487,7 +487,6 @@ class TraceSpanCollectionService {
 
     const record: UsageRecordRef = {
       tenantId: input.tenantId,
-      traceId: input.span.traceId,
       recordId: counting.recordId,
       spanId: input.span.spanId,
     };

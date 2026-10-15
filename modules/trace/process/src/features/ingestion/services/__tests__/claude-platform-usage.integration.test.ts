@@ -224,6 +224,29 @@ describe.skipIf(!redisUrl)("Claude SDK and Claude API usage, counted once per re
     });
   });
 
+  describe("given an API span sent without the SDK's trace context", () => {
+    /** @scenario "An API span sent without the SDK's trace context still counts the request once" */
+    it("counts the request once across the two traces", async () => {
+      const sdkTraceId = newTraceId();
+      const apiTraceId = newTraceId();
+      const { sdk, api } = sdkAndApiRequest();
+      const apiRoot = api.map((span, index) =>
+        index === 0 ? { ...span, parentSpanId: null } : span,
+      );
+      const { events, send } = door();
+
+      await send(sdkTraceId, sdk);
+      await send(apiTraceId, apiRoot);
+
+      const ofTrace = (traceId: string) =>
+        events.filter((event) => event.data.span.traceId === traceId);
+      expect(totalsOf(ofTrace(sdkTraceId))).toEqual(everyFold(ONE_REQUEST));
+      expect(totalsOf(ofTrace(apiTraceId))).toEqual(
+        everyFold({ promptTokens: 0, completionTokens: 0, cost: 0 }),
+      );
+    });
+  });
+
   describe("given a request traced only by the SDK", () => {
     /** @scenario "A request traced only by the SDK counts its messages.create span" */
     it("counts the SDK messages.create span", async () => {
