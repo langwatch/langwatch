@@ -10,6 +10,8 @@ const listIssuedLicensesInputSchemaDefinition = z.object({
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(100).default(25),
   search: z.string().max(200).optional(),
+  /** Testing licenses (ADR-180) are left out unless asked for. */
+  includeTesting: z.boolean().optional(),
 });
 export interface ListIssuedLicensesInputSchema extends Named<
   typeof listIssuedLicensesInputSchemaDefinition

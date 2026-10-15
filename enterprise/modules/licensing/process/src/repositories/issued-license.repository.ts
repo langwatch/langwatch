@@ -74,10 +74,12 @@ export interface IssuedLicenseRepository {
   findAllSeatsRaised(params: { organizationId?: string }): Promise<IssuedLicenseRecord[]>;
   /** Unrevoked licenses bound to one install, the most recently bound first. */
   findAllBoundToInstance(instanceId: string): Promise<IssuedLicenseRecord[]>;
+  /** Rows of any kind but `standard` are left out unless `includeTesting`. */
   listAll(params: {
     page: number;
     pageSize: number;
     search?: string;
+    includeTesting?: boolean;
   }): Promise<{ rows: IssuedLicenseRecord[]; total: number }>;
   update(id: string, data: IssuedLicensePatch): Promise<IssuedLicenseRecord>;
   /** Removes a row a failed flow wrote; a row already gone is not an error. */

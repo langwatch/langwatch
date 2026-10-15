@@ -1,3 +1,5 @@
+import { HStack } from "@langwatch/design-system/primitives";
+import { Switch } from "@langwatch/design-system/switch";
 import { useState } from "react";
 import { useDebounce } from "use-debounce";
 
@@ -10,6 +12,7 @@ import { AdminTable } from "./admin-table-shell.tsx";
 import { LicenseDetailDrawer } from "./license-detail-drawer.tsx";
 import { LicenseIssueDrawer } from "./license-issue-drawer.tsx";
 import { LicenseRevokeDialog } from "./license-revoke-dialog.tsx";
+import { TestingLicenseTokensSection } from "./testing-license-tokens-section.tsx";
 
 const PAGE_SIZE = 25;
 
@@ -21,6 +24,7 @@ export default function LicensesView() {
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search, 300);
   const [page, setPage] = useState(1);
+  const [includeTesting, setIncludeTesting] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [revoking, setRevoking] = useState<License | null>(null);
@@ -31,6 +35,7 @@ export default function LicensesView() {
     page: page - 1,
     pageSize: PAGE_SIZE,
     search: debouncedSearch || undefined,
+    includeTesting,
   });
 
   return (
@@ -55,6 +60,17 @@ export default function LicensesView() {
         onCreate={() => setCreating(true)}
         createLabel="New license"
       >
+        <HStack justify="flex-end" paddingX={4} paddingY={2}>
+          <Switch
+            checked={includeTesting}
+            onCheckedChange={({ checked }) => {
+              setIncludeTesting(checked === true);
+              setPage(1);
+            }}
+          >
+            Show testing licenses
+          </Switch>
+        </HStack>
         <LicensesTable
           licenses={list.data?.licenses ?? []}
           isLoading={list.isLoading}
@@ -65,6 +81,8 @@ export default function LicensesView() {
       </AdminTable>
 
       <ActivationCodesSection />
+
+      <TestingLicenseTokensSection />
 
       <LicenseDetailDrawer
         licenseId={openId}

@@ -1,10 +1,16 @@
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Badge, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Inbox, MoreVertical } from "lucide-react";
 
-import { SERVICE_LABELS, type License, type Service } from "../../model/license-terms.ts";
+import {
+  isStandardLicense,
+  licenseKindLabel,
+  SERVICE_LABELS,
+  type License,
+  type Service,
+} from "../../model/license-terms.ts";
 import { AdminDate, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 import { LicenseStatusBadge } from "../elements/license-status-badge.tsx";
 
@@ -82,7 +88,14 @@ function LicensesTableRow({
     <ListTable.Row onActivate={onOpen}>
       <ListTable.Cell>
         <VStack align="start" gap={0}>
-          <ListTable.RowAction onActivate={onOpen}>{license.organizationName}</ListTable.RowAction>
+          <HStack gap={2}>
+            <ListTable.RowAction onActivate={onOpen}>
+              {license.organizationName}
+            </ListTable.RowAction>
+            {isStandardLicense(license) ? null : (
+              <Badge colorPalette="purple">{licenseKindLabel(license.kind)}</Badge>
+            )}
+          </HStack>
           <Text fontSize="xs" color="fg.muted">
             {license.organizationId ? license.email : "Not linked to a customer organization"}
           </Text>

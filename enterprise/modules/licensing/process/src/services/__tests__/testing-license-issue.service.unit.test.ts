@@ -124,7 +124,9 @@ describe("issuing a testing licence", () => {
       await expect(codeOf(issuing.issue({ ...ask, lifetimeHours: 45 * 24, issuer }))).resolves.toBe(
         "testing_license_lifetime_too_long",
       );
-      await expect(licenses.listAll({ page: 0, pageSize: 10 })).resolves.toMatchObject({
+      await expect(
+        licenses.listAll({ page: 0, pageSize: 10, includeTesting: true }),
+      ).resolves.toMatchObject({
         total: 1,
       });
     });

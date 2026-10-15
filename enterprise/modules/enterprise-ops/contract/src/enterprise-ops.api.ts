@@ -29,6 +29,7 @@ export interface EnterpriseOpsApi {
     page: number;
     pageSize: number;
     search?: string;
+    includeTesting?: boolean;
     operator: OpsOperator | null;
   }): Promise<IssuedLicensePage>;
   getIssuedLicense(input: { id: string; operator: OpsOperator | null }): Promise<IssuedLicenseView>;

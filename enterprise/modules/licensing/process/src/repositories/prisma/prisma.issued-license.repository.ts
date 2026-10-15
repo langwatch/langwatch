@@ -94,21 +94,26 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
     page,
     pageSize,
     search,
+    includeTesting,
   }: {
     page: number;
     pageSize: number;
     search?: string;
+    includeTesting?: boolean;
   }): Promise<{ rows: IssuedLicenseRecord[]; total: number }> {
     const term = search?.trim();
-    const where: Prisma.IssuedLicenseWhereInput = term
-      ? {
-          OR: [
-            { organizationName: { contains: term, mode: "insensitive" } },
-            { email: { contains: term, mode: "insensitive" } },
-            { licenseId: { contains: term, mode: "insensitive" } },
-          ],
-        }
-      : {};
+    const where: Prisma.IssuedLicenseWhereInput = {
+      ...(includeTesting === true ? {} : { kind: "standard" }),
+      ...(term
+        ? {
+            OR: [
+              { organizationName: { contains: term, mode: "insensitive" } },
+              { email: { contains: term, mode: "insensitive" } },
+              { licenseId: { contains: term, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.issuedLicense.findMany({
         where,

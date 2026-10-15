@@ -431,6 +431,7 @@ export class LicenseRegistryService {
     page: number;
     pageSize: number;
     search?: string;
+    includeTesting?: boolean;
   }): Promise<IssuedLicensePage> {
     const { rows, total } = await this.options.repository.listAll(input);
     return { licenses: rows.map((row) => this.toView(row)), total };

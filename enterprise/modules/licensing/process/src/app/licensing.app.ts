@@ -575,6 +575,7 @@ export class LicensingModule implements LicensingApiContract {
     page: number;
     pageSize: number;
     search?: string;
+    includeTesting?: boolean;
   }): Promise<IssuedLicensePage> {
     return this.#registry.list(input);
   }

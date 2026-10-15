@@ -15,6 +15,8 @@ import { useEffect, useState } from "react";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useLicenseCommands } from "../../behavior/use-license-commands.ts";
 import {
+  isStandardLicense,
+  licenseKindLabel,
   termsFormFrom,
   termsPayload,
   type License,
@@ -154,6 +156,15 @@ function LicenseDetails({ license }: { license: License }) {
       <Detail label="Issued">{formatDate(license.issuedAt)}</Detail>
       <Detail label="Term ends">{formatDate(license.expiresAt)}</Detail>
       <Detail label="Source">{license.source}</Detail>
+      <Detail label="Kind">{licenseKindLabel(license.kind)}</Detail>
+      {isStandardLicense(license) ? null : (
+        <>
+          <Detail label="Testing organization">
+            {license.testingOrganizationId ?? <EmptyCell>none</EmptyCell>}
+          </Detail>
+          <Detail label="Issued by">{license.issuedById ?? <EmptyCell>unknown</EmptyCell>}</Detail>
+        </>
+      )}
       <Detail label="Email">{license.email}</Detail>
       <Detail label="Instance">
         {license.instanceId

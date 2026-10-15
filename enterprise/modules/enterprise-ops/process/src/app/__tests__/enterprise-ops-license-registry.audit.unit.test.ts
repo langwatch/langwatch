@@ -167,7 +167,7 @@ describe("the Cloud admin license registry", () => {
         expect.objectContaining({
           userId: "user_olive",
           action: "licenseRegistry.getAll",
-          args: { page: 0, pageSize: 25, hasSearch: true },
+          args: { page: 0, pageSize: 25, hasSearch: true, includeTesting: false },
           targetKind: "issuedLicense",
         }),
       ]);

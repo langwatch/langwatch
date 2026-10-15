@@ -52,11 +52,16 @@ export class LicenseRegistryAuditService {
   ) {}
 
   async list(
-    input: Staff & { page: number; pageSize: number; search?: string },
+    input: Staff & { page: number; pageSize: number; search?: string; includeTesting?: boolean },
   ): Promise<IssuedLicensePage> {
     const { operatorId, ...query } = input;
     await this.record(operatorId, "getAll", {
-      args: { page: query.page, pageSize: query.pageSize, hasSearch: Boolean(query.search) },
+      args: {
+        page: query.page,
+        pageSize: query.pageSize,
+        hasSearch: Boolean(query.search),
+        includeTesting: query.includeTesting === true,
+      },
     });
     return this.registry.listIssuedLicenses(query);
   }
