@@ -154,6 +154,12 @@ export class ProcessServer implements ProcessBoot {
         doors = RawHttpHost.create();
         surface = await processSurface({
           config: this.config.http as ApiHostConfig,
+          storage: {
+            s3Endpoint: config.objectStorage.s3.endpoint,
+            s3Region: config.objectStorage.s3.region,
+            s3Bucket: config.objectStorage.s3.bucket,
+            azureBlobEndpoint: config.objectStorage.azure.endpoint,
+          },
           production: this.production,
           isSaas: this.settings.isSaas ?? false,
           executionProxyBaseUrl: this.settings.nlpServiceUrl,
