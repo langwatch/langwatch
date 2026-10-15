@@ -48,14 +48,17 @@ export function projectSwitchGroups(
 
 /**
  * Where picking a project leads: the same page under the new project when the
- * address names the current one, else the new project's home, told to return here.
+ * address names the current one, else the new project's home, told to return here
+ * with the query intact (the MCP consent page carries its whole OAuth request there).
  */
 export function projectSwitchHref({
   pathname,
+  query = {},
   currentProjectSlug,
   targetSlug,
 }: {
   pathname: string;
+  query?: Readonly<Record<string, string | undefined>>;
   currentProjectSlug: string | undefined;
   targetSlug: string;
 }): string {
@@ -64,7 +67,11 @@ export function projectSwitchHref({
     return ["", targetSlug, ...rest].join("/");
   }
   if (pathname && pathname !== "/") {
-    return `/${targetSlug}?return_to=${encodeURIComponent(pathname)}`;
+    const search = new URLSearchParams(
+      Object.entries(query).filter((entry): entry is [string, string] => entry[1] !== void 0),
+    ).toString();
+    const here = search ? `${pathname}?${search}` : pathname;
+    return `/${targetSlug}?return_to=${encodeURIComponent(here)}`;
   }
   return `/${targetSlug}`;
 }

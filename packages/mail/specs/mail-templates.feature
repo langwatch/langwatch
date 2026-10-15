@@ -110,3 +110,10 @@ Feature: The transactional messages LangWatch sends
     When a member is told
     Then the email goes to that member and names the organization and the administrator
     And it says whether a second factor is now needed to open that organization
+
+  @unit
+  Scenario: An upgrade alert shows each failed step with its error and its own link
+    Given two upgrade steps failed on an installation
+    When the upgrade alert is rendered
+    Then the subject counts the failed steps and names the installation
+    And each step shows its id, its release, its error and a link that opens that step
