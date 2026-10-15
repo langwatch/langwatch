@@ -109,8 +109,10 @@ describe("the coding-agent-cost skill", () => {
     it("looks up the newest session event in any window and states its age", () => {
       const rendered = costSkill();
       expect(rendered).toContain("max(TimeUnixMs) AS newest");
+      expect(rendered).toContain("same `TenantId` filter");
       expect(rendered).toContain("events = 0");
       expect(rendered).toMatch(/never received/i);
+      expect(rendered).toContain("the newest Claude Code event is from <time>, <age> ago");
     });
 
     /** @scenario "The coding-agent-cost skill names the Claude Code telemetry setup" */

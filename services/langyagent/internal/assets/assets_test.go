@@ -54,10 +54,7 @@ func TestAgentsTemplate_SaysHowToCount(t *testing.T) {
 	}
 }
 
-// A time-bounded query that finds nothing used to get the bare reply
-// "No X in last 24h.", which the user cannot tell from a broken Langy. The
-// empty-results rule now sends the agent to the newest matching row in any
-// window so the reply states its age, or says the data never arrived.
+// TestAgentsTemplate_EmptyWindowStatesDataAge pins the empty-window rule: state the newest row's age or that it never arrived.
 //
 // @scenario "The prompt no longer answers an empty window with a bare line"
 // @scenario "A filtered question with no matches gets a plain none"
