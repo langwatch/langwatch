@@ -108,6 +108,10 @@ const SPAN_TIME_FILTER_START_END =
   "AND StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY " +
   "AND StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
 
+// The event the feedbacks query reads. One constant because the outer filter on the exploded
+// event and the predicate pushed into the stored_spans subquery must name the same event.
+const FEEDBACK_EVENT_NAME_SQL = "'thumbs_up_down'";
+
 // Partition-pruning bounds for the evaluation_runs JOIN subquery (OccurredAt doesn't prune
 // there since it partitions on ScheduledAt/UpdatedAt). Lower bounds only, on both columns —
 // no upper bound, since a re-evaluation updates rows long after the window. UpdatedAt is
@@ -3544,10 +3548,14 @@ function feedbackQueryParts({
   // Prune the stored_spans JOIN to identity columns plus the Events.* arrays
   // the feedback ARRAY JOIN reads, and push the StartTime window into the
   // subquery, instead of joining the full analytics column set (#2551 / #2605).
+  const spanRowFilter = `AND has("Events.Name", ${FEEDBACK_EVENT_NAME_SQL})`;
+  // That predicate reads the light Events.Name in PREWHERE, skipping the Events.Attributes map
+  // for every granule without a vote. The outer query keeps only that event, so no row changes.
   const spanJoin = buildJoinClause({
     table: "stored_spans",
     requiredColumns: new Set(['"Events.Timestamp"', '"Events.Name"', '"Events.Attributes"']),
     spanTimeFilter: SPAN_TIME_FILTER_START_END,
+    spanRowFilter,
   });
 
   return {
@@ -3601,7 +3609,7 @@ export function buildFeedbacksQuery({
     WHERE ${ts}.TenantId = {tenantId:String}
       AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
       AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
-      AND event_name = 'thumbs_up_down'
+      AND event_name = ${FEEDBACK_EVENT_NAME_SQL}
       AND mapContains(event_attrs, 'event.metrics.vote')
       ${filterWhere}
     ORDER BY event_timestamp DESC
@@ -3661,7 +3669,7 @@ export function buildFeedbacksPageQuery({
     WHERE ${ts}.TenantId = {tenantId:String}
       AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
       AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
-      AND event_name = 'thumbs_up_down'
+      AND event_name = ${FEEDBACK_EVENT_NAME_SQL}
       AND mapContains(event_attrs, 'event.metrics.vote')
       ${filterWhere}
       ${afterWhere}
