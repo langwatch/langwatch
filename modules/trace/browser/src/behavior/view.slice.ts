@@ -260,12 +260,8 @@ function persistDrafts(drafts: Map<string, DraftLensState>): void {
   if (typeof window === "undefined") return;
   try {
     // The search stays in the session: a device-wide key would carry it into
-    // every project (specs/traces-v2/view-system.feature).
-    const obj: Record<string, DraftLensState> = {};
-    for (const [k, v] of drafts) {
-      const kept = draftWithoutFilter(v);
-      if (Object.keys(kept).length > 0) obj[k] = kept;
-    }
+    // every project (specs/traces-v2/search-scope.feature).
+    const obj = Object.fromEntries(draftsWithoutFilters(drafts));
     writeUiStorage(DRAFTS_KEY, JSON.stringify(obj));
   } catch {
     // storage may be full / disabled
@@ -836,12 +832,17 @@ function filterDraftState(s: ViewSlice, text: string): Partial<ViewSlice> {
  */
 function forgottenSearchState(s: ExplorerStore): Partial<ExplorerStore> {
   const lensFilter = s.allLenses.find((l) => l.id === s.activeLensId)?.filterText ?? "";
-  const draftState = new Map<string, DraftLensState>();
-  for (const [lensId, draft] of s.draftState) {
-    const kept = draftWithoutFilter(draft);
-    if (Object.keys(kept).length > 0) draftState.set(lensId, kept);
+  return { ...freshSearchState(lensFilter), draftState: draftsWithoutFilters(s.draftState) };
+}
+
+/** Every draft with its search dropped; a draft left empty goes too. */
+function draftsWithoutFilters(drafts: Map<string, DraftLensState>): Map<string, DraftLensState> {
+  const kept = new Map<string, DraftLensState>();
+  for (const [lensId, draft] of drafts) {
+    const rest = draftWithoutFilter(draft);
+    if (Object.keys(rest).length > 0) kept.set(lensId, rest);
   }
-  return { ...freshSearchState(lensFilter), draftState };
+  return kept;
 }
 
 /** The state that adopting a lens puts on screen. */
