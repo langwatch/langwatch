@@ -24,4 +24,17 @@ constraint-dependencies = [
   "python-socketio>=5.16.2", # security: python-socketio advisory (#1547)
   "bleach>=6.4.0", # security: bleach advisory (#1494)
   "onnx>=1.22.0", # security: onnx advisory (#1560)
+  "transformers>=5.10.0", # security: transformers advisory (#2196)
+  "mistune>=3.3.3", # security: mistune advisory (#2216)
+  "tornado>=6.5.9", # security: tornado advisories covering <=6.5.8 (#2803-#2805)
+  "anyio>=4.14.2", # security: anyio advisories (#2434, #2435)
+  "soupsieve>=2.9.0", # security: soupsieve advisories (#2422, #2423)
+  "accelerate>=1.15.0", # security: accelerate advisory covers <=1.14.0 (#2787)
+  "pyjwt>=2.15.0", # security: PyJWT advisories covering <=2.14.0 (#2788-#2798, #2802, #2806, #2819)
+  "urllib3>=2.8.0", # security: urllib3 advisories covering <2.8.0 (#2799-#2801)
+  "fsspec>=2026.6.0", # security: fsspec advisory covering <2026.6.0
+  "langgraph-sdk>=0.4.4", # security: langgraph-sdk advisory covering <=0.4.3
+  "jupyterlab>=4.6.4", # security: jupyterlab advisories covering 4.6.0-4.6.3 (#2814, #2816, #2817)
+  "notebook>=7.6.3", # security: notebook advisory covering 7.5.0-7.6.2 (#2815)
+  "multidict>=6.9.1", # security: multidict advisory covering 6.7.0-6.9.0 (#2818)
 ]
