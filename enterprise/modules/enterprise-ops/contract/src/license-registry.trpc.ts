@@ -7,7 +7,6 @@ import {
   listActivationCodesInputSchema,
   revokeActivationCodeInputSchema,
   changeLicenseSeatsInputSchema,
-  issuedLicensePageSchema,
   issuedLicenseViewSchema,
   issueLicenseInputSchema,
   licenseIdInputSchema,
@@ -27,7 +26,6 @@ import {
   listTestingLicenseTokensInputSchema,
   mintedTestingLicenseTokenSchema,
   revokeTestingLicenseTokenInputSchema,
-  testingLicenseTokenPageSchema,
   testingLicenseTokenViewSchema,
 } from "@langwatch/enterprise-licensing-contract";
 /**
@@ -37,14 +35,20 @@ import {
  */
 import { defineTrpcContract } from "@langwatch/module";
 
+import {
+  namedIssuedLicensePageSchema,
+  namedIssuedLicenseViewSchema,
+  namedTestingLicenseTokenPageSchema,
+} from "./license-registry.responses.ts";
+
 export const licenseRegistryTrpc = defineTrpcContract("licenseRegistry")
   .query("getAll")
   .withInput(listIssuedLicensesInputSchema)
-  .withOutput(issuedLicensePageSchema)
+  .withOutput(namedIssuedLicensePageSchema)
 
   .query("getById")
   .withInput(licenseIdInputSchema)
-  .withOutput(issuedLicenseViewSchema)
+  .withOutput(namedIssuedLicenseViewSchema)
 
   .mutation("issue")
   .withInput(issueLicenseInputSchema)
@@ -92,7 +96,7 @@ export const licenseRegistryTrpc = defineTrpcContract("licenseRegistry")
 
   .query("testingLicenseTokens")
   .withInput(listTestingLicenseTokensInputSchema)
-  .withOutput(testingLicenseTokenPageSchema)
+  .withOutput(namedTestingLicenseTokenPageSchema)
 
   .mutation("createTestingLicenseServiceToken")
   .withInput(createTestingLicenseServiceTokenInputSchema)

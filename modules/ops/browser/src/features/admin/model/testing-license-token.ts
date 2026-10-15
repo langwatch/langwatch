@@ -6,6 +6,7 @@ export interface TestingLicenseToken {
   kind: "personal" | "service";
   name: string | null;
   ownerUserId: string;
+  ownerName?: string | null;
   expiresAt: string;
   revokedAt: string | null;
   revokedById: string | null;

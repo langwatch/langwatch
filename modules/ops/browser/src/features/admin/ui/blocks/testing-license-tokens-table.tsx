@@ -9,7 +9,7 @@ import {
   type TestingLicenseToken,
 } from "../../model/testing-license-token.ts";
 import { AdminDate, EmptyCell } from "../elements/admin-cells.tsx";
-import { ShortId } from "../elements/short-id.tsx";
+import { PersonCell } from "../elements/person-cell.tsx";
 
 const COLUMN_COUNT = 8;
 
@@ -50,7 +50,7 @@ export function TestingLicenseTokensTable({
             </ListTable.Cell>
             <ListTable.Cell>{token.kind}</ListTable.Cell>
             <ListTable.Cell>
-              <ShortId id={token.ownerUserId} />
+              <PersonCell id={token.ownerUserId} name={token.ownerName} />
             </ListTable.Cell>
             <ListTable.Cell>
               <AdminDate value={token.expiresAt} display="date" />

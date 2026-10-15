@@ -7,8 +7,10 @@ import {
 } from "@langwatch/enterprise-ops-contract";
 import { OpsApi, type OpsOperator } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/process";
+import { UserApi } from "@langwatch/user-contract";
 
 import { LicenseRegistryAuditService } from "../services/license-registry-audit.service.ts";
+import { PersonNamesService } from "../services/person-names.service.ts";
 import { SelfHostedInstanceAuditService } from "../services/self-hosted-instance-audit.service.ts";
 import { TestingLicenseTokenAuditService } from "../services/testing-license-token-audit.service.ts";
 
@@ -17,7 +19,12 @@ type EnterpriseOpsSetup = FeatureSetup<typeof EnterpriseOpsModule.dependencies, 
 /** Admits Cloud admin staff through ops, then forwards to licensing with the staff member recorded. */
 export class EnterpriseOpsModule implements EnterpriseOpsApiContract {
   static readonly contract = EnterpriseOpsApi;
-  static readonly dependencies = { ops: OpsApi, licensing: LicensingApi, auditLog: AuditLogApi };
+  static readonly dependencies = {
+    ops: OpsApi,
+    licensing: LicensingApi,
+    auditLog: AuditLogApi,
+    user: UserApi,
+  };
 
   readonly #ops: Pick<OpsApi, "admitCloudAdmin" | "admitOperator">;
   readonly #licenses: LicenseRegistryAuditService;
@@ -37,12 +44,13 @@ export class EnterpriseOpsModule implements EnterpriseOpsApiContract {
   }
 
   static create({ dependencies }: EnterpriseOpsSetup): EnterpriseOpsModule {
-    const { ops, licensing, auditLog } = dependencies;
+    const { ops, licensing, auditLog, user } = dependencies;
+    const names = PersonNamesService.create({ people: user });
     return new EnterpriseOpsModule({
       ops,
-      licenses: LicenseRegistryAuditService.create({ registry: licensing, auditLog }),
+      licenses: LicenseRegistryAuditService.create({ registry: licensing, auditLog, names }),
       instances: SelfHostedInstanceAuditService.create({ instances: licensing, auditLog }),
-      testingTokens: TestingLicenseTokenAuditService.create({ tokens: licensing, auditLog }),
+      testingTokens: TestingLicenseTokenAuditService.create({ tokens: licensing, auditLog, names }),
     });
   }
 

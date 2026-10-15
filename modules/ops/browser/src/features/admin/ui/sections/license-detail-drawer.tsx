@@ -27,6 +27,7 @@ import { LicenseTermsFields } from "../blocks/license-terms-fields.tsx";
 import { dateInputToISO, EmptyCell, formatDate, formatDateTime } from "../elements/admin-cells.tsx";
 import { Detail, Section } from "../elements/drawer-sections.tsx";
 import { LicenseStatusBadge } from "../elements/license-status-badge.tsx";
+import { PersonCell } from "../elements/person-cell.tsx";
 import { SignedLicenseOnce } from "../elements/signed-license-once.tsx";
 
 export function LicenseDetailDrawer({
@@ -162,9 +163,15 @@ function LicenseDetails({ license }: { license: License }) {
           <Detail label="Testing organization">
             {license.testingOrganizationId ?? <EmptyCell>none</EmptyCell>}
           </Detail>
-          <Detail label="Issued by">{license.issuedById ?? <EmptyCell>unknown</EmptyCell>}</Detail>
         </>
       )}
+      <Detail label="Issued by">
+        {license.issuedById ? (
+          <PersonCell id={license.issuedById} name={license.issuedByName} />
+        ) : (
+          <EmptyCell>unknown</EmptyCell>
+        )}
+      </Detail>
       <Detail label="Email">{license.email}</Detail>
       <Detail label="Instance">
         {license.instanceId

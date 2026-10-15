@@ -197,6 +197,13 @@ Feature: Developer testing licenses
     Then the token is revoked on Cloud and forgotten locally
     And a later ask with that token is refused
 
+  @unit
+  Scenario: Ops screens name the people behind tokens and licenses
+    Given testing-license tokens made by people and licenses issued by people
+    When an operator opens the token list or a license
+    Then each token shows the name of the person who made it, and each license the name of its issuer
+    And the short id stays beside the name, and shows alone when the person is gone
+
   # ============================================================================
   # haven
   # ============================================================================

@@ -18,6 +18,7 @@ import { testPeer } from "@langwatch/process/testing";
  * @see specs/self-hosting/connected-services/license-registry.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { enterpriseOpsProcessModule } from "../../enterprise-ops.module.ts";
@@ -116,6 +117,10 @@ async function build(registry: Partial<Registry> = {}) {
       testPeer({ token: OpsApi, instance: ops }),
       testPeer({ token: LicensingApi, instance: licensing }),
       testPeer({ token: AuditLogApi, instance: auditLog }),
+      testPeer({
+        token: UserApi,
+        instance: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+      }),
     ],
   });
   const app = runtime.service(EnterpriseOpsApi);

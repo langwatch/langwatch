@@ -7,9 +7,11 @@ import type { AuditLogApi, AuditLogJsonValue } from "@langwatch/audit-log-contra
 import type {
   LicensingApi,
   MintedTestingLicenseToken,
-  TestingLicenseTokenPage,
   TestingLicenseTokenView,
 } from "@langwatch/enterprise-licensing-contract";
+import type { NamedTestingLicenseTokenPage } from "@langwatch/enterprise-ops-contract";
+
+import type { PersonNamesService } from "./person-names.service.ts";
 
 type AuditArgs = Readonly<Record<string, AuditLogJsonValue>>;
 type Staff = Readonly<{ operatorId: string }>;
@@ -24,19 +26,31 @@ export class TestingLicenseTokenAuditService {
   static create(deps: {
     tokens: TestingLicenseTokens;
     auditLog: Pick<AuditLogApi, "record">;
+    names: PersonNamesService;
   }): TestingLicenseTokenAuditService {
-    return new TestingLicenseTokenAuditService(deps.tokens, deps.auditLog);
+    return new TestingLicenseTokenAuditService(deps.tokens, deps.auditLog, deps.names);
   }
 
   private constructor(
     private readonly tokens: TestingLicenseTokens,
     private readonly auditLog: Pick<AuditLogApi, "record">,
+    private readonly names: PersonNamesService,
   ) {}
 
-  async list(input: Staff & { page: number; pageSize: number }): Promise<TestingLicenseTokenPage> {
+  async list(
+    input: Staff & { page: number; pageSize: number },
+  ): Promise<NamedTestingLicenseTokenPage> {
     const query = { page: input.page, pageSize: input.pageSize };
     await this.record({ operatorId: input.operatorId, action: "list", args: query });
-    return this.tokens.listTestingLicenseTokens(query);
+    const page = await this.tokens.listTestingLicenseTokens(query);
+    const names = await this.names.namesFor({ ids: page.tokens.map((t) => t.ownerUserId) });
+    return {
+      ...page,
+      tokens: page.tokens.map((token) => ({
+        ...token,
+        ownerName: names.get(token.ownerUserId) ?? null,
+      })),
+    };
   }
 
   /** The token is shown to the ops manager once; the trail keeps its name and expiry only. */

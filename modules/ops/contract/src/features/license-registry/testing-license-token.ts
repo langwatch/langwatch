@@ -14,6 +14,8 @@ const testingLicenseTokenViewSchemaDefinition = z.object({
   name: z.string().nullable(),
   /** The person who made the token and whom it acts as. */
   ownerUserId: z.string(),
+  /** The owner's name; null when that person is gone. */
+  ownerName: z.string().nullable().optional(),
   expiresAt: z.string(),
   revokedAt: z.string().nullable(),
   revokedById: z.string().nullable(),

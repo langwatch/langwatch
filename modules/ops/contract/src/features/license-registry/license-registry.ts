@@ -29,6 +29,8 @@ const issuedLicenseViewSchemaDefinition = z.object({
   kind: z.string(),
   testingOrganizationId: z.string().nullable(),
   issuedById: z.string().nullable(),
+  /** The issuer's name; null when that person is gone, absent where a read names nobody. */
+  issuedByName: z.string().nullable().optional(),
   revokedAt: z.string().nullable(),
   revokedById: z.string().nullable(),
   revokedReason: z.string().nullable(),

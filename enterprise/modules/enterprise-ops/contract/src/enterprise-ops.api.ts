@@ -3,7 +3,6 @@ import type {
   ActivationCodePage,
   ActivationCodeView,
   IssuedActivationCode,
-  IssuedLicensePage,
   IssuedLicenseView,
   LicenseCustomer,
   LicenseTermsInput,
@@ -12,11 +11,16 @@ import type {
   SelfHostedInstancePage,
   SignedIssuedLicense,
   MintedTestingLicenseToken,
-  TestingLicenseTokenPage,
   TestingLicenseTokenView,
 } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/module";
 import type { OpsOperator } from "@langwatch/ops-contract";
+
+import type {
+  NamedIssuedLicensePage,
+  NamedIssuedLicenseView,
+  NamedTestingLicenseTokenPage,
+} from "./license-registry.responses.ts";
 
 /**
  * The operator views over enterprise subjects (ARCHITECTURE.md section 3): each op admits
@@ -31,8 +35,11 @@ export interface EnterpriseOpsApi {
     search?: string;
     includeTesting?: boolean;
     operator: OpsOperator | null;
-  }): Promise<IssuedLicensePage>;
-  getIssuedLicense(input: { id: string; operator: OpsOperator | null }): Promise<IssuedLicenseView>;
+  }): Promise<NamedIssuedLicensePage>;
+  getIssuedLicense(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<NamedIssuedLicenseView>;
   issueLicense(input: {
     customer: LicenseCustomer;
     email: string;
@@ -128,7 +135,7 @@ export interface EnterpriseOpsApi {
     page: number;
     pageSize: number;
     operator: OpsOperator | null;
-  }): Promise<TestingLicenseTokenPage>;
+  }): Promise<NamedTestingLicenseTokenPage>;
   createTestingLicenseServiceToken(input: {
     name: string;
     expiresInDays?: number;

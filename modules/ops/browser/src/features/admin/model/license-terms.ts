@@ -18,6 +18,7 @@ export interface License {
   kind: string;
   testingOrganizationId: string | null;
   issuedById: string | null;
+  issuedByName?: string | null;
   revokedAt: string | null;
   revokedReason: string | null;
   replacesId: string | null;

@@ -15,6 +15,7 @@ import { testPeer } from "@langwatch/process/testing";
  * @see specs/self-hosting/connected-services/testing-licenses.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { enterpriseOpsProcessModule } from "../../enterprise-ops.module.ts";
@@ -87,6 +88,10 @@ async function build() {
       testPeer({ token: OpsApi, instance: ops }),
       testPeer({ token: LicensingApi, instance: licensing }),
       testPeer({ token: AuditLogApi, instance: auditLog }),
+      testPeer({
+        token: UserApi,
+        instance: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+      }),
     ],
   });
   return { app: runtime.service(EnterpriseOpsApi), entries, commanded };
@@ -128,7 +133,7 @@ describe("testing-licence tokens in the ops console", () => {
         operator: manager,
       });
 
-      expect(page.tokens).toEqual([serviceToken]);
+      expect(page.tokens).toEqual([{ ...serviceToken, ownerName: null }]);
       expect(revoked).toMatchObject({ status: "revoked", revokedById: "user_olive" });
       expect(entries.map((entry) => entry.action)).toEqual([
         "testingLicenseTokens.list",

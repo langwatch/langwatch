@@ -3000,6 +3000,9 @@ importers:
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../../packages/process
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/user/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.5
