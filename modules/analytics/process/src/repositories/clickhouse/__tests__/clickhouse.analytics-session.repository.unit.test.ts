@@ -20,11 +20,11 @@ function memoryLimitExceeded(): Error {
 }
 
 function repositoryOver(driver: QueryDriver) {
-  const sessions = ClickHouseAnalyticsSessionsRepository.create(
-    new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver }),
-  );
+  const clickhouse = new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+  const sessions = ClickHouseAnalyticsSessionsRepository.create(clickhouse);
   return ClickHouseAnalyticsRepository.create({
     resolveClient: (tenantId) => sessions.resolve(tenantId),
+    clickhouse,
   });
 }
 

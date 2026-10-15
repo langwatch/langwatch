@@ -13,6 +13,7 @@ import {
   startMigratedClickHouse,
 } from "../../../__tests__/migrated-clickhouse.harness.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
+import { clickHouseQueryClientOver } from "./support/clickhouse-query-client.support.ts";
 
 const TENANT_ID = "test-analytics-feedback-continuation";
 const OTHER_TENANT_ID = "test-analytics-feedback-continuation-other";
@@ -140,7 +141,10 @@ describe("the paged feedback query on the shipped schema", () => {
 
   beforeAll(async () => {
     ch = (await startMigratedClickHouse()).client;
-    repository = ClickHouseAnalyticsRepository.create({ resolveClient: async () => ch });
+    repository = ClickHouseAnalyticsRepository.create({
+      resolveClient: async () => ch,
+      clickhouse: clickHouseQueryClientOver(ch),
+    });
     await deleteRows();
     const settings = { async_insert: 0, wait_for_async_insert: 0 } as const;
     await ch.insert({

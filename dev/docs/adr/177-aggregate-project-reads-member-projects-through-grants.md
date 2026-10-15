@@ -1,8 +1,8 @@
 # ADR-177: An aggregate project reads its member projects through shared grants
 
-**Date:** 2026-09-26, revised 2026-10-09
+**Date:** 2026-09-26, revised 2026-10-15
 
-**Status:** Accepted (v4.10, 2026-10-09)
+**Status:** Accepted (v4.13, 2026-10-15)
 
 **Builds on:** ADR-166 (grant-scoped data access: a sealed `Authorization`
 proof minted once at the door, carried by hand, applied by the store client),
@@ -444,10 +444,10 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
 - Whether the settings-shaped writes that ride `project:update` (pinned
   traces, model providers, retention jobs, topic clustering) should also be
   refused on an aggregate (v4.6). Owner: platform.
-- Whether to admit `TimeUnixMs` (log records) and `BucketStart` (the
-  analytics rollup) as time columns the client may window on. Until then
-  an aggregate's logs and analytics read the aggregate's own tenant and
-  show nothing. Owner: product and platform, for the next block.
+- Whether to admit `TimeUnixMs` (log records) as a time column the client
+  may window on. Until then an aggregate's logs read the aggregate's own
+  tenant and show nothing. `BucketStart` was admitted in v4.13. Owner:
+  product and platform, for the next block.
 - Whether the organisation reconcile should leave the request path (v4.7).
   Personal workspace creation, SCIM deprovisioning and department moves
   run it inline: per aggregate a lock, two reads of every member, the
@@ -841,3 +841,23 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   transcript reads) keep their own tenant and find nothing on an aggregate;
   the session rows carry no member name, so the page does not yet say which
   member a session belongs to.
+- v4.13 (2026-10-15, implementation note, no decision changed; lifts the
+  v4.9 mint limit). Routes checked under `analytics:view` mint the proof
+  again, because an analytics read now applies it: `analytics.getTimeseries`
+  and both REST timeseries routes hand it to the series, and a caller with
+  none (a scheduled report, a graph alert) reads under a proof the platform
+  mints for its own project alone. The four rollup and slim builders
+  (`trace_analytics_rollup`, `trace_analytics`, `evaluation_analytics_rollup`,
+  `evaluation_analytics`) write the fence marker instead of a tenant, so an
+  aggregate's series spans its members under their windows. `BucketStart`
+  is admitted as a fence time column with a one-minute bucket width: a
+  window admits only buckets wholly inside it, so a grant's edge drops the
+  bucket it cuts through rather than counting up to a minute outside the
+  grant. The series cache keys on the projects and windows the proof reads,
+  not on the proof, and a series asked under another project's proof is
+  refused before any read. The read tripwire is skipped when the proof
+  reads more than one project, since the legacy tables do not read members
+  yet. Not moved: `trace_summaries` and `evaluation_runs` (the legacy
+  builders), filter options, feedbacks and top documents keep their own
+  tenant, so the Analytics pages stay hidden on an aggregate (decision 8)
+  until those are fenced too.

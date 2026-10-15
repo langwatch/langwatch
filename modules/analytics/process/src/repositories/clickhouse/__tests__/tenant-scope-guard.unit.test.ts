@@ -5,9 +5,10 @@
  * @regression project-home-500s (analytics.getTimeseries 500)
  */
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
-import { checkTenantScope } from "@langwatch/clickhouse-client";
+import { checkTenantScope, expandStatement, fenceFor } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
+import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { pickAnalyticsTable } from "../clickhouse.analytics-route-table.mapper.ts";
 import { buildEvalRollupTimeseriesQuery } from "../clickhouse.eval-rollup-timeseries-query.mapper.ts";
@@ -20,6 +21,34 @@ const dates = {
   endDate: new Date("2026-06-16T00:00:00.000Z"),
   previousPeriodStartDate: new Date("2026-06-14T00:00:00.000Z"),
 };
+
+/** The fences a routed read runs under: the project alone, and an aggregate with one member. */
+const FENCES = {
+  own: fenceFor({ authorization: analyticsProof({ projectId: "tenant-a" }), reads: "analytics" }),
+  aggregate: fenceFor({
+    authorization: analyticsProof({
+      projectId: "tenant-a",
+      shared: [{ projectId: "member-b", from: Date.UTC(2026, 5, 1) }],
+    }),
+    reads: "analytics",
+  }),
+};
+
+/**
+ * A fenced builder's statement as the reader sends it: markers expanded into the fence, then
+ * the guard asked about the tenant set the reader declares.
+ */
+function fencedViolations(built: { sql: string; params: Record<string, unknown> }) {
+  return Object.values(FENCES).map((fence) => {
+    const expanded = expandStatement({ query: built.sql, queryParams: built.params, fence });
+    return checkTenantScope({
+      sql: expanded.query,
+      params: expanded.queryParams,
+      tenantId: "tenant-a",
+      tenantIds: [...fence.own, ...fence.shared.map((window) => window.projectId)],
+    });
+  });
+}
 
 describe("tenant scope guard vs the timeseries builders", () => {
   it("passes buildTimeseriesQuery with no filters — the reported crash", () => {
@@ -156,7 +185,7 @@ describe("tenant scope guard vs the timeseries builders", () => {
       timeScale: 60,
     });
 
-    expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+    expect(fencedViolations({ sql, params })).toEqual([null, null]);
   });
 
   it("passes buildSlimTimeseriesQuery when a filter clause carries its own OR", () => {
@@ -169,7 +198,7 @@ describe("tenant scope guard vs the timeseries builders", () => {
     });
 
     expect(sql).toContain(" OR ");
-    expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+    expect(fencedViolations({ sql, params })).toEqual([null, null]);
   });
 
   it("passes buildEvalSlimTimeseriesQuery with no filters", () => {
@@ -180,7 +209,7 @@ describe("tenant scope guard vs the timeseries builders", () => {
       timeScale: 60,
     });
 
-    expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+    expect(fencedViolations({ sql, params })).toEqual([null, null]);
   });
 
   it("refuses a filter on the eval slim, which the router sends to evaluation_runs", () => {
@@ -239,14 +268,19 @@ describe("tenant scope guard vs the timeseries builders", () => {
       timeZone: "Europe/Amsterdam",
     };
     const table = pickAnalyticsTable(input);
-    const build =
-      {
-        evaluation_analytics_rollup: buildEvalRollupTimeseriesQuery,
-        evaluation_analytics: buildEvalSlimTimeseriesQuery,
-      }[table as string] ?? buildTimeseriesQuery;
+    const fenced = {
+      evaluation_analytics_rollup: buildEvalRollupTimeseriesQuery,
+      evaluation_analytics: buildEvalSlimTimeseriesQuery,
+    }[table as string];
     resetParamCounter();
-    const { sql, params } = build(input as Parameters<typeof buildTimeseriesQuery>[0]);
+    const built = (fenced ?? buildTimeseriesQuery)(
+      input as Parameters<typeof buildTimeseriesQuery>[0],
+    );
 
-    expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+    const violations = fenced
+      ? fencedViolations(built)
+      : [checkTenantScope({ ...built, tenantId: "tenant-a" })];
+
+    expect(violations.filter((violation) => violation !== null)).toEqual([]);
   });
 });

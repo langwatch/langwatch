@@ -5,6 +5,7 @@
  */
 
 import type { AnalyticsAggregation, BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
+import { tenantScope } from "@langwatch/clickhouse-client";
 
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import {
@@ -175,7 +176,7 @@ export function buildRollupTimeseriesQuery(input: TimeseriesQueryInput): BuiltAn
     SELECT
       ${selectExprs.join(",\n      ")}
     FROM ${ROLLUP_TABLE} ${ra}
-    WHERE ${ra}.TenantId = {tenantId:String}
+    WHERE ${tenantScope("BucketStart")}
       AND (
         (${ra}.BucketStart >= {currentStart:DateTime64(3)} AND ${ra}.BucketStart < {currentEnd:DateTime64(3)})
         OR
@@ -188,7 +189,6 @@ export function buildRollupTimeseriesQuery(input: TimeseriesQueryInput): BuiltAn
   return {
     sql,
     params: {
-      tenantId: input.projectId,
       currentStart: input.startDate,
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,

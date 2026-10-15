@@ -14,6 +14,7 @@ import {
   type AuthzPermission,
 } from "@langwatch/authorization";
 import {
+  TENANT_SCOPE_BUCKET_WIDTH_MS,
   TENANT_SCOPE_TIME_COLUMNS,
   type TenantScopeTimeColumn,
 } from "@langwatch/clickhouse-markers";
@@ -38,13 +39,10 @@ const READ_RESOURCES = {
 >;
 export type ReadResource = keyof typeof READ_RESOURCES;
 
-/**
- * The permissions a route mints a proof for: only `traces:view`. No production read asks for
- * `analytics` yet, so minting under it would cost an engine pass nothing consumes; a
- * traces-minted proof asked for analytics reads its own project alone.
- */
+/** The permissions a route mints a proof for: one per resource a reader may be asked for. */
 export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set([
   READ_RESOURCES.traces.permission,
+  READ_RESOURCES.analytics.permission,
 ]);
 
 /** Every parameter the fence binds starts with this; callers may not. */
@@ -162,11 +160,18 @@ export function fenceExpression({
   // The default is never read: `TenantId IN ids` gates every lookup.
   const edgeOf = (edge: "from" | "until") =>
     `transform(TenantId, ${ids}, ${slot(edge, "Array(Int64)")}, toInt64(0))`;
+  const width = TENANT_SCOPE_BUCKET_WIDTH_MS[column];
+  // A bucket starting at or after `from` lies wholly after it; one ending by `until` lies
+  // wholly before it.
+  const closedUntil =
+    width === undefined
+      ? `${column} < fromUnixTimestamp64Milli(${edgeOf("until")})`
+      : `${column} <= fromUnixTimestamp64Milli(${edgeOf("until")} - ${width})`;
   const windowed =
     `(TenantId IN (${ids})` +
     ` AND ${column} >= fromUnixTimestamp64Milli(${edgeOf("from")})` +
     ` AND (${edgeOf("until")} = ${OPEN_UNTIL}` +
-    ` OR ${column} < fromUnixTimestamp64Milli(${edgeOf("until")})))`;
+    ` OR ${closedUntil}))`;
   const params: Record<string, unknown> = {
     [fenceParam("all")]: tenantsOf(fence),
     [fenceParam("ids")]: fence.shared.map((window) => window.projectId),

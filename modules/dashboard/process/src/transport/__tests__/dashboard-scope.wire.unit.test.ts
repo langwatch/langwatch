@@ -9,11 +9,12 @@ import {
   bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
+  recordProjectCredential,
   type RestMountOptions,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
-import type { Actor } from "@langwatch/authorization";
+import type { Actor, RestResolvedProjectCredential } from "@langwatch/authorization";
 import type { DashboardApi, DashboardScope } from "@langwatch/dashboard-contract";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
@@ -105,13 +106,38 @@ const PROJECT_KEY: Actor = { type: "api_key", id: "key-1" };
 const NOBODY = null;
 const keyOf = (userId: string): Actor => ({ type: "user", id: userId });
 
+/** What the project door resolves a key that names nobody to: an API key with no owner. */
+const ownerlessKeyOf = (projectId: string): RestResolvedProjectCredential => ({
+  type: "apiKey",
+  apiKeyId: "key-nobody",
+  userId: null,
+  organizationId: "organization-1",
+  ingestSourceType: null,
+  ingestionTemplateId: null,
+  project: {
+    id: projectId,
+    slug: projectId,
+    name: projectId,
+    teamId: "team-1",
+    organizationId: "organization-1",
+    isPersonal: false,
+    ownerUserId: null,
+    kind: "application",
+  },
+});
+
 /** The credential doors: boards, graphs, widgets and saved charts with one project's API key. */
 function credentialDoors(app: DashboardApi, projectId: string, actor: Actor | null = PROJECT_KEY) {
   const caller = { actor, scope: { tier: "project" as const, id: projectId } };
+  // The door states what it resolved, so a key that names nobody reads on its own project's proof.
+  const admit = ({ request }: { request: Request }) => {
+    if (actor === NOBODY) recordProjectCredential(request, ownerlessKeyOf(projectId));
+    return caller;
+  };
   const runtime = createRestRuntime({
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
-    identity: { authenticate: () => caller, identify: () => caller },
+    identity: { authenticate: admit, identify: admit },
   });
   const mount = (
     family: { router: () => RestTransportDeclaration<DashboardApi> },

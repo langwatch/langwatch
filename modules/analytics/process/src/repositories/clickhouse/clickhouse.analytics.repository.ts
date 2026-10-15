@@ -7,6 +7,12 @@ import {
   type AnalyticsTimeseriesInput,
   type AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
+import type { Authorization } from "@langwatch/authorization";
+import {
+  AuthorizedClickHouse,
+  type ClickHouseQueryClient,
+  tenantScopeKey,
+} from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
 import { z } from "zod";
@@ -41,24 +47,39 @@ class AnalyticsClientUnavailableError extends Error {
   }
 }
 
+/** A series asked under one project and a proof minted for another; nothing is read. */
+class AnalyticsProofProjectMismatchError extends Error {
+  readonly code = "analytics_proof_project_mismatch";
+  constructor(public readonly projectId: string) {
+    super(`Analytics proof does not cover project ${projectId} as its own`);
+    this.name = "AnalyticsProofProjectMismatchError";
+  }
+}
+
 type TimeseriesBuilder = (input: TimeseriesQueryInput) => {
   sql: string;
   params: Record<string, unknown>;
 };
 
-const builderFor = (table: AnalyticsTable): TimeseriesBuilder => {
+/**
+ * How a table's statement picks its tenants: `fenced` builders write the proof's marker and
+ * read through it (ADR-177); `own` builders still name the input's project by hand.
+ */
+type TimeseriesRoute = { scope: "fenced" | "own"; build: TimeseriesBuilder };
+
+const routeFor = (table: AnalyticsTable): TimeseriesRoute => {
   switch (table) {
     case "trace_analytics_rollup":
-      return buildRollupTimeseriesQuery;
+      return { scope: "fenced", build: buildRollupTimeseriesQuery };
     case "trace_analytics":
-      return buildSlimTimeseriesQuery;
+      return { scope: "fenced", build: buildSlimTimeseriesQuery };
     case "evaluation_analytics_rollup":
-      return buildEvalRollupTimeseriesQuery;
+      return { scope: "fenced", build: buildEvalRollupTimeseriesQuery };
     case "evaluation_analytics":
-      return buildEvalSlimTimeseriesQuery;
+      return { scope: "fenced", build: buildEvalSlimTimeseriesQuery };
     case "trace_summaries":
     case "evaluation_runs":
-      return buildTimeseriesQuery;
+      return { scope: "own", build: buildTimeseriesQuery };
     default: {
       const exhaustive: never = table;
       throw new Error(`Unknown Analytics table ${String(exhaustive)}`);
@@ -66,12 +87,27 @@ const builderFor = (table: AnalyticsTable): TimeseriesBuilder => {
   }
 };
 
+/** What a timeseries statement is sent through: the fenced reader or the own tenant's client. */
+type TimeseriesStatementClient = {
+  query(input: {
+    query: string;
+    query_params: Record<string, unknown>;
+    format: "JSONEachRow";
+    clickhouse_settings: Record<string, string | number>;
+  }): Promise<{ json(): Promise<unknown> }>;
+};
+
 /** The one ClickHouse persistence implementation for all timeseries tables. */
 export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   static create(options: {
     resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
+    /** The routed client the fenced reads go through; the proof picks their tenants. */
+    clickhouse: ClickHouseQueryClient;
   }): ClickHouseAnalyticsRepository {
-    return new ClickHouseAnalyticsRepository(options.resolveClient);
+    return new ClickHouseAnalyticsRepository(
+      options.resolveClient,
+      new AuthorizedClickHouse({ resolveClient: () => Promise.resolve(options.clickhouse) }),
+    );
   }
 
   private readonly logger = createLogger("langwatch:analytics:timeseries-repository");
@@ -80,6 +116,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     private readonly resolveClient: (
       tenantId: string,
     ) => Promise<EvaluationAnalyticsClickHouseClient | null>,
+    private readonly authorized: AuthorizedClickHouse,
   ) {
     super();
   }
@@ -89,14 +126,19 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   }
 
   async runTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult> {
-    if (!query.tenantId.trim()) {
-      throw new Error("Analytics timeseries tenantId is required");
+    const projectId = query.input.projectId;
+    if (!projectId.trim()) {
+      throw new Error("Analytics timeseries projectId is required");
     }
-    const client = await this.resolveClient(query.tenantId);
-    if (!client) throw new AnalyticsClientUnavailableError(query.tenantId);
+    const route = routeFor(query.table);
+    const client = await this.statementClient({
+      scope: route.scope,
+      authorization: query.authorization,
+      projectId,
+    });
 
     const builderInput: TimeseriesQueryInput = {
-      projectId: query.tenantId,
+      projectId,
       startDate: toDate(query.startDate),
       endDate: toDate(query.endDate),
       previousPeriodStartDate: toDate(query.previousPeriodStartDate),
@@ -110,7 +152,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       negateFilters: query.input.negateFilters,
       excludeOrigins: query.input.excludeOrigins,
     };
-    const built = builderFor(query.table)(builderInput);
+    const built = route.build(builderInput);
 
     try {
       const response = await client.query({
@@ -139,7 +181,8 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     } catch (error) {
       this.logger.warn(
         {
-          tenantId: query.tenantId,
+          tenantId: projectId,
+          scope: tenantScopeKey({ authorization: query.authorization, reads: "analytics" }),
           table: query.table,
           error: error instanceof Error ? error.message : String(error),
         },
@@ -273,6 +316,27 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       );
       throw error;
     }
+  }
+
+  /**
+   * The client a series is sent through. The proof is checked either way and must be for the
+   * input's project, so a series cannot be asked under one project and read under another's.
+   */
+  private async statementClient({
+    scope,
+    authorization,
+    projectId,
+  }: {
+    scope: TimeseriesRoute["scope"];
+    authorization: Authorization;
+    projectId: string;
+  }): Promise<TimeseriesStatementClient> {
+    const reader = this.authorized.as(authorization, { reads: "analytics" });
+    if (!reader.fence.own.includes(projectId)) {
+      throw new AnalyticsProofProjectMismatchError(projectId);
+    }
+    if (scope === "fenced") return reader;
+    return this.clientFor(projectId);
   }
 
   private async clientFor(tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> {
