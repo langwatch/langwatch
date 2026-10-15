@@ -12,49 +12,39 @@ import {
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type {
-  DashboardChartHoldings,
-  DashboardGraphKind,
-  DashboardRecord,
-  DashboardRepository,
-  DashboardSummaryRecord,
-  GraphRecord,
-} from "../repositories/dashboard.repository.ts";
-import type { BoardArea } from "../rules/dashboard-board-area.rules.ts";
+  BoardReach,
+  BoardRecord,
+  BoardRepository,
+  BoardSummaryRecord,
+} from "../repositories/board.repository.ts";
 
 /** The `release_dashboards` rollout, resolved for one project. */
 export interface DashboardsRollout {
   isDashboardsEnabled(input: { projectId: string }): Promise<boolean>;
 }
 
-/** A board as the chart holdings name it. */
-type BoardRef = Pick<DashboardRecord, "id" | "projectId">;
-
-/** Charts made in Analytics Reports and no widget: the board opens empty in Dashboards. */
-const isReportsBoard = (held: DashboardChartHoldings | undefined) =>
-  held !== undefined && held.legacyCharts && !held.widgets;
-
 /** Who is reading, from which project; no viewer is a project credential. */
 export type BoardReading = Readonly<{ projectId: string; viewer?: DashboardViewer }>;
 
 /** A board the reader may open here, and how they stand to it. */
 export type ReadableBoard = Readonly<{
-  board: DashboardRecord;
+  board: BoardRecord;
   standing: Exclude<DashboardStanding, "none">;
 }>;
 
 /**
- * The scope rules applied to stored boards: who sees which board from which project, and who
- * may write it. A board the reader may not see answers exactly as one that does not exist.
- * Spec: dashboards-v2.feature AC171 to AC173.
+ * The scope rules applied to the Dashboards area's boards: who sees which board from which
+ * project, and who may write it. A board the reader may not see answers exactly as one that does
+ * not exist. Spec: dashboards-v2.feature AC171 to AC173.
  */
 export class DashboardAccessService {
-  #repository: DashboardRepository;
+  #repository: BoardRepository;
   #projects: ProjectApi;
   #rollout: DashboardsRollout;
   #authz: Pick<AuthzApi, "canBatchByIds">;
 
   private constructor(options: {
-    repository: DashboardRepository;
+    repository: BoardRepository;
     projects: ProjectApi;
     rollout: DashboardsRollout;
     authz: Pick<AuthzApi, "canBatchByIds">;
@@ -66,7 +56,7 @@ export class DashboardAccessService {
   }
 
   static create(options: {
-    repository: DashboardRepository;
+    repository: BoardRepository;
     projects: ProjectApi;
     rollout: DashboardsRollout;
     authz: Pick<AuthzApi, "canBatchByIds">;
@@ -93,35 +83,11 @@ export class DashboardAccessService {
 
   /** The boards the reader's project lists: its own they may see, then the organization's. */
   async listBoards(
-    input: BoardReading & { graphKinds: readonly DashboardGraphKind[] },
-  ): Promise<{ home: DashboardSummaryRecord[]; guests: DashboardSummaryRecord[] }> {
+    input: BoardReading,
+  ): Promise<{ home: BoardSummaryRecord[]; guests: BoardSummaryRecord[] }> {
     const place = await this.placeOf(input);
-    const boards = await this.#repository.findAllDashboards({
-      ...reachOf(place),
-      graphKinds: input.graphKinds,
-    });
+    const boards = await this.#repository.findBoards(await this.#reachOf(place));
     return dashboardsListedFor({ boards, viewer: input.viewer, place });
-  }
-
-  /**
-   * These boards kept by area. A board holding widgets and Reports charts, or nothing, is a
-   * Dashboards one (dashboards-v2 AC199, AC199c).
-   */
-  async inArea<Board extends BoardRef>(input: {
-    boards: readonly Board[];
-    area: BoardArea;
-  }): Promise<Board[]> {
-    const holdings = await this.#holdings(input.boards);
-    const wantsReports = input.area === "reports";
-    return input.boards.filter((board) => isReportsBoard(holdings.get(board.id)) === wantsReports);
-  }
-
-  async #holdings(boards: readonly BoardRef[]): Promise<Map<string, DashboardChartHoldings>> {
-    const holdings = await this.#repository.findChartHoldings({
-      projectIds: [...new Set(boards.map((board) => board.projectId))],
-      dashboardIds: boards.map((board) => board.id),
-    });
-    return new Map(holdings.map((held) => [held.dashboardId, held]));
   }
 
   /** The board when the reader may open it here: at home, or as the organization's guest. */
@@ -132,8 +98,8 @@ export class DashboardAccessService {
     if (atHome !== "elsewhere") return atHome;
 
     const place = await this.placeOf(input);
-    const [board] = await this.#repository.findDashboards({
-      ...reachOf(place),
+    const [board] = await this.#repository.findBoardsByIds({
+      ...(await this.#reachOf(place)),
       dashboardIds: [input.dashboardId],
     });
     if (!board) return undefined;
@@ -142,24 +108,11 @@ export class DashboardAccessService {
     return standing === "none" ? undefined : { board, standing };
   }
 
-  /** The board with its builder graphs, when the reader may open it here. */
-  async findWithGraphs(
-    input: BoardReading & { dashboardId: string },
-  ): Promise<(DashboardRecord & { graphs: GraphRecord[] }) | undefined> {
-    const place = await this.placeOf(input);
-    const board = await this.#repository.findDashboard({
-      ...reachOf(place),
-      dashboardId: input.dashboardId,
-    });
-    if (!board) return undefined;
-    return dashboardStanding({ board, viewer: input.viewer, place }) === "none" ? undefined : board;
-  }
-
   /**
    * The project's own board, for a write. A board the reader may not see is not found; one the
    * organization shows here is refused as read-only, since they can plainly read it.
    */
-  async getWritable(input: BoardReading & { dashboardId: string }): Promise<DashboardRecord> {
+  async getWritable(input: BoardReading & { dashboardId: string }): Promise<BoardRecord> {
     const found = await this.findReadable(input);
     if (!found) throw new DashboardNotFoundError(input.projectId);
     if (found.standing === "guest") throw new DashboardReadOnlyHereError(input.projectId);
@@ -179,10 +132,7 @@ export class DashboardAccessService {
 
   /** The project's own boards the reader may not see: another member's Only me boards. */
   async findHiddenBoardIds(input: BoardReading): Promise<ReadonlySet<string>> {
-    const boards = await this.#repository.findAllDashboards({
-      projectId: input.projectId,
-      graphKinds: [],
-    });
+    const boards = await this.#repository.findBoards({ projectId: input.projectId });
     const place = { projectId: input.projectId, organizationId: void 0 };
     const hidden = boards.filter(
       (board) => dashboardStanding({ board, viewer: input.viewer, place }) === "none",
@@ -217,11 +167,23 @@ export class DashboardAccessService {
       .map(({ id, name, slug }) => ({ id, name, slug }));
   }
 
+  /** The repository reach of a place: its organization's live projects' shared boards (AC188). */
+  async #reachOf(place: DashboardPlace): Promise<BoardReach> {
+    if (place.organizationId === undefined) return { projectId: place.projectId };
+    const liveProjectIds = await this.#projects.findLiveNonGovernanceIdsByOrganization({
+      organizationId: place.organizationId,
+    });
+    return {
+      projectId: place.projectId,
+      organization: { organizationId: place.organizationId, liveProjectIds },
+    };
+  }
+
   /** Read without asking the project peer: most reads and every write are of an own board. */
   async #findAtHome(
     input: BoardReading & { dashboardId: string },
   ): Promise<ReadableBoard | undefined | "elsewhere"> {
-    const [board] = await this.#repository.findDashboards({
+    const [board] = await this.#repository.findBoardsByIds({
       projectId: input.projectId,
       dashboardIds: [input.dashboardId],
     });
@@ -231,11 +193,4 @@ export class DashboardAccessService {
     const visible = dashboardStanding({ board, viewer: input.viewer, place }) === "home";
     return visible ? { board, standing: "home" } : undefined;
   }
-}
-
-/** The repository reach of a place: its organization's shared boards when it has one. */
-function reachOf(place: DashboardPlace): { projectId: string; organizationId?: string } {
-  return place.organizationId === undefined
-    ? { projectId: place.projectId }
-    : { projectId: place.projectId, organizationId: place.organizationId };
 }

@@ -25,7 +25,6 @@ import {
 import {
   DashboardApi,
   DashboardsNotEnabledError,
-  SavedWorkbenchChartDashboardNotFoundError,
   SavedWorkbenchChartNotFoundError,
   dashboardConfig,
   type Dashboard,
@@ -212,16 +211,17 @@ export class DashboardModule implements DashboardApi {
     const workbenchAccess = new AnalyticsWorkbenchAccess(analytics);
     const workbenchCaller = new AnalyticsWorkbenchCaller(analytics);
     const repository = setup.repositories.dashboards;
+    const boards = setup.repositories.boards;
     const { projects, authz } = setup.dependencies;
     const rollout = new AnalyticsDashboardsRollout(analytics);
-    const access = DashboardAccessService.create({ repository, projects, rollout, authz });
+    const access = DashboardAccessService.create({ repository: boards, projects, rollout, authz });
 
     return new DashboardModule({
       services: {
-        dashboards: DashboardService.create({ repository, workbenchAccess, access }),
+        dashboards: DashboardService.create({ repository, boards, workbenchAccess, access }),
         access,
-        stars: DashboardStarService.create({ repository, access }),
-        scopes: DashboardScopeService.create({ repository, access, projects, authz }),
+        stars: DashboardStarService.create({ repository: boards, access }),
+        scopes: DashboardScopeService.create({ repository: boards, access, projects, authz }),
         charts: SavedWorkbenchChartService.create({
           repository: setup.repositories.dashboards,
           policy: SavedWorkbenchChartPolicyService.create({ analytics }),
@@ -827,10 +827,8 @@ export class DashboardModule implements DashboardApi {
     viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
     const { viewer, ...placement } = input;
-    const { projectId, chartId, dashboardId } = placement;
-    if (!(await this.#access.isWritable({ projectId, dashboardId, viewer }))) {
-      throw new SavedWorkbenchChartDashboardNotFoundError();
-    }
+    const { projectId, chartId } = placement;
+    // A Reports board has no scope (A8); the chart service refuses a board Reports does not hold.
     await this.#getVisibleChart({ projectId, chartId, viewer });
     return this.#charts.place(placement);
   }

@@ -1000,7 +1000,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then only the Reports list is offered: the board made in Analytics Reports, with "New dashboard"
     And no Dashboards board is offered, since a builder chart has no place on one
 
-  @unit @integration @unimplemented
+  @unit @integration
   Scenario: AC199d Split: a Reports delete leaves the Dashboards area unchanged
     Given a mixed board, in both areas under one id, with widgets and stars in Dashboards
     And a board made in Analytics Reports

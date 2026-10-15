@@ -25,6 +25,7 @@ import type { WorkbenchAccess } from "../../../services/dashboard.service.ts";
 import { DashboardService } from "../../../services/dashboard.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../../../services/saved-workbench-chart-policy.service.ts";
 import { SavedWorkbenchChartService } from "../../../services/saved-workbench-chart.service.ts";
+import { PrismaBoardRepository } from "../prisma.board.repository.ts";
 import { PrismaDashboardRepository } from "../prisma.dashboard.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -61,11 +62,13 @@ let projectId = "";
 
 function graphs(): DashboardService {
   const repository = PrismaDashboardRepository.create({ prisma: database() });
+  const boards = PrismaBoardRepository.create({ prisma: database() });
   return DashboardService.create({
     repository,
+    boards,
     workbenchAccess: new WorkbenchOn(),
     access: DashboardAccessService.create({
-      repository,
+      repository: boards,
       projects: createDashboardTestProjects(),
       rollout: DASHBOARDS_ROLLED_OUT,
       authz: createDashboardTestAuthz(),

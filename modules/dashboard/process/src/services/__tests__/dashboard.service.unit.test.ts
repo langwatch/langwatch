@@ -15,7 +15,9 @@ import {
   createDashboardTestProjects,
   DASHBOARDS_ROLLED_OUT,
 } from "../../app/__tests__/dashboard.fixture.ts";
+import { MemoryBoardRepository } from "../../repositories/memory/memory.board.repository.ts";
 import { MemoryDashboardWidgetRepository } from "../../repositories/memory/memory.dashboard-widget.repository.ts";
+import { MemoryDashboardDatabase } from "../../repositories/memory/memory.dashboard.database.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
 import { DashboardAccessService } from "../dashboard-access.service.ts";
 import { DashboardStarService } from "../dashboard-star.service.ts";
@@ -31,10 +33,12 @@ class FixedWorkbenchAccess implements WorkbenchAccess {
 }
 
 function serviceWith(workbenchEnabled = true) {
-  const widgets = MemoryDashboardWidgetRepository.create();
-  const repository = MemoryDashboardRepository.create({ widgets });
+  const database = MemoryDashboardDatabase.create();
+  const widgets = MemoryDashboardWidgetRepository.create({ database });
+  const repository = MemoryDashboardRepository.create({ database });
+  const boards = MemoryBoardRepository.create({ database });
   const access = DashboardAccessService.create({
-    repository,
+    repository: boards,
     projects: createDashboardTestProjects(),
     rollout: DASHBOARDS_ROLLED_OUT,
     authz: createDashboardTestAuthz(),
@@ -42,10 +46,12 @@ function serviceWith(workbenchEnabled = true) {
 
   return {
     repository,
+    boards,
     widgets,
-    stars: DashboardStarService.create({ repository, access }),
+    stars: DashboardStarService.create({ repository: boards, access }),
     service: DashboardService.create({
       repository,
+      boards,
       workbenchAccess: new FixedWorkbenchAccess(workbenchEnabled),
       access,
     }),

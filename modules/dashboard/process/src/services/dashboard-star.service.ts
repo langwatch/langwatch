@@ -6,7 +6,7 @@ import {
   type StarredDashboard,
 } from "@langwatch/dashboard-contract";
 
-import type { DashboardRepository } from "../repositories/dashboard.repository.ts";
+import type { BoardRepository } from "../repositories/board.repository.ts";
 import type { DashboardAccessService } from "./dashboard-access.service.ts";
 
 /** The member whose stars these are, and the project they are looking from. */
@@ -18,25 +18,22 @@ type Starring = Readonly<{ projectId: string; userId: string }>;
  * board the member can no longer see keeps its star, unlisted, until its scope widens again.
  */
 export class DashboardStarService {
-  #repository: DashboardRepository;
+  #repository: BoardRepository;
   #access: DashboardAccessService;
 
-  private constructor(repository: DashboardRepository, access: DashboardAccessService) {
+  private constructor(repository: BoardRepository, access: DashboardAccessService) {
     this.#repository = repository;
     this.#access = access;
   }
 
   static create(options: {
-    repository: DashboardRepository;
+    repository: BoardRepository;
     access: DashboardAccessService;
   }): DashboardStarService {
     return new DashboardStarService(options.repository, options.access);
   }
 
-  /**
-   * The member's stars for this project, boards and templates, in their own order. Only the
-   * Dashboards area lists stars, so a board holding only Analytics Reports charts is left out.
-   */
+  /** The member's stars for this project, boards and templates, in their own order. */
   async listStarred(input: Starring): Promise<StarredDashboard[]> {
     const projectId = projectIdSchema.parse(input.projectId);
     const { visibleIds, sharedProjectIds } = await this.#listed({ ...input, projectId });
@@ -45,15 +42,7 @@ export class DashboardStarService {
       userId: input.userId,
       sharedProjectIds,
     });
-    const boards = starred.flatMap((star) => (star.kind === "board" ? [star.dashboard] : []));
-    const listable = new Set(
-      (await this.#access.inArea({ boards, area: "dashboards" })).map((board) => board.id),
-    );
-    return starred.filter(
-      (star) =>
-        star.kind === "template" ||
-        (visibleIds.has(star.dashboard.id) && listable.has(star.dashboard.id)),
-    );
+    return starred.filter((star) => star.kind === "template" || visibleIds.has(star.dashboard.id));
   }
 
   /** Stars a board the member may open here, or a template, which only the browser can check. */
@@ -114,7 +103,6 @@ export class DashboardStarService {
     const { home, guests } = await this.#access.listBoards({
       projectId: input.projectId,
       viewer: { userId: input.userId },
-      graphKinds: [],
     });
     return {
       visibleIds: new Set([...home, ...guests].map((board) => board.id)),
