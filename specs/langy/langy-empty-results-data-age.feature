@@ -29,7 +29,7 @@ Feature: Langy tells an idle project from a broken pipeline
     Given the project has traces, the newest of them about 8 hours old
     When I ask how many traces I got in the last hour
     Then Langy names one likely cause such as export stopped, a wrong project or API key, or the app not being instrumented yet
-    And the cause is offered because the newest trace is hours old
+    And the cause follows the age of the newest trace
 
   @unit
   Scenario: A filtered question with no matches gets a plain none
