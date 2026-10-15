@@ -63,15 +63,15 @@ You need the admin role in your Claude Console organisation and a LangWatch API 
   </Step>
 </Steps>
 
-{/* Screenshot placeholder: the Claude Console "Add destination" form filled in with the LangWatch values above (Provider Custom, endpoint https://app.langwatch.ai/api/otel, Authorization header, Full content, 0.25 MB). */}
+{/* Screenshot placeholder: the Claude Console "Add destination" form filled in with the values above (Provider Custom, the /api/otel endpoint, the Authorization header, Full content, 0.25 MB). */}
 
-Anthropic sends OTLP/HTTP protobuf with gzip compression. LangWatch accepts it on the endpoint above, so there is nothing to configure for the protocol.
+Anthropic sends OTLP/HTTP protobuf with gzip compression. LangWatch accepts it on the endpoint above, so the protocol needs no setting.
 
 <Info>
   **Content size.** LangWatch keeps up to 256 KB for each attribute value for now, and this limit will be raised. Setting the maximum content size to `0.25` MB makes Anthropic shorten long prompts and responses itself and set `anthropic.content.truncated` to `true` on the span, so you can see which spans were cut.
 </Info>
 
-**Metadata only** also works. Spans then carry timing, status, models, token counts and tool names, but no prompts or responses, so you cannot read conversations or build evaluations and datasets from them. If your organisation has a HIPAA, FERPA or K-12 data-handling restriction with Anthropic, the API exports only metadata whatever the content mode.
+**Metadata only** also works. With it, you see timing, status, models, token counts and tool names, but you cannot read conversations or build evaluations and datasets, because the spans hold no prompts or responses. If your organisation has a HIPAA, FERPA or K-12 data-handling restriction with Anthropic, the API exports only metadata whatever the content mode.
 
 ### Self-hosted LangWatch
 
@@ -82,7 +82,7 @@ Use your own LangWatch base URL with `/api/otel`, for example `https://langwatch
 1. On the OpenTelemetry settings page, open the destination's **More actions** menu and click **Test**. The Console sends an `anthropic.test` span and shows whether it was delivered.
 2. Send a Messages API request in the [Console playground](https://platform.claude.com/playground) or from your application, in a workspace the destination covers.
 3. Check that the **Delivery** column shows **Healthy**. This can take about a minute.
-4. In LangWatch, open your project's traces and filter on `service.name` = `claude-platform`. API spans always carry this service name.
+4. In LangWatch, open your project's traces and filter on `service.name` = `claude-platform`, the service name of every API span.
 
 ## Read your trace
 
@@ -91,7 +91,7 @@ Use your own LangWatch base URL with `/api/otel`, for example `https://langwatch
 For a Messages API request, the trace has an `anthropic.messages.create` span with one `anthropic.model_request` span for each model run and a tool span for each server or MCP tool the API ran.
 
 - **Input and output** are on `anthropic.messages.create`. The system prompt is in `gen_ai.system_instructions`, the messages in `gen_ai.input.messages` and the response in `gen_ai.output.messages`.
-- **`anthropic.model_request` spans carry no input or output** by design. They hold the model, timing and token usage of each model run. An empty input on a model request span does not mean content export failed: open the parent `anthropic.messages.create` span.
+- **On `anthropic.model_request` spans you see no input or output**, by design. These spans hold the model, timing and token usage of each model run. An empty input there does not mean content export failed: open the parent `anthropic.messages.create` span to read the content.
 - **Tool spans** hold the tool arguments in `gen_ai.tool.call.arguments` and the result in `anthropic.tool_result.content`.
 
 For a Managed Agents session, read the `anthropic.session.turn` spans. A thread's first turn holds the system prompt, `gen_ai.input.messages` holds what came into the turn and `gen_ai.output.messages` what the agent produced. A session can span several traces: `gen_ai.conversation.id` holds the session thread ID and `anthropic.session.id` the session ID, so you can group spans by either.
@@ -102,7 +102,10 @@ With both API and SDK export, each request appears as two `anthropic.messages.cr
 
 Anthropic puts token usage on several levels of the same request: on `anthropic.messages.create` and again on each `anthropic.model_request` under it, and on the SDK client span when you also use SDK export. The values overlap, they are not separate usage.
 
-LangWatch currently adds up the token counts of every span in a trace. For Claude Platform traces, the trace's token total, and the cost estimated from it, therefore counts the same tokens more than once. This will be fixed. Until then, for an exact count of one request, read the `anthropic.model_request` spans (for Managed Agents, the `anthropic.model_request` and `anthropic.session.outcome_evaluation` spans) and add the `anthropic.compaction` spans when the request had compactions.
+LangWatch currently adds up the token counts of every span in a trace. For Claude Platform traces, the trace's token total, and the cost estimated from it, therefore counts the same tokens more than once. This will be fixed. Until then, to count each token once, add up only these spans:
+
+- **Messages API request**: the `anthropic.model_request` spans, plus any `anthropic.compaction` spans.
+- **Managed Agents session**: the `anthropic.model_request` and `anthropic.session.outcome_evaluation` spans.
 
 `gen_ai.usage.input_tokens` already includes tokens read from and written to the prompt cache. Anthropic's [token usage reference](https://platform.claude.com/docs/en/api/opentelemetry/spans#token-usage) lists every usage attribute.
 
@@ -160,7 +163,7 @@ console.log(answer);
 ```
 </CodeGroup>
 
-The SDK sends the current span's trace context in a `traceparent` header, so the API spans for the request nest under the SDK span in the same LangWatch trace. Send both to the same LangWatch project.
+In LangWatch you then see the API spans for the request nested under the SDK span, in the same trace, because the SDK sends the current span's trace context in a `traceparent` header. Send both to the same LangWatch project.
 
 You can also skip `langwatch.setup()` and point your own OpenTelemetry SDK at LangWatch with environment variables:
 
@@ -192,7 +195,7 @@ With Full content, each Claude Platform trace holds the prompt, the response and
 | **Failing**, status 404 | The OTLP endpoint URL ends in `/v1/traces`. Set it to `https://app.langwatch.ai/api/otel` and leave **OTLP traces endpoint URL** empty. |
 | **Disabled** | Hover over **Disabled** to see the reason. Anthropic disables a destination when the endpoint answers with a `3xx` redirect (check the URL starts with `https://app.langwatch.ai`), when the hostname resolves to a non-public IP address (self-hosted instances must be reachable from the internet), or after 24 hours of failed deliveries. Fix the cause, then click **Enable** in the **More actions** menu. |
 | **Healthy**, but no traces in LangWatch | The API key belongs to another LangWatch project, or the request ran in a workspace the destination does not cover. |
-| Spans have no input or output | The destination is on **Metadata only**, your organisation has a HIPAA, FERPA or K-12 restriction with Anthropic, or you are looking at an `anthropic.model_request` span, which never carries content. |
+| Spans have no input or output | Check that the destination is on **Full content**. If it is, your organisation may have a HIPAA, FERPA or K-12 restriction with Anthropic. On an `anthropic.model_request` span, no content is expected: open its parent. |
 | Long prompts or responses are cut | Content over the maximum content size is shortened by Anthropic and marked with `anthropic.content.truncated`. Keep the limit at `0.25` MB for now: larger values are cut by LangWatch's 256 KB limit per attribute value. |
 | Each request appears twice | Another library also traces the Claude SDK, such as an OpenInference instrumentor. Keep only one. |
 
