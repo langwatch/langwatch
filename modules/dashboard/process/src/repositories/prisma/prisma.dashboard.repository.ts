@@ -138,8 +138,15 @@ const savedWorkbenchChartRow = (row: StoredGraph): SavedWorkbenchChartRecord =>
     updatedAt: row.updatedAt,
   });
 
+// DashboardsV2 and DashboardWidget are claimed here until their own repository lands.
 export class PrismaDashboardRepository
-  extends PrismaRepository.transactionalFor("Dashboard", "CustomGraph", "DashboardFavourite")
+  extends PrismaRepository.transactionalFor(
+    "Dashboard",
+    "CustomGraph",
+    "DashboardFavourite",
+    "DashboardsV2",
+    "DashboardWidget",
+  )
   implements DashboardRepository
 {
   static readonly create = this.factory((prisma) => new PrismaDashboardRepository(prisma));
