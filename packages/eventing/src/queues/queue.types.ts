@@ -8,7 +8,7 @@ export interface EventSourcedQueueProcessorOptions {
   /**
    * Maximum number of groups that can be processed in parallel.
    * Only used by GroupQueueProcessor.
-   * @default 1000 (or the GLOBAL_QUEUE_CONCURRENCY env var)
+   * @default 100 (or the GLOBAL_QUEUE_CONCURRENCY env var)
    */
   globalConcurrency?: number;
 }

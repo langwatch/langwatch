@@ -41,8 +41,6 @@ const ROUTE_VERBS: readonly {
   // HTTP, served under the same bearer-session policy as /mcp — a client given
   // the /sse URL may speak only Streamable HTTP (langwatch/tasks#909).
   { path: "/sse", methods: ["POST", "GET", "DELETE"], policy: BEARER_SESSION_POLICY },
-  { path: "/messages", methods: ["POST"], policy: BEARER_SESSION_POLICY },
-  { path: "/sse/messages", methods: ["POST"], policy: BEARER_SESSION_POLICY },
   { path: PROTECTED_RESOURCE_METADATA_PATH, methods: ["GET"], policy: OAUTH_HANDSHAKE_POLICY },
   {
     path: `${PROTECTED_RESOURCE_METADATA_PATH}/mcp`,
@@ -105,11 +103,9 @@ export function hostedMcpRoutePolicies(): readonly {
 export const MCP_ROOT_PATHS: readonly string[] = [
   "/mcp",
   "/mcp/health",
+  // The retired SSE transport's URL, kept so configurations that still name it reach the
+  // Streamable HTTP transport.
   "/sse",
-  "/messages",
-  // Some clients resolve the endpoint the SSE stream advertises by appending
-  // it to the path they connected on, so the same handler answers both.
-  "/sse/messages",
   PROTECTED_RESOURCE_METADATA_PATH,
   AUTHORIZATION_SERVER_METADATA_PATH,
   "/.well-known/openid-configuration",

@@ -1,4 +1,7 @@
-/** Stubs matchMedia: the design-system colour-mode provider reads it and jsdom lacks it. */
+/**
+ * Stubs matchMedia (the colour-mode provider reads it) and ResizeObserver (a drawer's chrome
+ * watches its bands with one); jsdom ships neither.
+ */
 
 if (typeof window !== "undefined" && !window.matchMedia) {
   Object.defineProperty(window, "matchMedia", {
@@ -15,4 +18,18 @@ if (typeof window !== "undefined" && !window.matchMedia) {
       dispatchEvent: () => false,
     }),
   });
+}
+
+class ResizeObserverStub implements ResizeObserver {
+  constructor(_callback: ResizeObserverCallback) {}
+
+  disconnect(): void {}
+
+  observe(_target: Element): void {}
+
+  unobserve(_target: Element): void {}
+}
+
+if (typeof window !== "undefined" && !window.ResizeObserver) {
+  globalThis.ResizeObserver = ResizeObserverStub;
 }

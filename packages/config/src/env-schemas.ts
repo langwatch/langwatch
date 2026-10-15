@@ -11,6 +11,18 @@ export const environmentBooleanSchema = z
   .union([z.boolean(), z.literal("true"), z.literal("false"), z.literal("1"), z.literal("0")])
   .transform((value) => value === true || value === "true" || value === "1");
 
+/** The previous release's opt-in switch: only the literal `on` is on, anything else is off. */
+export const environmentExactOnSchema = z
+  .union([z.string(), z.boolean()])
+  .optional()
+  .transform((value) => value === true || value === "on");
+
+/** The previous release's opt-out switch: only the literal `off` is off, anything else is on. */
+export const environmentNotExactOffSchema = z
+  .union([z.string(), z.boolean()])
+  .optional()
+  .transform((value) => value !== false && value !== "off");
+
 /** A switch that accepts the literal `1` or `true`, in any casing. */
 export const environmentOneOrTrueSchema = z
   .union([z.string(), z.boolean()])

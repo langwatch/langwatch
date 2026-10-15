@@ -1,8 +1,10 @@
 import { NotFoundError } from "@langwatch/api/rest";
 import {
+  countDatasetRecordsInputSchema,
   datasetLookupInputSchema,
   listDatasetsInputSchema,
   type CopyDatasetInput,
+  type CountDatasetRecordsInput,
   type CreateDatasetRecordsInput,
   type AppendStoredObjectToDatasetInput,
   type CreateDatasetFromStoredObjectInput,
@@ -18,6 +20,8 @@ import {
   type DatasetPage,
   type DatasetPageInput,
   type DatasetRecord,
+  type DatasetRecordCount,
+  type DatasetSummary,
   type DatasetListResult,
   type DatasetHead,
   type DatasetRecordPage,
@@ -47,8 +51,10 @@ import type { DatasetAttachmentReferenceService } from "./dataset-attachment-ref
 import { DatasetCopyService } from "./dataset-copy.service.ts";
 import type { DatasetInlineAttachmentService } from "./dataset-inline-attachment.service.ts";
 import { DatasetNamingService } from "./dataset-naming.service.ts";
+import { DatasetRecordCountService } from "./dataset-record-count.service.ts";
 import { DatasetRecordService } from "./dataset-record.service.ts";
 import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
+import type { DatasetSingleFileService } from "./dataset-single-file.service.ts";
 import { DatasetUpsertService } from "./dataset-upsert.service.ts";
 
 export type DatasetServiceOptions = {
@@ -57,6 +63,8 @@ export type DatasetServiceOptions = {
   uploads?: DatasetUpload;
   queue?: DatasetNormalizeQueue;
   content?: DatasetContent;
+  /** The previous release's single-file datasets, served where that release kept them. */
+  singleFile?: DatasetSingleFileService;
   generateId?: () => string;
   /** The tier-aware batch bound the record writes refuse above. */
   requestBounds: DatasetRequestBoundsService;
@@ -91,10 +99,16 @@ export class DatasetService {
 
   private readonly copies: DatasetCopyService;
 
+  private readonly recordCounts: DatasetRecordCountService;
+
   private constructor(private readonly options: DatasetServiceOptions) {
     this.generateId =
       options.generateId ?? (() => generate(DATASET_RECORD_KSUID_RESOURCE).toString());
     this.naming = DatasetNamingService.create(options.repository);
+    this.recordCounts = DatasetRecordCountService.create({
+      datasets: options.repository,
+      records: options.records,
+    });
     this.upserts = DatasetUpsertService.create({
       options,
       getBySlugOrId: (input) => this.getBySlugOrId(input),
@@ -209,7 +223,16 @@ export class DatasetService {
 
   async listDatasets(input: ListDatasetsInput): Promise<DatasetListResult> {
     const parsed = listDatasetsInputSchema.parse(input);
-    const data = await this.options.repository.findAll(parsed);
+    const summaries = await this.options.repository.findAll(parsed);
+    const counts = await this.recordCounts.countRecords({
+      projectId: parsed.projectId,
+      datasetIds: summaries.map((dataset) => dataset.id),
+    });
+    const countById = new Map(counts.map((count) => [count.datasetId, count.recordCount]));
+    const data = summaries.map((dataset) => ({
+      ...dataset,
+      recordCount: countById.get(dataset.id) ?? 0,
+    }));
 
     return {
       data,
@@ -220,6 +243,14 @@ export class DatasetService {
         totalPages: data.length === 0 ? 0 : 1,
       },
     };
+  }
+
+  async findDatasetSummaries(input: ListDatasetsInput): Promise<DatasetSummary[]> {
+    return this.options.repository.findAll(listDatasetsInputSchema.parse(input));
+  }
+
+  async countRecords(input: CountDatasetRecordsInput): Promise<DatasetRecordCount[]> {
+    return this.recordCounts.countRecords(countDatasetRecordsInputSchema.parse(input));
   }
 
   async archiveDataset(input: DatasetLookupInput): Promise<{ id: string; archived: true }> {

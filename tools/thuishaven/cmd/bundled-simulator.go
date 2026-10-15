@@ -13,6 +13,7 @@ import (
 	lambdasim "github.com/langwatch/langwatch/services/sims/lambdasim/cmd"
 	llmsim "github.com/langwatch/langwatch/services/sims/llmsim/cmd"
 	mailsim "github.com/langwatch/langwatch/services/sims/mailsim/cmd"
+	mcpsim "github.com/langwatch/langwatch/services/sims/mcpsim/cmd"
 	outboundsim "github.com/langwatch/langwatch/services/sims/outboundsim/cmd"
 	paymentsim "github.com/langwatch/langwatch/services/sims/paymentsim/cmd"
 	storagesim "github.com/langwatch/langwatch/services/sims/storagesim/cmd"
@@ -32,7 +33,7 @@ func simulatorArgv() []string {
 
 func runBundledSimulator(ctx context.Context, _ deps, inv invocation) error {
 	if len(inv.args) != 1 {
-		return fmt.Errorf("haven simulator requires mail, idp, storage, voice, llm, analytics, outbound, payment, telemetry, lambda or github")
+		return fmt.Errorf("haven simulator requires mail, idp, storage, voice, llm, analytics, outbound, payment, telemetry, lambda, github or mcp")
 	}
 
 	var run func(context.Context, []string) error
@@ -60,8 +61,10 @@ func runBundledSimulator(ctx context.Context, _ deps, inv invocation) error {
 		run, service = lambdasim.Root, "lambdasim"
 	case "github":
 		run, service = githubsim.Root, "githubsim"
+	case "mcp":
+		run, service = mcpsim.Root, "mcpsim"
 	default:
-		return fmt.Errorf("unknown simulator %q — use mail, idp, storage, voice, llm, analytics, outbound, payment, telemetry, lambda or github", inv.args[0])
+		return fmt.Errorf("unknown simulator %q — use mail, idp, storage, voice, llm, analytics, outbound, payment, telemetry, lambda, github or mcp", inv.args[0])
 	}
 
 	info := *contexts.MustGetServiceInfo(ctx)

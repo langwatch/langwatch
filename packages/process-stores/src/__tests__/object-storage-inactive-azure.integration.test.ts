@@ -13,6 +13,7 @@ import {
   completeAzure,
   noObjectStorage,
   openObjectStorage,
+  PLATFORM_TENANT_ID,
 } from "./object-storage-stores.fixture.ts";
 
 /** What each bucket holds, keyed `bucket/key`: a scripted S3 over HTTP the real clients reach. */
@@ -105,10 +106,10 @@ describe("given incomplete Azure settings left in the deployment", () => {
       });
       closers.push(opened.close);
 
-      expect(await roundTrip({ storage: opened.storage, projectId: "global-project" })).toBe(
+      expect(await roundTrip({ storage: opened.storage, projectId: PLATFORM_TENANT_ID })).toBe(
         "payload",
       );
-      expect([...held.keys()]).toEqual(["global-bucket/global-project/object-1"]);
+      expect([...held.keys()]).toEqual([`global-bucket/${PLATFORM_TENANT_ID}/object-1`]);
     });
   });
 

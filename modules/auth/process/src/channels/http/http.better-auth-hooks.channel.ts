@@ -189,8 +189,10 @@ const announceSsoAutoJoin = ({
   );
 
   announcements.announceSignup({
+    userId: user.id,
     userName: user.name,
     userEmail: user.email,
+    organizationId: org.id,
     organizationName: org.name,
   });
 

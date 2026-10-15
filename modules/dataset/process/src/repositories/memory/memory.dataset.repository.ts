@@ -3,6 +3,7 @@ import {
   datasetColumnsSchema,
   datasetSchema,
   datasetStorageEntrySchema,
+  datasetSummarySchema,
   type Dataset,
   type DatasetStorageEntry,
   type DatasetStoragePageInput,
@@ -11,11 +12,13 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { toDate, type Instant } from "@langwatch/time";
 
-import type {
-  DatasetRow,
-  DatasetCreateInput,
-  DatasetRepository,
-  DatasetUpdateInput,
+import {
+  datasetRecordCountColumnsSchema,
+  type DatasetRow,
+  type DatasetCreateInput,
+  type DatasetRecordCountColumns,
+  type DatasetRepository,
+  type DatasetUpdateInput,
 } from "../dataset.repository.ts";
 import type { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
 
@@ -94,19 +97,44 @@ export class MemoryDatasetRepository implements DatasetRepository {
     page: number;
     limit: number;
   }): Promise<DatasetSummary[]> {
-    const rows = this.#database
+    return this.#database
       .datasets()
       .filter((row) => row.projectId === input.projectId && !row.archivedAt)
       .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
-      .slice((input.page - 1) * input.limit, input.page * input.limit);
+      .slice((input.page - 1) * input.limit, input.page * input.limit)
+      .map((row) => {
+        const { id, name, slug, columnTypes, status, createdAt, updatedAt } = toDataset(row);
+        return datasetSummarySchema.parse({
+          id,
+          name,
+          slug,
+          columnTypes,
+          status,
+          createdAt,
+          updatedAt,
+        });
+      });
+  }
 
-    return rows.map((row) => ({
-      ...toDataset(row),
-      recordCount: this.#database
-        .records()
-        .filter((record) => record.projectId === row.projectId && record.datasetId === row.id)
-        .length,
-    }));
+  async findRecordCountColumns(input: {
+    projectId: string;
+    datasetIds: readonly string[];
+  }): Promise<DatasetRecordCountColumns[]> {
+    return this.#database
+      .datasets()
+      .filter(
+        (row) =>
+          row.projectId === input.projectId && !row.archivedAt && input.datasetIds.includes(row.id),
+      )
+      .map(({ id, contentLayout, useS3, rowCount, s3RecordCount }) =>
+        datasetRecordCountColumnsSchema.parse({
+          id,
+          contentLayout,
+          useS3,
+          rowCount,
+          s3RecordCount,
+        }),
+      );
   }
 
   async create(input: DatasetCreateInput): Promise<Dataset> {

@@ -812,7 +812,7 @@ interface Input {
   password: string;
   addressProof: string;
 }
-// Output: createdUserSchema, ../../user/contract/src/user.ts:114
+// Output: createdUserSchema, ../../user/contract/src/user.ts:115
 interface Output {
   id: string;
 }
@@ -916,19 +916,19 @@ Run by the tasks process, before serve.
 | secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:59` |
 | secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:60` |
 | secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:272`                            |
-| config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:39`                  |
-| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:41`                  |
-| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:42`                  |
-| config | `passkeyHandleSecret`         | `PASSKEY_HANDLE_SECRET`                   | `../contract/src/auth.config.ts:44`                  |
-| config | `trustedIdpOrigins`           | `SSO_TRUSTED_IDP_ORIGINS`                 | `../contract/src/auth.config.ts:46`                  |
-| config | `idpSimulatorUrl`             | `LANGWATCH_IDPSIM_URL`                    | `../contract/src/auth.config.ts:47`                  |
-| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`                 | `../contract/src/auth.config.ts:49`                  |
-| config | `signInProviders`             | `AUTH_PROVIDER`                           | `../contract/src/auth.config.ts:51`                  |
-| config | `socialProviderBases`         | `GOOGLE_SIGN_IN_BASE`                     | `../contract/src/auth.config.ts:52`                  |
-| config | `isSaas`                      | `IS_SAAS`                                 | `../contract/src/auth.config.ts:54`                  |
-| config | `signUpMode`                  | `SIGN_UP_MODE`                            | `../contract/src/auth.config.ts:56`                  |
-| config | `publicBaseUrl`               | `BASE_HOST`                               | `../contract/src/auth.config.ts:58`                  |
-| config | `nodeEnvironment`             | `NODE_ENV`                                | `../contract/src/auth.config.ts:59`                  |
-| config | `cliRefreshTokenTtlSeconds`   | `LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS` | `../contract/src/auth.config.ts:64`                  |
+| config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:40`                  |
+| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:42`                  |
+| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:43`                  |
+| config | `passkeyHandleSecret`         | `PASSKEY_HANDLE_SECRET`                   | `../contract/src/auth.config.ts:45`                  |
+| config | `trustedIdpOrigins`           | `SSO_TRUSTED_IDP_ORIGINS`                 | `../contract/src/auth.config.ts:47`                  |
+| config | `idpSimulatorUrl`             | `LANGWATCH_IDPSIM_URL`                    | `../contract/src/auth.config.ts:48`                  |
+| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`                 | `../contract/src/auth.config.ts:50`                  |
+| config | `signInProviders`             | `AUTH_PROVIDER`                           | `../contract/src/auth.config.ts:52`                  |
+| config | `socialProviderBases`         | `GOOGLE_SIGN_IN_BASE`                     | `../contract/src/auth.config.ts:53`                  |
+| config | `isSaas`                      | `IS_SAAS`                                 | `../contract/src/auth.config.ts:55`                  |
+| config | `signUpMode`                  | `SIGN_UP_MODE`                            | `../contract/src/auth.config.ts:57`                  |
+| config | `publicBaseUrl`               | `BASE_HOST`                               | `../contract/src/auth.config.ts:59`                  |
+| config | `nodeEnvironment`             | `NODE_ENV`                                | `../contract/src/auth.config.ts:60`                  |
+| config | `cliRefreshTokenTtlSeconds`   | `LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS` | `../contract/src/auth.config.ts:65`                  |
 
 <!-- readme:generated:end -->

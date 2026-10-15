@@ -5,7 +5,11 @@ import type {
   StoredProjectionRead,
 } from "@langwatch/eventing";
 import type { IdentifierFact } from "@langwatch/identity-contract";
-import { isLiveIdentifierState, LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
+import {
+  isLiveIdentifierState,
+  LIVE_IDENTIFIER_STATES,
+  normalizeIdentifierValue,
+} from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -258,7 +262,7 @@ export class PrismaIdentityProjectionRepository
       fact.provider === "email" &&
       (fact.state === "VERIFIED" || fact.state === "PRIMARY") &&
       fact.value !== null
-        ? [fact.value]
+        ? [normalizeIdentifierValue(fact.value)]
         : [],
     );
     if (proven.length === 0) return;
@@ -266,7 +270,7 @@ export class PrismaIdentityProjectionRepository
       where: {
         id: userId,
         AND: [
-          { OR: proven.map((value) => ({ email: { equals: value, mode: "insensitive" } })) },
+          { email: { in: proven } },
           { OR: [{ emailVerified: false }, { signupConfirmationPending: true }] },
         ],
       },

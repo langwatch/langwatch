@@ -1,6 +1,10 @@
 import { createShikiAdapter } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { bundledLanguagesInfo, getSingletonHighlighter, type Highlighter } from "shiki";
+// The language registry is a small list of lazy loaders; the engine and grammars behind
+// `shiki` are ~600 kB, so they load on the first highlight, never with a page that merely
+// could show code. See dev/docs/adr/027-trace-drawer-code-highlighting.md
+import type { Highlighter } from "shiki";
+import { bundledLanguagesInfo } from "shiki/langs";
 
 // Eager base: the languages that dominate trace payloads (JSON I/O,
 // attribute values, transcripts, markdown). Loaded with the singleton
@@ -96,6 +100,7 @@ export async function ensureShikiLangLoaded(canonicalLang: string): Promise<void
 
 /** Singleton Shiki highlighter shared by all consumers; must be neutered to stay alive app-wide. */
 export async function getSharedHighlighter(): Promise<Highlighter> {
+  const { getSingletonHighlighter } = await import("shiki");
   return getSingletonHighlighter({
     langs: [...SHIKI_BASE_LANGS],
     themes: [...SHIKI_THEMES],
