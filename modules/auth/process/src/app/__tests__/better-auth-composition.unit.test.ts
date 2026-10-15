@@ -2,6 +2,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { AuthUnavailableError } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SignInProviderMounts, SsoApi } from "@langwatch/enterprise-sso-contract";
 /**
  * The module composes the deployment's ONE Better Auth instance, and the
@@ -113,6 +114,8 @@ async function appFor(
         providers.identity ??
         createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
       organizations: createApiFixture<OrganizationApi>(),
+
+      licensing: createApiFixture<LicensingApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       notifications: createApiFixture<NotificationService>(),
       sso: createApiFixture<SsoApi>({

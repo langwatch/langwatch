@@ -2,6 +2,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -96,6 +97,7 @@ async function bootAuth({
       sso: createApiFixture<SsoApi>(),
       authz: createApiFixture<AuthzApi>(),
       project: createApiFixture<ProjectApi>(),
+      licensing: createApiFixture<LicensingApi>(),
     })
     .boot();
 }

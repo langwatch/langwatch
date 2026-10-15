@@ -133,6 +133,20 @@ Feature: Developer testing licenses
     Then each token shows its name, who made it, its expiry and when it last issued a license
     And any ops manager can revoke it
 
+  @unit
+  Scenario: A person with ops permissions mints a personal token through the browser sign-in
+    Given a developer who holds ops permissions on Cloud and asked the CLI sign-in for a testing-license token
+    When they approve the sign-in in the browser
+    Then the CLI's next poll receives a personal testing-license token and its expiry
+    And the sign-in code is spent and cannot be exchanged again
+
+  @unit
+  Scenario: The browser sign-in refuses a testing-license token to someone without ops permissions
+    Given a person who holds no ops permissions on Cloud and a sign-in that asked for a testing-license token
+    When they approve the sign-in in the browser
+    Then the approval is refused with the code testing_license_requires_ops_manage
+    And no token is minted and the code stays unapproved
+
   # ============================================================================
   # Ops pages
   # ============================================================================

@@ -46,7 +46,7 @@ type CliDeviceCodeStatus = "pending" | "approved" | "denied" | "expired";
 /**
  * What the CLI is asking the browser to mint on approval.
  */
-export type CliCredentialType = "device_session" | "project_api_key";
+export type CliCredentialType = "device_session" | "project_api_key" | "testing_license";
 
 /**
  * Device metadata captured at `/exchange` so a person can recognise "Bob's MacBook Pro" in

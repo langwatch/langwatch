@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { type IdentityApi, NO_SESSION_CLAIMS } from "@langwatch/identity-contract";
@@ -120,6 +121,8 @@ async function composedBetterAuth(provider: ServedOidcProvider): Promise<BetterA
       organizations: createApiFixture<OrganizationApi>({
         checkSignUp: async () => ({ allowed: true, via: "open" }),
       }),
+
+      licensing: createApiFixture<LicensingApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       notifications: createApiFixture<NotificationService>(),
       sso: createApiFixture<SsoApi>({

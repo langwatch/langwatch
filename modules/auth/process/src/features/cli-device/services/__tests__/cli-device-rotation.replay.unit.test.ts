@@ -73,6 +73,8 @@ function rotationWorld() {
       }),
     ensurePersonalWorkspace: () => Promise.reject(new Error("not reached by a rotation")),
     canViewProject: () => Promise.resolve(state.otherProjectReachable),
+    holdsOpsManage: () => Promise.resolve(false),
+    mintTestingLicenseToken: () => Promise.reject(new Error("not reached by a rotation")),
     featureFlags: () =>
       createApiFixture<FeatureFlagApi>({ isEnabled: () => Promise.resolve(true) }),
     publicBaseUrl: () => "https://app.test",

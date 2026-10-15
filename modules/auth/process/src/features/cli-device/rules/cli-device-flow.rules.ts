@@ -30,6 +30,9 @@ export function normalizeDeviceLabel(raw: string | undefined | null): string | n
   return cleaned.length > 0 ? cleaned : null;
 }
 
+/** The refusal code a testing-licence approval or exchange answers without `ops:manage`. */
+export const TESTING_LICENSE_REFUSED_CODE = "testing_license_requires_ops_manage";
+
 /** Whether the grant behind a device code has already run out of time. */
 export function expired(record: CliDeviceCodeRecord): boolean {
   return nowInstant().epochMilliseconds > record.expires_at;

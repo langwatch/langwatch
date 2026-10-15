@@ -5,6 +5,7 @@ import {
   denyRequestSchema,
   deviceCodeRequestSchema,
 } from "@langwatch/auth-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { EnsuredPersonalWorkspace } from "@langwatch/organization-contract";
 import type * as zodModule from "zod";
@@ -91,6 +92,12 @@ export interface CliDeviceFlowCollaborators {
   }) => Promise<EnsuredPersonalWorkspace>;
   /** Whether the person holds `project:view` there: the bar a project session is bound at. */
   canViewProject: (input: { userId: string; projectId: string }) => Promise<boolean>;
+  /** Whether the person holds `ops:manage` at platform scope: a testing-licence token's bar. */
+  holdsOpsManage: (input: { userId: string }) => Promise<boolean>;
+  /** A personal testing-licence token for the person, shown once. */
+  mintTestingLicenseToken: (input: {
+    userId: string;
+  }) => Promise<Awaited<ReturnType<LicensingApi["mintPersonalTestingLicenseToken"]>>>;
   /** This deployment's flag store, for the device journey's rollout gate. */
   featureFlags: () => Pick<FeatureFlagApi, "isEnabled">;
   /** The deployment's public origin, or none. */

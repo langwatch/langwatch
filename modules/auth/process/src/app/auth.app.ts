@@ -39,6 +39,7 @@ import {
   type SocialProviderBases,
 } from "@langwatch/auth-contract";
 import { AuthzApi, type AuthzGrantsService } from "@langwatch/authz-contract";
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
 import {
   configuredAuthProvider,
@@ -261,6 +262,8 @@ export class AuthModule implements AuthApiContract {
     authz: AuthzApi,
     /** The live project a CLI device grant binds a session to. */
     projects: ProjectApi,
+    /** Mints the personal testing-licence token a CLI sign-in approves (ADR-180). */
+    licensing: LicensingApi,
   };
   static readonly config = authServerConfig;
   static readonly publicConfig = authBrowserConfig.project;
@@ -556,6 +559,14 @@ export class AuthModule implements AuthApiContract {
             projectId,
             permission: "project:view",
           }),
+        holdsOpsManage: ({ userId }) =>
+          dependencies.authz.can({
+            principal: { type: "user", id: userId },
+            permission: "ops:manage",
+            scope: { type: "platform" },
+          }),
+        mintTestingLicenseToken: ({ userId }) =>
+          dependencies.licensing.mintPersonalTestingLicenseToken({ userId }),
         featureFlags: () => dependencies.featureFlags,
         publicBaseUrl: () => config.publicBaseUrl,
       },
