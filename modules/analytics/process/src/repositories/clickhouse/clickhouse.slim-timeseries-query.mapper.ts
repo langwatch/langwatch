@@ -9,6 +9,7 @@ import type {
   AnalyticsFilterValue,
   BuiltAnalyticsQuery,
 } from "@langwatch/analytics-contract";
+import { tenantScope } from "@langwatch/clickhouse-client";
 import { customMetadataKeyCondition } from "@langwatch/trace-contract";
 
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../rules/trace-signal.rules.ts";
@@ -217,7 +218,7 @@ function dedupedSlim({
     sourceAlias: alias,
     keyColumns: ["TenantId", "TraceId"],
     columns: carried,
-    where: `TenantId = {tenantId:String} ${dateClause}`,
+    where: `${tenantScope("OccurredAt")} ${dateClause}`,
   });
 }
 
@@ -423,10 +424,8 @@ export function buildSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnal
   const havingClause =
     groupByColumn && !slimGroupByHandlesUnknown(input.groupBy) ? `HAVING group_key != ''` : "";
 
-  // Outer WHERE is wrapped in one enclosing paren: `dedupedSlim`'s own
-  // tenant predicate sits one bracket deep already, so this OR (and any
-  // filter clause) must nest deeper still to stay outside the tenant guard's
-  // reach — see the matching note on `baseWhere` in aggregation-builder.mapper.ts.
+  // The fence leads the outer WHERE as one bracket; every OR after it nests deeper, so the
+  // tenant guard never sees a disjunction beside the tenant set.
   const sql = `
     SELECT
       ${selectExprs.join(",\n      ")}
@@ -440,14 +439,14 @@ export function buildSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnal
       }),
       filterPredicates,
     })}
-    WHERE (${ta}.TenantId = {tenantId:String}
+    WHERE ${tenantScope("OccurredAt")}
       AND (
         (${ta}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ta}.OccurredAt < {currentEnd:DateTime64(3)})
         OR
         (${ta}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ta}.OccurredAt < {previousEnd:DateTime64(3)})
       )
       AND ${ta}.${SLIM_HAS_SIGNAL}
-      ${filterPredicates.length > 0 ? `AND ${ta}.${SLIM_MATCHES_FILTERS}` : ""})
+      ${filterPredicates.length > 0 ? `AND ${ta}.${SLIM_MATCHES_FILTERS}` : ""}
     GROUP BY ${groupByExprs.join(", ")}
     ${havingClause}
     ORDER BY period${typeof input.timeScale === "number" ? ", date" : ""}
@@ -456,7 +455,6 @@ export function buildSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnal
   return {
     sql,
     params: {
-      tenantId: input.projectId,
       currentStart: input.startDate,
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,

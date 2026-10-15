@@ -1,9 +1,23 @@
 import type { Authorize } from "@langwatch/api/access";
-import { sealAuthorization } from "@langwatch/authorization";
+import { type Actor, type AuthorizationInput, sealAuthorization } from "@langwatch/authorization";
 import { nowInstant } from "@langwatch/time";
 
 const TEST_ORGANIZATION_ID = "test-organization";
 const TEST_PROOF_LIFETIME_MS = 5 * 60 * 1000;
+
+/** Who a test proof names, as the authorizer would: an internal actor by its code path alone. */
+function principalOf(actor: Actor): AuthorizationInput["principal"] {
+  switch (actor.type) {
+    case "api_key":
+      return { type: "apiKey", id: actor.id };
+    case "internal":
+      return { type: "internal", codePath: actor.codePath };
+    case "system":
+      return { type: "system", name: actor.name };
+    case "user":
+      return { type: "user", id: actor.id };
+  }
+}
 
 /** The door's proof minter as a test supplies it: one own grant for the asked read. */
 export const mintTestAuthorization: NonNullable<Authorize["authorization"]> = async ({
@@ -14,7 +28,7 @@ export const mintTestAuthorization: NonNullable<Authorize["authorization"]> = as
 }) =>
   sealAuthorization({
     actor,
-    principal: actor.type === "api_key" ? { type: "apiKey", id: actor.id } : actor,
+    principal: principalOf(actor),
     scope: { organizationId: TEST_ORGANIZATION_ID },
     grants: [{ projectId, permissions: [permission], via: [], kind: "own" }],
     expiresAt: nowInstant().epochMilliseconds + TEST_PROOF_LIFETIME_MS,

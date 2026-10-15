@@ -28,7 +28,7 @@ describe("Analytics timeseries query compatibility", () => {
     const query = buildRollupTimeseriesQuery(input);
 
     expect(query.sql).toContain("Europe/Amsterdam");
-    expect(query.sql).toContain("TenantId = {tenantId:String}");
-    expect(query.params.tenantId).toBe("tenant-1");
+    expect(query.sql).toContain("{{tenantScope:BucketStart}}");
+    expect(query.params).not.toHaveProperty("tenantId");
   });
 });

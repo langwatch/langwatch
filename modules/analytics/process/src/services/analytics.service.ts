@@ -20,6 +20,13 @@ import {
   type AnalyticsEvaluationRollupAppendInput,
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
+import {
+  type Authorization,
+  internalActor,
+  projectIdsReadBy,
+  readScopeKeyOf,
+} from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import type { TenantStatementLimiter } from "@langwatch/limiter";
 import {
@@ -44,6 +51,7 @@ const MINUTES_PER_DAY = 24 * 60;
 const MAX_TIMESERIES_BUCKETS = 1000;
 const MS_PER_MINUTE = 60_000;
 const TIMESERIES_CACHE_TTL_MS = 30_000;
+const TIMESERIES_READ_CODE_PATH = "analytics.AnalyticsService.getTimeseries";
 
 type CacheEntry = {
   readonly expiresAt: number;
@@ -182,31 +190,32 @@ function refuseForeignFeedbacksCursor(): never {
   });
 }
 
+type AnalyticsServiceDeps = {
+  repository: AnalyticsRepository;
+  evaluationRepository: AnalyticsEvaluationRepository;
+  tenantLimiter: TenantStatementLimiter;
+  /** Mints the own-project proof a series asked without one reads under. */
+  authz: Pick<AuthzApi, "authorizeInternal">;
+  tripwire?: LoggingAnalyticsTripwireService;
+};
+
 export class AnalyticsService {
-  static create(options: {
-    repository: AnalyticsRepository;
-    evaluationRepository: AnalyticsEvaluationRepository;
-    tenantLimiter: TenantStatementLimiter;
-    tripwire?: LoggingAnalyticsTripwireService;
-  }): AnalyticsService {
+  static create(options: AnalyticsServiceDeps): AnalyticsService {
     return new AnalyticsService(options);
   }
 
   private readonly repository: AnalyticsRepository;
   private readonly evaluationRepository: AnalyticsEvaluationRepository;
   private readonly tenantLimiter: TenantStatementLimiter;
+  private readonly authz: Pick<AuthzApi, "authorizeInternal">;
   private readonly tripwire?: LoggingAnalyticsTripwireService;
   private readonly cache = new Map<string, CacheEntry>();
 
-  private constructor(deps: {
-    repository: AnalyticsRepository;
-    evaluationRepository: AnalyticsEvaluationRepository;
-    tenantLimiter: TenantStatementLimiter;
-    tripwire?: LoggingAnalyticsTripwireService;
-  }) {
+  private constructor(deps: AnalyticsServiceDeps) {
     this.repository = deps.repository;
     this.evaluationRepository = deps.evaluationRepository;
     this.tenantLimiter = deps.tenantLimiter;
+    this.authz = deps.authz;
     this.tripwire = deps.tripwire;
   }
 
@@ -225,14 +234,25 @@ export class AnalyticsService {
       try {
         const parsed = analyticsTimeseriesInputSchema.parse(input);
         refuseDisallowedSeriesAggregations(parsed);
-        const cacheKey = JSON.stringify({ input: parsed, options: options ?? null });
+        const authorization =
+          options?.authorization ?? (await this.ownProof({ projectId: parsed.projectId }));
+        // Keyed on who the proof fences, not the proof: each request mints a fresh one, and two
+        // callers on one aggregate with different grants must not share an answer.
+        const cacheKey = JSON.stringify({
+          input: parsed,
+          maxResultRows: options?.maxResultRows ?? null,
+          scope: readScopeKeyOf(authorization, "analytics:view"),
+        });
         const cached = this.cache.get(cacheKey);
         if (cached && cached.expiresAt > nowInstant().epochMilliseconds) {
           return cached.result;
         }
 
         this.cache.delete(cacheKey);
-        const result = await this.readTimeseries(parsed, options);
+        const result = await this.readTimeseries(parsed, {
+          authorization,
+          maxResultRows: options?.maxResultRows,
+        });
         this.cache.set(cacheKey, {
           result,
           expiresAt: nowInstant().epochMilliseconds + TIMESERIES_CACHE_TTL_MS,
@@ -250,9 +270,19 @@ export class AnalyticsService {
     });
   }
 
+  /** A series asked without a proof reads its own project as the platform, never a member. */
+  private ownProof({ projectId }: { projectId: string }): Promise<Authorization> {
+    return this.authz.authorizeInternal({
+      actor: internalActor(TIMESERIES_READ_CODE_PATH),
+      projectId,
+      permission: "analytics:view",
+      purpose: { kind: "operator", entry: TIMESERIES_READ_CODE_PATH },
+    });
+  }
+
   private async readTimeseries(
     parsed: AnalyticsTimeseriesInput,
-    options?: AnalyticsTimeseriesReadOptions,
+    options: { authorization: Authorization; maxResultRows: number | undefined },
   ): Promise<AnalyticsTimeseriesResult> {
     const startDate = Temporal.Instant.fromEpochMilliseconds(parsed.startDate);
     const endDate = Temporal.Instant.fromEpochMilliseconds(parsed.endDate);
@@ -271,17 +301,21 @@ export class AnalyticsService {
     const table = this.repository.tableFor(routedInput);
     const query = {
       table,
-      tenantId: parsed.projectId,
+      authorization: options.authorization,
       input: routedInput,
       startDate,
       endDate,
       previousPeriodStartDate,
       adjustedTimeScale,
-      maxResultRows: options?.maxResultRows,
+      maxResultRows: options.maxResultRows,
     };
+    // The legacy tables read the own project alone, so a proof spanning members has nothing
+    // to compare the routed read with.
+    const readsOneProject = projectIdsReadBy(options.authorization, "analytics:view").length === 1;
     if (
       table === "trace_summaries" ||
       table === "evaluation_runs" ||
+      !readsOneProject ||
       !(await this.tripwire?.isEnabled(parsed.projectId))
     ) {
       return this.limitedTimeseries(query);
@@ -306,7 +340,7 @@ export class AnalyticsService {
   /** A dashboard queues its panels behind its tenant's share rather than running them at once. */
   private limitedTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult> {
     return this.tenantLimiter.run({
-      tenantId: query.tenantId,
+      tenantId: query.input.projectId,
       task: () => this.repository.runTimeseries(query),
     });
   }

@@ -45,7 +45,7 @@ import {
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import type { RestCredentialPrincipal } from "@langwatch/authorization";
+import type { Authorization, RestCredentialPrincipal } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -413,6 +413,7 @@ export class AnalyticsModule
     const analytics = AnalyticsServiceClass.create({
       repository: setup.repositories.analytics,
       evaluationRepository,
+      authz: setup.dependencies.authz,
       tenantLimiter: new InProcessTenantStatementLimiter({
         maxConcurrent: setup.config.tenantAnalyticsConcurrency,
         maxQueued: TENANT_ANALYTICS_MAX_QUEUED,
@@ -892,19 +893,22 @@ export class AnalyticsModule
 
   /** The legacy `POST /api/analytics` body, read and refused in that family's own sentences. */
   async answerLegacyTimeseries(
-    input: Readonly<{ raw: string; projectId: string }>,
+    input: Readonly<{ raw: string; projectId: string; authorization: Authorization }>,
   ): Promise<AnalyticsLegacyTimeseriesAnswer> {
     const reading = readLegacyTimeseriesBody(input.raw);
     if (!reading.accepted) return { status: 400, body: reading.refusal };
 
     return {
       status: 200,
-      body: await this.getTimeseries({
-        ...reading.body,
-        projectId: input.projectId,
-        startDate: toEpochMs(reading.body.startDate),
-        endDate: toEpochMs(reading.body.endDate),
-      }),
+      body: await this.getTimeseries(
+        {
+          ...reading.body,
+          projectId: input.projectId,
+          startDate: toEpochMs(reading.body.startDate),
+          endDate: toEpochMs(reading.body.endDate),
+        },
+        { authorization: input.authorization },
+      ),
     };
   }
 

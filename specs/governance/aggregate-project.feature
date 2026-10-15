@@ -526,9 +526,24 @@ Feature: An aggregate project reads its member projects
     When ana opens that span in the prompt playground, with or without the link naming its trace
     Then the playground loads the span's messages and model either way
 
-  # Unimplemented: analytics read through raw clients and the rollup windows
-  # on BucketStart, a time column the fence does not admit yet; the fifth
-  # time column awaits a decision (ADR-144 open questions).
+  @unit
+  Scenario: A rollup bucket a grant's edge cuts through is left out
+    Given a shared grant that starts or ends part way through a minute
+    When a read on a minute rollup is fenced on BucketStart
+    Then only the minute buckets wholly inside the window are admitted
+    And an open grant admits every bucket from its start
+
+  @integration
+  Scenario: The aggregate's analytics rollup counts members inside their windows
+    Given an aggregate project with one member shared from a point in time
+    And another project in the organisation that is not a member and holds spans
+    When the aggregate's trace cost is read from the trace analytics rollup under its proof
+    Then the member's spans inside the window are counted
+    And the member's spans before the window and the non-member's spans are not
+
+  # Unimplemented: the rollup and slim analytics tables read members through the
+  # proof, but trace_summaries and evaluation_runs still read the aggregate's own
+  # tenant, and the page stays hidden until they are fenced too.
   @integration @unimplemented
   Scenario: Analytics aggregate across members
     Given an aggregate project with two members each holding traces

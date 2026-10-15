@@ -248,7 +248,7 @@ resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatc
 
 |             |                                             |
 | ----------- | ------------------------------------------- |
-| Declared at | `src/transport/analytics-legacy.rest.ts:43` |
+| Declared at | `src/transport/analytics-legacy.rest.ts:47` |
 | Base URL    | none: each route's path is its address      |
 | Addressing  | literal                                     |
 | Credential  | project                                     |
@@ -257,12 +257,12 @@ resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatc
 
 Query analytics timeseries (legacy path)
 
-Permission `analytics:view`. Declared at `src/transport/analytics-legacy.rest.ts:48`.
+Permission `analytics:view`. Declared at `src/transport/analytics-legacy.rest.ts:52`.
 
 Answers at `/api/analytics`, `/api/v1/analytics`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/analytics-legacy.rest.ts:51)
+// Rawbody: "text" (inline, src/transport/analytics-legacy.rest.ts:55)
 ```
 
 ### `analyticsRest`
@@ -422,7 +422,7 @@ Contract `../contract/src/analytics.trpc.ts:56`, router `src/transport/analytics
 ```typescript
 // analytics.getTimeseries
 type Input = z.infer<typeof timeseriesInputSchema>; // ../contract/src/analytics.input-schemas.ts:134
-// Output: analyticsTimeseriesResultSchema, ../contract/src/analytics.timeseries.ts:107
+// Output: analyticsTimeseriesResultSchema, ../contract/src/analytics.timeseries.ts:108
 interface Output {
   previousPeriod: {
     date: string;
@@ -436,7 +436,7 @@ interface Output {
 
 // analytics.dataForFilter
 type Input = z.infer<typeof analyticsDataForFilterInputSchema>; // ../contract/src/analytics.trpc.ts:44
-// Output: analyticsFilterOptionsResultSchema, ../contract/src/analytics.timeseries.ts:278
+// Output: analyticsFilterOptionsResultSchema, ../contract/src/analytics.timeseries.ts:279
 interface Output {
   options: {
     field: string;
@@ -447,7 +447,7 @@ interface Output {
 
 // analytics.topUsedDocuments
 type Input = z.infer<typeof sharedFiltersInputSchema>; // ../contract/src/analytics.input-schemas.ts:85
-// Output: analyticsTopDocumentsResultSchema, ../contract/src/analytics.timeseries.ts:254
+// Output: analyticsTopDocumentsResultSchema, ../contract/src/analytics.timeseries.ts:255
 interface Output {
   topDocuments: {
     documentId: string;
@@ -460,11 +460,11 @@ interface Output {
 
 // analytics.feedbacks
 type Input = z.infer<typeof sharedFiltersInputSchema>; // ../contract/src/analytics.input-schemas.ts:85
-type Output = z.infer<typeof analyticsFeedbacksResultSchema>; // ../contract/src/analytics.timeseries.ts:168
+type Output = z.infer<typeof analyticsFeedbacksResultSchema>; // ../contract/src/analytics.timeseries.ts:169
 
 // analytics.feedbacksPage
 type Input = z.infer<typeof analyticsFeedbacksPageInputSchema>; // ../contract/src/analytics.trpc.ts:54
-type Output = z.infer<typeof analyticsFeedbacksPageResultSchema>; // ../contract/src/analytics.timeseries.ts:230
+type Output = z.infer<typeof analyticsFeedbacksPageResultSchema>; // ../contract/src/analytics.timeseries.ts:231
 ```
 
 ## Sockets
