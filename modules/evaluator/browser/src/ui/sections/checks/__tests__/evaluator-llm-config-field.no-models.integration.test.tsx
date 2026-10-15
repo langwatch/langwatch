@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The judge's picker offers Instant Evals behind the release flag or the organization's
- * opt-in; the stand-in for the lent picker lists exactly the options this field hands it.
+ * The judge's picker offers Instant Evals only when the server releases the project, whatever
+ * the flag says; the stand-in for the lent picker lists exactly the options this field hands it.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   flagReleased: false,
-  optedIn: false,
+  released: false,
   providers: [] as unknown[],
 }));
 
@@ -42,7 +42,7 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => ({
     instantEval: {
       access: {
         useQuery: () => ({
-          data: { released: state.optedIn, offer: "enable" },
+          data: { released: state.released, offer: "enable" },
           isLoading: false,
         }),
       },
@@ -70,7 +70,7 @@ const CONFIGURED_PROVIDER = { provider: "openai", enabled: true, customModels: n
 
 beforeEach(() => {
   state.flagReleased = false;
-  state.optedIn = false;
+  state.released = false;
   state.providers = [];
 });
 afterEach(() => cleanup());
@@ -101,29 +101,30 @@ describe("EvaluatorLLMConfigField", () => {
       state.providers = [CONFIGURED_PROVIDER];
     });
 
-    describe("when release_instant_evals is on", () => {
+    describe("when the server releases Instant Evals", () => {
       /** @scenario "The judge model picker shows Instant Evals when released" */
       it("offers Instant Evals among the picker's options", () => {
-        state.flagReleased = true;
+        state.released = true;
         renderField();
 
         expect(offersInstantEvals()).toBe(true);
       });
     });
 
-    describe("when the flag is off but the organization opted in", () => {
-      /** @scenario "The judge model picker shows Instant Evals to an organization that opted in" */
-      it("offers Instant Evals among the picker's options", () => {
-        state.optedIn = true;
-        renderField();
-
-        expect(offersInstantEvals()).toBe(true);
-      });
-    });
-
-    describe("when release_instant_evals is off and the organization has not opted in", () => {
+    describe("when the server does not release Instant Evals", () => {
       /** @scenario "The judge model picker hides Instant Evals when not released" */
       it("does not offer Instant Evals", () => {
+        renderField();
+
+        expect(screen.queryByLabelText("model options")).not.toBeNull();
+        expect(offersInstantEvals()).toBe(false);
+      });
+    });
+
+    describe("when release_instant_evals is on but the server does not release Instant Evals", () => {
+      /** @scenario "The release flag alone does not put Instant Evals in the picker" */
+      it("does not offer Instant Evals", () => {
+        state.flagReleased = true;
         renderField();
 
         expect(screen.queryByLabelText("model options")).not.toBeNull();
@@ -142,10 +143,10 @@ describe("EvaluatorLLMConfigField", () => {
       });
     });
 
-    describe("when release_instant_evals is on", () => {
+    describe("when the server releases Instant Evals", () => {
       /** @scenario "A project with no model provider can still pick Instant Evals" */
       it("keeps the picker and offers Instant Evals", () => {
-        state.flagReleased = true;
+        state.released = true;
         renderField();
 
         expect(screen.queryByText(/No models configured/i)).toBeNull();

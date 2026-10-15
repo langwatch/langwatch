@@ -490,6 +490,7 @@ describe("SCIM characterization: provisioning invariants", () => {
           userId: "user_1",
           externalId: "ext_1",
           op: "create",
+          changed: true,
         });
       });
     });

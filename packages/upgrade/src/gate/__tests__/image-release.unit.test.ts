@@ -7,10 +7,8 @@ import { describe, expect, it } from "vitest";
 import { loadReleaseBaseline } from "../../manifest/baseline.ts";
 import { loadReleases } from "../../manifest/manifest-loader.ts";
 import { gooseStepId, prismaStepId, stampRelease } from "../../manifest/stamp.ts";
-import { planUpgrade } from "../../plan/plan-upgrade.ts";
 import { readImageCodeSteps } from "../image-code-steps.ts";
 import { imageRelease, readImageTree, unstampedSteps } from "../image-tree.ts";
-import { assertCurrent } from "../serving-gate.ts";
 
 const stamped = {
   prismaFolders: ["20260101000000_first"],

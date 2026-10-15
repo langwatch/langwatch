@@ -10,15 +10,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { mockRequestPasswordReset, publicEnvRef } = vi.hoisted(() => ({
   mockRequestPasswordReset: vi.fn(),
   publicEnvRef: {
-    // `IS_SAAS` is stated everywhere rather than left off, because it is the
-    // thing this screen now turns on: reset follows the IDENTIFIER, not the
-    // deployment, so the refusal is the HOSTED rule and a self-hosted install
-    // keeps the door open however it federates. A case that does not say
-    // which kind of deployment it is would be leaving out its own premise.
+    // The screen offers reset wherever this installation issues its own passwords.
     current: {
       NEXTAUTH_PROVIDER: "email" as string | undefined,
       HAS_EMAIL_PROVIDER_KEY: true,
       IS_SAAS: false,
+      EMAIL_PASSWORD_ENABLED: true,
     },
   },
 }));
@@ -48,6 +45,7 @@ describe("ForgotPassword page", () => {
       NEXTAUTH_PROVIDER: "email",
       HAS_EMAIL_PROVIDER_KEY: true,
       IS_SAAS: false,
+      EMAIL_PASSWORD_ENABLED: true,
     };
   });
 
@@ -122,6 +120,7 @@ describe("ForgotPassword page", () => {
         NEXTAUTH_PROVIDER: "email",
         HAS_EMAIL_PROVIDER_KEY: false,
         IS_SAAS: false,
+        EMAIL_PASSWORD_ENABLED: true,
       };
     });
 
@@ -162,20 +161,32 @@ describe("ForgotPassword page", () => {
     });
   });
 
-  describe("when a hosted organization signs in through an identity provider", () => {
-    // Reset follows the IDENTIFIER, not the deployment: a self-hosted install
-    // keeps this door open however it federates, so the refusal is the hosted
-    // rule and names itself as one.
+  describe("when this installation issues no passwords of its own", () => {
     it("explains the password is managed by the provider instead of a form", () => {
       publicEnvRef.current = {
-        NEXTAUTH_PROVIDER: "auth0",
-        IS_SAAS: true,
+        NEXTAUTH_PROVIDER: "okta",
+        IS_SAAS: false,
         HAS_EMAIL_PROVIDER_KEY: true,
+        EMAIL_PASSWORD_ENABLED: false,
       };
       renderPage();
 
       expect(screen.getByText(/managed by your identity provider/i)).toBeTruthy();
       expect(screen.queryByRole("button", { name: /send reset link/i })).toBeNull();
+    });
+  });
+
+  describe("when cloud names Auth0 but issues its own passwords", () => {
+    it("offers the reset form", () => {
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "auth0",
+        IS_SAAS: true,
+        HAS_EMAIL_PROVIDER_KEY: true,
+        EMAIL_PASSWORD_ENABLED: true,
+      };
+      renderPage();
+
+      expect(screen.getByRole("button", { name: /send reset link/i })).toBeTruthy();
     });
   });
 });

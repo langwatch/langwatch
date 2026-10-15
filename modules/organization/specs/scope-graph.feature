@@ -49,3 +49,10 @@ Feature: The scope graph is the caller's organizations, narrowed
     And nobody is signed in
     When the sign-in page renders
     Then the browser does not ask for the scope graph
+
+  # The session read sends a signed-out visitor to sign in; the graph would only answer 401.
+  @integration
+  Scenario: A page that needs a session asks for the scope graph only once someone is signed in
+    Given the visitor is on a page that needs a session, such as a dashboard
+    When the session has not answered yet, or answered that nobody is signed in
+    Then the browser does not ask for the scope graph

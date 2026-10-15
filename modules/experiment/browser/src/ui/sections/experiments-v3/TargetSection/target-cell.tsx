@@ -113,7 +113,7 @@ function CellFailure({
             whiteSpace="pre-wrap"
             wordBreak="break-word"
           >
-            {parseLLMError(failure.title).message}
+            {parseLLMError(failure.title).message /* no-raw-error-toast-ok */}
           </Alert.Title>
           {failure.description && (
             <Alert.Description userSelect="text">{failure.description}</Alert.Description>
@@ -128,7 +128,7 @@ function CellFailure({
               whiteSpace="pre-wrap"
               wordBreak="break-word"
             >
-              {parseLLMError(failure.raw).message}
+              {parseLLMError(failure.raw).message /* no-raw-error-toast-ok */}
             </Alert.Description>
           )}
         </Alert.Content>

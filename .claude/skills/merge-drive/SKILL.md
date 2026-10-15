@@ -29,11 +29,11 @@ If it prints `no merge in progress`, there is nothing to carry. Stop.
 
 ## 2. Read what binds you
 
-| File                                       | What it gives you                        |
-| ------------------------------------------ | ---------------------------------------- |
-| `.claude/skills/core/repository-rules.md`  | what binds every agent here              |
-| `.claude/skills/core/handoff-rules.md`     | the seven statuses, the 150-line cap     |
-| the local merge handoff files, if any      | what earlier merge lanes already settled |
+| File                                      | What it gives you                        |
+| ----------------------------------------- | ---------------------------------------- |
+| `.claude/skills/core/repository-rules.md` | what binds every agent here              |
+| `.claude/skills/core/handoff-rules.md`    | the seven statuses, the 150-line cap     |
+| the local merge handoff files, if any     | what earlier merge lanes already settled |
 
 Read the branch's own purpose before resolving anything. A restructuring branch
 deletes things **on purpose**, and main kept developing them; without knowing

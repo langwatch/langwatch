@@ -1,0 +1,783 @@
+/**
+ * Every template: one dashboard each. Rogerio's boards are preloaded for their agent kinds.
+ * A template's per-kind widget lists become their own "<Base>: <kind> focus" templates.
+ */
+
+import {
+  AGENT_KIND_FOCUS_LABELS,
+  type AgentKind,
+  type CatalogueScope,
+  type Persona,
+  type Trunk,
+} from "./catalogue-labels.ts";
+import { CATALOGUE_WIDGETS } from "./catalogue-widgets.ts";
+import { DATA_REQUIREMENTS } from "./data-requirements.ts";
+
+export interface CatalogueTemplate {
+  readonly id: string;
+  readonly name: string;
+  readonly job: string;
+  readonly personas: readonly Persona[];
+  readonly trunk: Trunk;
+  readonly origin: "prototype" | "library";
+  readonly scope: CatalogueScope;
+  readonly isDefault: boolean;
+  /** The widgets, top to bottom. */
+  readonly widgets: readonly string[];
+  /** The agent kinds whose projects get this board made for them; empty means gallery only. */
+  readonly preloadFor: readonly AgentKind[];
+  /**
+   * The one agent kind the template is made for. It only helps find the template: the board
+   * it makes covers the whole project.
+   */
+  readonly focusKind?: AgentKind;
+  /**
+   * What Langy is asked when a board is made from the template: a short written report, then
+   * what the board needs that the project has not set up yet, with an offer to help.
+   */
+  readonly reportPrompt: string;
+}
+
+/** A template as written: its widgets, and other widgets for some agent kinds. */
+interface AuthoredTemplate extends Omit<CatalogueTemplate, "focusKind"> {
+  readonly byAgentKind: Readonly<Partial<Record<AgentKind, readonly string[]>>>;
+}
+
+const AUTHORED_TEMPLATES: readonly AuthoredTemplate[] = [
+  {
+    id: "cockpit",
+    name: "Agent health",
+    job: "Is my agent doing its job and working normally? One glance.",
+    personas: ["leader", "product", "ops", "eng"],
+    trunk: "Grow",
+    origin: "prototype",
+    scope: "project",
+    isDefault: true,
+    widgets: ["ck-kpis", "ck-status", "ck-attention", "ck-top-ask", "ck-trend"],
+    byAgentKind: {
+      voice: ["ck-kpis", "ck-status", "ck-attention", "ck-top-ask", "voice-task-success"],
+      generative: ["ck-kpis", "ck-status", "ck-attention", "ck-top-ask", "gen-acceptance"],
+    },
+    preloadFor: [
+      "support-bot",
+      "rag",
+      "vendor",
+      "voice",
+      "extraction",
+      "regulated",
+      "tools-agent",
+      "generative",
+    ],
+    reportPrompt:
+      'Write a short report on my "Agent health" dashboard for the dashboard period. Is my agent doing its job and working normally? One glance. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Is my agent doing its job, and what does each success cost? (2) Is my agent up right now? (3) What is the one problem I should look at first this week? (4) What do users ask for most that my agent cannot do? (5) Does my agent resolve more conversations each day? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "costs",
+    name: "Running costs",
+    job: "See where the money goes, and whether I am on budget.",
+    personas: ["finance", "eng", "leader"],
+    trunk: "Profit",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: ["cost-verdict", "cost-by-source", "cost-by-model", "cost-waste"],
+    byAgentKind: {
+      voice: ["cost-verdict", "voice-cost-per-call", "cost-by-source", "cost-waste"],
+      extraction: ["cost-verdict", "ext-cost-per-doc", "cost-by-source", "cost-waste"],
+    },
+    preloadFor: [
+      "support-bot",
+      "rag",
+      "vendor",
+      "voice",
+      "extraction",
+      "tools-agent",
+      "generative",
+    ],
+    reportPrompt:
+      'Write a short report on my "Running costs" dashboard for the dashboard period. See where the money goes, and whether I am on budget. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Will I stay within my AI budget this month? (2) How much of my AI spend goes on testing, and how much on production? (3) Which model costs me the most? (4) How much of my AI spend is wasted? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "unit-cost",
+    name: "Cost per result",
+    job: "What does each conversation, customer and success cost me?",
+    personas: ["leader", "finance", "product"],
+    trunk: "Profit",
+    origin: "library",
+    scope: "project",
+    isDefault: false,
+    widgets: ["cost-outcome", "cost-conv", "fd-cost-efficiency", "cost-by-segment"],
+    byAgentKind: {},
+    preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Cost per result" dashboard for the dashboard period. What does each conversation, customer and success cost me? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) What does each correct outcome of my agent cost? (2) What does one conversation with my agent cost? (3) What does each successful trace of my agent cost? (4) Which of my customers or teams cost the most? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "models",
+    name: "Compare models",
+    job: "I am trying a new model or prompt. Is the new one as good, and cheaper?",
+    personas: ["prompt", "eng"],
+    trunk: "Profit",
+    origin: "library",
+    scope: "project",
+    isDefault: false,
+    widgets: ["ship-models", "ship-compare", "cost-by-model", "slowest-models", "top-models"],
+    byAgentKind: {},
+    preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Compare models" dashboard for the dashboard period. I am trying a new model or prompt. Is the new one as good, and cheaper? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which model gives my agent the same quality for less? (2) How do my last test runs compare? (3) Which model costs me the most? (4) Which model makes my agent slowest? (5) Which models do my traces use most? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "adoption",
+    name: "Usage and adoption",
+    job: "Who uses my agent, how much, and do users come back?",
+    personas: ["product", "leader"],
+    trunk: "Grow",
+    origin: "library",
+    scope: "project",
+    isDefault: false,
+    widgets: ["traffic", "users", "return", "conversation-length", "topics"],
+    byAgentKind: {},
+    preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Usage and adoption" dashboard for the dashboard period. Who uses my agent, how much, and do users come back? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) How much work did my agent handle? (2) How many users does my agent have, and who are the heaviest users? (3) Do users come back to my agent? (4) Are conversations with my agent getting longer? (5) What do users ask my agent about most? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "asks",
+    name: "What users ask",
+    job: "Learn what users want, and what my agent cannot do yet.",
+    personas: ["product", "expert"],
+    trunk: "Grow",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: ["ask-cannot", "ask-rising", "ans-topics", "ask-again"],
+    byAgentKind: {},
+    preloadFor: [
+      "support-bot",
+      "rag",
+      "vendor",
+      "voice",
+      "extraction",
+      "regulated",
+      "tools-agent",
+      "generative",
+    ],
+    reportPrompt:
+      'Write a short report on my "What users ask" dashboard for the dashboard period. Learn what users want, and what my agent cannot do yet. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) What do users ask for that my agent cannot do? (2) Which topics do users ask about more than before? (3) Which topics does my agent handle well, and which badly? (4) Do users have to ask again because my agent\'s first answer missed? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "happy",
+    name: "Are users happy?",
+    job: "Are users happy, and where are they frustrated?",
+    personas: ["product", "ops"],
+    trunk: "Grow",
+    origin: "library",
+    scope: "project",
+    isDefault: false,
+    widgets: ["satisfaction-shift", "user-thumbs", "ask-again", "return"],
+    byAgentKind: {},
+    preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Are users happy?" dashboard for the dashboard period. Are users happy, and where are they frustrated? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Did user satisfaction with my agent shift? (2) Which answers did users rate badly? (3) Do users have to ask again because my agent\'s first answer missed? (4) Do users come back to my agent? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "answers",
+    name: "Answer quality",
+    job: "Check whether my agent's answers are good, and where they fail.",
+    personas: ["product", "qa", "expert"],
+    trunk: "Protect",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: ["ans-outcomes", "ans-evaluators", "ans-idk", "so-agreement", "ans-review"],
+    byAgentKind: {
+      rag: [
+        "rag-failure-source",
+        "rag-empty-retrieval",
+        "ans-idk",
+        "ans-evaluators",
+        "so-agreement",
+        "ans-review",
+      ],
+      voice: ["ans-outcomes", "ans-evaluators", "ans-idk", "so-agreement"],
+      extraction: ["ans-outcomes", "ans-evaluators", "so-agreement", "ans-review"],
+      "tools-agent": ["ans-outcomes", "ans-evaluators", "so-agreement", "ans-review"],
+      generative: ["ans-outcomes", "ans-evaluators", "so-agreement", "ans-review"],
+    },
+    preloadFor: [
+      "support-bot",
+      "rag",
+      "vendor",
+      "voice",
+      "extraction",
+      "regulated",
+      "tools-agent",
+      "generative",
+    ],
+    reportPrompt:
+      "Write a short report on my \"Answer quality\" dashboard for the dashboard period. Check whether my agent's answers are good, and where they fail. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) How did my agent's conversations end? (2) Are my agent's checks passing? (3) On which topics does my agent fail to answer? (4) Do my automatic graders agree with human reviewers? (5) Which conversations should a person review? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.",
+  },
+  {
+    id: "unanswered",
+    name: "Questions my agent cannot answer",
+    job: "I know the subject. Show me where my agent fails to answer, and why.",
+    personas: ["expert", "product"],
+    trunk: "Protect",
+    origin: "library",
+    scope: "project",
+    isDefault: false,
+    widgets: ["ans-idk", "ask-cannot", "ans-review", "so-agreement", "lowest-scores"],
+    byAgentKind: {
+      rag: [
+        "ans-idk",
+        "ask-cannot",
+        "ans-review",
+        "so-agreement",
+        "rag-failure-source",
+        "rag-empty-retrieval",
+      ],
+    },
+    preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Questions my agent cannot answer" dashboard for the dashboard period. I know the subject. Show me where my agent fails to answer, and why. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) On which topics does my agent fail to answer? (2) What do users ask for that my agent cannot do? (3) Which conversations should a person review? (4) Do my automatic graders agree with human reviewers? (5) Which of my agent\'s answers scored worst? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "breaks",
+    name: "Where my agent breaks",
+    job: "Find the errors, failing steps and loops in my agent.",
+    personas: ["eng", "ops"],
+    trunk: "Protect",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: ["up-errors", "up-where-fails", "up-step-latency", "up-loops", "up-failing-traces"],
+    byAgentKind: {
+      "tools-agent": [
+        "tools-error-rate",
+        "tools-wrong-tool",
+        "up-loops",
+        "up-step-latency",
+        "up-failing-traces",
+      ],
+    },
+    preloadFor: [
+      "support-bot",
+      "rag",
+      "vendor",
+      "voice",
+      "extraction",
+      "regulated",
+      "tools-agent",
+      "generative",
+    ],
+    reportPrompt:
+      'Write a short report on my "Where my agent breaks" dashboard for the dashboard period. Find the errors, failing steps and loops in my agent. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which errors does my agent hit each day, and did a change start them? (2) Which step or tool in my agent fails most? (3) Which step makes my agent slow? (4) Does my agent go in circles? (5) Which of my agent\'s traces failed or ran slowest? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "speed",
+    name: "Make my agent faster",
+    job: "Find out what makes my agent slow.",
+    personas: ["eng"],
+    trunk: "Grow",
+    origin: "library",
+    scope: "project",
+    isDefault: false,
+    widgets: [
+      "latency-slo",
+      "latency-spread",
+      "up-step-latency",
+      "slowest-models",
+      "fd-throughput",
+    ],
+    byAgentKind: {
+      voice: [
+        "latency-slo",
+        "latency-spread",
+        "up-step-latency",
+        "slowest-models",
+        "voice-turn-latency",
+      ],
+    },
+    preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Make my agent faster" dashboard for the dashboard period. Find out what makes my agent slow. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which periods were slower than usual for my agent? (2) How far apart are my agent\'s typical and slowest responses? (3) Which step makes my agent slow? (4) Which model makes my agent slowest? (5) How much did my agent handle, how fast, and with how many errors? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "tools",
+    name: "Tool use",
+    job: "Does my agent pick the right tools, without wasted steps?",
+    personas: ["eng", "prompt"],
+    trunk: "Protect",
+    origin: "library",
+    scope: "project",
+    isDefault: false,
+    widgets: ["tools-error-rate", "tools-wrong-tool", "up-loops", "up-step-latency", "cost-waste"],
+    byAgentKind: {},
+    preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Tool use" dashboard for the dashboard period. Does my agent pick the right tools, without wasted steps? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which of my agent\'s tools fail, and does my agent recover? (2) Does my agent pick the right tool first? (3) Does my agent go in circles? (4) Which step makes my agent slow? (5) How much of my AI spend is wasted? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "release",
+    name: "Release check",
+    job: "Decide if the next version of my agent can go out.",
+    personas: ["qa", "eng", "product"],
+    trunk: "Protect",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: ["ship-verdict", "ship-suites", "ship-flaky", "ship-compare", "ship-rollout"],
+    byAgentKind: {
+      rag: ["ship-verdict", "rag-dataset-versions", "ship-flaky", "ship-compare", "ship-rollout"],
+      voice: ["ship-verdict", "ship-suites", "ship-flaky", "ship-models"],
+      extraction: ["ship-verdict", "ext-precision-recall", "ship-models", "ship-compare"],
+      regulated: ["ship-verdict", "ship-suites", "ship-compare", "ship-rollout"],
+      "tools-agent": ["ship-verdict", "ship-suites", "ship-flaky", "ship-compare", "ship-models"],
+      generative: ["ship-verdict", "ship-suites", "ship-compare", "ship-rollout"],
+    },
+    preloadFor: [
+      "support-bot",
+      "rag",
+      "vendor",
+      "voice",
+      "extraction",
+      "regulated",
+      "tools-agent",
+      "generative",
+    ],
+    reportPrompt:
+      'Write a short report on my "Release check" dashboard for the dashboard period. Decide if the next version of my agent can go out. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Can the new version of my agent ship? (2) Do my test suites keep passing? (3) Which of my tests flip between pass and fail? (4) How do my last test runs compare? (5) Did my agent get worse in production after my last change? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "change",
+    name: "Did my change help?",
+    job: "I just changed a prompt, model or tool. Did the change help or hurt?",
+    personas: ["eng", "prompt", "product"],
+    trunk: "Protect",
+    origin: "library",
+    scope: "project",
+    isDefault: false,
+    widgets: [
+      "ship-rollout",
+      "ans-outcomes",
+      "up-errors",
+      "token-drift",
+      "fd-quality",
+      "so-changes",
+    ],
+    byAgentKind: {},
+    preloadFor: [],
+    reportPrompt:
+      "Write a short report on my \"Did my change help?\" dashboard for the dashboard period. I just changed a prompt, model or tool. Did the change help or hurt? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Did my agent get worse in production after my last change? (2) How did my agent's conversations end? (3) Which errors does my agent hit each day, and did a change start them? (4) Is my agent's token use drifting up? (5) Is my agent's quality holding while errors move? (6) Who changed my agent's prompts, models and graders, and when? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.",
+  },
+  {
+    id: "evals",
+    name: "Can I trust my evals?",
+    job: "Check that my automatic graders, tests and test sets tell the truth.",
+    personas: ["qa", "expert"],
+    trunk: "Protect",
+    origin: "library",
+    scope: "project",
+    isDefault: false,
+    widgets: [
+      "so-agreement",
+      "evaluation-coverage",
+      "lowest-passing-evaluators",
+      "ship-flaky",
+      "rag-dataset-versions",
+    ],
+    byAgentKind: {},
+    preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Can I trust my evals?" dashboard for the dashboard period. Check that my automatic graders, tests and test sets tell the truth. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Do my automatic graders agree with human reviewers? (2) How much of my traffic is evaluated? (3) Which evaluators fail most? (4) Which of my tests flip between pass and fail? (5) Does my test set still match what users ask? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "data",
+    name: "Can I trust my numbers?",
+    job: "Check that my traces carry what the dashboards need, and fix what is missing.",
+    personas: ["eng"],
+    trunk: "Trust",
+    origin: "library",
+    scope: "project",
+    isDefault: false,
+    widgets: ["data-health", "cost-accuracy", "noise", "evaluation-coverage"],
+    byAgentKind: {},
+    preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Can I trust my numbers?" dashboard for the dashboard period. Check that my traces carry what the dashboards need, and fix what is missing. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Is my data complete? (2) Are my cost figures complete? (3) Which of my traces are noise? (4) How much of my traffic is evaluated? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "safety",
+    name: "Safety and privacy",
+    job: "Is my agent safe: no leaks, no attacks, and on brand?",
+    personas: ["risk", "eng"],
+    trunk: "Protect",
+    origin: "library",
+    scope: "project",
+    isDefault: false,
+    widgets: ["attacks", "pii", "off-scope", "so-rubric", "so-changes"],
+    byAgentKind: {},
+    preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "Safety and privacy" dashboard for the dashboard period. Is my agent safe: no leaks, no attacks, and on brand? For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Is anyone trying to break my agent? (2) Is personal data leaking through my agent? (3) Does my agent stay on brand and in scope? (4) Does my agent pass each policy check? (5) Who changed my agent\'s prompts, models and graders, and when? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "signoff",
+    name: "Risk sign-off",
+    job: "Give the risk team the evidence they need to sign a release off.",
+    personas: ["risk"],
+    trunk: "Protect",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: ["so-verdict", "so-rubric", "so-queue", "so-changes"],
+    byAgentKind: {},
+    preloadFor: ["regulated"],
+    reportPrompt:
+      'Write a short report on my "Risk sign-off" dashboard for the dashboard period. Give the risk team the evidence they need to sign a release off. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Can risk sign this release of my agent off? (2) Does my agent pass each policy check? (3) Is the human review queue under control? (4) Who changed my agent\'s prompts, models and graders, and when? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "customers",
+    name: "By customer",
+    job: "See how each of my customers uses my agent, and how my agent does for them.",
+    personas: ["ops", "product", "finance"],
+    trunk: "Grow",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: ["att-share", "cost-by-segment", "att-table", "att-change"],
+    byAgentKind: {},
+    preloadFor: ["vendor"],
+    reportPrompt:
+      'Write a short report on my "By customer" dashboard for the dashboard period. See how each of my customers uses my agent, and how my agent does for them. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which of my customers use my agent most? (2) Which of my customers or teams cost the most? (3) How does my agent do for each of my customers? (4) Did my last change break my agent for any customer? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "calls",
+    name: "Call quality",
+    job: "Check that my voice agent's calls feel natural and get the job done.",
+    personas: ["ops", "eng", "qa"],
+    trunk: "Protect",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: ["voice-turn-latency", "voice-call-health", "att-table", "ans-review"],
+    byAgentKind: {},
+    preloadFor: ["voice"],
+    reportPrompt:
+      'Write a short report on my "Call quality" dashboard for the dashboard period. Check that my voice agent\'s calls feel natural and get the job done. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which stage makes my voice agent slow to reply? (2) Which calls drop, or have my agent repeat itself? (3) How does my agent do for each of my customers? (4) Which conversations should a person review? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "fields",
+    name: "Field accuracy",
+    job: "See which fields and document types my agent gets wrong.",
+    personas: ["expert", "ops", "qa"],
+    trunk: "Protect",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: ["ext-field-accuracy", "ext-human-review", "att-table", "att-change"],
+    byAgentKind: {},
+    preloadFor: ["extraction"],
+    reportPrompt:
+      'Write a short report on my "Field accuracy" dashboard for the dashboard period. See which fields and document types my agent gets wrong. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which fields and document types does my agent get wrong? (2) How many documents does my agent send to a person? (3) How does my agent do for each of my customers? (4) Did my last change break my agent for any customer? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "outputs",
+    name: "Outputs users keep",
+    job: "See whether users keep what my agent writes.",
+    personas: ["product"],
+    trunk: "Grow",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: ["gen-dropoff", "att-table", "att-change", "cost-by-segment"],
+    byAgentKind: {},
+    preloadFor: ["generative"],
+    reportPrompt:
+      'Write a short report on my "Outputs users keep" dashboard for the dashboard period. See whether users keep what my agent writes. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) At which step do users drop what my agent wrote? (2) How does my agent do for each of my customers? (3) Did my last change break my agent for any customer? (4) Which of my customers or teams cost the most? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "org",
+    name: "LangWatch at a glance",
+    job: "See every agent, team and AI tool across my whole org.",
+    personas: ["leader", "risk", "finance"],
+    trunk: "Profit",
+    origin: "library",
+    scope: "org",
+    isDefault: false,
+    widgets: ["inventory", "ai-tools", "org-spend", "fd-gateway", "standard", "fd-coding-agents"],
+    byAgentKind: {},
+    preloadFor: [],
+    reportPrompt:
+      'Write a short report on my "LangWatch at a glance" dashboard for the dashboard period. See every agent, team and AI tool across my whole org. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Which agents run here, and who owns them? (2) Which AI tools do my staff use? (3) What does each team and app spend? (4) Which gateway keys spend the most? (5) Is every one of my agents held to the same checks? (6) What do my staff\'s coding agents cost, and do they succeed? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "me-tokens",
+    name: "My Token Burn Rate",
+    job: "Where my coding agents' tokens and money go: by pull request, by model, by token type.",
+    personas: ["eng"],
+    trunk: "Profit",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: [
+      "me-burn-summary",
+      "me-expensive-sessions",
+      "me-by-pr",
+      "me-spend-by-model",
+      "me-pace",
+      "me-cache-gauge",
+      "me-tool-round-trips",
+      "me-main-vs-sub",
+      "me-leaks",
+    ],
+    byAgentKind: {},
+    preloadFor: ["coding"],
+    reportPrompt:
+      "Write a short report on my \"My Token Burn Rate\" dashboard for the dashboard period. Where my coding agents' tokens and money go: by pull request, by model, by token type. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) What have my coding agents cost this period, and am I on pace? (2) Which of my coding sessions cost the most? (3) Which pull requests did my coding tokens go to? (4) Which models do my coding agents spend on? (5) Am I spending faster than in a typical week? (6) How much of my coding agents' input comes from the cache? (7) Which single tool calls sent my coding agent the most tokens? (8) How are my tokens split between the main thread and subagents? (9) Where are my coding agents wasting money? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.",
+  },
+  {
+    id: "me-shipped",
+    name: "What have I shipped",
+    job: "What my merged pull requests cost in coding-agent use.",
+    personas: ["eng"],
+    trunk: "Profit",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: [
+      "me-value-per-token",
+      "me-shipping-calendar",
+      "me-cost-per-pr",
+      "me-babysit",
+      "me-pr-leaderboard",
+      "me-output-vs-spend",
+    ],
+    byAgentKind: {},
+    preloadFor: ["coding"],
+    reportPrompt:
+      'Write a short report on my "What have I shipped" dashboard for the dashboard period. What my merged pull requests cost in coding-agent use. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) What does one merged pull request cost me? (2) How many pull requests did I merge each day? (3) Which of my merged pull requests cost far more than usual? (4) How much does a pull request cost while open (CI retries, review fixes)? (5) Which of my pull requests cost the most? (6) Is my output keeping up with my coding-agent spend? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "me-speed",
+    name: "Building speed",
+    job: "My coding sessions through the day: parallel work, idle time, what ran at night.",
+    personas: ["eng"],
+    trunk: "Grow",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: [
+      "me-gantt",
+      "me-waiting-on-you",
+      "me-reply-latency",
+      "me-parallel-heatmap",
+      "me-overnight",
+      "me-active-waiting",
+    ],
+    byAgentKind: {},
+    preloadFor: ["coding"],
+    reportPrompt:
+      'Write a short report on my "Building speed" dashboard for the dashboard period. My coding sessions through the day: parallel work, idle time, what ran at night. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) What did my coding sessions do today, and when did they wait on me? (2) Which of my coding sessions waited longest for my reply? (3) How long do my coding agents wait for my reply? (4) How many coding sessions do I run at once? (5) What did my coding agents do overnight? (6) How much time do my coding agents work, and how much do they wait on me? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "me-context",
+    name: "Context health",
+    job: "How big my context runs and where I compact. Smaller context means cheaper calls.",
+    personas: ["eng"],
+    trunk: "Profit",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: [
+      "me-context-per-call",
+      "me-compaction",
+      "me-call-cost",
+      "me-oversized-context",
+      "me-subagent-context",
+      "me-steps",
+    ],
+    byAgentKind: {},
+    preloadFor: ["coding"],
+    reportPrompt:
+      'Write a short report on my "Context health" dashboard for the dashboard period. How big my context runs and where I compact. Smaller context means cheaper calls. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) How big is my coding agents\' context each day? (2) Do I compact my context at the right size? (3) What does one model call cost at each context size? (4) How much do I spend carrying oversized context? (5) How much context does each type of subagent carry? (6) How many model calls do my coding agents take per task? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "me-harness",
+    name: "My harness",
+    job: "The skills, MCPs and CLIs I installed: use, effect and speed.",
+    personas: ["eng"],
+    trunk: "Grow",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: [
+      "me-harness-effect",
+      "me-tool-mix",
+      "me-clis-mcps",
+      "me-harness-changes",
+      "me-skills-in-use",
+      "me-harness-speed",
+      "me-dead-weight",
+    ],
+    byAgentKind: {},
+    preloadFor: ["coding"],
+    reportPrompt:
+      'Write a short report on my "My harness" dashboard for the dashboard period. The skills, MCPs and CLIs I installed: use, effect and speed. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Do my skills, MCPs and CLIs make my pull requests cheaper? (2) Which tools send my coding agents the most tokens? (3) Which CLIs and MCP servers do I use, and how much? (4) What changed in my coding setup since last week? (5) Which of my skills run, and how often? (6) Which tools slow my coding agents down? (7) Which MCP servers load into every session but are rarely called? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+  },
+  {
+    id: "me-market",
+    name: "The market",
+    job: "My real coding-agent use priced on other vendors' rate cards. Prices only, no quality adjustment.",
+    personas: ["eng"],
+    trunk: "Profit",
+    origin: "prototype",
+    scope: "project",
+    isDefault: false,
+    widgets: [
+      "me-sub-vs-api",
+      "me-provider-replay",
+      "me-context-fit",
+      "me-cache-sensitivity",
+      "me-peak-hours",
+    ],
+    byAgentKind: {},
+    preloadFor: ["coding"],
+    reportPrompt:
+      "Write a short report on my \"The market\" dashboard for the dashboard period. My real coding-agent use priced on other vendors' rate cards. Prices only, no quality adjustment. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Is my seat cheaper than paying API list prices? (2) What would my last month cost with other vendors? (3) How many of my calls would be too big for other vendors' context limits? (4) How would my bill change at a different cache hit rate? (5) Do my tokens fall in vendors' peak-price hours? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.",
+  },
+];
+
+const QUESTIONS = new Map(CATALOGUE_WIDGETS.map(({ id, question }) => [id, question] as const));
+
+/** The report Langy is asked for: the board's job, then each widget's question in order. */
+function reportPromptFor({
+  name,
+  job,
+  widgets,
+}: Pick<CatalogueTemplate, "name" | "job" | "widgets">): string {
+  const questions = widgets.map((id, index) => `(${index + 1}) ${QUESTIONS.get(id) ?? id}`);
+  return [
+    `Write a short report on my "${name}" dashboard for the dashboard period. ${job}`,
+    "For each of these questions, answer in one or two sentences with the real numbers from",
+    `LangWatchQL: ${questions.join(" ")} Then name the one thing that most needs attention,`,
+    "and why. If a question has no data for the period, say so rather than guessing.",
+  ].join(" ");
+}
+
+/** A focus template's id: its base's, then its agent kind, so each stays stable. */
+export function focusTemplateId({ baseId, kind }: { baseId: string; kind: AgentKind }): string {
+  return `${baseId}__${kind}`;
+}
+
+/** The template as written, made for one agent kind when only one kind gets it preloaded. */
+function baseTemplate({ byAgentKind, ...template }: AuthoredTemplate): CatalogueTemplate {
+  const variantKinds = new Set(Object.keys(byAgentKind));
+  const [onlyKind, ...otherKinds] = template.preloadFor;
+  return {
+    ...template,
+    preloadFor: template.preloadFor.filter((kind) => !variantKinds.has(kind)),
+    ...(onlyKind && otherKinds.length === 0 ? { focusKind: onlyKind } : {}),
+  };
+}
+
+/** Each per-kind widget list as its own template, preloaded where the base was for that kind. */
+function focusTemplates({ byAgentKind, ...base }: AuthoredTemplate): CatalogueTemplate[] {
+  return (Object.entries(byAgentKind) as [AgentKind, readonly string[]][]).map(
+    ([kind, widgets]) => {
+      const name = `${base.name}: ${AGENT_KIND_FOCUS_LABELS[kind]} focus`;
+      return {
+        ...base,
+        id: focusTemplateId({ baseId: base.id, kind }),
+        name,
+        isDefault: false,
+        widgets,
+        preloadFor: base.preloadFor.includes(kind) ? [kind] : [],
+        focusKind: kind,
+        reportPrompt: reportPromptFor({ name, job: base.job, widgets }),
+      };
+    },
+  );
+}
+
+const REQUIREMENTS = new Map(DATA_REQUIREMENTS.map((need) => [need.key, need] as const));
+const WIDGET_NEEDS = new Map(CATALOGUE_WIDGETS.map(({ id, requirements }) => [id, requirements]));
+const WIDGET_TITLES = new Map(CATALOGUE_WIDGETS.map(({ id, title }) => [id, title] as const));
+
+/** What a member can send or turn on to meet one requirement, sorted; none if traces do. */
+function settableNames(alternatives: readonly string[]): string[] {
+  if (alternatives.includes("traces")) return [];
+  return alternatives
+    .flatMap((key) => {
+      const need = REQUIREMENTS.get(key);
+      return need && need.kind !== "feature" ? [need.name] : [];
+    })
+    .toSorted();
+}
+
+/**
+ * What the board's widgets need that a member can send or turn on, each one's alternatives
+ * joined by "or". A need already implied by a narrower one is dropped, as is one met by plain
+ * traces or by something LangWatch itself has still to build: none is the member's to set up.
+ */
+export function templateSetupNeeds(widgets: readonly string[]): string[] {
+  const needs = widgets.flatMap((id) =>
+    (WIDGET_NEEDS.get(id) ?? []).flatMap((alternatives) => {
+      const settable = settableNames(alternatives);
+      return settable.length > 0 ? [settable] : [];
+    }),
+  );
+  const kept: string[][] = [];
+  for (const need of needs.toSorted((a, b) => a.length - b.length)) {
+    if (!kept.some((narrower) => isWithin({ narrower, need }))) kept.push(need);
+  }
+  return kept.map((need) => need.join(" or "));
+}
+
+/** A widget of the board and the data it waits for, as a sentence names it. */
+export interface WidgetGap {
+  readonly widget: string;
+  readonly gap: string;
+}
+
+/** The widgets that wait for data the member can send or turn on, each with its needs. */
+export function templateWidgetGaps(widgets: readonly string[]): WidgetGap[] {
+  return widgets.flatMap((id) => {
+    const needs = (WIDGET_NEEDS.get(id) ?? [])
+      .map((alternatives) => settableNames(alternatives).join(" or "))
+      .filter(Boolean);
+    return needs.length > 0
+      ? [{ widget: WIDGET_TITLES.get(id) ?? id, gap: needs.join(" and ") }]
+      : [];
+  });
+}
+
+/** Whether meeting `narrower` already meets `need`: each of its alternatives is one of need's. */
+const isWithin = ({ narrower, need }: { narrower: readonly string[]; need: readonly string[] }) =>
+  narrower.every((name) => need.includes(name));
+
+/** The report's last ask: find what the board needs that is not set up yet, and offer help. */
+function setupCheckFor(widgets: readonly string[]): string {
+  const needs = templateSetupNeeds(widgets);
+  const gaps = templateWidgetGaps(widgets);
+  const waiting =
+    gaps.length > 0
+      ? ` These widgets wait for data: ${gaps.map(({ widget, gap }) => `"${widget}" needs ${gap}`).join("; ")}.`
+      : "";
+  const listed = needs.length > 0 ? ` It needs: ${needs.join("; ")}.${waiting}` : "";
+  return [
+    `Then check what this dashboard needs that my project has not set up yet.${listed}`,
+    "Also look for fields its queries read that my traces lack, such as cost, user id or",
+    "evaluator results, and integrations I have not connected. Say plainly what is missing,",
+    "and offer to help me set up each piece.",
+  ].join(" ");
+}
+
+/** Every template, each base followed by its focus templates. */
+export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = AUTHORED_TEMPLATES.flatMap(
+  (template) => [baseTemplate(template), ...focusTemplates(template)],
+).map((template) => ({
+  ...template,
+  reportPrompt: `${template.reportPrompt} ${setupCheckFor(template.widgets)}`,
+}));

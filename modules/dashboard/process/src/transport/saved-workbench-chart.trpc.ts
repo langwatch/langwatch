@@ -1,7 +1,7 @@
 /**
  * The server half of the saved-workbench-chart namespace: a permission and a
- * handler per procedure the contract already named. Thin by design — the app
- * resolves who's asking, applies the rollout gate, admits against protections.
+ * handler per procedure. The member is the viewer: charts on boards they cannot
+ * see read as not found. The app applies the rollout gate and protections.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DashboardApi, savedWorkbenchChartTrpc } from "@langwatch/dashboard-contract";
@@ -12,12 +12,18 @@ export const savedWorkbenchChartTrpcTransport: TrpcRouterDeclaration<
 > = defineTrpcRouter(DashboardApi, savedWorkbenchChartTrpc)
   .procedure("getAll")
   .withPermission("analytics:view")
-  .handle(async ({ app, input }) => app.listSavedWorkbenchCharts({ projectId: input.projectId }))
+  .handle(async ({ app, input, actor }) =>
+    app.listSavedWorkbenchCharts({ projectId: input.projectId, viewer: { userId: actor.id } }),
+  )
 
   .procedure("getById")
   .withPermission("analytics:view")
-  .handle(async ({ app, input }) =>
-    app.getSavedWorkbenchChart({ projectId: input.projectId, chartId: input.id }),
+  .handle(async ({ app, input, actor }) =>
+    app.getSavedWorkbenchChart({
+      projectId: input.projectId,
+      chartId: input.id,
+      viewer: { userId: actor.id },
+    }),
   )
 
   .procedure("create")
@@ -38,6 +44,7 @@ export const savedWorkbenchChartTrpcTransport: TrpcRouterDeclaration<
       projectId: input.projectId,
       actorId: actor.id,
       chartId: input.id,
+      viewer: { userId: actor.id },
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.definition === undefined ? {} : { definition: input.definition }),
     }),
@@ -50,6 +57,7 @@ export const savedWorkbenchChartTrpcTransport: TrpcRouterDeclaration<
       projectId: input.projectId,
       chartId: input.id,
       actorId: actor.id,
+      viewer: { userId: actor.id },
       ...(input.timeWindow === undefined ? {} : { timeWindow: input.timeWindow }),
       ...(input.granularitySeconds === undefined
         ? {}
@@ -60,8 +68,12 @@ export const savedWorkbenchChartTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("delete")
   .withPermission("analytics:delete")
-  .handle(async ({ app, input }) => {
-    await app.deleteSavedWorkbenchChart({ projectId: input.projectId, chartId: input.id });
+  .handle(async ({ app, input, actor }) => {
+    await app.deleteSavedWorkbenchChart({
+      projectId: input.projectId,
+      chartId: input.id,
+      viewer: { userId: actor.id },
+    });
 
     return { success: true as const };
   })

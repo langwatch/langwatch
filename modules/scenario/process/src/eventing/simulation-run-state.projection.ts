@@ -53,6 +53,13 @@ const MAX_MESSAGE_CONTENT_BYTES = 64 * 1024;
 const MAX_MESSAGE_REST_BYTES = 64 * 1024;
 
 /**
+ * Half-width of the run-state read-back window around the folded event. A run's
+ * events land within hours of its start (a stalled run closes after a day); a
+ * later one (an archive) misses and the executor re-reads it unwindowed.
+ */
+export const SIMULATION_RUN_STATE_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
  * Serialise run metadata without encrypted secrets (queued event carries those).
  * `secretParameterNames` stays for readback.
  */
@@ -376,6 +383,12 @@ export class SimulationRunStateFoldProjection
   readonly name = "simulationRunState";
   readonly version = SIMULATION_PROJECTION_VERSIONS.RUN_STATE;
   readonly store: FoldProjectionStore<SimulationRunStateData>;
+  // Bounds the read-back to the weeks around the event (simulation_runs is
+  // partitioned by toYearWeek(StartedAt)); a miss retries without the window.
+  // See modules/scenario/specs/simulation-run-state-read-window.feature.
+  readonly options = {
+    readWindow: { widthMs: SIMULATION_RUN_STATE_READ_WINDOW_MS },
+  } as const;
 
   protected readonly events = simulationRunEvents;
 

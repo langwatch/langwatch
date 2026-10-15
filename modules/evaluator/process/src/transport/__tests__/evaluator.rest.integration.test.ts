@@ -59,6 +59,7 @@ function buildApi(overrides: Partial<EvaluatorApi> = {}) {
 
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },

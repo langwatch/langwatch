@@ -15,12 +15,15 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { InstanceAdminRepository } from "../repositories/instance-admin.repository.ts";
 import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules.ts";
 import { isOrganizationDatasetLimitWriteAllowed } from "../rules/organization-dataset-limit.rules.ts";
+import type { AdminAccess } from "./admin-access.service.ts";
 import type { AdminAuditSink } from "./impersonation.service.ts";
 
 const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "deleteMany"]);
 /** User writes that would skip the user module's facts and last-operator rule. */
 const USER_METHODS_REFUSED = new Set(["updateMany", "delete", "deleteMany"]);
 
+/** Asked as impersonation asks it: an operator's account is never a Back office target. */
+type InstanceAdminOperators = Pick<AdminAccess, "isAdmin">;
 /** Auth's account doors: each writes through user, then ends the credentials it outdates. */
 export type InstanceAdminAccounts = Pick<AuthApi, "deactivateUser" | "changeUserEmail">;
 /** Project's one door for its sharing switch, so share hears the fact it revokes from. */
@@ -31,6 +34,7 @@ interface InstanceAdminServiceOptions {
   repository: InstanceAdminRepository;
   users: UserApi;
   accounts: InstanceAdminAccounts;
+  operators: InstanceAdminOperators;
   /** Absent only where no sharing switch is edited; a switch then refuses by name. */
   projects?: InstanceAdminProjects | undefined;
   shares?: InstanceAdminShares | undefined;
@@ -67,6 +71,7 @@ export class InstanceAdminService {
   private readonly repository: InstanceAdminRepository;
   private readonly users: UserApi;
   private readonly accounts: InstanceAdminAccounts;
+  private readonly operators: InstanceAdminOperators;
   private readonly projects: InstanceAdminProjects;
   private readonly shares: InstanceAdminShares;
   private readonly audit: AdminAuditSink;
@@ -76,6 +81,7 @@ export class InstanceAdminService {
     repository: InstanceAdminRepository;
     users: UserApi;
     accounts: InstanceAdminAccounts;
+    operators: InstanceAdminOperators;
     projects: InstanceAdminProjects;
     shares: InstanceAdminShares;
     audit: AdminAuditSink;
@@ -84,6 +90,7 @@ export class InstanceAdminService {
     this.repository = deps.repository;
     this.users = deps.users;
     this.accounts = deps.accounts;
+    this.operators = deps.operators;
     this.projects = deps.projects;
     this.shares = deps.shares;
     this.audit = deps.audit;
@@ -95,6 +102,7 @@ export class InstanceAdminService {
       repository: options.repository,
       users: options.users,
       accounts: options.accounts,
+      operators: options.operators,
       projects: options.projects ?? NO_SHARING_DOOR,
       shares: options.shares ?? NO_SHARING_DOOR,
       audit: options.audit,
@@ -104,11 +112,7 @@ export class InstanceAdminService {
 
   async execute(input: AdminOperationInput): Promise<AdminOperationResult> {
     const parsed = adminOperationInputSchema.parse(input);
-    if (parsed.resource === "user" && USER_METHODS_REFUSED.has(parsed.method)) {
-      throw new ValidationError("The admin API does not bulk-update or delete users", {
-        meta: { fieldErrors: { method: ["Deactivate users one at a time instead."] } },
-      });
-    }
+    if (parsed.resource === "user") await this.refuseUserWrite(parsed);
     if (
       "traceSharingEnabled" in (parsed.params.data ?? {}) &&
       !(parsed.resource === "project" && ["create", "update"].includes(parsed.method))
@@ -117,15 +121,6 @@ export class InstanceAdminService {
         meta: {
           fieldErrors: { traceSharingEnabled: ["Edit each project, so its links are handled."] },
         },
-      });
-    }
-    if (
-      parsed.resource === "user" &&
-      parsed.method === "create" &&
-      "deactivatedAt" in (parsed.params.data ?? {})
-    ) {
-      throw new ValidationError("A new account starts active", {
-        meta: { fieldErrors: { deactivatedAt: ["Create the account, then deactivate it."] } },
       });
     }
     if (
@@ -243,6 +238,41 @@ export class InstanceAdminService {
     }
 
     return "deactivate";
+  }
+
+  /** The user writes the Back office never makes, each refused before anything is audited. */
+  private async refuseUserWrite(input: AdminOperationInput): Promise<void> {
+    const data = input.params.data ?? {};
+    if (USER_METHODS_REFUSED.has(input.method)) {
+      throw new ValidationError("The admin API does not bulk-update or delete users", {
+        meta: { fieldErrors: { method: ["Deactivate users one at a time instead."] } },
+      });
+    }
+    if (input.method === "create" && "deactivatedAt" in data) {
+      throw new ValidationError("A new account starts active", {
+        meta: { fieldErrors: { deactivatedAt: ["Create the account, then deactivate it."] } },
+      });
+    }
+    if ("emailVerified" in data) {
+      throw new ValidationError("An address is verified by its owner", {
+        meta: {
+          fieldErrors: {
+            emailVerified: ["Verification is not set by hand; a new address clears it."],
+          },
+        },
+      });
+    }
+    await this.refuseOperatorAccount(input);
+  }
+
+  /** Operators manage each other on the Operators page; the grant is revoked there first. */
+  private async refuseOperatorAccount(input: AdminOperationInput): Promise<void> {
+    if (!MUTATING_METHODS.has(input.method) || input.params.id === undefined) return;
+    if (!(await this.operators.isAdmin({ id: String(input.params.id) }))) return;
+
+    throw new ValidationError("An operator's account is not edited in the Back office", {
+      meta: { fieldErrors: { id: ["Revoke the operator on the Operators page first."] } },
+    });
   }
 
   /** Refused before the audit entry, so a refused write leaves nothing recorded. */
