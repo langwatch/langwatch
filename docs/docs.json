@@ -538,6 +538,7 @@
               {
                 "group": "Anthropic (Claude)",
                 "pages": [
+                  "integration/anthropic/claude-platform",
                   "integration/python/integrations/anthropic",
                   "integration/go/integrations/anthropic"
                 ]
