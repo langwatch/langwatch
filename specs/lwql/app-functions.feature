@@ -397,10 +397,32 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
 
   @unit
   Scenario: A multi-replica server without a shared function store is provisioned without the functions
-    Given a self-hosted ClickHouse with three replicas and no user_defined_zookeeper_path
+    Given a self-hosted ClickHouse with three replicas and no function store in Keeper at /clickhouse/user_defined
     When self-provisioning runs
-    Then the app functions are left out and the log names the setting to declare
+    Then the app functions are left out and the log names the setting and the path to declare
     And the rest of the access model is provisioned
+
+  # ClickHouse 25.10 lists user_defined_zookeeper_path nowhere in system.server_settings,
+  # so the probe asks Keeper for the store node the setting creates at boot.
+  @unit
+  Scenario: A replicated server whose function store is in Keeper is provisioned with the functions
+    Given a ClickHouse 25.10 with three replicas and the function store at /clickhouse/user_defined in Keeper
+    And system.server_settings does not list user_defined_zookeeper_path
+    When self-provisioning probes where a CREATE FUNCTION would land
+    Then the app functions are provisionable
+    And every app function, one missing from the store included, is created with CREATE OR REPLACE
+
+  @integration
+  Scenario: The probe finds the function store in Keeper on a real replicated ClickHouse
+    Given a ClickHouse 25.10 with Keeper, a table with two replicas and user_defined_zookeeper_path at /clickhouse/user_defined
+    When the function store probe runs
+    Then the app functions are provisionable
+
+  @integration
+  Scenario: The probe refuses a real replicated ClickHouse with no function store in Keeper
+    Given a ClickHouse 25.10 with Keeper and a table with two replicas but no user_defined_zookeeper_path
+    When the function store probe runs
+    Then the app functions are not provisionable
 
   @unit
   Scenario: A single-node server is provisioned with the functions

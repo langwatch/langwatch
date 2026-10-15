@@ -9,7 +9,10 @@ import { createLogger } from "@langwatch/observability";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
 
-import { canProvisionAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
+import {
+  APP_FUNCTION_KEEPER_STORE_PATH,
+  canProvisionAppFunctions,
+} from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,
@@ -18,6 +21,7 @@ import {
   LangWatchQLSelfProvisioningService,
   type LwqlSelfProvisionRequest,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../repositories/langwatch-ql-postgres.repository.ts";
 import type { LangWatchQLProvisioningRepository } from "../repositories/langwatch-ql-provisioning.repository.ts";
@@ -153,35 +157,19 @@ export function fillLwqlProjectKeys({
   });
 }
 
+/** False where the probe could not read the server; the repository logs why. */
 async function appFunctionsProvisionable(
   repository: LangWatchQLProvisioningRepository,
 ): Promise<boolean> {
-  try {
-    const [replicas, setting] = await Promise.all([
-      repository.queryRows(
-        "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas",
-      ),
-      repository.queryRows(
-        "SELECT value FROM system.server_settings WHERE name = 'user_defined_zookeeper_path'",
-      ),
-    ]);
-    const probe = {
-      maxTotalReplicas: Number(replicas[0]?.max_total_replicas ?? "0") || 0,
-      userDefinedZookeeperPath: typeof setting[0]?.value === "string" ? setting[0].value : "",
-    };
-    if (canProvisionAppFunctions(probe)) return true;
-    logger.error(
-      { maxTotalReplicas: probe.maxTotalReplicas },
-      "lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and no user_defined_zookeeper_path, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path in the server config and redeploy; LangWatchQL app functions stay refused until then",
-    );
-    return false;
-  } catch (error) {
-    logger.error(
-      { error: clickHouseErrorSummary(error) },
-      "lwql self-provisioning could not read the replica layout from system.replicas and system.server_settings; the app functions are left out until it can",
-    );
-    return false;
-  }
+  const [probe] =
+    await ClickHouseLangWatchQLAppFunctionStoreRepository.overAdmin(repository).findProbe();
+  if (probe === undefined) return false;
+  if (canProvisionAppFunctions(probe)) return true;
+  logger.error(
+    { maxTotalReplicas: probe.maxTotalReplicas, keeperPath: APP_FUNCTION_KEEPER_STORE_PATH },
+    `lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and no SQL function store in Keeper at ${APP_FUNCTION_KEEPER_STORE_PATH}, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path to ${APP_FUNCTION_KEEPER_STORE_PATH} in the server config on every replica and redeploy; LangWatchQL app functions stay refused until then`,
+  );
+  return false;
 }
 
 /**

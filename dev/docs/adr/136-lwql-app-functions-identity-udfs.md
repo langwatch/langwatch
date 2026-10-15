@@ -200,6 +200,15 @@ node there is no ensemble to point at. The cloud's own rendered config
 (`langwatch-saas`, `config/lwql-server.xml`) needs the same element and the
 same path, and lands as its own change.
 
+Before it creates the functions on a server with more than one replica, the
+provisioning task checks that the store really is in Keeper. ClickHouse 25.10
+does not list `user_defined_zookeeper_path` in `system.server_settings`, so the
+check reads `system.zookeeper` for the `/clickhouse/user_defined` node, which the
+server creates at boot when the setting is present, even with no function
+stored. A single node is not asked, because it has no `system.zookeeper`. With no
+node, the functions are left out and the log names the setting and the path.
+The ops checkup reads the same probe.
+
 ## 5. Caps are refusals, and truncation is never silent
 
 A cap breach is `lwql_app_function_key_cap` (422), naming the cap, the key kind

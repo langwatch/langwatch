@@ -1,53 +1,69 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 
-import type { AppFunctionStoreProbe } from "../../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
+import {
+  APP_FUNCTION_KEEPER_STORE,
+  type AppFunctionStoreProbe,
+  needsKeeperFunctionStore,
+} from "../../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import { LangWatchQLAppFunctionStoreRepository } from "../langwatch-ql-app-function-store.repository.ts";
+import type { LangWatchQLProvisioningRepository } from "../langwatch-ql-provisioning.repository.ts";
 
 const logger = createLogger("langwatch:analytics:lwql-app-function-store");
 
+type ReadRows = (sql: string) => Promise<Record<string, unknown>[]>;
+
+const MAX_TOTAL_REPLICAS_SQL =
+  "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas";
+
+const KEEPER_FUNCTION_STORE_SQL =
+  "SELECT toString(count()) AS stores FROM system.zookeeper " +
+  `WHERE path = '${APP_FUNCTION_KEEPER_STORE.parent}' AND name = '${APP_FUNCTION_KEEPER_STORE.name}'`;
+
 /**
- * Reads the replica layout and the UDF store setting. A server that cannot
- * answer (no `system.server_settings`, no access to `system.replicas`) answers
- * nothing, so a replicated server is never mistaken for a single node.
+ * Reads the replica layout and, only when replicated, whether Keeper holds the
+ * function store: a server with no Keeper has no `system.zookeeper` to ask. A
+ * server that cannot answer answers nothing, so it is never taken for a single node.
  */
 export class ClickHouseLangWatchQLAppFunctionStoreRepository extends LangWatchQLAppFunctionStoreRepository {
-  private constructor(private readonly clickhouse: ClickHouseQueryClient) {
+  private constructor(private readonly rows: ReadRows) {
     super();
   }
 
   static create(
     clickhouse: ClickHouseQueryClient,
   ): ClickHouseLangWatchQLAppFunctionStoreRepository {
-    return new ClickHouseLangWatchQLAppFunctionStoreRepository(clickhouse);
+    return new ClickHouseLangWatchQLAppFunctionStoreRepository(async (sql) => {
+      const result = await clickhouse.query<Record<string, unknown>>({
+        tenantId: "",
+        sql,
+        // The replica layout and the Keeper store describe the server, which no tenant owns.
+        SKIP_TENANT_CHECK: true,
+      });
+      return result.rows;
+    });
+  }
+
+  /** Over the deploy task's admin connection, the one that then creates the functions. */
+  static overAdmin(
+    admin: Pick<LangWatchQLProvisioningRepository, "queryRows">,
+  ): ClickHouseLangWatchQLAppFunctionStoreRepository {
+    return new ClickHouseLangWatchQLAppFunctionStoreRepository((sql) => admin.queryRows(sql));
   }
 
   async findProbe(): Promise<AppFunctionStoreProbe[]> {
     try {
-      const [replicas, setting] = await Promise.all([
-        this.clickhouse.query<{ max_total_replicas: string }>({
-          tenantId: "",
-          sql: "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas",
-          // The replica layout and server settings describe the server, which no tenant owns.
-          SKIP_TENANT_CHECK: true,
-        }),
-        this.clickhouse.query<{ value: string }>({
-          tenantId: "",
-          sql: "SELECT value FROM system.server_settings WHERE name = 'user_defined_zookeeper_path'",
-          // The replica layout and server settings describe the server, which no tenant owns.
-          SKIP_TENANT_CHECK: true,
-        }),
-      ]);
-      return [
-        {
-          maxTotalReplicas: Number(replicas.rows[0]?.max_total_replicas ?? "0") || 0,
-          userDefinedZookeeperPath: setting.rows[0]?.value ?? "",
-        },
-      ];
+      const replicas = await this.rows(MAX_TOTAL_REPLICAS_SQL);
+      const maxTotalReplicas = Number(replicas[0]?.max_total_replicas ?? "0") || 0;
+      if (!needsKeeperFunctionStore(maxTotalReplicas)) {
+        return [{ maxTotalReplicas, functionStoreInKeeper: false }];
+      }
+      const stores = await this.rows(KEEPER_FUNCTION_STORE_SQL);
+      return [{ maxTotalReplicas, functionStoreInKeeper: Number(stores[0]?.stores ?? "0") > 0 }];
     } catch (error) {
       logger.error(
         { error },
-        "Could not read the replica layout from system.replicas and system.server_settings, so LangWatchQL app functions are not provisionable until it can",
+        "Could not read the replica layout from system.replicas or the function store from system.zookeeper, so LangWatchQL app functions are not provisionable until it can",
       );
       return [];
     }
