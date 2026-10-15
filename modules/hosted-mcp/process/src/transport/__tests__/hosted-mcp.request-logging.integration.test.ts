@@ -37,7 +37,6 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 });
 
 import { MemoryMcpOAuthClientRepository } from "../../repositories/memory/memory.mcp-oauth-client.repository.ts";
-import { MemoryMcpSessionRelayRepository } from "../../repositories/memory/memory.mcp-session-relay.repository.ts";
 import { MemoryMcpSessionRepository } from "../../repositories/memory/memory.mcp-session.repository.ts";
 import { RedisMcpOAuthTokenRepository } from "../../repositories/redis/redis.mcp-oauth-token.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
@@ -101,8 +100,6 @@ const requestHeaders = {
   accept: "application/json, text/event-stream",
 };
 
-type LoggedRequest = (args: { path: string; body: unknown }) => Promise<Response>;
-
 /** Waits for the access log line, which is written when the response closes. */
 async function accessLogFor(path: string) {
   for (let attempt = 0; attempt < 50; attempt++) {
@@ -118,18 +115,9 @@ function portOf(server: Server): number {
   return typeof address === "object" && address ? address.port : 0;
 }
 
-function sessionRecord({
-  transport,
-  sessionId,
-  legacy,
-}: {
-  transport: "streamable" | "sse";
-  sessionId: string;
-  legacy: boolean;
-}) {
+function sessionRecord({ sessionId, legacy }: { sessionId: string; legacy: boolean }) {
   const projectId = legacy ? {} : { projectId: "logging-project" };
   return {
-    transport,
     sessionId,
     apiKey: VALID_API_KEY,
     ...projectId,
@@ -181,38 +169,18 @@ async function expectRecoveredRequestsAttributed({
   }
 }
 
-async function expectRelayedMessagesAttributed({
-  post,
-  sessionId,
-}: {
-  post: LoggedRequest;
-  sessionId: string;
-}): Promise<void> {
-  for (let id = 1; id < 3; id++) {
-    logLines.length = 0;
-    const response = await post({
-      path: `/messages?sessionId=${sessionId}`,
-      body: initializeBody({ id }),
-    });
-    expect(response.status).toBe(202);
-    expect((await accessLogFor("/messages")).fields.projectId).toBe("logging-project");
-  }
-}
-
 describe("Feature: MCP request logging", () => {
   let server: Server;
   let handler: McpHandler;
   let baseUrl: string;
-  // Held here so a test can play the replica that wrote a record or holds a stream.
+  // Held here so a test can play the replica that wrote a record.
   const records = MemoryMcpSessionRepository.create();
-  const relay = MemoryMcpSessionRelayRepository.create();
   const projects = new LoggingProjectLookup();
   const projectLookup = vi.spyOn(projects, "resolveLiveProjectByApiKey");
 
   beforeAll(async () => {
     handler = McpEndpointService.create({
       sessionRecords: records,
-      relay,
       oauthTokenRecords: RedisMcpOAuthTokenRepository.create({ redis: null }),
       oauthClients: MemoryMcpOAuthClientRepository.create(),
       projects,
@@ -259,9 +227,10 @@ describe("Feature: MCP request logging", () => {
     it("stores the authenticated project with the session for other replicas", async () => {
       const sessionId = await initializeSession();
 
-      await expect(
-        records.getRecord({ transport: "streamable", sessionId }),
-      ).resolves.toMatchObject({ kind: "found", projectId: "logging-project" });
+      await expect(records.getRecord({ sessionId })).resolves.toMatchObject({
+        kind: "found",
+        projectId: "logging-project",
+      });
     });
 
     describe("when the client makes another session request", () => {
@@ -290,6 +259,7 @@ describe("Feature: MCP request logging", () => {
         });
 
         expect(response.status).toBe(401);
+        expect(await response.json()).toEqual({ error: "Invalid or expired token" });
         expect((await accessLogFor("/mcp")).fields).not.toHaveProperty("projectId");
       });
     });
@@ -299,58 +269,15 @@ describe("Feature: MCP request logging", () => {
     describe("when the client resumes it on this replica", () => {
       it.each([true, false])("attributes the recovered session (legacy: %s)", async (legacy) => {
         const sessionId = `recovered-logging-${legacy}`;
-        await records.store(sessionRecord({ transport: "streamable", sessionId, legacy }));
+        await records.store(sessionRecord({ sessionId, legacy }));
         projectLookup.mockClear();
 
         await expectRecoveredRequestsAttributed({ baseUrl, sessionId });
 
-        await expect(
-          records.getRecord({ transport: "streamable", sessionId }),
-        ).resolves.toMatchObject({ projectId: "logging-project" });
-        expect(projectLookup).toHaveBeenCalledTimes(legacy ? 1 : 0);
-      });
-    });
-  });
-
-  describe("given a client holds an SSE stream on this replica", () => {
-    it("attributes its messages without another project lookup", async () => {
-      const abort = new AbortController();
-      try {
-        const response = await fetch(`${baseUrl}/sse`, {
-          headers: requestHeaders,
-          signal: abort.signal,
+        await expect(records.getRecord({ sessionId })).resolves.toMatchObject({
+          projectId: "logging-project",
         });
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error("SSE response has no body");
-        const event = await reader.read();
-        const endpoint = new TextDecoder().decode(event.value).match(/data: (.+)/)?.[1];
-        if (!endpoint) throw new Error("SSE stream has no message endpoint");
-        projectLookup.mockClear();
-
-        const posted = await post({ path: endpoint, body: initializeBody({ id: 1 }) });
-
-        expect(posted.status).toBe(202);
-        expect((await accessLogFor("/messages")).fields.projectId).toBe("logging-project");
-        expect(projectLookup).not.toHaveBeenCalled();
-      } finally {
-        abort.abort();
-      }
-    });
-  });
-
-  describe("given an SSE session held by another replica", () => {
-    describe("when this replica relays a message", () => {
-      it.each([true, false])("attributes the relayed message (legacy: %s)", async (legacy) => {
-        const sessionId = `remote-sse-${legacy}`;
-        const relayed: string[] = [];
-        await relay.listen({ sessionId, onMessage: (raw) => relayed.push(raw) });
-        await records.store(sessionRecord({ transport: "sse", sessionId, legacy }));
-        projectLookup.mockClear();
-
-        await expectRelayedMessagesAttributed({ post, sessionId });
-
         expect(projectLookup).toHaveBeenCalledTimes(legacy ? 1 : 0);
-        expect(relayed).toContain(JSON.stringify(initializeBody({ id: 2 })));
       });
     });
   });
@@ -377,11 +304,12 @@ describe("Feature: MCP request logging", () => {
 
     describe("when the request fails", () => {
       it("records the failing status too", async () => {
-        await fetch(`${baseUrl}/sse`, { method: "GET" });
+        const response = await fetch(`${baseUrl}/mcp`, { method: "DELETE" });
 
-        const line = await accessLogFor("/sse");
+        const line = await accessLogFor("/mcp");
 
-        expect(line.fields.status).toBe(401);
+        expect(line.fields.status).toBe(404);
+        expect(await response.json()).toEqual({ error: "Session not found" });
       });
     });
 

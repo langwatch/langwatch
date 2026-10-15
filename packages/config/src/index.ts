@@ -63,7 +63,9 @@ export { isReleaseBuild } from "./release-build.ts";
 export {
   environmentBooleanSchema,
   environmentExactOneSchema,
+  environmentExactOnSchema,
   environmentLegacyTruthySchema,
+  environmentNotExactOffSchema,
   environmentNotExactOneSchema,
   environmentOneOrTrueSchema,
   environmentPresenceSchema,

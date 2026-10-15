@@ -9,7 +9,7 @@ import {
   resolveLandingDestination,
 } from "../resolve-landing-destination.ts";
 
-const ALL_PRODUCTS: readonly ProductId[] = ["me", "llm-ops", "gateway", "governance"];
+const ALL_PRODUCTS: readonly ProductId[] = ["me", "llm-ops", "dashboards", "gateway", "governance"];
 
 function input(overrides: Partial<LandingDestinationInput> = {}): LandingDestinationInput {
   return {
@@ -87,6 +87,12 @@ describe("resolveLandingDestination", () => {
           }),
         ),
       ).toBe("/demo");
+    });
+
+    it("opens the last project's Dashboards area when Dashboards is remembered", () => {
+      expect(
+        resolveLandingDestination(input({ rememberedProduct: "dashboards", projectSlug: "demo" })),
+      ).toBe("/demo/dashboards");
     });
   });
 

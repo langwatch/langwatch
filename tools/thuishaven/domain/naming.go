@@ -95,6 +95,11 @@ const LambdaService = "lambda"
 // stack talks to, so a developer must never get it by surprise.
 const GithubService = "github"
 
+// McpService is the MCP client stand-in (services/sims/mcpsim) that drives
+// LangWatch's hosted MCP endpoint the way Claude Desktop, Claude Code and
+// Cursor do, routed at mcp.<slug>.langwatch.localhost. Opt-in like github.
+const McpService = "mcp"
+
 // APIService is the Hono API's own routed hostname
 // (api.<slug>.langwatch.localhost). It is additive, not a replacement: the
 // same-origin app.<slug>.../api path (Vite's own proxy to Stack.APIPort)

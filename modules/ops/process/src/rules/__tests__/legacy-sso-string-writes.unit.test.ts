@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AuditStub,
+  noOperators,
   organizationEdit,
   RepositoryStub,
 } from "../../services/__tests__/support/admin-doubles.ts";
@@ -15,6 +16,7 @@ import {
 function buildInstanceAdmin(connectionDecides: boolean) {
   const repository = new RepositoryStub();
   const service = InstanceAdminService.create({
+    operators: noOperators,
     accounts: {
       deactivateUser: () => Promise.reject(new Error("unreached")),
       changeUserEmail: () => Promise.reject(new Error("unreached")),

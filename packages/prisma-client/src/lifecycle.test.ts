@@ -332,6 +332,24 @@ describe("explicit Prisma lifecycle", () => {
       expect(logger.error).not.toHaveBeenCalled();
     });
 
+    it("lands Postgres's missing-relation wording at warn, with no Prisma code", () => {
+      const logger = fakeLogger();
+      const timestamp = new Date("2026-09-09T00:00:00.000Z");
+
+      forwardPrismaEvent({
+        logger,
+        level: "error",
+        event: {
+          target: "x",
+          message: 'Raw query failed. Message: `relation "IdentitySignInSwitch" does not exist`',
+          timestamp,
+        },
+      });
+
+      expect(logger.warn).toHaveBeenCalledOnce();
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
     it("lands a query event on the logger at debug, keyed by its SQL text", () => {
       const logger = fakeLogger();
       const timestamp = new Date("2026-09-09T00:00:00.000Z");

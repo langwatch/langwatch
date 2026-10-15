@@ -161,6 +161,7 @@ export class LangyFinalPartsService {
             provenance: "derived",
             card: parsed.card,
             ...(parsed.card.hints !== undefined ? { hints: parsed.card.hints } : {}),
+            ...(parsed.repaired ? { repaired: true } : {}),
           }),
         );
         continue;

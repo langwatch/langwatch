@@ -573,6 +573,7 @@ var baseTable = []commandSpec{
 	apiSpec(),
 	gatewaySpec(),
 	telemetrySpec(),
+	mcpSpec(),
 	authSpec(),
 	browserSpec(),
 	mfaSpec(),

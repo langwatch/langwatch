@@ -53,11 +53,15 @@ Write `browser-tests/<feature>/<date>/report.md`:
 
 ```markdown
 # Browser test: <feature>
+
 **Date / stack URL / branch / PR (if known)**
-| # | Scenario | Result | Evidence |
-| - | -------- | ------ | -------- |
-| 1 | <name>   | PASS   | 01-name.png |
+
+| #   | Scenario | Result | Evidence    |
+| --- | -------- | ------ | ----------- |
+| 1   | <name>   | PASS   | 01-name.png |
+
 ## Failures
+
 - **2:** expected X, saw Y (console and network lines).
 ```
 

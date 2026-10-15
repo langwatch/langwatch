@@ -1,7 +1,7 @@
 import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
-import { dataPrivacyConfig } from "../data-privacy.config.ts";
+import { dataPrivacyConfig, isGoogleDlpDisabled } from "../data-privacy.config.ts";
 
 const read = (source: Record<string, string | undefined>) =>
   parseProcessConfig({
@@ -15,6 +15,25 @@ describe("data privacy server configuration", () => {
     it("carries it as written, so both processes reach one answer", () => {
       expect(read({ LANGWATCH_DISABLE_GOOGLE_DLP: "true" }).googleDlpDisabled).toBe("true");
       expect(read({}).googleDlpDisabled).toBeUndefined();
+    });
+  });
+
+  describe("given the DLP opt-out written true in any case", () => {
+    /** @scenario "A setting written the way the previous release read it keeps that meaning" */
+    it("turns Google DLP off as the previous release did", () => {
+      for (const value of ["true", "TRUE", "True"]) {
+        expect(isGoogleDlpDisabled({ config: read({ LANGWATCH_DISABLE_GOOGLE_DLP: value }) })).toBe(
+          true,
+        );
+      }
+    });
+
+    it("leaves Google DLP on for any other value or none", () => {
+      for (const value of [undefined, "", "1", "false"]) {
+        expect(isGoogleDlpDisabled({ config: read({ LANGWATCH_DISABLE_GOOGLE_DLP: value }) })).toBe(
+          false,
+        );
+      }
     });
   });
 

@@ -55,9 +55,8 @@ describe("the API start path", () => {
         .split("\n")
         .filter((line) => !line.trimStart().startsWith("#"));
 
-      expect(steps.filter((line) => line.startsWith("CMD "))).toEqual([
-        "CMD cd /app/apps/api && pnpm --silent run start",
-      ]);
+      expect(steps.filter((line) => line.startsWith("CMD "))).toEqual(['CMD ["/app/start.sh"]']);
+      expect(readFromRoot("infra/docker/start.sh")).toContain("cd /app/apps/api");
       expect(steps.filter((line) => MIGRATES.test(line))).toEqual([]);
     });
   });

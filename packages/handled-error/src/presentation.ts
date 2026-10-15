@@ -458,6 +458,11 @@ const presentations = {
         : "Check the column names against the dataset's columns.";
     },
   },
+  lwql_invalid_query: {
+    title: "The database couldn't run this query",
+    describe: () =>
+      "The SQL reads, but the database rejected it as written, for example an aggregate in WHERE or mismatched types. Adjust the query and try again.",
+  },
   lwql_unparseable: {
     title: "This query couldn't be read",
     describe: () => "Check the SQL syntax and try again.",
@@ -598,6 +603,27 @@ const presentations = {
   dashboard_not_found: {
     title: "Dashboard not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  dashboard_read_only_here: {
+    title: "This dashboard is read-only here",
+    describe: () =>
+      "Another project owns it, so it can be changed only there. Duplicate it to get a copy you can edit in this project.",
+  },
+  dashboard_scope_author_only: {
+    title: "Only the person who made this dashboard can change its scope",
+    describe: () => "Ask them to change who can see it, or duplicate it to get your own copy.",
+  },
+  dashboards_not_enabled: {
+    title: "Dashboards aren't switched on here",
+    describe: () => "This project doesn't have Dashboards enabled yet.",
+  },
+  insight_not_found: {
+    title: "Insight not found",
+    describe: () => "It may have been removed. Reload to see the current inbox.",
+  },
+  insights_not_enabled: {
+    title: "Insights aren't switched on here",
+    describe: () => "This project doesn't have Insights enabled yet.",
   },
   dashboard_reorder_unknown_ids: {
     title: "Some of those dashboards are gone",
@@ -1714,14 +1740,9 @@ const presentations = {
     describe: () => "Check it is the license signing key and was copied in full.",
   },
   custom_chart_playground_not_enabled: {
-    title: "Custom chart playground isn't switched on here",
+    title: "Dashboard widgets aren't switched on here",
     describe: () =>
-      "This project doesn't have the custom chart playground enabled yet. Ask your administrator to switch it on.",
-  },
-  custom_graph_writes_disabled_for_playground: {
-    title: "Dashboard graph editing is off while the playground is on",
-    describe: () =>
-      "This project has the custom chart playground enabled, which turns off creating or editing dashboard graphs. Use the playground to build a chart instead.",
+      "This project needs both Dashboards and LangWatchQL switched on for dashboard widgets. Ask your administrator to switch them on.",
   },
   custom_role_not_found: {
     title: "Custom role not found",
@@ -2116,11 +2137,6 @@ const presentations = {
   team_not_in_organization: {
     title: "That team isn't in this organization",
     describe: () => "Pick a team that belongs to this organization.",
-  },
-  user_email_ambiguous: {
-    title: "More than one account uses this address",
-    describe: () =>
-      "Two or more accounts hold this email address in different letter case. Change one of their addresses, then try again.",
   },
   user_last_platform_operator: {
     title: "This is the last platform operator",
@@ -3620,7 +3636,7 @@ const presentations = {
   platform_operator_user_not_found: {
     title: "No active user has that address",
     describe: () =>
-      "Only an existing, active account can be made a platform operator. Ask them to sign up first.",
+      "Only an existing, active account with a verified address can be made a platform operator; on LangWatch Cloud, only a staff account.",
   },
   platform_permission_not_assignable: {
     title: "Operations permissions cannot be added to a role",
@@ -4653,6 +4669,11 @@ const presentations = {
     describe: () =>
       "Langy can only drive this page while it is answering you. Send it a message and ask again.",
   },
+  langy_ui_run_conversation: {
+    title: "This conversation can't change a page",
+    describe: () =>
+      "Langy ran this conversation on its own, so no page is open for it to change. Start a new conversation and ask there.",
+  },
   langy_ui_action_unknown: {
     title: "Langy tried something this page doesn't do",
     describe: () =>
@@ -4735,6 +4756,22 @@ const presentations = {
     title: "Key owner is gone",
     describe: () =>
       "The user who owns this key no longer exists, so the turn has no one to act as. Mint a new key under a current user.",
+  },
+  // An unattended turn refused before it started; the reader is whoever asked for the run.
+  langy_unattended_actor_missing: {
+    title: "Person no longer exists",
+    describe: () =>
+      "The person this run acts as no longer exists, so nothing ran. Request the run for a current member.",
+  },
+  langy_unattended_actor_deactivated: {
+    title: "Account is deactivated",
+    describe: () =>
+      "The person this run acts as has a deactivated account, so nothing ran. Reactivate the account, or request the run for another member.",
+  },
+  langy_unattended_no_langy_access: {
+    title: "No Langy access",
+    describe: () =>
+      "The person this run acts as cannot use Langy in this project, so nothing ran. A workspace admin can grant that access.",
   },
   langy_api_request_invalid: {
     title: "Invalid request body",
@@ -4914,6 +4951,57 @@ const presentations = {
   unsupported_media_type: {
     title: "That request was sent in the wrong format",
     describe: () => "Send the body with the Content-Type this endpoint reads, then try again.",
+  },
+  // ==========================================================================
+  // Hosted MCP. Read by an MCP client and the person who configured it, not on
+  // a LangWatch page, so the words say what to do in the client.
+  // ==========================================================================
+  mcp_authorization_required: {
+    title: "Sign in to use the LangWatch MCP server",
+    describe: () =>
+      "Connect your MCP client to LangWatch, or send a project API key as the bearer.",
+  },
+  mcp_invalid_token: {
+    title: "Your MCP sign-in has expired",
+    describe: () => "Sign in to LangWatch again from your MCP client.",
+  },
+  mcp_invalid_api_key: {
+    title: "That API key isn't valid",
+    describe: () => "Check the project API key your MCP client sends, or create a new one.",
+  },
+  mcp_grant_revoked: {
+    title: "Your access to this project has ended",
+    describe: () =>
+      "You no longer have access to the project this sign-in was for. Ask an admin, then sign in again.",
+  },
+  mcp_session_not_found: {
+    title: "This MCP session has ended",
+    describe: () => "Your MCP client opens a new session on its own. Reconnect if it does not.",
+  },
+  mcp_route_not_found: {
+    title: "Not found",
+    describe: () => "Check the MCP server URL your client is configured with.",
+  },
+  mcp_metadata_unpublished: {
+    title: "No document is published here",
+    describe: () => "LangWatch publishes its OAuth metadata at the protected-resource path.",
+  },
+  mcp_session_id_required: {
+    title: "That MCP request needs a session",
+    describe: () => "Send an initialize request first, then the session id it returns.",
+  },
+  mcp_method_not_allowed: {
+    title: "That method isn't supported here",
+    describe: () => "Check the MCP server URL and the request your client sends.",
+  },
+  mcp_session_limit_reached: {
+    title: "Too many open MCP sessions",
+    describe: (error) =>
+      `This key already has ${num(error, "maxSessions", 0) || "the most"} open sessions. Close some, then try again.`,
+  },
+  mcp_store_unavailable: {
+    title: "The MCP server is briefly unavailable",
+    describe: () => "Your MCP client retries on its own. Try again in a moment.",
   },
   upgrade_in_progress: {
     title: "LangWatch is upgrading",
@@ -5993,16 +6081,6 @@ const presentations = {
     title: "Hosted services are still being set up",
     describe: () =>
       "Your license is valid and its key is being prepared. Try again in a few seconds.",
-  },
-  below_lts_floor: {
-    title: "This version is too old to upgrade from",
-    describe: () =>
-      "Upgrade to the oldest supported long-term release first, then continue to this version.",
-  },
-  image_below_ledger_floor: {
-    title: "This image is older than the database",
-    describe: () =>
-      "The database has already been upgraded past what this image supports. Start an image at or above the version last run.",
   },
   step_after_unknown: {
     title: "An upgrade step depends on a step that doesn't exist",
