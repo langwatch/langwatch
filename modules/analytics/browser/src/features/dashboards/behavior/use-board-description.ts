@@ -1,5 +1,5 @@
 /**
- * A board's description, stored on the board through `dashboards.updateDetails`
+ * A board's description, stored on the board through `boards.update`
  * (AC14). While a save is in flight the board shows what was typed; after it,
  * the re-read list. Failures travel raw to the host (#5984).
  */
@@ -17,9 +17,9 @@ export function useBoardDescription({
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
   const utils = analyticsApi.useUtils();
-  const update = analyticsApi.dashboards.updateDetails.useMutation({
+  const update = analyticsApi.boards.update.useMutation({
     // Returned, so the save stays pending until the list holds the new value.
-    onSuccess: () => utils.dashboards.getAll.invalidate({ projectId }),
+    onSuccess: () => utils.boards.getAll.invalidate({ projectId }),
     onError: (error) => host.failed({ error, fallbackTitle: "Couldn't save the description" }),
   });
 

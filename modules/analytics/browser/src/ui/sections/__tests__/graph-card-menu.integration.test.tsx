@@ -11,26 +11,6 @@ import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
-
-// The menu's "Add to dashboard" item reads tRPC hooks at render; none of
-// these scenarios show it, so the client is stubbed rather than provided.
-vi.mock("../../../behavior/analytics-api.ts", () => ({
-  analyticsApi: {
-    useUtils: () => ({
-      dashboardWidgets: { list: { invalidate: vi.fn() } },
-      graphs: { getAll: { invalidate: vi.fn() } },
-    }),
-    dashboards: {
-      getOrCreateFirst: { useQuery: () => ({ data: undefined }) },
-    },
-    dashboardWidgets: {
-      assignDashboard: {
-        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-      },
-    },
-  },
-}));
-
 import { GraphCardMenu } from "../graph-card-menu.tsx";
 
 let host: StubAnalyticsHost;
@@ -48,7 +28,6 @@ function mount(overrides: Partial<Parameters<typeof GraphCardMenu>[0]> = {}) {
   withChakra(
     <GraphCardMenu
       graphId="chart-1"
-      projectId="project_test"
       projectSlug="my-project"
       dashboardId="dashboard-1"
       onDelete={onDelete}

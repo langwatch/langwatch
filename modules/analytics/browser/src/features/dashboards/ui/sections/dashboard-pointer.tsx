@@ -35,11 +35,7 @@ export function DashboardPointer({ boardId, boardName, widget }: DashboardPointe
       isSettled: host.isSettled(),
       canView: host.hasPermission(DASHBOARDS_PERMISSION),
     }) === "open";
-  // A Reports board does not open at its Dashboards address, so it reads as gone here.
-  const boards = analyticsApi.dashboards.getAll.useQuery(
-    { projectId, excludeLegacy: true },
-    { enabled: isOpen },
-  );
+  const boards = analyticsApi.boards.getAll.useQuery({ projectId }, { enabled: isOpen });
   const widgets = analyticsApi.dashboardWidgets.list.useQuery(
     { projectId },
     { enabled: isOpen && widget !== void 0 },

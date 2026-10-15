@@ -38,7 +38,7 @@ const mocks = vi.hoisted(() => ({
   rename: { mutate: vi.fn(), isPending: false },
   remove: { mutate: vi.fn(), isPending: false },
   utils: {
-    dashboards: {
+    boards: {
       getAll: { invalidate: vi.fn() },
       listStarred: { invalidate: vi.fn() },
     },
@@ -54,7 +54,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
     useUtils: () => mocks.utils,
-    dashboards: {
+    boards: {
       getAll: {
         useQuery: (input: unknown) => {
           mocks.listInputs.push(input);
@@ -67,7 +67,7 @@ vi.mock("../../../../behavior/analytics-api.ts", () => ({
         },
       },
       create: { useMutation: () => mocks.create },
-      rename: { useMutation: () => mocks.rename },
+      update: { useMutation: () => mocks.rename },
       delete: { useMutation: () => mocks.remove },
     },
   },
@@ -113,22 +113,23 @@ describe("given the project has boards", () => {
       asked: mocks.listInputs.at(-1),
       organizationBoards: result.current.organizationBoards,
     }).toEqual({
-      asked: { projectId: "project-1", includeOrganization: true, excludeLegacy: true },
+      asked: { projectId: "project-1", includeOrganization: true },
       organizationBoards: [mocks.shared],
     });
   });
 
   /** @scenario "AC199 Legacy board: the Dashboards area neither lists nor opens a board made in Analytics Reports" */
-  it("asks the list without the boards made in Analytics Reports", () => {
+  it("asks the Dashboards area's own list, never the Analytics Reports one", () => {
     renderHook(() => useSavedDashboards());
 
-    expect(mocks.listInputs.at(-1)).toMatchObject({ excludeLegacy: true });
+    // The mock answers `boards.getAll` alone; a `dashboards.*` read would throw.
+    expect(mocks.listInputs).not.toHaveLength(0);
   });
 });
 
 describe("given a member deletes a board", () => {
   /** @scenario "AC199b Legacy board: the Dashboards area refuses to delete a board made in Analytics Reports" */
-  it("never asks to cascade, so the server refuses a board made in Analytics Reports", () => {
+  it("deletes through the Dashboards area's own procedure, which keeps a Reports board", () => {
     const { result } = renderHook(() => useSavedDashboards());
 
     act(() => result.current.deleteBoard({ dashboardId: "board-1", onDeleted: vi.fn() }));

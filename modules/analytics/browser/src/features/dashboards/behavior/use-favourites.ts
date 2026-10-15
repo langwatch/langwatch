@@ -15,13 +15,10 @@ export function useFavourites() {
   const projectId = host.project()?.id ?? "";
   const utils = analyticsApi.useUtils();
 
-  const list = analyticsApi.dashboards.listStarred.useQuery(
-    { projectId },
-    { enabled: !!projectId },
-  );
-  const starMutation = analyticsApi.dashboards.star.useMutation();
-  const unstarMutation = analyticsApi.dashboards.unstar.useMutation();
-  const reorderMutation = analyticsApi.dashboards.reorderStars.useMutation();
+  const list = analyticsApi.boards.listStarred.useQuery({ projectId }, { enabled: !!projectId });
+  const starMutation = analyticsApi.boards.star.useMutation();
+  const unstarMutation = analyticsApi.boards.unstar.useMutation();
+  const reorderMutation = analyticsApi.boards.reorderStars.useMutation();
 
   const stars: MemberStar[] = (list.data ?? []).map((star) =>
     star.kind === "board"
@@ -45,8 +42,8 @@ export function useFavourites() {
 
   const refresh = () =>
     Promise.all([
-      utils.dashboards.listStarred.invalidate({ projectId }),
-      utils.dashboards.getAll.invalidate({ projectId }),
+      utils.boards.listStarred.invalidate({ projectId }),
+      utils.boards.getAll.invalidate({ projectId }),
     ]);
 
   const isStarred = (star: DashboardStar) => refs.some((ref) => sameStar(ref, star));

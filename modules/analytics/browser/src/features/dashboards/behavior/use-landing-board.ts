@@ -15,7 +15,7 @@ export function useLandingBoard() {
   const host = useAnalyticsHost();
   const saved = useSavedDashboards();
   const utils = analyticsApi.useUtils();
-  const create = analyticsApi.dashboards.create.useMutation();
+  const create = analyticsApi.boards.create.useMutation();
   const createRequested = useRef(false);
   const projectId = host.project()?.id ?? "";
   const userId = host.userId();
@@ -36,8 +36,8 @@ export function useLandingBoard() {
       // The re-reads list the new board, which this effect then opens, and its star.
       {
         onSuccess: () => {
-          void utils.dashboards.getAll.invalidate({ projectId });
-          void utils.dashboards.listStarred.invalidate({ projectId });
+          void utils.boards.getAll.invalidate({ projectId });
+          void utils.boards.listStarred.invalidate({ projectId });
         },
       },
     );

@@ -9,10 +9,3 @@ export const BUILDER_CHART_KIND = "builder";
 
 /** The kind a saved LangWatchQL workbench chart carries. */
 export const WORKBENCH_SQL_CHART_KIND = "workbench_sql";
-
-/**
- * The kind a persisted dashboard widget carries. Its `graph` column holds
- * `{ srcdocHtml, sql }`: the author HTML rendered in a sandboxed frame and
- * the LangWatchQL statement the parent executes on the frame's behalf.
- */
-export const DASHBOARD_SRCDOC_CHART_KIND = "dashboard_srcdoc";

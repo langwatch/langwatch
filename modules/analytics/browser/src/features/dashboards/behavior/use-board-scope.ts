@@ -33,7 +33,7 @@ function useScopeCalls() {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
   const utils = analyticsApi.useUtils();
-  const setScope = analyticsApi.dashboards.setScope.useMutation();
+  const setScope = analyticsApi.boards.setScope.useMutation();
 
   const reported = async <Answer>(call: () => Promise<Answer>): Promise<Answer | undefined> => {
     try {
@@ -50,8 +50,8 @@ function useScopeCalls() {
       setScope.mutateAsync({ projectId, dashboardId: board.id, scope: to }),
     );
     await Promise.all([
-      utils.dashboards.getAll.invalidate({ projectId }),
-      utils.dashboards.listStarred.invalidate({ projectId }),
+      utils.boards.getAll.invalidate({ projectId }),
+      utils.boards.listStarred.invalidate({ projectId }),
     ]);
     return written !== void 0;
   };
@@ -59,7 +59,7 @@ function useScopeCalls() {
   /** How many other members starred the board. */
   const readOtherStars = async (board: ScopedBoard) => {
     const impact = await reported(() =>
-      utils.client.dashboards.scopeImpact.query({ projectId, dashboardId: board.id }),
+      utils.client.boards.scopeImpact.query({ projectId, dashboardId: board.id }),
     );
     return impact?.otherStars;
   };

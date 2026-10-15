@@ -150,8 +150,7 @@ export function DashboardActionsMenu({
         loading={deleteDashboard.isPending}
         onConfirm={() => {
           deleteDashboard.mutate(
-            // Reports alone deletes a board with its Analytics Reports charts (AC199b).
-            { projectId, dashboardId, cascadeLegacy: true },
+            { projectId, dashboardId },
             {
               onSuccess: () => {
                 void dashboardsQuery.refetch();

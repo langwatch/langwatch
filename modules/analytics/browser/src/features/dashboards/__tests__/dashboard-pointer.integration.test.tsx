@@ -49,7 +49,7 @@ function renderPointer({
   const answer = (call: UiProcedureCall) => {
     asked.push(call.path);
     inputs.push(call);
-    if (call.path === "dashboards.getAll") return Promise.resolve(boards);
+    if (call.path === "boards.getAll") return Promise.resolve(boards);
     if (call.path === "dashboardWidgets.list") return Promise.resolve(widgets);
     return NO_PROCEDURES(call);
   };
@@ -93,9 +93,8 @@ describe("given an insight that came from a widget on a board", () => {
       const { inputs } = renderPointer({ boards: [], widgets: [] });
 
       expect(await screen.findByText("Checkout health (deleted)")).toBeInTheDocument();
-      expect(inputs.find((call) => call.path === "dashboards.getAll")?.input).toMatchObject({
-        excludeLegacy: true,
-      });
+      expect(inputs.map(({ path }) => path)).toContain("boards.getAll");
+      expect(inputs.map(({ path }) => path)).not.toContain("dashboards.getAll");
     });
   });
 
