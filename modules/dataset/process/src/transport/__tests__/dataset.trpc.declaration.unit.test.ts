@@ -83,6 +83,7 @@ describe("the dataset tRPC declaration", () => {
         ["upsert", "mutation", "datasets:manage"],
         ["validateDatasetName", "query", "datasets:view"],
         ["getAll", "query", "datasets:view"],
+        ["recordCounts", "query", "datasets:view"],
         ["getById", "query", "datasets:view"],
         ["deleteById", "mutation", "datasets:delete"],
         ["updateMapping", "mutation", "datasets:update"],

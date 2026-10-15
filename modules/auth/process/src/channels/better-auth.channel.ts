@@ -70,8 +70,10 @@ export abstract class BetterAuthAnnouncements {
 
   /** The signup notification the team watches. */
   abstract announceSignup(input: {
+    userId: string;
     userName: string;
     userEmail: string;
+    organizationId: string;
     organizationName: string;
   }): void;
 

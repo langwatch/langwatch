@@ -1,19 +1,26 @@
 /**
  * @vitest-environment jsdom
- * Datasets list screen (listing, search, navigation, states). Moved from
- * platform; fixtures use recordCount.
+ * Datasets list screen (listing, search, navigation, states). Entry counts
+ * are a second read, mocked apart from the list.
  */
 
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import type { DatasetSummary } from "@langwatch/dataset-contract";
 import { SetupWithAgentButtonToken } from "@langwatch/trace-client";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithDatasetHost } from "../../../testing.tsx";
 
-const { datasetsQuery, mockDeleteMutate } = vi.hoisted(() => ({
+const { countsQuery, datasetsQuery, mockDeleteMutate } = vi.hoisted(() => ({
+  countsQuery: {
+    current: { data: undefined } as {
+      data: { datasetId: string; recordCount: number }[] | undefined;
+      isError?: boolean;
+    },
+    asked: [] as { input: unknown; options: unknown }[],
+  },
   datasetsQuery: {
     current: { data: undefined, isLoading: false, refetch: vi.fn() } as {
       data: unknown;
@@ -54,6 +61,12 @@ vi.mock("@langwatch/dataset-client", () => ({
     }),
     dataset: {
       getAll: { useQuery: () => datasetsQuery.current },
+      recordCounts: {
+        useQuery: (input: unknown, options: unknown) => {
+          countsQuery.asked.push({ input, options });
+          return countsQuery.current;
+        },
+      },
       deleteById: { useMutation: () => ({ mutate: mockDeleteMutate, isPending: false }) },
     },
   },
@@ -75,9 +88,8 @@ vi.mock("../../../ui/sections/copy-dataset-dialog.tsx", () => ({
 
 const { default: DatasetsScreen } = await import("../datasets.screen.tsx");
 
-const makeDataset = (id: string, name: string, records: number): DatasetSummary => ({
+const makeDataset = (id: string, name: string): DatasetSummary => ({
   id,
-  projectId: "proj-1",
   name,
   slug: id,
   columnTypes: [
@@ -86,30 +98,21 @@ const makeDataset = (id: string, name: string, records: number): DatasetSummary 
   ],
   createdAt: new Date("2026-01-01T10:00:00Z"),
   updatedAt: new Date("2026-02-02T10:00:00Z"),
-  archivedAt: null,
-  mapping: null,
-  useS3: false,
-  s3RecordCount: null,
-  contentLayout: "postgres",
   status: "ready",
-  statusError: null,
-  stagingKey: null,
-  uploadFilename: null,
-  rowCount: null,
-  sizeBytes: null,
-  chunkCount: null,
-  chunkOffsets: null,
-  recordCount: records,
 });
 
 describe("Datasets list screen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    datasetsQuery.current = {
+    countsQuery.asked = [];
+    countsQuery.current = {
       data: [
-        makeDataset("ds-1", "offline evals", 12),
-        makeDataset("ds-2", "production samples", 3),
+        { datasetId: "ds-1", recordCount: 12 },
+        { datasetId: "ds-2", recordCount: 3 },
       ],
+    };
+    datasetsQuery.current = {
+      data: [makeDataset("ds-1", "offline evals"), makeDataset("ds-2", "production samples")],
       isLoading: false,
       refetch: vi.fn(),
     };
@@ -129,6 +132,45 @@ describe("Datasets list screen", () => {
       // Last update uses updatedAt, not createdAt.
       expect(screen.getAllByText(/Feb/)).toHaveLength(2);
       expect(screen.queryByText(/Jan/)).not.toBeInTheDocument();
+    });
+
+    describe("given the entry counts are still being counted", () => {
+      /** @scenario "The list shows before entry counts arrive" */
+      it("shows every row at once, with a muted placeholder for each count", () => {
+        countsQuery.current = { data: undefined };
+        renderWithDatasetHost(<DatasetsScreen />);
+
+        expect(screen.getByText("offline evals")).toBeInTheDocument();
+        expect(screen.getByText("production samples")).toBeInTheDocument();
+        expect(screen.getAllByLabelText("Counting entries")).toHaveLength(2);
+      });
+    });
+
+    describe("given reading the entry counts failed", () => {
+      /** @scenario "A failed entry count read shows the counts as unavailable" */
+      it("shows each count as unavailable instead of loading", () => {
+        countsQuery.current = { data: undefined, isError: true };
+        renderWithDatasetHost(<DatasetsScreen />);
+
+        expect(screen.getByText("offline evals")).toBeInTheDocument();
+        expect(screen.getAllByLabelText("Entry count unavailable")).toHaveLength(2);
+        expect(screen.queryByLabelText("Counting entries")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when their entry counts arrive", () => {
+      /** @scenario "Entry counts arrive after the list" */
+      it("asks for the listed datasets' counts and shows each one in its row", () => {
+        renderWithDatasetHost(<DatasetsScreen />);
+
+        expect(countsQuery.asked.at(-1)).toMatchObject({
+          input: { datasetIds: ["ds-1", "ds-2"] },
+          options: { enabled: true },
+        });
+        expect(within(screen.getByTestId("dataset-row-ds-1")).getByText("12")).toBeInTheDocument();
+        expect(within(screen.getByTestId("dataset-row-ds-2")).getByText("3")).toBeInTheDocument();
+        expect(screen.queryByLabelText("Counting entries")).not.toBeInTheDocument();
+      });
     });
 
     describe("when the reader searches", () => {
@@ -217,11 +259,27 @@ describe("Datasets list screen", () => {
     });
   });
 
+  describe("given the datasets loaded", () => {
+    /** @scenario The datasets list shows no error when the read succeeded */
+    it("shows the rows with no error notice", () => {
+      datasetsQuery.current = {
+        data: [makeDataset("ds-1", "offline evals")],
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      };
+      renderWithDatasetHost(<DatasetsScreen />);
+
+      expect(screen.getByText("offline evals")).toBeInTheDocument();
+      expect(screen.queryByText("Couldn't load the datasets")).not.toBeInTheDocument();
+    });
+  });
+
   describe("given a refresh fails after the datasets loaded", () => {
     /** @scenario A failed refresh keeps the datasets I already see */
     it("keeps the rows with the error as a notice over them", () => {
       datasetsQuery.current = {
-        data: [makeDataset("ds-1", "offline evals", 12)],
+        data: [makeDataset("ds-1", "offline evals")],
         isLoading: false,
         isError: true,
         refetch: vi.fn(),

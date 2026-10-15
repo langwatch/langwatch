@@ -18,7 +18,7 @@ describe("CAPABILITY_HYDRATORS.trace.byIds", () => {
         const unused = vi.fn();
         const utils: CapabilityTrpcUtils = {
           traces: { header: { fetch: fetchMock }, list: { fetch: unused } },
-          dataset: { getAll: { fetch: unused } },
+          dataset: { getAll: { fetch: unused }, recordCounts: { fetch: unused } },
           prompts: { getAllPromptsForProject: { fetch: unused } },
           experiments: { getAllByProjectId: { fetch: unused } },
         };

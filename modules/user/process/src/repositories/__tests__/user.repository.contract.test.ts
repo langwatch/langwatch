@@ -305,6 +305,22 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
     });
   });
 
+  describe("when the address is changed", () => {
+    /** @scenario "Changing an email clears its verification" */
+    it("stores the new address with its verification cleared", async () => {
+      const { users } = create();
+      const created = await users.createPasskeyUser({
+        email: EMAIL,
+        issuer: ISSUER,
+        emailVerified: true,
+      });
+
+      await expect(
+        users.updateProfile({ id: created.id, email: "new@example.com", emailVerified: false }),
+      ).resolves.toMatchObject({ email: "new@example.com", emailVerified: false });
+    });
+  });
+
   describe("when the account is retired and restored", () => {
     it("stamps and then clears the deactivation date", async () => {
       const { users } = create();

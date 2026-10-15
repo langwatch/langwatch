@@ -596,14 +596,14 @@ type Response = unknown;
 
 ### `scimOversight`
 
-Contract `../contract/src/scim-oversight.trpc.ts:18`, router `src/transport/scim-oversight.trpc.ts:28`.
+Contract `../contract/src/scim-oversight.trpc.ts:18`, router `src/transport/scim-oversight.trpc.ts:26`.
 
-| Procedure                           | Kind     | Gate                                                                                                                                                  | Input                            | Output                            |
-| ----------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------- |
-| `scimOversight.getAll`              | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `listOversightSyncsInputSchema`  | `oversightSyncListSchema`         |
-| `scimOversight.getById`             | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `oversightConnectionInputSchema` | inline                            |
-| `scimOversight.directoryIdentities` | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `oversightConnectionInputSchema` | inline                            |
-| `scimOversight.redriveRetiredApply` | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `redriveRetiredApplyInputSchema` | `redriveRetiredApplyResultSchema` |
+| Procedure                           | Kind     | Gate                             | Input                            | Output                            |
+| ----------------------------------- | -------- | -------------------------------- | -------------------------------- | --------------------------------- |
+| `scimOversight.getAll`              | query    | Platform permission `ops:manage` | `listOversightSyncsInputSchema`  | `oversightSyncListSchema`         |
+| `scimOversight.getById`             | query    | Platform permission `ops:manage` | `oversightConnectionInputSchema` | inline                            |
+| `scimOversight.directoryIdentities` | query    | Platform permission `ops:manage` | `oversightConnectionInputSchema` | inline                            |
+| `scimOversight.redriveRetiredApply` | mutation | Platform permission `ops:manage` | `redriveRetiredApplyInputSchema` | `redriveRetiredApplyResultSchema` |
 
 ```typescript
 // scimOversight.getAll
@@ -795,17 +795,18 @@ Declared at `src/eventing/scim-sso-connection.pipeline.ts:21`.
 
 ### Pipeline `scim-sync` (aggregate `scim_sync`)
 
-Declared at `src/eventing/scim-sync.pipeline.ts:50`. Events: `scimTokenIssuedEventSchema`, `scimUserPushedEventSchema`, `scimGroupMappedEventSchema`, `scimApplyFailedEventSchema`, `scimApplyRecoveredEventSchema`, `scimApplyRetiredEventSchema`, `scimApplyRedrivenEventSchema`, `scimTokenRevokedEventSchema`.
+Declared at `src/eventing/scim-sync.pipeline.ts:62`. Events: `scimTokenIssuedEventSchema`, `scimUserPushedEventSchema`, `scimGroupMappedEventSchema`, `scimApplyFailedEventSchema`, `scimApplyRecoveredEventSchema`, `scimApplyRetiredEventSchema`, `scimApplyRedrivenEventSchema`, `scimTokenRevokedEventSchema`.
 
-| Kind                | Name                                                                          | Handles | Declared at                             |
-| ------------------- | ----------------------------------------------------------------------------- | ------- | --------------------------------------- |
-| command             | –                                                                             | –       | `src/eventing/scim-sync.pipeline.ts:71` |
-| command             | –                                                                             | –       | `src/eventing/scim-sync.pipeline.ts:76` |
-| command             | –                                                                             | –       | `src/eventing/scim-sync.pipeline.ts:81` |
-| command             | –                                                                             | –       | `src/eventing/scim-sync.pipeline.ts:86` |
-| command             | –                                                                             | –       | `src/eventing/scim-sync.pipeline.ts:91` |
-| command             | –                                                                             | –       | `src/eventing/scim-sync.pipeline.ts:96` |
-| Postgres projection | `≈ new ScimSyncStateFoldProjection({ store: deps.scimSyncProjectionStore, })` | –       | `src/eventing/scim-sync.pipeline.ts:66` |
+| Kind                | Name                                                                          | Handles                 | Declared at                              |
+| ------------------- | ----------------------------------------------------------------------------- | ----------------------- | ---------------------------------------- |
+| command             | –                                                                             | –                       | `src/eventing/scim-sync.pipeline.ts:83`  |
+| command             | –                                                                             | –                       | `src/eventing/scim-sync.pipeline.ts:88`  |
+| command             | –                                                                             | –                       | `src/eventing/scim-sync.pipeline.ts:93`  |
+| command             | –                                                                             | –                       | `src/eventing/scim-sync.pipeline.ts:98`  |
+| command             | –                                                                             | –                       | `src/eventing/scim-sync.pipeline.ts:103` |
+| command             | –                                                                             | –                       | `src/eventing/scim-sync.pipeline.ts:108` |
+| process manager     | `scimSyncSummary`                                                             | intents `post` (outbox) | `src/eventing/scim-sync.pipeline.ts:113` |
+| Postgres projection | `≈ new ScimSyncStateFoldProjection({ store: deps.scimSyncProjectionStore, })` | –                       | `src/eventing/scim-sync.pipeline.ts:78`  |
 
 ### Pipeline `scim_maintenance` (aggregate `global`)
 
@@ -817,12 +818,14 @@ Declared at `src/eventing/scim.pipeline.ts:39`.
 
 ## Configuration
 
-| Kind   | Leaf                  | Environment variable          | Declared at                               |
-| ------ | --------------------- | ----------------------------- | ----------------------------------------- |
-| secret | `auth0WebhookSecret`  | `AUTH0_SCIM_WEBHOOK_SECRET`   | `../contract/src/scim.config.ts:22`       |
-| secret | `tokenPepper`         | `CREDENTIALS_SECRET`          | `../contract/src/scim-token-pepper.ts:10` |
-| secret | `tokenPepperFallback` | `NEXTAUTH_SECRET`             | `../contract/src/scim-token-pepper.ts:11` |
-| secret | `tokenPepperPrevious` | `CREDENTIALS_SECRET_PREVIOUS` | `../contract/src/scim-token-pepper.ts:13` |
-| config | `provenOffboarding`   | `SCIM_V2_GRANTS`              | `../contract/src/scim.config.ts:15`       |
+| Kind   | Leaf                          | Environment variable          | Declared at                               |
+| ------ | ----------------------------- | ----------------------------- | ----------------------------------------- |
+| secret | `auth0WebhookSecret`          | `AUTH0_SCIM_WEBHOOK_SECRET`   | `../contract/src/scim.config.ts:27`       |
+| secret | `tokenPepper`                 | `CREDENTIALS_SECRET`          | `../contract/src/scim-token-pepper.ts:10` |
+| secret | `tokenPepperFallback`         | `NEXTAUTH_SECRET`             | `../contract/src/scim-token-pepper.ts:11` |
+| secret | `tokenPepperPrevious`         | `CREDENTIALS_SECRET_PREVIOUS` | `../contract/src/scim-token-pepper.ts:13` |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`       | `src/app/scim.app.ts:243`                 |
+| config | `provenOffboarding`           | `SCIM_V2_GRANTS`              | `../contract/src/scim.config.ts:19`       |
+| config | `publicBaseUrl`               | `BASE_HOST`                   | `../contract/src/scim.config.ts:20`       |
 
 <!-- readme:generated:end -->

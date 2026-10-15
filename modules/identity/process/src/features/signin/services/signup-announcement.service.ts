@@ -13,7 +13,7 @@ type SignupAnnouncementDeps = Readonly<{
   logger: Pick<Logger, "warn">;
 }>;
 
-/** Main's sign-up announcement: the new-user notice, posted to LangWatch's own sign-ups channel. */
+/** Main's join announcement: the new-user card, posted to LangWatch's own sign-ups channel. */
 export class SignupAnnouncementService {
   private constructor(private readonly deps: SignupAnnouncementDeps) {}
 
@@ -21,9 +21,11 @@ export class SignupAnnouncementService {
     return new SignupAnnouncementService(deps);
   }
 
-  async announce(input: {
+  async announceJoin(input: {
+    userId: string;
     userName: string;
     userEmail: string;
+    organizationId: string;
     organizationName: string;
   }): Promise<void> {
     const { channel, publicBaseUrl, logger } = this.deps;
@@ -31,10 +33,10 @@ export class SignupAnnouncementService {
       logger.warn("SLACK_CHANNEL_SIGNUPS is not configured; skipping signup notification");
       return;
     }
-    const origin = {
-      environment: new URL(publicBaseUrl ?? DEFAULT_APP_URL).host,
-      sentAt: nowInstant().epochMilliseconds,
-    };
-    await channel.post(newUserNotice.render({ props: input, origin }));
+    const appUrl = publicBaseUrl ?? DEFAULT_APP_URL;
+    const origin = { environment: new URL(appUrl).host, sentAt: nowInstant().epochMilliseconds };
+    await channel.post(
+      newUserNotice.render({ props: { ...input, arrival: "sso", appUrl }, origin }),
+    );
   }
 }

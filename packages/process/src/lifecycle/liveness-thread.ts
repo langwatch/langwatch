@@ -302,6 +302,10 @@ server.on("upgrade", (req, socket, head) => {
   upstream.on("error", () => socket.destroy());
   socket.on("error", () => upstream.destroy());
 });
+// Longer than the idle reuse of any proxy in front (ALB and nginx 60s): Node's 5s default closes
+// a socket the proxy is about to reuse, and the proxy answers that request 502.
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
 const deadline = Date.now() + workerData.handoverMs;
 const bind = () => server.listen(workerData.port);
 server.on("listening", () => parentPort.postMessage({ type: "listening", address: server.address() }));
