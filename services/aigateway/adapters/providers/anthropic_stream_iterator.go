@@ -201,6 +201,7 @@ func (it *anthropicTranslatedStreamIterator) consume(resp *bfschemas.BifrostResp
 	}
 
 	for _, ev := range bfanthropic.ToAnthropicResponsesStreamResponse(it.bfCtx, resp) {
+		sealStreamReasoningData(resp, ev)
 		it.emit(it.framer.push(ev))
 	}
 }
