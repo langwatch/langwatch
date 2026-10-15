@@ -9,8 +9,8 @@ Feature: Activity Monitor — cross-platform AI activity ingestion + oversight
   cross-source spend, per-user breakdown, and anomaly alerts.
 
   This spec captures the user-facing contract. Implementation lives
-  under `platform/app/src/server/governance/activity-monitor/` and
-  `platform/app/src/server/routes/ingest/`. UI is gated behind
+  under `enterprise/modules/governance/process/src/ (activity-monitor)` and
+  `enterprise/modules/governance/process/src/transport/api-rest/`. UI is gated behind
   `release_ui_ai_governance_enabled`.
 
   Spec scope: the cross-platform monitoring pillar from gateway.md
@@ -25,7 +25,7 @@ Feature: Activity Monitor — cross-platform AI activity ingestion + oversight
       ingestion-sources.feature)
 
   Scenario: Admin lands on the Activity Monitor and sees one timeline
-    When the admin navigates to "/settings/activity-monitor"
+    When the admin navigates to "/governance"
     Then a single timeline lists every AI event in their org
     And events are tagged by SourceType (gateway / personal / claude_cowork /
       copilot_studio / openai_compliance / workato / otel_generic / s3_custom)
@@ -93,7 +93,7 @@ Feature: Activity Monitor — cross-platform AI activity ingestion + oversight
 
   Scenario: Self-host deployment retains the same UX
     Given a self-hoster running LangWatch via the umbrella helm chart
-    When their admin navigates to /settings/activity-monitor
+    When their admin navigates to /governance
     Then the UI renders identically to cloud
     And they can configure IngestionSources locally
     And the Activity Monitor scales with their existing CH cluster

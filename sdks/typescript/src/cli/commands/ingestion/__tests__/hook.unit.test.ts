@@ -1,11 +1,5 @@
 /**
- * What the session context hook reports: the repository, branch and worktree a
- * session is working in, the agent whose seam invoked it, and the trace a Stop
- * invocation carries.
- *
- * Where the record goes is hook-target, when it stays quiet is hook-dedup, and
- * the promises it makes to the session are hook-silence.
- *
+ * Hook payloads: repo, branch, worktree, agent, trace.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
@@ -13,6 +7,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { describe, expect, it } from "vitest";
+
+import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 
 import {
   attributesOf,
@@ -47,16 +43,24 @@ describe("the session context hook", () => {
       expect(hook.exits).toEqual([]);
     });
 
-    it("sends the configured OTLP headers alongside a json content type", async () => {
-      await hook.runHook({
-        env: {
-          OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ik-lw-abc_secret",
-        },
-      });
+    describe("when it sends the context record", () => {
+      it("includes the configured credentials, CLI identity, and content type", async () => {
+        await hook.runHook({
+          env: {
+            OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ik-lw-abc_secret",
+          },
+        });
 
-      expect(posted[0]!.headers).toEqual({
-        Authorization: "Bearer ik-lw-abc_secret",
-        "content-type": "application/json",
+        expect(posted[0]!.headers).toEqual({
+          Authorization: "Bearer ik-lw-abc_secret",
+          "content-type": "application/json",
+          "X-LangWatch-Surface": "cli",
+          "user-agent": `langwatch-sdk-node/${LANGWATCH_SDK_VERSION}`,
+          "x-langwatch-sdk-name": "langwatch-observability-sdk",
+          "x-langwatch-sdk-language": "typescript",
+          "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
+          "x-langwatch-sdk-platform": "node",
+        });
       });
     });
 
@@ -119,13 +123,12 @@ describe("the session context hook", () => {
         env: { CLAUDE_PROJECT_DIR: "/launch/checkout" },
         runGit: ({ args, cwd }) =>
           cwd === "/launch/checkout"
-            ? {
-                "remote get-url origin":
-                  "git@github.com:langwatch/langwatch.git",
+            ? ({
+                "remote get-url origin": "git@github.com:langwatch/langwatch.git",
                 "branch --show-current": "main",
                 "rev-parse --git-dir": "/launch/checkout/.git",
                 "rev-parse --git-common-dir": "/launch/checkout/.git",
-              }[args.join(" ")] ?? null
+              }[args.join(" ")] ?? null)
             : null,
       });
 
@@ -172,9 +175,7 @@ describe("the session context hook", () => {
 
       await hook.runHook();
 
-      expect(attributesOf(posted[0]!)["langwatch.session.name"]).toBe(
-        "lw-renamed",
-      );
+      expect(attributesOf(posted[0]!)["langwatch.session.name"]).toBe("lw-renamed");
     });
 
     /** @scenario "A named session posts even outside a git repository" */
@@ -214,9 +215,7 @@ describe("the session context hook", () => {
 
       await hook.runHook({ tool: "codex" });
 
-      expect(attributesOf(posted[0]!)).not.toHaveProperty(
-        "langwatch.session.name",
-      );
+      expect(attributesOf(posted[0]!)).not.toHaveProperty("langwatch.session.name");
     });
   });
 
@@ -281,9 +280,7 @@ describe("the session context hook", () => {
         env: { TRACEPARENT },
       });
 
-      expect(recordOf(posted[0]!).traceId).toBe(
-        "16872e6253edb3e8748023ff172703c4",
-      );
+      expect(recordOf(posted[0]!).traceId).toBe("16872e6253edb3e8748023ff172703c4");
       expect(recordOf(posted[0]!).spanId).toBe("be7ce7c6bf1173f5");
     });
 
@@ -310,8 +307,7 @@ describe("the session context hook", () => {
           hook_event_name: "Stop",
         },
         env: {
-          TRACEPARENT:
-            "00-00000000000000000000000000000000-0000000000000000-01",
+          TRACEPARENT: "00-00000000000000000000000000000000-0000000000000000-01",
         },
       });
 

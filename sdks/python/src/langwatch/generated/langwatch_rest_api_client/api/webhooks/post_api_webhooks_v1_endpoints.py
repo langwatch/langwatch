@@ -6,11 +6,6 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_webhooks_v1_endpoints_body import PostApiWebhooksV1EndpointsBody
 from ...models.post_api_webhooks_v1_endpoints_response_201 import PostApiWebhooksV1EndpointsResponse201
-from ...models.post_api_webhooks_v1_endpoints_response_400 import PostApiWebhooksV1EndpointsResponse400
-from ...models.post_api_webhooks_v1_endpoints_response_401 import PostApiWebhooksV1EndpointsResponse401
-from ...models.post_api_webhooks_v1_endpoints_response_403 import PostApiWebhooksV1EndpointsResponse403
-from ...models.post_api_webhooks_v1_endpoints_response_409 import PostApiWebhooksV1EndpointsResponse409
-from ...models.post_api_webhooks_v1_endpoints_response_500 import PostApiWebhooksV1EndpointsResponse500
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
@@ -38,44 +33,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    PostApiWebhooksV1EndpointsResponse201
-    | PostApiWebhooksV1EndpointsResponse400
-    | PostApiWebhooksV1EndpointsResponse401
-    | PostApiWebhooksV1EndpointsResponse403
-    | PostApiWebhooksV1EndpointsResponse409
-    | PostApiWebhooksV1EndpointsResponse500
-    | None
-):
+) -> PostApiWebhooksV1EndpointsResponse201 | None:
     if response.status_code == 201:
         response_201 = PostApiWebhooksV1EndpointsResponse201.from_dict(response.json())
 
         return response_201
-
-    if response.status_code == 400:
-        response_400 = PostApiWebhooksV1EndpointsResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = PostApiWebhooksV1EndpointsResponse401.from_dict(response.json())
-
-        return response_401
-
-    if response.status_code == 403:
-        response_403 = PostApiWebhooksV1EndpointsResponse403.from_dict(response.json())
-
-        return response_403
-
-    if response.status_code == 409:
-        response_409 = PostApiWebhooksV1EndpointsResponse409.from_dict(response.json())
-
-        return response_409
-
-    if response.status_code == 500:
-        response_500 = PostApiWebhooksV1EndpointsResponse500.from_dict(response.json())
-
-        return response_500
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -85,14 +47,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    PostApiWebhooksV1EndpointsResponse201
-    | PostApiWebhooksV1EndpointsResponse400
-    | PostApiWebhooksV1EndpointsResponse401
-    | PostApiWebhooksV1EndpointsResponse403
-    | PostApiWebhooksV1EndpointsResponse409
-    | PostApiWebhooksV1EndpointsResponse500
-]:
+) -> Response[PostApiWebhooksV1EndpointsResponse201]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -109,14 +64,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PostApiWebhooksV1EndpointsBody,
     idempotency_key: str | Unset = UNSET,
-) -> Response[
-    PostApiWebhooksV1EndpointsResponse201
-    | PostApiWebhooksV1EndpointsResponse400
-    | PostApiWebhooksV1EndpointsResponse401
-    | PostApiWebhooksV1EndpointsResponse403
-    | PostApiWebhooksV1EndpointsResponse409
-    | PostApiWebhooksV1EndpointsResponse500
-]:
+) -> Response[PostApiWebhooksV1EndpointsResponse201]:
     """Create a webhook endpoint
 
      Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for
@@ -135,7 +83,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiWebhooksV1EndpointsResponse201 | PostApiWebhooksV1EndpointsResponse400 | PostApiWebhooksV1EndpointsResponse401 | PostApiWebhooksV1EndpointsResponse403 | PostApiWebhooksV1EndpointsResponse409 | PostApiWebhooksV1EndpointsResponse500]
+        Response[PostApiWebhooksV1EndpointsResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -155,15 +103,7 @@ def sync(
     client: AuthenticatedClient,
     body: PostApiWebhooksV1EndpointsBody,
     idempotency_key: str | Unset = UNSET,
-) -> (
-    PostApiWebhooksV1EndpointsResponse201
-    | PostApiWebhooksV1EndpointsResponse400
-    | PostApiWebhooksV1EndpointsResponse401
-    | PostApiWebhooksV1EndpointsResponse403
-    | PostApiWebhooksV1EndpointsResponse409
-    | PostApiWebhooksV1EndpointsResponse500
-    | None
-):
+) -> PostApiWebhooksV1EndpointsResponse201 | None:
     """Create a webhook endpoint
 
      Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for
@@ -182,7 +122,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiWebhooksV1EndpointsResponse201 | PostApiWebhooksV1EndpointsResponse400 | PostApiWebhooksV1EndpointsResponse401 | PostApiWebhooksV1EndpointsResponse403 | PostApiWebhooksV1EndpointsResponse409 | PostApiWebhooksV1EndpointsResponse500
+        PostApiWebhooksV1EndpointsResponse201
     """
 
     return sync_detailed(
@@ -197,14 +137,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PostApiWebhooksV1EndpointsBody,
     idempotency_key: str | Unset = UNSET,
-) -> Response[
-    PostApiWebhooksV1EndpointsResponse201
-    | PostApiWebhooksV1EndpointsResponse400
-    | PostApiWebhooksV1EndpointsResponse401
-    | PostApiWebhooksV1EndpointsResponse403
-    | PostApiWebhooksV1EndpointsResponse409
-    | PostApiWebhooksV1EndpointsResponse500
-]:
+) -> Response[PostApiWebhooksV1EndpointsResponse201]:
     """Create a webhook endpoint
 
      Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for
@@ -223,7 +156,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiWebhooksV1EndpointsResponse201 | PostApiWebhooksV1EndpointsResponse400 | PostApiWebhooksV1EndpointsResponse401 | PostApiWebhooksV1EndpointsResponse403 | PostApiWebhooksV1EndpointsResponse409 | PostApiWebhooksV1EndpointsResponse500]
+        Response[PostApiWebhooksV1EndpointsResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -241,15 +174,7 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PostApiWebhooksV1EndpointsBody,
     idempotency_key: str | Unset = UNSET,
-) -> (
-    PostApiWebhooksV1EndpointsResponse201
-    | PostApiWebhooksV1EndpointsResponse400
-    | PostApiWebhooksV1EndpointsResponse401
-    | PostApiWebhooksV1EndpointsResponse403
-    | PostApiWebhooksV1EndpointsResponse409
-    | PostApiWebhooksV1EndpointsResponse500
-    | None
-):
+) -> PostApiWebhooksV1EndpointsResponse201 | None:
     """Create a webhook endpoint
 
      Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for
@@ -268,7 +193,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiWebhooksV1EndpointsResponse201 | PostApiWebhooksV1EndpointsResponse400 | PostApiWebhooksV1EndpointsResponse401 | PostApiWebhooksV1EndpointsResponse403 | PostApiWebhooksV1EndpointsResponse409 | PostApiWebhooksV1EndpointsResponse500
+        PostApiWebhooksV1EndpointsResponse201
     """
 
     return (

@@ -119,14 +119,14 @@ read as having addressed it.
 A shared stream was carrying two invariants in the FOLD, over state no
 per-identifier fold can see:
 
-| invariant | how the shared fold held it | where it goes |
-|---|---|---|
-| exactly one PRIMARY per person | a promotion demoted **every** other standing PRIMARY, not only the one the fact names | `primaryChangeFacts` reads the person's heads and states one fact per stream that must move |
-| erasure reaches every identifier | the fold wiped **every** head, not only the ids the writer listed | `userErasureFacts` reads the person's heads; that read is the sweep's bound |
+| invariant                        | how the shared fold held it                                                           | where it goes                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| exactly one PRIMARY per person   | a promotion demoted **every** other standing PRIMARY, not only the one the fact names | `primaryChangeFacts` reads the person's heads and states one fact per stream that must move |
+| erasure reaches every identifier | the fold wiped **every** head, not only the ids the writer listed                     | `userErasureFacts` reads the person's heads; that read is the sweep's bound                 |
 
 Both moves are ADR-110's principal-filter rule in identity's terms:
-*enforcement takes a filter over the whole subject rather than a list the caller
-enumerated.* The reads already exist — `markPrimary` and `eraseUser` both call
+_enforcement takes a filter over the whole subject rather than a list the caller
+enumerated._ The reads already exist — `markPrimary` and `eraseUser` both call
 `findHeads({ userId })` before they state anything.
 
 **A fact that names two streams is appended twice.** An event carries one
@@ -166,15 +166,15 @@ read across heads; a per-identifier fold cannot, so two histories fold
 differently — and both are reachable only from a partial replay window, because
 `primaryChangeFacts` cannot state either shape.
 
-| history | per person | per identifier |
-|---|---|---|
+| history                                                                                      | per person                                                          | per identifier                                              |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------- |
 | a promotion naming a previous, where the promoted head is absent or ineligible in the window | nothing moves: the demotion was conditional on the promotion taking | the previous is demoted, so the person ends with no PRIMARY |
-| a promotion naming NO previous, while another head stands PRIMARY | the standing head is demoted — the fold swept for it | the fact is never routed to that head, so two stand |
+| a promotion naming NO previous, while another head stands PRIMARY                            | the standing head is demoted — the fold swept for it                | the fact is never routed to that head, so two stand         |
 
 Both are degradations rather than corruptions, and they fall on the safe side of
 different lines: no PRIMARY means the legacy email field falls back to the most
 recently VERIFIED identifier, which the D01 read fork already specifies; two
-PRIMARY is the one that matters, and it is a *legacy* fact's shape — every fact
+PRIMARY is the one that matters, and it is a _legacy_ fact's shape — every fact
 stated from here on names each standing holder. The remedy for it, if it ever
 shows, is a parity check over the projection ("exactly one PRIMARY per person"),
 not a change to the fold: a rule that repaired state the fact did not name is
@@ -193,7 +193,7 @@ every command a person can run is serialized behind them. Per identifier they
 are not: two concurrent promotions each see no standing PRIMARY and both state
 `previousIdentifierId: null`, leaving two heads PRIMARY; two concurrent detaches
 each see the other still VERIFIED and between them strand the account. That is
-the same class ADR-116 §6 already settled once — *a read cannot decide a race* —
+the same class ADR-116 §6 already settled once — _a read cannot decide a race_ —
 and it is why address uniqueness has a row-truth lock rather than a guard.
 
 So the aggregate moves and **the lane does not follow it blindly**. A command's
@@ -258,7 +258,7 @@ than discovered later:
 
 - **A legacy `user_erased` names N identifiers in one event.** One event has one
   key, so it can only reach one head. It keys to the person's stream and wipes
-  nothing. This is a real gap while it lasts, and it is *not* covered by "the log
+  nothing. This is a real gap while it lasts, and it is _not_ covered by "the log
   mutation already removed the values": ADR-101 §5's event-log mutation **does
   not exist in code today** — `eraseUser` states the fact and the erasure
   service that was to sequence the mutation, the protocol-row deletions and the
@@ -353,7 +353,7 @@ properly. We take that knowingly.
 
 This ADR is landing across slices. The first has shipped with it.
 
-1. **The domain split** *(this change)* — `identityStreamsFor`,
+1. **The domain split** _(this change)_ — `identityStreamsFor`,
    `reduceIdentifier`, `primaryChangeFacts`, `userErasureFacts`;
    `reduceIdentity` re-expressed as the same rules with per-person delivery, so
    the live fold is byte-for-byte what it was; the two sweeps moved into the
@@ -388,6 +388,7 @@ This ADR is landing across slices. The first has shipped with it.
    person's tenant to its head regardless of the stated list, or refuse an
    attach for a person whose erasure has been stated. Naming it here so it is
    designed rather than discovered.
+
 6. **Replay and ops** — replay parity for a mixed-version history; the ops
    lookup re-pointed at the tenant.
 
@@ -395,9 +396,9 @@ This ADR is landing across slices. The first has shipped with it.
 
 - Specs: [`specs/identity/identifier-aggregate.feature`](../../../specs/identity/identifier-aggregate.feature).
   `specs/identity/identifier-model.feature` keeps every scenario through this
-  slice, and two of its lines need rewriting later: *the command is staged onto
-  sam's queue lane* at slice 2, and *folding the erasure wipes value and hash
-  fields from sam's Identifier rows* at slice 3.
+  slice, and two of its lines need rewriting later: _the command is staged onto
+  sam's queue lane_ at slice 2, and _folding the erasure wipes value and hash
+  fields from sam's Identifier rows_ at slice 3.
 - [ADR-101](101-identity-pipeline-and-identifiers.md) §1, §3, §5 · [ADR-110](110-grant-aggregates-are-grants.md) · [ADR-116](116-account-linkage-is-event-truth.md) §6 · [ADR-119](119-an-account-is-never-left-with-one-way-in.md)
 - Framework mechanism: `projections/projectionRouter.ts` (the store key and the
   lane are both `key(event) ?? event.aggregateId`),

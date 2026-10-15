@@ -1,10 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import type { CommandResult } from "../../utils/output";
 import { formatTable } from "../../utils/formatting";
-import { createDatasetService } from "./service-factory";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Truncates a string to a maximum length, adding ellipsis if truncated.
@@ -12,6 +13,12 @@ import { handleDatasetCommandError } from "./error-handler";
 const truncate = (value: string, maxLength: number): string => {
   if (value.length <= maxLength) return value;
   return value.substring(0, maxLength - 3) + "...";
+};
+
+const formatEntryCell = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value);
 };
 
 /**
@@ -64,14 +71,7 @@ export const recordsListCommand = async (
         const tableData = records.map((record) => {
           const row: Record<string, string> = { ID: record.id };
           entryKeys.forEach((key) => {
-            const value = record.entry[key];
-            const str =
-              value === null || value === undefined
-                ? ""
-                : typeof value === "string"
-                  ? value
-                  : JSON.stringify(value);
-            row[key] = truncate(str, 40);
+            row[key] = truncate(formatEntryCell(record.entry[key]), 40);
           });
           return row;
         });

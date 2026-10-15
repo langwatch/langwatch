@@ -1,10 +1,6 @@
 /**
- * `instant-eval run`, against a mocked service.
- *
- * What this pins is the estimate that has to happen before a large spend, the
- * estimate that must NOT happen for a small one, what a blocking run leaves
- * on the screen, and the exit code a failed run sets.
- *
+ * `instant-eval run` against a mocked service: the estimate before a large spend and not a small
+ * one, what a blocking run leaves on screen, and the exit code a failed run sets.
  * @see specs/features/instant-eval-cli.feature
  */
 
@@ -44,12 +40,7 @@ vi.mock("ora", () => ({
 
 import { runInstantEvalCommand } from "../run";
 
-const {
-  create: createSpy,
-  estimate: estimateSpy,
-  get: getSpy,
-  sample: sampleSpy,
-} = serviceSpies;
+const { create: createSpy, estimate: estimateSpy, get: getSpy, sample: sampleSpy } = serviceSpies;
 const { printed } = installCommandHarness();
 
 describe("instant-eval run, given a question", () => {
@@ -76,11 +67,7 @@ describe("instant-eval run, given a question", () => {
       estimateSpy.mockResolvedValue(ESTIMATE);
       createSpy.mockResolvedValue(FINISHED_RUN);
 
-      await runInstantEvalCommand(
-        "the customer sounds annoyed",
-        { limit: "10000" },
-        [],
-      );
+      await runInstantEvalCommand("the customer sounds annoyed", { limit: "10000" }, []);
 
       expect(estimateSpy).toHaveBeenCalledTimes(1);
       expect(createSpy).toHaveBeenCalledTimes(1);
@@ -103,11 +90,7 @@ describe("instant-eval run, given a question", () => {
       estimateSpy.mockResolvedValue(ESTIMATE);
       createSpy.mockResolvedValue(FINISHED_RUN);
 
-      await runInstantEvalCommand(
-        "annoyed",
-        { limit: "10000", output: "json" },
-        [],
-      );
+      await runInstantEvalCommand("annoyed", { limit: "10000", output: "json" }, []);
 
       const document = JSON.parse(printed());
       expect(document.outcome).toBe("finished");
@@ -228,9 +211,9 @@ describe("instant-eval run, given a question", () => {
     it("exits non-zero", async () => {
       createSpy.mockRejectedValue(new Error("instant_eval_row_cap_exceeded"));
 
-      await expect(
-        runInstantEvalCommand("annoyed", { limit: "50000" }, []),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runInstantEvalCommand("annoyed", { limit: "50000" }, [])).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });

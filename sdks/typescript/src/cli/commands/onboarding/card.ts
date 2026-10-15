@@ -33,14 +33,7 @@ export function guidedPathTitle(path: string): string {
   return (GUIDED_PATH_TITLES as Record<string, string>)[path] ?? path;
 }
 
-/**
- * What `onboarding state` prints. Langy runs it inside the panel, where the
- * output lands on a card the person reads as label and value rows, so every
- * value is customer copy: the paths by their titles, the provider the vendor's
- * way with the model beside it, the tour as Completed or Skipped. Nothing that
- * is the platform's own: no conversation id, no timestamps, no replay counter,
- * and no row at all for a tour the path never had or a list with nothing in it.
- */
+/** What `onboarding state` prints, as customer copy — nothing internal. */
 export interface GuidedStateCard {
   paths: string;
   currentPath?: string;
@@ -49,25 +42,24 @@ export interface GuidedStateCard {
   tour?: "Completed" | "Skipped";
 }
 
+function tourStatus(state: GuidedOnboardingState): "Completed" | "Skipped" | undefined {
+  if (state.tourCompletedAt) return "Completed";
+  if (state.tourSkippedAt) return "Skipped";
+  return undefined;
+}
+
 export function guidedStateCard(state: GuidedOnboardingState): GuidedStateCard {
-  const titles = (paths: GuidedOnboardingPath[]): string =>
-    paths.map(guidedPathTitle).join(", ");
+  const titles = (paths: GuidedOnboardingPath[]): string => paths.map(guidedPathTitle).join(", ");
   const provider =
     state.provider === undefined
       ? undefined
       : [PROVIDER_NAMES[state.provider] ?? state.provider, state.providerModel]
           .filter((part) => part !== undefined && part !== "")
           .join(" · ");
-  const tour = state.tourCompletedAt
-    ? "Completed"
-    : state.tourSkippedAt
-      ? "Skipped"
-      : undefined;
+  const tour = tourStatus(state);
   return {
     paths: titles(state.paths),
-    ...(state.currentPath === undefined
-      ? {}
-      : { currentPath: guidedPathTitle(state.currentPath) }),
+    ...(state.currentPath === undefined ? {} : { currentPath: guidedPathTitle(state.currentPath) }),
     ...(state.donePaths.length === 0 ? {} : { donePaths: titles(state.donePaths) }),
     ...(provider === undefined ? {} : { provider }),
     ...(tour === undefined ? {} : { tour }),
@@ -75,9 +67,8 @@ export function guidedStateCard(state: GuidedOnboardingState): GuidedStateCard {
 }
 
 /**
- * What `onboarding complete-path` prints: the panel's done marker, one line
- * naming the path that was set up and nothing else. The panel draws the
- * `text` field of a result as the card's body, so the line is the whole card.
+ * What `onboarding complete-path` prints: one line naming the path that was
+ * set up, and nothing else.
  */
 export interface GuidedPathDoneCard {
   text: string;

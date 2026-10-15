@@ -1,0 +1,173 @@
+import { generate } from "@langwatch/ksuid";
+import type { Named } from "@langwatch/module";
+import { z } from "zod";
+
+export const EVALUATOR_FEATURE_ID = "evaluator" as const;
+
+const EVALUATOR_KSUID_RESOURCE = "evaluator";
+
+/** The id a new evaluator gets: one scheme, where three used to be written. */
+export const newEvaluatorId = (): string => generate(EVALUATOR_KSUID_RESOURCE).toString();
+export const evaluatorTypeSchema = z.enum(["evaluator", "code", "workflow"]);
+export type EvaluatorType = z.infer<typeof evaluatorTypeSchema>;
+
+const evaluatorFieldSchemaDefinition = z
+  .object({
+    identifier: z.string().min(1),
+    type: z.string().min(1),
+    optional: z.boolean().optional(),
+  })
+  .strict();
+export interface EvaluatorFieldSchema extends Named<typeof evaluatorFieldSchemaDefinition> {}
+export const evaluatorFieldSchema: EvaluatorFieldSchema = evaluatorFieldSchemaDefinition;
+export type EvaluatorField = z.infer<typeof evaluatorFieldSchema>;
+
+const evaluatorConfigSchemaDefinition = z.record(z.string(), z.unknown());
+export interface EvaluatorConfigSchema extends Named<typeof evaluatorConfigSchemaDefinition> {}
+export const evaluatorConfigSchema: EvaluatorConfigSchema = evaluatorConfigSchemaDefinition;
+export type EvaluatorConfig = z.infer<typeof evaluatorConfigSchema>;
+
+const evaluatorSchemaDefinition = z
+  .object({
+    id: z.string().min(1),
+    projectId: z.string().min(1),
+    name: z.string().min(1),
+    slug: z.string().min(1).nullable(),
+    type: evaluatorTypeSchema,
+    config: z.json().nullable(),
+    workflowId: z.string().nullable(),
+    copiedFromEvaluatorId: z.string().nullable(),
+    archivedAt: z.date().nullable(),
+    createdAt: z.date(),
+    updatedAt: z.date(),
+    copyCount: z.number().int().nonnegative().optional(),
+    _count: z.object({ copiedEvaluators: z.number().int().nonnegative() }).optional(),
+  })
+  .strict();
+export interface EvaluatorSchema extends Named<typeof evaluatorSchemaDefinition> {}
+export const evaluatorSchema: EvaluatorSchema = evaluatorSchemaDefinition;
+export type Evaluator = z.infer<typeof evaluatorSchema>;
+
+export const standardEvaluatorOutputFields = [
+  { identifier: "passed", type: "bool" },
+  { identifier: "score", type: "float" },
+  { identifier: "label", type: "str" },
+] as const satisfies readonly EvaluatorField[];
+
+const evaluatorWithFieldsSchemaDefinition = evaluatorSchema
+  .safeExtend({
+    fields: z.array(evaluatorFieldSchema),
+    outputFields: z.array(evaluatorFieldSchema),
+    workflowName: z.string().optional(),
+    workflowIcon: z.string().optional(),
+  })
+  .strict();
+export interface EvaluatorWithFieldsSchema extends Named<
+  typeof evaluatorWithFieldsSchemaDefinition
+> {}
+export const evaluatorWithFieldsSchema: EvaluatorWithFieldsSchema =
+  evaluatorWithFieldsSchemaDefinition;
+export type EvaluatorWithFields = z.infer<typeof evaluatorWithFieldsSchema>;
+
+export type EvaluatorCategory =
+  | "quality"
+  | "rag"
+  | "safety"
+  | "policy"
+  | "other"
+  | "custom"
+  | "similarity";
+
+export type EvaluatorDefinition<_Type extends string = string> = {
+  name: string;
+  description: string;
+  category: EvaluatorCategory;
+  docsUrl?: string;
+  isGuardrail: boolean;
+  requiredFields: string[];
+  optionalFields: string[];
+  settings: Record<string, { description?: string; default: unknown }>;
+  envVars: string[];
+  result: {
+    score?: { description: string };
+    passed?: { description: string };
+    label?: { description: string };
+  };
+};
+
+export type CustomEvaluatorDefinition = {
+  name: string;
+  requiredFields: string[];
+};
+
+/** The catalogue's short presentation names are product vocabulary, not UI state. */
+export const evaluatorDisplayNames: Readonly<Record<string, string>> = {
+  "Azure Content Safety": "Content Safety",
+  "OpenAI Moderation": "Moderation",
+  "Azure Jailbreak Detection": "Jailbreak Detection",
+  "Presidio PII Detection": "PII Detection",
+  "Lingua Language Detection": "Language Detection",
+  "Azure Prompt Shield": "Prompt Injection Detection",
+};
+
+export const evaluatorDisplayName = (name: string): string => evaluatorDisplayNames[name] ?? name;
+
+export const fieldType = (fieldName: string): string =>
+  ({
+    contexts: "list",
+    expected_contexts: "list",
+    conversation: "list",
+  })[fieldName] ?? "str";
+
+function evaluatorSettingDefault({
+  key,
+  setting,
+  resolved,
+  fallback,
+}: {
+  key: string;
+  setting: { readonly default: unknown };
+  resolved: { defaultModel?: string | null; embeddingsModel?: string | null };
+  fallback: { defaultModel: string; embeddingsModel: string };
+}): unknown {
+  if (key === "model") return resolved.defaultModel ?? fallback.defaultModel;
+  if (key === "embeddings_model") return resolved.embeddingsModel ?? fallback.embeddingsModel;
+
+  return setting.default;
+}
+
+export function getEvaluatorDefaultSettings(
+  definition: EvaluatorDefinition | CustomEvaluatorDefinition | undefined,
+  resolved: { defaultModel?: string | null; embeddingsModel?: string | null } = {},
+  fallback: { defaultModel: string; embeddingsModel: string } = {
+    defaultModel: "openai/gpt-5",
+    embeddingsModel: "openai/text-embedding-3-small",
+  },
+): Record<string, unknown> {
+  if (!definition || !("settings" in definition)) return {};
+  return Object.fromEntries(
+    Object.entries(definition.settings)
+      .map(([key, setting]) => [key, evaluatorSettingDefault({ key, setting, resolved, fallback })])
+      .filter(([, value]) => value !== undefined),
+  );
+}
+
+/** Evaluator's lifecycle facts, which peers react to from their own side (§9). */
+export const EVALUATOR_LIFECYCLE_PIPELINE_NAME = "evaluator_lifecycle" as const;
+export const EVALUATOR_AGGREGATE_TYPE = "evaluator" as const;
+export const EVALUATOR_DELETED_EVENT_TYPE = "lw.evaluator.deleted" as const;
+export const EVALUATOR_DELETED_EVENT_VERSION = "2026-10-07" as const;
+
+/** Ids only: a peer reads anything else through `EvaluatorApi`, never the event. */
+const evaluatorDeletedEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  evaluatorId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export interface EvaluatorDeletedEventDataSchema extends Named<
+  typeof evaluatorDeletedEventDataSchemaDefinition
+> {}
+export const evaluatorDeletedEventDataSchema: EvaluatorDeletedEventDataSchema =
+  evaluatorDeletedEventDataSchemaDefinition;
+export type EvaluatorDeletedEventData = z.infer<typeof evaluatorDeletedEventDataSchema>;

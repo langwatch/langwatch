@@ -1,0 +1,70 @@
+/**
+ * Every `evaluations.*` procedure, declared once. The names are the browser's
+ * cache keys, so they are the wire names the surface has always called.
+ * @see specs/evaluators/azure-safety-byok-gating.feature
+ */
+import { defineTrpcContract } from "@langwatch/module";
+
+import {
+  customEvaluatorSchema,
+  evaluationInputsInputSchema,
+  evaluationInputsSchema,
+  evaluationProjectScopeSchema,
+  runTraceEvaluationInputSchema,
+  warmupEvaluatorsInputSchema,
+} from "./evaluation-trpc.schemas.ts";
+import {
+  monitorPerformanceForProjectInputSchema,
+  onlineEvaluationPerformanceSchema,
+} from "./evaluation.performance.ts";
+import {
+  evaluationRunOutcomeSchema,
+  evaluationWarmupSchema,
+  evaluatorCatalogueSchema,
+} from "./evaluation.responses.ts";
+
+export const evaluationTrpc = defineTrpcContract("evaluations")
+  /**
+   * Every evaluator LangWatch knows, each annotated with the environment
+   * variables this project is missing and whether this install carries its
+   * code at all.
+   */
+  .query("availableEvaluators")
+  .withInput(evaluationProjectScopeSchema)
+  .withOutput(evaluatorCatalogueSchema)
+
+  /** The project's own workflow-backed evaluators. */
+  .query("availableCustomEvaluators")
+  .withInput(evaluationProjectScopeSchema)
+  .withOutput(customEvaluatorSchema.array())
+
+  /**
+   * Scores one trace with one evaluator, now, and reports the result into the
+   * evaluation pipeline.
+   */
+  .mutation("runEvaluation")
+  .withInput(runTraceEvaluationInputSchema)
+  .withOutput(evaluationRunOutcomeSchema)
+
+  /** Keeps the evaluator runtime warm ahead of a run. */
+  .mutation("warmupLambda")
+  .withInput(warmupEvaluatorsInputSchema)
+  .withOutput(evaluationWarmupSchema)
+
+  /**
+   * The last seven days of score and pass rate for each of the project's
+   * monitors, against the same previous window the analytics page compares to.
+   */
+  .query("getMonitorPerformanceForProject")
+  .withInput(monitorPerformanceForProjectInputSchema)
+  .withOutput(onlineEvaluationPerformanceSchema.array())
+
+  /**
+   * What one evaluation was run over, for the trace drawer's evaluation card. Keyed by
+   * evaluationId, which is only tenant-scoped, so it stays project-gated, never share-public.
+   * Moved from `traces.getEvaluationInputs` with its owner (CD-2; T1 D2, 2026-10-08).
+   */
+  .query("getEvaluationInputs")
+  .withInput(evaluationInputsInputSchema)
+  .withOutput(evaluationInputsSchema)
+  .build();

@@ -185,3 +185,9 @@ Feature: Large dataset storage
     When I edit the dataset and change that column to an image
     Then the column is reported as an image
     And each stored data URL is kept exactly as it was
+
+  @unit
+  Scenario: A file queued for preparation before an upgrade is still prepared
+    Given a dataset file was queued for preparation by the previous release
+    When the upgraded worker picks the job up
+    Then the file is still prepared into the dataset's rows

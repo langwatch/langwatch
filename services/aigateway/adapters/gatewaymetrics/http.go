@@ -1,7 +1,9 @@
 package gatewaymetrics
 
 import (
+	"bufio"
 	"context"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -77,6 +79,19 @@ type statusRecorder struct {
 	http.ResponseWriter
 	status  int
 	written bool
+	// onHijack runs once when a handler takes the connection over.
+	onHijack func()
+}
+
+// Hijack hands the connection to the handler, which is how a WebSocket
+// upgrade leaves HTTP. The request is counted at that moment, as an upgrade.
+func (s *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	conn, rw, err := http.NewResponseController(s.ResponseWriter).Hijack()
+	if err == nil && s.onHijack != nil {
+		s.onHijack()
+		s.onHijack = nil
+	}
+	return conn, rw, err
 }
 
 func (s *statusRecorder) WriteHeader(code int) {
@@ -145,10 +160,21 @@ func Middleware(rec *Recorder) func(http.Handler) http.Handler {
 			start := time.Now()
 			rec.inFlight.Inc()
 
-			defer func() {
-				rec.inFlight.Dec()
+			// A hijacked connection is a socket that outlives the request by
+			// minutes, so it is observed when it upgrades and not when it ends.
+			observed := false
+			observe := func() {
+				if observed {
+					return
+				}
+				observed = true
 				provider, model := labels.get()
 				rec.ObserveHTTPRequest(routePattern(r), sr.status, provider, model, time.Since(start).Seconds())
+			}
+			sr.onHijack = observe
+			defer func() {
+				rec.inFlight.Dec()
+				observe()
 			}()
 
 			next.ServeHTTP(sr, r.WithContext(ctx))

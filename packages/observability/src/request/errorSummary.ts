@@ -1,27 +1,12 @@
 import pino from "pino";
-import { ERROR_SUMMARY } from "../constants";
-import { redactCommandCredentials } from "../logger";
+
+import { ERROR_SUMMARY } from "../constants.ts";
+import { redactCommandCredentials } from "../logger.ts";
 
 /**
- * A failure reduced to the four fields worth reading.
- *
- * Loki accepts at most 128 structured-metadata keys per record, and every
- * nested key of a logged error becomes one: a ZodError's `issues` or a Prisma
- * error's `meta` pushed request records past 250 keys, and Loki dropped them
- * whole (#8483). Type, message, code and stack are what a failure is triaged
- * by, and they stay a fixed four keys however wide the error is.
- *
- * Credential masking survives because an `Error` summary is cut from the
- * already-redacted pino serialization. That serialization folds the messages
- * of nested `cause`s into `message` and their stacks into `stack`, so inner
- * causes stay readable. Other fields of a cause, and extras such as a
- * HandledError's `reasons` or `meta`, are dropped by design.
- *
- * Non-Error throwables are summarised too: a string and an error-like object
- * (string `message`) keep their text, while any other object is described only
- * by its key count, never its keys or contents, because either can hold a
- * secret (e.g. request headers). Message and stack are length-capped on every
- * path, and the function never throws.
+ * A failure cut to type, message, code and stack, so a wide error stays under Loki's 128
+ * structured-metadata keys (#8483). Credentials stay masked, other objects are described by
+ * key count only, and it never throws (specs/observability/request-log-cause-and-level.feature).
  */
 export function summarizeError(error: unknown): ErrorSummary {
   try {
@@ -54,20 +39,7 @@ function summarizeUnsafe(error: unknown): ErrorSummary {
   }
 
   if (!(error instanceof Error)) {
-    if (isErrorLike(error)) {
-      const { name, message, code, stack } = redactCommandCredentials(error);
-      return {
-        type: typeof name === "string" && name ? name : "Object",
-        message: truncate(message, MAX_SUMMARY_MESSAGE_LENGTH),
-        ...(typeof code === "string" || typeof code === "number"
-          ? { code }
-          : {}),
-        ...(typeof stack === "string"
-          ? { stack: truncate(stack, MAX_SUMMARY_STACK_LENGTH) }
-          : {}),
-      };
-    }
-    return describeOpaqueValue(error);
+    return isErrorLike(error) ? summarizeErrorLike(error) : describeOpaqueValue(error);
   }
 
   const serialized = redactCommandCredentials(pino.stdSerializers.err(error));
@@ -82,9 +54,25 @@ function summarizeUnsafe(error: unknown): ErrorSummary {
     type,
     message: truncate(message, MAX_SUMMARY_MESSAGE_LENGTH),
     ...(typeof code === "string" || typeof code === "number" ? { code } : {}),
-    ...(stack === undefined
-      ? {}
-      : { stack: truncate(stack, MAX_SUMMARY_STACK_LENGTH) }),
+    ...(stack === undefined ? {} : { stack: truncate(stack, MAX_SUMMARY_STACK_LENGTH) }),
+  };
+}
+
+/** An error-shaped object that is not an `Error`: its text survives, credentials masked. */
+function summarizeErrorLike(
+  error: Parameters<typeof redactCommandCredentials>[0] & {
+    message: string;
+    name?: unknown;
+    code?: unknown;
+    stack?: unknown;
+  },
+): ErrorSummary {
+  const { name, message, code, stack } = redactCommandCredentials(error);
+  return {
+    type: typeof name === "string" && name ? name : "Object",
+    message: truncate(message, MAX_SUMMARY_MESSAGE_LENGTH),
+    ...(typeof code === "string" || typeof code === "number" ? { code } : {}),
+    ...(typeof stack === "string" ? { stack: truncate(stack, MAX_SUMMARY_STACK_LENGTH) } : {}),
   };
 }
 

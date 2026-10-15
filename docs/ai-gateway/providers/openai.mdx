@@ -8,15 +8,18 @@ sidebarTitle: OpenAI
 
 Open **Settings > Model Providers**, click **Add Model Provider** and select **OpenAI**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-| Field | Value |
-|---|---|
-| `OPENAI_API_KEY` | Your OpenAI API key. Required unless you set a base URL. |
+| Field             | Value                                                                        |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `OPENAI_API_KEY`  | Your OpenAI API key. Required unless you set a base URL.                     |
 | `OPENAI_BASE_URL` | Optional. An OpenAI-compatible endpoint to call instead of `api.openai.com`. |
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
 <Frame caption="The OpenAI row: name, scope, the two credential fields and the routing handle.">
-  <img src="/images/ai-gateway/model-provider-openai-form.png" alt="The OpenAI model provider drawer with OPENAI_API_KEY filled in and OPENAI_BASE_URL empty" />
+  <img
+    src="/images/ai-gateway/model-provider-openai-form.png"
+    alt="The OpenAI model provider drawer with OPENAI_API_KEY filled in and OPENAI_BASE_URL empty"
+  />
 </Frame>
 
 With a base URL set, the gateway treats the row as an OpenAI-compatible endpoint and sends the key as `Authorization: Bearer`.
@@ -39,15 +42,15 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 ## Endpoints
 
-| Endpoint | Served |
-|---|---|
-| `POST /v1/chat/completions` | Yes |
-| `POST /v1/responses` | Yes |
-| `POST /v1/messages` | Yes, translated from the Anthropic format |
-| `POST /v1/embeddings` | Yes |
-| `POST /v1/audio/speech`, `POST /v1/audio/transcriptions` | Yes |
-| `POST /v1/images/generations`, `POST /v1/images/edits` | Yes, non-streaming. Not on a row that sets a base URL. See [Images](/ai-gateway/api/images) |
-| `POST /v1/realtime/client_secrets` | Yes. See [Realtime](/ai-gateway/api/realtime) |
-| `GET /v1/models` | Yes, from the OpenAI catalog |
+| Endpoint                                                 | Served                                                                                      |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `POST /v1/chat/completions`                              | Yes                                                                                         |
+| `POST /v1/responses`                                     | Yes                                                                                         |
+| `POST /v1/messages`                                      | Yes, translated from the Anthropic format                                                   |
+| `POST /v1/embeddings`                                    | Yes                                                                                         |
+| `POST /v1/audio/speech`, `POST /v1/audio/transcriptions` | Yes                                                                                         |
+| `POST /v1/images/generations`, `POST /v1/images/edits`   | Yes, non-streaming. Not on a row that sets a base URL. See [Images](/ai-gateway/api/images) |
+| `POST /v1/realtime/client_secrets`                       | Yes. See [Realtime](/ai-gateway/api/realtime)                                               |
+| `GET /v1/models`                                         | Yes, from the OpenAI catalog                                                                |
 
 Prompt caching happens on OpenAI's side. The cached token counts come back in `usage` and on the trace. See [Cache control](/ai-gateway/cache-control).

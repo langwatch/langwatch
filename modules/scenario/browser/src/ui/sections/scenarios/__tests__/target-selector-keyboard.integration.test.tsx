@@ -1,0 +1,63 @@
+/**
+ * The target picker's agent rows are keyboard-reachable: Tab focuses, Enter selects.
+ * @vitest-environment jsdom
+ * @see specs/features/agents/connected-agents-ui.feature
+ */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+const mockAgents = [
+  {
+    id: "agent-1",
+    name: "Support Agent",
+    type: "http",
+    updatedAt: new Date("2025-01-01"),
+  },
+];
+
+beforeAll(() => {
+  Element.prototype.scrollTo = vi.fn();
+});
+
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
+}));
+
+vi.mock("../../../../behavior/prompts/use-all-prompts-for-project.ts", () => ({
+  useAllPromptsForProject: () => ({ data: [] }),
+}));
+
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
+  api: {
+    agents: { getAll: { useQuery: () => ({ data: mockAgents }) } },
+  },
+}));
+
+import type { TargetValue } from "../../../../model/scenario-target.ts";
+import { TargetSelector } from "../target-selector.tsx";
+
+describe("<TargetSelector/>", () => {
+  afterEach(cleanup);
+
+  describe("when the reader drives the open list with the keyboard", () => {
+    it("gives the agent row the focus and picks it on Enter", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn<(value: TargetValue) => void>();
+      renderWithDesignSystem(<TargetSelector value={null} onChange={onChange} />);
+
+      await user.click(screen.getByTestId("target-selector-trigger"));
+      await waitFor(() => {
+        expect(screen.getByTestId("target-option-agent-1")).toBeInTheDocument();
+      });
+
+      const option = screen.getByTestId("target-option-agent-1");
+      option.focus();
+      expect(option).toHaveFocus();
+
+      await user.keyboard("{Enter}");
+      expect(onChange).toHaveBeenCalledWith({ type: "http", id: "agent-1" });
+    });
+  });
+});

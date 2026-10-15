@@ -1,0 +1,247 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  BrowserUiDocumentTitle,
+  resolveUiHostServices,
+  UiHostServiceUnavailableError,
+  UiFeedback,
+  UiNavigation,
+  UiRoute,
+  UiSession,
+  type UiFailureNotice,
+  type UiSuccessNotice,
+} from "../capabilities.ts";
+
+class RecordingNavigation extends UiNavigation {
+  readonly moves: string[] = [];
+
+  navigate(to: string): void {
+    this.moves.push(`navigate ${to}`);
+  }
+
+  replace(to: string): void {
+    this.moves.push(`replace ${to}`);
+  }
+
+  back(): void {
+    this.moves.push("back");
+  }
+}
+
+class RecordingRoute extends UiRoute {
+  readonly writes: Readonly<Record<string, string | undefined>>[] = [];
+
+  reading() {
+    return { params: {}, query: {} };
+  }
+
+  setQuery(next: Readonly<Record<string, string | undefined>>): void {
+    this.writes.push(next);
+  }
+}
+
+const recordingRoute = (): UiRoute => new RecordingRoute();
+
+class RecordingFeedback extends UiFeedback {
+  readonly notices: (UiSuccessNotice | UiFailureNotice)[] = [];
+
+  succeeded(notice: UiSuccessNotice): void {
+    this.notices.push(notice);
+  }
+
+  warned(notice: UiSuccessNotice): void {
+    this.notices.push(notice);
+  }
+
+  informed(notice: UiSuccessNotice): void {
+    this.notices.push(notice);
+  }
+
+  failed(failure: UiFailureNotice): void {
+    this.notices.push(failure);
+  }
+}
+
+/** A live session that must never be reached when an install outranks it. */
+class UnusableSession extends UiSession {
+  currentUser(): never {
+    throw new Error("the installed session should have answered");
+  }
+
+  hasPermission(): never {
+    throw new Error("the installed session should have answered");
+  }
+
+  isSettled(): never {
+    throw new Error("the installed session should have answered");
+  }
+}
+
+class StubSession extends UiSession {
+  currentUser() {
+    return { id: "user_1", name: "Ada", email: "ada@example.com", image: null };
+  }
+
+  hasPermission(permission: string): boolean {
+    return permission === "prompt:read";
+  }
+
+  isSettled(): boolean {
+    return true;
+  }
+}
+
+describe("given the host service ports a screen asks instead of reaching for the browser", () => {
+  describe("when the composing application installs none of them", () => {
+    it("takes the defaults this package can build for the document title and navigation", () => {
+      const navigation = new RecordingNavigation();
+      const documentTitle = BrowserUiDocumentTitle.create({ title: "" });
+
+      const hostServices = resolveUiHostServices({
+        install: {},
+        documentTitle,
+        navigation,
+        route: recordingRoute(),
+      });
+
+      expect(hostServices.navigation).toBe(navigation);
+      expect(hostServices.documentTitle).toBe(documentTitle);
+    });
+
+    it("refuses feedback by name rather than swallowing what the user should read", () => {
+      const hostServices = resolveUiHostServices({
+        install: {},
+        documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
+        navigation: new RecordingNavigation(),
+        route: recordingRoute(),
+      });
+
+      expect(() =>
+        hostServices.feedback.failed({ error: new Error("boom"), fallbackTitle: "Couldn't save" }),
+      ).toThrow(UiHostServiceUnavailableError);
+      expect(() => hostServices.feedback.succeeded({ title: "Saved" })).toThrow(
+        /"feedback" UI host service has no implementation/,
+      );
+    });
+
+    it("refuses the session by name rather than answering an empty permission set", () => {
+      const hostServices = resolveUiHostServices({
+        install: {},
+        documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
+        navigation: new RecordingNavigation(),
+        route: recordingRoute(),
+      });
+
+      expect(() => hostServices.session.hasPermission("prompt:read")).toThrow(
+        /"session" UI host service has no implementation/,
+      );
+      expect(() => hostServices.session.currentUser()).toThrow(UiHostServiceUnavailableError);
+    });
+
+    it("refuses the scope by name rather than answering an unresolved one", () => {
+      const hostServices = resolveUiHostServices({
+        install: {},
+        documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
+        navigation: new RecordingNavigation(),
+        route: recordingRoute(),
+      });
+
+      expect(hostServices.scope).toBeDefined();
+      expect(() => hostServices.scope?.activeScope()).toThrow(
+        /"scope" UI host service has no implementation/,
+      );
+    });
+  });
+
+  describe("when the application composed a live session of its own", () => {
+    it("answers with it, so a mounted composition stops refusing", () => {
+      const session = new StubSession();
+
+      const hostServices = resolveUiHostServices({
+        install: {},
+        documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
+        navigation: new RecordingNavigation(),
+        route: recordingRoute(),
+        session,
+      });
+
+      expect(hostServices.session).toBe(session);
+    });
+
+    it("still lets an installed session win over it", () => {
+      const installed = new StubSession();
+
+      const hostServices = resolveUiHostServices({
+        install: { session: installed },
+        documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
+        navigation: new RecordingNavigation(),
+        route: recordingRoute(),
+        session: new UnusableSession(),
+      });
+
+      expect(hostServices.session).toBe(installed);
+    });
+  });
+
+  describe("when the composing application installs an implementation", () => {
+    it("uses the installed port over every default", () => {
+      const feedback = new RecordingFeedback();
+      const session = new StubSession();
+      const installedNavigation = new RecordingNavigation();
+
+      const hostServices = resolveUiHostServices({
+        install: { feedback, session, navigation: installedNavigation },
+        documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
+        navigation: new RecordingNavigation(),
+        route: recordingRoute(),
+      });
+
+      hostServices.feedback.succeeded({ title: "Saved" });
+      hostServices.navigation.replace("/settings");
+
+      expect(feedback.notices).toEqual([{ title: "Saved" }]);
+      expect(installedNavigation.moves).toEqual(["replace /settings"]);
+      expect(hostServices.session.hasPermission("prompt:read")).toBe(true);
+    });
+  });
+});
+
+describe("given the document title host service", () => {
+  describe("when a screen sets the title", () => {
+    it("writes it to the document it was built over", () => {
+      const target = { title: "LangWatch" };
+
+      BrowserUiDocumentTitle.create(target).set("Prompt Studio");
+
+      expect(target.title).toBe("Prompt Studio");
+    });
+  });
+
+  describe("when the screen that set the title is torn down", () => {
+    it("restores the title the document had before it", () => {
+      const target = { title: "LangWatch" };
+
+      const restore = BrowserUiDocumentTitle.create(target).set("Prompt Studio");
+      restore();
+
+      expect(target.title).toBe("LangWatch");
+    });
+  });
+
+  describe("when two screens set the title in turn", () => {
+    it("restores each to what it found, not to the original", () => {
+      const target = { title: "LangWatch" };
+      const hostService = BrowserUiDocumentTitle.create(target);
+
+      const restoreFirst = hostService.set("Prompts");
+      const restoreSecond = hostService.set("Prompt Studio");
+      restoreSecond();
+
+      expect(target.title).toBe("Prompts");
+
+      restoreFirst();
+
+      expect(target.title).toBe("LangWatch");
+    });
+  });
+});
