@@ -13,6 +13,7 @@ import {
   azureBlock,
   completeAzure,
   openObjectStorage,
+  PLATFORM_TENANT_ID,
   type ObjectStorageSettings,
 } from "./object-storage-stores.fixture.ts";
 
@@ -33,7 +34,7 @@ async function destinationFor(options: {
 }) {
   const opened = await openObjectStorage(options);
   closers.push(opened.close);
-  return opened.storage.destination("project-1");
+  return opened.storage.destination(PLATFORM_TENANT_ID);
 }
 
 describe("given STORED_OBJECTS_BACKEND is azure with complete Azure config and no private bucket", () => {
@@ -79,7 +80,7 @@ describe("given STORED_OBJECTS_BACKEND is azure with an incomplete Azure block",
     });
     closers.push(opened.close);
 
-    await expect(opened.storage.destination("project-1")).rejects.toMatchObject({
+    await expect(opened.storage.destination(PLATFORM_TENANT_ID)).rejects.toMatchObject({
       name: "AzureBackendMisconfiguredError",
       missingVariables: [name],
     });
@@ -195,6 +196,7 @@ describe("given writes moved to S3 while the Azure settings stay for legacy read
 describe("given each combination of Azure backend and auth-mode configuration", () => {
   const recordedOnAzure = {
     ...at,
+    projectId: PLATFORM_TENANT_ID,
     location: { kind: "azure", accountName: "lwacct", container: "lw-container" },
   } as const;
   const workloadIdentity = {
@@ -249,7 +251,9 @@ describe("given each combination of Azure backend and auth-mode configuration", 
       const opened = await openObjectStorage({ settings, accountKey: key });
       closers.push(opened.close);
 
-      const destination = await opened.storage.destination("project-1").catch(() => undefined);
+      const destination = await opened.storage
+        .destination(PLATFORM_TENANT_ID)
+        .catch(() => undefined);
       const resolvesToAzure = destination?.kind === "azure";
       const reachRefusal = await opened.storage
         .signDownload(recordedOnAzure, { expiresAt })

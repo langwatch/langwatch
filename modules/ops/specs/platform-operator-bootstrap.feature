@@ -172,6 +172,12 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     Then it fails with platform_operator_user_not_found
 
   @unit @operator-recovery
+  Scenario: The recovery task refuses an account whose address was never verified
+    Given an active account holds the address but never verified it
+    When grant-platform-operator runs with that address, on any deployment
+    Then it fails with platform_operator_user_not_found and nothing is granted
+
+  @unit @operator-recovery
   Scenario: The recovery task waits for a grant that is still being applied
     Given an active account holds the address
     And the grant is accepted but authz has not confirmed it within its own window
@@ -212,7 +218,6 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     Given a signed-in operator
     When they grant the role to an address whose account never verified it
     Then the refusal is platform_operator_user_not_found and nothing is granted
-    And the recovery task still grants that account
 
   @unit @operators-page
   Scenario: A refused grant never carries the address
@@ -225,3 +230,44 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     Given an operator impersonating a customer
     When they grant or revoke the role
     Then the refusal is ops_impersonated_operator_refused
+
+  # ============================================================================
+  # Staff only on the hosted cloud
+  # ============================================================================
+  # A deployment LangWatch runs is the seed's own "cloud" (IS_SAAS or Cloud admin); a developer's
+  # local stack is exempt, as Cloud admin is always on there, so it can grant its seeded admin.
+
+  @unit @operator-staff
+  Scenario: On the hosted cloud the page and the task grant a verified staff account
+    Given the hosted cloud
+    And an active account whose verified address is on langwatch.ai
+    When an operator grants it the role, or grant-platform-operator runs with its address
+    Then the account is granted
+
+  @unit @operator-staff
+  Scenario: On the hosted cloud an account outside the staff domain is refused
+    Given the hosted cloud
+    And an active account whose verified address is on another domain, a subdomain or a lookalike
+    When an operator grants it the role, or grant-platform-operator runs with its address
+    Then the refusal is platform_operator_user_not_found and nothing is granted
+
+  @unit @operator-staff
+  Scenario: On the hosted cloud an unverified staff address is refused
+    Given the hosted cloud
+    And an active account whose address on langwatch.ai was never verified
+    When an operator grants it the role, or grant-platform-operator runs with its address
+    Then the refusal is platform_operator_user_not_found and nothing is granted
+
+  @unit @operator-staff
+  Scenario: A self-hosted install grants any verified active account
+    Given a self-hosted install
+    And an active account whose verified address is on the install's own domain
+    When an operator grants it the role, or grant-platform-operator runs with its address
+    Then the account is granted
+
+  @unit @operator-staff
+  Scenario: A developer's local stack grants its own seeded admin
+    Given a local development stack running as the hosted cloud
+    And the seeded admin's verified address is not on langwatch.ai
+    When grant-platform-operator runs with that address
+    Then the account is granted

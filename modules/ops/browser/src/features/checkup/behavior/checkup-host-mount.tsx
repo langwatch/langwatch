@@ -25,6 +25,7 @@ class CapabilityCheckupHost extends CheckupHostApi {
       organizationId: string | undefined;
       isSaaS: boolean;
       mayManageOrganization: boolean;
+      mayManageInstall: boolean;
       feedback: UiFeedback;
     },
   ) {
@@ -43,6 +44,10 @@ class CapabilityCheckupHost extends CheckupHostApi {
     return this.deps.mayManageOrganization;
   }
 
+  canManageInstall(): boolean {
+    return this.deps.mayManageInstall;
+  }
+
   failed(failure: CheckupFailureNotice): void {
     this.deps.feedback.failed(failure);
   }
@@ -58,6 +63,7 @@ export default function CheckupHostMount({ children }: { children?: ReactNode })
   const { isSaaS } = useUiDeployment();
   const { organizationId } = useUiScope().activeScope();
   const mayManageOrganization = session.hasPermission("organization:manage");
+  const mayManageInstall = session.hasPermission("ops:manage");
 
   const host = useMemo(
     () =>
@@ -65,9 +71,10 @@ export default function CheckupHostMount({ children }: { children?: ReactNode })
         organizationId: organizationId ?? void 0,
         isSaaS,
         mayManageOrganization,
+        mayManageInstall,
         feedback,
       }),
-    [organizationId, isSaaS, mayManageOrganization, feedback],
+    [organizationId, isSaaS, mayManageOrganization, mayManageInstall, feedback],
   );
 
   return <CheckupHostProvider value={host}>{children}</CheckupHostProvider>;

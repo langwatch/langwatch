@@ -6,6 +6,7 @@ import {
   cliRefreshTokenKey,
   cliUserTokensIndexKey,
 } from "@langwatch/auth-contract";
+import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { describe, expect, it } from "vitest";
 
 import { MemoryCliDeviceSettlementChannel } from "../../../../channels/memory/memory.cli-device-settlement.channel.ts";
@@ -20,6 +21,7 @@ function setup({ refreshTokenTtlSeconds }: { refreshTokenTtlSeconds?: number } =
       store,
       settlements: MemoryCliDeviceSettlementChannel.create(),
       refreshTokenTtlSeconds,
+      rotations: MemorySharedCredentialStore.create(),
     }),
   };
 }

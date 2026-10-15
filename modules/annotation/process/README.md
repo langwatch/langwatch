@@ -6,7 +6,7 @@ The server half of [annotation](../README.md). Annotations on traces: comments, 
 
 ## Installation
 
-`defineProcessModule("annotation").withRepositories(annotationRepositories).withApi(AnnotationModule).withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport).withEventing(annotationLifecycleEventing).withMigrations(…).withTasks(…)`, `src/annotation.module.ts:20`.
+`defineProcessModule("annotation").withRepositories(annotationRepositories).withApi(AnnotationModule).withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport).withEventing(annotationLifecycleEventing).withMigrations(…)`, `src/annotation.module.ts:19`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -599,14 +599,6 @@ Declared at `src/eventing/annotation-lifecycle.pipeline.ts:26`. Events: `annotat
 | command | `recordAnnotationDeleted` | –       | `src/eventing/annotation-lifecycle.pipeline.ts:39` |
 | command | `recordScoreDefined`      | –       | `src/eventing/annotation-lifecycle.pipeline.ts:40` |
 | command | `recordScoreRenamed`      | –       | `src/eventing/annotation-lifecycle.pipeline.ts:41` |
-
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                                 | Class                         | Declared at                                      |
-| ------------------------------------ | ----------------------------- | ------------------------------------------------ |
-| `backfill-annotations-to-clickhouse` | `AnnotationTraceBackfillTask` | `src/tasks/annotation-trace-backfill.task.ts:12` |
 
 ## Configuration
 

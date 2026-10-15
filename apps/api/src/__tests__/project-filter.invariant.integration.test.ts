@@ -502,22 +502,31 @@ async function aggregateSightings({ session, role }: { session: LiveSession; rol
 }
 
 describe("when a listing hides only the governance home", () => {
-  it("fails unless every such listing is allow-listed with why the aggregate cannot reach a non-admin", () => {
-    const found = governanceOnlyFiltersByModule();
-    // The sweep's own guard: a regex that stopped matching would report every file clean.
-    expect(Object.keys(found)).toContain(MEMBERSHIP_REPOSITORY);
+  // Reads every source file under modules/, which outruns the 10 s default on a busy runner.
+  it(
+    "fails unless every such listing is allow-listed with why the aggregate cannot reach a non-admin",
+    { timeout: 60_000 },
+    () => {
+      const found = governanceOnlyFiltersByModule();
+      // The sweep's own guard: a regex that stopped matching would report every file clean.
+      expect(Object.keys(found)).toContain(MEMBERSHIP_REPOSITORY);
 
-    const unexplained = Object.entries(found)
-      .filter(([module, count]) => AGGREGATE_FILTERED_ELSEWHERE[module]?.count !== count)
-      .map(([module, count]) => `${module} (${count})`);
-    expect(
-      unexplained,
-      "these files hide only the governance project, so a non-admin would be listed the aggregate: filter with projectKindsHiddenFrom(role), or record why the aggregate cannot reach a non-admin there",
-    ).toEqual([]);
+      const unexplained = Object.entries(found)
+        .filter(([module, count]) => AGGREGATE_FILTERED_ELSEWHERE[module]?.count !== count)
+        .map(([module, count]) => `${module} (${count})`);
+      expect(
+        unexplained,
+        "these files hide only the governance project, so a non-admin would be listed the aggregate: filter with projectKindsHiddenFrom(role), or record why the aggregate cannot reach a non-admin there",
+      ).toEqual([]);
 
-    const stale = Object.keys(AGGREGATE_FILTERED_ELSEWHERE).filter((module) => !(module in found));
-    expect(stale, "allow-listed files that no longer hide only the governance project").toEqual([]);
-  });
+      const stale = Object.keys(AGGREGATE_FILTERED_ELSEWHERE).filter(
+        (module) => !(module in found),
+      );
+      expect(stale, "allow-listed files that no longer hide only the governance project").toEqual(
+        [],
+      );
+    },
+  );
 });
 
 describe.skipIf(!stores)("the hidden governance project as a member sees it", () => {
@@ -692,25 +701,31 @@ describe.skipIf(!stores)("the hidden governance project as a member sees it", ()
 
     describe("when a new project listing is added to the codebase", () => {
       /** @scenario "Every filtered project listing is a surface the leak gate drives" */
-      it("fails unless the listing registers itself as a driven surface", () => {
-        const filtering = modulesFilteringTheGovernanceHome();
-        expect(filtering).toContain(PROJECT_REPOSITORY);
+      it(
+        "fails unless the listing registers itself as a driven surface",
+        { timeout: 60_000 },
+        () => {
+          const filtering = modulesFilteringTheGovernanceHome();
+          expect(filtering).toContain(PROJECT_REPOSITORY);
 
-        const registered = new Set(surfaces.map((surface) => surface.module));
-        const unaccounted = filtering.filter(
-          (module) =>
-            !registered.has(module) && !(module in NOT_A_LISTING) && !(module in PROVEN_ELSEWHERE),
-        );
-        expect(
-          unaccounted,
-          "these readers filter the governance home but no surface above drives them",
-        ).toEqual([]);
+          const registered = new Set(surfaces.map((surface) => surface.module));
+          const unaccounted = filtering.filter(
+            (module) =>
+              !registered.has(module) &&
+              !(module in NOT_A_LISTING) &&
+              !(module in PROVEN_ELSEWHERE),
+          );
+          expect(
+            unaccounted,
+            "these readers filter the governance home but no surface above drives them",
+          ).toEqual([]);
 
-        const stale = surfaces
-          .map((surface) => surface.module)
-          .filter((module) => !filtering.includes(module));
-        expect(stale, "registered surfaces whose module no longer filters").toEqual([]);
-      });
+          const stale = surfaces
+            .map((surface) => surface.module)
+            .filter((module) => !filtering.includes(module));
+          expect(stale, "registered surfaces whose module no longer filters").toEqual([]);
+        },
+      );
     });
   });
 

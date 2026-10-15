@@ -36,6 +36,7 @@ function authPublicEnvironment(config: UiFeatureConfig): AuthPublicEnvironment {
     STRIPE_LICENSE_PAYMENT_LINK_URL: config.billing.licensePaymentUrl,
     NEXTAUTH_PROVIDER: config.auth.authProvider,
     SIGN_UP_MODE: config.auth.signUpMode,
+    EMAIL_PASSWORD_ENABLED: config.auth.emailPasswordEnabled,
   };
 }
 

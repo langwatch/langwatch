@@ -19,8 +19,9 @@ const simAPITimeout = 5 * time.Second
 // seam the `haven <sim>` commands share: resolve the port from the stack's
 // session, then GET, POST, PUT or DELETE JSON against it.
 type SimAPI struct {
-	base   string
-	client *http.Client
+	base    string
+	client  *http.Client
+	timeout time.Duration // zero: simAPITimeout
 }
 
 // NewSimAPI dials a simulator on this machine's loopback port.
@@ -29,6 +30,14 @@ func NewSimAPI(port int) SimAPI { return NewSimAPIAt(fmt.Sprintf("http://127.0.0
 // NewSimAPIAt dials a simulator at an explicit base URL.
 func NewSimAPIAt(base string) SimAPI {
 	return SimAPI{base: strings.TrimRight(base, "/"), client: &http.Client{Timeout: simAPITimeout}}
+}
+
+// WithTimeout is the same client with a longer bound on each call, for a verb
+// the sim answers only once a run has ended (mcpsim's runs with wait set).
+func (a SimAPI) WithTimeout(timeout time.Duration) SimAPI {
+	a.timeout = timeout
+	a.client = &http.Client{Timeout: timeout}
+	return a
 }
 
 // Get reads one JSON document; into may be a *json.RawMessage.
@@ -69,7 +78,11 @@ func (a SimAPI) do(method, path string, params url.Values, body, into any) error
 		}
 		reader = bytes.NewReader(encoded)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), simAPITimeout)
+	timeout := a.timeout
+	if timeout <= 0 {
+		timeout = simAPITimeout
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, method, target, reader)
 	if err != nil {

@@ -207,7 +207,8 @@ describe("buildFinalAssistantParts", () => {
   });
 
   describe("given a block whose JSON was cut off with unclosed brackets", () => {
-    it("salvages it into a document that validates, and stamps the card", () => {
+    /** @scenario "A card repaired from damaged JSON says so on its part" */
+    it("salvages it into a document that validates, and stamps the card as repaired", () => {
       const truncated = [
         "```langy-card",
         '{"kind": "stats", "blockId": "b1", "items": [{"label": "p95", "value": 812',
@@ -225,8 +226,42 @@ describe("buildFinalAssistantParts", () => {
             blockId: "b1",
             items: [{ label: "p95", value: 812 }],
           },
+          repaired: true,
         },
       ]);
+    });
+  });
+
+  describe("given a fenced insights card", () => {
+    const insightsFence = (finding: Record<string, unknown>) =>
+      [
+        "I read the board.",
+        "```langy-card",
+        JSON.stringify({ kind: "insights", blockId: "daily-insights", findings: [finding] }),
+        "```",
+      ].join("\n");
+    const finding = { title: "Checkout cost doubled", body: "From 41 to 96.", tone: "bad" };
+
+    /** @scenario "A fenced insights card is stamped only when it validates" */
+    it("stamps the findings as a typed part, and leaves the prose without them", () => {
+      expect(buildFinalAssistantParts({ text: insightsFence(finding) })).toEqual([
+        { type: "text", text: "I read the board.", role: "assistant" },
+        {
+          type: "langy-card",
+          blockId: "daily-insights",
+          kind: "insights",
+          provenance: "derived",
+          card: { kind: "insights", blockId: "daily-insights", findings: [finding] },
+        },
+      ]);
+    });
+
+    it("stamps no card for a finding that names an owner: the raw text is kept as failed", () => {
+      const parts = buildFinalAssistantParts({
+        text: insightsFence({ ...finding, ownerUserId: "user-attacker" }),
+      });
+
+      expect(parts.map((part) => part.type)).toEqual(["text", "langy-card-failed"]);
     });
   });
 

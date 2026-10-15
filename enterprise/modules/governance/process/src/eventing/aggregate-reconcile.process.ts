@@ -2,14 +2,15 @@
 import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { z } from "zod";
 
-/** M8487-RECONCILE-PM: one instance per aggregate reconciles it; the daily wake enqueues them all. */
+/** M8487-RECONCILE-PM: one instance per aggregate reconciles it; the daily wake only prunes. */
 export const AGGREGATE_RECONCILE_PROCESS_NAME = "aggregateProjectReconcile" as const;
 export const AGGREGATE_RECONCILE_INTENT = "reconcile" as const;
-export const AGGREGATE_SWEEP_INTENT = "sweep" as const;
-/** Main's nightly catch-up for anything a trigger missed. */
-export const AGGREGATE_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+/** Wire name kept from the sweep, so a sweep queued before the deploy still runs (as a prune). */
+export const AGGREGATE_PRUNE_INTENT = "sweep" as const;
+/** Clears finished reconciles; reconciles come from facts alone (ADR-177, ADR-025). */
+export const AGGREGATE_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 export const AGGREGATE_RECONCILE_MAX_ATTEMPTS = 5;
-/** Dispatched rows older than this are pruned by the sweep. */
+/** Dispatched rows older than this are pruned; dead ones stay for an operator. */
 export const AGGREGATE_RECONCILE_RETENTION_MS = 2 * 24 * 60 * 60 * 1000;
 
 export const aggregateReconcileIntentSchema = z.object({
@@ -18,16 +19,18 @@ export const aggregateReconcileIntentSchema = z.object({
 });
 export type AggregateReconcileIntent = z.infer<typeof aggregateReconcileIntentSchema>;
 
-export const aggregateSweepIntentSchema = z.object({ scheduledFor: z.number().int() });
-export type AggregateSweepIntent = z.infer<typeof aggregateSweepIntentSchema>;
+export const aggregatePruneIntentSchema = z.object({ scheduledFor: z.number().int() });
 
-export const aggregateReconcileStateSchema = z.object({ lastSweepAt: z.number().nullable() });
+/** A state stored before the prune existed carries none, so it reads as never pruned. */
+export const aggregateReconcileStateSchema = z.object({
+  lastPruneAt: z.number().nullable().default(null),
+});
 type AggregateReconcileState = z.infer<typeof aggregateReconcileStateSchema>;
-export const AGGREGATE_RECONCILE_INITIAL_STATE: AggregateReconcileState = { lastSweepAt: null };
+export const AGGREGATE_RECONCILE_INITIAL_STATE: AggregateReconcileState = { lastPruneAt: null };
 
 type AggregateReconcileIntents = {
   [AGGREGATE_RECONCILE_INTENT]: IntentSpec<typeof aggregateReconcileIntentSchema>;
-  [AGGREGATE_SWEEP_INTENT]: IntentSpec<typeof aggregateSweepIntentSchema>;
+  [AGGREGATE_PRUNE_INTENT]: IntentSpec<typeof aggregatePruneIntentSchema>;
 };
 
 /** The process instance one aggregate's reconciles queue on. */
@@ -39,11 +42,11 @@ export function aggregateReconcileProcessKey({
   return `aggregate:${aggregateProjectId}`;
 }
 
-/** Every wake asks for one sweep, keyed by its schedule time so a redelivery is a repeat. */
-export const aggregateSweepWake: WakeHandler<AggregateReconcileState, AggregateReconcileIntents> = (
+/** Every wake asks for one prune, keyed by its schedule time so a redelivery is a repeat. */
+export const aggregatePruneWake: WakeHandler<AggregateReconcileState, AggregateReconcileIntents> = (
   _state,
   ctx,
 ) => ({
-  state: { lastSweepAt: ctx.at },
-  intents: [ctx.intent(AGGREGATE_SWEEP_INTENT, `sweep:${ctx.at}`, { scheduledFor: ctx.at })],
+  state: { lastPruneAt: ctx.at },
+  intents: [ctx.intent(AGGREGATE_PRUNE_INTENT, `prune:${ctx.at}`, { scheduledFor: ctx.at })],
 });

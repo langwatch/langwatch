@@ -5,6 +5,8 @@
  */
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
+  LANGY_CONVERSATION_ORIGIN,
+  type LangyConversationOrigin,
   LangyConversationIdUnadoptableError,
   foldLangyConversationTurn,
   initLangyConversationTurnState,
@@ -33,6 +35,7 @@ export type ConversationListItem = {
   title: string | null;
   isShared: boolean;
   isOwn: boolean;
+  origin: LangyConversationOrigin;
   lastActivityAt: Instant;
   messageCount: number;
 };
@@ -185,6 +188,11 @@ export function toListItem(row: LangyConversationRow, userId: string): Conversat
     title: row.title,
     isShared: row.isShared,
     isOwn: row.userId === userId,
+    // A free string column: anything that is not a run reads as the person's own chat.
+    origin:
+      row.origin === LANGY_CONVERSATION_ORIGIN.RUN
+        ? LANGY_CONVERSATION_ORIGIN.RUN
+        : LANGY_CONVERSATION_ORIGIN.INTERACTIVE,
     lastActivityAt: Temporal.Instant.fromEpochMilliseconds(
       row.lastActivityAtMs > 0 ? row.lastActivityAtMs : row.createdAtMs,
     ),

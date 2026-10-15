@@ -1,4 +1,5 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 /**
@@ -21,6 +22,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { evaluationProcessModule } from "../../evaluation.module.ts";
 import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
 
@@ -39,6 +41,9 @@ function process(
     .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
     .withStores(memoryStores())
     .provide({
+      authz: createApiFixture<AuthzApi>({
+        authorizeInternal: async ({ projectId }) => ownProof({ projectId }),
+      }),
       workflow,
       trace,
       "model-provider": createApiFixture<ModelProviderApi>({

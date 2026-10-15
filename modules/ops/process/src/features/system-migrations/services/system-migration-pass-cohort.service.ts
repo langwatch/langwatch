@@ -4,6 +4,7 @@ import type { TenantMigrationStep } from "@langwatch/upgrade/step";
 
 import type { OrganizationDataplaneResolver } from "../../../app/ops.app.ts";
 import type { OpsRepositories } from "../../../repositories/ops.repositories.ts";
+import { ProjectHasNoOrganizationError } from "../../../repositories/tenant-source.repository.ts";
 import { userMigrates } from "../../../rules/ops-system-migration-cohort.rules.ts";
 import { RoutingTableOrganizationDataplaneService } from "../../../services/organization-dataplane.service.ts";
 import { SystemMigrationCohortService } from "./system-migration-cohort.service.ts";
@@ -56,6 +57,7 @@ export class SystemMigrationPassCohortService {
   }): MigrationCohort {
     const projects = this.options.repositories.projectTenants;
     const owners = new Map<string, string>();
+    const orphans = new Set<string>();
     const prepare = async ({ tenantIds }: { tenantIds: readonly string[] }): Promise<void> => {
       const unknown = tenantIds.filter((projectId) => !owners.has(projectId));
       if (unknown.length === 0) return;
@@ -72,9 +74,21 @@ export class SystemMigrationPassCohortService {
       tenantId: string;
       migrationName: string;
     }) => {
+      if (orphans.has(tenantId)) return false;
       let organizationId = owners.get(tenantId);
       if (organizationId === undefined) {
-        organizationId = await projects.getOrganizationId(tenantId);
+        try {
+          organizationId = await projects.getOrganizationId(tenantId);
+        } catch (error) {
+          if (!(error instanceof ProjectHasNoOrganizationError)) throw error;
+          orphans.add(tenantId);
+          // An orphan project (no team, so no organization) belongs to no enrolled cohort.
+          logger.warn(
+            { projectId: tenantId, migrationName },
+            "skipping project with no owning organization",
+          );
+          return false;
+        }
         owners.set(tenantId, organizationId);
       }
       return organizationCohort({ tenantId: organizationId, migrationName });

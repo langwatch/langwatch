@@ -3,6 +3,7 @@
  * @see specs/setup/boot-sequence.feature
  * @see specs/upgrade/upgrade-stuck-states-locks.feature
  */
+import type * as observabilityModule from "@langwatch/observability";
 import { DEFAULT_LEASE_TIMING, holdUpgradeLease } from "@langwatch/upgrade/runner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,7 +11,8 @@ import { holdTasksLease, LEGACY_TASKS_IMAGE } from "../migration-lock.ts";
 
 const logs = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn() }));
 
-vi.mock("@langwatch/observability", () => ({
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof observabilityModule>()),
   createLogger: () => ({ info: logs.info, warn: logs.warn }),
 }));
 
