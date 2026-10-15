@@ -113,6 +113,61 @@ describe("given a listed run's candidates", () => {
     expect(await redis.exists(`${groupKey}:failstreak`, `${groupKey}:attempt`)).toBe(0);
   });
 
+  /** @scenario "A claim leaves a group parked at its tenant's cap out of the next claims" */
+  it("scores a group the tenant cap parks seconds ahead, not due again at once", async () => {
+    scripts = new GroupStagingScripts(redis, QUEUE_NAME, { tenantConcurrencyCap: 1 });
+    const nowMs = Date.now();
+    await stage({ groupId: "tenant/g1", jobId: "j1", dueMs: nowMs - 2_000 });
+    await stage({ groupId: "tenant/g2", jobId: "j2", dueMs: nowMs - 1_000 });
+    await scripts.registerPreflightTargets({
+      targetKey: LIST_KEY,
+      groupIds: ["tenant/g1", "tenant/g2"],
+    });
+
+    const claimed = await claim({ nowMs, maxJobs: 10 });
+
+    expect(claimed.map((job) => job.stagedJobId)).toEqual(["j1"]);
+    expect(await redis.zscore(`${QUEUE_NAME}:gq:parked:tenant`, "tenant/g2")).not.toBeNull();
+    expect(Number(await redis.zscore(CANDIDATES_KEY, "tenant/g2"))).toBeGreaterThan(nowMs + 1_000);
+  });
+
+  /** @scenario "A claim leaves a blocked group out of the next claims" */
+  it("scores a blocked group seconds ahead, not due again at once", async () => {
+    const nowMs = Date.now();
+    await stage({ groupId: "tenant/g1", jobId: "j1", dueMs: nowMs - 1_000 });
+    await redis.sadd(`${QUEUE_NAME}:gq:blocked`, "tenant/g1");
+    await scripts.registerPreflightTargets({ targetKey: LIST_KEY, groupIds: ["tenant/g1"] });
+
+    expect(await claim({ nowMs, maxJobs: 10 })).toEqual([]);
+    expect(Number(await redis.zscore(CANDIDATES_KEY, "tenant/g1"))).toBeGreaterThan(nowMs + 1_000);
+  });
+
+  /** @scenario "A claim over a listed run leaves other tenants' parked groups parked" */
+  it("does not unpark groups past the tenant cap when it has free slots", async () => {
+    scripts = new GroupStagingScripts(redis, QUEUE_NAME, {
+      tenantConcurrencyCap: 1,
+      globalConcurrencyBudget: 10,
+    });
+    const nowMs = Date.now();
+    const parkedKey = `${QUEUE_NAME}:gq:parked:busy`;
+    await stage({ groupId: "busy/g1", jobId: "busy-j1", dueMs: nowMs - 1_000 });
+    await redis.zrem(`${QUEUE_NAME}:gq:ready`, "busy/g1");
+    await redis.zadd(parkedKey, nowMs - 1_000, "busy/g1");
+    await redis.sadd(`${QUEUE_NAME}:gq:parked-tenants`, "busy");
+    // At its cap: one group already in flight, so only the cap override could unpark the other.
+    await redis.zadd(`${QUEUE_NAME}:gq:tenant_active_z:busy`, nowMs + 60_000, "busy/g0");
+    // The parked-group check just ran, so this claim neither re-runs it nor widens the cap.
+    await redis.set(`${QUEUE_NAME}:gq:reconcile-ts`, String(nowMs));
+    await stage({ groupId: "listed/g1", jobId: "j1", dueMs: nowMs - 1_000 });
+    await scripts.registerPreflightTargets({ targetKey: LIST_KEY, groupIds: ["listed/g1"] });
+
+    const claimed = await claim({ nowMs, maxJobs: 10 });
+
+    expect(claimed.map((job) => job.stagedJobId)).toEqual(["j1"]);
+    expect(await redis.zscore(parkedKey, "busy/g1")).not.toBeNull();
+    expect(await redis.zscore(`${QUEUE_NAME}:gq:ready`, "busy/g1")).toBeNull();
+  });
+
   /** @scenario "A claim with fewer due groups than free slots looks at each waiting group once" */
   it("looks at each of a hundred waiting groups once in one claim", async () => {
     const nowMs = Date.now();
