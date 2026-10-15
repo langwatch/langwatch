@@ -29,7 +29,10 @@ import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
 import { clonePayload } from "../rules/payload-clone.rules.ts";
-import { capOversizedAttributes } from "../rules/trace-attribute-cap.rules.ts";
+import {
+  capOversizedAttributes,
+  MAX_RECORDED_ATTRIBUTE_VALUE_BYTES,
+} from "../rules/trace-attribute-cap.rules.ts";
 
 export interface TraceSpanPiiRedaction {
   redact(input: {
@@ -186,9 +189,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     const resource = commandData.resource ? clonePayload(commandData.resource) : null;
 
     this.stripReservedAttributes(span, resource);
-    if (!command.data.spoolRef) {
-      this.capAttributes({ span, resource, tenantId, traceId, spanId });
-    }
+    this.capAttributes({ span, resource, tenantId, traceId, spanId });
 
     const piiRedactionLevel = commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
     const [piiResult, costResult, tokenResult] = await Promise.allSettled([
@@ -301,7 +302,11 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     traceId: string;
     spanId: string;
   }): void {
-    const cappedAttributeCount = capOversizedAttributes(span, resource);
+    const cappedAttributeCount = capOversizedAttributes(
+      span,
+      resource,
+      MAX_RECORDED_ATTRIBUTE_VALUE_BYTES,
+    );
     if (cappedAttributeCount === 0) {
       return;
     }
