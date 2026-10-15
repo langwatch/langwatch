@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api } from "../../../behavior/ops-api.ts";
 import { useOpsMutationOutcomes } from "../../../behavior/ops-mutation-outcome.ts";
+import { inBatches } from "../model/dlq-batches.ts";
 /** What a pending bulk or single act covers — named fully in the confirm. */
 export interface PendingDlqAction {
   kind: "redrive" | "discard";
@@ -12,30 +13,6 @@ export interface PendingDlqAction {
 }
 
 const plural = (count: number) => (count === 1 ? "group" : "groups");
-
-/** The explicit-id endpoints accept at most this many ids per call. */
-const MAX_GROUP_IDS_PER_CALL = 2000;
-
-/**
- * Sends the ids in sequential batches the endpoint accepts and sums each
- * count, so one act covers every group the operator saw.
- */
-async function inBatches<T extends Record<string, number>>(
-  input: { queueName: string; groupIds: string[] },
-  send: (batch: { queueName: string; groupIds: string[] }) => Promise<T>,
-): Promise<T> {
-  const totals: Record<string, number> = {};
-  for (let i = 0; i < input.groupIds.length; i += MAX_GROUP_IDS_PER_CALL) {
-    const result = await send({
-      queueName: input.queueName,
-      groupIds: input.groupIds.slice(i, i + MAX_GROUP_IDS_PER_CALL),
-    });
-    for (const [key, value] of Object.entries(result)) {
-      totals[key] = (totals[key] ?? 0) + value;
-    }
-  }
-  return totals as T;
-}
 
 /**
  * The DLQ card's recovery mutations (specs/ops/dead-letter-recovery.feature).
