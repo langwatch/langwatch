@@ -1,0 +1,384 @@
+import { AuthzApi } from "@langwatch/authz-contract";
+import {
+  dataRetentionConfig,
+  DataRetentionApi,
+  INDEFINITE_RETENTION_DAYS,
+  resolvePlatformDefaultRetentionDays,
+  type DataRetentionApi as DataRetentionApiContract,
+  type DataRetentionServerConfig,
+  type KillRetroactiveMutationInput,
+  type PinTraceInput,
+  type PinnedTrace,
+  type ResolvedRetention,
+  type RetentionCallerInput,
+  type RetentionCategory,
+  type RetentionPolicy,
+  type RetentionPolicySnapshot,
+  type RetentionStorageUsage,
+  type RetroactiveMutationProgress,
+  type RetroactiveMutationProjectInput,
+  type ScopeAssignment,
+  type StorageMeterTenantInput,
+  type StorageMeterTenantsInput,
+  type UnpinTraceInput,
+} from "@langwatch/data-retention-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureSetup } from "@langwatch/process";
+import { UserApi } from "@langwatch/user-contract";
+
+import {
+  buildDataRetentionSeatPolicyPipeline,
+  type DataRetentionSeatPolicyPipeline,
+} from "../eventing/data-retention-seat-policy.pipeline.ts";
+import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
+import {
+  DataRetentionPolicyService,
+  type RetentionActor,
+} from "../services/data-retention-policy.service.ts";
+import { DataRetentionSnapshotService } from "../services/data-retention-snapshot.service.ts";
+import { DataRetentionService } from "../services/data-retention.service.ts";
+import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
+import { RetentionPlanService } from "../services/retention-plan.service.ts";
+import { SeatRetentionPolicyService } from "../services/seat-retention-policy.service.ts";
+import { StorageMeterScopeService } from "../services/storage-meter-scope.service.ts";
+import { StorageMeterService } from "../services/storage-meter.service.ts";
+
+/** A project's place in the organization chain, plus the name it renders under. */
+export type RetentionProjectLineage = Readonly<{
+  projectId: string;
+  name: string;
+  teamId: string | null;
+  organizationId: string | null;
+  organizationName: string | null;
+}>;
+
+/** One organization's scope targets, as the settings page lists them. */
+export type RetentionOrganizationDirectory = Readonly<{
+  teams: readonly { id: string; name: string }[];
+  /**
+   * Archived projects stay in the list so an existing rule that targets one
+   * still resolves a NAME; the picker drops them, which is a filter the
+   * snapshot applies rather than one this read makes.
+   */
+  projects: readonly { id: string; name: string; teamId: string; archived: boolean }[];
+}>;
+
+/**
+ * The organization lineage a retention rule is placed, named and gated against.
+ * Not this feature's own repository: `Organization`, `Team` and `Project`
+ * belong to other features, and a repository here would claim them.
+ */
+export interface DataRetentionDirectoryReader {
+  /** The project the settings page was opened from, or null when there is none. */
+  findProjectLineage(input: { projectId: string }): Promise<RetentionProjectLineage | null>;
+
+  findOrganizationDirectory(input: {
+    organizationId: string;
+  }): Promise<RetentionOrganizationDirectory>;
+
+  /**
+   * The live projects one scope resolves to, enumerated FROM the organization
+   * so a foreign id resolves to no rows. Archived projects are excluded: the
+   * storage card must not count what the reader cannot see.
+   */
+  findScopeProjects(input: {
+    organizationId: string;
+    scope: ScopeAssignment;
+  }): Promise<readonly { id: string; teamId: string }[]>;
+}
+
+type DataRetentionSetup = FeatureSetup<
+  typeof DataRetentionModule.dependencies,
+  DataRetentionServerConfig,
+  DataRetentionRepositories
+>;
+
+export class DataRetentionModule implements DataRetentionApiContract {
+  static readonly contract = DataRetentionApi;
+  static readonly dependencies = {
+    permissions: AuthzApi,
+    users: UserApi,
+    entitlement: EntitlementApi,
+  };
+  static readonly config = dataRetentionConfig;
+
+  readonly #retention: DataRetentionService;
+  readonly #policy: DataRetentionPolicyService;
+  readonly #snapshots: DataRetentionSnapshotService;
+  readonly #scopeMeter: StorageMeterScopeService;
+  readonly #seatPolicies: SeatRetentionPolicyService;
+  readonly #users: UserApi;
+
+  private constructor(services: {
+    retention: DataRetentionService;
+    policy: DataRetentionPolicyService;
+    snapshots: DataRetentionSnapshotService;
+    scopeMeter: StorageMeterScopeService;
+    seatPolicies: SeatRetentionPolicyService;
+    users: UserApi;
+  }) {
+    this.#retention = services.retention;
+    this.#policy = services.policy;
+    this.#snapshots = services.snapshots;
+    this.#scopeMeter = services.scopeMeter;
+    this.#seatPolicies = services.seatPolicies;
+    this.#users = services.users;
+  }
+
+  static create({ repositories, dependencies, config }: DataRetentionSetup): DataRetentionModule {
+    const storageMeter = StorageMeterService.create({
+      meter: repositories.storageMeter,
+      cache: repositories.storageMeterCache,
+    });
+    const retention = DataRetentionService.create({
+      policies: repositories.policies,
+      pins: repositories.pins,
+      projectScopes: repositories.projectScopes,
+      defaultRetentionDays: resolvePlatformDefaultRetentionDays({
+        LANGWATCH_DEFAULT_RETENTION_DAYS: config.platformDefaultDays,
+        NODE_ENV: config.nodeEnvironment,
+      }),
+      retroactive: repositories.retroactive,
+      cache: repositories.cache,
+      storageMeter,
+    });
+    const permissions = RetentionPermissionsService.create({ authz: dependencies.permissions });
+    const policy = DataRetentionPolicyService.create({
+      directory: repositories.directory,
+      permissions,
+      plans: RetentionPlanService.create({
+        entitlement: dependencies.entitlement,
+        isSaas: config.isSaas,
+      }),
+    });
+
+    return new DataRetentionModule({
+      retention,
+      policy,
+      snapshots: DataRetentionSnapshotService.create({
+        retention,
+        directory: repositories.directory,
+        permissions,
+        policy,
+      }),
+      scopeMeter: StorageMeterScopeService.create({
+        meter: storageMeter,
+        directory: repositories.directory,
+        permissions,
+      }),
+      seatPolicies: SeatRetentionPolicyService.create({ rules: retention }),
+      users: dependencies.users,
+    });
+  }
+
+  /** The pipeline `data_retention_seat_policy` registers, over billing's activation fact. */
+  seatPolicyPipeline(): DataRetentionSeatPolicyPipeline {
+    return buildDataRetentionSeatPolicyPipeline({ seatPolicies: this.#seatPolicies });
+  }
+
+  getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {
+    return this.#retention.getResolvedForProject(input);
+  }
+
+  getPlatformDefaultRetentionDays(): number {
+    return this.#retention.getPlatformDefaultRetentionDays();
+  }
+
+  getRetentionDays(input: { projectId: string; category: RetentionCategory }): Promise<number> {
+    return this.#retention.getRetentionDays(input);
+  }
+
+  listOrganizationRules(input: { organizationId: string }): Promise<RetentionPolicy[]> {
+    return this.#retention.listOrganizationRules(input);
+  }
+
+  setForScope(input: {
+    organizationId: string;
+    scope: ScopeAssignment;
+    category: RetentionCategory;
+    retentionDays: number;
+  }): Promise<RetentionPolicy> {
+    return this.#retention.setForScope(input);
+  }
+
+  pin(input: PinTraceInput): Promise<PinnedTrace> {
+    return this.#retention.pin(input);
+  }
+
+  unpin(input: UnpinTraceInput): Promise<void> {
+    return this.#retention.unpin(input);
+  }
+
+  autoPin(input: UnpinTraceInput): Promise<PinnedTrace> {
+    return this.#retention.autoPin(input);
+  }
+
+  autoUnpin(input: UnpinTraceInput): Promise<void> {
+    return this.#retention.autoUnpin(input);
+  }
+
+  isPinned(input: UnpinTraceInput): Promise<boolean> {
+    return this.#retention.isPinned(input);
+  }
+
+  findPin(input: UnpinTraceInput): Promise<PinnedTrace | null> {
+    return this.#retention.findPin(input);
+  }
+
+  listByProject(input: { projectId: string }): Promise<PinnedTrace[]> {
+    return this.#retention.listByProject(input);
+  }
+
+  getPinnedTraceIds(input: { projectId: string }): Promise<string[]> {
+    return this.#retention.getPinnedTraceIds(input);
+  }
+
+  getRetroactiveMutationProgress(
+    input: RetroactiveMutationProjectInput,
+  ): Promise<RetroactiveMutationProgress[]> {
+    return this.#retention.getRetroactiveMutationProgress(input);
+  }
+
+  getTotalStorageBytes(input: StorageMeterTenantInput): Promise<number> {
+    return this.#retention.getTotalStorageBytes(input);
+  }
+
+  getTotalStorageBytesForTenants(input: StorageMeterTenantsInput): Promise<number> {
+    return this.#retention.getTotalStorageBytesForTenants(input);
+  }
+
+  async getPolicySnapshot(
+    input: { projectId: string } & RetentionCallerInput,
+  ): Promise<RetentionPolicySnapshot> {
+    return this.#snapshots.getSnapshot({
+      projectId: input.projectId,
+      actor: await this.#actor(input.userId),
+    });
+  }
+
+  async getScopeStorageUsage(
+    input: { projectId: string; scope: ScopeAssignment } & RetentionCallerInput,
+  ): Promise<RetentionStorageUsage> {
+    return this.#scopeMeter.getScopeUsage({
+      projectId: input.projectId,
+      scope: input.scope,
+      actor: await this.#actor(input.userId),
+    });
+  }
+
+  /**
+   * The door has asked the target's permission; this refuses a target outside the named
+   * organization, so the preview never leaks another organization's resolved default.
+   */
+  async previewScopeRemoval(
+    input: { organizationId?: string; scope: ScopeAssignment } & RetentionCallerInput,
+  ): Promise<ResolvedRetention> {
+    const target = await this.#scopeTarget(input);
+    await this.#retention.assertScopeInOrganization(target);
+
+    return this.#retention.previewScopeRemoval(target);
+  }
+
+  async changeScopeRetention(
+    input: {
+      organizationId?: string;
+      scope: ScopeAssignment;
+      category: RetentionCategory;
+      retentionDays: number;
+    } & RetentionCallerInput,
+  ): Promise<RetentionPolicy> {
+    const actor = await this.#actor(input.userId);
+    const { organizationId, scope } = await this.#scopeTarget(input);
+    await this.#retention.assertScopeInOrganization({ organizationId, scope });
+    // Paid plans may persist only their fixed presets, enterprise and self-hosted the full
+    // range above the custom floor. The indefinite sentinel is a no-op here so the
+    // platform-operator check below still runs.
+    await this.#policy.assertWriteAllowed({
+      actor,
+      organizationId,
+      retentionDays: input.retentionDays,
+    });
+    if (input.retentionDays === INDEFINITE_RETENTION_DAYS) {
+      await this.#policy.assertCanDisableRetention({ actor });
+    }
+
+    return this.#retention.setForScope({
+      organizationId,
+      scope,
+      category: input.category,
+      retentionDays: input.retentionDays,
+    });
+  }
+
+  async removeForScope(
+    input: {
+      organizationId?: string;
+      scope: ScopeAssignment;
+      category: RetentionCategory;
+    } & RetentionCallerInput,
+  ): Promise<void> {
+    const actor = await this.#actor(input.userId);
+    const { organizationId, scope } = await this.#scopeTarget(input);
+    await this.#retention.assertScopeInOrganization({ organizationId, scope });
+    await this.#policy.assertPlanForScope({ actor, organizationId });
+    await this.#retention.removeForScope({
+      organizationId,
+      scope,
+      category: input.category,
+    });
+  }
+
+  /**
+   * The retention is resolved through the cascade, never taken from the caller:
+   * a client value would let `project:update` contract data to any number. The
+   * answer names what was applied — an organization save loses to a closer one.
+   */
+  async applyRetentionToExistingData(
+    input: { projectId: string; category: RetentionCategory } & RetentionCallerInput,
+  ): Promise<{ tables: string[]; appliedRetentionDays: number }> {
+    const actor = await this.#actor(input.userId);
+    await this.#policy.assertPlanForProject({ actor, projectId: input.projectId });
+    const effective = await this.#retention.getResolvedForProject({ projectId: input.projectId });
+    const appliedRetentionDays = effective[input.category];
+    const result = await this.#retention.triggerRetroactiveUpdate({
+      projectId: input.projectId,
+      category: input.category,
+      newRetentionDays: appliedRetentionDays,
+    });
+
+    return { ...result, appliedRetentionDays };
+  }
+
+  async killRetroactiveMutation(
+    input: KillRetroactiveMutationInput & RetentionCallerInput,
+  ): Promise<void> {
+    const actor = await this.#actor(input.userId);
+    await this.#policy.assertPlanForProject({ actor, projectId: input.projectId });
+    await this.#retention.killRetroactiveMutation({
+      projectId: input.projectId,
+      mutationId: input.mutationId,
+    });
+  }
+
+  /**
+   * The caller's profile, resolved from the id rather than read off the
+   * request.
+   */
+  async #actor(userId: string): Promise<RetentionActor> {
+    const user = await this.#users.findById({ id: userId });
+
+    return { userId, email: user?.email ?? null };
+  }
+
+  /** The named organisation, or the one the approved target sits in; never the page's project. */
+  async #scopeTarget(input: {
+    organizationId?: string;
+    scope: ScopeAssignment;
+  }): Promise<{ organizationId: string; scope: ScopeAssignment }> {
+    const organizationId =
+      input.organizationId ??
+      (await this.#retention.getScopeOrganizationId({ scope: input.scope }));
+
+    return { organizationId, scope: input.scope };
+  }
+}

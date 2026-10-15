@@ -1,0 +1,28 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "lib": ["es2023"],
+    "noUncheckedIndexedAccess": true,
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "./dist",
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
+  },
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "./tsconfig.test.json"
+    },
+    {
+      "path": "./tsconfig.tests.json"
+    }
+  ]
+}

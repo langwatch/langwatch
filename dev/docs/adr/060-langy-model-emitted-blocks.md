@@ -27,7 +27,7 @@ Langy frontend — the durable event stream these cards must live in), ADR-078
 
 ADR-079 (card determinism) settled who decides presentation: a pure function
 at the command boundary, never the model. It also named what the model was
-left without — any legitimate channel to contribute *data* to a card — and
+left without — any legitimate channel to contribute _data_ to a card — and
 sketched one (`langwatch present`) that was never built, with the amendment
 correcting the record.
 
@@ -109,6 +109,14 @@ every kind is classified `resource` or `presentation` at declaration, and the
 allowlist is typed as presentation-only, so widening it is a type error rather
 than an omission (see `cards/derived-safe.ts`). This answers ADR-079's open
 question conservatively.
+
+> **2026-10-11.** The allowlist gained **insights**: findings Langy wrote about
+> one board, each a headline, a body and a verdict. It is presentation-shaped
+> (it asserts no record) and strict where its siblings strip: a key it does not
+> list refuses the card. Only the `daily-insights` skill teaches it, so its
+> example is checked there and not in AGENTS.md. A stamped part now also says
+> when its JSON was repaired (`repaired`), so a reader that files what it reads
+> can refuse a card that was cut off. See `modules/insight/adrs/004-daily-run.md`.
 
 ### 4. Provenance chrome is always on, and computation still belongs to the platform
 

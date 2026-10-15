@@ -1,0 +1,761 @@
+/**
+ * The procedures this package calls, and the hooks that call them.
+ */
+
+import type {
+  Annotation,
+  AnnotationQueueDetail,
+  AnnotationQueueListEntry,
+  AnnotationQueueRecord,
+  AnnotationScore,
+} from "@langwatch/annotation-contract";
+import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
+import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
+import type { DataPrivacySnapshot } from "@langwatch/data-privacy-contract";
+import type { instantEvalTrpc } from "@langwatch/instant-eval-contract";
+import type {
+  PresenceCursorEvent,
+  PresenceCursorInput,
+  PresenceEvent,
+  PresenceLeaveRequest,
+  PresenceProjectInput,
+  PresenceUpdateInput,
+} from "@langwatch/presence-contract";
+import type { MediaProbeResult } from "@langwatch/scenario-contract";
+import type { ShareLink, ShareResourceType, ShareVisibility } from "@langwatch/share-contract";
+import { type TimeInput } from "@langwatch/time";
+import type {
+  AiActionResult,
+  ChangeTraceNameCommand,
+  ChangeTraceNameResult,
+  ConversationContext,
+  DerivedTraceEvent,
+  DiscoverResult,
+  ExplorerInstantEvalRuns,
+  ExportProgressEvent,
+  FacetValuesResult,
+  RouteSearchInput,
+  RouteSearchResult,
+  SessionGroupsResult,
+  SharedTraceDto,
+  SpanDetail,
+  SpanLangwatchSignals,
+  SpanTreeNode,
+  Trace,
+  TraceEditOverlayDto,
+  TraceEditOverlayPatch,
+  TraceEventRollup,
+  TraceHeader,
+  TraceHeaderReadInput,
+  TraceListPage,
+  TraceLogRecordDto,
+  TraceResourceInfoDto,
+} from "@langwatch/trace-contract";
+
+import type { CodingAgentSessionDisplay } from "../model/coding-agent/trace/session-display.ts";
+import type { ConversationTurn } from "../model/explorer/conversation-turn.ts";
+import type { SessionGroupPayloadItem } from "../model/explorer/session-group-payload.ts";
+
+/** The project every trace procedure is scoped to. */
+type ProjectScope = { projectId: string };
+
+/**
+ * The window a list read covers, in epoch milliseconds.
+ */
+type TimeRange = { from: number; to: number; live?: boolean };
+
+/** How a trace list is ordered. */
+type TraceSort = { columnId: string; direction: "asc" | "desc" };
+
+/** One trace, addressed. */
+type TraceScope = ProjectScope & { traceId: string };
+
+/** The partition-pruning hint every per-trace read takes. */
+type SpanReadHint = { occurredAtMs?: number };
+
+/** The reader's own account, as the annotation rail reads it. */
+type TraceAccountInfo = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+  createdAt: TimeInput;
+};
+
+/** One saved lens. */
+type SavedViewRead = {
+  id: string;
+  name: string;
+  kind?: string | null;
+  filters: Record<string, unknown>;
+  query?: string | null;
+  period?: { relativeDays?: number; startDate?: string; endDate?: string } | null;
+  userId?: string | null;
+  createdAt: TimeInput;
+  updatedAt: TimeInput;
+};
+
+export type TraceApiMap = {
+  traces: {
+    /** One page of the trace list. */
+    list: {
+      query: {
+        input: ProjectScope & {
+          timeRange: TimeRange;
+          sort: TraceSort;
+          page?: number;
+          pageSize?: number;
+          cursor?: { sortValue: number; traceId: string };
+          query?: string | null;
+        };
+        output: TraceListPage;
+      };
+    };
+
+    /** Whether a privacy rule hides input or output from this reader, and who can see it. */
+    getFieldRedactionStatus: {
+      query: {
+        input: ProjectScope;
+        output: {
+          isRedacted: Record<"input" | "output", boolean>;
+          visibleTo: Record<"input" | "output", string | null>;
+        };
+      };
+    };
+
+    /** Event rollups for the list's Events column, keyed by trace id. */
+    listEvents: {
+      query: {
+        input: ProjectScope & { traceIds: string[]; timeRange: TimeRange };
+        output: Record<string, TraceEventRollup>;
+      };
+    };
+
+    /** How many traces arrived since a moment, for the live badge. */
+    newCount: {
+      query: {
+        input: ProjectScope & { timeRange: TimeRange; since: number; query?: string | null };
+        output: { count: number };
+      };
+    };
+
+    /** The conversation a trace belongs to, oldest turn first. */
+    conversationContext: {
+      query: {
+        input: ProjectScope & { conversationId: string };
+        output: Omit<ConversationContext, "turns"> & { turns: ConversationTurn[] };
+      };
+    };
+
+    /**
+     * The sidebar's facets: the project's cached discovery with no `query`
+     * field, the counts under one when it carries it (empty string included).
+     */
+    discover: {
+      query: {
+        input: ProjectScope & {
+          timeRange: TimeRange;
+          query?: string | null;
+          evalRuns?: ExplorerInstantEvalRuns;
+        };
+        output: DiscoverResult;
+      };
+    };
+
+    /** Pushed when a tenant's facet payload finishes its background refresh. */
+    onDiscoverUpdate: {
+      subscription: { input: ProjectScope; output: { projectId: string } };
+    };
+
+    /** One facet's values, paged. */
+    facetValues: {
+      query: {
+        input: ProjectScope & {
+          timeRange: TimeRange;
+          facetKey: string;
+          prefix?: string;
+          limit?: number;
+          offset?: number;
+        };
+        output: FacetValuesResult;
+      };
+    };
+
+    /** Where Enter on a sentence goes: a filter, a phrase, a judgement, Langy. */
+    routeSearch: {
+      mutation: { input: RouteSearchInput; output: RouteSearchResult };
+    };
+
+    /** The search bar's composer: filter, or save a lens. */
+    aiAction: {
+      mutation: {
+        input: ProjectScope & { prompt: string; timeRange: TimeRange };
+        output: AiActionResult;
+      };
+    };
+
+    /** One trace's summary row. */
+    header: { query: { input: TraceHeaderReadInput; output: TraceHeader } };
+
+    /** Renames a trace. */
+    changeName: {
+      mutation: { input: ChangeTraceNameCommand; output: ChangeTraceNameResult };
+    };
+
+    /** The spans that changed since a version, for the live drawer. */
+    spanTreeDelta: {
+      query: {
+        input: TraceScope & SpanReadHint & { sinceUpdatedAtMs?: number };
+        output: SpanTreeNode[];
+      };
+    };
+
+    /** The whole span tree in one response. */
+    spanTree: { query: { input: TraceScope & SpanReadHint; output: SpanTreeNode[] } };
+
+    /** The span tree, one page at a time, for traces too large for one read. */
+    spanTreePaginated: {
+      query: {
+        input: TraceScope &
+          SpanReadHint & {
+            limit?: number;
+            cursor?: { startTimeMs: number; spanId: string };
+          };
+        output: {
+          nodes: SpanTreeNode[];
+          nextCursor: { startTimeMs: number; spanId: string } | null;
+        };
+      };
+    };
+
+    /** LangWatch's own per-span signals. */
+    spanLangwatchSignals: {
+      query: { input: TraceScope & SpanReadHint; output: SpanLangwatchSignals[] };
+    };
+
+    /** Every span in the trace, in full. */
+    spansFull: { query: { input: TraceScope & SpanReadHint; output: SpanDetail[] } };
+
+    /** One span, in full. */
+    spanDetail: {
+      query: { input: TraceScope & SpanReadHint & { spanId: string }; output: SpanDetail };
+    };
+
+    /** The resource attributes behind a trace's spans. */
+    resourceInfo: {
+      query: { input: TraceScope & SpanReadHint; output: TraceResourceInfoDto };
+    };
+
+    /** Events derived from the trace's spans. */
+    traceEvents: {
+      query: { input: TraceScope & SpanReadHint; output: DerivedTraceEvent[] };
+    };
+
+    /**
+     * The evaluations attached to the traces on a page.
+     */
+    evals: {
+      query: { input: ProjectScope & Record<string, unknown>; output: unknown };
+    };
+
+    /** The log records emitted inside a trace. */
+    traceLogs: {
+      query: { input: TraceScope & SpanReadHint; output: TraceLogRecordDto[] };
+    };
+
+    /** Every evaluation attached to a trace. */
+    getEvaluations: {
+      query: { input: TraceScope; output: SharedTraceDto["evaluations"] };
+    };
+
+    /** One trace, whole: the queue conversation's only turn when its thread answers with none. */
+    getById: {
+      query: { input: TraceScope; output: Trace };
+    };
+
+    /** The whole trace rendered as one readable digest. */
+    getFormattedSpansDigest: {
+      query: {
+        input: ProjectScope & { traceIds: string[]; withEditOverlay?: boolean };
+        output: Record<string, string>;
+      };
+    };
+
+    /**
+     * Whole traces with their spans, by id.
+     */
+    getTracesWithSpans: {
+      query: {
+        input: ProjectScope & { traceIds: string[]; withEditOverlay?: boolean };
+        output: Trace[];
+      };
+    };
+
+    /** Whole traces with their spans, by conversation. */
+    getTracesWithSpansByThreadIds: {
+      query: {
+        input: ProjectScope & { threadIds: string[]; withEditOverlay?: boolean };
+        output: Trace[];
+      };
+    };
+
+    /** The attribute names a project's traces carry. */
+    getFieldNames: {
+      query: {
+        input: ProjectScope & { startDate?: number; endDate?: number };
+        output: {
+          traceIds: string[];
+          fieldNames: string[];
+          metadataKeys: { key: string; label: string }[];
+          spanNames: { key: string; label: string }[];
+          evaluationNames: { key: string; label: string }[];
+        };
+      };
+    };
+
+    /** A recent sample of traces, for a mapping preview. */
+    getSampleTracesDataset: {
+      query: { input: ProjectScope & Record<string, unknown>; output: Trace[] };
+    };
+
+    /** Pushed when a trace this project owns changes. */
+    onTraceUpdate: {
+      subscription: { input: ProjectScope; output: { traceId: string } };
+    };
+  };
+
+  codingAgents: {
+    /** The coding-agent session a trace belongs to, if any. */
+    session: { query: { input: TraceScope; output: CodingAgentSessionDisplay | null } };
+
+    /** The coding-agent transcript built from the trace's spans and logs. */
+    transcript: {
+      query: { input: TraceScope & SpanReadHint; output: CodingAgentTranscript };
+    };
+
+    /** The Sessions lens: one row per conversation, in ClickHouse (was `traces.sessions`). */
+    sessionGroups: {
+      query: {
+        input: ProjectScope & {
+          timeRange: TimeRange;
+          sort?: TraceSort;
+          pageSize?: number;
+          cursor?: string;
+          query?: string | null;
+        };
+        output: Omit<SessionGroupsResult, "sessions"> & {
+          sessions: SessionGroupPayloadItem[];
+        };
+      };
+    };
+  };
+
+  traceEditOverlay: {
+    /** The correction stored on a trace, redacted for this reader. */
+    getByTraceId: { query: { input: TraceScope; output: TraceEditOverlayDto | null } };
+
+    /** Stores a correction. */
+    upsert: {
+      mutation: {
+        input: TraceScope & { patch: TraceEditOverlayPatch };
+        output: TraceEditOverlayDto;
+      };
+    };
+  };
+
+  sharedTrace: {
+    /** The whole read-only payload behind a share token, one view spent. */
+    get: { query: { input: { token: string }; output: SharedTraceDto } };
+  };
+
+  pinnedTrace: {
+    getPin: {
+      query: {
+        input: TraceScope;
+        output: { traceId: string; source?: string | null } | null;
+      };
+    };
+    pin: { mutation: { input: TraceScope; output: { traceId: string } } };
+    unpin: { mutation: { input: TraceScope; output: { ok: true } } };
+  };
+
+  savedViews: {
+    getAll: {
+      query: { input: ProjectScope & { kind?: string }; output: SavedViewRead[] };
+    };
+    create: {
+      mutation: {
+        input: ProjectScope & {
+          id?: string;
+          kind?: string;
+          name: string;
+          filters: Record<string, unknown>;
+          query?: string;
+          period?: { relativeDays?: number; startDate?: string; endDate?: string };
+          scope?: "project" | "myself";
+        };
+        output: SavedViewRead;
+      };
+    };
+    rename: {
+      mutation: {
+        input: ProjectScope & { viewId: string; name: string };
+        output: SavedViewRead;
+      };
+    };
+    delete: {
+      mutation: { input: ProjectScope & { viewId: string }; output: { id: string } };
+    };
+  };
+
+  share: {
+    listForResource: {
+      query: {
+        input: ProjectScope & { resourceType: ShareResourceType; resourceId: string };
+        output: ShareLink[];
+      };
+    };
+    createShare: {
+      mutation: {
+        input: ProjectScope & {
+          resourceType: ShareResourceType;
+          resourceId: string;
+          visibility?: ShareVisibility;
+          expiresAt?: TimeInput | null;
+          maxViews?: number | null;
+        };
+        output: ShareLink;
+      };
+    };
+    revoke: {
+      mutation: { input: ProjectScope & { id: string }; output: { id: string } };
+    };
+  };
+
+  annotation: {
+    getByTraceId: {
+      query: {
+        input: TraceScope & { anchor?: "all" | "trace" };
+        output: TraceAnnotationRead[];
+      };
+    };
+    getByTraceIds: {
+      query: {
+        input: ProjectScope & {
+          traceIds: string[];
+          anchor?: "all" | "trace";
+        };
+        output: TraceAnnotationRead[];
+      };
+    };
+    create: {
+      mutation: {
+        input: ProjectScope & {
+          traceId: string;
+          comment?: string | null;
+          isThumbsUp?: boolean | null;
+          scoreOptions?: Record<string, unknown>;
+          expectedOutput?: string | null;
+          anchorKind?: string | null;
+          anchorId?: string | null;
+          anchorPath?: string | null;
+        };
+        output: TraceAnnotationRead;
+      };
+    };
+    updateByTraceId: {
+      mutation: {
+        input: ProjectScope & {
+          id: string;
+          traceId?: string;
+          comment?: string | null;
+          isThumbsUp?: boolean | null;
+          scoreOptions?: Record<string, unknown>;
+          expectedOutput?: string | null;
+          anchorKind?: string | null;
+          anchorId?: string | null;
+          anchorPath?: string | null;
+        };
+        output: TraceAnnotationRead;
+      };
+    };
+    deleteById: {
+      mutation: {
+        input: ProjectScope & { annotationId: string };
+        output: { id: string };
+      };
+    };
+    getQueues: { query: { input: ProjectScope; output: AnnotationQueueListEntry[] } };
+    getQueueBySlugOrId: {
+      query: {
+        input: ProjectScope & { slug?: string; queueId?: string };
+        output: AnnotationQueueDetail | null;
+      };
+    };
+    createQueueItem: {
+      mutation: {
+        input: ProjectScope & { traceIds: string[]; annotators: string[] };
+        output: { created: number; skipped: number };
+      };
+    };
+    createOrUpdateQueue: {
+      mutation: {
+        input: ProjectScope & {
+          name: string;
+          description: string;
+          userIds: string[];
+          scoreTypeIds: string[];
+          queueId?: string;
+        };
+        output: AnnotationQueueRecord;
+      };
+    };
+    getPendingItemsCount: { query: { input: ProjectScope; output: { count: number } } };
+    getAssignedItemsCount: { query: { input: ProjectScope; output: { count: number } } };
+    getQueueItemsCounts: {
+      query: { input: ProjectScope; output: { id: string; pendingCount: number }[] };
+    };
+    getOptimizedAnnotationQueues: {
+      query: { input: ProjectScope & Record<string, unknown>; output: unknown };
+    };
+  };
+
+  annotationScore: {
+    getAll: { query: { input: ProjectScope; output: AnnotationScore[] } };
+    getAllActive: { query: { input: ProjectScope; output: AnnotationScore[] } };
+    getById: {
+      query: { input: ProjectScope & { scoreId: string }; output: AnnotationScore | null };
+    };
+    upsert: {
+      mutation: { input: ProjectScope & Record<string, unknown>; output: AnnotationScore };
+    };
+  };
+
+  /** The project's privacy settings, read to explain a filter that redaction empties. */
+  dataPrivacy: {
+    getSnapshot: { query: { input: ProjectScope; output: DataPrivacySnapshot } };
+  };
+
+  monitors: {
+    getById: {
+      query: {
+        input: ProjectScope & { id: string };
+        output: {
+          id: string;
+          name: string;
+          slug?: string | null;
+          checkType?: string | null;
+          evaluator?: {
+            id: string;
+            name: string;
+            evaluatorType?: string | null;
+            config?: Record<string, unknown> | null;
+          } | null;
+        } | null;
+      };
+    };
+  };
+
+  organization: {
+    /**
+     * The scope skeleton, narrowed to the presence switches and project names this family reads.
+     */
+    getScopeGraph: {
+      query: {
+        input: Record<string, never>;
+        output: {
+          id: string;
+          presenceEnabled: boolean;
+          teams: {
+            id: string;
+            projects: { id: string; name: string; presenceEnabled: boolean }[];
+          }[];
+        }[];
+      };
+    };
+
+    getOrganizationWithMembersAndTheirTeams: {
+      query: {
+        input: { organizationId: string };
+        output: {
+          id: string;
+          name: string;
+          members: {
+            userId: string;
+            role: string;
+            user: { id: string; name: string | null; email: string | null; image: string | null };
+          }[];
+          teams: { id: string; name: string; slug: string }[];
+        } | null;
+      };
+    };
+  };
+
+  translate: {
+    translate: {
+      mutation: {
+        input: ProjectScope & { textToTranslate: string; targetLanguage?: string };
+        output: { translation: string };
+      };
+    };
+  };
+
+  user: {
+    getAccountInfo: { query: { input: Record<string, never>; output: TraceAccountInfo } };
+    getTraceExplorerTourPreference: {
+      query: {
+        input: Record<string, never>;
+        output: { dismissed: boolean; dismissedAt: TimeInput | null };
+      };
+    };
+    dismissTraceExplorerTour: {
+      mutation: {
+        input: Record<string, never>;
+        output: { dismissed: boolean; dismissedAt: TimeInput | null };
+      };
+    };
+  };
+
+  export: {
+    /** Progress frames for a running export. */
+    onExportProgress: {
+      subscription: {
+        input: ProjectScope & Record<string, unknown>;
+        output: TraceExportProgressFrame;
+      };
+    };
+  };
+
+  featureFlag: {
+    isEnabled: {
+      query: {
+        input: { flag: string; projectId?: string | null; organizationId?: string | null };
+        output: { enabled: boolean };
+      };
+    };
+  };
+
+  analytics: {
+    dataForFilter: {
+      query: {
+        input: ProjectScope & Record<string, unknown>;
+        output: { options: { field: string; label: string; count: number }[] };
+      };
+    };
+  };
+
+  modelProvider: {
+    getAllForProjectForFrontend: {
+      query: { input: ProjectScope; output: Record<string, ModelProviderFrontendRead> };
+    };
+  };
+
+  personalWorkspaceFeatures: {
+    get: { query: { input: ProjectScope; output: Record<string, boolean> } };
+    enableAll: { mutation: { input: ProjectScope; output: Record<string, boolean> } };
+  };
+
+  presence: {
+    update: {
+      mutation: {
+        input: Omit<PresenceUpdateInput, "user">;
+        output: { ok: true };
+      };
+    };
+    leave: { mutation: { input: PresenceLeaveRequest; output: { ok: true } } };
+    cursor: {
+      mutation: { input: Omit<PresenceCursorInput, "user">; output: { ok: true } };
+    };
+    onPresenceUpdate: {
+      subscription: { input: PresenceProjectInput; output: TracePresenceFrame };
+    };
+    onPresenceCursor: {
+      subscription: { input: PresenceProjectInput; output: TracePresenceCursorFrame };
+    };
+  };
+
+  project: {
+    /** Whether the project has ever received a trace; polled while it has not. */
+    getHasFirstMessage: {
+      query: { input: ProjectScope; output: { firstMessage: boolean } };
+    };
+  };
+
+  evaluations: {
+    /** What an evaluation was run over, for the evaluation cards; evaluation serves it. */
+    getEvaluationInputs: {
+      query: {
+        input: ProjectScope & { evaluationId: string };
+        output: Record<string, unknown> | null;
+      };
+    };
+  };
+
+  storedObjects: {
+    headById: {
+      query: { input: ProjectScope & Record<string, unknown>; output: MediaProbeResult };
+    };
+  };
+
+  ops: {
+    /** Whether the reader may see the Ops workspace, and at what tier. */
+    getScope: {
+      query: {
+        input: undefined;
+        output: { hasAccess: boolean; scope: { kind: string } | null };
+      };
+    };
+  };
+
+  setupSkills: {
+    getPrompt: {
+      query: { input: ProjectScope & { skill: string }; output: { body: string } };
+    };
+  };
+} & ContractApiMap<typeof instantEvalTrpc>;
+
+/**
+ * One annotation on a trace, with the person who wrote it and the part of the trace it
+ * is anchored to.
+ */
+type TraceAnnotationRead = Omit<Annotation, "anchorKind"> & {
+  /**
+   * WHAT part of the trace the annotation hangs off.
+   */
+  anchorKind: "field" | "message" | "span" | null;
+  /** The reviewer, joined on. Absent on a row read without the join. */
+  user?: { id: string; name: string | null; image?: string | null } | null;
+};
+
+/** One frame of the export progress stream — the export module's own event. */
+type TraceExportProgressFrame = ExportProgressEvent;
+
+/** One presence frame, and one cursor frame — the contract's own. */
+type TracePresenceFrame = PresenceEvent;
+type TracePresenceCursorFrame = PresenceCursorEvent;
+
+/** One configured provider, as the frontend reads it. */
+type ModelProviderFrontendRead = {
+  provider: string;
+  enabled: boolean;
+  customKeys: Record<string, unknown> | null;
+  models: string[] | null;
+  embeddingsModels: string[] | null;
+  disabledByAdmin?: boolean;
+};
+
+/**
+ * What each procedure hands back, addressed the way `RouterOutputs` was, and
+ * shaped the way the browser receives it: dates arrive as ISO strings.
+ */
+export type RouterOutputs = OutputsFromMap<TraceApiMap>;
+
+/**
+ * Trace's typed tRPC hooks. Same machinery, same transport and same React Query
+ * cache as the application's `api` proxy — see `createModuleApi` for why
+ * separate instances still share cache entries.
+ */
+export const traceApi = createModuleApi<TraceApiMap>();
+
+/** The name a hundred moved call sites already write. */
+export const api = traceApi;

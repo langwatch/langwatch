@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2023"],
+    "types": [],
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "verbatimModuleSyntax": true,
+    // No `.tsx` lives in this app, and none may. It is here because
+    // `@langwatch/mail` is resolved from source and its templates are JSX:
+    // react-email renders them server-side at send time, which is the one
+    // exception `frontend-boundary.unit.test.ts` grants a backend graph. The
+    // background process carries the same line for the same reason.
+    "jsx": "react-jsx",
+    "composite": true,
+    "noEmit": false
+  },
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    }
+  ]
+}

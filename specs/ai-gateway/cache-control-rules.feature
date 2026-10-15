@@ -39,16 +39,17 @@ Feature: Cache control rules — operator-defined overrides without client code 
   # §2. Matcher semantics — first-match-wins by priority
   # ─────────────────────────────────────────────────────────────────────────
 
-  Scenario: First-match-wins by priority descending
+  Scenario: First-match-wins, lowest priority number first
     Given two rules configured for the organisation:
       | priority | match                          | action             |
       | 200      | vk_tags: ["env=prod"]          | force ttl=600      |
       | 100      | model: "gpt-5-mini"            | disable            |
     And a VK "vk_prod_openai" with tags ["env=prod"]
     When a request to /v1/chat/completions resolves to model "gpt-5-mini"
-    Then the rule with priority 200 matches first
-    And the response header "X-LangWatch-Cache-Mode" equals "force"
-    And span attribute "langwatch.cache.rule_id" equals the priority-200 rule id
+    Then the rule with priority 100 matches first
+    And the response header "X-LangWatch-Cache-Mode" equals "disable"
+    And span attribute "langwatch.cache.rule_id" equals the priority-100 rule id
+    # The gateway checks the lowest number first (docs/ai-gateway/cache-control.mdx, Priority).
 
   Scenario: AND semantics across non-null matchers
     Given a cache rule with matchers:
@@ -297,7 +298,7 @@ Feature: Cache control rules — operator-defined overrides without client code 
   Scenario: List view shows priority-ordered rules with matcher + action badges
     Given three cache rules with priorities 200 / 100 / 50 in the org
     When the user opens /gateway/cache-rules
-    Then rows appear in descending priority order
+    Then rows appear in the order the gateway checks them: 50, then 100, then 200
     And each row shows a matcher summary (vk_id / vk_prefix / vk_tags / principal_id / model / request_metadata)
     And each row shows an action badge colour-coded by mode:
       | mode    | colour  |

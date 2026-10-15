@@ -309,3 +309,45 @@ func (f *fatalSvc) String() string              { return f.name }
 func (f *fatalSvc) Start(context.Context) error { return nil }
 func (f *fatalSvc) Stop(context.Context) error  { return nil }
 func (f *fatalSvc) Fatal() <-chan error         { return f.fatalCh }
+
+// budgetedService stops under a deadline of its own.
+type budgetedService struct {
+	budget   time.Duration
+	deadline time.Duration
+	err      error
+}
+
+func (b *budgetedService) String() string              { return "budgeted" }
+func (b *budgetedService) Start(context.Context) error { return nil }
+func (b *budgetedService) StopBudget() time.Duration   { return b.budget }
+func (b *budgetedService) Stop(ctx context.Context) error {
+	if at, ok := ctx.Deadline(); ok {
+		b.deadline = time.Until(at)
+	}
+	b.err = ctx.Err()
+	return nil
+}
+
+func TestGroup_a_service_with_its_own_stop_budget_outlives_the_graceful_one(t *testing.T) {
+	budgeted := &budgetedService{budget: time.Hour}
+	plain := &budgetedService{}
+	g := New(WithDrainDelay(0), WithGraceful(50*time.Millisecond))
+	// Stops run in reverse, so the slow one eats the whole graceful budget
+	// before the budgeted service is asked to stop.
+	slow := Worker("slow", func(context.Context) {}, func() { time.Sleep(80 * time.Millisecond) })
+	g.Add(budgeted, plain, slow)
+
+	ctx, cancel := context.WithCancel(nopCtx())
+	cancel()
+	_ = g.Run(ctx)
+
+	if budgeted.err != nil {
+		t.Fatalf("the budgeted service was stopped under an ended context: %v", budgeted.err)
+	}
+	if budgeted.deadline < 30*time.Minute {
+		t.Fatalf("stop deadline = %v, want the service's own hour", budgeted.deadline)
+	}
+	if plain.deadline > time.Second {
+		t.Fatalf("a service with no budget of its own got %v, want the group's graceful budget", plain.deadline)
+	}
+}

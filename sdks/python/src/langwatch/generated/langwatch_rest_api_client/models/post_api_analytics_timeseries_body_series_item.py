@@ -9,9 +9,6 @@ from attrs import field as _attrs_field
 from ..models.post_api_analytics_timeseries_body_series_item_aggregation import (
     PostApiAnalyticsTimeseriesBodySeriesItemAggregation,
 )
-from ..models.post_api_analytics_timeseries_body_series_item_metric import (
-    PostApiAnalyticsTimeseriesBodySeriesItemMetric,
-)
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -30,7 +27,7 @@ T = TypeVar("T", bound="PostApiAnalyticsTimeseriesBodySeriesItem")
 class PostApiAnalyticsTimeseriesBodySeriesItem:
     """
     Attributes:
-        metric (PostApiAnalyticsTimeseriesBodySeriesItemMetric):
+        metric (str):
         aggregation (PostApiAnalyticsTimeseriesBodySeriesItemAggregation):
         key (str | Unset):
         subkey (str | Unset):
@@ -39,7 +36,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItem:
         as_percent (bool | Unset):
     """
 
-    metric: PostApiAnalyticsTimeseriesBodySeriesItemMetric
+    metric: str
     aggregation: PostApiAnalyticsTimeseriesBodySeriesItemAggregation
     key: str | Unset = UNSET
     subkey: str | Unset = UNSET
@@ -49,7 +46,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItem:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        metric = self.metric.value
+        metric = self.metric
 
         aggregation = self.aggregation.value
 
@@ -98,7 +95,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItem:
         )
 
         d = dict(src_dict)
-        metric = PostApiAnalyticsTimeseriesBodySeriesItemMetric(d.pop("metric"))
+        metric = d.pop("metric")
 
         aggregation = PostApiAnalyticsTimeseriesBodySeriesItemAggregation(d.pop("aggregation"))
 

@@ -1,0 +1,112 @@
+import { createLogger } from "@langwatch/observability";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool, type PoolConfig } from "pg";
+
+const logger = createLogger("langwatch:postgres:pool");
+
+/**
+ * pg emits `error` on a pool when an idle client is lost; with no listener Node throws it
+ * as an uncaught exception. Warn while running, debug once the pool is ending.
+ */
+export function guardPoolErrors({ pool }: { pool: Pool }): Pool {
+  pool.on("error", (error) => {
+    const log = pool.ending ? logger.debug : logger.warn;
+    log.call(logger, { error }, "postgres pool lost an idle connection");
+  });
+  return pool;
+}
+
+export interface PrismaPgPoolConfig extends PoolConfig {
+  connectionString: string;
+  schema: string | undefined;
+}
+
+export interface PrismaDriverAdapter {
+  adapter: PrismaPg;
+  pool: Pool;
+}
+
+export abstract class PrismaDriverAdapterFactory {
+  abstract create(databaseUrl: string): PrismaDriverAdapter;
+}
+
+/**
+ * Parses schema and pool-tuning parameters that pg driver ignores, applying them explicitly
+ * to match Rust engine behavior.
+ */
+export class PrismaDriverAdapterService extends PrismaDriverAdapterFactory {
+  private constructor() {
+    super();
+  }
+
+  static create(): PrismaDriverAdapterService {
+    return new PrismaDriverAdapterService();
+  }
+
+  /**
+   * Creates an explicitly owned pg pool and adapter. The adapter does not
+   * dispose the external pool: PrismaShutdownService closes both resources in
+   * a deterministic order.
+   */
+  create(databaseUrl: string): PrismaDriverAdapter {
+    const { schema, ...poolConfig } = this.poolConfig(databaseUrl);
+    const pool = guardPoolErrors({ pool: new Pool(poolConfig) });
+    const adapter = new PrismaPg(pool, {
+      schema,
+      disposeExternalPool: false,
+    });
+    return { adapter, pool };
+  }
+
+  /**
+   * Compatibility construction for a caller that only owns a PrismaClient.
+   * PrismaPg owns the pool it creates and closes it when the client disconnects.
+   */
+  createOwnedAdapter(databaseUrl: string): PrismaPg {
+    const { schema, ...poolConfig } = this.poolConfig(databaseUrl);
+    const pool = guardPoolErrors({ pool: new Pool(poolConfig) });
+    return new PrismaPg(pool, { schema, disposeExternalPool: true });
+  }
+
+  poolConfig(databaseUrl: string): PrismaPgPoolConfig {
+    const params = urlParams(databaseUrl);
+    const schema = params.get("schema") ?? undefined;
+    const connectionLimit = positiveIntParam(params, "connection_limit");
+    const poolTimeoutSeconds = positiveIntParam(params, "pool_timeout");
+    return {
+      connectionString: databaseUrl,
+      schema,
+      // Startup parameters. search_path: raw SQL is unqualified, so it must name
+      // the URL schema. TimeZone=UTC: the adapter sends a Date with no offset,
+      // which Postgres reads in the session zone, so any other zone shifts it.
+      options: schema ? `-c search_path="${schema}" -c TimeZone=UTC` : "-c TimeZone=UTC",
+      ...(connectionLimit !== undefined ? { max: connectionLimit } : {}),
+      // pg's `connectionTimeoutMillis` bounds the whole `pool.connect()` wait —
+      // queueing for a free slot included — which is what the engine's
+      // `pool_timeout` (seconds) bounded.
+      ...(poolTimeoutSeconds !== undefined
+        ? { connectionTimeoutMillis: poolTimeoutSeconds * 1000 }
+        : {}),
+    };
+  }
+}
+
+/**
+ * The pg Pool configuration a Prisma-style DATABASE_URL asks for. Must not
+ * throw on an empty or malformed URL, so import-only suites (no database,
+ * env validation skipped) stay lazy and pass; parsing failure means no overrides.
+ */
+function urlParams(databaseUrl: string): URLSearchParams {
+  try {
+    return new URL(databaseUrl).searchParams;
+  } catch {
+    return new URLSearchParams();
+  }
+}
+
+function positiveIntParam(params: URLSearchParams, name: string): number | undefined {
+  const raw = params.get(name);
+  if (raw === null) return undefined;
+  const value = Number.parseInt(raw, 10);
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+}

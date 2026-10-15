@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -17,12 +17,12 @@ class PatchApiAnnotationsIdBody:
     Attributes:
         comment (str):
         is_thumbs_up (bool):
-        email (str | Unset):
+        email (None | str | Unset):
     """
 
     comment: str
     is_thumbs_up: bool
-    email: str | Unset = UNSET
+    email: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -30,7 +30,11 @@ class PatchApiAnnotationsIdBody:
 
         is_thumbs_up = self.is_thumbs_up
 
-        email = self.email
+        email: None | str | Unset
+        if isinstance(self.email, Unset):
+            email = UNSET
+        else:
+            email = self.email
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -52,7 +56,14 @@ class PatchApiAnnotationsIdBody:
 
         is_thumbs_up = d.pop("isThumbsUp")
 
-        email = d.pop("email", UNSET)
+        def _parse_email(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        email = _parse_email(d.pop("email", UNSET))
 
         patch_api_annotations_id_body = cls(
             comment=comment,
