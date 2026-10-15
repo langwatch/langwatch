@@ -167,7 +167,7 @@ export function AgentCard({
         (onEdit || onDelete || onTest || onTalkToIt) && (
           <Menu.Root>
             <AgentCardMenuTrigger agentName={agent.name} />
-            <Menu.Content className={CARD_MENU_CLASS} portalled={false}>
+            <Menu.Content className={CARD_MENU_CLASS}>
               {onEdit && (
                 <Menu.Item value="edit" onClick={onEdit}>
                   <Pencil aria-hidden="true" size={14} /> Edit

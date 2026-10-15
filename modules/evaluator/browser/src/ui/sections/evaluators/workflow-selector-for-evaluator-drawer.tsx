@@ -3,16 +3,8 @@ import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Drawer } from "@langwatch/design-system/drawer";
-import {
-  Button,
-  Field,
-  HStack,
-  Input,
-  Text,
-  Textarea,
-  useDisclosure,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { EmojiPicker } from "@langwatch/design-system/emoji-picker";
+import { Field, HStack, Input, Text, Textarea, VStack } from "@langwatch/design-system/primitives";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import { createLogger } from "@langwatch/observability/browser";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
@@ -23,7 +15,6 @@ import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { getRandomWorkflowIcon } from "../../../model/workflow/random-workflow-icon.ts";
 import { customEvaluatorTemplate } from "../../../model/workflow/templates/custom-evaluator.template.ts";
 import { FormServerError } from "../../elements/workflow/studio-host/errors.tsx";
-import { EmojiPickerModal } from "../workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx";
 
 const logger = createLogger("langwatch:evaluator:workflow-selector");
 
@@ -53,7 +44,6 @@ export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEva
   const complexProps = getComplexProps();
   const utils = evaluatorClient.useUtils();
   const router = useRouter();
-  const emojiPicker = useDisclosure();
 
   const onClose = props.onClose ?? closeDrawer;
   const flowCallbacks = getFlowCallbacks("workflowSelectorForEvaluator");
@@ -181,19 +171,9 @@ export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEva
         <FormServerError form={form} />
 
         <Field.Root invalid={!!errors.name || !!errors.icon}>
-          <EmojiPickerModal
-            open={emojiPicker.open}
-            onClose={emojiPicker.onClose}
-            onChange={(emoji) => {
-              setValue("icon", emoji);
-              emojiPicker.onClose();
-            }}
-          />
           <Field.Label>Name and icon</Field.Label>
           <HStack>
-            <Button variant="outline" onClick={emojiPicker.onOpen}>
-              {icon}
-            </Button>
+            <EmojiPicker value={icon} onChange={(emoji) => setValue("icon", emoji)} />
             <Input
               {...register("name", {
                 validate: (value) => value.trim().length > 0 || "Enter a name for the evaluator.",

@@ -1,17 +1,15 @@
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { EmojiPicker } from "@langwatch/design-system/emoji-picker";
 import {
   Alert,
-  Button,
   Field,
   HStack,
   Input,
   Text,
   Textarea,
-  useDisclosure,
   VStack,
 } from "@langwatch/design-system/primitives";
-import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 
 import type { CreateWorkflowAgentInput } from "../../model/workflow/create-workflow-agent-input.ts";
@@ -26,15 +24,9 @@ export interface WorkflowSelectorDrawerProps {
   onClose: () => void;
   onGoBack?: () => void;
   onCreate(input: CreateWorkflowAgentInput): Promise<void>;
-  renderIconPicker(props: {
-    open: boolean;
-    onClose(): void;
-    onChange(icon: string): void;
-  }): ReactNode;
 }
 
 export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
-  const picker = useDisclosure();
   const form = useForm<CreateWorkflowAgentInput>({
     defaultValues: { name: props.agentName ?? "", icon: props.defaultIcon, description: "" },
   });
@@ -89,19 +81,9 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
           </Alert.Root>
         )}
         <Field.Root invalid={!!errors.name || !!errors.icon}>
-          {props.renderIconPicker({
-            open: picker.open,
-            onClose: picker.onClose,
-            onChange(emoji) {
-              setValue("icon", emoji);
-              picker.onClose();
-            },
-          })}
           <Field.Label>Name and Icon</Field.Label>
           <HStack>
-            <Button variant="outline" onClick={picker.onOpen} fontSize="lg">
-              {icon}
-            </Button>
+            <EmojiPicker value={icon} onChange={(emoji) => setValue("icon", emoji)} />
             <Input
               {...register("name", {
                 validate: (value) => value.trim() !== "" || "Name is required",
