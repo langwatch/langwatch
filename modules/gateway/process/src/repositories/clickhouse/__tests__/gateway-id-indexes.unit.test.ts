@@ -58,9 +58,9 @@ describe("the gateway id index declarations", () => {
     },
   );
 
-  it("keeps gateway_spend's index for its fixed 13 months plus seven days of slack", () => {
+  it("keeps gateway_spend's index for its fixed 13 months plus seven days of slack, the fill marker forever", () => {
     expect(blockCreating("gateway_spend_id_index")).toContain(
-      "TTL toDateTime(ToAt) + INTERVAL 13 MONTH + INTERVAL 7 DAY DELETE",
+      "TTL IF(TenantId = '', toDateTime('2106-01-01'), toDateTime(ToAt) + INTERVAL 13 MONTH + INTERVAL 7 DAY) DELETE",
     );
   });
 
