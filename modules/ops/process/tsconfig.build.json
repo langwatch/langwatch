@@ -99,6 +99,9 @@
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/mail/tsconfig.build.json"
+    },
+    {
       "path": "../../langy/contract/tsconfig.build.json"
     },
     {

@@ -12112,6 +12112,9 @@ importers:
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
+      '@langwatch/mail':
+        specifier: workspace:*
+        version: link:../../../packages/mail
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
