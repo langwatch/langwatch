@@ -88,7 +88,8 @@ export function useDlqActions() {
     discard,
     canaryRedrive,
     confirmPending: () => {
-      if (!pending) return;
+      // An empty set sends nothing, so it must not report a success either.
+      if (!pending || pending.groupIds.length === 0) return;
       const input = {
         queueName: pending.queueName,
         groupIds: pending.groupIds,
