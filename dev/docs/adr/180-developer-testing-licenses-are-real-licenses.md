@@ -71,6 +71,12 @@ Today a self-hosted plan read verifies only the signature, so an expired licence
 (`license.service.ts`). For a testing licence every entitlement read requires an unexpired,
 matching licence, and caches end at expiry. Standard customer licences keep today's policy.
 
+A cached answer about a testing licence lives at most until its expiry and at most 60 seconds, so
+a revoked or expired licence stops working within a minute. A testing licence is refused while
+`LANGWATCH_CONNECT_INSTANCE_ID` names the instance id: an operator-chosen id would let a copied
+licence pass on another machine. A registry row whose `kind` this release does not know is shown
+as the raw string and treated like a testing licence wherever the difference matters.
+
 A testing licence syncs hourly (and on boot and on demand) even with no hosted service; a refusal
 from the sync clears it. Offline, it lasts until its signed expiry and no longer.
 
