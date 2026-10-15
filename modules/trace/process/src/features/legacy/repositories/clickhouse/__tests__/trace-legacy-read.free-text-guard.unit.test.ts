@@ -21,6 +21,11 @@ const PROJECT_ID = "project-1";
 const OWN_READ = ownProof({ projectId: PROJECT_ID });
 const PROTECTIONS = { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true };
 
+/** A fenced read binds the fence's reserved `tenantScope_` parameters. */
+const isFenced = (params: Record<string, unknown> | undefined): boolean =>
+  Object.keys(params ?? {}).some((name) => name.startsWith("tenantScope_"));
+
+/** The guard as the member runs it; a fenced read also declares its fence's tenants. */
 function guardRefusals(
   calls: [{ query: string; query_params?: Record<string, unknown> }][],
 ): unknown[] {
@@ -30,6 +35,7 @@ function guardRefusals(
         sql: statement.query,
         params: statement.query_params,
         tenantId: PROJECT_ID,
+        ...(isFenced(statement.query_params) ? { tenantIds: [PROJECT_ID] } : {}),
       }),
     )
     .filter((refusal) => refusal !== null);

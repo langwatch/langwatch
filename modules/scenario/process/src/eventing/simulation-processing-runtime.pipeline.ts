@@ -9,6 +9,7 @@ import type { ResourceOwnership } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   loadRunAttachments,
+  SCENARIO_RESOURCE_CLASSES,
   SimulationRunNotFoundError,
   type RunScenarioEvaluationsDeps,
   type SimulationProcessingEvent,
@@ -67,10 +68,11 @@ const GRADING_PROTECTIONS: Protections = {
   canSeeCapturedOutput: true,
 };
 
-/** What this worker's pool holds: the slots it has and the runtime classes it consumes. */
+/** What this worker's pool holds: its slots, the classes it consumes, a project's voice runs. */
 interface ExecutionPoolBudget {
   readonly slotBudget: number;
   readonly consumed: readonly ScenarioResourceClass[];
+  readonly voiceRunsMaxConcurrent: number;
 }
 
 /** What simulation_processing's `build` is handed by the process. */
@@ -129,6 +131,10 @@ export class SimulationProcessingRuntimeAdapter {
       setup.participation === "consume"
         ? ScenarioExecutionPoolService.create({
             concurrency: this.input.pool.slotBudget,
+            projectSlots: {
+              voice:
+                this.input.pool.voiceRunsMaxConcurrent * SCENARIO_RESOURCE_CLASSES.voice.weight,
+            },
             acceptJob: (job) => consumesJobClass({ consumed: this.input.pool.consumed, job }),
           })
         : void 0;

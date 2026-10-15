@@ -396,7 +396,9 @@ regexes = [
 [[allowlists]]
 description = "Governance tool-card row identifiers are UI keys, not credentials"
 targetRules = ["generic-api-key"]
-paths = ['''^enterprise/modules/governance/browser/src/features/ingestion-sources/toolCatalog/tool-cards\.ts$''']
+paths = [
+  '''^enterprise/modules/governance/browser/src/features/ingestion-sources/toolCatalog/tool-cards\.ts$''',
+]
 
 # `dGhlIHNhbXBsZSBub25jZQ==`, the `Sec-WebSocket-Key` in the raw upgrade
 # requests the voice listener tests write onto a socket. A `Sec-WebSocket-Key`

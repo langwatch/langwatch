@@ -22,7 +22,7 @@ import type { McpAuthorizeApi } from "../transport/mcp-authorize.rest.ts";
 
 /** Everything the hosted MCP endpoint needs from the process that mounts it. */
 type HostedMcpDependencies = Readonly<{
-  /** Session records, the replica relay, OAuth codes and clients, from one tier. */
+  /** Session records, OAuth codes and clients, from one tier. */
   repositories: HostedMcpRepositories;
   projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
   /** Required, not optional: an unwired re-check is a token that never expires. */
@@ -139,7 +139,6 @@ export class HostedMcpModule implements HostedMcpApiContract, McpAuthorizeApi {
     return McpEndpointService.create({
       ...collaborators,
       sessionRecords: repositories.sessions,
-      relay: repositories.relay,
       oauthTokenRecords: repositories.oauthTokens,
       oauthClients: repositories.oauthClients,
     });

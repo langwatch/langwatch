@@ -20,7 +20,7 @@ const phase = () => {
     return "main";
   }
 };
-// unreadBody marks a failed response whose body was gone (the page navigated); observe.go matches it.
+// unreadBody marks a failed response whose body was gone (the page navigated); observe.go reads it.
 const unreadBody = "body unread";
 const stopped = () => existsSync(join(runDir, "walk.stop"));
 const dismissNudge = (page) =>
@@ -59,12 +59,17 @@ async function signIn(page) {
   await dismissNudge(page);
 }
 
-let browser = await chromium.launch();
+// No GPU or WebGL: the boot screen's shader otherwise renders in software on ~4 cores;
+// without WebGL it shows its still background.
+const launchOptions = {
+  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--disable-webgl"],
+};
+let browser = await chromium.launch(launchOptions);
 let page;
 let step = "start";
 // Opens the walker's one tab, relaunching Chromium first when it died, so a crash costs one round.
 async function openPage() {
-  if (!browser.isConnected()) browser = await chromium.launch();
+  if (!browser.isConnected()) browser = await chromium.launch(launchOptions);
   page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   // The lab has no internet: web fonts answer empty CSS, so a stalled DNS lookup never holds
   // the page.

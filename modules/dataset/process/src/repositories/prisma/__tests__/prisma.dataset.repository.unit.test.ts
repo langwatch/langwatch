@@ -16,20 +16,22 @@ const row = (id: string) => ({
   columnTypes: [{ name: "input", type: "string" }],
   createdAt: NOW,
   updatedAt: NOW,
-  archivedAt: null,
-  mapping: null,
+  status: "ready",
 });
+
+/** What the list's `select` answers: no tenant or storage columns. */
+const summaryRow = (id: string) => {
+  const { projectId: _projectId, ...summary } = row(id);
+  return summary;
+};
 
 describe("PrismaDatasetRepository", () => {
   describe("given a project holding datasets and archived datasets", () => {
     describe("when a page of them is listed", () => {
       /** @scenario "List datasets returns paginated non-archived datasets" */
-      it("asks only for the live rows, windowed, each with its record count", async () => {
-        const findMany = vi.fn().mockResolvedValue([row("a"), row("b"), row("c")]);
-        const groupBy = vi.fn().mockResolvedValue([
-          { datasetId: "a", _count: { _all: 2 } },
-          { datasetId: "c", _count: { _all: 7 } },
-        ]);
+      it("asks only for the live rows, windowed, and only the columns a list renders", async () => {
+        const findMany = vi.fn().mockResolvedValue([summaryRow("a"), summaryRow("b")]);
+        const groupBy = vi.fn();
         const prisma = prismaDouble({ dataset: { findMany }, datasetRecord: { groupBy } });
 
         const listed = await PrismaDatasetRepository.create({ prisma }).findAll({
@@ -43,42 +45,20 @@ describe("PrismaDatasetRepository", () => {
           orderBy: { createdAt: "desc" },
           skip: 5,
           take: 5,
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            columnTypes: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
         });
-        expect(groupBy).toHaveBeenCalledWith({
-          by: ["datasetId"],
-          where: { projectId: "project-1", datasetId: { in: ["a", "b", "c"] } },
-          _count: { _all: true },
-        });
-        expect(
-          listed.map(({ id, name, slug, columnTypes, recordCount }) => ({
-            id,
-            name,
-            slug,
-            columnTypes,
-            recordCount,
-          })),
-        ).toEqual([
-          {
-            id: "a",
-            name: "Dataset a",
-            slug: "dataset-a",
-            columnTypes: [{ name: "input", type: "string" }],
-            recordCount: 2,
-          },
-          {
-            id: "b",
-            name: "Dataset b",
-            slug: "dataset-b",
-            columnTypes: [{ name: "input", type: "string" }],
-            recordCount: 0,
-          },
-          {
-            id: "c",
-            name: "Dataset c",
-            slug: "dataset-c",
-            columnTypes: [{ name: "input", type: "string" }],
-            recordCount: 7,
-          },
+        expect(groupBy).not.toHaveBeenCalled();
+        expect(listed.map(({ id, name, slug }) => ({ id, name, slug }))).toEqual([
+          { id: "a", name: "Dataset a", slug: "dataset-a" },
+          { id: "b", name: "Dataset b", slug: "dataset-b" },
         ]);
       });
     });

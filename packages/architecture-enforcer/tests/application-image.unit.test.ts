@@ -13,10 +13,13 @@ const readPackageScripts = (app: string): Record<string, string> =>
 describe("given the production image", () => {
   /** @scenario "API and worker remain commands in the same image" */
   it("carries the UI, API and worker applications and starts the API by default", () => {
-    for (const app of ["ui", "api", "worker"]) {
+    for (const app of ["api", "worker"]) {
       expect(DOCKERFILE, app).toContain(`COPY --from=builder /app/apps/${app} ./apps/${app}`);
     }
-    expect(DOCKERFILE).toMatch(/^CMD cd \/app\/apps\/api && pnpm --silent run start$/m);
+    expect(DOCKERFILE).toContain(
+      "COPY --from=builder /app/apps/ui/dist/client ./apps/ui/dist/client",
+    );
+    expect(DOCKERFILE).toMatch(/^CMD \["\/app\/start\.sh"\]$/m);
   });
 
   /** @scenario "API and worker remain commands in the same image" */

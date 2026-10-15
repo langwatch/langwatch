@@ -342,6 +342,7 @@ const resolvedIdentity = projectIdentitySchema.parse({
   organizationId: resolvedProject.team.organizationId,
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 });
 
 /** The project directory a key service reads, over one in-memory peer. */

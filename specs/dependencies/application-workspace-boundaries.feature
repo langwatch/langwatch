@@ -333,6 +333,21 @@ Feature: Physical application workspace boundaries
       And its worker command starts the worker
       And no additional image is required by the source split
 
+    @unit @deployment
+    Scenario: An old Helm chart's LangWatchQL render task still runs from the previous path
+      Given the previous release's chart runs "cd /app/platform/app && pnpm run task renderLwqlAccessConfig --out /render"
+      When the image runs that command
+      Then it runs "lwql-render-access-config" from /app/apps/tasks
+      And the output folder reaches the task as LWQL_RENDER_OUT_DIR, not as an argument
+      And without --out, or with no folder after it, it exits 2, names the flag and runs nothing
+
+    @unit @deployment
+    Scenario: The image's production install keeps the committed package versions
+      Given the image re-resolves the lockfile to drop dev-tool peer dependencies
+      When the re-resolved lockfile names a package version the committed lockfile does not
+      Then the image build fails and names that version
+      And a re-resolve that only drops packages passes
+
     @unimplemented
     @integration @deployment
     Scenario: No new network service is required

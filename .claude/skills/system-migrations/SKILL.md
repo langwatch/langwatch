@@ -74,11 +74,11 @@ A migration that sends many commands must not flood the queue ahead of live work
 - The list closes in a `finally`. The run returns only when its listed work has run; a blocked or failed group fails the
   run with its name; a list whose work stands still for the stall wait fails with the waiting groups named.
 - The stall wait is the `timeoutMs` the caller passes to `runListedWork`; the ruling is five minutes (Alex, 2026-10-12,
-  `specs/upgrade/background-steps.feature:208`), because a busy worker is not a stalled one. The callers still pass 60,000:
-  `PASS_QUEUE_WAIT_MS` (`runner.service.ts:35`), `BACKGROUND_STEP_QUEUE_WAIT_MS`
+  `specs/upgrade/background-steps.feature:208`), because a busy worker is not a stalled one. The callers pass it as 5 minutes:
+  `PASS_QUEUE_WAIT_MS` (`runner.service.ts:36`), `BACKGROUND_STEP_QUEUE_WAIT_MS`
   (`packages/upgrade/src/background/background-steps.service.ts:109`; a step may set `queueWaitMs`) and `PASS_REQUEST_WAIT_MS`
-  (`packages/upgrade/src/gate/in-process-upgrade.ts:63`). Only the preflight drain default is 300,000
-  (`groupQueue.ts:522`). Read the constant before quoting a number, and when you touch one, move it to the ruling.
+  (`packages/upgrade/src/gate/in-process-upgrade.ts:63`, a serving worker's run only: `pnpm task upgrade` sends no pass
+  request, because no worker is consuming yet and it would wait the whole stall). Read the constant before quoting a number, and when you touch one, move it to the ruling.
 - A background (non-tenant) step has the same list and also waits, before saving a checkpoint, until at most 1,000 of its
   own jobs are outstanding (`BACKGROUND_STEP_MAX_OUTSTANDING_JOBS`). Save between bounded pages.
 - A fact event restoring state (`data.backfilled === true`) updates state without creating follow-on subscriber jobs.

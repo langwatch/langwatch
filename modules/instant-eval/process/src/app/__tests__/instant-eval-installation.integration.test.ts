@@ -135,7 +135,7 @@ function projectWithTeam(id: string): ProjectWithTeam {
 /** The peers a run resolves through, each answering the one question it asks. */
 function installation({
   isReleased = true,
-  isOptedIn = false,
+  isOptedIn = isReleased,
   isFreePlan = true,
   classifier = "jev",
   judgeKey = "test-judge-key",
@@ -149,8 +149,13 @@ function installation({
   mayManageOrganization = true,
   recordOptIn = async () => undefined,
 }: {
+  /** What the release flag answers: on the hosted service it releases an enterprise plan only. */
   isReleased?: boolean;
-  /** Whether the organization switched Instant Evals on itself, as organization answers. */
+  /**
+   * Whether the organization switched Instant Evals on itself, as organization answers; it follows
+   * the flag unless stated, so a self-serve fixture is released the way the hosted service
+   * releases one.
+   */
   isOptedIn?: boolean;
   isFreePlan?: boolean;
   classifier?: "jev" | "null" | "memory" | undefined;
@@ -669,6 +674,37 @@ describe("given an organization's own Instant Evals switch", () => {
 
       expect(access).toEqual({ released: true, offer: "enable", viaConnect: false });
       expect(recorded).toEqual([{ organizationId: ORGANIZATION, userId: "member-1" }]);
+    });
+  });
+
+  describe("when the release flag is on for a self-serve organization that never switched itself on", () => {
+    /** @scenario "The release flag does not release a self-serve organization that never switched itself on" */
+    it("is not released, and the popover still offers the switch", async () => {
+      const access = await withInstallation(
+        { isReleased: true, isOptedIn: false },
+        async (api) => ({
+          isEnabled: await api.isEnabled({ projectId: PROJECT }),
+          offer: await api.getOptInAccess({ projectId: PROJECT, userId: "member-1" }),
+        }),
+      );
+
+      expect(access).toEqual({
+        isEnabled: false,
+        offer: { released: false, offer: "enable", viaConnect: false },
+      });
+    });
+  });
+
+  describe("when the release flag is on for an enterprise organization that never switched itself on", () => {
+    /** @scenario "The release flag releases an enterprise organization" */
+    it("is released from the flag", async () => {
+      await withInstallation(
+        { isReleased: true, isOptedIn: false, planType: "ENTERPRISE" },
+        async (api) => {
+          await expect(api.isReleased({ projectId: PROJECT })).resolves.toBe(true);
+          await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(true);
+        },
+      );
     });
   });
 

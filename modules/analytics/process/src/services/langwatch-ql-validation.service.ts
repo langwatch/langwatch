@@ -82,6 +82,8 @@ export class LangWatchQLValidationService {
         joins: [...block.joins],
         filteredColumns: [...block.filteredColumns],
         groupByColumns: [...block.groupByColumns],
+        referencedColumns: [...block.referencedColumns],
+        projectedColumns: [...block.projectedColumns],
         hasGroupBy: block.hasGroupBy,
         isAggregated: block.isAggregated,
       })),
@@ -108,6 +110,12 @@ export class LangWatchQLValidationService {
         Object.entries(policy.viewColumns ?? {}).map(([table, columns]) => [
           qualifyTableName({ table, defaultDatabase }),
           sortedUnique(columns),
+        ]),
+      ),
+      gatedColumnGates: new Map(
+        Object.entries(policy.gatedColumnGates ?? {}).map(([column, gates]) => [
+          column.trim().toLowerCase(),
+          sortedUnique(gates),
         ]),
       ),
     };

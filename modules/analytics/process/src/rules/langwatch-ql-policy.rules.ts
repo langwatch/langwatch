@@ -68,6 +68,11 @@ export interface LangWatchQLPolicy {
    * it only sharpens a `GATED_COLUMN` refusal into one naming the view's usable columns.
    */
   readonly viewColumns?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * What each withheld field needs that the caller lacks, by field name. Optional: it only
+   * lets a `GATED_COLUMN` refusal say what would lift it (`missingGates`).
+   */
+  readonly gatedColumnGates?: Readonly<Record<string, readonly string[]>>;
 }
 
 /** The policy in the form the walk compares against: lowercased and set-shaped. */
@@ -83,6 +88,8 @@ export interface ResolvedLangWatchQLPolicy {
   readonly availableViews: readonly string[];
   /** `viewColumns`, keyed by the qualified table name. */
   readonly viewColumns: ReadonlyMap<string, readonly string[]>;
+  /** `gatedColumnGates`, keyed by the lowercased field name. */
+  readonly gatedColumnGates: ReadonlyMap<string, readonly string[]>;
 }
 
 /**

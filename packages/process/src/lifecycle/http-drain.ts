@@ -7,6 +7,9 @@ export type DrainableHttpServer = Readonly<{
   closeAllConnections?: () => void;
 }>;
 
+/** How often a drain closes connections that went idle after finishing their request. */
+const IDLE_REAP_INTERVAL_MS = 50;
+
 export type DrainLogger = Readonly<{
   info: (obj: object, msg: string) => void;
   error: (obj: object, msg: string) => void;
@@ -33,6 +36,9 @@ export async function drainHttpServer({
     server.close(() => resolve());
   });
   server.closeIdleConnections?.();
+  // A keep-alive socket outlives its last response by the 65s idle timeout; reap each as it idles.
+  const idleReaper = setInterval(() => server.closeIdleConnections?.(), IDLE_REAP_INTERVAL_MS);
+  idleReaper.unref();
   // Started before the session teardown, so that teardown cannot eat into the grace.
   const graceExpired = delay(graceMs, false as const, { ref: false });
   try {
@@ -41,6 +47,7 @@ export async function drainHttpServer({
     logger.error({ error }, "session teardown failed during shutdown, draining connections anyway");
   }
   const drained = await Promise.race([closed.then(() => true as const), graceExpired]);
+  clearInterval(idleReaper);
   if (drained) return;
   logger.info({ graceMs }, "connections outlived the drain grace, destroying the stragglers");
   server.closeAllConnections?.();
