@@ -11,6 +11,9 @@ import type {
   SelfHostedInstanceDetail,
   SelfHostedInstancePage,
   SignedIssuedLicense,
+  MintedTestingLicenseToken,
+  TestingLicenseTokenPage,
+  TestingLicenseTokenView,
 } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/module";
 import type { OpsOperator } from "@langwatch/ops-contract";
@@ -117,6 +120,23 @@ export interface EnterpriseOpsApi {
     id: string;
     operator: OpsOperator | null;
   }): Promise<SelfHostedInstanceDetail>;
+
+  // -- testing-licence tokens (ADR-180 section 2); ops managers only ------------
+
+  listTestingLicenseTokens(input: {
+    page: number;
+    pageSize: number;
+    operator: OpsOperator | null;
+  }): Promise<TestingLicenseTokenPage>;
+  createTestingLicenseServiceToken(input: {
+    name: string;
+    expiresInDays?: number;
+    operator: OpsOperator | null;
+  }): Promise<MintedTestingLicenseToken>;
+  revokeTestingLicenseToken(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<TestingLicenseTokenView>;
 }
 
 export const EnterpriseOpsApi = moduleApi<EnterpriseOpsApi>()("enterprise-ops");

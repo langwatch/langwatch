@@ -13,6 +13,7 @@ import { GenerateLicenseTask } from "./tasks/generate-license.task.ts";
 import { connectHostDoor, connectHostRest } from "./transport/connect-host.rest.ts";
 import { connectTrpcTransport } from "./transport/connect.trpc.ts";
 import { licenseTrpcTransport } from "./transport/licensing.trpc.ts";
+import { testingLicenseDoor, testingLicenseRest } from "./transport/testing-license.rest.ts";
 
 export const licensingProcessModule: PublishedProcessModule<
   "licensing",
@@ -21,11 +22,11 @@ export const licensingProcessModule: PublishedProcessModule<
 > = defineProcessModule("licensing")
   .withRepositories(licensingRepositories)
   .withApi(LicensingModule)
-  .withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostRest)
+  .withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostRest, testingLicenseRest)
   .withEventing(licenseSyncEventing)
   .withEventing(licensingCustomerEventing)
   // The connect host's bearer, verified before the body (W02-DOOR-SHAPE, 2026-10-10).
-  .withDoors({ licence_token: connectHostDoor })
+  .withDoors({ licence_token: connectHostDoor, testing_license_token: testingLicenseDoor })
   .withTasks(({ app, repositories }) => [
     GenerateLicenseTask.create({
       mint: LicenseMintService.create({

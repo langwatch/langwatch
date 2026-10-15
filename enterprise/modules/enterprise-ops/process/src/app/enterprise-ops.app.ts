@@ -10,6 +10,7 @@ import type { FeatureSetup } from "@langwatch/process";
 
 import { LicenseRegistryAuditService } from "../services/license-registry-audit.service.ts";
 import { SelfHostedInstanceAuditService } from "../services/self-hosted-instance-audit.service.ts";
+import { TestingLicenseTokenAuditService } from "../services/testing-license-token-audit.service.ts";
 
 type EnterpriseOpsSetup = FeatureSetup<typeof EnterpriseOpsModule.dependencies, undefined>;
 
@@ -21,15 +22,18 @@ export class EnterpriseOpsModule implements EnterpriseOpsApiContract {
   readonly #ops: Pick<OpsApi, "admitCloudAdmin" | "admitOperator">;
   readonly #licenses: LicenseRegistryAuditService;
   readonly #instances: SelfHostedInstanceAuditService;
+  readonly #testingTokens: TestingLicenseTokenAuditService;
 
   private constructor(deps: {
     ops: Pick<OpsApi, "admitCloudAdmin" | "admitOperator">;
     licenses: LicenseRegistryAuditService;
     instances: SelfHostedInstanceAuditService;
+    testingTokens: TestingLicenseTokenAuditService;
   }) {
     this.#ops = deps.ops;
     this.#licenses = deps.licenses;
     this.#instances = deps.instances;
+    this.#testingTokens = deps.testingTokens;
   }
 
   static create({ dependencies }: EnterpriseOpsSetup): EnterpriseOpsModule {
@@ -38,6 +42,7 @@ export class EnterpriseOpsModule implements EnterpriseOpsApiContract {
       ops,
       licenses: LicenseRegistryAuditService.create({ registry: licensing, auditLog }),
       instances: SelfHostedInstanceAuditService.create({ instances: licensing, auditLog }),
+      testingTokens: TestingLicenseTokenAuditService.create({ tokens: licensing, auditLog }),
     });
   }
 
@@ -109,6 +114,20 @@ export class EnterpriseOpsModule implements EnterpriseOpsApiContract {
     operator,
     id,
   }) => this.#instances.getById({ id, operatorId: await this.#staff(operator) });
+
+  listTestingLicenseTokens: EnterpriseOpsApiContract["listTestingLicenseTokens"] = async ({
+    operator,
+    ...rest
+  }) => this.#testingTokens.list({ ...rest, operatorId: await this.#manager(operator) });
+
+  createTestingLicenseServiceToken: EnterpriseOpsApiContract["createTestingLicenseServiceToken"] =
+    async ({ operator, ...rest }) =>
+      this.#testingTokens.createService({ ...rest, operatorId: await this.#manager(operator) });
+
+  revokeTestingLicenseToken: EnterpriseOpsApiContract["revokeTestingLicenseToken"] = async ({
+    operator,
+    id,
+  }) => this.#testingTokens.revoke({ id, operatorId: await this.#manager(operator) });
 
   /** The staff member's id, or not-found; ops admits only where its cloud-ops capability is on (§3.5). */
   async #staff(operator: OpsOperator | null): Promise<string> {

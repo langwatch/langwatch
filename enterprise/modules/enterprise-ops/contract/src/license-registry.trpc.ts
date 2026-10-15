@@ -23,6 +23,12 @@ import {
   selfHostedInstanceDetailSchema,
   selfHostedInstanceIdInputSchema,
   selfHostedInstancePageSchema,
+  createTestingLicenseServiceTokenInputSchema,
+  listTestingLicenseTokensInputSchema,
+  mintedTestingLicenseTokenSchema,
+  revokeTestingLicenseTokenInputSchema,
+  testingLicenseTokenPageSchema,
+  testingLicenseTokenViewSchema,
 } from "@langwatch/enterprise-licensing-contract";
 /**
  * The license registry surface (ADR-156), as the admin console reads and writes
@@ -83,6 +89,18 @@ export const licenseRegistryTrpc = defineTrpcContract("licenseRegistry")
   .mutation("revokeActivationCode")
   .withInput(revokeActivationCodeInputSchema)
   .withOutput(activationCodeViewSchema)
+
+  .query("testingLicenseTokens")
+  .withInput(listTestingLicenseTokensInputSchema)
+  .withOutput(testingLicenseTokenPageSchema)
+
+  .mutation("createTestingLicenseServiceToken")
+  .withInput(createTestingLicenseServiceTokenInputSchema)
+  .withOutput(mintedTestingLicenseTokenSchema)
+
+  .mutation("revokeTestingLicenseToken")
+  .withInput(revokeTestingLicenseTokenInputSchema)
+  .withOutput(testingLicenseTokenViewSchema)
   .build();
 
 /** The registry of self-hosted installs (ADR-156 §10), as the admin console

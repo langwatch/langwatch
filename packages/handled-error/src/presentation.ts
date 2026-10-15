@@ -6211,6 +6211,33 @@ const presentations = {
     title: "This testing license is for a different organization",
     describe: () => "Activate it on the organization it was approved for.",
   },
+  testing_license_lifetime_too_long: {
+    title: "A testing license lasts at most 30 days",
+    describe: () => "Ask for a shorter testing license. It can be renewed before it runs out.",
+  },
+  testing_license_service_token_lifetime_too_long: {
+    title: "A service token expires within a year",
+    describe: () => "Choose an expiry of a year or less, and create a new token when it runs out.",
+  },
+  testing_license_token_invalid: {
+    title: "This testing license token is not valid",
+    describe: () =>
+      "Sign in to LangWatch Cloud again, or use a service token an ops manager created.",
+  },
+  testing_license_token_expired: {
+    title: "This testing license token has expired",
+    describe: () =>
+      "Sign in to LangWatch Cloud again, or ask an ops manager for a new service token.",
+  },
+  testing_license_token_revoked: {
+    title: "This testing license token was revoked",
+    describe: () =>
+      "Sign in to LangWatch Cloud again, or ask an ops manager for a new service token.",
+  },
+  testing_license_token_not_found: {
+    title: "Testing license token not found",
+    describe: () => "The token may already have been removed. Refresh the list and try again.",
+  },
   license_overage_max_requires_overage: {
     title: "Overage maximum needs overage enabled",
     describe: () =>

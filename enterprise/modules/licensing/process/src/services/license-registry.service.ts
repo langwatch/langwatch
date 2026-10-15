@@ -43,6 +43,7 @@ import {
   issuedLicenseView,
   statusOfIssuedLicense,
 } from "../rules/issued-license.rules.ts";
+import { TESTING_LICENSE_TERMS } from "../rules/testing-license-issue.rules.ts";
 import type { ContractBudgets } from "./contract-budget.service.ts";
 import { IssuedLicenseWriterService } from "./issued-license-writer.service.ts";
 
@@ -107,6 +108,41 @@ export class LicenseRegistryService {
       overrides: terms,
     });
     await this.syncBudget(row, input.operatorId);
+    return { licenseKey, license: this.toView(row) };
+  }
+
+  /**
+   * Signs a testing licence for one local organization on one instance (ADR-180 section 3),
+   * bound to that instance from issue. It names no Cloud customer, so it marks none.
+   */
+  async issueTesting(input: {
+    instanceId: string;
+    organizationId: string;
+    expiresAt: Instant;
+    issuedById: string;
+  }): Promise<SignedIssuedLicense> {
+    const privateKey = this.writer.getSigningKey();
+    const { licenseKey } = this.options.generation.generate({
+      organizationId: input.organizationId,
+      organizationName: TESTING_LICENSE_TERMS.organizationName,
+      email: TESTING_LICENSE_TERMS.email,
+      planType: TESTING_LICENSE_TERMS.planType,
+      ...licenseSeats({
+        members: TESTING_LICENSE_TERMS.maxMembers,
+        membersLite: TESTING_LICENSE_TERMS.maxMembersLite,
+      }),
+      expiresAt: toDate(input.expiresAt),
+      connectServices: [],
+      privateKey,
+      now: toDate(this.options.now()),
+      testing: { instanceId: input.instanceId },
+    });
+    const row = await this.writer.createRow({
+      licenseKey,
+      organizationId: null,
+      source: "BACKOFFICE",
+      issuedById: input.issuedById,
+    });
     return { licenseKey, license: this.toView(row) };
   }
 

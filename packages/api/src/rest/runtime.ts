@@ -75,6 +75,7 @@ import {
 } from "./credential.ts";
 import {
   DOOR_SCOPE_TIER,
+  SERVICE_CALLER_DOORS,
   permissionOf,
   routePermissions,
   type RestDeprecation,
@@ -505,10 +506,21 @@ function assertDoorQuestions({
   door: RestIdentity;
   credential: RestDoorCredential;
 }): void {
-  if (route.permissionPlatform && !door.authorizePlatform) {
+  if (
+    route.permissionPlatform &&
+    !door.authorizePlatform &&
+    !SERVICE_CALLER_DOORS.has(credential)
+  ) {
     throw new Error(
       `REST ${address} asks "${route.permission}" at the platform, and this runtime supplied no ` +
         "identity.authorizePlatform",
+    );
+  }
+
+  if (SERVICE_CALLER_DOORS.has(credential) && !route.permissionPlatform) {
+    throw new Error(
+      `REST ${address} answers behind the "${credential}" door, whose personal caller is asked a ` +
+        'platform permission on every call: declare one with { at: "platform" }',
     );
   }
 
@@ -839,6 +851,7 @@ function authenticateMiddleware({
         credential,
         request: context.req.raw,
         rawBody: context.get(ROUTE_RAW_BODY),
+        authorization: ports.authorization,
       });
 
       // The door is told the admitted kinds; the runtime still refuses one it let through.
@@ -2124,17 +2137,25 @@ async function callerOf({
   credential,
   request,
   rawBody,
+  authorization,
 }: {
   rawBody?: string | Uint8Array;
   credential: RestDoorCredential;
   route: RestTransportRoute<unknown>;
   door: RestIdentity;
   request: Request;
+  authorization: RestRuntimeMembers["authorization"];
 }): Promise<RestCaller | null> {
   const kind = route.access?.kind;
 
   if (route.permissionPlatform) {
-    return platformCallerOf({ door, request, platform: route.permissionPlatform });
+    return platformCallerOf({
+      door,
+      request,
+      platform: route.permissionPlatform,
+      credential,
+      authorization,
+    });
   }
 
   if (credential === "browser" && route.permissionTarget) return requireIdentify(door)({ request });
@@ -2198,10 +2219,14 @@ async function platformCallerOf({
   door,
   request,
   platform,
+  credential,
+  authorization,
 }: {
   door: RestIdentity;
   request: Request;
   platform: PlatformPermissionDeclaration;
+  credential: RestDoorCredential;
+  authorization: RestRuntimeMembers["authorization"];
 }): Promise<RestCaller> {
   const caller = await Promise.resolve(requireIdentify(door)({ request })).catch(
     (error: unknown) => {
@@ -2209,11 +2234,18 @@ async function platformCallerOf({
       throw refused && platform.refusal === "hidden" ? platformRefusal(platform) : error;
     },
   );
+  const serviceDoor = SERVICE_CALLER_DOORS.has(credential);
+
+  // A service credential is no person: its door verified it, and nothing is asked (ADR-180 §2).
+  if (serviceDoor && caller.actor === null) return caller;
 
   await decidePlatform({
     declaration: platform,
     actor: caller.actor,
-    ask: ({ permission }) => requireAuthorizePlatform(door)({ caller, permission }),
+    // A module-bound door answers no platform question; the request's own decisions do, fresh.
+    ask: serviceDoor
+      ? (input) => authorization.forRequest(request).getPlatformDecision(input)
+      : ({ permission }) => requireAuthorizePlatform(door)({ caller, permission }),
   });
 
   return caller;
@@ -2402,7 +2434,7 @@ function doorScopeOf({
   return scope;
 }
 
-/** A door that names no tenant identifies no person either. */
+/** A door that names no tenant identifies no person either, unless it vouches for one. */
 function doorActorOf({
   credential,
   actor,
@@ -2410,7 +2442,8 @@ function doorActorOf({
   credential: RestDoorCredential;
   actor: Actor | null;
 }): Actor | null {
-  return credential !== "browser" && DOOR_SCOPE_TIER[credential] === null ? null : actor;
+  const vouchesForAPerson = credential === "browser" || SERVICE_CALLER_DOORS.has(credential);
+  return !vouchesForAPerson && DOOR_SCOPE_TIER[credential] === null ? null : actor;
 }
 
 /**
@@ -3136,6 +3169,7 @@ const HANDLER_CREDENTIAL = {
   cli_token: "apiKey",
   otlp_ingest: "apiKey",
   licence_token: "apiKey",
+  testing_license_token: "apiKey",
   browser: "session",
   internal_secret: "internal",
 } as const satisfies Record<Exclude<Credential, "public">, HandlerCredential>;

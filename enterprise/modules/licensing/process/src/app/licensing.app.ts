@@ -56,6 +56,11 @@ import {
   type LicenseSeatChange,
   type SeatChangeResult,
   type SignedIssuedLicense,
+  type IssuedTestingLicense,
+  type MintedTestingLicenseToken,
+  type TestingLicenseIssuer,
+  type TestingLicenseTokenPage,
+  type TestingLicenseTokenView,
   type StoreLicenseResult,
   type GenerateLicenseKeyInput,
   LicenseSigningNotConfiguredError,
@@ -117,6 +122,8 @@ import { SelfHostedCrmService } from "../services/self-hosted-crm.service.ts";
 import type { SelfHostedLeadsInfrastructure } from "../services/self-hosted-crm.service.ts";
 import { SelfHostedInstanceService } from "../services/self-hosted-instance.service.ts";
 import { SsoGateStatusService } from "../services/sso-gate-status.service.ts";
+import { TestingLicenseIssueService } from "../services/testing-license-issue.service.ts";
+import { TestingLicenseTokenService } from "../services/testing-license-token.service.ts";
 
 /** Seat counts over organization's membership rows, read through its shares (R-C1f, Q9). */
 function seatCountsOver(
@@ -176,6 +183,8 @@ export class LicensingModule implements LicensingApiContract {
   readonly #signingKey: string | undefined;
   readonly #domainClaims: DomainClaimAuthorityService;
   readonly #ssoGate: SsoGateStatusService;
+  readonly #testingTokens: TestingLicenseTokenService;
+  readonly #testingIssue: TestingLicenseIssueService;
   #configuredActivation: ConfiguredActivationService | undefined;
 
   /** The licensing_customer pipeline, whose facts organization applies (R42). */
@@ -206,8 +215,10 @@ export class LicensingModule implements LicensingApiContract {
     domainClaims,
     customerFacts,
     signInProviderMounts,
+    testing,
   }: {
     signInProviderMounts: SignInProviderMountRepository;
+    testing: Readonly<{ tokens: TestingLicenseTokenService; issue: TestingLicenseIssueService }>;
     customerFacts: LicensingCustomerFactsService;
     generation: LicenseGenerationService;
     domainClaims: DomainClaimAuthorityService;
@@ -235,6 +246,8 @@ export class LicensingModule implements LicensingApiContract {
     this.#identity = install.identity;
     this.#customerFacts = customerFacts;
     this.#refresh = install.refresh;
+    this.#testingTokens = testing.tokens;
+    this.#testingIssue = testing.issue;
     this.#ssoGate = SsoGateStatusService.create({
       mounts: signInProviderMounts,
       isPlatformSsoLicensed: () => this.isPlatformSsoLicensed(),
@@ -345,6 +358,7 @@ export class LicensingModule implements LicensingApiContract {
         organizations: repositories.connectOrganizations,
       }),
       signInProviderMounts: repositories.signInProviderMounts,
+      testing: testingParts({ repositories, registry: registryParts.registry }),
     });
     if (!config.isSaas && configured.form === "activation_code") {
       app.#configuredActivation = ConfiguredActivationService.create({
@@ -744,6 +758,48 @@ export class LicensingModule implements LicensingApiContract {
     return this.#activation.answer(input);
   }
 
+  /** Testing licences (ADR-180 section 2); signing refuses where no key is set. */
+  issueTestingLicense(input: {
+    instanceId: string;
+    organizationId: string;
+    lifetimeHours?: number;
+    issuer: TestingLicenseIssuer;
+  }): Promise<IssuedTestingLicense> {
+    return this.#testingIssue.issue(input);
+  }
+
+  verifyTestingLicenseToken(input: { bearer: string | null }): Promise<TestingLicenseIssuer> {
+    return this.#testingTokens.verify(input);
+  }
+
+  mintPersonalTestingLicenseToken(input: {
+    userId: string;
+  }): Promise<{ token: string; expiresAt: string }> {
+    return this.#testingTokens.mintPersonal(input);
+  }
+
+  createTestingLicenseServiceToken(input: {
+    name: string;
+    expiresInDays?: number;
+    operatorId: string;
+  }): Promise<MintedTestingLicenseToken> {
+    return this.#testingTokens.createService(input);
+  }
+
+  listTestingLicenseTokens(input: {
+    page: number;
+    pageSize: number;
+  }): Promise<TestingLicenseTokenPage> {
+    return this.#testingTokens.list(input);
+  }
+
+  revokeTestingLicenseToken(input: {
+    id: string;
+    operatorId: string;
+  }): Promise<TestingLicenseTokenView> {
+    return this.#testingTokens.revoke(input);
+  }
+
   recordUsageReport(input: IncomingUsageReport): Promise<SelfHostedSignal[]> {
     return this.#instances.recordReport(input);
   }
@@ -765,6 +821,22 @@ export class LicensingModule implements LicensingApiContract {
 const BOOT_REDEMPTION_TIMEOUT_MS = 15_000;
 
 /** What the registry and the hosted routes resolve to together. */
+/** The testing-licence tokens and the issue they authorise, over this module's own table. */
+function testingParts({
+  repositories,
+  registry,
+}: {
+  repositories: Pick<LicensingRepositories, "testingLicenseTokens">;
+  registry: LicenseRegistryService;
+}): Readonly<{ tokens: TestingLicenseTokenService; issue: TestingLicenseIssueService }> {
+  const now = () => nowInstant();
+  const tokens = TestingLicenseTokenService.create({
+    repository: repositories.testingLicenseTokens,
+    now,
+  });
+  return { tokens, issue: TestingLicenseIssueService.create({ registry, tokens, now }) };
+}
+
 type LicenseRegistryParts = Readonly<{
   registry: LicenseRegistryService;
   credentials: ConnectCredentialService;

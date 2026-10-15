@@ -229,6 +229,7 @@ export type RestDoorCredential = Extract<
   | "cli_token"
   | "otlp_ingest"
   | "licence_token"
+  | "testing_license_token"
   | "browser"
 >;
 
@@ -249,7 +250,17 @@ export const DOOR_SCOPE_TIER = {
   cli_token: "organization",
   otlp_ingest: "project",
   licence_token: "organization",
+  testing_license_token: null,
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
+
+/**
+ * The doors whose caller may be a service credential no person stands behind (ADR-180 §2). Their
+ * routes declare a platform permission, asked of the person behind a personal token on every call;
+ * a caller the door identified as no person is admitted on the door's word alone. No other door is.
+ */
+export const SERVICE_CALLER_DOORS: ReadonlySet<RestDoorCredential> = new Set<RestDoorCredential>([
+  "testing_license_token",
+]);
 
 /** The scope a handler on `Door` is handed: the tier that door resolves. */
 type DoorScope<Door extends RestDoorCredential> = (typeof DOOR_SCOPE_TIER)[Door] extends null

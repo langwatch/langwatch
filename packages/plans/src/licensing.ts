@@ -28,6 +28,9 @@ export const statedLiteSeatsSchema = z
     `Lite seats can be at most ${MAX_STATED_LITE_SEATS}; leave them empty for the plan's default`,
   );
 
+/** The seats every developer testing licence carries (ADR-180 section 2). */
+export const TESTING_LICENSE_SEATS = { maxMembers: 10, maxMembersLite: 10 } as const;
+
 /** Whether the plan may publish. Named here so no payload restates it. */
 export const planPublishingShape = {
   canPublish: z.boolean(),

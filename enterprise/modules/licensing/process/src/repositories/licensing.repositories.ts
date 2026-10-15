@@ -7,6 +7,7 @@ import type { MemberSeatRepository } from "./member-seat.repository.ts";
 import type { OrganizationLicenseRepository } from "./organization-license.repository.ts";
 import type { SelfHostedInstanceRepository } from "./self-hosted-instance.repository.ts";
 import type { SignInProviderMountRepository } from "./sign-in-provider-mount.repository.ts";
+import type { TestingLicenseTokenRepository } from "./testing-license-token.repository.ts";
 
 /**
  * The stores this module owns. Chosen once, at boot, by the registry beside
@@ -16,6 +17,8 @@ export interface LicensingRepositories {
   readonly organizationLicenses: OrganizationLicenseRepository;
   readonly issuedLicenses: IssuedLicenseRepository;
   readonly activationCodes: ActivationCodeRepository;
+  /** The tokens that can only ask for a testing licence (ADR-180). */
+  readonly testingLicenseTokens: TestingLicenseTokenRepository;
   readonly selfHostedInstances: SelfHostedInstanceRepository;
   readonly connectOrganizations: ConnectOrganizationRepository;
   readonly instanceIdentity: InstanceIdentityRepository;
