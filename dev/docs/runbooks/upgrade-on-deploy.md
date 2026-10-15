@@ -191,6 +191,14 @@ rollback, so steps that need old writers gone wait again for the assertion or th
 next upgrade run, and reopens every done background step so it re-runs over the rollback's writes.
 It answers the ids it reopened; running it twice reopens nothing more.
 
+**LangWatchQL after a `helm rollback`.** A rollback to an image before the non-destructive
+converge (issue #8726) brings back its drop-first converge: it drops each `_pg` engine table before
+recreating it, so a converge that fails while ClickHouse is still re-mounting the named collection
+leaves no engine tables, and that image has no level-triggered check to repair them. After
+such a rollback, check that every `_pg` table exists in the LangWatchQL database once ClickHouse
+has finished rolling, and run the LangWatchQL provisioning again if one is missing. Rolling forward
+to an image with the check repairs them within 5 minutes.
+
 ## One runner at a time
 
 Only one process runs the upgrade at once, because of the runner lease: a row lease in the

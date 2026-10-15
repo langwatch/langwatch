@@ -237,6 +237,7 @@ async function convergeClickHouse({
   names,
   sourceDatabase,
   failureLevel,
+  only,
 }: {
   repository: LangWatchQLProvisioningRepository;
   source: Readonly<Record<string, string | undefined>>;
@@ -244,6 +245,8 @@ async function convergeClickHouse({
   names: LangWatchQLNames;
   sourceDatabase: string;
   failureLevel: ProvisioningFailureLevel;
+  /** The drifted objects alone; absent, the whole ClickHouse half. */
+  only: readonly string[] | undefined;
 }): Promise<void> {
   const configStoreEntities = await repository.inventoryConfigStore({ names });
   const includeAppFunctions = await appFunctionsProvisionable(repository);
@@ -261,6 +264,7 @@ async function convergeClickHouse({
       postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
       includeAppFunctions,
       mode,
+      ...(only === undefined ? {} : { only }),
     }),
   });
   if (result.skipped.length > 0) {
@@ -297,15 +301,20 @@ function postgresFailureFields({ error, secret }: { error: unknown; secret: stri
   };
 }
 
-/** The approved views, then the reader role; its revokes and grants are one statement. */
+/** One message on both paths, so one alert covers a deploy's failure and a check's. */
+const POSTGRES_FAILED_MESSAGE = "lwql provisioning failed creating PostgreSQL objects";
+
+/** The approved views (only the drifted ones, when named), then the reader role's grants. */
 async function convergePostgres({
   database,
   plan,
   failureLevel,
+  only,
 }: {
   database: LwqlProvisioningDatabase;
   plan: LwqlConvergencePlan;
   failureLevel: ProvisioningFailureLevel;
+  only: readonly string[] | undefined;
 }): Promise<unknown> {
   try {
     await runPostgresStatements({
@@ -314,6 +323,9 @@ async function convergePostgres({
         ...lwqlProvisioning.postgresApprovedViewStatements({
           schema: plan.schema,
           readerRole: LWQL_POSTGRES_READER_ROLE,
+          ...(only === undefined
+            ? {}
+            : { views: selfProvisioning.postgresDatasets({ approvedViews: only }) }),
         }),
         // After the views: the reader role's grants name them.
         ...selfProvisioning.postgresReaderStatements({
@@ -326,7 +338,7 @@ async function convergePostgres({
   } catch (error) {
     logger[failureLevel](
       postgresFailureFields({ error, secret: plan.request.postgresReaderPassword }),
-      "lwql provisioning failed converging the PostgreSQL reader role and approved views; the ClickHouse objects converge regardless",
+      POSTGRES_FAILED_MESSAGE,
     );
     return error;
   }
@@ -348,7 +360,7 @@ async function convergeLocked({
   const postgresFailure =
     only && only.postgres.length === 0
       ? undefined
-      : await convergePostgres({ database, plan, failureLevel });
+      : await convergePostgres({ database, plan, failureLevel, only: only?.postgres });
   if (!only || only.clickHouse.length > 0) {
     await withProvisioningRepository({
       open: plan.openRepository,
@@ -360,6 +372,7 @@ async function convergeLocked({
           names: plan.names,
           sourceDatabase,
           failureLevel,
+          only: only?.clickHouse,
         }),
     });
   }
@@ -369,7 +382,7 @@ async function convergeLocked({
 /**
  * Converges the whole model and never throws: a refusal is a loud log and a fail-closed endpoint
  * (ADR-159). `failOnError` rethrows so the upgrade run fails (Alex, 2026-10-09); `only`, the
- * reconvergence check's drift, converges just the halves it names and logs at warn.
+ * reconvergence check's drift, converges just the objects it names and logs at warn.
  */
 export async function convergeLwqlAccessModel({
   database,

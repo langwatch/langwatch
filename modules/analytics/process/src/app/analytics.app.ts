@@ -53,6 +53,7 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { OverloadedRefusal, StatementBoundTelemetry } from "@langwatch/process-stores";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -227,6 +228,8 @@ type LwqlProvisioningOperations = Readonly<{
 
 const NO_DRIFT: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], keyMap: false };
 
+const lwqlLogger = createLogger("langwatch:analytics:lwql:provisioning");
+
 const LWQL_UNAVAILABLE: LwqlProvisioningOperations = {
   probeOwner: () => Promise.resolve("none"),
   converge: () => Promise.resolve(),
@@ -280,7 +283,7 @@ function lwqlProvisioningOperations({
     },
     openRepository,
   });
-  return {
+  const operations: LwqlProvisioningOperations = {
     probeOwner: () => openRepository().probeOwner({ names }),
     converge: async () => {
       // SQL mode only: in rendered mode a config store owns the access entities.
@@ -309,6 +312,30 @@ function lwqlProvisioningOperations({
         sourceDatabase: admin.target.database,
         dryRun,
       }),
+  };
+  return readerPassword === undefined ? warningCheckOff(operations) : operations;
+}
+
+/** Without the reader password the check is off; said once, where a check runs, not on the api. */
+function warningCheckOff(operations: LwqlProvisioningOperations): LwqlProvisioningOperations {
+  let warned = false;
+  const warn = (): void => {
+    if (warned) return;
+    warned = true;
+    lwqlLogger.warn(
+      "LWQL_POSTGRES_READER_PASSWORD is not set, so the LangWatchQL reconvergence check is off on this worker",
+    );
+  };
+  return {
+    ...operations,
+    converge: () => {
+      warn();
+      return operations.converge();
+    },
+    findAppOwnedDrift: () => {
+      warn();
+      return operations.findAppOwnedDrift();
+    },
   };
 }
 

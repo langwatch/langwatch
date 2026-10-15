@@ -20,13 +20,15 @@ import {
   lwqlReconvergenceWake,
 } from "../analytics-lwql-reconvergence.process.ts";
 
-const { logCalls } = vi.hoisted(() => ({ logCalls: [] as { level: string; message: unknown }[] }));
+const { logCalls } = vi.hoisted(() => ({
+  logCalls: [] as { level: string; fields: unknown; message: unknown }[],
+}));
 vi.mock("@langwatch/observability", async (importActual) => {
   const actual = await importActual<typeof Observability>();
   const at =
     (level: string) =>
     (...args: unknown[]) => {
-      logCalls.push({ level, message: args.at(-1) });
+      logCalls.push({ level, fields: args.length > 1 ? args[0] : undefined, message: args.at(-1) });
     };
   return {
     ...actual,
@@ -40,6 +42,8 @@ vi.mock("@langwatch/observability", async (importActual) => {
 });
 
 const ALERT = "lwql provisioning failed creating ClickHouse objects";
+const POSTGRES_ALERT = "lwql provisioning failed creating PostgreSQL objects";
+const HOUR = 60 * 60_000;
 const FIRST_SLOT = 1_700_000_000_000;
 const healthy: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], keyMap: false };
 const wakeOnce = { fillKeyMap: false };
@@ -240,6 +244,79 @@ describe("given a check over the app-owned objects", () => {
       world.convergeAppOwned = () => Promise.reject(new Error("Timeout error."));
       await check(wakeOnce);
       expect(alerts()).toHaveLength(2);
+    });
+
+    /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
+    it("carries a stable error_signature on the alert line", async () => {
+      const { check } = workerOver(clickHouseWorld({ missing: ["agents_pg"] }));
+      await check(wakeOnce);
+
+      expect(logCalls.find((call) => call.level === "error")).toMatchObject({
+        message: ALERT,
+        fields: {
+          error_signature: "669:NAMED_COLLECTION_DOESNT_EXIST:NAMED_COLLECTION_DOESNT_EXIST",
+        },
+      });
+    });
+
+    /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
+    it("alerts again on a failure after a check that found nothing to converge", async () => {
+      const world = clickHouseWorld({ missing: ["agents_pg"] });
+      const { check } = workerOver(world);
+      const alerts = () => logCalls.filter((call) => call.level === "error");
+
+      await check(wakeOnce);
+      const missing = [...world.missing];
+      world.missing.clear();
+      await check(wakeOnce);
+      for (const name of missing) world.missing.add(name);
+      await check(wakeOnce);
+
+      expect(alerts()).toHaveLength(2);
+    });
+
+    /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
+    it("alerts again when the same failure has gone an hour without an error-level line", async () => {
+      let now = FIRST_SLOT;
+      const { check } = workerOver(clickHouseWorld({ missing: ["agents_pg"] }), {
+        now: () => now,
+      });
+      const alerts = () => logCalls.filter((call) => call.level === "error");
+
+      for (; now < FIRST_SLOT + HOUR; now += LWQL_RECONVERGENCE_INTERVAL_MS) await check(wakeOnce);
+      expect(alerts()).toHaveLength(1);
+
+      await check(wakeOnce);
+      expect(alerts()).toHaveLength(2);
+    });
+  });
+
+  describe("when PostgreSQL refuses its half", () => {
+    /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
+    it("alerts with the PostgreSQL message and still converges ClickHouse", async () => {
+      const drift: LwqlAppOwnedDrift = {
+        clickHouse: ["agents_pg"],
+        postgres: ["lwql_agents"],
+        keyMap: false,
+      };
+      const converged: LwqlAppOwnedDrift[] = [];
+      await runLwqlReconvergence({
+        probe: () => Promise.resolve("config_store"),
+        converge: () => Promise.resolve(),
+        findDrift: () => Promise.resolve(drift),
+        convergeAppOwned: async (half) => {
+          if (half.postgres.length > 0) {
+            throw Object.assign(new Error("permission denied"), { code: "P2010" });
+          }
+          converged.push(half);
+        },
+        fillKeyMap: () => Promise.resolve(),
+      })(wakeOnce);
+
+      expect(logCalls.filter((call) => call.level === "error").map((call) => call.message)).toEqual(
+        [POSTGRES_ALERT],
+      );
+      expect(converged).toEqual([{ clickHouse: ["agents_pg"], postgres: [], keyMap: false }]);
     });
   });
 

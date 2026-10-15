@@ -24,6 +24,8 @@ import {
   LangWatchQLConnectionService,
   LWQL_CONNECTION_DEFAULTS,
 } from "../../../services/langwatch-ql-connection.service.ts";
+import { LWQL_APP_FUNCTION_CATALOG } from "../../app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import { LangWatchQLAppFunctionStatementsService } from "./langwatch-ql-app-function-statements.service.ts";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
   LangWatchQLPostgresMappingService,
@@ -34,6 +36,7 @@ import { LangWatchQLViewProvisioningService } from "./langwatch-ql-view-provisio
 import { SHIPPED_LWQL_DEDUP } from "./langwatch-ql-view-statements.service.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
+const appFunctionStatements = LangWatchQLAppFunctionStatementsService.create();
 const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 const connections = LangWatchQLConnectionService.create();
@@ -77,7 +80,7 @@ interface LwqlExpectedRelation {
 
 /** What the app-owned ClickHouse objects lack; names only, never DDL. */
 interface LwqlClickHouseDrift {
-  /** Each object absent, or holding columns the catalog no longer declares. */
+  /** Each object absent, or lacking a column the catalog declares. */
   readonly objects: readonly string[];
   /** The key map was among them, so a converge that repairs it is followed by a fill. */
   readonly keyMap: boolean;
@@ -93,9 +96,12 @@ export interface LwqlAppOwnedDrift {
 const columnNames = (view: LangWatchQLViewDefinition): string[] =>
   view.columns.map((column) => column.name);
 
-/** Order-blind: a reordered column list still serves every query by name. */
-function sameColumns(found: readonly string[] | undefined, expected: readonly string[]): boolean {
-  if (found === undefined || found.length !== expected.length) return false;
+/**
+ * Order-blind, and blind to extra columns: those are a newer deploy's, so a worker still on an
+ * older catalog never rewrites a newer view during a rollout.
+ */
+function holdsColumns(found: readonly string[] | undefined, expected: readonly string[]): boolean {
+  if (found === undefined) return false;
   const held = new Set(found);
   return expected.every((column) => held.has(column));
 }
@@ -176,6 +182,7 @@ export class LangWatchQLSelfProvisioningService {
     postgres,
     includeAppFunctions = true,
     mode = "sql",
+    only,
   }: {
     names: LangWatchQLNames;
     restrictedPassword: string;
@@ -185,6 +192,8 @@ export class LangWatchQLSelfProvisioningService {
     includeAppFunctions?: boolean;
     /** `rendered` leaves the config-store-owned entities to the config files. */
     mode?: LwqlAccessModelMode;
+    /** The reconvergence check's drift: only these app-owned objects, never the access entities. */
+    only?: readonly string[];
   }): string[] {
     if (names.database !== sourceDatabase) {
       throw new Error(
@@ -192,6 +201,15 @@ export class LangWatchQLSelfProvisioningService {
       );
     }
     const collection = this.namedCollection({ names });
+    if (only !== undefined) {
+      return this.#driftedStatements({
+        names,
+        sourceDatabase,
+        collection,
+        includeAppFunctions,
+        only,
+      });
+    }
     const definition = accessModelDefinition.build({
       names,
       passwordSha256Hex: createHash("sha256").update(restrictedPassword).digest("hex"),
@@ -220,6 +238,59 @@ export class LangWatchQLSelfProvisioningService {
       ...views,
       ...accessModelDefinition.renderDdl(definition),
     ];
+  }
+
+  /** The drifted objects, and every view over an engine table that is about to be replaced. */
+  #driftedStatements({
+    names,
+    sourceDatabase,
+    collection,
+    includeAppFunctions,
+    only,
+  }: {
+    names: LangWatchQLNames;
+    sourceDatabase: string;
+    collection: string;
+    includeAppFunctions: boolean;
+    only: readonly string[];
+  }): string[] {
+    const drifted = new Set(only);
+    const engineTables = catalogShapes
+      .postgresViews(LWQL_VIEW_CATALOG)
+      .filter((view) => drifted.has(view.sourceTable));
+    const replaced = new Set(engineTables.map((view) => view.sourceTable));
+    const views = LWQL_VIEW_CATALOG.filter(
+      (view) =>
+        drifted.has(view.name) ||
+        (catalogShapes.isPostgresResident(view) && replaced.has(view.sourceTable)),
+    );
+    const functions = includeAppFunctions
+      ? LWQL_APP_FUNCTION_CATALOG.filter((definition) => drifted.has(definition.name))
+      : [];
+    return [
+      ...appFunctionStatements.functionStatements({ functions }),
+      ...(drifted.has(names.keyMapTable)
+        ? [accessModel.keyMapTableStatement({ names, sourceDatabase })]
+        : []),
+      ...postgresViews.engineTableStatements({ names, collection, views: engineTables }),
+      ...viewProvisioning.setupStatements({
+        names,
+        sourceDatabase,
+        views,
+        dedup: SHIPPED_LWQL_DEDUP,
+      }),
+    ];
+  }
+
+  /** The catalog datasets whose approved PostgreSQL view is among `approvedViews`. */
+  postgresDatasets({
+    approvedViews,
+  }: {
+    approvedViews: readonly string[];
+  }): LangWatchQLViewDefinition[] {
+    return catalogShapes
+      .postgresViews(LWQL_VIEW_CATALOG)
+      .filter((view) => approvedViews.includes(view.postgres.approvedView));
   }
 
   /** The reader role converged on every path: the app owns `lwql_ro` (ADR-159). */
@@ -253,7 +324,7 @@ export class LangWatchQLSelfProvisioningService {
     ];
   }
 
-  /** Each expected relation absent or holding other columns, then each absent app function. */
+  /** Each expected relation absent or lacking an expected column, then each absent app function. */
   findDrift({
     names,
     relations,
@@ -271,7 +342,7 @@ export class LangWatchQLSelfProvisioningService {
   }): LwqlClickHouseDrift {
     const objects = [
       ...relations
-        .filter((relation) => !sameColumns(found.relations.get(relation.name), relation.columns))
+        .filter((relation) => !holdsColumns(found.relations.get(relation.name), relation.columns))
         .map((relation) => relation.name),
       ...functions.filter((name) => !found.functions.includes(name)),
     ];
@@ -285,13 +356,13 @@ export class LangWatchQLSelfProvisioningService {
       .map((view) => ({ name: view.postgres.approvedView, columns: columnNames(view) }));
   }
 
-  /** Each approved view absent, holding other columns, or not selectable by the reader role. */
+  /** Each approved view absent, lacking an expected column, or not selectable by the reader. */
   findPostgresGaps({ found }: { found: readonly LwqlPostgresViewFound[] }): string[] {
     const byName = new Map(found.map((view) => [view.view, view]));
     return this.approvedPostgresViews()
       .filter((expected) => {
         const view = byName.get(expected.name);
-        return !view?.granted || !sameColumns(view.columns, expected.columns);
+        return !view?.granted || !holdsColumns(view.columns, expected.columns);
       })
       .map((expected) => expected.name);
   }

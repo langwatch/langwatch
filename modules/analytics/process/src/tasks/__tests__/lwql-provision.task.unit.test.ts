@@ -1,7 +1,14 @@
 import type * as Observability from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LwqlAppOwnedDrift } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import {
+  LangWatchQLProductionProvisioningService,
+  LWQL_POSTGRES_READER_ROLE,
+} from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
+import {
+  type LwqlAppOwnedDrift,
+  LangWatchQLSelfProvisioningService,
+} from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
 import {
@@ -31,6 +38,7 @@ vi.mock("@langwatch/observability", async (importActual) => {
   };
 });
 
+const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 const READER_PASSWORD = "reader-unit-secret";
 const NAMES = {
   database: "langwatch",
@@ -226,7 +234,7 @@ describe("convergeLwqlAccessModel", () => {
         expect.objectContaining({
           level: "error",
           fields: expect.objectContaining({ code: "P2010", sqlState: "42501" }),
-          message: expect.stringContaining("PostgreSQL reader role"),
+          message: "lwql provisioning failed creating PostgreSQL objects",
         }),
       );
       expect(JSON.stringify(logCalls)).not.toContain(READER_PASSWORD);
@@ -240,6 +248,10 @@ describe("convergeLwqlAccessModel", () => {
       keyMap: false,
       ...drift,
     });
+    const [engineTable] = selfProvisioning
+      .appOwnedRelations({ names: NAMES })
+      .filter((relation) => relation.name.endsWith("_pg"));
+    const approvedViews = selfProvisioning.approvedPostgresViews().map((view) => view.name);
 
     /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
     it("skips the PostgreSQL half when no approved view drifted", async () => {
@@ -250,11 +262,11 @@ describe("convergeLwqlAccessModel", () => {
         database: postgres.database,
         plan: clickHouse.plan,
         failOnError: true,
-        only: only({ clickHouse: ["agents_pg"] }),
+        only: only({ clickHouse: [engineTable?.name ?? ""] }),
       });
 
       expect(postgres.ran).toEqual([]);
-      expect(clickHouse.ran.length).toBeGreaterThan(0);
+      expect(clickHouse.ran.filter((s) => s.includes("ENGINE = PostgreSQL"))).toHaveLength(1);
     });
 
     /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
@@ -266,11 +278,36 @@ describe("convergeLwqlAccessModel", () => {
         database: postgres.database,
         plan: clickHouse.plan,
         failOnError: true,
-        only: only({ postgres: ["lwql_agents"] }),
+        only: only({ postgres: approvedViews.slice(0, 1) }),
       });
 
       expect(postgres.ran.length).toBeGreaterThan(0);
       expect(clickHouse.ran).toEqual([]);
+    });
+
+    /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing or stale" */
+    it("re-creates only the drifted approved view, then converges the reader's grants", async () => {
+      const [drifted, untouched] = approvedViews;
+      if (!drifted || !untouched) throw new Error("the catalog maps too few PostgreSQL datasets");
+      const postgres = postgresThat({ refuses: false });
+      const viewStatements = (view: string) =>
+        LangWatchQLProductionProvisioningService.create().postgresApprovedViewStatements({
+          schema: "public",
+          readerRole: LWQL_POSTGRES_READER_ROLE,
+          views: selfProvisioning.postgresDatasets({ approvedViews: [view] }),
+        });
+      const ran = (statement: string) => postgres.ran.some((run) => run.endsWith(statement));
+
+      await convergeLwqlAccessModel({
+        database: postgres.database,
+        plan: clickHouseThat().plan,
+        failOnError: true,
+        only: only({ postgres: [drifted] }),
+      });
+
+      expect(viewStatements(drifted).every(ran)).toBe(true);
+      expect(viewStatements(untouched).some(ran)).toBe(false);
+      expect(postgres.ran.some((run) => run.includes("REVOKE ALL"))).toBe(true);
     });
 
     /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
@@ -286,7 +323,7 @@ describe("convergeLwqlAccessModel", () => {
         return logCalls.filter((call) => call.level === "error").map((call) => call.message);
       };
 
-      expect(await errorsOf(only({ clickHouse: ["agents_pg"] }))).toEqual([]);
+      expect(await errorsOf(only({ clickHouse: [engineTable?.name ?? ""] }))).toEqual([]);
       expect(await errorsOf(undefined)).toContain(
         "lwql provisioning failed creating ClickHouse objects",
       );

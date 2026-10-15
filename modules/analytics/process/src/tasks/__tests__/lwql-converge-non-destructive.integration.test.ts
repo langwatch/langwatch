@@ -23,9 +23,8 @@ import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-cat
 import { convergeLwqlAccessModel, type LwqlConvergencePlan } from "../lwql-provision.task.ts";
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
-const ENGINE_TABLES = LangWatchQLCatalogShapesService.create()
-  .postgresViews(LWQL_VIEW_CATALOG)
-  .map((view) => view.sourceTable);
+const POSTGRES_VIEWS = LangWatchQLCatalogShapesService.create().postgresViews(LWQL_VIEW_CATALOG);
+const ENGINE_TABLES = [...new Set(POSTGRES_VIEWS.map((view) => view.sourceTable))];
 
 /** The PostgreSQL half runs against the harness's own server in its own suite. */
 const noPostgres: LwqlProvisioningDatabase = {
@@ -106,6 +105,20 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
     );
   }
 
+  /** Each LangWatchQL view over an engine table, read through to PostgreSQL. */
+  async function viewAnswers(): Promise<number[]> {
+    return Promise.all(
+      POSTGRES_VIEWS.map(async (view) => {
+        const result = await harness.admin.query({
+          query: `SELECT count() AS n FROM ${names.database}.${view.name}`,
+          format: "JSONEachRow",
+        });
+        const [row] = await result.json<{ n: string }>();
+        return Number(row?.n);
+      }),
+    );
+  }
+
   beforeAll(async () => {
     [harness, postgres] = await Promise.all([
       startLangWatchQLClickHouse({ suite: "converge-non-destructive", facts: "migrated" }),
@@ -126,6 +139,31 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
   afterAll(async () => {
     await harness?.applyAsAdmin([`DROP NAMED COLLECTION IF EXISTS ${collection}`]);
     await Promise.all([harness?.stop(), postgres?.stop()]);
+  });
+
+  describe("when converges run again over the views and engine tables already present", () => {
+    /** @scenario "A converge over present views and engine tables succeeds again and the views still answer" */
+    it("succeeds each time, replacing an engine table under its views, and every view still answers", async () => {
+      const [engineTable] = ENGINE_TABLES;
+      if (!engineTable) throw new Error("the catalog maps no PostgreSQL dataset");
+
+      await expect(
+        convergeLwqlAccessModel({ database: noPostgres, plan: plan(), failOnError: true }),
+      ).resolves.toBeUndefined();
+      await expect(
+        convergeLwqlAccessModel({
+          database: noPostgres,
+          plan: plan(),
+          failOnError: true,
+          only: { clickHouse: [engineTable], postgres: [], keyMap: false },
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(await engineTables()).toEqual(ENGINE_TABLES.toSorted());
+      const answered = await viewAnswers();
+      expect(answered).toHaveLength(POSTGRES_VIEWS.length);
+      expect(answered.every((count) => Number.isInteger(count))).toBe(true);
+    });
   });
 
   describe("when the named collection disappears and a converge runs", () => {

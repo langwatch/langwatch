@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { LangWatchQLNames } from "../../../../services/langwatch-ql-access-model.service.ts";
+import { lwqlAppFunctionNames } from "../../../app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { canProvisionAppFunctions } from "../../../app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import { LangWatchQLSelfProvisioningService } from "../langwatch-ql-self-provisioning.service.ts";
 
@@ -286,6 +287,76 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
       keyMap: true,
     });
   });
+
+  /** @scenario "An older worker never rewrites a newer view" */
+  it("finds nothing when every relation holds a newer deploy's extra columns as well", () => {
+    const newer = new Map(
+      [...everything].map(([name, columns]) => [name, [...columns, "AddedByANewerDeploy"]]),
+    );
+    expect(drift(newer)).toEqual({ objects: [], keyMap: false });
+  });
+
+  /** @scenario "An older worker never rewrites a newer view" */
+  it("names a view that lacks a column this worker's catalog expects", () => {
+    const view = relations.at(-1);
+    if (!view) throw new Error("the catalog declares no view");
+    const found = new Map(everything);
+    found.set(view.name, [...view.columns.slice(1), "AddedByANewerDeploy"]);
+
+    expect(drift(found).objects).toEqual([view.name]);
+  });
+});
+
+describe("given the drift a reconvergence check converges", () => {
+  const statementsFor = (only: readonly string[]) =>
+    selfProvisioning.clickHouseStatements({
+      names: NAMES,
+      restrictedPassword: "restricted-secret",
+      sourceDatabase: SOURCE_DATABASE,
+      postgres: POSTGRES,
+      mode: "rendered",
+      only,
+    });
+  const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
+  const engineTables = relations.filter((relation) => relation.name.endsWith("_pg"));
+
+  /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing or stale" */
+  it("replaces only the drifted engine table and the views over it", () => {
+    const [engineTable, other] = engineTables;
+    if (!engineTable || !other) throw new Error("the catalog maps too few PostgreSQL datasets");
+
+    const statements = statementsFor([engineTable.name]);
+    const replaced = statements.filter((s) => s.includes("ENGINE = PostgreSQL"));
+    const views = statements.filter((s) => s.startsWith("CREATE OR REPLACE VIEW"));
+
+    expect(replaced).toHaveLength(1);
+    expect(replaced[0]).toContain(`.${engineTable.name} (`);
+    expect(views.length).toBeGreaterThan(0);
+    for (const view of views) expect(view).toContain(`.${engineTable.name} AS`);
+    expect(statements.some((s) => s.includes(`.${other.name}`))).toBe(false);
+    expect(statements.some((s) => s.startsWith("CREATE OR REPLACE FUNCTION"))).toBe(false);
+    expect(statements.some((s) => s.includes(NAMES.keyMapTable + " ("))).toBe(false);
+    expect(statements.some((s) => /^CREATE DATABASE|^CREATE USER|^GRANT/.test(s))).toBe(false);
+  });
+
+  /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing or stale" */
+  it("creates the key map and a function only when each drifted, and a drifted view alone", () => {
+    const view = relations.at(-1);
+    const [appFunction] = lwqlAppFunctionNames();
+    if (!view || !appFunction) throw new Error("the catalog declares no view or no function");
+
+    expect(statementsFor([appFunction])).toEqual([
+      expect.stringMatching(new RegExp(`^CREATE OR REPLACE FUNCTION ${appFunction} `)),
+    ]);
+    expect(statementsFor([NAMES.keyMapTable])).toEqual([
+      expect.stringMatching(/^CREATE TABLE IF NOT EXISTS .*lwql_api_key_tenant_map /),
+    ]);
+    expect(statementsFor([view.name])).toEqual([
+      expect.stringMatching(
+        new RegExp(`^CREATE OR REPLACE VIEW ${SOURCE_DATABASE}\\.${view.name}\\n`),
+      ),
+    ]);
+  });
 });
 
 describe("given what the reconvergence check finds in PostgreSQL", () => {
@@ -295,6 +366,12 @@ describe("given what the reconvergence check finds in PostgreSQL", () => {
   /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
   it("finds no gap when every approved view exists with its columns and the reader may select it", () => {
     expect(selfProvisioning.findPostgresGaps({ found })).toEqual([]);
+  });
+
+  /** @scenario "An older worker never rewrites a newer view" */
+  it("finds no gap in an approved view holding a newer deploy's extra column", () => {
+    const newer = found.map((view) => ({ ...view, columns: [...view.columns, "addedByNewer"] }));
+    expect(selfProvisioning.findPostgresGaps({ found: newer })).toEqual([]);
   });
 
   /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing or stale" */

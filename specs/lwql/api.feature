@@ -1026,7 +1026,8 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # converge again, so the worker checks, level-triggered and with no end: every
   # 5 minutes one check across the fleet reads the system tables (and the
   # PostgreSQL catalog) for the app-owned objects the catalog expects, and
-  # converges only what is missing or stale. Rendered mode never touches the
+  # converges only the objects that are absent or lack a column the catalog
+  # declares; extra columns are a newer deploy's. Rendered mode never touches the
   # config-store-owned entities; sql mode keeps the owner probe above. An operator
   # who will not wait for the next check uses Ops > Upgrades Retry.
   @unit
@@ -1048,11 +1049,23 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   @unit
   Scenario: The reconvergence check converges the app-owned LangWatchQL objects it finds missing or stale
     Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
-    And an app-owned object is missing, or holds columns the catalog no longer declares
+    And an app-owned object is missing, or lacks a column the catalog declares
     When the reconvergence check runs
-    Then it converges the halves that drifted, ClickHouse, PostgreSQL or both
+    Then it converges only the drifted objects, and the views over an engine table it replaces
+    And it creates the key map or an app function only when that one drifted
+    And in PostgreSQL it re-creates only the drifted approved views, then the reader role's grants
     And it leaves the user, settings profile, row policies and named collection to the config store
     And a ClickHouse that cannot be read converges nothing, and the next check reads again
+
+  # During a rollout old and new workers run the check side by side. An object
+  # holding every column a worker's catalog declares is healthy to that worker,
+  # however many more it holds, so an older worker leaves a newer view alone.
+  @unit
+  Scenario: An older worker never rewrites a newer view
+    Given a newer deploy has converged views and approved views with columns this worker's catalog does not declare
+    When this worker's reconvergence check runs
+    Then it finds no drift and runs no DDL
+    And a view that lacks a column this worker's catalog declares is still drift
 
   @unit
   Scenario: The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place
@@ -1075,15 +1088,19 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the revokes and the grants run
     Then they run as one statement, revokes first, so a live read never sees the role without its grants
 
-  # The alert keeps the deploy runner's signature, "lwql provisioning failed creating
-  # ClickHouse objects", with the ClickHouse code and name. Each worker logs it at error
-  # on its first failure and when the failure changes, and at warn while it repeats.
+  # The alert keeps the deploy runner's messages, "lwql provisioning failed creating
+  # ClickHouse objects" and "lwql provisioning failed creating PostgreSQL objects", one per
+  # store, with a stable error_signature field. Each worker logs it at error on the first
+  # failure, when the failure changes and hourly while it holds, and at warn in between.
   @unit
   Scenario: A failed converge is retried by the next check and alerts once per change of failure
     Given the reconvergence check's converge of the app-owned objects failed
     When later checks fail the same way
     Then each logs a warning that the check retries, without crashing the worker
-    And the error-level alert is logged on the first failure and again only when the failure changes
+    And the error-level alert is logged on the first failure, when the failure changes, and when the last one is over an hour old
+    And a check that finds that store converged clears it, so its next failure alerts again
+    And a PostgreSQL failure alerts with its own message, and ClickHouse still converges
+    And the alert line carries the failure's error_signature
     And the converge's own statement failure is logged at warn on the check's path and at error on a deploy's
 
   @integration
@@ -1092,6 +1109,28 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the named collection disappears and a converge runs and fails
     Then every engine table still exists and still answers
     And each engine table is replaced in one statement, never dropped first
+
+  @integration
+  Scenario: A converge over present views and engine tables succeeds again and the views still answer
+    Given a rendered install whose engine tables and the views over them exist and answer
+    When a full converge runs again, and then a check's converge of one engine table
+    Then both succeed, each engine table replaced under the views that read it
+    And every view still answers
+
+  @e2e
+  Scenario: A three-replica deployment reconverges LangWatchQL after provisioning failed during a ClickHouse outage
+    Given a three-replica rendered-mode install whose PostgreSQL engine tables are missing
+    And the app boots while every ClickHouse replica is down, so its converge fails
+    When ClickHouse comes back and no further deploy runs
+    Then within one check interval every engine table exists on every replica
+    And the restricted identity reads the PostgreSQL-backed views
+
+  @e2e
+  Scenario: A single-node upgrade that restarts ClickHouse reconverges LangWatchQL
+    Given a single-node rendered-mode install whose PostgreSQL engine tables are missing
+    When an upgrade restarts the only ClickHouse replica and no further deploy runs
+    Then within one check interval every engine table exists
+    And the restricted identity reads the PostgreSQL-backed views
 
   @integration
   Scenario: A rendered install whose named collection appears late converges on a later check

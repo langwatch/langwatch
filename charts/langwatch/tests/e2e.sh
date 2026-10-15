@@ -1040,8 +1040,8 @@ test_lwql_upgrade_from_main() {
 # a terminating replica) and nothing retried, leaving the Postgres-backed views
 # over missing `<x>_pg` tables. Both suites end with NO further deploy.
 # ─────────────────────────────────────────────────────────────────────────────
-# The reconvergence watch caps its probe interval at 5 min
-# (LWQL_RECONVERGENCE_MAX_DELAY_MS); one full interval plus 5 min for pod boots.
+# The reconvergence check runs every 5 min with no end (LWQL_RECONVERGENCE_INTERVAL_MS);
+# one full interval plus 5 min for pod boots.
 LWQL_RECONVERGE_WAIT="${LWQL_RECONVERGE_WAIT:-600}"
 LWQL_PG_BASELINE=""
 
@@ -1123,7 +1123,7 @@ wait_lwql_reconverged() {
     [[ "$got" == "$LWQL_PG_BASELINE" ]] && { pass "app reconverged LWQL after $((SECONDS + LWQL_RECONVERGE_WAIT - deadline))s"; return; }
     sleep 10
   done
-  warn "no reconvergence after ${LWQL_RECONVERGE_WAIT}s; _pg tables now: '${got}'"
+  fail "no reconvergence after ${LWQL_RECONVERGE_WAIT}s; _pg tables now: '${got}'"
 }
 
 # @scenario "A three-replica deployment reconverges LangWatchQL after provisioning failed during a ClickHouse outage"
@@ -1159,7 +1159,7 @@ test_lwql_replicas_converge_after_failed_provision() {
     sleep 5; attempts=$((attempts + 1))
     [[ $attempts -ge 36 ]] && fail "restarted app pod never started a container while ClickHouse was down"
   done
-  # Past the watch's first three probes (5s, 15s, 35s after boot), all against no ClickHouse.
+  # A minute against no ClickHouse: the boot's converge fails, and any check in it fails too.
   sleep 60
   pass "induced: the app booted and provisioned against an unavailable ClickHouse"
 
