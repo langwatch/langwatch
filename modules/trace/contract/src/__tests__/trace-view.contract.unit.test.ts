@@ -160,6 +160,7 @@ describe("trace view contract", () => {
       "outputVisibleTo",
       "contentPrivacy",
       "piiAnalysisIncomplete",
+      "truncatedAttributes",
       "restrictedAttributes",
       "error",
       "metrics",
