@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { inBatches, MAX_GROUP_IDS_PER_CALL } from "../model/dlq-batches.ts";
+import { inBatches, MAX_GROUP_IDS_PER_CALL, PartialBatchError } from "../model/dlq-batches.ts";
 
 describe("inBatches", () => {
   describe("given more group ids than one call accepts", () => {
@@ -21,19 +21,54 @@ describe("inBatches", () => {
     });
   });
 
-  describe("given a batch fails", () => {
-    it("stops before sending the batches after it", async () => {
-      const groupIds = Array.from({ length: 4_500 }, (_, index) => `group-${index}`);
-      let calls = 0;
+  describe("given exactly one id more than one call accepts", () => {
+    it("sends a second call holding the one remaining id", async () => {
+      const groupIds = Array.from(
+        { length: MAX_GROUP_IDS_PER_CALL + 1 },
+        (_, index) => `g-${index}`,
+      );
+      const sizes: number[] = [];
 
-      const run = inBatches({ queueName: "q", groupIds }, async () => {
-        calls += 1;
-        if (calls === 2) throw new Error("redis down");
-        return { redrivenCount: 2_000 };
+      await inBatches({ queueName: "q", groupIds }, async (batch) => {
+        sizes.push(batch.groupIds.length);
+        return { discardedCount: batch.groupIds.length };
       });
 
-      await expect(run).rejects.toThrow("redis down");
+      expect(sizes).toEqual([MAX_GROUP_IDS_PER_CALL, 1]);
+    });
+  });
+
+  describe("given a batch fails after an earlier one applied", () => {
+    it("stops there and reports what the earlier batches applied", async () => {
+      const groupIds = Array.from({ length: 4_500 }, (_, index) => `group-${index}`);
+      const cause = new Error("redis down");
+      let calls = 0;
+
+      const failure = await inBatches({ queueName: "q", groupIds }, async () => {
+        calls += 1;
+        if (calls === 2) throw cause;
+        return { redrivenCount: 2_000, jobsRedriven: 3_000 };
+      }).catch((error: unknown) => error);
+
       expect(calls).toBe(2);
+      expect(failure).toBeInstanceOf(PartialBatchError);
+      expect((failure as PartialBatchError).cause).toBe(cause);
+      expect((failure as PartialBatchError).done).toEqual({
+        redrivenCount: 2_000,
+        jobsRedriven: 3_000,
+      });
+    });
+  });
+
+  describe("given the first batch fails", () => {
+    it("rethrows its error unchanged, since nothing applied", async () => {
+      const cause = new Error("forbidden");
+
+      const failure = await inBatches({ queueName: "q", groupIds: ["g"] }, async () => {
+        throw cause;
+      }).catch((error: unknown) => error);
+
+      expect(failure).toBe(cause);
     });
   });
 });
