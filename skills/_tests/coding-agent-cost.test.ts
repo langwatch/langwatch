@@ -112,6 +112,7 @@ describe("the coding-agent-cost skill", () => {
       expect(rendered).toContain(
         "adding `AND TenantId = '<id>'` when the report covers one project",
       );
+      expect(rendered).toContain("If the report window has no `model_call` rows");
       expect(rendered).toContain(
         "no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data",
       );
