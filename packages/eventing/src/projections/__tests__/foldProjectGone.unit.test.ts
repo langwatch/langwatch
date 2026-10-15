@@ -1,5 +1,16 @@
 import { ProjectNotFoundError } from "@langwatch/authorization";
+import type * as observabilityModule from "@langwatch/observability";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// Capture the router's own logger so the no-op can be asserted to warn.
+const { warnSpy } = vi.hoisted(() => ({ warnSpy: vi.fn() }));
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual = await importOriginal<typeof observabilityModule>();
+  return {
+    ...actual,
+    createLogger: () => ({ warn: warnSpy, error: vi.fn(), info: vi.fn(), debug: vi.fn() }),
+  };
+});
 
 import type { Event } from "../../domain/types.ts";
 import {
@@ -53,6 +64,10 @@ describe("a fold whose project no longer exists", () => {
       const { request } = foldQueues({ readFails: new ProjectNotFoundError(tenantId) });
 
       await expect(request.onEvent("counter", event, { tenantId })).resolves.toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        { tenantId, projectionName: "counter" },
+        expect.stringContaining("no longer exists"),
+      );
     });
 
     it("completes the coalesced batch as a no-op", async () => {
@@ -61,6 +76,10 @@ describe("a fold whose project no longer exists", () => {
       await expect(
         request.onEventBatch!("counter", [event], { tenantId }),
       ).resolves.toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        { tenantId, projectionName: "counter" },
+        expect.stringContaining("no longer exists"),
+      );
     });
   });
 
@@ -72,6 +91,7 @@ describe("a fold whose project no longer exists", () => {
       await expect(request.onEvent("counter", event, { tenantId })).rejects.toThrow(
         "clickhouse down",
       );
+      expect(warnSpy).not.toHaveBeenCalled();
     });
   });
 });
