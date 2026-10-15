@@ -1,6 +1,6 @@
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Badge, Button, Text } from "@langwatch/design-system/primitives";
+import { Badge, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { Inbox } from "lucide-react";
 
 import {
@@ -11,7 +11,7 @@ import {
 import { AdminDate, EmptyCell } from "../elements/admin-cells.tsx";
 import { PersonCell } from "../elements/person-cell.tsx";
 
-const COLUMN_COUNT = 8;
+const COLUMN_COUNT = 7;
 
 export function TestingLicenseTokensTable({
   tokens,
@@ -37,7 +37,6 @@ export function TestingLicenseTokensTable({
           <ListTable.ColumnHeader>Expires</ListTable.ColumnHeader>
           <ListTable.ColumnHeader>Last used</ListTable.ColumnHeader>
           <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
-          <ListTable.ColumnHeader>Revoked</ListTable.ColumnHeader>
           <ListTable.ColumnHeader width="fit" label="Actions" />
         </ListTable.Row>
       </ListTable.Header>
@@ -63,14 +62,14 @@ export function TestingLicenseTokensTable({
               )}
             </ListTable.Cell>
             <ListTable.Cell>
-              <Badge colorPalette={TOKEN_STATUS_COLORS[token.status]}>{token.status}</Badge>
-            </ListTable.Cell>
-            <ListTable.Cell>
-              {token.revokedAt ? (
-                <AdminDate value={token.revokedAt} display="date" />
-              ) : (
-                <EmptyCell>no</EmptyCell>
-              )}
+              <VStack align="start" gap={0}>
+                <Badge colorPalette={TOKEN_STATUS_COLORS[token.status]}>{token.status}</Badge>
+                {token.revokedAt ? (
+                  <Text fontSize="xs" color="fg.muted">
+                    <AdminDate value={token.revokedAt} display="date" />
+                  </Text>
+                ) : null}
+              </VStack>
             </ListTable.Cell>
             <ListTable.Cell>
               {token.status === "active" ? (
