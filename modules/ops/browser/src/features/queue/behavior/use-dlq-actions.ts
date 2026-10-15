@@ -1,3 +1,4 @@
+import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api } from "../../../behavior/ops-api.ts";
@@ -11,6 +12,30 @@ export interface PendingDlqAction {
 }
 
 const plural = (count: number) => (count === 1 ? "group" : "groups");
+
+/** The explicit-id endpoints accept at most this many ids per call. */
+const MAX_GROUP_IDS_PER_CALL = 2000;
+
+/**
+ * Sends the ids in sequential batches the endpoint accepts and sums each
+ * count, so one act covers every group the operator saw.
+ */
+async function inBatches<T extends Record<string, number>>(
+  input: { queueName: string; groupIds: string[] },
+  send: (batch: { queueName: string; groupIds: string[] }) => Promise<T>,
+): Promise<T> {
+  const totals: Record<string, number> = {};
+  for (let i = 0; i < input.groupIds.length; i += MAX_GROUP_IDS_PER_CALL) {
+    const result = await send({
+      queueName: input.queueName,
+      groupIds: input.groupIds.slice(i, i + MAX_GROUP_IDS_PER_CALL),
+    });
+    for (const [key, value] of Object.entries(result)) {
+      totals[key] = (totals[key] ?? 0) + value;
+    }
+  }
+  return totals as T;
+}
 
 /**
  * The DLQ card's recovery mutations (specs/ops/dead-letter-recovery.feature).
@@ -29,20 +54,24 @@ export function useDlqActions() {
     void utils.ops.invalidate();
   };
 
-  const redrive = api.ops.redriveManyFromDlq.useMutation(
-    countOutcomeHandlers({
+  const redrive = useMutation({
+    mutationFn: (input: { queueName: string; groupIds: string[] }) =>
+      inBatches(input, (batch) => utils.client.ops.redriveManyFromDlq.mutate(batch)),
+    ...countOutcomeHandlers({
       onSettled: settle,
       title: (n) => `Redrove ${n} ${plural(n)}`,
       failure: "Couldn't redrive the groups",
     }),
-  );
-  const discard = api.ops.discardManyFromDlq.useMutation(
-    countOutcomeHandlers({
+  });
+  const discard = useMutation({
+    mutationFn: (input: { queueName: string; groupIds: string[] }) =>
+      inBatches(input, (batch) => utils.client.ops.discardManyFromDlq.mutate(batch)),
+    ...countOutcomeHandlers({
       onSettled: settle,
       title: (n) => `Discarded ${n} ${plural(n)}`,
       failure: "Couldn't discard the groups",
     }),
-  );
+  });
   const canaryRedrive = api.ops.canaryRedrive.useMutation(
     countOutcomeHandlers({
       onSettled: settle,
