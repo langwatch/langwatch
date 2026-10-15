@@ -101,3 +101,20 @@ func TestToolOrgRecordRoundTrips(t *testing.T) {
 		t.Fatalf("record shape wrong: %s (%v)", encoded, err)
 	}
 }
+
+func TestFindSeededOrgResolvesBySlug(t *testing.T) {
+	var raw any
+	list := `[{"id":"other","slug":"someone-else","teams":[]},` +
+		`{"id":"org-ksuid","slug":"local-dev-org","teams":[{"projects":[` +
+		`{"id":"x","slug":"another"},{"id":"project-ksuid","slug":"local-dev-project"}]}]}]`
+	if err := json.Unmarshal([]byte(list), &raw); err != nil {
+		t.Fatal(err)
+	}
+	orgID, projectID, ok := findSeededOrg(raw)
+	if !ok || orgID != "org-ksuid" || projectID != "project-ksuid" {
+		t.Fatalf("got %q %q %v", orgID, projectID, ok)
+	}
+	if _, _, found := findSeededOrg([]any{}); found {
+		t.Fatal("an empty list must not resolve")
+	}
+}

@@ -1,7 +1,7 @@
 /**
- * Idempotent local-dev / CI seed: fixed, hardcoded ids (never random) for
- * Organization, Team, Project, admin User (upserted by ID, not email) and
- * API tokens — plaintext identical everywhere, only the bcrypt hash differs.
+ * Idempotent local-dev / CI seed: Organization, Team, Project and users get random KSUIDs
+ * and are found again by slug or email; API tokens keep their plaintext everywhere,
+ * only the bcrypt hash differs.
  */
 
 import { createHash, createHmac } from "node:crypto";
@@ -41,12 +41,19 @@ import {
 import { seedDemoPlatform } from "./seed-demo-platform.ts";
 import { seedGithubFixture } from "./seed-github-fixture.ts";
 import {
-  buildAdminUserUpsertArgs,
-  LOCAL_DEV_ADMIN_USER_ID,
+  LOCAL_DEV_ADMIN_LOCAL_PART,
   resolveSeedEmailDomain,
+  RETIRED_ADMIN_USER_ID,
   seedEmailAddress,
 } from "./seed-identity.ts";
 import { chooseSeedLicense, type SeedLicenseChoice } from "./seed-license.ts";
+import {
+  resolveOrganizationId,
+  upsertOrganization,
+  upsertProject,
+  upsertSeedUser,
+  upsertTeam,
+} from "./seed-local-rows.ts";
 
 const logger = createLogger("langwatch:tasks:storage-seed");
 
@@ -134,27 +141,23 @@ export function llmsimProviderKeys({
   return undefined;
 }
 
-const ORG_ID = "local-dev-organization";
 const ORG_SLUG = "local-dev-org";
 const ORG_NAME = "Local Dev Organization";
 
-const TEAM_ID = "local-dev-team";
 const TEAM_SLUG = "local-dev-team";
 const TEAM_NAME = "Local Dev Team";
 
-const PROJECT_ID = "local-dev-project";
 const PROJECT_SLUG = "local-dev-project";
 const PROJECT_NAME = "Local Dev Project";
 
-const ADMIN_USER_ID = LOCAL_DEV_ADMIN_USER_ID;
-const ADMIN_LOCAL_PART = "admin";
+const ADMIN_LOCAL_PART = LOCAL_DEV_ADMIN_LOCAL_PART;
 const ADMIN_PASSWORD = "LocalHavenAdmin!2026";
 const ADMIN_NAME = "Haven Local Admin";
 
 /** The tools' own accounts, so no tool answers the admin's passkey offer or sessions. */
 const TOOL_USERS = [
-  { id: "local-dev-fuzz-ui-user", localPart: "fuzz-ui", name: "Fuzz UI" },
-  { id: "local-dev-passkey-probe-user", localPart: "passkey-probe", name: "Passkey Probe" },
+  { retiredId: "local-dev-fuzz-ui-user", localPart: "fuzz-ui", name: "Fuzz UI" },
+  { retiredId: "local-dev-passkey-probe-user", localPart: "passkey-probe", name: "Passkey Probe" },
 ] as const;
 
 // Must match domain.DefaultLocalAPIKey in tools/thuishaven/domain/overlay.go.
@@ -180,7 +183,10 @@ const SCIM_TOKEN_ID = "local-dev-scim-token";
 const DEFAULT_PROMPT_TAG = "production";
 const DEFAULT_PROMPT_TAG_ID = "local-dev-prompt-tag-production";
 
-/** The idempotent local-dev / CI seed: fixed ids and tokens, written straight to the database. */
+/**
+ * The idempotent local-dev / CI seed: random ids found again by slug or email, fixed tokens,
+ * written straight to the database.
+ */
 export async function storageSeed({ connections, chain, environment }: TaskInput): Promise<void> {
   const database = connections.database;
   if (!database) throw new Error("This task needs DATABASE_URL");
@@ -224,8 +230,9 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
 
   // The licence must be valid under the key this stack boots with. No licence is committed:
   // the seed signs one with the private key from secrets (seed-license.ts has the order).
+  const organizationId = await resolveOrganizationId({ prisma, slug: ORG_SLUG });
   const existingLicense = await prisma.organizationLicense.findUnique({
-    where: { organizationId: ORG_ID },
+    where: { organizationId },
     select: { licenseKey: true },
   });
   const { licensing } = parseProcessConfig({
@@ -240,25 +247,22 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
       stored: existingLicense?.licenseKey ?? null,
       publicKey: licensing.publicKey ?? DEFAULT_LICENSE_PUBLIC_KEY,
       privateKey,
-      organization: { id: ORG_ID, name: ORG_NAME, email: adminEmail },
+      organization: { id: organizationId, name: ORG_NAME, email: adminEmail },
     }),
   );
   logSeedLicenseChoice(licenseChoice);
   const license = licenseChoice.licenseKey;
-  const organization = await prisma.organization.upsert({
-    where: { id: ORG_ID },
-    create: {
-      id: ORG_ID,
-      name: ORG_NAME,
-      slug: ORG_SLUG,
-      license,
-    },
-    update: { license },
+  const organization = await upsertOrganization({
+    prisma,
+    id: organizationId,
+    slug: ORG_SLUG,
+    name: ORG_NAME,
+    license,
   });
   // Licensing reads its own row first (round 37 D6); organization's column goes with its contract.
   await prisma.organizationLicense.upsert({
-    where: { organizationId: ORG_ID },
-    create: { organizationId: ORG_ID, licenseKey: license },
+    where: { organizationId: organization.id },
+    create: { organizationId: organization.id, licenseKey: license },
     update: { licenseKey: license },
   });
 
@@ -281,53 +285,31 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
     update: {},
   });
 
-  const team = await prisma.team.upsert({
-    where: { id: TEAM_ID },
-    create: {
-      id: TEAM_ID,
-      name: TEAM_NAME,
-      slug: TEAM_SLUG,
-      organizationId: organization.id,
-    },
-    update: {},
+  const team = await upsertTeam({
+    prisma,
+    slug: TEAM_SLUG,
+    name: TEAM_NAME,
+    organizationId: organization.id,
   });
 
-  const project = await prisma.project.upsert({
-    where: { id: PROJECT_ID },
-    create: {
-      id: PROJECT_ID,
-      name: PROJECT_NAME,
-      slug: PROJECT_SLUG,
-      apiKey,
-      teamId: team.id,
-      language: "en",
-      framework: "langchain",
-      firstMessage: isPastOnboarding,
-      integrated: isPastOnboarding,
-    },
-    // An explicit override must also be able to CLEAR the flags
-    // (`haven db seed --no-first-message`); without one, an existing true is kept.
-    update:
-      hasFirstMessageOverride || isPastOnboarding
-        ? {
-            apiKey,
-            firstMessage: isPastOnboarding,
-            integrated: isPastOnboarding,
-          }
-        : { apiKey },
+  const project = await upsertProject({
+    prisma,
+    slug: PROJECT_SLUG,
+    name: PROJECT_NAME,
+    apiKey,
+    teamId: team.id,
+    isPastOnboarding,
+    hasFirstMessageOverride,
   });
 
-  // Admin user + BetterAuth credential (email/password) login. Upserted by
-  // ADMIN_USER_ID, never by email, so this always finds the SAME account —
-  // even one seeded under the retired admin@haven.localhost default — and
-  // rewrites its email in place rather than ever creating a second admin.
-  const user = await prisma.user.upsert(
-    buildAdminUserUpsertArgs({
-      adminUserId: ADMIN_USER_ID,
-      email: adminEmail,
-      name: ADMIN_NAME,
-    }),
-  );
+  // Admin user + BetterAuth credential (email/password) login, found by email (or by the
+  // fixed id older seeds wrote) so a reseed rewrites the same account and never adds a second.
+  const user = await upsertSeedUser({
+    prisma,
+    email: adminEmail,
+    name: ADMIN_NAME,
+    retiredId: RETIRED_ADMIN_USER_ID,
+  });
 
   const hashedPassword = await hashPassword(ADMIN_PASSWORD, 10);
   await prisma.account.upsert({
@@ -507,16 +489,15 @@ async function seedToolUsers({
 }): Promise<SeedGrant[]> {
   const grants: SeedGrant[] = [];
   for (const toolUser of TOOL_USERS) {
-    const seeded = await prisma.user.upsert(
-      buildAdminUserUpsertArgs({
-        adminUserId: toolUser.id,
-        email: seedEmailAddress({
-          localPart: toolUser.localPart,
-          domainOverride: resolveSeedEmailDomain({ environment }),
-        }),
-        name: toolUser.name,
+    const seeded = await upsertSeedUser({
+      prisma,
+      email: seedEmailAddress({
+        localPart: toolUser.localPart,
+        domainOverride: resolveSeedEmailDomain({ environment }),
       }),
-    );
+      name: toolUser.name,
+      retiredId: toolUser.retiredId,
+    });
     await prisma.account.upsert({
       where: {
         provider_providerAccountId: { provider: "credential", providerAccountId: seeded.id },

@@ -31,6 +31,9 @@ type Config struct {
 	APIKey string
 	// ProjectID is the project an automated OAuth approval grants (MCPSIM_PROJECT_ID).
 	ProjectID string
+	// ProjectSlug names that project when its id is not known up front; the sim looks the id
+	// up through GET /api/projects with AccessToken (MCPSIM_PROJECT_SLUG, MCPSIM_ACCESS_TOKEN).
+	ProjectSlug, AccessToken string
 	// PublicURL is the sim's own URL; the OAuth redirect_uri is PublicURL+"/callback" (MCPSIM_PUBLIC_URL).
 	PublicURL string
 	// Cookie is a LangWatch browser session for automated approval (MCPSIM_COOKIE). Never reported.
@@ -47,7 +50,8 @@ func LoadConfig() Config {
 	cfg := Config{
 		Addr: cmp.Or(os.Getenv("MCPSIM_ADDR"), "127.0.0.1:5598"), Stack: os.Getenv("MCPSIM_STACK"),
 		Endpoint: strings.TrimRight(os.Getenv("MCPSIM_ENDPOINT"), "/"), APIKey: os.Getenv("MCPSIM_API_KEY"),
-		ProjectID: os.Getenv("MCPSIM_PROJECT_ID"), PublicURL: strings.TrimRight(os.Getenv("MCPSIM_PUBLIC_URL"), "/"),
+		ProjectID: os.Getenv("MCPSIM_PROJECT_ID"), ProjectSlug: os.Getenv("MCPSIM_PROJECT_SLUG"),
+		AccessToken: os.Getenv("MCPSIM_ACCESS_TOKEN"), PublicURL: strings.TrimRight(os.Getenv("MCPSIM_PUBLIC_URL"), "/"),
 		Cookie: os.Getenv("MCPSIM_COOKIE"), SignInEmail: os.Getenv("MCPSIM_SIGNIN_EMAIL"), SignInPassword: os.Getenv("MCPSIM_SIGNIN_PASSWORD"),
 	}
 	return cfg

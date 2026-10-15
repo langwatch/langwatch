@@ -13,18 +13,20 @@ import {
   DASHBOARDS_DEMO_TEAM,
 } from "./dashboards-demo-ids.ts";
 import { adminGrants, attachSeedGrants } from "./seed-authz.ts";
-import { LOCAL_DEV_ADMIN_USER_ID } from "./seed-identity.ts";
+import { resolveOrganizationId, upsertOrganization, upsertTeam } from "./seed-local-rows.ts";
 
-/** The member who sees the demo: by email when given, else the local-dev admin. */
+/** The member who sees the demo: by email when given, else the local-dev admin by its address. */
 export async function findDemoMember({
   prisma,
   email,
+  adminEmail,
 }: {
   prisma: PrismaClient;
   email: string | undefined;
+  adminEmail: string;
 }): Promise<{ id: string; email: string | null }> {
   const user = await prisma.user.findFirst({
-    where: email ? { email } : { id: LOCAL_DEV_ADMIN_USER_ID },
+    where: { email: email ?? adminEmail },
     select: { id: true, email: true },
   });
   if (!user) {
@@ -46,18 +48,13 @@ export async function seedDashboardsDemoIdentity({
   /** Attaches the member's admin grants as authz commands; one they hold is skipped. */
   authz: Pick<AuthzApi, "defineRole" | "attachBindings">;
   userId: string;
-}): Promise<void> {
-  const organization = await prisma.organization.upsert({
-    where: { id: DASHBOARDS_DEMO_ORGANIZATION.id },
-    create: { ...DASHBOARDS_DEMO_ORGANIZATION },
-    update: { name: DASHBOARDS_DEMO_ORGANIZATION.name },
-    select: { id: true },
-  });
-  const team = await prisma.team.upsert({
-    where: { id: DASHBOARDS_DEMO_TEAM.id },
-    create: { ...DASHBOARDS_DEMO_TEAM, organizationId: organization.id },
-    update: { name: DASHBOARDS_DEMO_TEAM.name },
-    select: { id: true },
+}): Promise<{ organizationId: string }> {
+  const organization = await upsertDemoOrganization({ prisma });
+  const team = await upsertTeam({
+    prisma,
+    slug: DASHBOARDS_DEMO_TEAM.slug,
+    name: DASHBOARDS_DEMO_TEAM.name,
+    organizationId: organization.id,
   });
   for (const project of DASHBOARDS_DEMO_PROJECTS) {
     const hasTraffic = project.agents.length > 0;
@@ -112,4 +109,11 @@ export async function seedDashboardsDemoIdentity({
     roles: [],
     grants: adminGrants({ organizationId: organization.id, teamId: team.id, userId }),
   });
+  return { organizationId: organization.id };
+}
+
+async function upsertDemoOrganization({ prisma }: { prisma: PrismaClient }) {
+  const { slug, name } = DASHBOARDS_DEMO_ORGANIZATION;
+  const id = await resolveOrganizationId({ prisma, slug });
+  return upsertOrganization({ prisma, id, slug, name });
 }

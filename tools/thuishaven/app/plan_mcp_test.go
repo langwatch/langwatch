@@ -18,7 +18,8 @@ func TestMcpEnvNamesTheStacksAppKeyProjectAndAdminLogin(t *testing.T) {
 	for _, want := range []string{
 		"MCPSIM_ADDR=127.0.0.1:45599", "MCPSIM_STACK=feat-x",
 		"MCPSIM_ENDPOINT=https://app.feat-x.langwatch.localhost",
-		"MCPSIM_API_KEY=sk-lw-test", "MCPSIM_PROJECT_ID=local-dev-project",
+		"MCPSIM_API_KEY=sk-lw-test", "MCPSIM_PROJECT_SLUG=" + domain.DefaultProjectSlug,
+		"MCPSIM_ACCESS_TOKEN=" + domain.DefaultPrivateAccessToken,
 		"MCPSIM_PUBLIC_URL=https://mcp.feat-x.langwatch.localhost",
 		"MCPSIM_SIGNIN_EMAIL=" + domain.DefaultAdminEmail, "MCPSIM_SIGNIN_PASSWORD=" + domain.DefaultAdminPassword,
 	} {

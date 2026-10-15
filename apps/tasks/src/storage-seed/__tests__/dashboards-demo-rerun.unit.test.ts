@@ -62,6 +62,7 @@ function runAt({ now = NOW, days = 60 }: { now?: number; days?: number } = {}): 
     now,
     todayStart: Math.floor(now / DAY_MS) * DAY_MS,
     gatewaySecret: "gateway-secret",
+    organizationId: "demo-organization",
   };
 }
 

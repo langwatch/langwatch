@@ -17,7 +17,7 @@ iQIDAQAB
 -----END PUBLIC KEY-----`;
 
 const ORGANIZATION = {
-  id: "local-dev-organization",
+  id: "organization-under-test",
   name: "Local Dev Organization",
   email: "admin@example.test",
 };

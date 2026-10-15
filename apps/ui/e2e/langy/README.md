@@ -38,9 +38,10 @@ OPENAI_API_KEY=<a real OpenAI key or a gateway virtual key> \
 npx vitest run langy.scenario.test.ts --reporter=verbose
 ```
 
-All `LANGY_*` vars default to this repo's local haven seed identity
-(`langy-workspace` slug, `admin@mail.langwatch.localhost` / `local-dev-project`) — see
-`config.ts`. Override them to point at a different stack.
+The `LANGY_*` vars default to this repo's local haven seed identity (`langy-workspace` slug,
+`admin@mail.langwatch.localhost`, project slug `local-dev-project`) — see `config.ts`. The seed
+gives the project a random id, so `LANGY_PROJECT_ID` has no default: read it from the project's
+settings page and set it. Override the rest to point at a different stack.
 
 ## Coverage (42 scenarios)
 

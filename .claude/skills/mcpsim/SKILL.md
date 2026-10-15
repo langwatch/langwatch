@@ -45,7 +45,8 @@ Approval needs a signed-in LangWatch person:
   answered `redirect`. The session comes from, in order: `--cookie` (or `MCPSIM_COOKIE`),
   else the sim signs in itself at `POST /api/auth/sign-in/email` with `MCPSIM_SIGNIN_EMAIL` /
   `MCPSIM_SIGNIN_PASSWORD` (local `*.localhost` stacks only). haven sets the stack admin's
-  login and `MCPSIM_PROJECT_ID=local-dev-project`, so `haven sim mcp oauth` is automated by
+  login, `MCPSIM_PROJECT_SLUG=local-dev-project` and its seeded access token (seeded ids are
+  random, so the sim looks the project id up by slug), so `haven sim mcp oauth` is automated by
   default. The person must hold a role that may approve MCP for the project (a viewer cannot).
 
 ## Scenarios

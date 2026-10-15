@@ -17,7 +17,7 @@ import {
 } from "../dashboards-demo-ids.ts";
 
 const MEMBER = "user-who-sees-the-demo";
-const ADMIN = { id: "local-dev-admin-user", email: "admin@mail.langwatch.localhost" };
+const ADMIN = { id: "admin-user-id", email: "admin@mail.langwatch.localhost" };
 const SOMEONE = { id: "user-with-an-email", email: "someone@example.dev" };
 
 const rowSchema = z.record(z.string(), z.unknown());
@@ -65,7 +65,14 @@ class DemoDatabase {
         );
       },
     },
-    organization: { upsert: async (args: unknown) => this.upsert("organization", args) },
+    organization: {
+      findUnique: async (args: unknown) => {
+        const { where } = z.object({ where: z.object({ slug: z.string() }) }).parse(args);
+        const held = this.rows("organization").find((row) => row.slug === where.slug);
+        return held ? { id: held.id } : null;
+      },
+      upsert: async (args: unknown) => this.upsert("organization", args),
+    },
     team: { upsert: async (args: unknown) => this.upsert("team", args) },
     project: {
       upsert: async (args: unknown) => this.upsert("project", args),
@@ -97,6 +104,11 @@ class DemoDatabase {
   rows(table: keyof DemoDatabase["tables"]): Row[] {
     return [...this.tables[table].values()];
   }
+
+  /** The id the database's one organization or team was created under. */
+  idOf(table: "organization" | "team"): string {
+    return String(this.rows(table)[0]?.id);
+  }
 }
 
 const seed = (database: DemoDatabase) =>
@@ -114,9 +126,17 @@ describe("given a database with users and no demo", () => {
     it("makes the organization with its four projects, each under its fixed key", async () => {
       await seed(database);
 
-      expect(database.rows("organization")).toEqual([{ ...DASHBOARDS_DEMO_ORGANIZATION }]);
+      const { slug, name } = DASHBOARDS_DEMO_ORGANIZATION;
+      expect(database.rows("organization")).toEqual([
+        { id: expect.any(String), slug, name, license: undefined },
+      ]);
       expect(database.rows("team")).toEqual([
-        { ...DASHBOARDS_DEMO_TEAM, organizationId: DASHBOARDS_DEMO_ORGANIZATION.id },
+        {
+          id: expect.any(String),
+          slug: DASHBOARDS_DEMO_TEAM.slug,
+          name: DASHBOARDS_DEMO_TEAM.name,
+          organizationId: database.idOf("organization"),
+        },
       ]);
       expect(
         database.rows("project").map(({ name, apiKey, teamId, integrated }) => ({
@@ -135,7 +155,7 @@ describe("given a database with users and no demo", () => {
             apiKey: "sk-lw-dashboards-demo-day-zero",
             integrated: false,
           },
-        ].map((project) => ({ ...project, teamId: DASHBOARDS_DEMO_TEAM.id })),
+        ].map((project) => ({ ...project, teamId: database.idOf("team") })),
       );
     });
 
@@ -158,14 +178,14 @@ describe("given a database with users and no demo", () => {
       await seed(database);
 
       expect(database.rows("organizationUser")).toEqual([
-        { userId: MEMBER, organizationId: DASHBOARDS_DEMO_ORGANIZATION.id, role: "ADMIN" },
+        { userId: MEMBER, organizationId: database.idOf("organization"), role: "ADMIN" },
       ]);
       expect(database.rows("teamUser")).toEqual([
-        { userId: MEMBER, teamId: DASHBOARDS_DEMO_TEAM.id, role: "ADMIN" },
+        { userId: MEMBER, teamId: database.idOf("team"), role: "ADMIN" },
       ]);
       expect(database.attached).toHaveLength(1);
       expect(database.attached[0]).toMatchObject({
-        organizationId: DASHBOARDS_DEMO_ORGANIZATION.id,
+        organizationId: database.idOf("organization"),
         onDuplicate: "skip",
       });
       expect(
@@ -180,13 +200,13 @@ describe("given a database with users and no demo", () => {
           principal: { userId: MEMBER },
           role: "ADMIN",
           scopeType: "ORGANIZATION",
-          scopeId: DASHBOARDS_DEMO_ORGANIZATION.id,
+          scopeId: database.idOf("organization"),
         },
         {
           principal: { userId: MEMBER },
           role: "ADMIN",
           scopeType: "TEAM",
-          scopeId: DASHBOARDS_DEMO_TEAM.id,
+          scopeId: database.idOf("team"),
         },
       ]);
     });
@@ -198,7 +218,7 @@ describe("given a database with users and no demo", () => {
       await seed(database);
       database.tables.project.set("an-older-demo-project", {
         id: "dashboards-demo-retired",
-        teamId: DASHBOARDS_DEMO_TEAM.id,
+        teamId: database.idOf("team"),
         archivedAt: null,
       });
 
@@ -227,7 +247,11 @@ describe("given a database with users and no demo", () => {
   describe("when the run names a user's email", () => {
     /** @scenario "The demo user is chosen by email, or is the local-dev admin" */
     it("takes that user as the member", async () => {
-      const member = await findDemoMember({ prisma: database.prisma, email: SOMEONE.email });
+      const member = await findDemoMember({
+        prisma: database.prisma,
+        email: SOMEONE.email,
+        adminEmail: ADMIN.email,
+      });
 
       expect(member).toEqual(SOMEONE);
     });
@@ -236,7 +260,11 @@ describe("given a database with users and no demo", () => {
   describe("when the run names no email", () => {
     /** @scenario "The demo user is chosen by email, or is the local-dev admin" */
     it("takes the local-dev admin", async () => {
-      const member = await findDemoMember({ prisma: database.prisma, email: undefined });
+      const member = await findDemoMember({
+        prisma: database.prisma,
+        email: undefined,
+        adminEmail: ADMIN.email,
+      });
 
       expect(member).toEqual(ADMIN);
     });
@@ -245,7 +273,11 @@ describe("given a database with users and no demo", () => {
   describe("when the run names an email no user has", () => {
     /** @scenario "A missing demo user refuses by name" */
     it("refuses, naming the email and the flag that sets it", async () => {
-      const finding = findDemoMember({ prisma: database.prisma, email: "nobody@example.dev" });
+      const finding = findDemoMember({
+        prisma: database.prisma,
+        email: "nobody@example.dev",
+        adminEmail: ADMIN.email,
+      });
 
       await expect(finding).rejects.toThrow(
         "No user has the email nobody@example.dev; sign up once, or set DASHBOARDS_DEMO_USER_EMAIL",
