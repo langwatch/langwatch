@@ -66,10 +66,10 @@ listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>
 
 #### `listForProject`
 
-The Sessions screen's rows, cut to what this viewer may see: the generated title follows the project's content visibility, the cost follows `cost:view`.
+The Sessions screen's rows, cut to what this viewer may see (title under content visibility, cost under `cost:view`), read through the route's proof so an aggregate's page spans its members (ADR-177).
 
 ```typescript
-listForProject(input: CodingAgentSessionsListInput, by: CodingAgentViewer): Promise<CodingAgentSessionListRow[]>;
+listForProject(input: CodingAgentSessionsListInput & { authorization: Authorization }, by: CodingAgentViewer): Promise<CodingAgentSessionListRow[]>;
 ```
 
 #### `contributeSpanFacts`

@@ -328,6 +328,31 @@ Feature: An aggregate project reads its member projects
     And Quick Search offers the same pages as the navigation and no action that creates data
     And no monitor can be created on the aggregate
 
+  # An aggregate records no coding-agent session of its own, so the recency
+  # signal an ordinary project grows the Sessions destination from never
+  # arrives; the aggregate offers it on its kind alone (v4.12).
+
+  @integration
+  Scenario: The aggregate offers Sessions without a session of its own
+    Given the aggregate recorded no coding-agent session
+    When ana opens the aggregate project
+    Then the navigation shows Sessions beside Trace Explorer
+
+  @unit
+  Scenario: The aggregate's Sessions page lists its members' sessions under their windows
+    Given an aggregate reading two members through shared grants
+    And one member's grant starts after some of its sessions
+    When ana opens the aggregate's Sessions page
+    Then the sessions of both members show, newest first
+    And the sessions before that grant's start are absent
+
+  @unit
+  Scenario: A sessions read through the proof names no tenant of its own
+    Given a repository reading sessions through the proof-checked client
+    When it reads an aggregate's page
+    Then the statement's tenants and the window on StartedAt come from the proof
+    And the latest-version group is bound to the same tenants
+
   # ── E. The reconciler keeps members current ──────────────────────────────
 
   @integration

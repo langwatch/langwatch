@@ -1,4 +1,5 @@
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
 import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "../model/coding-agent-activity.ts";
@@ -10,9 +11,9 @@ export interface CodingAgentLinks {
 }
 
 /**
- * Coding-agent destinations are grown by the project, not configured:
- * each needs its own recent signal, so sessions-only or PR-only both
- * appear alone, and each fades once its signal falls out of the window.
+ * Coding-agent destinations are grown by the project, not configured: each needs its own
+ * recent signal and fades once it falls out of the window. An aggregate owns no session
+ * to signal with, so it offers Sessions on its kind alone (ADR-177).
  */
 export function useCodingAgentLinks(): CodingAgentLinks {
   const host = useNavigationHost();
@@ -26,11 +27,12 @@ export function useCodingAgentLinks(): CodingAgentLinks {
   return {
     shouldShowSessions:
       canSeeCodingAgentActivity &&
-      withinDays({
-        at: project?.lastCodingAgentSessionAt,
-        days: CODING_AGENT_LINK_WINDOW_DAYS,
-        now,
-      }),
+      (isAggregateProjectKind(project?.kind) ||
+        withinDays({
+          at: project?.lastCodingAgentSessionAt,
+          days: CODING_AGENT_LINK_WINDOW_DAYS,
+          now,
+        })),
     shouldShowPullRequests:
       canSeeCodingAgentActivity &&
       withinDays({

@@ -72,6 +72,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/clickhouse-markers/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {

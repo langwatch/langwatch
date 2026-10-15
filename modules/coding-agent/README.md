@@ -19,7 +19,7 @@ Coding-agent observability: sessions built from coding-agent traces, their trans
 | Kind                      | Name                                                     | Declared at                                                                                   |
 | ------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | ClickHouse table (writes) | `coding_agent_session_events`                            | `process/src/repositories/clickhouse/clickhouse.coding-agent-session-event.repository.ts:208` |
-| ClickHouse table (writes) | `coding_agent_sessions`                                  | `process/src/repositories/clickhouse/clickhouse.coding-agent-session.repository.ts:436`       |
+| ClickHouse table (writes) | `coding_agent_sessions`                                  | `process/src/repositories/clickhouse/clickhouse.coding-agent-session.repository.ts:451`       |
 | ClickHouse table (writes) | `coding_agent_trace_sessions`                            | `process/src/repositories/clickhouse/clickhouse.coding-agent-trace-session.repository.ts:73`  |
 | ClickHouse table (writes) | `session_metric_series`                                  | `process/src/repositories/clickhouse/clickhouse.session-metric-series.repository.ts:93`       |
 | Stores required           | clickhouse                                               | `process/src/repositories/clickhouse/clickhouse.coding-agent.repositories.ts:23`              |

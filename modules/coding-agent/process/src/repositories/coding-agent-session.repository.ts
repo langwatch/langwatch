@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
@@ -49,6 +50,17 @@ export abstract class CodingAgentSessionRepository {
   abstract findManyRecent(input: {
     tenantId: string;
     userId?: string;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }): Promise<CodingAgentSession[]>;
+
+  /**
+   * The same page through a proof's fence (ADR-177): every project the proof
+   * names, a shared one cut to its grant's window on `StartedAt`.
+   */
+  abstract findManyRecentFenced(input: {
+    authorization: Authorization;
     fromMs: number;
     toMs: number;
     limit: number;

@@ -1,13 +1,14 @@
 /**
- * The time columns a marker may name: each table's own occurrence time and partition key
- * (`OccurredAt` trace_summaries, `StartTime` stored_spans, `ScheduledAt` evaluation_runs,
- * `Timestamp` logs), since a shared grant's window is applied to it.
+ * The time columns a marker may name, each a table's own partition key a shared grant's
+ * window applies to: `OccurredAt` trace_summaries, `StartTime` stored_spans, `ScheduledAt`
+ * evaluation_runs, `Timestamp` logs, `StartedAt` coding_agent_sessions.
  */
 export const TENANT_SCOPE_TIME_COLUMNS = [
   "OccurredAt",
   "StartTime",
   "ScheduledAt",
   "Timestamp",
+  "StartedAt",
 ] as const;
 export type TenantScopeTimeColumn = (typeof TENANT_SCOPE_TIME_COLUMNS)[number];
 

@@ -39,10 +39,13 @@ export interface AgentCodeEditorDrawerProps extends AgentCodeEditorOptions {
   }): ReactNode;
   renderInputs(input: {
     inputs: AgentField[];
-    onChange(inputs: AgentField[]): void;
+    onChange: (inputs: AgentField[]) => void;
     onMappingChange: MappingChange;
   }): ReactNode;
-  renderOutputs(input: { outputs: AgentField[]; onChange(outputs: AgentField[]): void }): ReactNode;
+  renderOutputs(input: {
+    outputs: AgentField[];
+    onChange: (outputs: AgentField[]) => void;
+  }): ReactNode;
   renderMappings(input: {
     inputs: AgentField[];
     outputs: AgentField[];

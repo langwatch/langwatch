@@ -57,6 +57,7 @@ export class CodingAgentSessionListPullRequestService {
 
       for (const headBranch of this.dependencies.assignments.branchesOf(session)) {
         drives.push({
+          tenantId: session.tenantId,
           sessionId: session.sessionId,
           startedAtMs: session.startedAtMs,
           repositoryHost: this.dependencies.github.normalizeRepositoryHost(session.repositoryHost),
@@ -128,26 +129,32 @@ export class CodingAgentSessionListPullRequestService {
           continue;
         }
 
-        const rows = found.get(drive.sessionId) ?? new Map();
+        const rows = found.get(sessionListKey(drive)) ?? new Map();
         rows.set(candidate.prNumber, {
           number: candidate.prNumber,
           url: candidate.htmlUrl,
           title: candidate.title,
         });
-        found.set(drive.sessionId, rows);
+        found.set(sessionListKey(drive), rows);
       }
     }
 
     return new Map(
-      [...found].map(([sessionId, rows]) => [
-        sessionId,
+      [...found].map(([key, rows]) => [
+        key,
         [...rows.values()].toSorted((a, b) => a.number - b.number),
       ]),
     );
   }
 }
 
+/** The key a session's pull requests sit under: one session id in two members is two sessions. */
+export function sessionListKey(session: { tenantId: string; sessionId: string }): string {
+  return `${session.tenantId}\0${session.sessionId}`;
+}
+
 type ListBranchDrive = {
+  tenantId: string;
   sessionId: string;
   startedAtMs: number;
   repositoryHost: string;
