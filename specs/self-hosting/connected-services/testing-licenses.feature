@@ -147,6 +147,16 @@ Feature: Developer testing licenses
     Then the approval is refused with the code testing_license_requires_ops_manage
     And no token is minted and the code stays unapproved
 
+  @unit
+  Scenario: The browser sign-in page says what a testing-license sign-in allows
+    Given a sign-in that asked for a testing-license token
+    When the person opens the browser sign-in page and confirms the code
+    Then the page says haven will issue developer testing licenses in their name while they hold ops permissions on Cloud
+    And no project or key-permission choices are shown
+    When they approve it
+    Then the approval carries the organization they picked and no key selection
+    And if the approval is refused the page says only people with ops permissions on Cloud can approve it
+
   # ============================================================================
   # Ops pages
   # ============================================================================

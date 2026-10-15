@@ -79,9 +79,12 @@ export type ApiKeyFailureNotice = {
   id?: string;
 };
 
-// CLI credential type: device_session (user-scoped, ~/.langwatch/config.json) or project_api_key
-// (SDK key, .env).
-export type CliCredentialType = "device_session" | "project_api_key";
+// CLI credential type: device_session (user-scoped, ~/.langwatch/config.json), project_api_key
+// (SDK key, .env) or testing_license (haven's developer testing licenses, ops managers only).
+export type CliCredentialType = "device_session" | "project_api_key" | "testing_license";
+
+/** The refusal code for a testing-license sign-in approved without ops permissions. */
+export const TESTING_LICENSE_REFUSED_CODE = "testing_license_requires_ops_manage";
 
 // Device code lookup result: four cases (pending, expired, unknown, failed) not one nullable;
 // screen needs different messages for each.
@@ -112,7 +115,9 @@ export type CliDeviceApproval = {
 };
 
 /** What an approve or a deny came back as. */
-export type CliDeviceActionResult = { outcome: "ok" } | { outcome: "failed"; message: string };
+export type CliDeviceActionResult =
+  | { outcome: "ok" }
+  | { outcome: "failed"; message: string; code?: string };
 
 /** The one thing the screens are handed. */
 export abstract class ApiKeyHostApi {
