@@ -172,6 +172,12 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		BlockLocalHTTPCalls:           cfg.BlockLocalHTTPCalls,
 		RequireHTTPSCustomerEndpoints: cfg.RequireHTTPSCustomerEndpoints,
 		AllowedEndpointHosts:          splitAllowedHosts(cfg.AllowedProxyHosts),
+		// Dispatch reaches private IPs exactly when the operator has turned the
+		// egress block off, so the chat/messages path follows the same choice as
+		// the pre-flight validator rather than refusing an internal endpoint on
+		// its own.
+		AllowPrivateNetwork: !cfg.BlockLocalHTTPCalls,
+		ProviderCACertPEM:   cfg.ProviderCACertPEM,
 		// The control plane owns codex OAuth sessions; the router calls back
 		// through it to refresh a 401'd access token once.
 		CodexRefresher:  cpClient,

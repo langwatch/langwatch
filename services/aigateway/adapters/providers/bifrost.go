@@ -98,6 +98,15 @@ type BifrostOptions struct {
 	BlockLocalHTTPCalls           bool
 	RequireHTTPSCustomerEndpoints bool
 	AllowedEndpointHosts          []string
+	// AllowPrivateNetwork lets dispatch reach RFC 1918 addresses. The caller
+	// derives it from the egress model (the inverse of BlockLocalHTTPCalls), so
+	// the chat/messages dispatch honors the same operator choice the pre-flight
+	// validator already does. Default false keeps private IPs refused.
+	AllowPrivateNetwork bool
+	// ProviderCACertPEM is a PEM CA (literal or an `env.*` reference) added to
+	// the dispatch client's trusted roots for provider TLS. Empty leaves the
+	// system roots alone. Verification is not disabled.
+	ProviderCACertPEM string
 	// CodexRefresher wires the control-plane token refresh for the codex
 	// provider (see adapters/providers/codex.go).
 	CodexRefresher domain.CodexTokenRefresher
@@ -120,9 +129,11 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	compatEndpoints := newAnthropicCompatRegistry(anthropicCompatMaxEndpoints)
 	bf, err := bifrost.Init(ctx, bfschemas.BifrostConfig{
 		Account: &account{
-			anthropicCompat: compatEndpoints,
-			openAIBaseURL:   opts.OpenAIBackendURL,
-			logger:          opts.Logger,
+			anthropicCompat:     compatEndpoints,
+			openAIBaseURL:       opts.OpenAIBackendURL,
+			allowPrivateNetwork: opts.AllowPrivateNetwork,
+			providerCACertPEM:   opts.ProviderCACertPEM,
+			logger:              opts.Logger,
 		},
 		InitialPoolSize: pool,
 		Logger:          &bifrostLogger{logger: opts.Logger},
@@ -1259,6 +1270,19 @@ type account struct {
 	// openAIBaseURL redirects bifrost's native OpenAI provider to a local
 	// server in tests. Empty in production. See BifrostOptions.OpenAIBackendURL.
 	openAIBaseURL string
+	// allowPrivateNetwork lets dispatch reach RFC 1918 addresses. It mirrors
+	// the operator's egress choice (the inverse of BLOCK_LOCAL_HTTP_CALLS):
+	// bifrost's dialer refuses a private IP unless NetworkConfig.AllowPrivateNetwork
+	// is set, and that config is per-provider, built here. Without this the
+	// pre-flight validator and the /models dialer honor the toggle but the
+	// chat/messages dispatch does not, so a self-hosted install permits an
+	// internal endpoint everywhere except the one path that serves models.
+	// Link-local and cloud-metadata stay blocked regardless (bifrost dialer).
+	allowPrivateNetwork bool
+	// providerCACertPEM is a PEM CA (literal, or an `env.*` reference) trusted
+	// for provider TLS on top of the system roots. Empty leaves the roots alone.
+	// Verification stays on; this is not InsecureSkipVerify.
+	providerCACertPEM string
 	// logger is passed to credentialToBifrostKey for the dropped
 	// api_version warning. May be nil.
 	logger *zap.Logger
@@ -1380,6 +1404,27 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 			Type: bfschemas.HTTPProxy,
 			URL:  &proxyURLEnv,
 		}
+	}
+	// Carry the operator's egress and TLS choices onto the per-provider
+	// NetworkConfig bifrost dials with. Both default to the safe posture
+	// (private IPs refused, system roots only), so an install that sets
+	// neither is unchanged.
+	//
+	// AllowPrivateNetwork closes the gap where BLOCK_LOCAL_HTTP_CALLS and
+	// ALLOWED_PROXY_HOSTS reach the pre-flight validator and the /models
+	// dialer but not this dispatch path: bifrost's dialer refuses an RFC 1918
+	// address unless this is set, so without it a self-hosted install cannot
+	// serve models from an internal endpoint even with the block turned off.
+	// Link-local and cloud-metadata stay refused by bifrost regardless.
+	cfg.NetworkConfig.AllowPrivateNetwork = a.allowPrivateNetwork
+	// CACertPEM trusts an operator-provided internal CA for provider TLS, on
+	// top of the system roots (bifrost merges it into the pool). Verification
+	// stays on. The value is a literal PEM or an `env.*` reference; NewEnvVar
+	// resolves the reference (and leaves a literal PEM untouched), the same way
+	// bifrost reads its own ca_cert_pem. Leave it unset to keep the system
+	// roots alone.
+	if a.providerCACertPEM != "" {
+		cfg.NetworkConfig.CACertPEM = bfschemas.NewEnvVar(a.providerCACertPEM)
 	}
 	cfg.CheckAndSetDefaults()
 	return cfg, nil

@@ -282,6 +282,15 @@ security:
   # Exact, case-insensitive hostnames allowed to use private egress while the
   # guard is enabled. Cloud metadata/link-local destinations remain blocked.
   allowedProxyHosts: []
+  # PEM-encoded CA certificate the dispatch client trusts for provider TLS, on
+  # top of the system roots. For self-hosted installs whose custom provider
+  # serves TLS with an internal CA (on-prem clusters, LAN inference behind a
+  # private PKI) that the base image does not carry. A literal PEM block, or an
+  # "env.VARNAME" reference the gateway resolves at dispatch. Empty keeps the
+  # system roots alone. Certificate verification stays on — this never disables
+  # it. Note: reaching a provider that resolves to a private IP also requires
+  # blockLocalHTTPCalls=false (the dispatch follows that same egress choice).
+  providerCACertPEM: ""
   # Browser origins allowed to call /v1 directly (CORS). Exact origins such
   # as https://app.example.com, or a single "*" for any origin. Empty sends
   # no CORS headers. The gateway refuses to start on a malformed origin.
