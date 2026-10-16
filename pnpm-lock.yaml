@@ -6222,9 +6222,6 @@ importers:
       hono:
         specifier: 'catalog:'
         version: 4.13.1
-      prom-client:
-        specifier: 'catalog:'
-        version: 15.1.3
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -9611,9 +9608,6 @@ importers:
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
-      prom-client:
-        specifier: 'catalog:'
-        version: 15.1.3
       samlify:
         specifier: 2.13.1
         version: 2.13.1
@@ -10484,9 +10478,6 @@ importers:
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
-      prom-client:
-        specifier: 'catalog:'
-        version: 15.1.3
       ws:
         specifier: 'catalog:'
         version: 8.21.3(bufferutil@4.1.0)
@@ -14781,9 +14772,6 @@ importers:
       langwatch:
         specifier: workspace:*
         version: link:../../../sdks/typescript
-      prom-client:
-        specifier: 'catalog:'
-        version: 15.1.3
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -17344,9 +17332,6 @@ importers:
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
-      prom-client:
-        specifier: 'catalog:'
-        version: 15.1.3
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -17399,9 +17384,6 @@ importers:
       msgpackr:
         specifier: ^2.0.4
         version: 2.0.4
-      prom-client:
-        specifier: 'catalog:'
-        version: 15.1.3
     devDependencies:
       '@langwatch/test-harness':
         specifier: workspace:*

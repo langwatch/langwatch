@@ -36,6 +36,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import {
   AlertTriangle,
+  ArrowRight,
   CheckCircle,
   ChevronDown,
   ChevronUp,
@@ -402,10 +403,12 @@ function RowTrailing({
   file,
   isOpen,
   onToggle,
+  onOpen,
 }: {
   file: BulkFile;
   isOpen: boolean;
   onToggle: () => void;
+  onOpen: () => void;
 }) {
   switch (file.status) {
     case "pending":
@@ -450,9 +453,21 @@ function RowTrailing({
       );
     case "ready":
       return (
-        <HStack gap={1} color="fg.success" textStyle="bodySm">
+        <HStack
+          as="button"
+          gap={1}
+          color="fg.success"
+          textStyle="bodySm"
+          cursor="pointer"
+          title="Open dataset"
+          aria-label={`Open dataset ${file.name}`}
+          data-testid="dataset-bulk-open"
+          _hover={{ textDecoration: "underline" }}
+          onClick={onOpen}
+        >
           <CheckCircle size={14} />
-          <Text>Ready</Text>
+          <Text>Ready · Open</Text>
+          <ArrowRight size={14} />
         </HStack>
       );
     case "failed":
@@ -504,6 +519,7 @@ function BulkFileRow({
   onName,
   onReady,
   onFailed,
+  onOpen,
 }: {
   file: BulkFile;
   projectId: string;
@@ -514,6 +530,7 @@ function BulkFileRow({
   onName: (next: string) => void;
   onReady: () => void;
   onFailed: (error?: string) => void;
+  onOpen: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   // Only an in-flight PUT is cancellable; a `processing` row is already
@@ -557,7 +574,12 @@ function BulkFileRow({
           </Text>
         </VStack>
         <Spacer />
-        <RowTrailing file={file} isOpen={isOpen} onToggle={() => setIsOpen((o) => !o)} />
+        <RowTrailing
+          file={file}
+          isOpen={isOpen}
+          onToggle={() => setIsOpen((o) => !o)}
+          onOpen={onOpen}
+        />
         {file.status === "failed" && (
           <Button size="xs" variant="outline" onClick={onRetry}>
             <RefreshCw size={12} /> Retry
@@ -636,12 +658,15 @@ export function BulkUploadDrawer({
   open,
   onClose,
   onUploaded,
+  onOpenDataset,
   onCreateFromScratch,
 }: {
   open: boolean;
   onClose: () => void;
   /** Called as files reach `ready` so the host can refresh the datasets list. */
   onUploaded?: () => void;
+  /** Opens an uploaded dataset; omit and ready rows are not links. */
+  onOpenDataset?: (datasetId: string) => void;
   /** Escape hatch out of the upload flow: create an empty dataset by hand
    *  instead. Omit to hide the "Skip" affordance. */
   onCreateFromScratch?: () => void;
@@ -679,6 +704,12 @@ export function BulkUploadDrawer({
       ? `Fix the column names in ${invalidFiles.join(", ")} (open "confirm types").`
       : undefined;
   const unavailableReason = unavailableReasonOf({ hasUploadable: bulk.hasUploadable, projectId });
+
+  const openDataset = (datasetId: string | undefined) => {
+    if (!datasetId || !onOpenDataset) return;
+    onOpenDataset(datasetId);
+    onClose();
+  };
 
   const upload = () => {
     setRefused(hasInvalidColumns);
@@ -784,7 +815,10 @@ export function BulkUploadDrawer({
               onReady={() => {
                 bulk.markReady(file.id);
                 onUploaded?.();
+                // Closed mid-upload, the user has moved on: never pull them away.
+                if (open && bulk.files.length === 1) openDataset(file.datasetId);
               }}
+              onOpen={() => openDataset(file.datasetId)}
               onFailed={(error) => bulk.markFailed(file.id, error)}
             />
           ))}
