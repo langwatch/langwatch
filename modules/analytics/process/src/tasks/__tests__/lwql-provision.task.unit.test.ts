@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
-import { LwqlProvisionTask } from "../lwql-provision.task.ts";
+import {
+  APP_FUNCTION_SPLIT_CODE,
+  LwqlProvisionTask,
+  verifyAppFunctionsOnEveryReplica,
+} from "../lwql-provision.task.ts";
 
 function untouchedDatabase(): LwqlProvisioningDatabase {
   return { $executeRawUnsafe: vi.fn(), $transaction: vi.fn() };
@@ -95,6 +99,42 @@ describe("LwqlProvisionTask", () => {
       await expect(task.run({ args: [], signal: new AbortController().signal })).rejects.toThrow(
         'Invalid database name: "bad-db!"',
       );
+    });
+  });
+});
+
+describe("verifyAppFunctionsOnEveryReplica", () => {
+  const missingOnOneHost = {
+    name: "llm_readable_thread",
+    missingOn: ["ch-1"],
+    inKeeper: true,
+    oneDefinition: true,
+  };
+
+  describe("when a Keeper-backed replica picks the function up within the wait", () => {
+    it("passes once every replica lists it", async () => {
+      const answers = [[missingOnOneHost], []];
+      await expect(
+        verifyAppFunctionsOnEveryReplica({
+          findSplit: () => Promise.resolve(answers.shift() ?? []),
+          waitMs: 1_000,
+          pollMs: 1,
+        }),
+      ).resolves.toBeUndefined();
+      expect(answers).toEqual([]);
+    });
+  });
+
+  describe("when a function stays missing on one host", () => {
+    /** @scenario "A created app function missing on one replica fails the provisioning step" */
+    it("fails the step with the stable code", async () => {
+      await expect(
+        verifyAppFunctionsOnEveryReplica({
+          findSplit: () => Promise.resolve([missingOnOneHost]),
+          waitMs: 20,
+          pollMs: 1,
+        }),
+      ).rejects.toMatchObject({ code: APP_FUNCTION_SPLIT_CODE });
     });
   });
 });

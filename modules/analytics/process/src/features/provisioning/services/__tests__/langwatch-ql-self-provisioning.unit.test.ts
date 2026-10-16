@@ -36,10 +36,10 @@ function statementsWith({ includeAppFunctions }: { includeAppFunctions?: boolean
 }
 
 describe("given a self-hosted ClickHouse with more than one replica", () => {
-  describe("when it has no user_defined_zookeeper_path", () => {
+  describe("when Keeper holds no function store for it", () => {
     /** @scenario "A multi-replica server without a shared function store is provisioned without the functions" */
     it("is provisioned without the app functions but with the rest of the access model", () => {
-      expect(canProvisionAppFunctions({ maxTotalReplicas: 3, userDefinedZookeeperPath: "" })).toBe(
+      expect(canProvisionAppFunctions({ maxTotalReplicas: 3, functionStoreInKeeper: false })).toBe(
         false,
       );
 
@@ -55,7 +55,7 @@ describe("given a single-node ClickHouse", () => {
   describe("when self-provisioning runs", () => {
     /** @scenario "A single-node server is provisioned with the functions" */
     it("creates the app functions on its local store", () => {
-      expect(canProvisionAppFunctions({ maxTotalReplicas: 0, userDefinedZookeeperPath: "" })).toBe(
+      expect(canProvisionAppFunctions({ maxTotalReplicas: 0, functionStoreInKeeper: false })).toBe(
         true,
       );
 
