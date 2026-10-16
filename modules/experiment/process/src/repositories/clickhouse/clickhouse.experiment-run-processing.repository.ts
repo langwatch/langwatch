@@ -43,9 +43,7 @@ export class ClickHouseExperimentRunProcessingRepository {
 
   idLookup(): ExperimentIdLookupRepository {
     return this.clickhouse
-      ? ClickHouseExperimentIdLookupRepository.create({
-          clickhouse: this.clickhouse,
-        })
+      ? ClickHouseExperimentIdLookupRepository.create({ clickhouse: this.clickhouse })
       : MemoryExperimentIdLookupRepository.create();
   }
 

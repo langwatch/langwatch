@@ -54,10 +54,7 @@ export class EvaluationRunProjectionService extends EvaluationRunProjectionRepos
 
   async findRunByEvaluationId(input: EvaluationRunProofLookup): Promise<EvaluationRunData | null> {
     try {
-      return await this.repository.getByEvaluationId({
-        ...input,
-        retention: this.retention,
-      });
+      return await this.repository.getByEvaluationId({ ...input, retention: this.retention });
     } catch (error) {
       if (error instanceof EvaluationNotFoundError) return null;
       throw error;

@@ -29,18 +29,19 @@ export class ClickHouseExperimentIdLookupRepository extends ExperimentIdLookupRe
     const client = await this.clickhouse.resolveClient(tenantId);
     const result = await client.query({
       query: `
-            SELECT ExperimentId
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND RunId = {runId:String}
-              {{idBound:experiment_runs.RunId:runId}}
-            ORDER BY UpdatedAt DESC
-            LIMIT 1
-          `,
+        SELECT ExperimentId
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND RunId = {runId:String}
+          {{idBound:experiment_runs.RunId:runId}}
+        ORDER BY UpdatedAt DESC
+        LIMIT 1
+      `,
       query_params: { tenantId, runId },
       format: "JSONEachRow",
       idBound: { fallback: "unbounded" },
     });
+
     const rows = await result.json<{ ExperimentId: string }>();
     return rows[0]?.ExperimentId ?? null;
   }

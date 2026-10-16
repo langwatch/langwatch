@@ -71,13 +71,7 @@ export class TraceSummaryService {
       return authorization;
     }
     const projectId =
-      tenantId ??
-      (
-        await this.repository.findTenantIdsByTraceId({
-          authorization,
-          traceId,
-        })
-      )[0];
+      tenantId ?? (await this.repository.findTenantIdsByTraceId({ authorization, traceId }))[0];
     if (projectId === undefined) {
       return authorization;
     }

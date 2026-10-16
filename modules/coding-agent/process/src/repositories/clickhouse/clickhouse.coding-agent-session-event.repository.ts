@@ -12,7 +12,6 @@ import { clickHouseMomentOf, routingTenantOf, type ClickHouseMoment } from "./cl
 
 const TABLE_NAME = "coding_agent_session_events" as const;
 
-/** A time predicate spliced into a statement, with the parameters it names. */
 const logger = createLogger("langwatch:app-layer:coding-agent:session-events-repository");
 
 /**

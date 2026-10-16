@@ -1137,10 +1137,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         sessionGroups: SessionGroupsService.create({
           repository: options.repositories.sessionGroups,
         }),
-        spans: SpanStorageService.create({
-          repository: spanStorageRepository,
-          blobResolutionDeps,
-        }),
+        spans: SpanStorageService.create({ repository: spanStorageRepository, blobResolutionDeps }),
         summary: TraceSummaryService.create({
           repository: options.repositories.summary,
           fullResolutionDeps: { spanStorageRepository, ...blobResolutionDeps },
