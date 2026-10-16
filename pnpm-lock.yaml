@@ -13930,8 +13930,8 @@ importers:
   modules/scenario/contract:
     dependencies:
       '@ag-ui/core':
-        specifier: ~0.0.57
-        version: 0.0.58
+        specifier: ~1.0.1
+        version: 1.0.1(zod@4.6.5)
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
@@ -18674,6 +18674,14 @@ packages:
 
   '@ag-ui/core@0.0.58':
     resolution: {integrity: sha512-XgGb7YmhV+yMBaEmlrpsd5S+nUxq0JgSegss2t4gIFR1j7w3w0ibtKfRgcQHWeMvwZxcT5S28VEEarqtgxYYHw==}
+
+  '@ag-ui/core@1.0.1':
+    resolution: {integrity: sha512-Q6pxgI7gcey/0pHfM37S7GNrsYqTrrjjFLpi1dckHNGX2l9VTL0CjnyNc44lwPfHIzFmmEvQfbrAeEPINGGg/Q==}
+    peerDependencies:
+      zod: ^3.25.18 || ^4.0.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
 
   '@ai-sdk/anthropic@3.0.69':
     resolution: {integrity: sha512-LshR7X3pFugY0o41G2VKTmg1XoGpSl7uoYWfzk6zjVZLhCfeFiwgpOga+eTV4XY1VVpZwKVqRnkDbIL7K2eH5g==}
@@ -29733,6 +29741,10 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
+  '@ag-ui/core@1.0.1(zod@4.6.5)':
+    optionalDependencies:
+      zod: 4.6.5
+
   '@ai-sdk/anthropic@3.0.69(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
@@ -31335,7 +31347,7 @@ snapshots:
 
   '@better-auth/utils@0.5.0':
     dependencies:
-      '@noble/hashes': 2.2.0
+      '@noble/hashes': 2.4.0
 
   '@better-fetch/fetch@1.3.1': {}
 

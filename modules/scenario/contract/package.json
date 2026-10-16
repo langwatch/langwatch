@@ -21,7 +21,7 @@
     "test:repo": "vitest run --config vitest.repo.config.ts"
   },
   "dependencies": {
-    "@ag-ui/core": "~0.0.57",
+    "@ag-ui/core": "~1.0.1",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
