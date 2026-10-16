@@ -10,6 +10,15 @@ export const LWQL_RECONVERGENCE_INTERVAL_MS = 5 * 60_000;
 /** A safety net under the project-created subscriber: a fill reads every project. */
 export const LWQL_KEY_MAP_REFILL_MS = 24 * 60 * 60_000;
 
+const KEY_MAP_FILL_RETRY_CAP_MS = 2 * 60 * 60_000;
+/** Deliveries of a check whose fill keeps failing; the last lands 22.6 hours after the first. */
+export const LWQL_KEY_MAP_FILL_MAX_ATTEMPTS = 16;
+
+/** 5 minutes, doubling, capped at 2 hours: each retried fill reads every project. */
+export function lwqlKeyMapFillRetryDelayMs({ attempt }: { attempt: number }): number {
+  return Math.min(LWQL_RECONVERGENCE_INTERVAL_MS * 2 ** (attempt - 1), KEY_MAP_FILL_RETRY_CAP_MS);
+}
+
 export const lwqlReconvergenceSchema = z.object({
   scheduledFor: z.number().int(),
   /** The first check, and the first a day after the last ask, fill missing key-map rows. */
@@ -34,7 +43,7 @@ type LwqlReconvergenceIntents = {
 /**
  * Every wake asks for one check, keyed by its slot so two workers' copies of a wake dedupe. The
  * mark moves when a check is asked to fill: a failed fill throws, and the outbox delivers that
- * check again every 5 minutes until the fill succeeds or the next day's ask takes over.
+ * check again, backing off to every 2 hours, until the fill succeeds or the chain ends in a day.
  */
 export const lwqlReconvergenceWake: WakeHandler<
   LwqlReconvergenceState,

@@ -385,16 +385,57 @@ describe("given a check over the app-owned objects", () => {
     /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
     it("still probes when the fill fails, then fails the check so the outbox delivers it again", async () => {
       const probe = vi.fn(() => Promise.resolve<LwqlAccessModelOwner>("sql_store"));
+      const refused = new Error("ECONNREFUSED");
       const check = runLwqlReconvergence({
         probe,
         converge: () => Promise.resolve(),
         findDrift: () => Promise.resolve(healthy),
         convergeAppOwned: () => Promise.resolve(),
-        fillKeyMap: () => Promise.reject(new Error("ECONNREFUSED")),
+        fillKeyMap: () => Promise.reject(refused),
       });
 
-      await expect(check({ fillKeyMap: true })).rejects.toThrow("lwql key-map fill failed");
+      await expect(check({ fillKeyMap: true })).rejects.toMatchObject({ cause: refused });
       expect(probe).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the outbox delivers a check again after its fill failed", () => {
+    function redelivered(fillKeyMap: () => Promise<unknown>) {
+      const deps = {
+        probe: vi.fn(() => Promise.resolve<LwqlAccessModelOwner>("none")),
+        converge: vi.fn(() => Promise.resolve()),
+        findDrift: vi.fn(() =>
+          Promise.resolve<LwqlAppOwnedDrift>({
+            clickHouse: ["agents_pg"],
+            postgres: [],
+            isKeyMapMissing: false,
+          }),
+        ),
+        convergeAppOwned: vi.fn(() => Promise.resolve()),
+        fillKeyMap: vi.fn(fillKeyMap),
+      };
+      return { deps, done: runLwqlReconvergence(deps)(wakeOnce, { attempt: 2 }) };
+    }
+
+    /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
+    it("only fills, leaving drift, converges and the probe to the next wake's check", async () => {
+      const { deps, done } = redelivered(() => Promise.resolve());
+      await done;
+
+      expect(deps.fillKeyMap).toHaveBeenCalledTimes(1);
+      expect(deps.findDrift).not.toHaveBeenCalled();
+      expect(deps.convergeAppOwned).not.toHaveBeenCalled();
+      expect(deps.probe).not.toHaveBeenCalled();
+      expect(deps.converge).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
+    it("fails again with the ClickHouse error as the cause when the fill fails again", async () => {
+      const refused = new Error("ECONNREFUSED");
+      const { deps, done } = redelivered(() => Promise.reject(refused));
+
+      await expect(done).rejects.toMatchObject({ cause: refused });
+      expect(deps.probe).not.toHaveBeenCalled();
     });
   });
 });
@@ -456,13 +497,25 @@ describe("given the pipeline's check, delivered by its outbox", () => {
 
   describe("when an asked-for fill fails", () => {
     /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
-    it("delivers the check again 5 minutes later until a fill succeeds, for up to a day", async () => {
-      const { fill, deliver, maxAttempts, retryDelayMs } = deliveredChecks({ failures: 2 });
+    it("delivers the check again until a fill succeeds", async () => {
+      const { fill, deliver } = deliveredChecks({ failures: 2 });
 
       expect(await deliver({ scheduledFor: FIRST_SLOT, fillKeyMap: true })).toBe(3);
       expect(fill.runs).toBe(3);
-      expect(retryDelayMs({ attempt: 1 })).toBe(LWQL_RECONVERGENCE_INTERVAL_MS);
-      expect(maxAttempts * LWQL_RECONVERGENCE_INTERVAL_MS).toBe(LWQL_KEY_MAP_REFILL_MS);
+    });
+
+    /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
+    it("backs off from 5 minutes to every 2 hours, and gives up before the next day's ask", () => {
+      const { maxAttempts, retryDelayMs } = deliveredChecks({ failures: 0 });
+      const delays = Array.from({ length: maxAttempts - 1 }, (_, i) =>
+        retryDelayMs({ attempt: i + 1 }),
+      );
+      const lastDeliveryAfterMs = delays.reduce((sum, delay) => sum + delay, 0);
+
+      expect(delays.slice(0, 3)).toEqual([5, 10, 20].map((minutes) => minutes * 60_000));
+      expect(Math.max(...delays)).toBe(2 * HOUR);
+      expect(lastDeliveryAfterMs).toBeLessThan(LWQL_KEY_MAP_REFILL_MS);
+      expect(lastDeliveryAfterMs + 2 * HOUR).toBeGreaterThan(LWQL_KEY_MAP_REFILL_MS);
     });
 
     /** @scenario "The reconvergence check fills the key-map rows a project lacks" */

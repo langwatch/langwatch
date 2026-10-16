@@ -24,9 +24,10 @@ import {
   runLwqlReconvergence,
 } from "./analytics-lwql-reconvergence.intent.ts";
 import {
-  LWQL_KEY_MAP_REFILL_MS,
+  LWQL_KEY_MAP_FILL_MAX_ATTEMPTS,
   LWQL_RECONVERGENCE_INITIAL_STATE,
   LWQL_RECONVERGENCE_INTERVAL_MS,
+  lwqlKeyMapFillRetryDelayMs,
   lwqlReconvergenceStateSchema,
   lwqlReconvergenceSchema,
   lwqlReconvergenceWake,
@@ -76,10 +77,10 @@ export function buildLwqlReconvergence({
           }),
         )
         // One check at a time. Only a failed key-map fill throws: its check is delivered again
-        // every 5 minutes for up to a day, when the wake asks for a fill anew.
+        // with backoff, ending before the wake asks for a fill anew a day later.
         .outbox({
-          maxAttempts: LWQL_KEY_MAP_REFILL_MS / LWQL_RECONVERGENCE_INTERVAL_MS,
-          retryDelayMs: () => LWQL_RECONVERGENCE_INTERVAL_MS,
+          maxAttempts: LWQL_KEY_MAP_FILL_MAX_ATTEMPTS,
+          retryDelayMs: lwqlKeyMapFillRetryDelayMs,
           concurrency: 1,
           batchSize: 1,
           leaseDurationMs: 10 * 60 * 1000,
