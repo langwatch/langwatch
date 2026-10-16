@@ -1,8 +1,6 @@
 /**
  * @vitest-environment node
- * The Dashboards area's boards, stars and widget deletes, stated once and run against both
- * backends: the memory twin always, and the Postgres one when a test database is named at
- * `LANGWATCH_TEST_DATABASE_URL`. A delete here never reaches a Reports chart or its alerts.
+ * Dashboards boards, stars and widget deletes on memory and Postgres; no delete reaches Reports.
  * @see specs/dashboards-v2.feature
  */
 import { randomUUID } from "node:crypto";

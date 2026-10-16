@@ -1,6 +1,5 @@
 /**
- * The Dashboards boards REST family over the real dashboard application and its memory
- * repositories, beside the Reports boards' family and the widget add-to-dashboard route.
+ * The Dashboards boards REST family over the real dashboard application and memory repositories.
  * @see modules/dashboard/specs/dashboards-v2.feature
  * @vitest-environment node
  */

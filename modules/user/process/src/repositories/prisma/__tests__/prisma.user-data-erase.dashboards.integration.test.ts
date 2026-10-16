@@ -1,8 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The erasure against a real Postgres for the Dashboards tables: a person's Only me boards, their
- * stale Reports copies and stars go, a board others can see stays without its author.
+ * Postgres erasure: Only me boards, stale Reports copies, stars go; shared boards lose the author.
  * @see modules/user/specs/data-erasure.feature
  */
 import { randomUUID } from "node:crypto";

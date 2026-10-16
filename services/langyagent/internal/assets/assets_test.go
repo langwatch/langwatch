@@ -223,11 +223,11 @@ func TestChartSkills_PlaceOnTheDashboardInContextOrAsk(t *testing.T) {
 		t.Fatalf("MaterializeSkills: %v", err)
 	}
 	// A widget goes on a Dashboards board; a saved chart on an Analytics Reports one.
-	listCommands := map[string]string{
-		"dashboard-widgets": "langwatch dashboard-widget boards",
-		"lwql-charts":       "langwatch dashboard list",
+	refusals := map[string]string{
+		"dashboard-widgets": "Never choose a board for the user.",
+		"lwql-charts":       "Never pick one from `langwatch dashboard list` on your own",
 	}
-	for name, listCommand := range listCommands {
+	for name, refusal := range refusals {
 		body, err := os.ReadFile(filepath.Join(dest, name, "SKILL.md"))
 		if err != nil {
 			t.Fatalf("read %s skill: %v", name, err)
@@ -236,7 +236,7 @@ func TestChartSkills_PlaceOnTheDashboardInContextOrAsk(t *testing.T) {
 		for _, want := range []string{
 			"dashboard in the user's context",
 			"ask which board with the `question` tool",
-			"Never pick one from `" + listCommand + "` on your own",
+			refusal,
 		} {
 			if !strings.Contains(skill, want) {
 				t.Errorf("the %s skill lacks %q", name, want)

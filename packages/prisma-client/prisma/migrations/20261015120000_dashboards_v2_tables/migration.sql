@@ -1,3 +1,7 @@
+-- IRREVERSIBLE: no down step. This copies boards and widgets into new tables and v1 keeps its
+-- own rows, so a rollback image ignores the new tables and runs as before. Dropping them would
+-- lose every board created or edited in Dashboards v2 after this runs.
+
 -- Dashboards v2 moves off the Analytics Reports tables onto its own (dashboards-v2.feature,
 -- AC199 to AC199k). Additive and copy-only: no Dashboard or CustomGraph row is changed or
 -- deleted, so the image still serving keeps reading and writing them. No foreign key, per the
