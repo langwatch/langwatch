@@ -12,7 +12,12 @@ import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { canProvisionAppFunctions } from "../../../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
+import { findLangWatchQLAppFunctions } from "../../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import {
+  APP_FUNCTION_KEEPER_STORE_PATH,
+  canProvisionAppFunctions,
+} from "../../../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
+import { LangWatchQLAppFunctionStatementsService } from "../../../features/provisioning/services/langwatch-ql-app-function-statements.service.ts";
 import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../clickhouse.langwatch-ql-app-function-store.repository.ts";
 
 const KEEPER_CONFIG = `<clickhouse>
@@ -81,6 +86,16 @@ async function provisionable({ client }: ReplicatedServer): Promise<boolean[]> {
   return (await repository.findProbe()).map(canProvisionAppFunctions);
 }
 
+async function keeperStoreNodes({ client }: ReplicatedServer): Promise<string[]> {
+  const rows = await (
+    await client.query({
+      query: `SELECT name FROM system.zookeeper WHERE path = '${APP_FUNCTION_KEEPER_STORE_PATH}'`,
+      format: "JSONEachRow",
+    })
+  ).json<{ name: string }>();
+  return rows.map((row) => row.name);
+}
+
 describe("ClickHouseLangWatchQLAppFunctionStoreRepository on a replicated ClickHouse", () => {
   const servers: ReplicatedServer[] = [];
 
@@ -101,6 +116,16 @@ describe("ClickHouseLangWatchQLAppFunctionStoreRepository on a replicated ClickH
     /** @scenario "The probe finds the function store in Keeper on a real replicated ClickHouse" */
     it("finds the store and allows the app functions", async () => {
       await expect(provisionable(server)).resolves.toEqual([true]);
+    });
+
+    /** @scenario "A function created on a real replicated ClickHouse lands in the Keeper function store" */
+    it("stores the created llm_readable_thread in Keeper", async () => {
+      const [definition] = findLangWatchQLAppFunctions("llm_readable_thread");
+      if (definition === undefined) throw new Error("llm_readable_thread is not in the catalogue");
+      await server.client.command({
+        query: LangWatchQLAppFunctionStatementsService.create().functionStatement(definition),
+      });
+      await expect(keeperStoreNodes(server)).resolves.toContain("function_llm_readable_thread.sql");
     });
   });
 

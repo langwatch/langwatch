@@ -419,6 +419,12 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Then the app functions are provisionable
 
   @integration
+  Scenario: A function created on a real replicated ClickHouse lands in the Keeper function store
+    Given a ClickHouse 25.10 with Keeper, a table with two replicas and user_defined_zookeeper_path at /clickhouse/user_defined
+    When the catalogue's CREATE OR REPLACE FUNCTION for llm_readable_thread runs
+    Then Keeper lists function_llm_readable_thread.sql under /clickhouse/user_defined
+
+  @integration
   Scenario: The probe refuses a real replicated ClickHouse with no function store in Keeper
     Given a ClickHouse 25.10 with Keeper and a table with two replicas but no user_defined_zookeeper_path
     When the function store probe runs
