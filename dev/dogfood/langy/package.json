@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node --env-file-if-exists=.env src/agent.ts",
+    "sync": "node --env-file-if-exists=.env sync.ts",
     "test": "vitest run",
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc --noEmit"
   },

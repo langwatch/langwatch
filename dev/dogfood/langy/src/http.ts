@@ -18,7 +18,7 @@ export interface HttpAnswer<T = unknown> {
 export interface LangWatchHttp {
   readonly projectId: string;
   request: <T = unknown>(input: {
-    method: "GET" | "POST" | "PUT" | "DELETE";
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
     path: string;
     body?: unknown;
     headers?: Record<string, string>;
@@ -50,7 +50,7 @@ export function createLangWatchHttp({ config }: { config: LangWatchConfig }): La
       headers,
       timeoutMs = DEFAULT_TIMEOUT_MS,
     }: {
-      method: "GET" | "POST" | "PUT" | "DELETE";
+      method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
       path: string;
       body?: unknown;
       headers?: Record<string, string>;

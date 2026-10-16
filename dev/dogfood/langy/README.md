@@ -19,6 +19,11 @@ src/login-world.ts   C1: a coding-agent cost question (issue 8770)
 src/prompt-world.ts  the default world: a prompt with a marker phrase, and errored traces
 src/http.ts          the public API with an API key and X-Project-Id
 run.sh               starts the agent in the background against this worktree's haven stack
+scenarios/*.json     the ten rows as code: name, situation, criteria, labels, parameters, turns
+run-plan.json        the run plan: its name, description, agent and repeat count
+sync.ts              makes a project match scenarios/ and run-plan.json (npm run sync)
+src/sync-diff.ts     what a sync would change, pure and tested
+src/sync-files.ts    reads and checks the files; src/sync-api.ts the public routes it calls
 ```
 
 ## What it does
@@ -89,6 +94,33 @@ what setup and teardown returned.
 ```bash
 npm test     # the world parameter, the facts of each world, and the turn loop over a fake API
 ```
+
+## Sync the scenarios
+
+The scenarios live as code in `scenarios/`, one JSON file per row, in the
+shape of the public scenario API. One sync makes a project match them:
+
+```bash
+npm run sync -- --dry-run   # print the changes, write nothing
+npm run sync                # write them
+```
+
+- A file whose name no scenario has is **created** (in the Default test
+  suite); a scenario that differs from its file is **updated** on every owned
+  field (situation, criteria, labels, parameters, turns, models). An absent
+  optional field means the server default. Two scenarios with one name stop
+  the sync.
+- The run plan named in `run-plan.json` (or the file `LANGY_RUN_PLAN_FILE`
+  names) is created or edited so it picks exactly these scenarios and targets
+  only the connected agent named there.
+- A file removed from `scenarios/` drops that scenario from the plan; the
+  scenario itself stays (gap 21).
+- It reads `LANGWATCH_ENDPOINT`, `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID`
+  (`.env` or the environment). It uses Node built-ins only, so CI runs it
+  without an install: `.github/workflows/langy-scenarios-sync.yml` (a draft)
+  syncs on a push to main and skips with a notice when the
+  `LANGY_DOGFOOD_API_KEY`, `LANGY_DOGFOOD_PROJECT_ID` or
+  `LANGY_DOGFOOD_ENDPOINT` secret is missing.
 
 ## Feature gaps
 
@@ -198,3 +230,23 @@ hit. "Fix in" names who closes it.
     teardown) and **Langy API** (a cancel route for a turn).
 19. **"Run again" on a plan's row makes a new one-scenario plan** instead of
     rerunning that row inside the plan. Fix in: **agent testing**.
+20. **Run plans cannot be written through the run plans API.** `/api/v1/run-plans`
+    lists, reads, runs, reruns and archives only
+    (`modules/suite/process/src/transport/run-plans.rest.ts:160-240`), and the
+    CLI has no `run-plan create` or `update` (`sdks/typescript/src/cli/program.ts:3598-3690`).
+    Workaround: the sync writes the plan through the deprecated `/api/suites`
+    POST and PATCH (`modules/suite/process/src/transport/suites-alias.rest.ts:457,476`),
+    which answer with a `deprecation` header. The two families also spell one
+    scope two ways: `scenarios` in run plans, `cases` in suites. Fix in:
+    **agent testing** (create and update on `/api/v1/run-plans`).
+21. **A scenario has no key a file can own.** The create body has a name but no
+    slug or external id (`modules/scenario/contract/src/scenario-rest.schemas.ts:190-206`),
+    so the sync matches by name: a rename creates a new scenario, and the old
+    one stays in the project, out of the plan, until someone archives it. Fix
+    in: **agent testing** (a stable slug, or an upsert by external id).
+22. **The CLI cannot write these scenarios.** `scenario create` and `update`
+    take criteria as one comma-separated string
+    (`sdks/typescript/src/cli/program.ts:3473,3498`), and nine of the ten rows have a
+    criterion with a comma; neither takes parameters or max turns. The sync
+    uses `POST` and `PUT /api/v1/scenarios` instead. Fix in: **CLI** (repeatable
+    `--criterion`, `--param`, `--max-turns`, or `--from-file <json>`).
