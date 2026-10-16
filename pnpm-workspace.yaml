@@ -189,7 +189,7 @@ catalog:
   zod: ^4.6.5
   zod-validation-error: ^5.0.0
   zundo: ^2.3.0
-  zustand: ^4.5.7
+  zustand: ^5.0.15
 
 catalogMode: strict
 
