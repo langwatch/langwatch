@@ -53,6 +53,13 @@ type Options struct {
 	RequireHTTPSCustomerEndpoints bool
 	// AllowedEndpointHosts bypasses private-network blocking for exact hosts.
 	AllowedEndpointHosts []string
+	// AllowPrivateNetwork lets dispatch reach RFC 1918 addresses. Mirror it from
+	// the egress model (the inverse of BlockLocalHTTPCalls) so the dispatch path
+	// follows the same operator choice as the pre-flight validator.
+	AllowPrivateNetwork bool
+	// ProviderCACertPEM is a PEM CA (literal or an `env.*` reference) trusted for
+	// provider TLS on top of the system roots. Empty leaves the roots alone.
+	ProviderCACertPEM string
 }
 
 // New constructs a Dispatcher backed by Bifrost. Returns an error if
@@ -66,6 +73,8 @@ func New(ctx context.Context, opts Options) (*Dispatcher, error) {
 		BlockLocalHTTPCalls:           opts.BlockLocalHTTPCalls,
 		RequireHTTPSCustomerEndpoints: opts.RequireHTTPSCustomerEndpoints,
 		AllowedEndpointHosts:          opts.AllowedEndpointHosts,
+		AllowPrivateNetwork:           opts.AllowPrivateNetwork,
+		ProviderCACertPEM:             opts.ProviderCACertPEM,
 	})
 	if err != nil {
 		return nil, err

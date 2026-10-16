@@ -161,3 +161,49 @@ Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
       When a chat completion for "custom/stealth/ox-alpha" is sent through the gateway
       Then the model sent upstream is "stealth/ox-alpha"
       And the request reaches the custom provider
+
+  # The gateway already lets the pre-flight validator and the /models dialer
+  # honor BLOCK_LOCAL_HTTP_CALLS / ALLOWED_PROXY_HOSTS, but the chat/messages
+  # dispatch runs on bifrost's own dialer, which refuses an RFC 1918 address
+  # unless the per-provider NetworkConfig.AllowPrivateNetwork is set. The config
+  # built in GetConfigForProvider never set it, so a self-hosted install could
+  # permit an internal endpoint everywhere except the one path that serves
+  # models. The dispatch now mirrors the operator's egress choice.
+  #
+  # Bindings: services/aigateway/adapters/providers/private_network_and_ca_test.go
+  Rule: Dispatch reaches a private-IP endpoint exactly when local egress is allowed
+
+    @unit
+    Scenario: With the local-egress block off, dispatch is allowed to reach a private IP
+      Given an operator who has turned the local-egress block off
+      When the gateway builds the dispatch config for a provider
+      Then the dispatch may connect to an RFC 1918 private address
+
+    @unit
+    Scenario: With the local-egress block on, dispatch still refuses a private IP
+      Given an operator who has left the local-egress block on
+      When the gateway builds the dispatch config for a provider
+      Then the dispatch refuses an RFC 1918 private address
+
+  # Self-hosted custom providers often serve TLS with an internal CA the base
+  # image does not carry, so dispatch failed with
+  # "x509: certificate signed by unknown authority" and the only workaround was
+  # baking the CA into the image. bifrost already trusts a NetworkConfig.CACertPEM
+  # on top of the system roots; the gateway now feeds it from an operator setting.
+  # Certificate verification stays on — this is not InsecureSkipVerify.
+  #
+  # Bindings: services/aigateway/adapters/providers/private_network_and_ca_test.go
+  Rule: An operator-provided CA is trusted for provider TLS without disabling verification
+
+    @unit
+    Scenario: A configured internal CA is carried onto the dispatch config
+      Given an operator has configured an internal CA certificate for providers
+      When the gateway builds the dispatch config for a provider
+      Then the dispatch trusts that CA for the provider's TLS
+      And certificate verification is not disabled
+
+    @unit
+    Scenario: With no CA configured, dispatch keeps the system roots alone
+      Given an operator has configured no internal CA certificate
+      When the gateway builds the dispatch config for a provider
+      Then the dispatch carries no extra CA and verification is unchanged

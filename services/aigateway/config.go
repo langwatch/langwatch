@@ -50,6 +50,16 @@ type Config struct {
 	// non-streaming HTTP surface — services/langyagent and services/nlpgo
 	// both embed config.Server too but have no use for this field.
 	NonStreamingHeartbeatIntervalSeconds int64 `env:"NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS"`
+	// ProviderCACertPEM is a PEM-encoded CA certificate the dispatch client
+	// trusts for provider endpoint TLS, on top of the system roots. It is for
+	// self-hosted installs whose custom provider serves TLS with an internal CA
+	// (on-prem clusters, LAN inference behind a private PKI), where the leaf
+	// chains to a CA the base image does not carry. The value is a literal PEM
+	// block, or an `env.VARNAME` reference bifrost resolves at dispatch — the
+	// same shape bifrost's own CACertPEM accepts. Empty keeps the system roots
+	// alone. Certificate verification stays on either way; this never disables
+	// it (that is InsecureSkipVerify, which the gateway does not expose).
+	ProviderCACertPEM string `env:"GATEWAY_PROVIDER_CA_PEM"`
 }
 
 // SpendEmitterConfig governs the async spend-command emission (the billing

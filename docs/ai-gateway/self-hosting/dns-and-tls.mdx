@@ -195,8 +195,9 @@ TLS in front of the gateway is one boundary. The other is the provider endpoints
 | `security.requireHTTPSCustomEndpoints` | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuse a provider base URL with an `http://` scheme                                         |
 | `security.blockLocalHTTPCalls`         | `BLOCK_LOCAL_HTTP_CALLS`         | Refuse a provider base URL that resolves to a private, loopback or other non-public address |
 | `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that may resolve to a private address while the block is on                       |
+| `security.providerCACertPEM`           | `GATEWAY_PROVIDER_CA_PEM`        | PEM CA trusted for provider TLS on top of the system roots, for an endpoint served by an internal CA. A literal PEM or an `env.VARNAME` reference; verification stays on |
 
-Both switches default to `false`, so a self-hosted install can route to a model server on the cluster network. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused with every setting. Setting `ENVIRONMENT` to anything other than `local` requires both switches to be `true`.
+Both switches default to `false`, so a self-hosted install can route to a model server on the cluster network — including the dispatch path, which follows the same block setting as the pre-flight check, so a custom provider on a private IP is reached when the block is off. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused with every setting. Setting `ENVIRONMENT` to anything other than `local` requires both switches to be `true`.
 
 ## Common failures
 
@@ -207,5 +208,6 @@ Both switches default to `false`, so a self-hosted install can route to a model 
 | A long stream stops at 60 seconds | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout |
 | CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Set `ingress.gateway.host`, or `gateway.publicUrl` |
 | A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Add the hostname to `ALLOWED_PROXY_HOSTS` |
+| A provider dispatch fails with `x509: certificate signed by unknown authority` | The endpoint serves TLS with an internal CA the image does not carry | Set `security.providerCACertPEM` (`GATEWAY_PROVIDER_CA_PEM`) to that CA |
 
 More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).
