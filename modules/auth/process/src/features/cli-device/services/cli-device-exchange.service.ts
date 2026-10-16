@@ -252,7 +252,11 @@ async function testingLicenseAnswer({
     );
   }
 
-  const minted = await flow.mintTestingLicenseToken({ userId });
+  const minted = await flow.mintTestingLicenseToken({ userId }).catch(async (error: unknown) => {
+    // Nothing was minted or consumed, so the next poll may try again.
+    await flow.sessions().releaseExchangeClaim(record.device_code);
+    throw error;
+  });
 
   await flow.sessions().consumeDeviceCode({ record, alsoPollWindow: true });
 

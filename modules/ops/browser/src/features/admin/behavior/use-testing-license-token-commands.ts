@@ -12,6 +12,8 @@ export function useTestingLicenseTokenCommands() {
       onSuccess: async () => {
         await utils.licenseRegistry.invalidate();
       },
+      onError: (error: unknown) =>
+        showErrorToast({ error, fallbackTitle: "The token was not created" }),
     }),
     revoke: api.licenseRegistry.revokeTestingLicenseToken.useMutation({
       onSuccess: async () => {

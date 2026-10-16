@@ -333,14 +333,37 @@ export async function seededProjectId({
   apiUrl: string;
   project: SeededProject;
 }): Promise<string> {
-  const response = await fetch(`${apiUrl}/projects?limit=1000`, {
-    headers: { authorization: `Bearer ${project.organizationApiKey}` },
-  });
-  if (!response.ok) throw new Error(`GET /api/projects answered ${response.status}`);
-  const page = (await response.json()) as { data?: { id: string; slug: string }[] };
-  const found = page.data?.find((each) => each.slug === project.projectSlug);
-  if (!found) throw new Error(`no project ${project.projectSlug} in GET /api/projects`);
-  return found.id;
+  for (let page = 1; ; page++) {
+    const response = await fetch(`${apiUrl}/projects?page=${page}&limit=${PROJECT_PAGE_LIMIT}`, {
+      headers: { authorization: `Bearer ${project.organizationApiKey}` },
+    });
+    if (!response.ok) throw new Error(`GET /api/projects answered ${response.status}`);
+    const { projects, total } = projectPageOf(await response.json());
+    const found = projects.find((each) => each.slug === project.projectSlug);
+    if (found) return found.id;
+    if (projects.length === 0 || page * PROJECT_PAGE_LIMIT >= total) {
+      throw new Error(`no project ${project.projectSlug} in GET /api/projects`);
+    }
+  }
+}
+
+/** The most projects one `GET /api/projects` page may hold. */
+const PROJECT_PAGE_LIMIT = 1000;
+
+/** The ids, slugs and total count out of one `GET /api/projects` page. */
+function projectPageOf(body: unknown): { projects: { id: string; slug: string }[]; total: number } {
+  if (typeof body !== "object" || body === null) return { projects: [], total: 0 };
+  const data: unknown[] = "data" in body && Array.isArray(body.data) ? body.data : [];
+  const pagination = "pagination" in body ? body.pagination : undefined;
+  const total =
+    typeof pagination === "object" &&
+    pagination !== null &&
+    "total" in pagination &&
+    typeof pagination.total === "number"
+      ? pagination.total
+      : 0;
+  const projects = data.flatMap(projectOf);
+  return { projects, total };
 }
 
 /**
@@ -359,4 +382,12 @@ function seededOrganizationToken(seedSource: string): string {
   const lookupId = seedConstant(seedSource, "PRIVATE_TOKEN_LOOKUP_ID");
   const secret = seedConstant(seedSource, "PRIVATE_TOKEN_SECRET");
   return `${prefix}${lookupId}_${secret}`;
+}
+
+/** One project row of the page, or none when the row is not shaped like one. */
+function projectOf(each: unknown): { id: string; slug: string }[] {
+  if (typeof each !== "object" || each === null) return [];
+  const id = "id" in each ? each.id : undefined;
+  const slug = "slug" in each ? each.slug : undefined;
+  return typeof id === "string" && typeof slug === "string" ? [{ id, slug }] : [];
 }

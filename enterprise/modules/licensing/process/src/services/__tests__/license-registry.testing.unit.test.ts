@@ -8,7 +8,6 @@ import {
   NodeLicenseCryptographyService,
 } from "@langwatch/enterprise-license-signing";
 import type { IssuedLicenseCustomerRecord } from "@langwatch/enterprise-licensing-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { Temporal, toDate, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -19,6 +18,7 @@ import {
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
 import { contractTermsOf } from "../../rules/contract-terms.rules.ts";
 import { LicenseRegistryService } from "../license-registry.service.ts";
+import { codeOf, QuietBudgets, QuietManagedKeys } from "./support/registry-doubles.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 const TERM_END: Instant = Temporal.Instant.from("2027-01-01T00:00:00.000Z");
@@ -34,18 +34,6 @@ class RecordingCustomers {
   async recordSelfHostedCustomerLicensed({ id }: { id: string; name: string }): Promise<void> {
     this.marked.push(id);
   }
-}
-
-class QuietManagedKeys {
-  async issue(): Promise<void> {}
-  async retire(): Promise<void> {}
-  async invalidate(): Promise<void> {}
-  async setConnectServices(): Promise<void> {}
-  async setLicense(): Promise<void> {}
-}
-
-class QuietBudgets {
-  async sync(): Promise<void> {}
 }
 
 function harness() {
@@ -77,14 +65,6 @@ function harness() {
       testing: { instanceId: "instance-a" },
     }).licenseKey;
   return { registry, repository, organizations, cryptography, testingLicenseKey };
-}
-
-async function codeOf(work: Promise<unknown>): Promise<string | undefined> {
-  const error = await work.then(
-    () => undefined,
-    (thrown: unknown) => thrown,
-  );
-  return HandledError.isHandled(error) ? error.code : undefined;
 }
 
 describe("given a testing licence in the registry", () => {

@@ -133,6 +133,15 @@ describe("SsoGateService", () => {
     expect(inspectPlatformAccess).toHaveBeenCalledTimes(2);
   });
 
+  /** @scenario "An expired testing license grants nothing, without a restart" */
+  it("treats a testing licence allow whose end time cannot be read as expired", async () => {
+    inspectPlatformAccess.mockResolvedValue({ ...validAccess(), allowedUntil: "not-a-time" });
+    const gate = create();
+
+    expect(await gate.platformAllowed()).toBe(false);
+    expect(await gate.resolveProvider()).toBe("email");
+  });
+
   /** @scenario "A signed license enables a mounted provider" */
   it("resolves the configured provider once the licensing service reports genuine access", async () => {
     inspectPlatformAccess.mockResolvedValue(validAccess());

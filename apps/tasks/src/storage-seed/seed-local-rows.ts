@@ -119,10 +119,9 @@ export async function upsertSeedUser({
   name: string;
   retiredId: string;
 }) {
-  const held = await prisma.user.findFirst({
-    where: { OR: [{ email }, { id: retiredId }] },
-    select: { id: true },
-  });
+  const held =
+    (await prisma.user.findFirst({ where: { email }, select: { id: true } })) ??
+    (await prisma.user.findFirst({ where: { id: retiredId }, select: { id: true } }));
   if (held) return prisma.user.update({ where: { id: held.id }, data: { email } });
   return prisma.user.create({
     data: { id: generate(USER_KSUID_RESOURCE).toString(), email, name, emailVerified: true },

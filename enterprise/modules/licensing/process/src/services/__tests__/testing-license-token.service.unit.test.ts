@@ -3,12 +3,12 @@
  * manager for CI, refused once revoked or expired, always verified as the person who made them.
  * Spec: specs/self-hosting/connected-services/testing-licenses.feature
  */
-import { HandledError } from "@langwatch/handled-error";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { MemoryTestingLicenseTokenRepository } from "../../repositories/memory/memory.testing-license-token.repository.ts";
 import { TestingLicenseTokenService } from "../testing-license-token.service.ts";
+import { codeOf } from "./support/registry-doubles.ts";
 
 const START: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 
@@ -22,14 +22,6 @@ function harness() {
       now = now.add({ hours });
     },
   };
-}
-
-async function codeOf(work: Promise<unknown>): Promise<string | undefined> {
-  const error = await work.then(
-    () => undefined,
-    (thrown: unknown) => thrown,
-  );
-  return HandledError.isHandled(error) ? error.code : undefined;
 }
 
 describe("a service token", () => {

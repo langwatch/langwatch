@@ -4,7 +4,12 @@ import {
   type TestingLicenseTokenView,
 } from "@langwatch/enterprise-licensing-contract";
 import { EnterpriseOpsApi } from "@langwatch/enterprise-ops-contract";
-import { AdminSurfaceHiddenError, OpsApi, type OpsOperator } from "@langwatch/ops-contract";
+import {
+  AdminSurfaceHiddenError,
+  OpsApi,
+  OpsOperatorRequiredError,
+  type OpsOperator,
+} from "@langwatch/ops-contract";
 import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
@@ -23,9 +28,6 @@ import { enterpriseOpsProcessModule } from "../../enterprise-ops.module.ts";
 const MANAGER = "olive@langwatch.test";
 const VIEWER = "victor@langwatch.test";
 
-/** What the stand-in ops gate throws for staff lacking ops:manage. */
-class OpsManageRefused extends Error {}
-
 /** OpsApi's gates: two staff addresses, of whom only one holds ops:manage. */
 const ops = createApiFixture<OpsApi>({
   admitCloudAdmin: async (operator) => {
@@ -36,7 +38,7 @@ const ops = createApiFixture<OpsApi>({
   },
   admitOperator: async (operator, permission) => {
     if (operator?.email === MANAGER) return;
-    throw new OpsManageRefused(`${operator?.id ?? "nobody"} lacks ${permission}`);
+    throw new OpsOperatorRequiredError(permission);
   },
 });
 
@@ -149,7 +151,7 @@ describe("testing-licence tokens in the ops console", () => {
 
       await expect(
         app.createTestingLicenseServiceToken({ name: "CI", operator: viewer }),
-      ).rejects.toBeInstanceOf(OpsManageRefused);
+      ).rejects.toMatchObject({ code: "permission_denied" });
       await expect(
         app.listTestingLicenseTokens({ page: 0, pageSize: 50, operator: null }),
       ).rejects.toMatchObject({ code: "not_found" });

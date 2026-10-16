@@ -26,8 +26,7 @@ export const CONFIG = {
   set PROJECT_ID(value: string) {
     projectId = value;
   },
-  PROJECT_SLUG:
-    process.env.LANGY_PROJECT_SLUG ?? process.env.LANGY_PROJECT_ID ?? "local-dev-project",
+  PROJECT_SLUG: process.env.LANGY_PROJECT_SLUG ?? "local-dev-project",
   ADMIN_EMAIL: process.env.LANGY_ADMIN_EMAIL ?? "admin@mail.langwatch.localhost",
   ADMIN_PASSWORD: process.env.LANGY_ADMIN_PASSWORD ?? "LocalHavenAdmin!2026",
 };

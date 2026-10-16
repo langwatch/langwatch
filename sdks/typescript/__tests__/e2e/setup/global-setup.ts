@@ -69,11 +69,17 @@ export default async function setup(): Promise<() => Promise<void>> {
     }
   }
 
+  const projectId = await seededProjectId({ apiUrl: stack.apiUrl, project }).catch(
+    async (error: unknown) => {
+      await stack.stop();
+      throw error;
+    },
+  );
   writeStackHandoff({
     baseUrl: stack.baseUrl,
     apiKey: project.apiKey,
     organizationApiKey: project.organizationApiKey,
-    projectId: await seededProjectId({ apiUrl: stack.apiUrl, project }),
+    projectId,
   });
 
   process.env.LANGWATCH_ENDPOINT = stack.baseUrl;

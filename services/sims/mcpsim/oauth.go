@@ -357,8 +357,11 @@ func (s *Server) projectIDBySlug(ctx context.Context) (string, error) {
 	var page struct {
 		Data []struct{ ID, Slug string }
 	}
-	if res.StatusCode != http.StatusOK || json.NewDecoder(res.Body).Decode(&page) != nil {
+	if res.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("looking up project %q: GET /api/projects answered %d", s.cfg.ProjectSlug, res.StatusCode)
+	}
+	if err := json.NewDecoder(res.Body).Decode(&page); err != nil {
+		return "", fmt.Errorf("looking up project %q: %w", s.cfg.ProjectSlug, err)
 	}
 	for _, p := range page.Data {
 		if p.Slug == s.cfg.ProjectSlug {

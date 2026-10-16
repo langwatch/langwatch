@@ -27,7 +27,7 @@ const startedSchema = z.object({ device_code: z.string(), user_code: z.string() 
 
 /** The grant over real memory session state, a person who is a member, and a recording mint. */
 function testingLicenseWorld({ holdsOpsManage }: { holdsOpsManage: boolean }) {
-  const permissions = { holdsOpsManage };
+  const permissions = { holdsOpsManage, mintFails: false };
   const sessions = CliDeviceSessionService.create({
     store: MemoryCliDeviceSessionRepository.create(),
     settlements: MemoryCliDeviceSettlementChannel.create(),
@@ -51,6 +51,7 @@ function testingLicenseWorld({ holdsOpsManage }: { holdsOpsManage: boolean }) {
     session: async () => ({ id: USER_ID, email: "ops@langwatch.test" }),
     holdsOpsManage: async () => permissions.holdsOpsManage,
     mintTestingLicenseToken: async ({ userId }) => {
+      if (permissions.mintFails) throw new Error("licensing unreachable");
       mintedFor.push(userId);
 
       return { token: TOKEN, expiresAt: EXPIRES_AT };
@@ -140,6 +141,22 @@ describe("the CLI device flow for a testing-licence token", () => {
         httpStatus: 408,
       });
       expect(world.mintedFor).toEqual([]);
+    });
+  });
+
+  describe("when minting the token fails once", () => {
+    it("leaves the code redeemable, so the next poll gets the token", async () => {
+      const world = testingLicenseWorld({ holdsOpsManage: true });
+      const { device_code, user_code } = await world.start();
+      await world.approve({ userCode: user_code });
+      world.permissions.mintFails = true;
+
+      await expect(world.exchange({ deviceCode: device_code })).rejects.toThrow("licensing unreachable");
+      world.permissions.mintFails = false;
+      const answer = await world.exchange({ deviceCode: device_code });
+
+      expect(answer.body).toMatchObject({ testing_license_token: TOKEN });
+      expect(world.mintedFor).toEqual([USER_ID]);
     });
   });
 

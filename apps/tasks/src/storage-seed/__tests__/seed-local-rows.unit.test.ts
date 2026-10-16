@@ -28,9 +28,7 @@ const userWriteSchema = z.object({
   where: z.object({ id: z.string() }).optional(),
   data: rowSchema,
 });
-const userFindSchema = z.object({
-  where: z.object({ OR: z.array(rowSchema) }),
-});
+const userFindSchema = z.object({ where: rowSchema });
 
 type Row = Record<string, unknown>;
 type SlugTable = "organization" | "team" | "project";
@@ -60,9 +58,7 @@ class LocalDatabase {
         const { where } = userFindSchema.parse(args);
         return (
           this.tables.user.find((row) =>
-            where.OR.some((clause) =>
-              Object.entries(clause).every(([field, value]) => row[field] === value),
-            ),
+            Object.entries(where).every(([field, value]) => row[field] === value),
           ) ?? null
         );
       },
@@ -213,6 +209,23 @@ describe("given an admin an older seed wrote under its fixed id and a retired ad
 
       expect(admin.id).toBe(RETIRED_ADMIN_ID);
       expect(database.tables.user).toEqual([{ id: RETIRED_ADMIN_ID, email: ADMIN_EMAIL }]);
+    });
+
+    /** @scenario "A database seeded before the address rename reseeds onto the new one" */
+    it("keeps the account already holding the new address when both exist", async () => {
+      const database = new LocalDatabase();
+      database.tables.user.push(
+        { id: RETIRED_ADMIN_ID, email: "admin@haven.localhost" },
+        { id: "current-admin", email: ADMIN_EMAIL },
+      );
+
+      const { admin } = await seedLocalRows(database);
+
+      expect(admin.id).toBe("current-admin");
+      expect(database.tables.user.map((row) => row.email)).toEqual([
+        "admin@haven.localhost",
+        ADMIN_EMAIL,
+      ]);
     });
   });
 });

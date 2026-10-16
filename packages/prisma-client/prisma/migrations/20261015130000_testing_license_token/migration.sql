@@ -1,3 +1,4 @@
+-- IRREVERSIBLE: additive only; drops are an Ops step.
 -- ADR-180 section 2: the tokens that can only ask for a testing licence, personal or
 -- service. Only the token's hash is stored, never the token.
 CREATE TABLE IF NOT EXISTS "TestingLicenseToken" (

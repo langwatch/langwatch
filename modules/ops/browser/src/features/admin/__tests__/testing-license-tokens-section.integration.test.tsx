@@ -107,6 +107,7 @@ describe("TestingLicenseTokensSection", () => {
     }
 
     describe("when the expiry is past the maximum", () => {
+      /** @scenario "An ops manager creates a service token for CI" */
       it("says so and creates nothing", async () => {
         const name = await openDrawer();
         fireEvent.change(name, { target: { value: "CI" } });
@@ -121,6 +122,7 @@ describe("TestingLicenseTokensSection", () => {
     });
 
     describe("when the manager creates it with the default expiry", () => {
+      /** @scenario "An ops manager creates a service token for CI" */
       it("sends 90 days and shows the token once", async () => {
         const name = await openDrawer();
         fireEvent.change(name, { target: { value: "  CI on main  " } });

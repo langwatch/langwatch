@@ -96,7 +96,9 @@ The storage seed writes the local organization, team, project and admin user und
 bound to a well-known organization id is valid on every developer's machine, so seeded rows get
 random KSUIDs like any other row and the seed finds its rows again by slug and email. Readers of
 the fixed ids (the diff tools, the Langy e2e default, tests) resolve them by slug. The slugs and
-the instance id, already random per database, are unchanged.
+the instance id, already random per database, are unchanged. The dashboards demo's projects keep
+their fixed ids: a licence binds to an organization, never a project, and the gateway and Langy demo
+data are keyed by those ids.
 
 ### 6. Ops pages hide testing licences by the kind, not by guessing
 

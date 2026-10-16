@@ -821,7 +821,6 @@ export class LicensingModule implements LicensingApiContract {
 /** A redemption at start gives up well before the transport's own timeout. */
 const BOOT_REDEMPTION_TIMEOUT_MS = 15_000;
 
-/** What the registry and the hosted routes resolve to together. */
 /** The testing-licence tokens and the issue they authorise, over this module's own table. */
 function testingParts({
   repositories,
@@ -838,6 +837,7 @@ function testingParts({
   return { tokens, issue: TestingLicenseIssueService.create({ registry, tokens, now }) };
 }
 
+/** What the registry and the hosted routes resolve to together. */
 type LicenseRegistryParts = Readonly<{
   registry: LicenseRegistryService;
   credentials: ConnectCredentialService;
