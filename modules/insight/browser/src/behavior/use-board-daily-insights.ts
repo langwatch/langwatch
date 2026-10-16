@@ -1,7 +1,7 @@
 /**
- * One person's daily run on one board: the read, and the three acts on it. Each write lands
- * in the cached read first, since the worker folds the event a moment later; a refused write
- * puts the read back and says so.
+ * One person's daily run on one board: the read, the three acts on it, and Run now. Each write
+ * lands in the cached read first, since the worker folds the event a moment later; a refused
+ * write puts the read back and says so. Run now opens Langy on the run once it started.
  * @see modules/insight/adrs/004-daily-run.md
  */
 
@@ -10,11 +10,13 @@ import type {
   InsightRunBoard,
   InsightRunSettings,
 } from "@langwatch/insight-contract";
+import { LANGY_CONVERSATION_PARAM } from "@langwatch/langy-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { currentTimeZone } from "@langwatch/time";
+import { useEffect, useState } from "react";
 
-import { defaultRunSettings, runTimeWords } from "../model/daily-run.ts";
-import { useInsightHost } from "../model/insight-host.ts";
+import { defaultRunSettings, requestedRunOf, runTimeWords } from "../model/daily-run.ts";
+import { type InsightHostApi, useInsightHost } from "../model/insight-host.ts";
 import { insightApi } from "./insight-api.ts";
 
 const NEVER_DECIDED: InsightDailyRunSetting = {
@@ -22,7 +24,17 @@ const NEVER_DECIDED: InsightDailyRunSetting = {
   settings: null,
   lastRun: null,
   offReason: null,
+  runInFlight: null,
 };
+
+/** How often Run now asks whether its run started, and how long before it stops asking. */
+const RUN_START_POLL_MS = 2_000;
+const RUN_START_WAIT_MS = 2 * 60_000;
+
+/** Langy's panel opens on `?langyConversation=` wherever a project page is. */
+function openInLangy({ host, conversationId }: { host: InsightHostApi; conversationId: string }) {
+  host.setQuery({ ...host.query(), [LANGY_CONVERSATION_PARAM]: conversationId });
+}
 
 type Write = {
   next: (current: InsightDailyRunSetting) => InsightDailyRunSetting;
@@ -42,10 +54,33 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     host.isEnabled() === true &&
     host.hasPermission("analytics:view");
   const scope = { projectId, board: { kind: board.kind, id: board.id } };
-  const query = insightApi.insights.getBoardDailyRun.useQuery(scope, { enabled: available });
+  // Set from Run now until its run shows: the read is asked again until then.
+  const [awaitedRun, setAwaitedRun] = useState<{ lastRunAtBefore: number | null } | null>(null);
+  const query = insightApi.insights.getBoardDailyRun.useQuery(scope, {
+    enabled: available,
+    refetchInterval: awaitedRun ? RUN_START_POLL_MS : false,
+  });
   const utils = insightApi.useUtils();
   const configure = insightApi.insights.configureBoardDailyRun.useMutation();
   const turnOffRun = insightApi.insights.turnOffBoardDailyRun.useMutation();
+  const runNowRequest = insightApi.insights.runBoardDailyRunNow.useMutation();
+
+  const requested =
+    awaitedRun && query.data ? requestedRunOf({ setting: query.data, ...awaitedRun }) : undefined;
+  const hasRequestedRunShown = requested !== undefined;
+  const requestedConversationId = requested?.conversationId ?? null;
+  useEffect(() => {
+    if (!hasRequestedRunShown) return;
+    setAwaitedRun(null);
+    if (requestedConversationId !== null) {
+      openInLangy({ host, conversationId: requestedConversationId });
+    }
+  }, [hasRequestedRunShown, requestedConversationId, host]);
+  useEffect(() => {
+    if (!awaitedRun) return;
+    const giveUp = setTimeout(() => setAwaitedRun(null), RUN_START_WAIT_MS);
+    return () => clearTimeout(giveUp);
+  }, [awaitedRun]);
 
   const write = ({ next, send, done, fallbackTitle }: Write) => {
     const before = utils.insights.getBoardDailyRun.getData(scope);
@@ -86,13 +121,14 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     });
 
   const ownTimezone = currentTimeZone() || "UTC";
+  const settings = query.data?.settings ?? defaultRunSettings({ timezone: ownTimezone });
   return {
     /** False without a project that takes runs, the flag or the grant: draw nothing. */
     available,
     /** Undefined until the read answers. */
     setting: available ? query.data : undefined,
     /** What the person last chose, or what a board starts with. */
-    settings: query.data?.settings ?? defaultRunSettings({ timezone: ownTimezone }),
+    settings,
     ownTimezone,
     insightsHref: project ? `/${project.slug}/insights` : undefined,
     turnOn: (settings: InsightRunSettings) =>
@@ -112,6 +148,24 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
         done: "Daily insights off. What Langy filed stays in your inbox.",
         fallbackTitle: "Couldn't turn off daily insights",
       }),
+    /** A run is a Langy turn, so Run now asks what turning the run on asks. */
+    mayRunNow: host.hasPermission("langy:create"),
+    /** True from Run now until its run shows, or the wait for it ends. */
+    isStartingRun: awaitedRun !== null,
+    runNow: () => {
+      setAwaitedRun({ lastRunAtBefore: query.data?.lastRun?.at ?? null });
+      runNowRequest.mutate(
+        { projectId, board, maxInsights: settings.maxInsights },
+        {
+          onSuccess: () => void utils.insights.getBoardDailyRun.invalidate(scope),
+          onError: (error) => {
+            setAwaitedRun(null);
+            host.failed({ error, fallbackTitle: "Couldn't start the run" });
+          },
+        },
+      );
+    },
+    openInLangy: (conversationId: string) => openInLangy({ host, conversationId }),
     /** "No thanks" on the offer: an off, so the board never asks again. */
     decline: () =>
       turnOffWith({

@@ -61,6 +61,9 @@ function settled(overrides: Partial<InsightDailyScheduleState> = {}): InsightDai
     maxInsights: null,
     consecutiveSkips: 0,
     skipStreakSlot: null,
+    runInFlightId: null,
+    runInFlightConversationId: null,
+    runInFlightStartedAt: null,
     lastRunId: "run-1",
     lastRunAt: RAN_AT,
     lastRunOutcome: "filed",
@@ -301,10 +304,11 @@ function contractCases(backend: Backend): void {
             conversationId: "conversation-1",
           },
           offReason: null,
+          runInFlight: null,
         },
       ]);
       expect(await settingOf({ userId: OTHER, scheduleId: theirs })).toEqual([
-        { state: "off", settings: null, lastRun: null, offReason: null },
+        { state: "off", settings: null, lastRun: null, offReason: null, runInFlight: null },
       ]);
       expect(await settingOf({ userId: OTHER, scheduleId: mine })).toEqual([]);
       expect(

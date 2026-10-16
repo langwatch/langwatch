@@ -18,6 +18,7 @@ import { dailyScheduleId } from "../../rules/insight-daily-run.rules.ts";
 import {
   InsightRunRequestedEventSchema,
   InsightRunSettledEventSchema,
+  InsightRunStartedEventSchema,
   InsightScheduleConfiguredEventSchema,
   InsightScheduleRearmRequestedEventSchema,
   InsightScheduleTurnedOffEventSchema,
@@ -86,6 +87,9 @@ describe("given a run that settled", () => {
       lastRunConversationId: "conversation-1",
       consecutiveSkips: 0,
       skipStreakSlot: T0,
+      runInFlightId: null,
+      runInFlightConversationId: null,
+      runInFlightStartedAt: null,
     });
   });
 
@@ -165,6 +169,74 @@ describe("given an outcome on a stream that is not its person's and board's", ()
     });
 
     expect(applyInsightDailyRunEvent(PROJECTION.init(), elsewhere)).toBe(PROJECTION.init());
+  });
+});
+
+const started = (at: number, data: Record<string, unknown> = {}) =>
+  InsightRunStartedEventSchema.parse({
+    ...envelope(at),
+    type: INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_STARTED,
+    data: {
+      ...SCHEDULE,
+      runId: "run-1",
+      slot: T0,
+      conversationId: "conversation-1",
+      turnId: "turn-1",
+      ...data,
+    },
+  });
+
+describe("given a run was requested for a board", () => {
+  describe("when the run starts, and then settles", () => {
+    /** @scenario "A started run names its conversation on the board's row" */
+    it("names the run's conversation as the run in flight, then no run in flight", () => {
+      const running = applyInsightDailyRunEvent(PROJECTION.init(), started(T0 + 1_000));
+      const ran = applyInsightDailyRunEvent(running, settled(T0 + 60_000));
+
+      expect(PROJECTION.eventTypes).toContain(INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_STARTED);
+      expect(running).toMatchObject({
+        runInFlightId: "run-1",
+        runInFlightConversationId: "conversation-1",
+        runInFlightStartedAt: T0 + 1_000,
+        lastRunId: null,
+      });
+      expect(ran).toMatchObject({
+        runInFlightId: null,
+        runInFlightConversationId: null,
+        runInFlightStartedAt: null,
+        lastRunId: "run-1",
+        lastRunConversationId: "conversation-1",
+      });
+    });
+  });
+
+  describe("when a lost run settles after a newer run started", () => {
+    it("keeps the newer run in flight", () => {
+      const lost = applyInsightDailyRunEvent(PROJECTION.init(), started(T0 + 1_000));
+      const newer = applyInsightDailyRunEvent(
+        lost,
+        started(T0 + 3_600_000, { runId: "run-2", conversationId: "conversation-2" }),
+      );
+
+      const after = applyInsightDailyRunEvent(newer, settled(T0 + 3_600_001));
+
+      expect(after).toMatchObject({
+        runInFlightId: "run-2",
+        runInFlightConversationId: "conversation-2",
+        lastRunId: "run-1",
+      });
+    });
+  });
+
+  describe("when the start of a run that already settled is delivered again", () => {
+    it("names no run in flight", () => {
+      const ran = applyInsightDailyRunEvent(
+        applyInsightDailyRunEvent(PROJECTION.init(), started(T0 + 1_000)),
+        settled(T0 + 60_000),
+      );
+
+      expect(applyInsightDailyRunEvent(ran, started(T0 + 1_000))).toBe(ran);
+    });
   });
 });
 

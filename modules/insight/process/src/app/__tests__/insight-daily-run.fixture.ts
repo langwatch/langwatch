@@ -45,6 +45,7 @@ import {
   type LangyStartUnattendedTurnInput,
   type LangyTurnSettlementWait,
   type LangyTurnSettlementWaitInput,
+  LangyTurnsRateLimitedError,
   salvageLangyDerivedCard,
   splitLangyCardFences,
 } from "@langwatch/langy-contract";
@@ -287,6 +288,8 @@ export function runWorld() {
     langy: {
       /** Thrown by the start when set, as Langy refuses or fails it. */
       startError: null as Error | null,
+      /** The project's unattended window is full: Langy refuses every turn it counts. */
+      isWindowFull: false,
       answer: answerWith([]),
       /** Replaces the settled answer when set: a failed turn, a question, a turn that hangs. */
       settle: null as
@@ -308,6 +311,9 @@ function scriptedLangy(world: RunWorld) {
     startUnattendedTurn: async (input) => {
       starts.push(input);
       if (world.langy.startError) throw world.langy.startError;
+      if (world.langy.isWindowFull && input.isExemptFromRateLimit !== true) {
+        throw new LangyTurnsRateLimitedError({ retryAfterSeconds: 60 });
+      }
       const known = turns.get(input.idempotencyKey);
       if (known && known.text !== input.text) throw new LangyIdempotencyMismatchError();
       const turn = known ?? {

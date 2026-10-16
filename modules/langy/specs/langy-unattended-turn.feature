@@ -228,6 +228,18 @@ Feature: Unattended Langy turns
       Then it is refused with langy_turns_rate_limited
       And a chat turn in the same project still starts
 
+    @unit
+    Scenario: A caller can start an unattended turn outside the window
+      Given a project whose unattended turns reached their window
+      When an unattended turn is started that its caller marks as not counted
+      Then it starts, and the window counts nothing for it
+
+    @integration
+    Scenario: A run conversation is listed in the person's history
+      Given an unattended turn started for a member
+      When the member lists their conversations
+      Then the run conversation is listed, with origin run
+
   Rule: The settled answer is handed back whole
 
     @unit

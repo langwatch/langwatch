@@ -1,7 +1,7 @@
 /**
- * The server half of `insights.*`. Every procedure takes `analytics:view` on the project, and
- * turning a daily run on `langy:create` too. Each answers for the caller alone: an insight is its
- * owner's. Each write is refused on an aggregate, which is read only (ADR-177 decision 8).
+ * The server half of `insights.*`. Every procedure takes `analytics:view`, and turning a daily
+ * run on or running it now `langy:create` too. Each answers for the caller alone. Each write is
+ * refused on an aggregate, which is read only (ADR-177 decision 8).
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { InsightApi, insightTrpc } from "@langwatch/insight-contract";
@@ -48,4 +48,10 @@ export const insightTrpcTransport: TrpcRouterDeclaration<InsightApi, typeof insi
     .refusedOnAggregate()
     .withPermission("analytics:view")
     .handle(({ app, input, actor }) => app.turnOffDailyRun({ ...input, userId: actor.id }))
+
+    // The same run the schedule asks for, so it files into the same inbox.
+    .procedure("runBoardDailyRunNow")
+    .refusedOnAggregate()
+    .withPermission(["analytics:view", "langy:create"])
+    .handle(({ app, input, actor }) => app.requestDailyRun({ ...input, userId: actor.id }))
     .build();

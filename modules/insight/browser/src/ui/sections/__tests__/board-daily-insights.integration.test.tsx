@@ -31,9 +31,10 @@ const NOW = nowInstant().epochMilliseconds;
 const READ = "insights.getBoardDailyRun";
 const CONFIGURE = "insights.configureBoardDailyRun";
 const TURN_OFF = "insights.turnOffBoardDailyRun";
+const RUN_NOW = "insights.runBoardDailyRunNow";
 const OFFER = "Turn on daily insights for Checkout health?";
 
-const NOTHING_YET = { settings: null, lastRun: null, offReason: null };
+const NOTHING_YET = { settings: null, lastRun: null, offReason: null, runInFlight: null };
 const UNDECIDED: InsightDailyRunSetting = { state: "undecided", ...NOTHING_YET };
 const DECLINED: InsightDailyRunSetting = { state: "off", ...NOTHING_YET };
 const ON: InsightDailyRunSetting = {
@@ -41,7 +42,14 @@ const ON: InsightDailyRunSetting = {
   settings: { hour: 9, timezone: AMSTERDAM, maxInsights: 3 },
   lastRun: null,
   offReason: null,
+  runInFlight: null,
 };
+const RUNNING: InsightDailyRunSetting = {
+  ...ON,
+  runInFlight: { conversationId: "conversation-7", startedAt: NOW },
+};
+/** A member who may also ask Langy, which a run is. */
+const ASKER: StubInsightHostOptions = { permissions: ["analytics:view", "langy:create"] };
 
 type LastRun = NonNullable<InsightDailyRunSetting["lastRun"]>;
 
@@ -98,7 +106,8 @@ function openBoard({
   host: options = {},
   ...board
 }: {
-  setting?: InsightDailyRunSetting;
+  /** What the read answers; a function answers what holds when the read is asked. */
+  setting?: InsightDailyRunSetting | (() => InsightDailyRunSetting);
   widgets?: number | "loading";
   entries?: InsightEntry[];
   /** How the server answers a write; it accepts unless a test says otherwise. */
@@ -113,9 +122,11 @@ function openBoard({
     host: new StubInsightHost(options),
     answer: (call) => {
       calls.push(call);
-      if (call.path === READ) return Promise.resolve(setting);
+      if (call.path === READ) {
+        return Promise.resolve(typeof setting === "function" ? setting() : setting);
+      }
       if (call.path === "insights.getAll") return Promise.resolve(entries);
-      if (call.path === CONFIGURE || call.path === TURN_OFF) return write(call);
+      if ([CONFIGURE, TURN_OFF, RUN_NOW].includes(call.path)) return write(call);
       return Promise.reject(new Error(`No test answer for ${call.path}`));
     },
   });
@@ -124,7 +135,7 @@ function openBoard({
     host,
     calls,
     reads: () => sent(READ),
-    writes: () => [...sent(CONFIGURE), ...sent(TURN_OFF)],
+    writes: () => [...sent(CONFIGURE), ...sent(TURN_OFF), ...sent(RUN_NOW)],
     sent,
     user: userEvent.setup({ pointerEventsCheck: 0 }),
   };
@@ -297,6 +308,7 @@ describe("given a member turned a board's daily run off", () => {
           settings: { hour: 17, timezone: "Asia/Tokyo", maxInsights: 5 },
           lastRun: null,
           offReason: null,
+          runInFlight: null,
         },
       });
       await waitFor(() => expect(quietControl()).toBeInTheDocument());
@@ -484,6 +496,97 @@ describe("given a member turned a board's daily run on", () => {
       const dropdown = await openDropdown(board.user);
 
       expect(dropdown.getByText(line)).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a member turned a board's daily run on, and may ask Langy", () => {
+  describe("when they open the dropdown in the board's header", () => {
+    /** @scenario "Run now is in the dropdown of a board that is on" */
+    it("offers Run now", async () => {
+      const board = openBoard({ setting: ON, host: ASKER });
+
+      const dropdown = await openDropdown(board.user);
+
+      expect(dropdown.getByRole("button", { name: "Run now" })).toBeInTheDocument();
+      expect(board.writes()).toEqual([]);
+    });
+
+    it("offers no Run now to a member who may not ask Langy", async () => {
+      const board = openBoard({ setting: ON });
+
+      const dropdown = await openDropdown(board.user);
+
+      expect(dropdown.queryByRole("button", { name: "Run now" })).toBeNull();
+    });
+  });
+
+  describe("when they choose Run now, with no run in flight", () => {
+    /** @scenario "Run now asks for a run and opens Langy on it" */
+    it("asks for a run on the board, and opens Langy on its conversation once it started", async () => {
+      let hasStarted = false;
+      const board = openBoard({
+        setting: () => (hasStarted ? RUNNING : ON),
+        host: ASKER,
+        write: () => Promise.resolve({ requestId: "request-1" }),
+      });
+      const dropdown = await openDropdown(board.user);
+
+      await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+      await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(1));
+      // The read is asked again once the request is in; it names no run yet, so Langy waits.
+      await waitFor(() => expect(board.reads().length).toBeGreaterThan(1));
+      expect(board.host.queries).toEqual([]);
+      hasStarted = true;
+
+      await waitFor(
+        () => expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
+        { timeout: 5_000 },
+      );
+      expect(board.sent(RUN_NOW)).toEqual([
+        {
+          projectId: "project-1",
+          board: { kind: "dashboard", id: "board-1", name: "Checkout health" },
+          maxInsights: 3,
+        },
+      ]);
+      expect(board.host.failures).toEqual([]);
+    });
+  });
+
+  describe("when a run is in flight and they open the dropdown", () => {
+    /** @scenario "A run in flight is opened, not started again" */
+    it("says a run is going and offers to open it in Langy, not Run now", async () => {
+      const board = openBoard({ setting: RUNNING, host: ASKER });
+
+      const dropdown = await openDropdown(board.user);
+
+      expect(dropdown.getByText("A run is going.")).toBeInTheDocument();
+      expect(dropdown.queryByRole("button", { name: "Run now" })).toBeNull();
+      await board.user.click(dropdown.getByRole("button", { name: "Open in Langy" }));
+
+      expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]);
+      expect(board.writes()).toEqual([]);
+    });
+  });
+
+  describe("when the server refuses Run now", () => {
+    /** @scenario "A refused Run now says so" */
+    it("tells the member the run could not be started, and offers Run now again", async () => {
+      const board = openBoard({
+        setting: ON,
+        host: ASKER,
+        write: () => Promise.reject(new UiProcedureRefusal("insights_not_enabled", 403)),
+      });
+      const dropdown = await openDropdown(board.user);
+
+      await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+
+      await waitFor(() => expect(board.host.failures).toHaveLength(1));
+      expect(board.host.failures[0]?.fallbackTitle).toBe("Couldn't start the run");
+      const again = await openDropdown(board.user);
+      expect(again.getByRole("button", { name: "Run now" })).toBeInTheDocument();
+      expect(board.host.queries).toEqual([]);
     });
   });
 });

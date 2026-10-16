@@ -202,3 +202,20 @@ export function shouldOfferDailyInsights({
 /** Said before a person turns a From LangWatch board on: no run can read one yet. */
 export const TEMPLATE_BOARD_NOTE =
   "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.";
+
+/**
+ * What a Run now waits for: the run in flight, or a newer last run when the run settled before
+ * a read saw it start. Undefined while neither shows; a run that never reached Langy has none.
+ */
+export function requestedRunOf({
+  setting,
+  lastRunAtBefore,
+}: {
+  setting: InsightDailyRunSetting;
+  /** When the last run ended as the person chose Run now; null when none had. */
+  lastRunAtBefore: number | null;
+}): { conversationId: string | null } | undefined {
+  if (setting.runInFlight) return { conversationId: setting.runInFlight.conversationId };
+  if ((setting.lastRun?.at ?? null) === lastRunAtBefore) return undefined;
+  return { conversationId: setting.lastRun?.conversationId ?? null };
+}

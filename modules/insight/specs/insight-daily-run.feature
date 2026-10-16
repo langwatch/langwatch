@@ -1158,3 +1158,59 @@ Feature: The daily insights run
       When the member turns it on
       Then the control goes back to off
       And the member is told it could not be turned on
+
+  Rule: A person can run their board's insights now
+    Run now asks for the same run the schedule asks for, so it files into the same inbox.
+    Insights runs have no rate limit for now: what is worth running is not known yet.
+
+    @integration
+    Scenario: Run now is in the dropdown of a board that is on
+      Given a member turned a board's daily run on
+      When they open the dropdown in the board's header
+      Then it offers Run now
+
+    @integration
+    Scenario: Run now asks for a run and opens Langy on it
+      Given a board that is on, with no run in flight
+      When the member chooses Run now
+      Then a run is requested for them on that board
+      And once the run has started, the Langy panel opens on the run's conversation
+
+    @integration
+    Scenario: A run in flight is opened, not started again
+      Given a board that is on, with a run in flight
+      When the member opens the dropdown
+      Then it says a run is going and offers to open it in Langy, not Run now
+      And opening it opens the Langy panel on the run's conversation
+
+    @integration
+    Scenario: A refused Run now says so
+      Given a board that is on, and a server that refuses the request
+      When the member chooses Run now
+      Then the member is told the run could not be started
+      And the dropdown offers Run now again
+
+    @unit
+    Scenario: A started run names its conversation on the board's row
+      Given a run was requested for a board
+      When the run starts
+      Then the board's row names the run's conversation as the run in flight
+      And once the run settles the row names no run in flight
+
+    @integration
+    Scenario: Run now asks for analytics:view and langy:create
+      Given a member without analytics:view or without langy:create
+      When they ask to run a board now
+      Then the request is refused as forbidden and no run is requested
+
+    @integration
+    Scenario: Run now is refused on an aggregate project, and with the flag off
+      Given an aggregate project, or a project with release_insights off
+      When a member asks to run a board now
+      Then the request is refused and no run is requested
+
+    @unit
+    Scenario: An Insights run is not held to the unattended window
+      Given a project whose unattended turns reached their window
+      When an Insights run asks Langy for its turn
+      Then the turn starts

@@ -15,6 +15,10 @@ export const INSIGHT_DAILY_RUN_MAX_ATTEMPTS = 3;
 /** Longer than a run may wait for Langy, so a slow run is never handed to a second pod. */
 export const INSIGHT_DAILY_RUN_LEASE_MS = 20 * 60_000;
 
+/** A run that recorded no outcome within every attempt's lease is lost, and blocks no more. */
+export const INSIGHT_DAILY_RUN_EXPIRY_MS =
+  INSIGHT_DAILY_RUN_LEASE_MS * INSIGHT_DAILY_RUN_MAX_ATTEMPTS;
+
 export const runBoardIntentSchema = z.object({
   scheduleId: z.string().min(1),
   userId: z.string().min(1),

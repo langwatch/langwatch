@@ -2456,6 +2456,11 @@ model InsightDailyScheduleProjection {
   /// The scheduled days in a row whose run ended skipped, and the slot of the newest counted.
   consecutiveSkips      Int     @default(0)
   skipStreakSlot        Float?
+  /// The run that started and has not settled, its Langy conversation and when it started.
+  /// NULL when none is in flight.
+  runInFlightId         String?
+  runInFlightConversationId String?
+  runInFlightStartedAt  Float?
   createdAt             Float
   updatedAt             Float
   occurredAt            Float
