@@ -294,10 +294,12 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
       authorization: aggregate,
       traceId: "trace_1",
       sinceUpdatedAtMs: 1,
+      occurredAtMs: 100,
     });
 
-    // The resolver probes (recent, then unbounded), one unhinted page, one delta.
-    expect(calls).toHaveLength(4);
+    // The resolver probes (recent, then unbounded), one unhinted page, then the delta's
+    // hinted window, which finds nothing here and reads once more unbounded.
+    expect(calls).toHaveLength(5);
     for (const call of calls) {
       expect(call.sql).not.toContain("{tenantId:String}");
       expect(call.sql).not.toContain("{{tenant");
@@ -427,7 +429,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
   });
 
   /** @scenario "A live waterfall receives row-version updates" */
-  it("uses the live row-version delta query without an occurrence window", async () => {
+  it("bounds the live row-version delta below only, by the trace id index", async () => {
     const calls: FencedCall[] = [];
     const repository = fencedTree(calls, () => [
       {
@@ -455,6 +457,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
       authorization,
       traceId: "trace_1",
       sinceUpdatedAtMs: 29,
+      occurredAtMs: 100,
     });
 
     expect(calls).toHaveLength(1);
@@ -464,7 +467,10 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
       "UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})",
     );
     expect(calls[0]?.sql).toContain("LIMIT 10000");
-    expect(calls[0]?.sql).not.toContain("fromMs:Int64");
+    expect(calls[0]?.sql).toContain(
+      "StartTime >= fromUnixTimestamp64Milli({idBound_fromMs:Int64})",
+    );
+    expect(calls[0]?.sql).not.toContain("idBound_toMs");
     expect(rows).toEqual([
       expect.objectContaining({
         spanId: "span_1",

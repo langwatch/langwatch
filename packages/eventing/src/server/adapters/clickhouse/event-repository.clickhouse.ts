@@ -170,7 +170,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
   static createForEventReads(options: {
     resolveClient: EventingClickHouseClientResolver;
     eventLogIndex?: EventLogIdIndex;
-  }): Pick<EventRepository, "getEventRecord" | "getEventRecords"> {
+  }): Pick<EventRepository, "getEventRecord" | "getEventRecords" | "findEventRecordsOfAggregates"> {
     return new EventingClickHouseEventRepository({
       resolveClient: options.resolveClient,
       ...(options.eventLogIndex === undefined ? {} : { eventLogIndex: options.eventLogIndex }),
@@ -214,6 +214,38 @@ export class EventingClickHouseEventRepository implements EventRepository {
     });
     if (range === null) return occurredAtFromMs;
     return Math.max(range.fromMs, occurredAtFromMs ?? 0);
+  }
+
+  /**
+   * The earliest occurred time across the asked aggregates, read per tenant because the index
+   * is tenant-scoped. Any tenant the index misses keeps today's unbounded read for the lot.
+   */
+  private async occurredAtFloorOfAggregates({
+    aggregates,
+    aggregateType,
+  }: {
+    aggregates: readonly { tenantId: string; aggregateId: string }[];
+    aggregateType: string;
+  }): Promise<number | undefined> {
+    const idsByTenant = new Map<string, Set<string>>();
+    for (const { tenantId, aggregateId } of aggregates) {
+      const ids = idsByTenant.get(tenantId) ?? new Set<string>();
+      ids.add(String(aggregateId));
+      idsByTenant.set(tenantId, ids);
+    }
+    const ranges = await Promise.all(
+      [...idsByTenant].map(([tenantId, ids]) =>
+        eventLogOccurredRange({
+          index: this.eventLogIndex,
+          read: "aggregate",
+          tenantId,
+          aggregateTypes: [aggregateType],
+          aggregateIds: [...ids],
+        }),
+      ),
+    );
+    if (ranges.length === 0 || ranges.some((range) => range === null)) return undefined;
+    return Math.min(...ranges.flatMap((range) => (range === null ? [] : [range.fromMs])));
   }
 
   private async getClient(tenantId: string): Promise<EventingClickHouseClient> {
@@ -356,6 +388,14 @@ export class EventingClickHouseEventRepository implements EventRepository {
     const [resolvingTenantId] = tenantIds;
     if (resolvingTenantId === void 0) return [];
     try {
+      const occurredAtFromMs = await this.occurredAtFloorOfAggregates({
+        aggregates,
+        aggregateType,
+      });
+      const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+      const occurredAtFilter = hasLowerBound
+        ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
+        : "";
       const client = await this.getClient(resolvingTenantId);
       const result = await client.query({
         query: `
@@ -367,13 +407,19 @@ export class EventingClickHouseEventRepository implements EventRepository {
           WHERE TenantId IN ({tenantIds:Array(String)})
             AND AggregateType = {aggregateType:String}
             AND AggregateId IN ({aggregateIds:Array(String)})
+            ${occurredAtFilter}
           ORDER BY TenantId ASC, AggregateId ASC, EventTimestamp ASC, EventId ASC
         `,
-        query_params: { tenantIds, aggregateType, aggregateIds },
+        query_params: {
+          tenantIds,
+          aggregateType,
+          aggregateIds,
+          ...(hasLowerBound ? { occurredAtFromMs } : {}),
+        },
         format: "JSONEachRow",
         tenantIds,
-        // Unbounded, as in `getEventRecords`: each aggregate's whole history by its key.
-        SKIP_COLD_SCAN_CHECK: true,
+        // Unbounded, each aggregate's whole history by its key, as in `getEventRecords`.
+        ...(hasLowerBound ? {} : { SKIP_COLD_SCAN_CHECK: true as const }),
       });
       const rows = await result.json<EventLogRow & { TenantId: string; AggregateId: string }>();
       const asked = new Set(

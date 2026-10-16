@@ -310,6 +310,40 @@ describe("the event log's aggregate index", () => {
       const read = statements.find((each) => each.sql.includes("FROM event_log\n"));
       expect(read?.params).toMatchObject({ occurredAtFromMs: daysAgo(365) });
     });
+
+    it("bounds a read of many aggregates below by the earliest of their first weeks", async () => {
+      const resolveClient: EventingClickHouseClientResolver = async (tenant) => ({
+        query: async (request) => ({
+          json: async <Row>() =>
+            (
+              await clickhouse.query<Row>({
+                tenantId: tenant,
+                sql: request.query,
+                ...(request.query_params === undefined ? {} : { params: request.query_params }),
+                ...(request.tenantIds === undefined ? {} : { tenantIds: request.tenantIds }),
+                ...(request.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
+              })
+            ).rows,
+        }),
+        insert: async () => undefined,
+      });
+      const repository = EventingClickHouseEventRepository.createForEventReads({
+        resolveClient,
+        eventLogIndex: index(),
+      });
+
+      const records = await repository.findEventRecordsOfAggregates({
+        aggregates: [
+          { tenantId, aggregateId: "replayed" },
+          { tenantId, aggregateId: "last-month" },
+        ],
+        aggregateType: "thing",
+      });
+
+      expect(records).toHaveLength(7);
+      const read = statements.find((each) => each.sql.includes("FROM event_log\n"));
+      expect(read?.params).toMatchObject({ occurredAtFromMs: daysAgo(365) });
+    });
   });
 
   describe("given an aggregate with events last month and one with no occurred time", () => {

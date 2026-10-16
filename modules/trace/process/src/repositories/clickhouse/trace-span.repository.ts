@@ -278,21 +278,20 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     authorization: Authorization;
     traceId: string;
     sinceUpdatedAtMs: number;
+    occurredAtMs?: number;
   }): Promise<TraceSpanSummaryRecord[]> {
     const client = this.clickhouse.as(input.authorization, { reads: "traces" });
-    // Deliberately unbounded by the occurred-at hint: a live trace can run
-    // past any fixed window. `UpdatedAt` is not the partition key, but the
-    // tenant/trace prefix remains selective and preserves the old route's
-    // behaviour for in-place span updates.
+    // `UpdatedAt` is not the partition key, so the trace-id marker bounds the
+    // read from below only: a live trace can run past any upper bound.
     const sinceFilter = "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})";
     const result = await client.query({
-      // ID_BOUND_SKIP: a live delta, bounded by its own since-time, never by occurred time.
       query: `
         SELECT ${summarySelect}
         FROM ${STORED_SPANS_TABLE}
         WHERE ${tenantScope("StartTime")} AND TraceId = {traceId:String}
+          ${STORED_SPANS_ID_BOUND}
           ${sinceFilter}
-          AND ${fencedDedupInTuple(sinceFilter)}
+          AND ${fencedDedupInTuple(`${STORED_SPANS_ID_BOUND} ${sinceFilter}`)}
         ORDER BY StartTimeMs ASC
         LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
       `,
@@ -301,6 +300,12 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
         sinceUpdatedAtMs: input.sinceUpdatedAtMs,
       },
       format: "JSONEachRow",
+      idBound: {
+        occurredAtHint: input.occurredAtMs ?? null,
+        fallback: "unbounded",
+        openEnded: true,
+        resolveHint: () => this.resolveTraceOccurredAtMs(input.authorization, input.traceId),
+      },
     });
     return spanSummaryRowsSchema
       .parse(await result.json())
