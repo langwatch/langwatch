@@ -14,7 +14,7 @@ Price-card comparisons lie by omission: a provider that halves the per-token pri
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Personal coding-agent usage needs `langwatch login --device`; a team or application project needs `--project <slug>` on the read commands.
+Personal coding-agent usage needs `langwatch login --device` on a laptop; skip it when `LANGWATCH_API_KEY` is set, because that key is the sign-in; a team or application project needs `--project <slug>` on the read commands.
 
 ## Step 2: Export the Real Mix
 

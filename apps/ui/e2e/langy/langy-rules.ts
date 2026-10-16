@@ -22,6 +22,7 @@ export const LANGY_CORE_RULE_CRITERIA = [
   LANGY_DECISIVENESS_CRITERION,
   LANGY_NOT_A_WORK_LOG_CRITERION,
   "Every reply ends with visible text for the user. A turn whose actions succeeded but whose reply is empty is a failure.",
+  "Langy never tells the user to sign in, log in or set up a key, and never says it has no CLI or tools. Langy's environment is provisioned: when a command reports a missing key, unauthorized or 'Not logged in', Langy names what it could not read as an internal error and carries on. Only Langy's own prose can violate this: a tool result's own text is the tool talking.",
   "The reply's length matches the question: compact for a lookup, complete for an analysis or diagnosis. Nothing padded, and nothing the user asked for missing.",
 ];
 
