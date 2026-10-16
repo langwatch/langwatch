@@ -1,0 +1,57 @@
+{
+  "name": "@langwatch/docs-site",
+  "private": true,
+  "description": "Prerendered documentation app: static HTML and agent exports, shared design-system React at build time, and small lazy browser islands.",
+  "type": "module",
+  "exports": {
+    ".": null
+  },
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc -b",
+    "build": "node src/site/build.ts",
+    "preview": "node src/site/preview.ts",
+    "test": "vitest run",
+    "test:smoke": "node scripts/smoke.test.mjs",
+    "test:links": "node src/site/check-links.ts",
+    "test:session": "node scripts/session.smoke.test.mjs",
+    "test:performance": "node scripts/performance.smoke.test.mjs",
+    "size": "node scripts/performance-report.mjs",
+    "test:layout": "node scripts/layout.smoke.test.mjs",
+    "test:polish": "node scripts/polish.smoke.test.mjs",
+    "test:news": "node scripts/news.smoke.test.mjs",
+    "test:refinement": "node scripts/refinement.smoke.test.mjs",
+    "test:mount": "node scripts/mount.smoke.test.mjs"
+  },
+  "dependencies": {
+    "@langwatch/design-system": "workspace:*",
+    "@mdx-js/react": "catalog:",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "shiki": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/time": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@mdx-js/rollup": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "mermaid": "catalog:",
+    "oxc-transform-react": "catalog:",
+    "playwright": "catalog:",
+    "rehype-slug": "catalog:",
+    "remark-frontmatter": "catalog:",
+    "remark-gfm": "catalog:",
+    "remark-mdx-frontmatter": "catalog:",
+    "remark-parse": "catalog:",
+    "typescript": "catalog:",
+    "unified": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "yaml": "catalog:"
+  }
+}

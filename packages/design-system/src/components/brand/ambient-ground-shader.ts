@@ -130,11 +130,15 @@ export async function mountAmbientShader({
   element,
   mode,
   onSlow,
+  minPixelRatio,
+  maxPixelCount,
 }: {
   element: HTMLElement;
   mode: "light" | "dark";
   /** Called once the shader has stopped itself because its frames were too slow. */
   onSlow?: () => void;
+  minPixelRatio?: number;
+  maxPixelCount?: number;
 }): Promise<() => void> {
   const noiseTexture = mode === "dark" ? await loadedNoiseTexture() : undefined;
   const mount =
@@ -158,6 +162,8 @@ export async function mountAmbientShader({
           LIVE_ONLY_ON_A_GPU,
           WARP_AT_REST.speed,
           wallClockFrame({ speed: WARP_AT_REST.speed }),
+          minPixelRatio,
+          maxPixelCount,
         )
       : new ShaderMount(
           element,
@@ -174,6 +180,8 @@ export async function mountAmbientShader({
           LIVE_ONLY_ON_A_GPU,
           MESH_AT_REST.speed,
           wallClockFrame({ speed: MESH_AT_REST.speed }),
+          minPixelRatio,
+          maxPixelCount,
         );
   let stopped = false;
   const stop = () => {

@@ -1,0 +1,345 @@
+# LangWatch documentation site
+
+The application lives in `apps/docs/`; authored pages, navigation and media stay
+in `docs/`. The build produces a plain static directory, with no
+application server, database or API required. React and the shared design system
+render at build time; browser interactions load only their small islands.
+
+The site renders the existing `docs/` MDX, navigation from `docs/docs.json`, and
+operations from `docs/api-reference/openapiLangWatch.json` and
+`docs/api-reference/openapi-evals.json`. Pages need no React route files. Only
+pages listed in the navigation are published, including API operations.
+
+Run these commands from the repository root, using the repository's Node and
+pnpm versions. Install workspace dependencies with `pnpm install`. On a machine
+without Playwright's Chromium, install it once:
+
+```sh
+pnpm --filter @langwatch/docs-site exec playwright install chromium
+```
+
+Chromium renders Mermaid to light and dark SVG during compilation. Diagrams do
+not need JavaScript in the published site. Syntax highlighting also runs during
+compilation. The initial star count uses GitHub's public API with a cached,
+optional fallback; building requires no credentials.
+
+## Develop
+
+```sh
+pnpm --filter @langwatch/docs-site dev
+```
+
+Open `http://localhost:5173`. Direct page URLs work. The server renders complete
+HTML, and Vite recompiles MDX and its imported snippets when they change.
+Changes to MDX, navigation or either OpenAPI document reload the page;
+interactive React islands use React refresh. Search is generated from the
+current navigation and source, so it works before a production build exists.
+Invalid MDX shows Vite's error overlay and recovers when corrected.
+
+The development server exposes a source search index without heading anchors.
+The production index includes rendered article text and heading anchors.
+
+## Build
+
+```sh
+pnpm --filter @langwatch/docs-site build
+```
+
+This command compiles the client and renderer, then prerenders every configured
+page into `apps/docs/dist`. It emits:
+
+- `/path/index.html` for each page, plus the introduction at `/index.html`.
+  Configured `section/index` pages also have a `/section` alias.
+- Identical `/path.md`, `/path.claude` and `/path.agent` content exports.
+- Hashed JavaScript and CSS under `assets/`, fonts, posters and docs media.
+- `search-index.json` with article text, navigation trails and headings, plus
+  lossless `.br` and `.gz` variants for hosts supporting precompressed delivery.
+- `llms.txt`, a directory of configured pages linking to their Markdown.
+- `redirects.json` and noindex redirect pages for exact source paths from `docs.json`.
+- `404.html` with the documentation shell and recovery links.
+- `skipped.json`, empty after a successful build.
+
+A missing configured source, invalid MDX or rendering failure makes the command
+fail. Do not publish output from a failed build. Each renderer uses its own temporary
+directory under the system temporary root (`TMPDIR` when set), removed on completion
+or failure. Builds with different output directories do not share renderer output.
+No authored MDX or OpenAPI files are changed.
+
+The build caches rendered pages by their compiled inputs and combines their styles
+in navigation order. Renderer threads are bounded by available cores and memory.
+`--render-workers 1` selects one renderer; `--no-render-cache` disables cache reuse.
+An unchanged complete output is checked by content and reused without rebuilding.
+Caches live under `apps/docs/node_modules/.cache/docs-site` and are disposable.
+
+To emit URLs under a mount while retaining production canonical URLs:
+
+```sh
+pnpm --filter @langwatch/docs-site build --base-path /docs --out-dir "$TMPDIR/docs-mounted"
+pnpm --filter @langwatch/docs-site preview --base-path /docs --out-dir "$TMPDIR/docs-mounted" --port 4175
+```
+
+Haven's docs lane builds this mounted artifact and serves it natively at
+`app.<slug>.langwatch.localhost/docs/`. With a full stack, all other app routes
+still reach the app. `haven up --only docs` runs only the static docs server;
+both the app and docs hostnames open `/docs/`. Use the Vite command above for
+authoring with hot reload; Haven serves the compiled output.
+
+## Preview
+
+```sh
+pnpm --filter @langwatch/docs-site preview
+```
+
+Open `http://localhost:4173`. Preview serves the last build and requires that port
+to be free. `/integration/quick-start` and `/integration/quick-start/` both serve
+`/integration/quick-start/index.html`. Configured redirects return 301 and retain
+incoming query parameters unless the destination already supplies that key.
+Unknown page routes return `404.html` with HTTP status 404. Malformed URL encoding
+returns 400. These are the routing rules a future static host must implement.
+Stop either local server with Ctrl+C.
+
+## Source ownership
+
+`src/app/` composes pages, theme and the reading shell. `src/features/` owns
+content, code, navigation, API reference, discovery, search, releases, session
+and shell behavior. A feature uses `compile/` for Node build work, `model/` for
+portable values, `ui/` for React and `browser/` for client enhancements as needed.
+There is no module installer or dependency injection pipeline.
+
+`src/site/` owns the static build, prerenderer, preview and Vite plugins;
+`vite.config.ts` delegates to the same configuration used by build commands.
+`src/site/document.ts` defines lazy browser entries and the document template seams.
+`src/browser/` holds the small navigation bootstrap. Worker source lives in
+`worker/`. Build paths and CLI options are in `src/paths.ts`; browser environment
+configuration stays in `src/config.ts`.
+
+The compiler and UI use strict TypeScript. Node 24 runs the typed build tools
+without a second loader. Dependency versions come from the workspace catalog.
+The Oxc React Compiler optimizes docs React components on the browser path;
+shared design-system sources are reused without recompiling them. Complete pages
+render at build time. Only interactive React islands need a browser runtime.
+
+## Components and validation
+
+The shell, MDX components and API playground consume design-system exports;
+docs-specific semantic tokens live in `src/app/theme-config.ts`. Raw legacy skill markup is
+adapted during compilation. The current eight embedded product recordings have
+no audio streams; the video renderer explicitly mutes these silent demonstrations.
+Narrated media requires captions and a corresponding renderer before publication.
+
+The docs ground uses the marketing site's blue, apricot and rust palette. The
+centred paper, navigation rail and raised panels use separate semantic surfaces;
+gradients stay behind the page. The ground is static, including under reduced
+motion. The home recording starts only on request and has a local poster frame.
+Its agent setup panel copies the full tracing prompt from `skills/directory.mdx`;
+the picker changes the paste instructions, and an expandable preview shows exactly
+what is copied. The source remains in the MDX.
+The compiler watches that source so edits also refresh the home panel in dev.
+
+Potential design-system contributions are the layered documentation shell,
+agent setup panel and compact announcement strip. They remain docs-local until
+another surface needs the same behaviour. The docs also disable drawer and dialog
+animations under reduced motion; that behaviour is a design-system candidate.
+
+```sh
+pnpm --filter @langwatch/docs-site typecheck
+pnpm exec oxlint --quiet --type-aware --config .oxlintrc.jsonc apps/docs
+```
+
+Behaviour scenarios live in `specs/`; unit and SSR tests are colocated with their
+owner under `src/**/__tests__/`. Browser runners live in `scripts/`; the typed
+link checker lives in `src/site/`.
+
+## Test without disturbing a running preview
+
+The unit suite uses the repository's shared Vitest configuration. Run it through
+the package script, with the usual worker limit:
+
+```sh
+VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/docs-site test
+```
+
+Build an isolated artifact, then run the browser smoke and local link checks:
+
+```sh
+pnpm --filter @langwatch/docs-site build --out-dir "$TMPDIR/docs-test-dist"
+pnpm --filter @langwatch/docs-site test:smoke --out-dir "$TMPDIR/docs-test-dist" --screenshots "$TMPDIR/docs-test-shots"
+pnpm --filter @langwatch/docs-site test:links --out-dir "$TMPDIR/docs-test-dist"
+```
+
+The smoke runner starts its own preview on an available port, closes it and
+Chromium in cleanup, and captures the introduction, quick start and trace API
+page at 1440 and 390 pixels in light and dark. It checks clipboard copying,
+keyboard search, API authentication validation, the complete page inventory,
+redirects and 404 responses. API requests are intercepted; no real key is used.
+Additional regressions exercise the agent picker, full authored prompt copying,
+mobile navigation and focus restoration, diagrams with JavaScript disabled, and
+video failure followed by a successful retry. Clipboard rejection is injected at
+the browser API boundary to exercise the visible recovery state deterministically.
+Clipboard controls stay disabled in prerendered HTML until their handlers are ready.
+Every browser context and temporary server closes even when an assertion fails.
+
+The link checker checks every built HTML page, local link and fragment, following
+configured redirects. It treats links to `docs.langwatch.ai` as local, skips
+external destinations, writes `link-report.json` in the chosen output directory,
+and exits non-zero for broken links. It has no exclusion list for content errors.
+
+For a separate manual preview:
+
+```sh
+pnpm --filter @langwatch/docs-site preview --out-dir "$TMPDIR/docs-test-dist" --port 4175
+```
+
+`--out-dir` is resolved from the package directory; absolute paths avoid
+ambiguity. Omitting it retains the normal `apps/docs/dist` output. Preview still
+defaults to port 4173, and fails if its chosen port is occupied.
+
+## Static artifact and CI
+
+`.github/workflows/docs-site.yml` installs materialized LFS assets, typechecks,
+tests, builds and checks the site, then uploads the `apps/docs/dist` artifact.
+It has no cloud deployment job or credentials. Build output contains no
+host-specific edge code. A future deployment belongs in GitHub Actions.
+
+Any static host can serve the directory. Configure directory-index routing,
+a real 404 status for `404.html`, Markdown content types for `.md`, `.claude`
+and `.agent`, and the desired cache headers. Exact redirects have refresh pages
+with a canonical destination and a link usable without JavaScript. Existing pages
+take precedence. Pattern redirects need hosting rules; they remain in
+`redirects.json`. Preview tests HTTP redirects and query preservation separately.
+
+Keep old hashed assets long enough for cached documents to finish loading their
+lazy chunks. Revalidate mutable HTML, search and worker files; immutable hashed
+assets can use a long cache lifetime. These are hosting requirements, not cloud
+configuration emitted by the compiler. The existing Mintlify release workflow
+and DNS cutover remain separate decisions.
+
+## Shared session prototype
+
+[ADR-180](../../dev/docs/adr/180-docs-session-credentials.md) is a draft requiring
+product-owner approval. No app endpoint, credential mint, popup exchange or
+production session adapter is implemented. The default build has no session
+control. Manual API-key entry continues to work as before.
+
+Set `VITE_DOCS_SESSION_AUTH=mock` at build or dev startup to expose **Use my
+LangWatch session** in the API playground. Only `off` (the default) and `mock`
+are accepted. This is public build configuration, never a secret. The demo uses
+one fixed project and one-minute credentials held only in memory. It simulates
+`GET /api/v1/traces/{traceId}` locally, refuses other scopes and never sends the
+mock credential to a network endpoint. Connection clears manual-key input;
+expiry, disconnect and leaving the page clear session access. Switching back to
+a manual key is explicit. Examples and copied code keep environment placeholders.
+
+The docs-local `DocsTokenProvider` interface in `src/features/session/model/token-provider.ts`
+separates acquisition and revocation from the playground. The controller validates
+provider responses, rejects late connections and enforces expiry and scope. A
+future app adapter requires approval and additional origin/source/state checks;
+setting a flag cannot enable an unimplemented live provider. The mock does not
+sign anyone into or out of their real LangWatch account.
+
+```sh
+VITE_DOCS_SESSION_AUTH=mock pnpm --filter @langwatch/docs-site dev
+VITE_DOCS_SESSION_AUTH=mock pnpm --filter @langwatch/docs-site build --out-dir "$TMPDIR/docs-session-dist"
+pnpm --filter @langwatch/docs-site test:session --out-dir "$TMPDIR/docs-session-dist" --screenshots "$TMPDIR/docs-session-shots"
+```
+
+For a haven review in this worktree:
+
+```sh
+VITE_DOCS_SESSION_AUTH=mock .bin/haven/haven up --only docs --agent -d
+.bin/haven/haven browser open https://app.feat-docs-site.langwatch.localhost:1355/docs/api-reference/traces/get-trace --lane docs
+.bin/haven/haven browser close --lane docs
+.bin/haven/haven down
+```
+
+Restart dev without the flag to hide the prototype. Production CI never sets it.
+The session smoke runner requires a mock-enabled build and checks both themes
+at 1440 and 390 pixels, including expiry, disconnect, clipboard redaction and
+zero API calls. Unit tests cover the default flag, cancelled acquisition, invalid
+credentials and restricted operations. Real popup, CSRF, CORS, server revocation
+and self-hosted behaviour remain proposed scenarios, explicitly unimplemented.
+
+## Static-first performance
+
+Pages are complete HTML with build-extracted, content-hashed design-system CSS.
+MDX and highlighting do not ship to readers. The bootstrap adds navigation and
+lazy controls. Search and contextual menus load the shared design-system runtime
+on interaction; reading and the API island do not need that runtime.
+See [Revision 4: performance](./DESIGN.md) for the boundaries and alternatives.
+
+Deferred reading enhancements prefetch internal links after deliberate hover or
+focus, with at most two requests in flight and a small viewport allowance. Offline
+and save-data readers do not trigger speculative requests.
+Navigation preserves the header and handles history, focus and announcements.
+A build change or a failed transition falls back to a normal document navigation.
+The dev server renders the same static page structure and reloads authored MDX.
+
+The production-only service worker precaches shell CSS/JS, the Latin reading font
+and an offline page. Other font faces are cached when requested.
+It revalidates public HTML/search, caps page caches at 40 entries, and expires the
+stale-while-revalidate window after 60 seconds. API requests, authentication
+headers, arbitrary query strings and private/no-store responses bypass caching.
+The public search index's build-version query is cacheable for offline search.
+The worker stays within its registration scope, including a `/docs/` mount. Updates
+activate on successful installation without forcing a reload; subsequent document
+navigation adopts the new version. Future hosting should retain old hashed assets
+for open tabs and let `sw.js` revalidate promptly.
+
+```sh
+pnpm --filter @langwatch/docs-site size --out-dir "$TMPDIR/docs-performance"
+pnpm --filter @langwatch/docs-site test:performance --out-dir "$TMPDIR/docs-performance"
+pnpm --filter @langwatch/docs-site test:layout --out-dir "$TMPDIR/docs-performance" --screenshots "$TMPDIR/docs-layout"
+```
+
+`size` fails above 3 KB gzipped for initial reading and above 15 KB for the bootstrap, inline theme setup, idle
+controls and service worker combined. It separately reports the full search and
+playground interaction costs, including shared React/Zod. `test:performance`
+checks static reading, navigation, prefetch, worker replacement, offline fallback
+and credential isolation. `test:layout` checks 1280, 1440, 1670 and 390 pixel widths
+in light and dark. Run worker tests only against an isolated build: the update
+scenario temporarily changes that build’s `sw.js` and restores it afterwards.
+
+The page uses one document scroll: the floating content panel has a gradient gap
+above it, tall rails flow naturally, and the full-width footer sits outside it.
+Only a rail that fits the viewport becomes sticky. The ground shader is a separate
+idle enhancement; reduced motion keeps the static floor without loading it.
+
+```sh
+pnpm --filter @langwatch/docs-site test:polish --out-dir "$TMPDIR/docs-test-dist" --screenshots "$TMPDIR/docs-polish"
+```
+
+Pass `--before <previous-build>` to capture matching guide and agent-card baseline
+screenshots. The suite also exercises grouped command results, keyboard actions,
+contextual menus, theme selection and complete prompt copying.
+
+## Release updates
+
+The root `CHANGELOG.md` supplies the latest published version, date and change
+for the static announcement. The two newest entries also appear on
+`/self-hosting/releases` and in its Markdown export. Source MDX is unchanged.
+Dev watches the changelog, and the docs CI workflow includes it in its path
+filter. Missing or invalid release data hides the strip. Dismissal is remembered
+per version; storage denial still allows dismissal for the current document.
+There is no automatic ticker or additional announcement script.
+
+```sh
+pnpm --filter @langwatch/docs-site test:news --out-dir "$TMPDIR/docs-test-dist" --screenshots "$TMPDIR/docs-news"
+```
+
+Every configured page exports identical Markdown at `.md`, `.claude` and `.agent`; API exports include the resolved endpoint, authentication, parameters, request/response schemas and curl example, while guides retain authored MDX with their title and description. The latter two are content aliases rather than agent configuration. Root `index` exports map to the introduction. Discovery includes `llms.txt`, `robots.txt`, `humans.txt`, `agents.txt` and `sitemap.xml`. Local preview sets Markdown content types for all three extensions; production hosting must do the same.
+
+Alt+Shift+C copies the current page outside editable controls. The sidebar command selector copies the five supported CLI launchers; Cursor and Aider use the gateway guide rather than an invented wrapper command. Page feedback links open a GitHub issue draft containing the page URL.
+
+The coding-agent hero uses checked-in 640/1024/1560px WebP derivatives of the existing session-detail PNG, with responsive preload only on its overview page. Other imagery remains lazy. Ambient rendering has a docs-specific 360,000-pixel cap and 0.5 minimum pixel ratio; design-system callers retain their existing defaults. Run `test:refinement --out-dir <build> --screenshots <scratch-directory>` for the exports, clipboard, tab-panel mapping, responsive image, footer and shader checks.
+
+## Git LFS assets
+
+Docs images, video/audio, vector graphics, fonts and downloadable media are tracked by the docs-scoped patterns in `.gitattributes`. Install Git LFS, run `git lfs install --local --skip-repo` once when using this repo's `.githooks` (or ordinary `git lfs install` with Git's default hooks), then `git lfs pull` after a checkout that skipped LFS downloads. The docs CI checkout enables LFS, and the build rejects unresolved pointer files before emitting output. The static directory contains the full asset bytes; readers do not fetch from Git LFS.
+
+New asset revisions are stored in LFS. Conversion in this branch does not rewrite existing repository history, so historical binary blobs remain until a separately coordinated history migration.
+
+## Static search metadata
+
+Every page emits a canonical URL, description when provided, Open Graph/social metadata, a factual WebPage JSON-LD record, breadcrumbs linking to real pages, a Markdown alternate and an llms.txt discovery link during prerender. HTML aliases share one canonical URL; introduction uses the root URL. Client navigation updates the destination metadata together with its content. The custom 404 is marked noindex. Public OpenAPI documents are copied alongside the page exports. Guide exports inline supported snippet imports and include provenance and absolute documentation links; fenced examples remain unchanged.
+
+These are discoverability and sharing features, not ranking guarantees. Validate production status codes, redirects and response headers against the future host; Markdown HTTP canonical/noindex response headers and production search analytics have not been configured here.

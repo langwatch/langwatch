@@ -13,6 +13,7 @@ Four Node processes, one composite of two of them, and three Go services:
 
 | Process               | Package                   | What it is                                                     |
 | --------------------- | ------------------------- | -------------------------------------------------------------- |
+| `apps/docs`           | `@langwatch/docs-site`    | Static documentation UI; React prerenders HTML and agent exports |
 | `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA)                             |
 | `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle                   |
 | `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers                   |
@@ -21,6 +22,10 @@ Four Node processes, one composite of two of them, and three Go services:
 | `services/aigateway`  | Go                        | Virtual-key data plane (Bifrost fan-out)                       |
 | `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators                  |
 | `services/langyagent` | Go                        | Langy conversation manager (pi harness workers)                |
+
+The docs UI is independently built under `apps/docs` from authored `docs/` content.
+Its deployment is static HTML, CSS, media and lazy browser islands; it needs no
+Node server, API or database in production.
 
 **Applications hold no product code.** The product lives in modules. An
 application is a `main.ts` and a `config.ts`; everything it used to carry —

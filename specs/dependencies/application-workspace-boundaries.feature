@@ -21,6 +21,14 @@ Feature: Physical application workspace boundaries
   I want UI, API, worker and self-host execution in separate workspace packages
   So that each executable has an enforceable dependency graph without changing how LangWatch is deployed
 
+  @unit
+  Scenario: Static docs is a recognized UI application
+    Given apps/docs declares the docs-site workspace package
+    And an arbitrary apps/unknown package exists
+    When repository applications are classified
+    Then docs is classified as a UI application
+    And the arbitrary application is rejected
+
   Rule: Every executable has one truthful application package
 
     @unimplemented

@@ -39,6 +39,11 @@ LangWatch provides the missing operations platform for AI applications. Every LL
 
 LangWatch has four areas, and you can use each one on its own.
 
+<figure>
+  <img className="docs-product-shot" src="/images/coding-agents/optimized/session-detail-1024.webp" srcSet="/images/coding-agents/optimized/session-detail-640.webp 640w, /images/coding-agents/optimized/session-detail-1024.webp 1024w, /images/coding-agents/optimized/session-detail-1560.webp 1560w" sizes="(min-width: 1280px) calc(100vw - 620px), (min-width: 1024px) calc(100vw - 380px), calc(100vw - 40px)" width="1560" height="900" alt="A Claude Code session inside LangWatch, showing cost, tools, context and cache health." />
+  <figcaption>From a coding session to every model call. <a href="/coding-agents/overview">Track Claude Code, Codex and your team's agents →</a></figcaption>
+</figure>
+
 <CardGroup cols={2}>
   <Card title="LLM Ops" icon="chart-network" href="/observability/overview">
     Everything you need to ship and improve an LLM application:
@@ -127,12 +132,12 @@ Enterprise features, such as multi-source governance ingestion and anomaly detec
 
 LangWatch Cloud has a free plan: [sign up](https://app.langwatch.ai) to create a project.
 
-<Note>
-  **For agents**: struggled with anything on this page, or something did not work as documented? Ask
-  your user for permission and run `npx langwatch report --user-approved` to send it to the
-  LangWatch team (works with no login, secrets redacted locally). It is how rough edges get fixed
-  for every agent. See the [reporting guide](/support#reporting-issues-from-coding-agents).
-</Note>
+<Tip>
+  **Found broken or outdated docs?** Use **Report outdated or broken docs** next to **Edit this page** below.
+  Agents: include the page URL, the failing step and a proposed fix in a GitHub issue.
+  For CLI diagnostics, ask your user before running `npx langwatch report --user-approved`.
+  See the [reporting guide](/support#reporting-issues-from-coding-agents).
+</Tip>
 
 
 ---
@@ -209,12 +214,12 @@ Field: `labels`
 
 Labels let you zoom in on specific features or A/B test different approaches right within the LangWatch dashboard.
 
-<Note>
-  **For agents**: struggled with anything on this page, or something did not work as documented? Ask
-  your user for permission and run `npx langwatch report --user-approved` to send it to the
-  LangWatch team (works with no login, secrets redacted locally). It is how rough edges get fixed
-  for every agent. See the [reporting guide](/support#reporting-issues-from-coding-agents).
-</Note>
+<Tip>
+  **Found broken or outdated docs?** Use **Report outdated or broken docs** next to **Edit this page** below.
+  Agents: include the page URL, the failing step and a proposed fix in a GitHub issue.
+  For CLI diagnostics, ask your user before running `npx langwatch report --user-approved`.
+  See the [reporting guide](/support#reporting-issues-from-coding-agents).
+</Tip>
 
 
 ---
@@ -13292,7 +13297,7 @@ existing routes:
 
 | Surface | Purpose | Audience | Where it lives |
 |---------|---------|----------|----------------|
-| `/governance` | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. |
+| `/governance` | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing-the-setup-state-signal) below) | Top-level route, org-scoped. |
 | `/me`, `/me/settings` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
 | `/[project]/...` | LLMOps daily-use, traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
 | `/governance/ingestion-sources`, `/gateway/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, publish routing policies. | The governance pages open on `governance:view` and `/gateway/routing-policies` on `routingPolicies:view`. Each write control needs the matching `:manage` grant (`ingestionSources:manage`, `routingPolicies:manage`) and is hidden without it. | Governance sub-routes, deliberately separate from daily-use surfaces. |
@@ -13383,7 +13388,7 @@ without touching any other.
 | ----- | ------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1** | Gateway proxy             | Yes                         | Mid-flight inspect, rewrite, **block**. Mint per-user virtual keys. Enforce policy + budget before the call leaves the gateway.                                              |
 | **2** | BYOK endpoint routing     | Sometimes                   | Customer points a SaaS platform's "custom LLM endpoint" at the gateway. Same depth as Tier 1 _for traffic that flows through it_.                                            |
-| **3** | Audit log ingest          | No                          | Pull from a closed platform's compliance API into [`IngestionSource`](#tier-3--audit-log-ingest) records. Detect anomalies, alert, **trigger admin-API revoke** out-of-band. |
+| **3** | Audit log ingest          | No                          | Pull from a closed platform's compliance API into [`IngestionSource`](#tier-3-audit-log-ingest) records. Detect anomalies, alert, **trigger admin-API revoke** out-of-band. |
 | **4** | OTel, SDK instrumentation | Partial                     | Customer's agent code (or an opt-in SaaS like Claude Cowork) emits OpenTelemetry to LangWatch. Per-turn detail, no block, but full trace context.                            |
 | **5** | Sandboxed runtime         | Yes (you host it)           | LangWatch runs the agent. Egress policy, MCP allowlist, file-system jail, tool approval. Maximum control.                                                                    |
 
@@ -18925,19 +18930,56 @@ keywords:
   - opentelemetry coding agents
 ---
 
+<AgentActions />
+
+<figure>
+  <img className="docs-product-shot" src="/images/coding-agents/optimized/session-detail-1024.webp" srcSet="/images/coding-agents/optimized/session-detail-640.webp 640w, /images/coding-agents/optimized/session-detail-1024.webp 1024w, /images/coding-agents/optimized/session-detail-1560.webp 1560w" sizes="(min-width: 1280px) calc(100vw - 620px), (min-width: 1024px) calc(100vw - 380px), calc(100vw - 40px)" width="1560" height="900" loading="eager" fetchPriority="high" alt="Claude Code session in LangWatch: model calls, tools, cost, compactions and cache health." />
+  <figcaption>Inspect a session, replay its terminal and see where tokens and time went. <a href="/coding-agents/sessions">Explore sessions →</a></figcaption>
+</figure>
+
 ## Getting started
 
 
   ### Claude Code
-```bash npx langwatch claude ```
+
+
+```bash
+npx langwatch claude
+```
+
+
   ### Codex
-```bash npx langwatch codex ```
+
+
+```bash
+npx langwatch codex
+```
+
+
   ### GitHub Copilot
-```bash npx langwatch copilot ```
+
+
+```bash
+npx langwatch copilot
+```
+
+
   ### Gemini CLI
-```bash npx langwatch gemini ```
+
+
+```bash
+npx langwatch gemini
+```
+
+
   ### OpenCode
-```bash npx langwatch opencode ```
+
+
+```bash
+npx langwatch opencode
+```
+
+
   ### Cursor
 
     Set Cursor's OpenAI base URL to `https://gateway.langwatch.ai/v1` and its OpenAI API key to a
@@ -20187,12 +20229,12 @@ LangWatch provides several official integrations with other tools and services.
 
 We use [GitHub Discussions](https://github.com/orgs/langwatch/discussions/new?category=integration-request) to track interest in new integrations. Please upvote/add to the list below if you'd like to see a new integration.
 
-<Note>
-  **For agents**: struggled with anything on this page, or something did not work as documented? Ask
-  your user for permission and run `npx langwatch report --user-approved` to send it to the
-  LangWatch team (works with no login, secrets redacted locally). It is how rough edges get fixed
-  for every agent. See the [reporting guide](/support#reporting-issues-from-coding-agents).
-</Note>
+<Tip>
+  **Found broken or outdated docs?** Use **Report outdated or broken docs** next to **Edit this page** below.
+  Agents: include the page URL, the failing step and a proposed fix in a GitHub issue.
+  For CLI diagnostics, ask your user before running `npx langwatch report --user-approved`.
+  See the [reporting guide](/support#reporting-issues-from-coding-agents).
+</Tip>
 
 
 ---
@@ -20401,12 +20443,12 @@ func main() {
 - **Need org-wide controls?** See [AI Governance](/ai-governance/overview) for per-user workspaces, anomaly detection, OCSF/SIEM export, and ingestion sources for non-gateway telemetry, paired with the AI Gateway data plane.
 - **Routing every LLM call through a single endpoint?** See [AI Gateway](/ai-gateway/overview): virtual keys, budgets, fallback chains, guardrails.
 
-<Note>
-  **For agents**: struggled with anything on this page, or something did not work as documented? Ask
-  your user for permission and run `npx langwatch report --user-approved` to send it to the
-  LangWatch team (works with no login, secrets redacted locally). It is how rough edges get fixed
-  for every agent. See the [reporting guide](/support#reporting-issues-from-coding-agents).
-</Note>
+<Tip>
+  **Found broken or outdated docs?** Use **Report outdated or broken docs** next to **Edit this page** below.
+  Agents: include the page URL, the failing step and a proposed fix in a GitHub issue.
+  For CLI diagnostics, ask your user before running `npx langwatch report --user-approved`.
+  See the [reporting guide](/support#reporting-issues-from-coding-agents).
+</Tip>
 
 
 ---
@@ -29761,7 +29803,7 @@ LangWatch follows the OpenTelemetry semantic conventions and adds its own attrib
   Understand the OpenTelemetry semantic conventions that LangWatch follows for consistent observability.
 </Card>
 
-<Card title="LangWatch Attributes" icon="attributes" href="#langwatch-custom-attributes">
+<Card title="LangWatch Attributes" icon="attributes" href="#langwatch-attributes-reference">
   Explore LangWatch's custom attributes designed specifically for LLM applications and AI observability.
 </Card>
 </CardGroup>
@@ -33085,7 +33127,8 @@ The AI assistant will:
 **Example transformation:**
 
 Before:
-```python
+<CodeGroup>
+```python title="chat.py"
 from openai import OpenAI
 
 client = OpenAI()
@@ -33098,8 +33141,24 @@ def chat(message: str):
     return response.choices[0].message.content
 ```
 
+```typescript title="chat.ts"
+import { OpenAI } from "openai";
+
+const client = new OpenAI();
+
+async function chat(message: string) {
+  const response = await client.chat.completions.create({
+    model: "gpt-5-mini",
+    messages: [{ role: "user", content: message }],
+  });
+  return response.choices[0].message.content;
+}
+```
+</CodeGroup>
+
 After (automatically added by AI assistant):
-```python
+<CodeGroup>
+```python title="chat.py" {2,5,7-12}
 from openai import OpenAI
 import langwatch
 
@@ -33119,6 +33178,31 @@ def chat(message: str):
     )
     return response.choices[0].message.content
 ```
+
+```typescript title="chat.ts" {2-3,5-6,10-12}
+import { OpenAI } from "openai";
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch/observability";
+
+setupObservability({ serviceName: "chatbot" });
+const tracer = getLangWatchTracer("chatbot");
+const client = new OpenAI();
+
+async function chat(message: string) {
+  return tracer.withActiveSpan("chat", async (span) => {
+    span.setInput(message);
+    span.setAttribute("langwatch.labels", ["document_parsing"]);
+    const response = await client.chat.completions.create({
+      model: "gpt-5-mini",
+      messages: [{ role: "user", content: message }],
+    });
+    const text = response.choices[0].message.content;
+    span.setOutput(text);
+    return text;
+  });
+}
+```
+</CodeGroup>
 
 ### Set Up Evaluations
 
@@ -33376,12 +33460,12 @@ Fetches Scenario documentation pages to understand how to write agent tests.
 Your AI assistant will automatically choose the right tools based on your request. You don't need to call these tools manually.
 </Info>
 
-<Note>
-  **For agents**: struggled with anything on this page, or something did not work as documented? Ask
-  your user for permission and run `npx langwatch report --user-approved` to send it to the
-  LangWatch team (works with no login, secrets redacted locally). It is how rough edges get fixed
-  for every agent. See the [reporting guide](/support#reporting-issues-from-coding-agents).
-</Note>
+<Tip>
+  **Found broken or outdated docs?** Use **Report outdated or broken docs** next to **Edit this page** below.
+  Agents: include the page URL, the failing step and a proposed fix in a GitHub issue.
+  For CLI diagnostics, ask your user before running `npx langwatch report --user-approved`.
+  See the [reporting guide](/support#reporting-issues-from-coding-agents).
+</Tip>
 
 
 ---
@@ -65080,16 +65164,78 @@ The chart ships a NetworkPolicy for the Langy agent only, and the AI Gateway's N
 
 ### To LangWatch
 
-| Host and path | Component | When | What it carries | How to stop it |
-|---|---|---|---|---|
-| `app.langwatch.ai/api/track_usage` | Workers | Daily at 12:00 UTC, when no license on the install names a hosted service | The usage report: counts, timestamps, the release, optional email domains and hostname. No content | `DISABLE_USAGE_STATS=true` |
-| `connect.langwatch.ai/v1/stats` | Workers | The same report, sent here instead once a license names a hosted service | The same report | `DISABLE_USAGE_STATS=true` |
-| `connect.langwatch.ai/v1/license/sync` | Workers daily; App on demand from the License page | For organizations whose license names a hosted service | The license token, the instance id, the release, and the member and lite member counts | `LANGWATCH_CONNECT_DISABLED=true` |
-| `connect.langwatch.ai/v1/license/activate` | App | An admin redeems an activation code on the License page | The activation code and the instance id | Paste a license instead, or `LANGWATCH_CONNECT_DISABLED=true` |
-| `gateway.langwatch.ai/v1/instant-evals/classify` | App, Workers | The license names [Instant Evals](#instant-evals), no admin switched it off, and Instant Evals run or a sentence typed in trace search is routed | Content: the text being judged and the questions | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
-| `gateway.langwatch.ai/v1` | AI Gateway | The license names [managed models](#managed-models), no admin switched it off, and a virtual-key request names a `langwatch/` model | Content: the full model request and response | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
-| `gateway.langwatch.ai/v1/usage`, `/v1/budget` | App | Someone opens **Settings, Connect** or **Settings, Checkup** in an organization whose license names a hosted service, an admin switches a service on or off, or an admin sets a spending cap | The license token and the instance id; the cap | `LANGWATCH_CONNECT_DISABLED=true`. A blocked or failed read shows usage as unavailable on the page |
-| `connect.langwatch.ai`, `gateway.langwatch.ai` | App | Someone runs the reach checks on **Settings, Checkup** | A `HEAD` request with no body, to test the firewall | `LANGWATCH_CONNECT_DISABLED=true`, or do not run them |
+#### `app.langwatch.ai/api/track_usage`
+
+| Property | Details |
+| --- | --- |
+| Component | Workers |
+| When | Daily at 12:00 UTC, when no license on the install names a hosted service |
+| What it carries | The usage report: counts, timestamps, the release, optional email domains and hostname. No content |
+| How to stop it | `DISABLE_USAGE_STATS=true` |
+
+#### `connect.langwatch.ai/v1/stats`
+
+| Property | Details |
+| --- | --- |
+| Component | Workers |
+| When | The same report, sent here instead once a license names a hosted service |
+| What it carries | The same report |
+| How to stop it | `DISABLE_USAGE_STATS=true` |
+
+#### `connect.langwatch.ai/v1/license/sync`
+
+| Property | Details |
+| --- | --- |
+| Component | Workers daily; App on demand from the License page |
+| When | For organizations whose license names a hosted service |
+| What it carries | The license token, the instance id, the release, and the member and lite member counts |
+| How to stop it | `LANGWATCH_CONNECT_DISABLED=true` |
+
+#### `connect.langwatch.ai/v1/license/activate`
+
+| Property | Details |
+| --- | --- |
+| Component | App |
+| When | An admin redeems an activation code on the License page |
+| What it carries | The activation code and the instance id |
+| How to stop it | Paste a license instead, or `LANGWATCH_CONNECT_DISABLED=true` |
+
+#### `gateway.langwatch.ai/v1/instant-evals/classify`
+
+| Property | Details |
+| --- | --- |
+| Component | App, Workers |
+| When | The license names [Instant Evals](#instant-evals), no admin switched it off, and Instant Evals run or a sentence typed in trace search is routed |
+| What it carries | Content: the text being judged and the questions |
+| How to stop it | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
+
+#### `gateway.langwatch.ai/v1`
+
+| Property | Details |
+| --- | --- |
+| Component | AI Gateway |
+| When | The license names [managed models](#managed-models), no admin switched it off, and a virtual-key request names a `langwatch/` model |
+| What it carries | Content: the full model request and response |
+| How to stop it | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
+
+#### `gateway.langwatch.ai/v1/usage`, `/v1/budget`
+
+| Property | Details |
+| --- | --- |
+| Component | App |
+| When | Someone opens **Settings, Connect** or **Settings, Checkup** in an organization whose license names a hosted service, an admin switches a service on or off, or an admin sets a spending cap |
+| What it carries | The license token and the instance id; the cap |
+| How to stop it | `LANGWATCH_CONNECT_DISABLED=true`. A blocked or failed read shows usage as unavailable on the page |
+
+#### `connect.langwatch.ai`, `gateway.langwatch.ai`
+
+| Property | Details |
+| --- | --- |
+| Component | App |
+| When | Someone runs the reach checks on **Settings, Checkup** |
+| What it carries | A `HEAD` request with no body, to test the firewall |
+| How to stop it | `LANGWATCH_CONNECT_DISABLED=true`, or do not run them |
+
 
 The license token is a hash of the license key, not the key itself. The instance id is minted once into the install's own database.
 
@@ -65107,14 +65253,60 @@ With a license that names hosted services, the install also runs the daily licen
 
 ### To services you configure
 
-| Host | Component | When | What it carries | How to stop it |
-|---|---|---|---|---|
-| Model providers you add (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex AI, Gemini, custom endpoints and others) | AI Gateway, NLP, LangEvals; App when it validates a key | A feature uses a provider you configured | Content: prompts and completions | Remove the provider |
-| `dlp.googleapis.com` | App, Workers | Strict PII redaction, only when the in-cluster Presidio call fails and Google credentials are set (`app.evaluators.google.enabled`) | Content: span text to redact | `LANGWATCH_DISABLE_GOOGLE_DLP=true` |
-| `api.github.com`, or `GITHUB_LANGY_HOST` | App | The Langy GitHub App is configured | Repository and installation metadata, token requests | Leave the GitHub App unset |
-| `github.com`, `api.github.com`, `codeload.github.com`, the npm registry, and hosts on a project's allow-list | Langy agent | `networkPolicy.allowExternalHttps: true` on the Langy agent. The NetworkPolicy then allows `:443` to any public address. The agent's L7 egress adapter checks proxied traffic against the allow-list, which is cooperative by default | git clone and push, `gh`, `npm` | Off by default, see [Langy networking](/self-hosting/langy/networking-and-egress) |
-| Twilio, ElevenLabs | Workers, AI Gateway | Voice scenarios with your credentials | Audio | Do not configure them |
-| Webhooks, Slack, email (SMTP, SES, SendGrid, Resend), SSO identity providers, S3 or Azure Blob storage, OTLP export | App, Workers; NLP for workflow HTTP blocks | You configure them | What you configure them to send | Do not configure them |
+#### Model providers you add (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex AI, Gemini, custom endpoints and others)
+
+| Property | Details |
+| --- | --- |
+| Component | AI Gateway, NLP, LangEvals; App when it validates a key |
+| When | A feature uses a provider you configured |
+| What it carries | Content: prompts and completions |
+| How to stop it | Remove the provider |
+
+#### `dlp.googleapis.com`
+
+| Property | Details |
+| --- | --- |
+| Component | App, Workers |
+| When | Strict PII redaction, only when the in-cluster Presidio call fails and Google credentials are set (`app.evaluators.google.enabled`) |
+| What it carries | Content: span text to redact |
+| How to stop it | `LANGWATCH_DISABLE_GOOGLE_DLP=true` |
+
+#### `api.github.com`, or `GITHUB_LANGY_HOST`
+
+| Property | Details |
+| --- | --- |
+| Component | App |
+| When | The Langy GitHub App is configured |
+| What it carries | Repository and installation metadata, token requests |
+| How to stop it | Leave the GitHub App unset |
+
+#### `github.com`, `api.github.com`, `codeload.github.com`, the npm registry, and hosts on a project's allow-list
+
+| Property | Details |
+| --- | --- |
+| Component | Langy agent |
+| When | `networkPolicy.allowExternalHttps: true` on the Langy agent. The NetworkPolicy then allows `:443` to any public address. The agent's L7 egress adapter checks proxied traffic against the allow-list, which is cooperative by default |
+| What it carries | git clone and push, `gh`, `npm` |
+| How to stop it | Off by default, see [Langy networking](/self-hosting/langy/networking-and-egress) |
+
+#### Twilio, ElevenLabs
+
+| Property | Details |
+| --- | --- |
+| Component | Workers, AI Gateway |
+| When | Voice scenarios with your credentials |
+| What it carries | Audio |
+| How to stop it | Do not configure them |
+
+#### Webhooks, Slack, email (SMTP, SES, SendGrid, Resend), SSO identity providers, S3 or Azure Blob storage, OTLP export
+
+| Property | Details |
+| --- | --- |
+| Component | App, Workers; NLP for workflow HTTP blocks |
+| When | You configure them |
+| What it carries | What you configure them to send |
+| How to stop it | Do not configure them |
+
 
 Presidio runs inside LangEvals, in the cluster. Strict PII redaction stays in the cluster unless the Google DLP fallback above is set up.
 
@@ -65122,13 +65314,51 @@ Presidio runs inside LangEvals, in the cluster. Strict PII redaction stays in th
 
 Libraries inside the images can call third parties on their own. A self-hosted install switches each of these off by default: the code, the images and the `npx @langwatch/server` launcher set the defaults below, and the Helm chart sets them again in a ConfigMap. The images carry the tokenizer files and the model prices they need.
 
-| Host | Component | What it would do | Default | How to turn it on |
-|---|---|---|---|---|
-| `api.trycloudflare.com` and the Cloudflare tunnel edge; `cloudflare-dns.com`, `dns.google` | Workers | Open a public `*.trycloudflare.com` hostname to the worker's voice media listener, so phone calls can reach it | Off: the app leaves the tunnel off on a self-hosted production install, and the chart sets `VOICE_TUNNEL=false` | `VOICE_TUNNEL=true` on the Workers. Or set `VOICE_PUBLIC_BASE_URL` to your own hostname, which needs no tunnel |
-| `checkpoint.prisma.io` | App (the upgrade Job, or the app's first boot) | Prisma's version check while `pnpm task upgrade` applies migrations: CLI version, hashed project path, database type, command name | Never: LangWatch sets `CHECKPOINT_DISABLE=1` in every environment, in the app's Prisma config, the image, the chart and the launcher | No switch |
-| `openaipublic.blob.core.windows.net` | App, Workers, LangEvals | Download a tokenizer file for token counting | Never: the app image ships every file and sets `TIKTOKENS_PATH`, and the LangEvals image ships them in its tiktoken cache | No switch |
-| `raw.githubusercontent.com` | LangEvals | Download the LiteLLM model price list at startup | Never: LangEvals prices model calls from LangWatch's own model catalog, shipped in the image, on top of the list bundled with the pinned LiteLLM | No switch |
-| `t.explodinggradients.com` | LangEvals | RAGAS usage analytics: a random id, the RAGAS version, provider and model names, request counts | Off: LangEvals, its image and the chart set `RAGAS_DO_NOT_TRACK=true` | `RAGAS_DO_NOT_TRACK=false` |
+#### `api.trycloudflare.com` and the Cloudflare tunnel edge; `cloudflare-dns.com`, `dns.google`
+
+| Property | Details |
+| --- | --- |
+| Component | Workers |
+| What it would do | Open a public `*.trycloudflare.com` hostname to the worker's voice media listener, so phone calls can reach it |
+| Default | Off: the app leaves the tunnel off on a self-hosted production install, and the chart sets `VOICE_TUNNEL=false` |
+| How to turn it on | `VOICE_TUNNEL=true` on the Workers. Or set `VOICE_PUBLIC_BASE_URL` to your own hostname, which needs no tunnel |
+
+#### `checkpoint.prisma.io`
+
+| Property | Details |
+| --- | --- |
+| Component | App (the upgrade Job, or the app's first boot) |
+| What it would do | Prisma's version check while `pnpm task upgrade` applies migrations: CLI version, hashed project path, database type, command name |
+| Default | Never: LangWatch sets `CHECKPOINT_DISABLE=1` in every environment, in the app's Prisma config, the image, the chart and the launcher |
+| How to turn it on | No switch |
+
+#### `openaipublic.blob.core.windows.net`
+
+| Property | Details |
+| --- | --- |
+| Component | App, Workers, LangEvals |
+| What it would do | Download a tokenizer file for token counting |
+| Default | Never: the app image ships every file and sets `TIKTOKENS_PATH`, and the LangEvals image ships them in its tiktoken cache |
+| How to turn it on | No switch |
+
+#### `raw.githubusercontent.com`
+
+| Property | Details |
+| --- | --- |
+| Component | LangEvals |
+| What it would do | Download the LiteLLM model price list at startup |
+| Default | Never: LangEvals prices model calls from LangWatch's own model catalog, shipped in the image, on top of the list bundled with the pinned LiteLLM |
+| How to turn it on | No switch |
+
+#### `t.explodinggradients.com`
+
+| Property | Details |
+| --- | --- |
+| Component | LangEvals |
+| What it would do | RAGAS usage analytics: a random id, the RAGAS version, provider and model names, request counts |
+| Default | Off: LangEvals, its image and the chart set `RAGAS_DO_NOT_TRACK=true` |
+| How to turn it on | `RAGAS_DO_NOT_TRACK=false` |
+
 
 Emails the install sends embed the LangWatch logo from `app.langwatch.ai`, so the recipient's mail client loads it when it shows images.
 
@@ -65170,10 +65400,24 @@ To remove the slot, switch managed models off on **Settings, Connect**, or set `
 
 ## The usage report and the license sync
 
-| Channel | Who sends it | Where it goes | What it carries | How to stop it |
-|---|---|---|---|---|
-| Usage report | Every install: open source, offline license, or connected | `app.langwatch.ai/api/track_usage`, or `connect.langwatch.ai/v1/stats` once the license names a hosted service | The fields in the [dictionary](/self-hosting/usage-report-dictionary): counts, timestamps, the release, aggregated email domains | `DISABLE_USAGE_STATS=true`, or the two switches on the Checkup page |
-| License sync | Installs whose license names a hosted service | `connect.langwatch.ai/v1/license/sync` | A license token derived from the signed license key (a hash, not the key), the instance id, the release, and the member and lite member counts | It is a term of a license with hosted services and has no switch of its own. `LANGWATCH_CONNECT_DISABLED=true` stops it with everything else. An offline license never sends it |
+#### Usage report
+
+| Property | Details |
+| --- | --- |
+| Who sends it | Every install: open source, offline license, or connected |
+| Where it goes | `app.langwatch.ai/api/track_usage`, or `connect.langwatch.ai/v1/stats` once the license names a hosted service |
+| What it carries | The fields in the [dictionary](/self-hosting/usage-report-dictionary): counts, timestamps, the release, aggregated email domains |
+| How to stop it | `DISABLE_USAGE_STATS=true`, or the two switches on the Checkup page |
+
+#### License sync
+
+| Property | Details |
+| --- | --- |
+| Who sends it | Installs whose license names a hosted service |
+| Where it goes | `connect.langwatch.ai/v1/license/sync` |
+| What it carries | A license token derived from the signed license key (a hash, not the key), the instance id, the release, and the member and lite member counts |
+| How to stop it | It is a term of a license with hosted services and has no switch of its own. `LANGWATCH_CONNECT_DISABLED=true` stops it with everything else. An offline license never sends it |
+
 
 The two are separate on purpose. The usage report is optional and says so; the license sync is a contract term and says that.
 
@@ -68904,6 +69148,10 @@ Langy, the AI assistant, is part of this install and runs on the node's normal c
   LangWatch team and is the fastest way to get started.
 </Note>
 
+<Info>
+**Preparing for 3.21?** The next minor release is planned to preserve existing integrations while applying internal data migrations automatically. Self-hosted operators should review [3.21 upgrade preparation](/self-hosting/releases#preparing-for-321) before rollout.
+</Info>
+
 ## Architecture at a Glance
 
 <Frame caption="Every component runs in your environment. The dashed line is the only connection to LangWatch, and each part of it has a switch.">
@@ -68929,10 +69177,8 @@ See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) f
 </Frame>
 
 <CardGroup cols={2}>
-<Card title="LangWatch Cloud" icon="cloud">
+<Card title="LangWatch Cloud" icon="cloud" href="https://langwatch.ai">
 Fully managed by the LangWatch team. No infrastructure to manage, sign up and start sending traces in minutes.
-
-[Sign up at langwatch.ai](https://langwatch.ai)
 
 </Card>
 
@@ -68960,13 +69206,13 @@ LangWatch manages the control plane (App, Workers, NLP, LangEvals). You provide 
 
 ### At a Glance
 
-|                            | **Cloud** | **Self-Managed** | **Cloud Enterprise** | **Hybrid** |
-| -------------------------- | :-------: | :--------------: | :------------------: | :--------: |
-| You manage infrastructure  |           |       Yes        |                      |            |
-| You manage data storage    |           |       Yes        |         Yes          |    Yes     |
-| LangWatch manages app      |    Yes    |                  |         Yes          |    Yes     |
-| Data stored in your network |           |       Yes        |         Yes          |    Yes     |
-| Setup time                 |  Minutes  |      Hours       |         Days         |    Days    |
+| Responsibility | Cloud | Self-Managed | Cloud Enterprise | Hybrid |
+| --- | :---: | :---: | :---: | :---: |
+| You manage infrastructure | No | Yes | No | No |
+| You manage data storage | No | Yes | Yes | Yes |
+| LangWatch manages app | Yes | No | Yes | Yes |
+| Data stored in your network | No | Yes | Yes | Yes |
+| Setup time | Minutes | Hours | Days | Days |
 
 ## Quick Start
 
@@ -69031,6 +69277,38 @@ Enterprise capabilities include:
 title: Releases and support
 description: "How LangWatch is versioned, which releases get fixes, and why you can upgrade to the latest release from any version."
 ---
+
+## Preparing for 3.21
+
+<Info>
+**Upcoming minor release.** 3.21 is planned as a backward-compatible release with substantial internal changes and data migrations. Existing API and SDK integrations are intended to keep working. This is preparation guidance; review the final release notes before deploying the 3.21 image.
+</Info>
+
+### What changes for self-hosted operators
+
+Migration work runs through the existing upgrade system on deployment. The runner records completed work and checkpoints so a retry can resume rather than repeat the entire upgrade. Most installations should not need a manual migration pass.
+
+An automatic migration can still need operator assistance when historical data is inconsistent, required database privileges are missing, a dependency is unavailable, or another upgrade holds the lease. Treat an incomplete migration as something to investigate; a successful container start alone does not establish that every tenant migration finished.
+
+### Prepare before rollout
+
+1. Take fresh PostgreSQL and ClickHouse backups and verify your restore procedure. See [Backups](/self-hosting/configuration/backups).
+2. Test the target image and your current Helm values in staging. Keep `CREDENTIALS_SECRET`, provider credentials, existing SSO configuration and callback URLs unchanged during the upgrade.
+3. Read [Before you upgrade](/self-hosting/upgrade#before-you-upgrade), including the queue-format preparation and database privileges that apply to your starting release.
+4. Check the planned work with `pnpm task upgrade plan` from the target app image. Schedule time for the blocking steps and background migrations; larger installations may take longer.
+5. Make sure an operator listed in `ADMIN_EMAILS` can reach **Ops → Upgrades** and inspect tenant migrations after deployment.
+
+### Confirm the upgrade completed
+
+Use **Ops → Upgrades** (`/ops/upgrades`) or `pnpm task upgrade status` to inspect the installation ledger and the recorded steps. Check **Tenant migrations** separately for Finalized, Held and Parked counts. Smoke-test sign-in, trace ingestion and the integrations your team uses before declaring the rollout complete.
+
+Held or parked tenant migrations are retried automatically and can be targeted from the operator view. Review the reason before retrying; preserve existing sign-in connections and domain ownership while resolving conflicts. See [Check the migration results](/self-hosting/upgrade#check-the-migration-results).
+
+### If an automatic step needs help
+
+Read the error and its next action in `pnpm task upgrade status`. Resolve the named dependency, privilege or data conflict, then use the documented retry flow. Completed steps and checkpoints are retained. Do not delete the upgrade ledger or force a migration complete to bypass an error.
+
+If the cause is unclear, include the starting and target versions, failed step name, deployment method and redacted error when [contacting support](/support). Never include API keys, provider credentials, database passwords or `CREDENTIALS_SECRET`. The [upgrade guide](/self-hosting/upgrade) covers failure reasons, retries and recovery in detail.
 
 ## Versioning
 
@@ -70371,6 +70649,10 @@ For timeouts or connection issues, the tool uses exponential backoff (up to 5 re
 title: Upgrade Guide
 description: "How to upgrade LangWatch to the latest version"
 ---
+
+<Info>
+**Planning the 3.21 rollout?** Start with [3.21 upgrade preparation](/self-hosting/releases#preparing-for-321). Migrations are intended to run automatically; this guide explains how to confirm completion and investigate a step that needs operator assistance.
+</Info>
 
 ## Before You Upgrade
 
