@@ -1371,7 +1371,7 @@ Contract `../contract/src/traces.trpc.ts:620`, router `src/transport/shared-trac
 interface Input {
   token: string;
 }
-type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-share.schemas.ts:212
+type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-share.schemas.ts:213
 ```
 
 ### `spans`
@@ -1910,7 +1910,7 @@ interface Input {
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof spanDetailSchema>; // ../contract/src/trace-view.contract.ts:227
+type Output = z.infer<typeof spanDetailSchema>; // ../contract/src/trace-view.contract.ts:246
 
 // traces.resourceInfo
 // Input: inline, ../contract/src/traces.trpc.ts:593
@@ -1920,7 +1920,7 @@ interface Input {
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof traceResourceInfoSchema>; // ../contract/src/trace-view.contract.ts:286
+type Output = z.infer<typeof traceResourceInfoSchema>; // ../contract/src/trace-view.contract.ts:305
 
 // traces.traceEvents
 // Input: inline, ../contract/src/traces.trpc.ts:607

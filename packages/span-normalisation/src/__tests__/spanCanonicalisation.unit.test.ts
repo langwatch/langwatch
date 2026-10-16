@@ -99,10 +99,10 @@ describe("canonicaliseLogRecord()", () => {
 });
 
 describe("orderedSpanCanonicalisers()", () => {
-  it("runs all sixteen canonicalisers, the fallback last", () => {
+  it("runs all eighteen canonicalisers, the fallback and then the fresh-input pass last", () => {
     const ids = orderedSpanCanonicalisers({ codexScopes }).map(({ id }) => id);
 
-    expect(ids).toHaveLength(16);
-    expect(ids.at(-1)).toBe("fallback");
+    expect(ids).toHaveLength(18);
+    expect(ids.slice(-2)).toEqual(["fallback", "fresh-input"]);
   });
 });

@@ -461,7 +461,14 @@ function SpanTooltipBody({
       {(totalTokens > 0 || (span.cost ?? 0) > 0) && (
         <Box marginTop={1.5} display="grid" gridTemplateColumns="auto 1fr" gap={0.5} columnGap={3}>
           {span.inputTokens != null && (
-            <TipCell label="Input" value={span.inputTokens.toLocaleString()} />
+            <TipCell
+              label={
+                (span.cacheReadTokens ?? 0) > 0 || (span.cacheCreationTokens ?? 0) > 0
+                  ? "Uncached input"
+                  : "Input"
+              }
+              value={span.inputTokens.toLocaleString()}
+            />
           )}
           {span.outputTokens != null && (
             <TipCell label="Output" value={span.outputTokens.toLocaleString()} />

@@ -424,4 +424,62 @@ describe("GenAICanonicaliserService", () => {
       expect(ctx.out[ATTR_KEYS.GEN_AI_OPERATION_NAME]).toBe("tool");
     });
   });
+
+  describe("when gen_ai.usage.cache_write.input_tokens is present", () => {
+    /** @scenario "A GenAI convention span's cache write is priced at the catalogue cache-write rate" */
+    it("records the cache buckets and restates the input as the fresh remainder", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]: 3000,
+        [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS]: 40,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: 500,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS]: 2000,
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(500);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(2000);
+      expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS)).toBe(500);
+      expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS)).toBe(2000);
+    });
+
+    it("restates the input when only cache reads happened", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]: 15232,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: 15217,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS]: 0,
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(15);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBeUndefined();
+    });
+
+    /** @scenario "An input count smaller than its cache buckets is left as sent" */
+    it("leaves an input count smaller than its cache buckets as sent", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]: 15,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: 15217,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS]: 0,
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(15);
+    });
+  });
+
+  describe("when only gen_ai.usage.cache_read.input_tokens is present", () => {
+    it("leaves the input as sent, since LangWatch SDKs send it with a fresh input count", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]: 100,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: 900,
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(100);
+    });
+  });
 });

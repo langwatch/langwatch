@@ -8,12 +8,15 @@ import {
   extractUsageTokens,
   recordValueType,
   mapSpanTypeToGenAiOperationName,
+  markInputAsFresh,
+  restateInputAsFresh,
 } from "./canonicalExtraction.ts";
 import { asBoolean, asNumber, coerceToStringArray, isRecord } from "./canonicalGuard.ts";
 import {
   extractSystemInstructionFromMessages,
   stripLiftedSystemMessage,
 } from "./canonicalMessage.ts";
+import { isMastraSpan } from "./mastraCanonicaliser.ts";
 
 const GEN_AI_RULE_PREFIX = "genai";
 
@@ -172,12 +175,9 @@ export class GenAiSpanService {
       ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
     ]);
 
-    const cachedInputTokens = asNumber(attrs.get(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS));
-    if (cachedInputTokens !== null) {
-      attrs.delete(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS);
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cachedInputTokens);
-      ctx.recordRule(`${GEN_AI_RULE_PREFIX}:cached_input_tokens->cache_read.input_tokens`);
-    }
+    this.canonicaliseLegacyCacheKeys(ctx);
+    this.canonicaliseCacheWrite(ctx);
+    this.canonicaliseLangWatchCachedInput(ctx);
 
     const reasoningOutputTokens = asNumber(
       attrs.get(ATTR_KEYS.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS),
@@ -201,6 +201,79 @@ export class GenAiSpanService {
       ctx.setAttr(ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN, timeToFirstChunkSeconds * 1000);
       ctx.recordRule(`${GEN_AI_RULE_PREFIX}:response.time_to_first_chunk`);
     }
+  }
+
+  /** Older OpenLLMetry and Strands releases' cache counts, under the canonical keys. */
+  private canonicaliseLegacyCacheKeys(ctx: ExtractorContext): void {
+    const aliases: [string, string][] = [
+      [
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS_LEGACY,
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+      ],
+      [
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS_LEGACY,
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+      ],
+      [
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS_LEGACY,
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+      ],
+    ];
+    for (const [legacy, canonical] of aliases) {
+      const tokens = asNumber(ctx.bag.attrs.get(legacy));
+      if (tokens === null) {
+        continue;
+      }
+
+      ctx.bag.attrs.delete(legacy);
+      if (tokens > 0) {
+        ctx.setAttrIfAbsent(canonical, tokens);
+        ctx.recordRule(`${GEN_AI_RULE_PREFIX}:${legacy}->${canonical}`);
+      }
+    }
+  }
+
+  /**
+   * The LangWatch SDKs send the flat `cached_input_tokens` beside a fresh input count. Mastra's
+   * older releases send the same key with the AI SDK's input count, so Mastra reads its own.
+   */
+  private canonicaliseLangWatchCachedInput(ctx: ExtractorContext): void {
+    if (isMastraSpan(ctx)) {
+      return;
+    }
+
+    const cachedInputTokens = asNumber(
+      ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS),
+    );
+    if (cachedInputTokens === null) {
+      return;
+    }
+
+    ctx.bag.attrs.delete(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS);
+
+    ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cachedInputTokens);
+    ctx.recordRule(`${GEN_AI_RULE_PREFIX}:cached_input_tokens->cache_read.input_tokens`);
+    markInputAsFresh(ctx, { ruleId: `${GEN_AI_RULE_PREFIX}:usage.input_tokens(fresh as sent)` });
+  }
+
+  /**
+   * `cache_write.input_tokens` marks the Claude SDK's usage shape, whose input count includes the
+   * cache reads and writes. The raw key stays, so later passes see it was handled.
+   */
+  private canonicaliseCacheWrite(ctx: ExtractorContext): void {
+    const cacheWrite = asNumber(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS));
+    if (cacheWrite === null) {
+      return;
+    }
+
+    if (cacheWrite > 0) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cacheWrite);
+      ctx.recordRule(`${GEN_AI_RULE_PREFIX}:usage.cache_write->cache_creation`);
+    }
+    restateInputAsFresh(ctx, {
+      cacheWrite,
+      ruleId: `${GEN_AI_RULE_PREFIX}:usage.input_tokens(fresh)`,
+    });
   }
 
   /** The OpenInference invocation parameters, each under its canonical numeric attribute. */

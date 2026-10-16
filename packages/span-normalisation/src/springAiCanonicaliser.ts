@@ -5,11 +5,14 @@ import type {
   ExtractorContext,
   LogExtractorContext,
 } from "./canonicalAttributes.ts";
+import { isAnthropicProviderSpan, markInputAsFresh } from "./canonicalExtraction.ts";
 
 export const SPRING_AI_SCOPE_NAMES: ReadonlySet<string> = new Set([
   "org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",
   "org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler",
 ]);
+
+const SPRING_AI_KIND = "spring.ai.kind";
 
 const PROMPT_IDENTIFIER = "Chat Model Prompt Content:";
 const COMPLETION_IDENTIFIER = "Chat Model Completion:";
@@ -23,9 +26,14 @@ export class SpringAICanonicaliserService implements AttributeCanonicaliser {
 
   readonly id = "spring-ai";
 
-  apply(_ctx: ExtractorContext): void {
-    // Spring AI emits gen_ai.* spans via Micrometer when configured;
-    // GenAICanonicaliserService handles that side. Nothing to do here.
+  /**
+   * Spring AI's gen_ai.* spans are read by GenAICanonicaliserService. Its Anthropic model reports
+   * the API's input count, which excludes the cache, unlike the GenAI conventions.
+   */
+  apply(ctx: ExtractorContext): void {
+    if (ctx.bag.attrs.has(SPRING_AI_KIND) && isAnthropicProviderSpan(ctx)) {
+      markInputAsFresh(ctx, { ruleId: `${this.id}:usage.input_tokens(fresh as sent)` });
+    }
   }
 
   applyLog(ctx: LogExtractorContext): void {

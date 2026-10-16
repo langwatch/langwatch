@@ -23,13 +23,17 @@ import {
   type RecordSpanCommandData,
   type SpanReceivedEvent,
   type PIIRedactionLevel,
+  TRUNCATED_ATTRIBUTES_KEY,
 } from "@langwatch/trace-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
 import { clonePayload } from "../rules/payload-clone.rules.ts";
-import { capOversizedAttributes } from "../rules/trace-attribute-cap.rules.ts";
+import {
+  capOversizedAttributes,
+  MAX_RECORDED_ATTRIBUTE_VALUE_BYTES,
+} from "../rules/trace-attribute-cap.rules.ts";
 
 export interface TraceSpanPiiRedaction {
   redact(input: {
@@ -186,9 +190,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     const resource = commandData.resource ? clonePayload(commandData.resource) : null;
 
     this.stripReservedAttributes(span, resource);
-    if (!command.data.spoolRef) {
-      this.capAttributes({ span, resource, tenantId, traceId, spanId });
-    }
+    this.capAttributes({ span, resource, tenantId, traceId, spanId });
 
     const piiRedactionLevel = commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
     const [piiResult, costResult, tokenResult] = await Promise.allSettled([
@@ -301,7 +303,11 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     traceId: string;
     spanId: string;
   }): void {
-    const cappedAttributeCount = capOversizedAttributes(span, resource);
+    const cappedAttributeCount = capOversizedAttributes(
+      span,
+      resource,
+      MAX_RECORDED_ATTRIBUTE_VALUE_BYTES,
+    );
     if (cappedAttributeCount === 0) {
       return;
     }
@@ -321,9 +327,9 @@ export class EventingRecordSpanAdapter implements CommandHandler<
   private stripReservedAttributes(span: OtlpSpan, resource: OtlpResource | null): void {
     const strip = (attributes: OtlpSpan["attributes"]): OtlpSpan["attributes"] =>
       attributes.filter((attribute) => {
-        const reserved = attribute.key.startsWith(
-          EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PREFIX,
-        );
+        const reserved =
+          attribute.key.startsWith(EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PREFIX) ||
+          attribute.key === TRUNCATED_ATTRIBUTES_KEY;
         const allowed = EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PASSTHROUGH.has(attribute.key);
         if (!reserved || allowed) {
           return true;
@@ -331,7 +337,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
 
         this.logger.warn(
           { attributeKey: attribute.key },
-          "Stripped user-submitted langwatch.reserved.* attribute",
+          "Stripped a user-submitted reserved attribute",
         );
         return false;
       });

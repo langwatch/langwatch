@@ -46,9 +46,13 @@ export function TokenBreakdownTooltipContent({
   totalWithCache,
   estimated,
 }: TokenBreakdownTooltipContentProps) {
+  const hasCache = (cacheReadTokens ?? 0) > 0 || (cacheCreationTokens ?? 0) > 0;
   return (
     <VStack align="stretch" gap={0.5} minWidth="180px">
-      <TooltipRow label="Input" value={inputTokens?.toLocaleString() ?? "—"} />
+      <TooltipRow
+        label={hasCache ? "Uncached input" : "Input"}
+        value={inputTokens?.toLocaleString() ?? "—"}
+      />
       <TooltipRow label="Output" value={outputTokens?.toLocaleString() ?? "—"} />
       {cacheReadTokens != null && (
         <TooltipRow label="Cache read" value={cacheReadTokens.toLocaleString()} />

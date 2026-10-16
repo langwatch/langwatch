@@ -51,8 +51,8 @@ function rollupColumnFor(metric: TraceRollupMetricKey): string {
       return `${ra}.CacheWriteTokensSum`;
     case "performance.reasoning_tokens":
       return `${ra}.ReasoningTokensSum`;
+    // Total tokens count the cache reads and writes: input is the fresh remainder.
     case "performance.total_tokens":
-      return `(${ra}.PromptTokensSum + ${ra}.CompletionTokensSum)`;
     case "performance.total_processed_tokens":
       return `(${ra}.PromptTokensSum + ${ra}.CompletionTokensSum + ${ra}.CacheReadTokensSum + ${ra}.CacheWriteTokensSum)`;
     default: {

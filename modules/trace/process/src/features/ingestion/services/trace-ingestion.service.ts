@@ -22,13 +22,17 @@ import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/a
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 
-import type { TraceSpanDedupRepository } from "../../../repositories/trace-span-dedup.repository.ts";
+import type {
+  TraceSpanDedupRepository,
+  UsageRecordRef,
+} from "../../../repositories/trace-span-dedup.repository.ts";
 import {
   codexHelperThreadMarkersOf,
   stampCodexHelperThread,
   type ScopedSpans,
 } from "../../claude-code/rules/codex-helper-thread.rules.ts";
 import { TraceIngestionMetricsService } from "./trace-ingestion-metrics.service.ts";
+import { TraceRequestUsageService } from "./trace-request-usage.service.ts";
 
 type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
 
@@ -372,6 +376,7 @@ export class TraceIngestionService {
  */
 class TraceSpanCollectionService {
   private readonly logger = createLogger("langwatch:trace-processing:span-collection");
+  private readonly usage: TraceRequestUsageService;
 
   private constructor(
     private readonly options: {
@@ -379,7 +384,9 @@ class TraceSpanCollectionService {
       commands: TraceIngressCommand;
       payloads?: TraceIngressPayload;
     },
-  ) {}
+  ) {
+    this.usage = TraceRequestUsageService.create({ dedup: options.dedup });
+  }
 
   static create(options: {
     dedup: TraceSpanDedupRepository;
@@ -398,6 +405,7 @@ class TraceSpanCollectionService {
     otelSpanRef?: OtelSpan;
   }): Promise<SpanIngestionResult> {
     let lockAcquired = false;
+    let usageRecord: UsageRecordRef | null = null;
 
     try {
       const claim = await this.options.dedup.claimProcessing({
@@ -411,9 +419,12 @@ class TraceSpanCollectionService {
 
       lockAcquired = claim.outcome === "acquired";
 
+      const usage = await this.usage.claim(input);
+      usageRecord = usage.acquired;
+
       const commandData: RecordSpanCommandData = {
         tenantId: input.tenantId,
-        span: input.span,
+        span: usage.span,
         resource: input.resource,
         instrumentationScope: input.instrumentationScope,
         piiRedactionLevel: input.piiRedactionLevel,
@@ -438,6 +449,9 @@ class TraceSpanCollectionService {
           traceId: input.span.traceId,
           spanId: input.span.spanId,
         });
+      }
+      if (usageRecord) {
+        await this.usage.release({ record: usageRecord });
       }
 
       input.otelSpanRef?.addEvent("span_ingestion_error", {

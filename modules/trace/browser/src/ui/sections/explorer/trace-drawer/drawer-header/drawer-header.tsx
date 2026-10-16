@@ -387,10 +387,8 @@ export const DrawerHeader = memo(function DrawerHeader({
     reasoningTokens,
   } = readTokenUsage(trace.attributes);
 
-  // Total tokens the model actually processed = input + output PLUS cache read + cache
-  // write.
-  const totalTokensWithCache =
-    trace.totalTokens + (cacheReadTokens ?? 0) + (cacheCreationTokens ?? 0);
+  // The header's total already counts the cache reads and writes.
+  const totalTokensWithCache = trace.totalTokens;
 
   // If we have concrete input AND output token numbers to display, trust them
   // and suppress the "estimated" caveat — historical trace summaries can carry
@@ -1255,7 +1253,7 @@ function HeaderMetricsRow({
               label="Tokens"
               value={
                 trace.inputTokens != null && trace.outputTokens != null
-                  ? `${formatTokens(trace.inputTokens)} in · ${formatTokens(trace.outputTokens)} out`
+                  ? `${formatTokens(trace.inputTokens + (cacheReadTokens ?? 0) + (cacheCreationTokens ?? 0))} in · ${formatTokens(trace.outputTokens)} out`
                   : trace.totalTokens.toLocaleString()
               }
             />

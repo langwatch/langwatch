@@ -40,6 +40,13 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     # across charged the cached tokens at the full input rate and again at
     # the cache rate, which priced such a turn about four times over.
 
+  @unit
+  Scenario: A codex response span's cached input is priced once, not twice
+    Given a codex response span whose gen_ai.usage.input_tokens includes its cached tokens
+    And a codex turn span that reports the same whole input on its gen_ai usage keys
+    When the spans are canonicalised with every other canonicaliser
+    Then each span's input tokens are the part that was not cached
+
   # --- Which conversation a codex turn belongs to ---------------------------
 
   # A codex turn span names two ids: the session it belongs to, and the turn

@@ -52,8 +52,14 @@ describe("CONTENT_KEY_CATALOG", () => {
             "gen_ai.tool.call.result",
             "ai.toolCall",
             "ai.toolCall.args",
+            "anthropic.tool_result.content",
           ],
         });
+      });
+
+      /** @scenario "Dropping tool content drops the Claude tool result" */
+      it("drops the Claude tool result with the tool content", () => {
+        expect(CONTENT_KEY_CATALOG.tools).toContain("anthropic.tool_result.content");
       });
 
       /** @scenario "Every content category has a key set" */

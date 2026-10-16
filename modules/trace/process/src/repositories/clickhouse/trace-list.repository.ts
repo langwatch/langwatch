@@ -25,6 +25,7 @@ import { z } from "zod";
 
 import { scopeTraceFilterToTable } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-scope.mapper.ts";
 import type { TraceFilterWhere } from "../../rules/trace-filter-hidden-origins.rules.ts";
+import { TRACE_SUMMARY_TOTAL_TOKENS_SQL } from "../../rules/trace-token-total.rules.ts";
 import { chBoolean, chNumber, chString } from "./stored-span-row.mapper.ts";
 
 const TABLE_NAME = "trace_summaries" as const;
@@ -234,9 +235,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     });
 
     const rawSortExpression =
-      query.sort.column === "TotalTokens"
-        ? "(coalesce(TotalPromptTokenCount, 0) + coalesce(TotalCompletionTokenCount, 0))"
-        : query.sort.column;
+      query.sort.column === "TotalTokens" ? TRACE_SUMMARY_TOTAL_TOKENS_SQL : query.sort.column;
     // Every supported list sort is numeric (OccurredAt is normalized to epoch
     // milliseconds). Coalescing nullable metrics makes the keyset comparison
     // use exactly the same value as ORDER BY and as the service-side cursor.

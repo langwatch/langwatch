@@ -3,7 +3,11 @@ import { type ExtractorContext, takeAttribute } from "../canonicalAttributes.ts"
 import {
   extractModelToBoth,
   extractUsageTokens,
+  isAnthropicProviderSpan,
+  isInputRestatedAsFresh,
+  markInputAsFresh,
   normaliseModelFromAiModelObject,
+  setFreshInputTokens,
 } from "../canonicalExtraction.ts";
 import { asNumber } from "../canonicalGuard.ts";
 import { AI_SDK_SPAN_TYPE_MAP, canonicaliseVercelToolCall } from "./vercelToolCall.ts";
@@ -73,11 +77,12 @@ function canonicaliseUsage(ctx: ExtractorContext): void {
     asNumber(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]) ??
     asNumber(attrs.get(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS));
   if (canonicalInput !== null) {
-    const cacheRead =
-      asNumber(takeAttribute(attrs, ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS)) ??
-      asNumber(takeAttribute(attrs, ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS));
+    const detailRead = asNumber(takeAttribute(attrs, ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS));
+    const flatRead = asNumber(takeAttribute(attrs, ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS));
+    const cacheRead = detailRead ?? flatRead;
     const cacheWrite = asNumber(takeAttribute(attrs, ATTR_KEYS.AI_USAGE_CACHE_WRITE_TOKENS));
     const noCacheTokens = asNumber(takeAttribute(attrs, ATTR_KEYS.AI_USAGE_NO_CACHE_TOKENS));
+    const sentByV5 = detailRead === null && cacheWrite === null && noCacheTokens === null;
     if (cacheRead !== null && cacheRead > 0) {
       ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cacheRead);
       ctx.recordRule(`${VERCEL_RULE_PREFIX}:ai.usage.cacheRead->gen_ai.usage.cache_read`);
@@ -87,7 +92,14 @@ function canonicaliseUsage(ctx: ExtractorContext): void {
       ctx.recordRule(`${VERCEL_RULE_PREFIX}:ai.usage.cacheWrite->gen_ai.usage.cache_creation`);
     }
 
-    recordFreshInputTokens({ cacheRead, cacheWrite, canonicalInput, ctx, noCacheTokens });
+    recordFreshInputTokens({
+      cacheRead,
+      cacheWrite,
+      canonicalInput,
+      ctx,
+      noCacheTokens,
+      sentByV5,
+    });
 
     const reasoningTokens = asNumber(takeAttribute(attrs, ATTR_KEYS.AI_USAGE_REASONING_TOKENS));
     if (reasoningTokens !== null && reasoningTokens > 0) {
@@ -100,9 +112,9 @@ function canonicaliseUsage(ctx: ExtractorContext): void {
 }
 
 /**
- * The Vercel SDK reports input tokens including the cached portion, so once a
- * cache read or write is known the canonical input count is restated as the
- * fresh part alone.
+ * AI SDK v6 reports input tokens including the cache, with the fresh part as `noCacheTokens`. A v5
+ * span has only the flat `cachedInputTokens`: its Anthropic provider reports the API's own input
+ * count, which excludes the cache, while its other providers include it.
  */
 function recordFreshInputTokens({
   cacheRead,
@@ -110,20 +122,31 @@ function recordFreshInputTokens({
   canonicalInput,
   ctx,
   noCacheTokens,
+  sentByV5,
 }: {
   cacheRead: number | null;
   cacheWrite: number | null;
   canonicalInput: number;
   ctx: ExtractorContext;
   noCacheTokens: number | null;
+  sentByV5: boolean;
 }): void {
   const hasCacheTokens = (cacheRead ?? 0) > 0 || (cacheWrite ?? 0) > 0;
   if (!hasCacheTokens) return;
+  if (noCacheTokens === null && isInputRestatedAsFresh(ctx)) return;
+  if (sentByV5 && isAnthropicProviderSpan(ctx)) {
+    markInputAsFresh(ctx, {
+      ruleId: `${VERCEL_RULE_PREFIX}:ai.usage.inputTokens(fresh as sent)`,
+    });
+    return;
+  }
 
   const freshInput =
     noCacheTokens ?? Math.max(0, canonicalInput - (cacheRead ?? 0) - (cacheWrite ?? 0));
   if (freshInput === canonicalInput) return;
 
-  ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, freshInput);
-  ctx.recordRule(`${VERCEL_RULE_PREFIX}:ai.usage.inputTokens->gen_ai.usage.input_tokens(fresh)`);
+  setFreshInputTokens(ctx, {
+    freshInput,
+    ruleId: `${VERCEL_RULE_PREFIX}:ai.usage.inputTokens->gen_ai.usage.input_tokens(fresh)`,
+  });
 }
