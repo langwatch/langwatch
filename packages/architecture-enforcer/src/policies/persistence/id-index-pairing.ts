@@ -10,9 +10,9 @@ import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import { upStatements } from "./clickhouse-table-ownership.ts";
 
 /**
- * Every goose `*_id_index` table has one `defineIdIndex` declaration, and every declaration has
- * its goose table and view, so readiness, the fill and every read by id cover the index
- * (dev/docs/plans/id-index-2026-10-10.md).
+ * Every goose id index table (`<source>_id_index`, or a second `<source>_by_<key>_index`) has one
+ * `defineIdIndex` declaration, and every declaration its goose table and view, so readiness, the
+ * fill and every read by id cover the index (dev/docs/plans/id-index-2026-10-10.md).
  */
 
 const POLICY = "id-index-pairing";
@@ -23,19 +23,42 @@ const TEST_FILE = /(?:__tests__|__fixtures__|\/fixtures\/|\.(?:test|spec)\.)/;
 const SOURCE_FILE = /\.[cm]?tsx?$/;
 const DEFINE = "defineIdIndex";
 const GOOSE_TABLE =
-  /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:\$\{[^}]*\}\.)?`?([A-Za-z_]\w*_id_index)`?(?![\w])/gi;
+  /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:\$\{[^}]*\}\.)?`?([A-Za-z_]\w*(?:_id_index|_by_\w+_index))`?(?![\w])/gi;
 const GOOSE_VIEW =
-  /CREATE\s+MATERIALIZED\s+VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:\$\{[^}]*\}\.)?`?([A-Za-z_]\w*_id_index)_mv`?/gi;
+  /CREATE\s+MATERIALIZED\s+VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:\$\{[^}]*\}\.)?`?([A-Za-z_]\w*(?:_id_index|_by_\w+_index))_mv`?/gi;
 const ALLOWED =
-  "Declare each id index once with defineIdIndex({ source, key, time }) in its owner, beside the goose file that creates <source>_id_index and its _mv view (dev/docs/plans/id-index-2026-10-10.md).";
+  "Declare each id index once with defineIdIndex({ source, key, time }) in its owner, beside the goose file that creates <source>_id_index (or, with by: true, <source>_by_<key>_index) and its _mv view (dev/docs/plans/id-index-2026-10-10.md).";
 
-/** One `defineIdIndex` call: its source table, key columns, and where it is written. */
+/** One `defineIdIndex` call: its source table, key columns, index name, and where it is written. */
 export type IdIndexDeclarationSite = {
   source: string;
   key: readonly string[];
+  index: string;
   file: string;
   line: number;
 };
+
+/**
+ * Mirrors `idIndexName` in `@langwatch/clickhouse-client`, which this package does not
+ * depend on.
+ */
+export function idIndexNameOf({
+  source,
+  key,
+  by,
+}: {
+  source: string;
+  key: readonly string[];
+  by: boolean;
+}): string {
+  if (!by) return `${source}_id_index`;
+  const snake = (column: string) =>
+    column
+      .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+      .replace(/([A-Z])([A-Z][a-z])/g, "$1_$2")
+      .toLowerCase();
+  return `${source}_by_${key.map(snake).join("_")}_index`;
+}
 
 /** The roots a declaration may live in: every module, and eventing. */
 export function declarationRoots({
@@ -95,8 +118,10 @@ function declarationOf({
     key !== undefined && ts.isArrayLiteralExpression(key)
       ? key.elements.filter(ts.isStringLiteralLike).map((element) => element.text)
       : [];
+  const by = stringProperty({ literal: argument, name: "by" })?.kind === ts.SyntaxKind.TrueKeyword;
   const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
-  return { source: table.text, key: columns, file: source.fileName, line };
+  const index = idIndexNameOf({ source: table.text, key: columns, by });
+  return { source: table.text, key: columns, index, file: source.fileName, line };
 }
 
 /** Every `defineIdIndex({ source: "…", key: [...] })` in the modules and eventing. */
@@ -162,7 +187,7 @@ export function lintIdIndexPairingAt({
   const violations: ArchitectureViolation[] = [];
   const declared = new Map<string, IdIndexDeclarationSite>();
   for (const declaration of declarations) {
-    const index = `${declaration.source}_id_index`;
+    const { index } = declaration;
     const site = {
       policy: POLICY,
       file: declaration.file,

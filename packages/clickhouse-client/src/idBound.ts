@@ -74,22 +74,32 @@ export type IdIndexRegistryStatements = IdIndexMarkerStatements & {
 
 type Registered = { declaration: IdIndexDeclaration; readiness: IdIndexReadiness };
 
+/** Which declared index a source and key columns name: the source's first index, or a second. */
+type IndexSelector = { source: string; key: readonly string[] };
+
 /**
- * Every id index a process declared, by source table, each with its readiness per target. A
- * declaration is made once, at composition; declaring the same index again is a no-op, and a
- * different index on the same source is refused.
+ * Every id index a process declared, by index, each with its readiness per target. A source may
+ * carry several on different keys; declaring the same index again is a no-op, and a different
+ * index under the same name, or on the same source and key, is refused.
  */
 export class IdIndexRegistry {
-  private readonly bySource = new Map<string, Registered>();
+  private readonly byIndex = new Map<string, Registered>();
 
   constructor(private readonly statements: IdIndexRegistryStatements) {}
 
   declare({ indexes }: { indexes: readonly IdIndexDeclaration[] }): void {
     for (const declaration of indexes) {
-      const known = this.bySource.get(declaration.source);
+      const known = [...this.byIndex.values()].find(
+        (each) =>
+          each.declaration.index === declaration.index ||
+          (each.declaration.source === declaration.source &&
+            sameKey({ left: each.declaration.key, right: declaration.key })),
+      );
       if (known !== undefined) {
         if (sameDeclaration({ left: known.declaration, right: declaration })) continue;
-        throw new Error(`Two different id indexes are declared over ${declaration.source}.`);
+        throw new Error(
+          `Two different id indexes are declared over ${declaration.source} as ${declaration.index}.`,
+        );
       }
       const statements = this.statements;
       const readiness = IdIndexReadiness.create({
@@ -97,28 +107,48 @@ export class IdIndexRegistry {
         indexes: [declaration],
         watch: () => idIndexReadinessTargets({ privateRoutes: statements.privateRoutes() }),
       });
-      this.bySource.set(declaration.source, { declaration, readiness });
+      this.byIndex.set(declaration.index, { declaration, readiness });
     }
   }
 
   /** Every declared index, in declaration order: the fill's and the retention raise's list. */
   declarations(): IdIndexDeclaration[] {
-    return [...this.bySource.values()].map((each) => each.declaration);
+    return [...this.byIndex.values()].map((each) => each.declaration);
   }
 
-  declarationOf({ source }: { source: string }): IdIndexDeclaration | undefined {
-    return this.bySource.get(source)?.declaration;
+  /**
+   * The index a read by `key` on `source` uses: the one keyed exactly so, else the first whose
+   * key starts with it, as `ExperimentId` alone reads `[ExperimentId, RunId]`.
+   */
+  declarationOf(selector: IndexSelector): IdIndexDeclaration | undefined {
+    return this.registeredOf(selector)?.declaration;
   }
 
-  /** Whether the source's index is ready on the target, from memory; an undeclared one is not. */
-  isReady({ source, target }: { source: string; target: string }): boolean {
-    return this.bySource.get(source)?.readiness.isOn({ target }) ?? false;
+  /** Whether the selected index is ready on the target, from memory; an undeclared one is not. */
+  isReady({ target, ...selector }: IndexSelector & { target: string }): boolean {
+    return this.registeredOf(selector)?.readiness.isOn({ target }) ?? false;
   }
 
   /** Checks one index on one target now, or joins the check in flight. */
-  check({ source, target }: { source: string; target: string }): Promise<boolean> {
-    return this.bySource.get(source)?.readiness.check({ target }) ?? Promise.resolve(false);
+  check({ target, ...selector }: IndexSelector & { target: string }): Promise<boolean> {
+    return this.registeredOf(selector)?.readiness.check({ target }) ?? Promise.resolve(false);
   }
+
+  private registeredOf({ source, key }: IndexSelector): Registered | undefined {
+    const onSource = [...this.byIndex.values()].filter(
+      (each) => each.declaration.source === source,
+    );
+    return (
+      onSource.find((each) => sameKey({ left: each.declaration.key, right: key })) ??
+      onSource.find((each) =>
+        sameKey({ left: each.declaration.key.slice(0, key.length), right: key }),
+      )
+    );
+  }
+}
+
+function sameKey({ left, right }: { left: readonly string[]; right: readonly string[] }): boolean {
+  return left.length === right.length && left.every((column, at) => column === right[at]);
 }
 
 function sameDeclaration({
@@ -160,7 +190,7 @@ export function idBoundOf({
 }: {
   sql: string;
   params: Record<string, unknown>;
-  registry: Pick<IdIndexRegistry, "declarationOf"> | undefined;
+  registry: Pick<IdIndexRegistry, "declarationOf" | "declarations"> | undefined;
   /** Renders the lower bound alone, for a live read whose rows run past any upper one. */
   openEnded?: boolean | undefined;
 }): IdBound | null {
@@ -172,8 +202,16 @@ export function idBoundOf({
     }
   }
   const { table } = marker;
-  const declaration = registry?.declarationOf({ source: table });
-  if (declaration === undefined) throw new StatementScopeError({ kind: "unknown-id-index", table });
+  const declaration = registry?.declarationOf({ source: table, key: marker.columns.split(",") });
+  if (declaration === undefined) {
+    const declared = registry?.declarations().some((each) => each.source === table) ?? false;
+    if (!declared) throw new StatementScopeError({ kind: "unknown-id-index", table });
+    throw new StatementScopeError({
+      kind: "id-index-key-mismatch",
+      table,
+      columns: marker.columns,
+    });
+  }
   const lookup: IdIndexLookup = {
     index: declaration.index,
     key: keyOf({ declaration, marker, params }),
@@ -293,11 +331,11 @@ export async function readIdBound<Row>({
   options: IdBoundOptions | undefined;
   run: (statement: { sql: string; params: Record<string, unknown> }) => Promise<Row[]>;
 }): Promise<Row[]> {
-  const source = bound.declaration.source;
+  const { source, key } = bound.declaration;
   const target = await targetOf();
   const read = (window: WindowFragment | null, openEnded?: boolean) =>
     run(bound.render(window, openEnded));
-  if (!registry.isReady({ source, target })) {
+  if (!registry.isReady({ source, key, target })) {
     return readNotReady({ source, options, read });
   }
   const within = hardWindowOf({ options });

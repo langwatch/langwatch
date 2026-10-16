@@ -277,6 +277,7 @@ export {
   fillStatement,
   IdIndexFillIncompleteError,
   idIndexFillTargets,
+  idIndexName,
   sortKeyLeadsWith,
 } from "./idIndexFill.ts";
 export type { ClickHouseClientResolver, ReadResource } from "./authorized-reads.ts";

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TenantScopedReader } from "../authorized-reads.ts";
 import { ClickHouseQueryClient } from "../client.ts";
-import { defineIdIndex } from "../idIndexFill.ts";
+import { defineIdIndex, type IdIndexDeclaration, idIndexName } from "../idIndexFill.ts";
 import { ID_INDEX_WIDEN_MS } from "../indexedRead.ts";
 import type { QueryDriver, QueryRequest } from "../query.ts";
 import { TenantGuard } from "../tenantGuard.ts";
@@ -21,6 +21,14 @@ const NOW = Date.parse("2026-10-11T12:00:00Z");
 const DAY = 24 * 60 * 60 * 1000;
 const SPANS = defineIdIndex({ source: "stored_spans", key: ["TraceId"], time: "StartTime" });
 
+const RUNS = defineIdIndex({ source: "experiment_runs", key: ["RunId"], time: "StartedAt" });
+const RUNS_BY_EXPERIMENT = defineIdIndex({
+  source: "experiment_runs",
+  key: ["ExperimentId"],
+  time: "StartedAt",
+  by: true,
+});
+
 const READ =
   "SELECT SpanId FROM stored_spans WHERE TenantId = {tenantId:String} " +
   "AND TraceId = {traceId:String} {{idBound:stored_spans.TraceId:traceId}}";
@@ -30,13 +38,21 @@ function serverWith({
   ready,
   index = { n: 0, fromMs: 0, toMs: 0 },
   rows = [],
+  indexes = [SPANS],
+  readyIndexes,
 }: {
   ready: boolean;
+  /** The index tables whose marker row is found; every one when absent. */
+  readyIndexes?: readonly string[];
   index?: { n: number; fromMs: number; toMs: number };
   rows?: unknown[];
+  indexes?: readonly IdIndexDeclaration[];
 }) {
   const execute = vi.fn<QueryDriver["execute"]>().mockImplementation(async (request) => {
-    if (request.sql.includes("{marker:String}")) return { rows: ready ? [{ ready: 1 }] : [] };
+    if (request.sql.includes("{marker:String}")) {
+      const marked = ready && (readyIndexes?.includes(request.table ?? "") ?? true);
+      return { rows: marked ? [{ ready: 1 }] : [] };
+    }
     if (request.sql.startsWith("SELECT 1 AS found FROM ")) return { rows: [{ found: 1 }] };
     if (request.sql.includes("count() AS n")) {
       return {
@@ -49,7 +65,7 @@ function serverWith({
     driver: { execute, insert: async () => {}, command: async () => {} },
     tenantGuard: new TenantGuard(),
   });
-  client.declareIdIndexes({ indexes: [SPANS] });
+  client.declareIdIndexes({ indexes });
   const sent = (): QueryRequest[] => execute.mock.calls.map(([request]) => request);
   const reads = () =>
     sent().filter(
@@ -75,7 +91,9 @@ describe("a read carrying {{idBound}}", () => {
     /** @scenario "until the backfill completes, a lookup keeps today's fallback" */
     it("expands the marker to nothing and runs today's read once", async () => {
       const server = serverWith({ ready: false });
-      await server.client.idIndexes().check({ source: "stored_spans", target: "shared" });
+      await server.client
+        .idIndexes()
+        .check({ source: "stored_spans", key: ["TraceId"], target: "shared" });
 
       await server.client.query({
         tenantId: "p1",
@@ -92,7 +110,9 @@ describe("a read carrying {{idBound}}", () => {
 
     it("reads the caller's hinted window, then its fallback, as before the index", async () => {
       const server = serverWith({ ready: false });
-      await server.client.idIndexes().check({ source: "stored_spans", target: "shared" });
+      await server.client
+        .idIndexes()
+        .check({ source: "stored_spans", key: ["TraceId"], target: "shared" });
 
       await server.client.query({
         tenantId: "p1",
@@ -120,7 +140,9 @@ describe("a read carrying {{idBound}}", () => {
         index: { n: 1, fromMs, toMs },
         rows: [{ SpanId: "s1" }],
       });
-      await server.client.idIndexes().check({ source: "stored_spans", target: "shared" });
+      await server.client
+        .idIndexes()
+        .check({ source: "stored_spans", key: ["TraceId"], target: "shared" });
 
       const { rows } = await server.client.query({
         tenantId: "p1",
@@ -148,7 +170,9 @@ describe("a read carrying {{idBound}}", () => {
     /** @scenario "an id the index has never seen probes recent data once and stops" */
     it("probes the recent 35 days once for an id the index has never seen", async () => {
       const server = serverWith({ ready: true });
-      await server.client.idIndexes().check({ source: "stored_spans", target: "shared" });
+      await server.client
+        .idIndexes()
+        .check({ source: "stored_spans", key: ["TraceId"], target: "shared" });
 
       await server.client.query({
         tenantId: "p1",
@@ -167,7 +191,9 @@ describe("a read carrying {{idBound}}", () => {
 
     it("reads a given time first and stops there when it finds rows", async () => {
       const server = serverWith({ ready: true, rows: [{ SpanId: "s1" }] });
-      await server.client.idIndexes().check({ source: "stored_spans", target: "shared" });
+      await server.client
+        .idIndexes()
+        .check({ source: "stored_spans", key: ["TraceId"], target: "shared" });
 
       await server.client.query({
         tenantId: "p1",
@@ -187,7 +213,9 @@ describe("a read carrying {{idBound}}", () => {
         index: { n: 1, fromMs: NOW - 3 * DAY, toMs: NOW - 3 * DAY },
         rows: [{ SpanId: "s1" }],
       });
-      await server.client.idIndexes().check({ source: "stored_spans", target: "shared" });
+      await server.client
+        .idIndexes()
+        .check({ source: "stored_spans", key: ["TraceId"], target: "shared" });
 
       await server.client.query({
         tenantId: "p1",
@@ -213,7 +241,9 @@ describe("a read carrying {{idBound}}", () => {
         index: { n: 1, fromMs: NOW - 90 * DAY, toMs: NOW - 80 * DAY },
         rows: [{ SpanId: "s1" }],
       });
-      await server.client.idIndexes().check({ source: "stored_spans", target: "shared" });
+      await server.client
+        .idIndexes()
+        .check({ source: "stored_spans", key: ["TraceId"], target: "shared" });
 
       const { rows } = await server.client.query({
         tenantId: "p1",
@@ -229,7 +259,9 @@ describe("a read carrying {{idBound}}", () => {
     /** @scenario "an id the index has never seen reads nothing when the read asks for nothing" */
     it("sends no source read for an unseen id when the miss reads nothing", async () => {
       const server = serverWith({ ready: true, rows: [{ SpanId: "s1" }] });
-      await server.client.idIndexes().check({ source: "stored_spans", target: "shared" });
+      await server.client
+        .idIndexes()
+        .check({ source: "stored_spans", key: ["TraceId"], target: "shared" });
 
       const { rows } = await server.client.query({
         tenantId: "p1",
@@ -247,7 +279,9 @@ describe("a read carrying {{idBound}}", () => {
     /** @scenario "a read names its id and the reader adds the index bound" */
     it("bounds the aliased column where the marker names an alias", async () => {
       const server = serverWith({ ready: true, index: { n: 1, fromMs: NOW, toMs: NOW } });
-      await server.client.idIndexes().check({ source: "stored_spans", target: "shared" });
+      await server.client
+        .idIndexes()
+        .check({ source: "stored_spans", key: ["TraceId"], target: "shared" });
 
       await server.client.query({
         tenantId: "p1",
@@ -265,7 +299,9 @@ describe("a read carrying {{idBound}}", () => {
   describe("given the fenced reader with a shared grant", () => {
     it("reads the index under the fence's tenant set, so a shared project's id is found", async () => {
       const server = serverWith({ ready: true, index: { n: 1, fromMs: NOW, toMs: NOW } });
-      await server.client.idIndexes().check({ source: "stored_spans", target: "shared" });
+      await server.client
+        .idIndexes()
+        .check({ source: "stored_spans", key: ["TraceId"], target: "shared" });
       const reader = new TenantScopedReader({
         client: async () => server.client,
         fence: { own: ["p1"], shared: [{ projectId: "p2", from: 0, until: null }] },
@@ -373,6 +409,96 @@ describe("a read carrying {{idBound}}", () => {
   });
 });
 
+describe("a source with a second id index on another key", () => {
+  const RUN_READ =
+    "SELECT RunId FROM experiment_runs WHERE TenantId = {tenantId:String} " +
+    "AND RunId = {runId:String} {{idBound:experiment_runs.RunId:runId}}";
+  const EXPERIMENT_READ =
+    "SELECT RunId FROM experiment_runs WHERE TenantId = {tenantId:String} " +
+    "AND ExperimentId = {experimentId:String} " +
+    "{{idBound:experiment_runs.ExperimentId:experimentId}}";
+
+  const readyServer = async () => {
+    const server = serverWith({
+      ready: true,
+      index: { n: 1, fromMs: NOW - DAY, toMs: NOW },
+      indexes: [RUNS, RUNS_BY_EXPERIMENT],
+    });
+    const registry = server.client.idIndexes();
+    await registry.check({ source: "experiment_runs", key: ["RunId"], target: "shared" });
+    await registry.check({ source: "experiment_runs", key: ["ExperimentId"], target: "shared" });
+    const lookups = () => server.sent().filter((request) => request.sql.includes("count() AS n"));
+    return { ...server, lookups };
+  };
+
+  it("reads each marker through the index its key names", async () => {
+    const server = await readyServer();
+    const params = { tenantId: "p1", runId: "r1", experimentId: "e1" };
+
+    await server.client.query({ tenantId: "p1", sql: RUN_READ, params });
+    await server.client.query({ tenantId: "p1", sql: EXPERIMENT_READ, params });
+
+    const [byRun, byExperiment] = server.lookups();
+    expect(byRun?.sql).toContain("FROM experiment_runs_id_index WHERE");
+    expect(byRun?.params).toMatchObject({ idIndexKey0: "r1" });
+    expect(byExperiment?.sql).toContain("FROM experiment_runs_by_experiment_id_index WHERE");
+    expect(byExperiment?.params).toMatchObject({ idIndexKey0: "e1" });
+  });
+
+  it("keeps each index's readiness apart", async () => {
+    const server = serverWith({
+      ready: true,
+      indexes: [RUNS, RUNS_BY_EXPERIMENT],
+      readyIndexes: ["experiment_runs_by_experiment_id_index"],
+    });
+    const registry = server.client.idIndexes();
+    await registry.check({ source: "experiment_runs", key: ["ExperimentId"], target: "shared" });
+    await registry.check({ source: "experiment_runs", key: ["RunId"], target: "shared" });
+
+    expect(
+      registry.isReady({ source: "experiment_runs", key: ["ExperimentId"], target: "shared" }),
+    ).toBe(true);
+    expect(registry.isReady({ source: "experiment_runs", key: ["RunId"], target: "shared" })).toBe(
+      false,
+    );
+  });
+
+  it("refuses a key no index on the table declares", async () => {
+    const server = await readyServer();
+
+    const refused = await server.client
+      .query({
+        tenantId: "p1",
+        sql: RUN_READ.replace("experiment_runs.RunId", "experiment_runs.Name"),
+        params: { tenantId: "p1", runId: "r1" },
+      })
+      .then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+
+    expect(refused).toMatchObject({
+      violation: { kind: "id-index-key-mismatch", table: "experiment_runs", columns: "Name" },
+    });
+  });
+
+  it("declares both, and refuses a different index on the same source and key", () => {
+    const server = serverWith({ ready: true, indexes: [RUNS, RUNS_BY_EXPERIMENT] });
+    const registry = server.client.idIndexes();
+
+    expect(registry.declarations().map((each) => each.index)).toEqual([
+      "experiment_runs_id_index",
+      "experiment_runs_by_experiment_id_index",
+    ]);
+    expect(() =>
+      registry.declare({ indexes: [{ ...RUNS_BY_EXPERIMENT, time: "FinishedAt" }] }),
+    ).toThrow("Two different id indexes are declared over experiment_runs");
+    expect(() =>
+      registry.declare({ indexes: [{ ...RUNS, index: "experiment_runs_by_run_id_index" }] }),
+    ).toThrow("Two different id indexes are declared over experiment_runs");
+  });
+});
+
 describe("defineIdIndex", () => {
   it("names the index after its source and copies the source's retention by default", () => {
     expect(SPANS).toEqual({
@@ -382,6 +508,22 @@ describe("defineIdIndex", () => {
       time: "StartTime",
       retentionAnchor: "StartTime",
       retention: "copied",
+    });
+  });
+
+  describe("when it is a source's second index", () => {
+    it("names it after its key columns in snake case", () => {
+      expect(RUNS_BY_EXPERIMENT.index).toBe("experiment_runs_by_experiment_id_index");
+      expect(
+        idIndexName({
+          source: "simulation_runs",
+          key: ["ScenarioSetId", "BatchRunId"],
+          by: true,
+        }),
+      ).toBe("simulation_runs_by_scenario_set_id_batch_run_id_index");
+      expect(idIndexName({ source: "experiment_runs", key: ["ExperimentId"] })).toBe(
+        "experiment_runs_id_index",
+      );
     });
   });
 });

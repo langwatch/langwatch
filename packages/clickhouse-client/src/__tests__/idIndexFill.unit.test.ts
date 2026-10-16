@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ClickHouseQueryClient } from "../client.ts";
 import {
+  defineIdIndex,
   fillIdIndexes,
   fillOwnerIdIndexes,
   fillStatement,
@@ -66,7 +67,7 @@ function serverWith({ failFirstBatches }: { failFirstBatches: number }) {
     requests()
       .filter((request) => request.params?.marker !== undefined)
       .map((request) => request.organizationId ?? "shared");
-  return { client, batches, markers };
+  return { client, requests, batches, markers };
 }
 
 /** One tenant's 23 span rows over 9 traces in one partition, as the source sorts them. */
@@ -362,6 +363,89 @@ describe("fillIdIndexes", () => {
         'raise {"organizationId":"org_private","indexes":["stored_spans_id_index"]}',
         "marker stored_spans_id_index org_private",
         "marker spans_forever_id_index org_private",
+      ]);
+    });
+  });
+
+  describe("given two indexes on one source, by different keys", () => {
+    const RUNS = defineIdIndex({ source: "experiment_runs", key: ["RunId"], time: "StartedAt" });
+    const RUNS_BY_EXPERIMENT = defineIdIndex({
+      source: "experiment_runs",
+      key: ["ExperimentId"],
+      time: "StartedAt",
+      by: true,
+    });
+
+    it("fills each, raises both and writes each one's marker", async () => {
+      const server = serverWith({ failFirstBatches: 0 });
+      const raised: string[][] = [];
+
+      await fillOwnerIdIndexes({
+        clickhouse: server.client,
+        indexes: [RUNS, RUNS_BY_EXPERIMENT],
+        checkpoint: checkpointFrom(null).checkpoint,
+        signal: new AbortController().signal,
+        raiseRetention: async ({ indexes }) => {
+          raised.push(indexes);
+        },
+      });
+
+      const filled = (index: string) =>
+        server
+          .requests()
+          .filter((request) => request.sql.startsWith(`INSERT INTO ${index} (TenantId, `))
+          .filter((request) => request.params?.marker === undefined);
+      expect(filled("experiment_runs_id_index")).toHaveLength(2);
+      expect(filled("experiment_runs_by_experiment_id_index")).toHaveLength(2);
+      expect(raised).toEqual([
+        ["experiment_runs_id_index", "experiment_runs_by_experiment_id_index"],
+      ]);
+      expect(
+        server
+          .requests()
+          .filter((request) => request.params?.marker !== undefined)
+          .map((request) => request.table),
+      ).toEqual(["experiment_runs_id_index", "experiment_runs_by_experiment_id_index"]);
+    });
+
+    it("resumes at the second index's cursor without refilling the first", async () => {
+      const server = serverWith({ failFirstBatches: 0 });
+      const resumeFrom = {
+        targetsDone: [],
+        targetsCounted: ["shared"],
+        targetsFailed: [],
+        cursor: {
+          target: "shared",
+          table: "experiment_runs_by_experiment_id_index",
+          partition: "202641",
+          afterTenantId: "",
+          throughTenantId: null,
+          slice: 0,
+          slices: 1,
+        },
+        done: 3,
+        total: 4,
+        batches: 3,
+        retries: 0,
+      };
+
+      await fillIdIndexes({
+        statements: server.client,
+        targets: idIndexFillTargets({ privateRoutes: new Map() }),
+        indexes: [RUNS, RUNS_BY_EXPERIMENT],
+        batchRows: 20,
+        checkpoint: checkpointFrom(resumeFrom).checkpoint,
+        signal: new AbortController().signal,
+        beforeMarker: async () => {},
+      });
+
+      const inserts = server
+        .requests()
+        .filter((request) => request.params?.marker === undefined)
+        .map((request) => `${request.table} ${String(request.params?.partition)}`);
+      expect(inserts).toEqual([
+        "experiment_runs_by_experiment_id_index 202640",
+        "experiment_runs_by_experiment_id_index 202640",
       ]);
     });
   });

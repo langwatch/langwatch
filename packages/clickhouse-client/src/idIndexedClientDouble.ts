@@ -42,7 +42,8 @@ export async function readyIdIndexedClientDouble({
 }): Promise<ClickHouseQueryClient> {
   const client = clientOver({ indexes, driver, ready: true });
   for (const index of indexes) {
-    await client.idIndexes().check({ source: index.source, target: SHARED_CLICKHOUSE_TARGET });
+    const { source, key } = index;
+    await client.idIndexes().check({ source, key, target: SHARED_CLICKHOUSE_TARGET });
   }
   return client;
 }

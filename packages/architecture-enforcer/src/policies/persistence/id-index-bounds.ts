@@ -117,6 +117,32 @@ function skipped({ lines, line }: { lines: readonly string[]; line: number }): b
   return lines.slice(from, line).some((text) => SKIP.test(text));
 }
 
+function reportUnboundReads({
+  relevant,
+  statement,
+  lines,
+  line,
+  file,
+  found,
+}: {
+  relevant: readonly IndexPattern[];
+  statement: string;
+  lines: readonly string[];
+  line: number;
+  file: string;
+  found: UnboundIdRead[];
+}): void {
+  // A source with a second index has a pattern per key; the statement is reported once.
+  const reported = new Set<string>();
+  for (const pattern of relevant) {
+    if (reported.has(pattern.source)) continue;
+    if (!pattern.reads.test(statement) || !pattern.matchesKey.test(statement)) continue;
+    if (statement.includes(pattern.marker) || skipped({ lines, line })) continue;
+    reported.add(pattern.source);
+    found.push({ source: pattern.source, file, line });
+  }
+}
+
 function unboundReadsIn({
   file,
   patterns,
@@ -138,11 +164,7 @@ function unboundReadsIn({
     }
     const statement = literalText({ node, constants });
     const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
-    for (const pattern of relevant) {
-      if (!pattern.reads.test(statement) || !pattern.matchesKey.test(statement)) continue;
-      if (statement.includes(pattern.marker) || skipped({ lines, line })) continue;
-      found.push({ source: pattern.source, file, line });
-    }
+    reportUnboundReads({ relevant, statement, lines, line, file, found });
   };
   visit(source);
   return found;

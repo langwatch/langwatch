@@ -2,7 +2,10 @@ import type { ResolvedRetention } from "@langwatch/data-retention-contract";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
-import { DECLARED_ID_INDEXES } from "../../__tests__/support/declared-id-indexes.fixture.ts";
+import {
+  DECLARED_ID_INDEXES,
+  EXPERIMENT_RUNS_BY_EXPERIMENT,
+} from "../../__tests__/support/declared-id-indexes.fixture.ts";
 import {
   createDataRetentionTestProjectScopes,
   retentionTestGraph,
@@ -533,6 +536,30 @@ describe("given a ClickHouse target whose id indexes were filled", () => {
           key.startsWith("stored_spans_id_index//"),
         ),
       ).toBe(false);
+    });
+
+    it("raises a source's second index, on another key, beside its first", async () => {
+      const retroactive = MemoryRetroactiveRetentionRepository.create();
+      retroactive.idIndexDeclarations = [...DECLARED_ID_INDEXES, EXPERIMENT_RUNS_BY_EXPERIMENT];
+      retroactive.idIndexTenants = new Map([
+        ["experiment_runs_id_index", [PROJECT]],
+        ["experiment_runs_by_experiment_id_index", [PROJECT]],
+      ]);
+      const service = createService({ retroactive });
+
+      const result = await service.raiseIdIndexRetention({
+        indexes: ["experiment_runs_id_index", "experiment_runs_by_experiment_id_index"],
+      });
+
+      expect(result.tables).toEqual([
+        "experiment_runs_id_index",
+        "experiment_runs_by_experiment_id_index",
+      ]);
+      expect(
+        retroactive.idIndexRetention.get(
+          `experiment_runs_by_experiment_id_index/${PROJECT}/experiments`,
+        ),
+      ).toBe(DEFAULT_DAYS);
     });
 
     it("refuses an empty list of indexes", async () => {

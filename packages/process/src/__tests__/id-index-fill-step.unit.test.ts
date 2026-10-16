@@ -75,7 +75,9 @@ describe("given a module that declares its id indexes once", () => {
 
       const state = await install({ tier: "live", clickhouse });
 
-      expect(clickhouse.idIndexes().declarationOf({ source: "dataset_runs" })).toEqual(RUNS);
+      expect(
+        clickhouse.idIndexes().declarationOf({ source: "dataset_runs", key: ["RunId"] }),
+      ).toEqual(RUNS);
       const step = fillStepOf(state);
       expect(step).toMatchObject({
         id: "dataset:fill-id-indexes",

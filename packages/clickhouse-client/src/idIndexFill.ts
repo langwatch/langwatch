@@ -28,14 +28,40 @@ export type IdIndexDeclaration = Readonly<{
   timeFormat?: IdIndexTimeFormat | undefined;
 }>;
 
+/** `ExperimentId` as `experiment_id`: a key column as an index name spells it. */
+function snakeCaseOf({ column }: { column: string }): string {
+  return column
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1_$2")
+    .toLowerCase();
+}
+
 /**
- * Declares one id index the way its goose file creates it: named `<source>_id_index`, expiring
- * on `time` and copying the source's `_retention_days` unless told otherwise.
+ * An id index's table name: `<source>_id_index` for a source's first, and `<source>_by_<key>_index`
+ * for a second on other key columns (`experiment_runs_by_experiment_id_index`).
+ */
+export function idIndexName({
+  source,
+  key,
+  by = false,
+}: {
+  source: string;
+  key: readonly string[];
+  by?: boolean | undefined;
+}): string {
+  if (!by) return `${source}_id_index`;
+  return `${source}_by_${key.map((column) => snakeCaseOf({ column })).join("_")}_index`;
+}
+
+/**
+ * Declares one id index the way its goose file creates it: named by `idIndexName`, expiring on
+ * `time` and copying the source's `_retention_days` unless told otherwise.
  */
 export function defineIdIndex({
   source,
   key,
   time,
+  by,
   retentionAnchor = time,
   retention = "copied",
   filter,
@@ -44,6 +70,8 @@ export function defineIdIndex({
   source: string;
   key: readonly string[];
   time: string;
+  /** A source's second index, on other key columns: named `<source>_by_<key>_index`. */
+  by?: true | undefined;
   retentionAnchor?: string | undefined;
   retention?: "copied" | "none" | undefined;
   filter?: string | undefined;
@@ -52,7 +80,7 @@ export function defineIdIndex({
   if (key.length === 0) throw new Error(`The id index over ${source} names no key column.`);
   return {
     source: assertIdentifier({ name: source }),
-    index: `${source}_id_index`,
+    index: idIndexName({ source, key, by }),
     key: key.map((column) => assertIdentifier({ name: column })),
     time: assertIdentifier({ name: time }),
     retentionAnchor: assertIdentifier({ name: retentionAnchor }),

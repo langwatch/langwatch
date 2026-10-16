@@ -35,3 +35,14 @@ export const DECLARED_ID_INDEXES: readonly IdIndexDeclaration[] = [
     retention: "none",
   }),
 ];
+
+/**
+ * A second index on `experiment_runs`, by another key:
+ * `experiment_runs_by_experiment_id_index`.
+ */
+export const EXPERIMENT_RUNS_BY_EXPERIMENT: IdIndexDeclaration = defineIdIndex({
+  source: "experiment_runs",
+  key: ["ExperimentId"],
+  time: "StartedAt",
+  by: true,
+});

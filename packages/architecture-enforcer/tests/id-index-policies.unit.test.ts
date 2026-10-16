@@ -40,6 +40,13 @@ const goose = (statements: readonly string[]): string =>
   `-- +goose Up\n${statements.map((each) => `-- +goose StatementBegin\n${each}\n-- +goose StatementEnd\n`).join("")}`;
 
 const MIGRATION = "packages/clickhouse-migrations/migrations/00200_dataset_runs_id_index.sql";
+const SECOND_DECLARED = `export const RUNS_BY_DATASET = defineIdIndex({ source: "dataset_runs", key: ["DatasetId"], time: "StartedAt", by: true });\n`;
+const SECOND_TABLE =
+  "CREATE TABLE IF NOT EXISTS dataset_runs_by_dataset_id_index (TenantId String) ENGINE = MergeTree;";
+const SECOND_VIEW =
+  "CREATE MATERIALIZED VIEW IF NOT EXISTS dataset_runs_by_dataset_id_index_mv TO dataset_runs_by_dataset_id_index AS SELECT 1;";
+const SECOND_MIGRATION =
+  "packages/clickhouse-migrations/migrations/00201_dataset_runs_by_dataset_id_index.sql";
 
 function pairing(files: Readonly<Record<string, string>>): string[] {
   return lintIdIndexPairingAt({ root: workspace(files), catalogue: CATALOGUE }).map(
@@ -47,8 +54,8 @@ function pairing(files: Readonly<Record<string, string>>): string[] {
   );
 }
 
-function bounds(reads: string): number[] {
-  const root = workspace({ [DECLARATIONS]: DECLARED, [READS]: reads });
+function bounds(reads: string, { declared = DECLARED }: { declared?: string } = {}): number[] {
+  const root = workspace({ [DECLARATIONS]: declared, [READS]: reads });
   return lintIdIndexBoundsAt({ root, catalogue: CATALOGUE }).map(
     (violation) => violation.line ?? 0,
   );
@@ -75,7 +82,78 @@ describe("id-index-pairing", () => {
   });
 });
 
+describe("id-index-pairing over a source's second index", () => {
+  describe("given both declarations with their goose tables and views", () => {
+    it("pairs each by its own name", () => {
+      expect(
+        pairing({
+          [DECLARATIONS]: `${DECLARED}${SECOND_DECLARED}`,
+          [MIGRATION]: goose([TABLE, VIEW]),
+          [SECOND_MIGRATION]: goose([SECOND_TABLE, SECOND_VIEW]),
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("given a second index on one side only", () => {
+    it("reports its table with no declaration, and its declaration with no table or view", () => {
+      expect(
+        pairing({
+          [DECLARATIONS]: DECLARED,
+          [MIGRATION]: goose([TABLE, VIEW]),
+          [SECOND_MIGRATION]: goose([SECOND_TABLE, SECOND_VIEW]),
+        }),
+      ).toEqual([
+        "dataset_runs_by_dataset_id_index has no defineIdIndex declaration, so no read, fill or retention raise uses it.",
+      ]);
+      expect(
+        pairing({
+          [DECLARATIONS]: `${DECLARED}${SECOND_DECLARED}`,
+          [MIGRATION]: goose([TABLE, VIEW]),
+        }),
+      ).toEqual([
+        "dataset_runs_by_dataset_id_index is declared, but no goose migration creates it.",
+        "dataset_runs_by_dataset_id_index is declared, but no goose migration creates its dataset_runs_by_dataset_id_index_mv view.",
+      ]);
+    });
+  });
+});
+
 describe("id-index-bounds", () => {
+  describe("given a source with a second index on another key", () => {
+    const byDataset = [
+      "export const byDataset = `SELECT * FROM dataset_runs",
+      "  WHERE TenantId = {tenantId:String} AND DatasetId = {datasetId:String}`;",
+      "",
+    ].join("\n");
+
+    it("reports a read by the second key once that index is declared", () => {
+      expect(bounds(byDataset)).toEqual([]);
+      expect(bounds(byDataset, { declared: `${DECLARED}${SECOND_DECLARED}` })).toEqual([1]);
+    });
+
+    it("accepts the second key's marker, and reports a read by both keys once", () => {
+      const declared = `${DECLARED}${SECOND_DECLARED}`;
+      expect(
+        bounds(
+          [
+            "export const byDataset = `SELECT * FROM dataset_runs",
+            "  WHERE TenantId = {tenantId:String} AND DatasetId = {datasetId:String}",
+            "  {{idBound:dataset_runs.DatasetId:datasetId}}`;",
+            "",
+          ].join("\n"),
+          { declared },
+        ),
+      ).toEqual([]);
+      expect(
+        bounds(
+          "export const both = `SELECT * FROM dataset_runs WHERE DatasetId = {datasetId:String} AND RunId = {runId:String}`;\n",
+          { declared },
+        ),
+      ).toEqual([1]);
+    });
+  });
+
   describe("given a module statement reading a declared source by its key", () => {
     /** @scenario "a read by id that skips its index is refused by the source check" */
     it("reports it when it carries neither the marker nor a reason to skip", () => {
