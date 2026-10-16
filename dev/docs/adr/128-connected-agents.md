@@ -84,6 +84,8 @@ The connect-agent flow becomes: install the SDK, decorate the function, start th
 
 ADR-098's transport note is fulfilled by this ADR; `langwatch agent dev` stays for HTTP agents.
 
+(Amended 2026-10-16: connected agents may declare scenario setup and teardown hooks; the register frame, call envelope and result frame gain fields. See [ADR-180](180-scenario-run-hooks.md).)
+
 ### Composition and protocol boundaries
 
 The Agent installer constructs one App with private entity services and repositories.
