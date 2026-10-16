@@ -113,6 +113,7 @@ describe("LicensesView", () => {
   });
 
   describe("given an empty list kept on screen while the next query loads", () => {
+    /** @scenario The console's license filters say what they hide */
     it("says nothing about the list until the answer arrives", () => {
       answer.counts = { active: 0, inactive: 0, customer: 0, internal: 0, all: 0 };
       answer.isPlaceholderData = true;

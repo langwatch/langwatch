@@ -110,6 +110,7 @@ Feature: License registry
     Then every license is listed
     When the operator searches for something no license matches
     Then the empty list says the search matched nothing
+    And while the next answer loads, the list says nothing about being empty
 
   @unit
   Scenario: The instance admin organizations list does not carry license keys
