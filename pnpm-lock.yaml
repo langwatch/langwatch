@@ -306,8 +306,8 @@ catalogs:
       specifier: ^8.1.6
       version: 8.1.6
     '@slack/webhook':
-      specifier: ^7.1.0
-      version: 7.1.0
+      specifier: ^8.0.2
+      version: 8.0.2
     '@tanstack/react-query':
       specifier: 5.101.4
       version: 5.101.4
@@ -2630,7 +2630,7 @@ importers:
         version: link:../../../../packages/upgrade
       '@slack/webhook':
         specifier: 'catalog:'
-        version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+        version: 8.0.2
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e))
@@ -4172,7 +4172,7 @@ importers:
         version: link:../../../../modules/user/contract
       '@slack/webhook':
         specifier: 'catalog:'
-        version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+        version: 8.0.2
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e))
@@ -6002,7 +6002,7 @@ importers:
         version: 13.3.2
       '@slack/webhook':
         specifier: 'catalog:'
-        version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+        version: 8.0.2
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e))
@@ -6527,7 +6527,7 @@ importers:
         version: link:../../webhook/contract
       '@slack/webhook':
         specifier: 'catalog:'
-        version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+        version: 8.0.2
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e))
@@ -9592,7 +9592,7 @@ importers:
         version: link:../../user/contract
       '@slack/webhook':
         specifier: 'catalog:'
-        version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+        version: 8.0.2
       better-auth:
         specifier: 'catalog:'
         version: 1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)))(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.1)
@@ -12538,7 +12538,7 @@ importers:
         version: link:../../user/contract
       '@slack/webhook':
         specifier: 'catalog:'
-        version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
+        version: 8.0.2
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e))
@@ -22993,9 +22993,13 @@ packages:
     resolution: {integrity: sha512-I8vmSjNYWsaxuWPx6dz4yeh0h7vRBWbgAMK14LEmblbZ404BtrPbXs6jDPx4cYgGf8msDGF4A9opLZBu21FViQ==}
     engines: {node: '>= 12.13.0', npm: '>= 6.12.0'}
 
-  '@slack/webhook@7.1.0':
-    resolution: {integrity: sha512-cVXjP1n5s9gF7EW0zi58gYhf9JQ+FDu9t0Tq4ufdJxSO6QkT4wBMjSWYGAz61Xi6eHaZlnyGu7RuzwpGERLYbw==}
-    engines: {node: '>= 18', npm: '>= 8.6.0'}
+  '@slack/types@3.2.0':
+    resolution: {integrity: sha512-IN4gdtlzQt8UJoj+1v+qAHeR4TxHO0KMlIs841SFfDQAcFFnsrWaGsEAE4goxVt8O/JOAFaGGdrFTzhNBop/Fg==}
+    engines: {node: '>= 20', npm: '>=9.6.4'}
+
+  '@slack/webhook@8.0.2':
+    resolution: {integrity: sha512-gBPlV9W6zfP4qcijX47Ni5GznbZ8Q7oZYnCQMGkOGnEHPny+gR1xpjaUdafSwGNEVKjHtW39+A2Upzg1GPHyVg==}
+    engines: {node: '>= 20', npm: '>=9.6.4'}
 
   '@smithy/core@3.33.3':
     resolution: {integrity: sha512-CsOeKq/9kA3y6VJHt+/+VTCtBaxJ4OTFpgrjIUhPpDIKxBci1k2bJaQASF2h/ELWrulGp+t97DZ0mevfAD8idg==}
@@ -23636,6 +23640,9 @@ packages:
 
   '@types/retry@0.12.0':
     resolution: {integrity: sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==}
+
+  '@types/retry@0.12.5':
+    resolution: {integrity: sha512-3xSjTp3v03X/lSQLkczaN9UIEwJMoMCA1+Nb5HfbJEQWogdeQIyVtTvxPXDQjZ5zws8rFQfVfRdz03ARihPJgw==}
 
   '@types/sanitize-html@2.16.1':
     resolution: {integrity: sha512-n9wjs8bCOTyN/ynwD8s/nTcTreIHB1vf31vhLMGqUPNHaweKC4/fAl4Dj+hUlCTKYgm4P3k83fmiFfzkZ6sgMA==}
@@ -34240,14 +34247,15 @@ snapshots:
 
   '@slack/types@2.21.1': {}
 
-  '@slack/webhook@7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)':
+  '@slack/types@3.2.0': {}
+
+  '@slack/webhook@8.0.2':
     dependencies:
-      '@slack/types': 2.21.1
+      '@slack/types': 3.2.0
       '@types/node': 26.2.0
-      axios: 1.19.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
-    transitivePeerDependencies:
-      - debug
-      - supports-color
+      '@types/retry': 0.12.5
+      p-retry: 4.6.2
+      retry: 0.13.1
 
   '@smithy/core@3.33.3':
     dependencies:
@@ -34948,6 +34956,8 @@ snapshots:
   '@types/resolve@1.20.6': {}
 
   '@types/retry@0.12.0': {}
+
+  '@types/retry@0.12.5': {}
 
   '@types/sanitize-html@2.16.1':
     dependencies:
