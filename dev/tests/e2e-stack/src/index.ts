@@ -281,9 +281,6 @@ export async function startStack(options: StartStackOptions): Promise<RunningSta
 }
 
 export type SeededProject = Readonly<{
-  organizationId: string;
-  teamId: string;
-  projectId: string;
   projectSlug: string;
   /** The project's own ingestion key, the one an SDK reads from the environment. */
   apiKey: string;
@@ -312,9 +309,6 @@ function seedConstant(source: string, name: string, file: string = SEED_FILE): s
 export function seededProject(): SeededProject {
   const source = readFileSync(SEED_FILE, "utf8");
   return {
-    organizationId: seedConstant(source, "ORG_ID"),
-    teamId: seedConstant(source, "TEAM_ID"),
-    projectId: seedConstant(source, "PROJECT_ID"),
     projectSlug: seedConstant(source, "PROJECT_SLUG"),
     apiKey: seedConstant(source, "DEFAULT_INGESTION_KEY"),
     organizationApiKey: seededOrganizationToken(source),
@@ -325,6 +319,27 @@ export function seededProject(): SeededProject {
     )}`,
     adminPassword: seedConstant(source, "ADMIN_PASSWORD"),
   };
+}
+
+/**
+ * The seeded project's id, which the seed mints at random (ADR-180): found by its slug through
+ * `GET /api/projects` with the seeded organization token, as haven finds it.
+ */
+export async function seededProjectId({
+  apiUrl,
+  project,
+}: {
+  apiUrl: string;
+  project: SeededProject;
+}): Promise<string> {
+  const response = await fetch(`${apiUrl}/projects?limit=1000`, {
+    headers: { authorization: `Bearer ${project.organizationApiKey}` },
+  });
+  if (!response.ok) throw new Error(`GET /api/projects answered ${response.status}`);
+  const page = (await response.json()) as { data?: { id: string; slug: string }[] };
+  const found = page.data?.find((each) => each.slug === project.projectSlug);
+  if (!found) throw new Error(`no project ${project.projectSlug} in GET /api/projects`);
+  return found.id;
 }
 
 /**
