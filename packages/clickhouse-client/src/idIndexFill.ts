@@ -123,6 +123,8 @@ export type IdIndexFillCursor = {
   slice: number;
   slices: number;
   throughKey?: string[] | undefined;
+  /** The partition is filled and already counted in `done`; a resumed walk moves past it. */
+  complete?: true | undefined;
 };
 
 /** The step's report, replaced whole on each save; `done`/`total` count partitions. */
@@ -528,6 +530,7 @@ function cursorOf(value: unknown): IdIndexFillCursor | null {
     slice: numberOf(field("slice")),
     slices: Math.max(1, numberOf(field("slices"))),
     ...(throughKey.length === 0 ? {} : { throughKey }),
+    ...(field("complete") === true ? { complete: true as const } : {}),
   };
 }
 
@@ -670,8 +673,19 @@ class IdIndexFill {
       if (resumed !== null && partition.partition > resumed.partition) continue;
       if (this.options.signal.aborted) return false;
       const cursor = resumed?.partition === partition.partition ? resumed : null;
+      if (cursor?.complete === true) continue;
       if (!(await this.fillPartition({ target, index, partition, cursor }))) return false;
       this.report.done += 1;
+      // Saved together with `done`, so a walk stopped before the next partition never counts this one twice.
+      const last = this.report.cursor;
+      if (
+        last !== null &&
+        last.target === target.key &&
+        last.table === index.index &&
+        last.partition === partition.partition
+      ) {
+        this.report.cursor = { ...last, complete: true };
+      }
     }
     return true;
   }

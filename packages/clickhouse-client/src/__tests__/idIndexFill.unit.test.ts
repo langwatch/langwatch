@@ -196,6 +196,46 @@ describe("fillIdIndexes", () => {
     });
   });
 
+  describe("given a walk stopped right after a partition finished", () => {
+    it("resumes past that partition and counts it once", async () => {
+      const first = serverWith({ failFirstBatches: 0 });
+      const stop = new AbortController();
+      const options = {
+        targets: idIndexFillTargets({ privateRoutes: new Map() }),
+        indexes: [SPANS],
+        batchRows: 20,
+        beforeMarker: async () => {},
+        sleep: async () => {},
+      };
+
+      // The small partition is one batch; the process stops as it commits.
+      const stopped = await fillIdIndexes({
+        ...options,
+        statements: first.client,
+        checkpoint: {
+          resumeFrom: null,
+          save: async ({ report }) => {
+            if (report.batches === 1) stop.abort();
+          },
+        },
+        signal: stop.signal,
+      });
+
+      expect(stopped).toMatchObject({ done: 1, total: 2 });
+
+      const second = serverWith({ failFirstBatches: 0 });
+      const report = await fillIdIndexes({
+        ...options,
+        statements: second.client,
+        checkpoint: checkpointFrom(structuredClone(stopped)).checkpoint,
+        signal: new AbortController().signal,
+      });
+
+      expect(second.batches().map((batch) => batch.partition)).toEqual(["202640", "202640"]);
+      expect(report).toMatchObject({ done: 2, total: 2, targetsDone: ["shared"] });
+    });
+  });
+
   describe("given a batch that fails on every attempt", () => {
     it("records the target as failed, carries on, and throws at the end", async () => {
       const server = serverWith({ failFirstBatches: 100 });
