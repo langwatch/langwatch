@@ -51,6 +51,14 @@ Feature: Model Provider service
     Then the stored provider is disabled by default
 
   @unit
+  Scenario: A Vertex AI call carries the service account stored on the provider
+    Given a project has a Vertex AI provider with a service account JSON, a project and a location
+    When a Vertex AI model call is prepared for the project
+    Then vertex_credentials carries the stored service account JSON
+    And vertex_project and vertex_location carry the stored project and location
+    And the service account is never sent as api_key
+
+  @unit
   Scenario: The platform chain borrows the Google credential from data privacy
     Given data privacy holds the deployment's Google application credential
     When the platform provider chain is read

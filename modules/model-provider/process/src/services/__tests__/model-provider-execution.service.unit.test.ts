@@ -4,6 +4,7 @@
 
 import {
   expandLatestAlias,
+  findModelProviderDefinition,
   ModelProviderNotFoundError,
   ModelRestrictedForExecutionError,
 } from "@langwatch/model-provider-contract";
@@ -181,6 +182,55 @@ describe("ModelProviderExecutionService.prepare", () => {
       const prepared = await prepare(service, "gemini/gemini-2.5-flash");
 
       expect(prepared).toMatchObject({ api_base: "http://127.0.0.1:21651" });
+    });
+  });
+
+  describe("given a Vertex AI row with a stored service account", () => {
+    const serviceAccount = '{"type":"service_account","project_id":"acme-ai"}';
+    const vertex = {
+      provider: "vertex_ai",
+      enabled: true,
+      models: ["gemini-2.5-flash"],
+      customKeys: {
+        GOOGLE_APPLICATION_CREDENTIALS: serviceAccount,
+        VERTEXAI_PROJECT: "acme-ai",
+        VERTEXAI_LOCATION: "us-central1",
+      },
+    };
+    // The definition comes from the real registry, so the test fails if the
+    // key the service reads drifts from the key the provider is stored under.
+    const service = ModelProviderExecutionService.create({
+      query: {
+        getExecutionProviders: async () => ({ vertex_ai: vertex }),
+        getByIdForProject: async () => {
+          throw new ModelProviderNotFoundError();
+        },
+        findRowServingModel: async () => null,
+      },
+      catalog: {
+        prepareExecution: async ({ parameters }: { parameters: Record<string, unknown> }) =>
+          parameters,
+        pickExecutionDefinition: ({ provider }: { provider: string }) => {
+          const definition = findModelProviderDefinition(provider);
+          return definition ? { apiKey: definition.apiKey, endpointKey: null } : null;
+        },
+        pickExecutionValue: ({ key }: { key: string }) =>
+          (vertex.customKeys as Record<string, string>)[key] ?? null,
+        pickStoredExecutionValue: ({ key }: { key: string }) =>
+          (vertex.customKeys as Record<string, string>)[key] ?? null,
+      },
+    } as never);
+
+    /** @scenario "A Vertex AI call carries the service account stored on the provider" */
+    it("sends the stored service account as vertex_credentials, never as api_key", async () => {
+      const prepared = await prepare(service, "vertex_ai/gemini-2.5-flash");
+
+      expect(prepared).toMatchObject({
+        vertex_credentials: serviceAccount,
+        vertex_project: "acme-ai",
+        vertex_location: "us-central1",
+      });
+      expect(prepared).not.toHaveProperty("api_key");
     });
   });
 });
