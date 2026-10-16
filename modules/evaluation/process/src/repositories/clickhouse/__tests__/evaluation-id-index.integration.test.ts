@@ -239,4 +239,44 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
       ).toBe(false);
     });
   });
+
+  describe("given runs read for a batch of traces (the second id index)", () => {
+    /** @scenario "A batch of traces' earlier evaluations is read through the trace id index" */
+    it("bounds the batch read and its latest-version subquery to the trace index's range", async () => {
+      statements = [];
+      outcomes.length = 0;
+
+      const found = await repository.findTraceEvaluations({
+        authorization: ownProof({ projectId: tenantId }),
+        traceIds: [`trace-${tracedId}`, `trace-absent-${tracedId}`],
+      });
+
+      expect(found.map((run) => run.evaluationId)).toEqual([tracedId]);
+      const read = statements.find(
+        (statement) => statement.sql.includes("FROM evaluation_runs AS runs") && statement.params,
+      );
+      expect(read?.params).toMatchObject({
+        idBound_fromMs: expect.any(Number),
+        idBound_toMs: expect.any(Number),
+      });
+      expect(read?.sql.match(/idBound_fromMs/g)).toHaveLength(2);
+      expect(outcomes).toContainEqual({ table: "evaluation_runs", outcome: "index_hit" });
+    });
+
+    /** @scenario "A batch of traces' earlier evaluations is read through the trace id index" */
+    it("reads the same runs with no time bound while the trace index is not ready", async () => {
+      statements = [];
+
+      const found = await notReady.findTraceEvaluations({
+        authorization: ownProof({ projectId: tenantId }),
+        traceIds: [`trace-${tracedId}`, `trace-absent-${tracedId}`],
+      });
+
+      expect(found.map((run) => run.evaluationId)).toEqual([tracedId]);
+      const read = statements.find((statement) =>
+        statement.sql.includes("FROM evaluation_runs AS runs"),
+      );
+      expect(read?.sql).not.toContain("idBound_fromMs");
+    });
+  });
 });

@@ -14,7 +14,9 @@ import {
 import {
   evaluationRunDataSchema,
   EvaluationNotFoundError,
+  traceEvaluationDataSchema,
   type EvaluationRunData,
+  type TraceEvaluationData,
 } from "@langwatch/evaluation-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -42,6 +44,48 @@ function retentionTenantOf(authorization: Authorization): string {
     singleTenantOf({ authorization, reads: "traces" }) ??
     ownProjectIdOf({ authorization, reads: "traces" })
   );
+}
+
+const TRACE_EVALUATION_COLUMNS_LIGHT = [
+  "EvaluationId",
+  "EvaluatorId",
+  "EvaluatorType",
+  "EvaluatorName",
+  "TraceId",
+  "IsGuardrail",
+  "Status",
+  "Score",
+  "Passed",
+  "Label",
+  "Details",
+  "Error",
+  `toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAt`,
+  `toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAt`,
+  `toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt`,
+].join(", ");
+const TRACE_EVALUATION_COLUMNS_WITH_INPUTS = `${TRACE_EVALUATION_COLUMNS_LIGHT}, Inputs`;
+
+type TraceEvaluationRow = {
+  EvaluationId: string;
+  EvaluatorId: string;
+  EvaluatorType: string;
+  EvaluatorName: string | null;
+  TraceId: string | null;
+  IsGuardrail: boolean | number | string;
+  Status: string;
+  Score: number | null;
+  Passed: boolean | number | string | null;
+  Label: string | null;
+  Details: string | null;
+  Error: string | null;
+  Inputs?: string | null;
+  ScheduledAt: number | string | null;
+  StartedAt: number | string | null;
+  CompletedAt: number | string | null;
+};
+
+function isFlagSet(flag: boolean | number | string): boolean {
+  return flag === true || flag === 1 || flag === "1" || flag === "true";
 }
 
 type ScheduledAtRange = { scheduledAtFrom: number; scheduledAtTo?: number };
@@ -236,6 +280,90 @@ export class EvaluationRunClickHouseReadRepository {
       );
       throw error;
     }
+  }
+
+  /**
+   * Each trace's latest evaluation versions, unordered, with no time bound of their own: only
+   * the trace id index narrows the read. A memory-limit failure retries without the inputs.
+   */
+  async findTraceEvaluations(input: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+  }): Promise<TraceEvaluationData[]> {
+    if (input.traceIds.length === 0) return [];
+    try {
+      return await this.queryTraceEvaluations({
+        ...input,
+        columns: TRACE_EVALUATION_COLUMNS_WITH_INPUTS,
+      });
+    } catch (error) {
+      if (!isMemoryLimitError(error)) {
+        logger.error(
+          { traceIdCount: input.traceIds.length, error },
+          "Failed to fetch trace evaluations from ClickHouse",
+        );
+        throw error;
+      }
+      logger.warn(
+        { traceIdCount: input.traceIds.length },
+        "Trace evaluation read hit the ClickHouse memory limit; retrying without inputs",
+      );
+      return this.queryTraceEvaluations({ ...input, columns: TRACE_EVALUATION_COLUMNS_LIGHT });
+    }
+  }
+
+  private async queryTraceEvaluations(input: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+    columns: string;
+  }): Promise<TraceEvaluationData[]> {
+    const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
+    const result = await client.query<TraceEvaluationRow>({
+      query: `
+        SELECT ${input.columns}
+        FROM ${TABLE_NAME} AS ${RUNS}
+        WHERE ${tenantSet()}
+          AND ${RUNS}.TraceId IN ({traceIds:Array(String)})
+          {{idBound:evaluation_runs.TraceId:traceIds:${RUNS}}}
+          AND (${RUNS}.TenantId, ${RUNS}.EvaluationId, ${RUNS}.UpdatedAt) IN (
+            SELECT TenantId, EvaluationId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE ${tenantScope("ScheduledAt")}
+              AND TraceId IN ({traceIds:Array(String)})
+              {{idBound:evaluation_runs.TraceId:traceIds}}
+            GROUP BY TenantId, EvaluationId
+          )
+      `,
+      query_params: { traceIds: [...input.traceIds] },
+      format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
+    });
+    return (await result.json()).flatMap((row) =>
+      row.TraceId
+        ? [
+            traceEvaluationDataSchema.parse({
+              evaluationId: row.EvaluationId,
+              evaluatorId: row.EvaluatorId,
+              evaluatorType: row.EvaluatorType,
+              evaluatorName: row.EvaluatorName,
+              traceId: row.TraceId,
+              isGuardrail: isFlagSet(row.IsGuardrail),
+              status: row.Status,
+              score: row.Score,
+              passed: row.Passed === null ? null : isFlagSet(row.Passed),
+              label: row.Label,
+              details: row.Details,
+              error: row.Error,
+              ...(row.Inputs === undefined ? {} : { inputs: parseObject(row.Inputs) }),
+              timestamps: {
+                scheduledAt: toNumberOrNull(row.ScheduledAt),
+                startedAt: toNumberOrNull(row.StartedAt),
+                completedAt: toNumberOrNull(row.CompletedAt),
+              },
+            }),
+          ]
+        : [],
+    );
   }
 
   async findInputs(input: {
