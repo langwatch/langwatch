@@ -384,6 +384,10 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Groq Integration](https://langwatch.ai/docs/integration/go/integrations/groq.md): Instrument Groq API calls in Go using LangWatch for LLM observability, cost tracking, and agent evaluation insights.
 - [Grok (xAI) Integration](https://langwatch.ai/docs/integration/go/integrations/grok.md): Instrument Grok (xAI) API calls in Go using LangWatch to capture traces and improve AI agent evaluations.
 - [Ollama (Local Models) Integration](https://langwatch.ai/docs/integration/go/integrations/ollama.md): Instrument local Ollama models in Go to monitor performance, debug RAG flows, and support AI agent testing environments.
+
+### OpenRouter
+
+- [OpenRouter Broadcast Integration](https://langwatch.ai/docs/integration/openrouter-broadcast.md): Send a trace of every OpenRouter request to LangWatch with OpenRouter Broadcast, with no SDK or code change in your application.
 - [OpenRouter Integration](https://langwatch.ai/docs/integration/go/integrations/openrouter.md): Instrument OpenRouter model calls in Go with LangWatch to compare models, track quality, and run AI agent evaluations.
 
 ### LiteLLM
