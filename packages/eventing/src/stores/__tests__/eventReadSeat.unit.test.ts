@@ -3,8 +3,8 @@
  * @see specs/clickhouse/id-index-reads.feature
  */
 import { generate, Ksuid } from "@langwatch/ksuid";
-import { register } from "prom-client";
-import { describe, expect, it, vi } from "vitest";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTenantId } from "../../domain/tenantId.ts";
 import { EventNotFoundError, ValidationError } from "../../services/errorHandling.ts";
@@ -51,13 +51,11 @@ async function seatHolding({
   return { seat: EventLogReadSeat.create({ repository: recorded }), eventId, reads };
 }
 
+let meter = createRecordingMeterProvider();
+
 /** How many event reads were counted with `outcome` so far. */
-async function countedEventReads(outcome: string): Promise<number> {
-  const metric = register.getSingleMetric("es_event_log_index_read_total");
-  const values = metric === undefined ? [] : (await metric.get()).values;
-  return values
-    .filter((value) => value.labels.read === "event" && value.labels.outcome === outcome)
-    .reduce((sum, value) => sum + value.value, 0);
+function countedEventReads(outcome: string): number {
+  return meter.valueOf("es_event_log_index_read_total", { read: "event", outcome });
 }
 
 /** The time a KSUID id carries, or a fixed time for an id that carries none. */
@@ -74,6 +72,12 @@ function read(seat: EventLogReadSeat, eventId: string, tenantId = TENANT) {
 }
 
 describe("EventLogReadSeat", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+  });
+  afterEach(() => meter.uninstall());
+
   describe("given an event recorded within seven days of its id's time", () => {
     /** @scenario "An event inside the window is answered" */
     it("answers the event with its data", async () => {
@@ -109,12 +113,11 @@ describe("EventLogReadSeat", () => {
       const { seat, eventId, reads } = await seatHolding({
         occurredAt: (t) => t - 90 * DAY_MS,
       });
-      const before = await countedEventReads("window_fallback");
-
+      
       await expect(read(seat, eventId)).resolves.toMatchObject({ id: eventId });
 
       expect(reads.map((each) => each.occurredAt !== undefined)).toEqual([true, false]);
-      expect(await countedEventReads("window_fallback")).toBe(before + 1);
+      expect(countedEventReads("window_fallback")).toBe(1);
     });
   });
 
