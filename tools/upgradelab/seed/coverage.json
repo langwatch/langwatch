@@ -222,6 +222,11 @@
       "seed": "unplanned",
       "note": "no seed door written yet"
     },
+    "coding-agent:track-session-id-index-materialisation": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "no seed door written yet; the table is small, so the step finishes in seconds"
+    },
     "trace:track-updated-at-index-materialisation": {
       "status": "seeded",
       "seed": "heavy:otlp",

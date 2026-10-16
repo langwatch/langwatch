@@ -93,6 +93,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "coding-agent:track-session-id-index-materialisation",
+    "kind": "data",
+    "mode": "background",
+    "owner": "coding-agent",
+    "description": "Waits for ClickHouse to build the coding agent sessions session-id index over existing rows.",
+    "needsOldWritersGone": false
+  },
+  {
     "id": "data-retention:keep-control-plane-events-forever",
     "kind": "data",
     "mode": "background",

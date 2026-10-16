@@ -472,7 +472,8 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
 
   /**
    * Reads the latest raw session record without `FINAL`: late signals can move `StartedAt`,
-   * leaving superseded ReplacingMergeTree rows until TTL.
+   * leaving superseded ReplacingMergeTree rows until TTL. The dedup subquery stays unwindowed;
+   * the `idx_session_id` bloom filter (migration 00110), not the sort key, keeps it cheap.
    */
   private async findLatestRecord({
     tenantId,

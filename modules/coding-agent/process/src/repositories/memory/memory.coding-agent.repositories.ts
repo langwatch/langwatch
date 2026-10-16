@@ -3,6 +3,7 @@ import type { FoldProjectionStore } from "@langwatch/eventing";
 import type { CodingAgentSessionFoldCacheRepository } from "../coding-agent-session-fold-cache.repository.ts";
 import type { CodingAgentRepositories } from "../coding-agent.repositories.ts";
 import { MemoryCodingAgentSessionEventRepository } from "./memory.coding-agent-session-event.repository.ts";
+import { MemoryCodingAgentSessionIndexMaterialisationRepository } from "./memory.coding-agent-session-index-materialisation.repository.ts";
 import { MemoryCodingAgentSessionRepository } from "./memory.coding-agent-session.repository.ts";
 import { MemoryCodingAgentTraceSessionRepository } from "./memory.coding-agent-trace-session.repository.ts";
 import { MemoryCodingAgentDatabase } from "./memory.coding-agent.database.ts";
@@ -39,6 +40,8 @@ export class MemoryCodingAgentRepositories {
       sessionEvents: MemoryCodingAgentSessionEventRepository.create(memory),
       sessionContextMemo: MemorySessionContextMemoRepository.create(),
       sessionFoldCache: MemoryCodingAgentSessionFoldCacheRepository.create(),
+      sessionIdIndexMaterialisation:
+        MemoryCodingAgentSessionIndexMaterialisationRepository.create(),
     };
   }
 }
