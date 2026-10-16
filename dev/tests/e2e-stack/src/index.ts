@@ -308,12 +308,13 @@ function seedConstant(source: string, name: string, file: string = SEED_FILE): s
  */
 export function seededProject(): SeededProject {
   const source = readFileSync(SEED_FILE, "utf8");
+  const identity = readFileSync(SEED_IDENTITY_FILE, "utf8");
   return {
     projectSlug: seedConstant(source, "PROJECT_SLUG"),
     apiKey: seedConstant(source, "DEFAULT_INGESTION_KEY"),
     organizationApiKey: seededOrganizationToken(source),
-    adminEmail: `${seedConstant(source, "ADMIN_LOCAL_PART")}@${seedConstant(
-      readFileSync(SEED_IDENTITY_FILE, "utf8"),
+    adminEmail: `${seedConstant(identity, "LOCAL_DEV_ADMIN_LOCAL_PART", SEED_IDENTITY_FILE)}@${seedConstant(
+      identity,
       "DEFAULT_SEED_EMAIL_DOMAIN",
       SEED_IDENTITY_FILE,
     )}`,
