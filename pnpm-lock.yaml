@@ -498,8 +498,8 @@ catalogs:
       specifier: ^1.0.0
       version: 1.1.0
     nodemailer:
-      specifier: ^9.0.3
-      version: 9.0.3
+      specifier: ^10.0.14
+      version: 10.0.14
     nprogress:
       specifier: ^0.2.0
       version: 0.2.0
@@ -11524,7 +11524,7 @@ importers:
         version: 8.1.6(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       nodemailer:
         specifier: 'catalog:'
-        version: 9.0.3
+        version: 10.0.14
       undici:
         specifier: 'catalog:'
         version: 8.10.0
@@ -27290,9 +27290,9 @@ packages:
   node-rsa@1.1.1:
     resolution: {integrity: sha512-Jd4cvbJMryN21r5HgxQOpMEqv+ooke/korixNNK3mGqfGJmy0M77WDDzo/05969+OkMy3XW1UuZsSmW9KQm7Fw==}
 
-  nodemailer@9.0.3:
-    resolution: {integrity: sha512-n+YP+NKwR5zRWa60k3GiQ6Q3B4KXCoAw40dAKeCtYn020iNN74aWK2liXIC3ZEATeGql7we3tE3t8QwhY0eskw==}
-    engines: {node: '>=6.0.0'}
+  nodemailer@10.0.14:
+    resolution: {integrity: sha512-eJoLFKg55fesSlzUekmfOv/SBXh4KUYT8oiQc2RLP0tfG0rbNMJBK7wgHJwXTJwqyKlSJMz9UzDZ4v+aHEvo8g==}
+    engines: {node: '>=20.0.0'}
 
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
@@ -39418,7 +39418,7 @@ snapshots:
     dependencies:
       asn1: 0.2.6
 
-  nodemailer@9.0.3: {}
+  nodemailer@10.0.14: {}
 
   normalize-path@3.0.0: {}
 
