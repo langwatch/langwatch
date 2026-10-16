@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.6.0](https://github.com/langwatch/langwatch/compare/skills@v1.5.0...skills@v1.6.0) (2026-10-16)
+
+
+### Features
+
+* **dashboard:** move dashboards v2 onto its own tables ([#8707](https://github.com/langwatch/langwatch/issues/8707)) ([7f1f527](https://github.com/langwatch/langwatch/commit/7f1f527f85363fe97cdc93d300b7c469de4463eb))
+* **dashboards,insight:** dashboards and insights v1 ([#8545](https://github.com/langwatch/langwatch/issues/8545)) ([7b5e13d](https://github.com/langwatch/langwatch/commit/7b5e13dd84492d526f1442e3360005ff1ed08613))
+* **governance:** event-only aggregate reconcile; coding-agent-cost skill narrows by TenantId ([#8652](https://github.com/langwatch/langwatch/issues/8652)) ([ad90571](https://github.com/langwatch/langwatch/commit/ad9057171de3543a0cba75b07328ba348a8f2373))
+
+
+### Bug Fixes
+
+* dashboards and insights v1 follow-ups ([#8648](https://github.com/langwatch/langwatch/issues/8648)) ([127182a](https://github.com/langwatch/langwatch/commit/127182af50d2716f03ecf9f4092c90cebf89cf56))
+
 ## [1.5.0](https://github.com/langwatch/langwatch/compare/skills@v1.4.0...skills@v1.5.0) (2026-09-30)
 
 
