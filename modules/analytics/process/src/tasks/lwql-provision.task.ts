@@ -4,14 +4,20 @@
  * @see specs/lwql/api.feature
  */
 
+import { setTimeout as sleep } from "node:timers/promises";
+
 import { parseConnectionUrl } from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
+import { nowInstant } from "@langwatch/time";
 
+import { lwqlAppFunctionNames } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import {
   APP_FUNCTION_KEEPER_STORE_PATH,
+  APP_FUNCTION_REPLICA_WAIT_MS,
   canProvisionAppFunctions,
+  type SplitAppFunction,
 } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import {
   LangWatchQLProductionProvisioningService,
@@ -157,19 +163,51 @@ export function fillLwqlProjectKeys({
   });
 }
 
-/** False where the probe could not read the server; the repository logs why. */
+/** False where the probe could not read every replica; the repository logs why. */
 async function appFunctionsProvisionable(
-  repository: LangWatchQLProvisioningRepository,
+  store: ClickHouseLangWatchQLAppFunctionStoreRepository,
 ): Promise<boolean> {
-  const [probe] =
-    await ClickHouseLangWatchQLAppFunctionStoreRepository.overAdmin(repository).findProbe();
+  const [probe] = await store.findProbe();
   if (probe === undefined) return false;
   if (canProvisionAppFunctions(probe)) return true;
   logger.error(
     { maxTotalReplicas: probe.maxTotalReplicas, keeperPath: APP_FUNCTION_KEEPER_STORE_PATH },
-    `lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and does not keep its SQL functions in Keeper at ${APP_FUNCTION_KEEPER_STORE_PATH}, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path to ${APP_FUNCTION_KEEPER_STORE_PATH} in the server config on every replica and redeploy; LangWatchQL app functions stay refused until then`,
+    `lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and not every replica keeps its SQL functions in Keeper at ${APP_FUNCTION_KEEPER_STORE_PATH}, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path to ${APP_FUNCTION_KEEPER_STORE_PATH} in the server config on every replica and redeploy; LangWatchQL app functions stay refused until then`,
   );
   return false;
+}
+
+/** The stable code and message an alert matches when a created function split across replicas. */
+export const APP_FUNCTION_SPLIT_CODE = "lwql_app_functions_split";
+const APP_FUNCTION_SPLIT_MESSAGE =
+  "lwql app functions did not reach every ClickHouse replica and the Keeper function store after CREATE FUNCTION";
+
+/**
+ * After the create, waits briefly for the Keeper watch, then fails the step where a
+ * function is missing from a host or Keeper or differs between hosts: a replica keeping
+ * functions on local disk is caught here, since names alone cannot tell it apart. ADR-136.
+ */
+export async function verifyAppFunctionsOnEveryReplica({
+  findSplit,
+  waitMs = APP_FUNCTION_REPLICA_WAIT_MS,
+  pollMs = 500,
+}: {
+  findSplit: () => Promise<SplitAppFunction[]>;
+  waitMs?: number;
+  pollMs?: number;
+}): Promise<void> {
+  const deadline = nowInstant().epochMilliseconds + waitMs;
+  let split = await findSplit();
+  while (split.length > 0 && nowInstant().epochMilliseconds < deadline) {
+    await sleep(pollMs);
+    split = await findSplit();
+  }
+  if (split.length === 0) return;
+  logger.error(
+    { code: APP_FUNCTION_SPLIT_CODE, functions: split, keeperPath: APP_FUNCTION_KEEPER_STORE_PATH },
+    APP_FUNCTION_SPLIT_MESSAGE,
+  );
+  throw Object.assign(new Error(APP_FUNCTION_SPLIT_MESSAGE), { code: APP_FUNCTION_SPLIT_CODE });
 }
 
 /**
@@ -207,7 +245,7 @@ async function withSelfProvisionLock<T>({
   });
 }
 
-/** Inventory, app-function probe, SQL-mode guard, then the statements; the key map is a step's. */
+/** Inventory, function probe, SQL-mode guard, statements, replica check; key map is a step's. */
 async function convergeClickHouse({
   repository,
   source,
@@ -222,7 +260,11 @@ async function convergeClickHouse({
   sourceDatabase: string;
 }): Promise<void> {
   const configStoreEntities = await repository.inventoryConfigStore({ names });
-  const includeAppFunctions = await appFunctionsProvisionable(repository);
+  const functionStore = ClickHouseLangWatchQLAppFunctionStoreRepository.overAdmin({
+    admin: repository,
+    cluster: source.CLICKHOUSE_CLUSTER,
+  });
+  const includeAppFunctions = await appFunctionsProvisionable(functionStore);
   const mode = selfProvisioning.accessModelMode({ source });
   if (mode === "sql") {
     await clusterGuard.assertSafe({ query: (sql) => repository.queryRows(sql), source });
@@ -243,6 +285,11 @@ async function convergeClickHouse({
       { skippedCount: result.skipped.length },
       "lwql provisioning yielded to config-store-owned entities and provisioned the rest",
     );
+  }
+  if (includeAppFunctions) {
+    await verifyAppFunctionsOnEveryReplica({
+      findSplit: () => functionStore.findSplitAppFunctions({ names: lwqlAppFunctionNames() }),
+    });
   }
 }
 

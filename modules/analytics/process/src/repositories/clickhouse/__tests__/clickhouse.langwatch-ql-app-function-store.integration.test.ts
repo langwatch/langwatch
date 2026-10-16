@@ -1,12 +1,8 @@
 /**
- * The function store probe against a real ClickHouse with embedded Keeper. One server
- * holds two replicas of one table, so `system.replicas` reports a replicated layout
- * without a second container. Always its own containers: the Keeper config is the subject.
+ * The function store checks against two real ClickHouse 25.10 replicas sharing one Keeper.
+ * Every probe and check runs through the second replica, as a load-balanced URL may, while
+ * creates run through either. Always its own containers: the server config is the subject.
  */
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
@@ -18,9 +14,16 @@ import {
   canProvisionAppFunctions,
 } from "../../../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import { LangWatchQLAppFunctionStatementsService } from "../../../features/provisioning/services/langwatch-ql-app-function-statements.service.ts";
+import {
+  APP_FUNCTION_SPLIT_CODE,
+  verifyAppFunctionsOnEveryReplica,
+} from "../../../tasks/lwql-provision.task.ts";
 import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../clickhouse.langwatch-ql-app-function-store.repository.ts";
 
-const KEEPER_CONFIG = `<clickhouse>
+const CREDENTIALS = { username: "lwtest", password: "lwtest" };
+const CLUSTER = "lwtest";
+
+const KEEPER_SERVER_CONFIG = `<clickhouse>
   <keeper_server>
     <tcp_port>9181</tcp_port>
     <server_id>1</server_id>
@@ -35,141 +38,187 @@ const FUNCTION_STORE_CONFIG = `<clickhouse>
   <user_defined_zookeeper_path>/clickhouse/user_defined</user_defined_zookeeper_path>
 </clickhouse>`;
 
-type ReplicatedServer = { container: StartedClickHouseContainer; client: ClickHouseClient };
+/** The second replica's view: Keeper on the first, and a cluster of both. */
+function clusterConfig(keeperHost: string): string {
+  const replica = (host: string) =>
+    `<replica><host>${host}</host><port>9000</port><user>${CREDENTIALS.username}</user><password>${CREDENTIALS.password}</password></replica>`;
+  return `<clickhouse>
+  <zookeeper><node><host>${keeperHost}</host><port>9181</port></node></zookeeper>
+  <remote_servers><${CLUSTER}><shard>${replica(keeperHost)}${replica("localhost")}</shard></${CLUSTER}></remote_servers>
+</clickhouse>`;
+}
 
-async function startReplicatedServer({
-  functionStore,
+type Node = { container: StartedClickHouseContainer; client: ClickHouseClient; host: string };
+type Cluster = { first: Node; second: Node };
+
+async function startNode({
+  configs,
+  replica,
 }: {
-  functionStore: boolean;
-}): Promise<ReplicatedServer> {
-  const directory = mkdtempSync(join(tmpdir(), "lwql-function-store-"));
-  const file = (name: string, contents: string) => {
-    const path = join(directory, name);
-    writeFileSync(path, contents);
-    return path;
-  };
+  configs: Record<string, string>;
+  replica: string;
+}): Promise<Node> {
   const container = await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
-    .withCopyFilesToContainer([
-      {
-        source: file("keeper.xml", KEEPER_CONFIG),
-        target: "/etc/clickhouse-server/config.d/keeper.xml",
-      },
-      ...(functionStore
-        ? [
-            {
-              source: file("function-store.xml", FUNCTION_STORE_CONFIG),
-              target: "/etc/clickhouse-server/config.d/function-store.xml",
-            },
-          ]
-        : []),
-    ])
+    .withUsername(CREDENTIALS.username)
+    .withPassword(CREDENTIALS.password)
+    .withCopyContentToContainer(
+      Object.entries(configs).map(([name, content]) => ({
+        content,
+        target: `/etc/clickhouse-server/config.d/${name}.xml`,
+      })),
+    )
     .withStartupTimeout(120_000)
     .start();
-  const client = createClient({
-    url: container.getHttpUrl(),
-    username: container.getUsername(),
-    password: container.getPassword(),
+  const client = createClient({ url: container.getHttpUrl(), ...CREDENTIALS });
+  await client.command({
+    query: `CREATE TABLE probe (id UInt64) ENGINE = ReplicatedMergeTree('/clickhouse/tables/probe', '${replica}') ORDER BY id`,
   });
-  for (const replica of ["r1", "r2"]) {
-    await client.command({
-      query: `CREATE TABLE replica_${replica} (id UInt64) ENGINE = ReplicatedMergeTree('/clickhouse/tables/probe', '${replica}') ORDER BY id`,
-    });
-  }
-  return { container, client };
+  const [self] = await rows<{ host: string }>(client, "SELECT hostName() AS host");
+  if (self === undefined) throw new Error("the replica did not report its hostName()");
+  return { container, client, host: self.host };
 }
 
-async function provisionable({ client }: ReplicatedServer): Promise<boolean[]> {
-  const repository = ClickHouseLangWatchQLAppFunctionStoreRepository.overAdmin({
-    queryRows: async (sql) =>
-      (await client.query({ query: sql, format: "JSONEachRow" })).json<Record<string, unknown>>(),
+/** Two replicas of one table; the second keeps functions in Keeper or on its local disk. */
+async function startCluster({ second }: { second: "keeper" | "local" }): Promise<Cluster> {
+  const first = await startNode({
+    configs: { keeper: KEEPER_SERVER_CONFIG, "function-store": FUNCTION_STORE_CONFIG },
+    replica: "r1",
   });
-  return (await repository.findProbe()).map(canProvisionAppFunctions);
+  const keeperHost = first.container.getIpAddress("bridge");
+  const secondNode = await startNode({
+    configs: {
+      cluster: clusterConfig(keeperHost),
+      ...(second === "keeper" ? { "function-store": FUNCTION_STORE_CONFIG } : {}),
+    },
+    replica: "r2",
+  });
+  return { first, second: secondNode };
 }
 
-/** Writes a Keeper node as another server would, through the image's own keeper-client. */
-async function writeKeeperNode(
-  { container }: ReplicatedServer,
-  { path, value }: { path: string; value: string },
-): Promise<void> {
-  const { exitCode, output } = await container.exec([
-    "clickhouse",
-    "keeper-client",
-    "--host=localhost",
-    "--port=9181",
-    `--query=create '${path}' '${value}'`,
-  ]);
-  if (exitCode !== 0) throw new Error(`keeper-client could not create ${path}: ${output}`);
+async function rows<Row>(client: ClickHouseClient, query: string): Promise<Row[]> {
+  return (await client.query({ query, format: "JSONEachRow" })).json<Row>();
 }
 
-async function keeperStoreNodes({ client }: ReplicatedServer): Promise<string[]> {
-  const rows = await (
-    await client.query({
-      query: `SELECT name FROM system.zookeeper WHERE path = '${APP_FUNCTION_KEEPER_STORE_PATH}'`,
-      format: "JSONEachRow",
-    })
-  ).json<{ name: string }>();
-  return rows.map((row) => row.name);
+/** The repository over the second replica, as the deploy task's admin connection. */
+function storeOver({ second }: Cluster) {
+  return ClickHouseLangWatchQLAppFunctionStoreRepository.overAdmin({
+    admin: { queryRows: (sql) => rows<Record<string, unknown>>(second.client, sql) },
+    cluster: undefined,
+  });
 }
 
-describe("ClickHouseLangWatchQLAppFunctionStoreRepository on a replicated ClickHouse", () => {
-  const servers: ReplicatedServer[] = [];
+async function provisionable(cluster: Cluster): Promise<boolean[]> {
+  return (await storeOver(cluster).findProbe()).map(canProvisionAppFunctions);
+}
+
+async function keeperStoreNodes({ first }: Cluster): Promise<string[]> {
+  const found = await rows<{ name: string }>(
+    first.client,
+    `SELECT name FROM system.zookeeper WHERE path = '${APP_FUNCTION_KEEPER_STORE_PATH}'`,
+  );
+  return found.map((row) => row.name);
+}
+
+describe("ClickHouseLangWatchQLAppFunctionStoreRepository on two replicas sharing Keeper", () => {
+  const clusters: Cluster[] = [];
 
   afterAll(async () => {
-    for (const { client, container } of servers) {
-      await client.close();
-      await container.stop();
+    for (const node of clusters.flatMap(({ first, second }) => [second, first])) {
+      await node.client.close();
+      await node.container.stop();
     }
   });
 
-  describe("given user_defined_zookeeper_path at /clickhouse/user_defined", () => {
-    let server: ReplicatedServer;
+  describe("given user_defined_zookeeper_path at /clickhouse/user_defined on both replicas", () => {
+    let cluster: Cluster;
     beforeAll(async () => {
-      server = await startReplicatedServer({ functionStore: true });
-      servers.push(server);
-    }, 180_000);
+      cluster = await startCluster({ second: "keeper" });
+      clusters.push(cluster);
+    }, 240_000);
 
-    /** @scenario "The probe finds the function store in Keeper on a real replicated ClickHouse" */
-    it("finds the store and allows the app functions", async () => {
-      await expect(provisionable(server)).resolves.toEqual([true]);
+    /** @scenario "The probe finds the function store in Keeper on every replica of a real replicated ClickHouse" */
+    it("finds the store on every replica and allows the app functions", async () => {
+      await expect(provisionable(cluster)).resolves.toEqual([true]);
     });
 
-    /** @scenario "A function created on a real replicated ClickHouse lands in the Keeper function store" */
-    it("stores the created llm_readable_thread in Keeper", async () => {
+    /** @scenario "A function created on a real replicated ClickHouse reaches Keeper and every replica" */
+    it("stores the created llm_readable_thread in Keeper and every replica loads it", async () => {
       const [definition] = findLangWatchQLAppFunctions("llm_readable_thread");
       if (definition === undefined) throw new Error("llm_readable_thread is not in the catalogue");
-      await server.client.command({
+      await cluster.first.client.command({
         query: LangWatchQLAppFunctionStatementsService.create().functionStatement(definition),
       });
-      await expect(keeperStoreNodes(server)).resolves.toContain("function_llm_readable_thread.sql");
+
+      await expect(keeperStoreNodes(cluster)).resolves.toContain(
+        "function_llm_readable_thread.sql",
+      );
+      const store = storeOver(cluster);
+      await expect(
+        verifyAppFunctionsOnEveryReplica({
+          findSplit: () => store.findSplitAppFunctions({ names: ["llm_readable_thread"] }),
+        }),
+      ).resolves.toBeUndefined();
     });
   });
 
-  describe("given no user_defined_zookeeper_path", () => {
-    let server: ReplicatedServer;
+  describe("given the second replica keeps its functions on local disk", () => {
+    let cluster: Cluster;
     beforeAll(async () => {
-      server = await startReplicatedServer({ functionStore: false });
-      servers.push(server);
-    }, 180_000);
+      cluster = await startCluster({ second: "local" });
+      clusters.push(cluster);
+    }, 240_000);
 
-    /** @scenario "The probe refuses a real replicated ClickHouse with no function store in Keeper" */
-    it("finds no store and refuses the app functions", async () => {
-      await expect(provisionable(server)).resolves.toEqual([false]);
-    });
-
-    describe("when another server made the Keeper store and this one keeps a function on local disk", () => {
+    describe("when a function is created through the local-disk replica", () => {
       beforeAll(async () => {
-        await writeKeeperNode(server, { path: APP_FUNCTION_KEEPER_STORE_PATH, value: "store" });
-        await writeKeeperNode(server, {
-          path: `${APP_FUNCTION_KEEPER_STORE_PATH}/function_x.sql`,
-          value: "CREATE FUNCTION x AS () -> 1",
-        });
-        await server.client.command({ query: "CREATE FUNCTION local_only AS () -> 1" });
+        await cluster.second.client.command({ query: "CREATE FUNCTION local_only AS () -> 1" });
       });
 
-      /** @scenario "The probe refuses a real replicated ClickHouse that keeps its functions locally beside another server's Keeper store" */
-      it("sees the store but refuses the app functions", async () => {
-        await expect(keeperStoreNodes(server)).resolves.toEqual(["function_x.sql"]);
-        await expect(provisionable(server)).resolves.toEqual([false]);
+      /** @scenario "A function created through a replica on local disk is reported missing from the other replicas" */
+      it("reports the function missing from the Keeper replica and from Keeper, and fails the step", async () => {
+        const store = storeOver(cluster);
+        await expect(store.findSplitAppFunctions({ names: ["local_only"] })).resolves.toEqual([
+          {
+            name: "local_only",
+            missingOn: [cluster.first.host],
+            inKeeper: false,
+            oneDefinition: true,
+          },
+        ]);
+        await expect(
+          verifyAppFunctionsOnEveryReplica({
+            findSplit: () => store.findSplitAppFunctions({ names: ["local_only"] }),
+            waitMs: 1_000,
+            pollMs: 200,
+          }),
+        ).rejects.toMatchObject({ code: APP_FUNCTION_SPLIT_CODE });
+      });
+
+      /** @scenario "The probe refuses a real replicated ClickHouse where one replica keeps its functions on local disk" */
+      it("refuses the app functions on the next probe", async () => {
+        await expect(provisionable(cluster)).resolves.toEqual([false]);
+      });
+    });
+
+    describe("when both replicas hold the same function by name, one in Keeper and one locally", () => {
+      beforeAll(async () => {
+        await cluster.second.client.command({ query: "DROP FUNCTION local_only" });
+        await cluster.first.client.command({ query: "CREATE FUNCTION same_name AS () -> 1" });
+        await cluster.second.client.command({ query: "CREATE FUNCTION same_name AS () -> 1" });
+      });
+
+      /** @scenario "A replace through a replica on local disk that matched the store by name is caught after the create" */
+      it("passes the probe by name, then catches the replace that reached one replica", async () => {
+        await expect(provisionable(cluster)).resolves.toEqual([true]);
+
+        await cluster.second.client.command({
+          query: "CREATE OR REPLACE FUNCTION same_name AS () -> 2",
+        });
+
+        await expect(
+          storeOver(cluster).findSplitAppFunctions({ names: ["same_name"] }),
+        ).resolves.toEqual([
+          { name: "same_name", missingOn: [], inKeeper: true, oneDefinition: false },
+        ]);
       });
     });
   });

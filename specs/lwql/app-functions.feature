@@ -403,40 +403,73 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     And the rest of the access model is provisioned
 
   # ClickHouse 25.10 lists user_defined_zookeeper_path nowhere in system.server_settings,
-  # so the probe compares the Keeper store with the SQL functions this server knows.
+  # so the probe compares the Keeper store with the SQL functions every replica knows,
+  # read through clusterAllReplicas. A local store holding the same names as Keeper, or
+  # an empty store beside empty replicas, cannot be told apart by name; the check after
+  # the create catches the first function that does not reach Keeper and every replica.
   @unit
   Scenario: A replicated server whose function store is in Keeper is provisioned with the functions
     Given a ClickHouse 25.10 with three replicas and the function store at /clickhouse/user_defined in Keeper
     And system.server_settings does not list user_defined_zookeeper_path
-    When self-provisioning probes where a CREATE FUNCTION would land
+    When self-provisioning probes every replica for where a CREATE FUNCTION would land
     Then the app functions are provisionable
     And every app function, one missing from the store included, is created with CREATE OR REPLACE
 
-  @integration
-  Scenario: The probe finds the function store in Keeper on a real replicated ClickHouse
-    Given a ClickHouse 25.10 with Keeper, a table with two replicas and user_defined_zookeeper_path at /clickhouse/user_defined
+  @unit
+  Scenario: A replicated server with Keeper but no function store in it is not provisionable
+    Given a ClickHouse with three replicas and Keeper but no node at /clickhouse/user_defined
     When the function store probe runs
+    Then the app functions are not provisionable
+
+  @unit
+  Scenario: A replicated server with an unreachable replica is not checked
+    Given a ClickHouse with three replicas where clusterAllReplicas cannot reach one
+    When the function store probe runs
+    Then the probe answers nothing, so the app functions are skipped and the log names the host
+
+  @unit
+  Scenario: A created app function missing on one replica fails the provisioning step
+    Given the app functions were created
+    And after a short wait for the Keeper watch one replica still does not list one of them
+    When self-provisioning checks every replica after the create
+    Then it logs an error with the stable code lwql_app_functions_split and the hosts missing it
+    And the provisioning step fails as a failed create does, without crashing the deploy
+
+  @integration
+  Scenario: The probe finds the function store in Keeper on every replica of a real replicated ClickHouse
+    Given two ClickHouse 25.10 replicas sharing Keeper, both with user_defined_zookeeper_path at /clickhouse/user_defined
+    When the function store probe runs through one replica
     Then the app functions are provisionable
 
   @integration
-  Scenario: A function created on a real replicated ClickHouse lands in the Keeper function store
-    Given a ClickHouse 25.10 with Keeper, a table with two replicas and user_defined_zookeeper_path at /clickhouse/user_defined
-    When the catalogue's CREATE OR REPLACE FUNCTION for llm_readable_thread runs
+  Scenario: A function created on a real replicated ClickHouse reaches Keeper and every replica
+    Given two ClickHouse 25.10 replicas sharing Keeper, both with user_defined_zookeeper_path at /clickhouse/user_defined
+    When the catalogue's CREATE OR REPLACE FUNCTION for llm_readable_thread runs on the other replica
     Then Keeper lists function_llm_readable_thread.sql under /clickhouse/user_defined
+    And the check after the create finds it on every replica
 
   @integration
-  Scenario: The probe refuses a real replicated ClickHouse with no function store in Keeper
-    Given a ClickHouse 25.10 with Keeper and a table with two replicas but no user_defined_zookeeper_path
+  Scenario: A function created through a replica on local disk is reported missing from the other replicas
+    Given two ClickHouse 25.10 replicas sharing Keeper, the second with no user_defined_zookeeper_path
+    When a function is created through the second replica
+    Then the check after the create reports it missing from the first replica and from Keeper
+    And the provisioning step fails with the stable code lwql_app_functions_split
+
+  @integration
+  Scenario: The probe refuses a real replicated ClickHouse where one replica keeps its functions on local disk
+    Given two ClickHouse 25.10 replicas sharing Keeper, the second with no user_defined_zookeeper_path
+    And the second replica holds a function the Keeper store lacks
     When the function store probe runs
     Then the app functions are not provisionable
 
   @integration
-  Scenario: The probe refuses a real replicated ClickHouse that keeps its functions locally beside another server's Keeper store
-    Given a ClickHouse 25.10 with Keeper and a table with two replicas but no user_defined_zookeeper_path
-    And another server made /clickhouse/user_defined in Keeper with function_x.sql under it
-    And this server holds a function local_only on its local disk
+  Scenario: A replace through a replica on local disk that matched the store by name is caught after the create
+    Given two ClickHouse 25.10 replicas sharing Keeper, the second with no user_defined_zookeeper_path
+    And both replicas hold a function of the same name, the first through Keeper and the second on local disk
     When the function store probe runs
-    Then the app functions are not provisionable
+    Then the app functions are provisionable, since names alone cannot tell the stores apart
+    When CREATE OR REPLACE changes that function through the second replica
+    Then the check after the create reports that the replicas hold different definitions
 
   @unit
   Scenario: A single-node server is provisioned with the functions

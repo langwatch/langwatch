@@ -1,7 +1,7 @@
 /**
  * The probe the deploy task and the ops checkup both read, over a driver that answers as
  * ClickHouse 25.10 does: system.server_settings never lists user_defined_zookeeper_path,
- * and a server with no Keeper has no system.zookeeper table at all.
+ * a server with no Keeper has no system.zookeeper table, and every replica answers alone.
  */
 import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
@@ -28,16 +28,24 @@ function unknownTable(sql: string): Error {
   });
 }
 
+type Replica = { host: string; functions: string[] };
+
 function clickHouse2510({
   maxTotalReplicas,
   keeper,
-  serverFunctions = [],
+  replicas = [],
   storeEntries = [],
+  clusters = [
+    { name: "langwatch", hosts: String(maxTotalReplicas), widest_shard: String(maxTotalReplicas) },
+  ],
+  unreachable = false,
 }: {
   maxTotalReplicas: number;
   keeper: "absent" | "with-function-store" | "without-function-store";
-  serverFunctions?: string[];
+  replicas?: Replica[];
   storeEntries?: string[];
+  clusters?: Record<string, string>[];
+  unreachable?: boolean;
 }): QueryDriver {
   const names = (list: string[]) => list.map((name) => ({ name }));
   return {
@@ -47,8 +55,17 @@ function clickHouse2510({
         return answer([{ max_total_replicas: String(maxTotalReplicas) }]);
       }
       if (sql.includes("system.server_settings")) return answer([]);
-      if (sql.includes("system.functions") && sql.includes("origin = 'SQLUserDefined'")) {
-        return answer(names(serverFunctions));
+      if (sql.includes("system.clusters")) return answer(clusters);
+      if (sql.includes("clusterAllReplicas('langwatch', system.functions)")) {
+        if (unreachable) return Promise.reject(new Error("All connection tries failed: ch-2:9000"));
+        return answer(
+          replicas.map(({ host, functions }) => ({
+            host,
+            functions: Object.fromEntries(
+              functions.map((name) => [name, `CREATE FUNCTION ${name}`]),
+            ),
+          })),
+        );
       }
       if (sql.includes("system.zookeeper")) {
         if (keeper === "absent") return Promise.reject(unknownTable(sql));
@@ -67,6 +84,11 @@ function clickHouse2510({
   };
 }
 
+const THREE_EMPTY_REPLICAS: Replica[] = ["ch-0", "ch-1", "ch-2"].map((host) => ({
+  host,
+  functions: [],
+}));
+
 function provisionableOver(driver: QueryDriver): Promise<boolean[]> {
   const repository = ClickHouseLangWatchQLAppFunctionStoreRepository.create(
     new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver }),
@@ -79,7 +101,11 @@ describe("ClickHouseLangWatchQLAppFunctionStoreRepository", () => {
     /** @scenario "A replicated server whose function store is in Keeper is provisioned with the functions" */
     it("is provisionable, so every app function, a missing one included, is created", async () => {
       const [provisionable] = await provisionableOver(
-        clickHouse2510({ maxTotalReplicas: 3, keeper: "with-function-store" }),
+        clickHouse2510({
+          maxTotalReplicas: 3,
+          keeper: "with-function-store",
+          replicas: THREE_EMPTY_REPLICAS,
+        }),
       );
 
       expect(provisionable).toBe(true);
@@ -94,22 +120,66 @@ describe("ClickHouseLangWatchQLAppFunctionStoreRepository", () => {
     });
   });
 
-  describe("given a replicated server whose functions are not the ones in the Keeper store", () => {
-    it("is not provisionable, since this server keeps its functions on local disk", async () => {
+  describe("given a replicated server where one replica keeps a function the Keeper store lacks", () => {
+    it("is not provisionable, since that replica keeps its functions on local disk", async () => {
       await expect(
         provisionableOver(
           clickHouse2510({
             maxTotalReplicas: 3,
             keeper: "with-function-store",
-            serverFunctions: ["local_only"],
-            storeEntries: ["function_other_server.sql"],
+            replicas: [
+              { host: "ch-0", functions: ["x"] },
+              { host: "ch-1", functions: ["x"] },
+              { host: "ch-2", functions: ["x", "local_only"] },
+            ],
+            storeEntries: ["function_x.sql"],
           }),
         ),
       ).resolves.toEqual([false]);
     });
   });
 
+  describe("given a replicated server where one replica cannot be reached", () => {
+    /** @scenario "A replicated server with an unreachable replica is not checked" */
+    it("answers nothing, so the functions are skipped", async () => {
+      await expect(
+        provisionableOver(
+          clickHouse2510({ maxTotalReplicas: 3, keeper: "with-function-store", unreachable: true }),
+        ),
+      ).resolves.toEqual([]);
+    });
+  });
+
+  describe("given a replicated server where fewer hosts answer than the cluster has", () => {
+    it("answers nothing rather than trusting the replicas it could see", async () => {
+      await expect(
+        provisionableOver(
+          clickHouse2510({
+            maxTotalReplicas: 3,
+            keeper: "with-function-store",
+            replicas: THREE_EMPTY_REPLICAS.slice(0, 2),
+          }),
+        ),
+      ).resolves.toEqual([]);
+    });
+  });
+
+  describe("given a replicated server with no cluster spanning its replicas", () => {
+    it("answers nothing, since no query can reach every replica", async () => {
+      await expect(
+        provisionableOver(
+          clickHouse2510({
+            maxTotalReplicas: 3,
+            keeper: "with-function-store",
+            clusters: [{ name: "default", hosts: "1", widest_shard: "1" }],
+          }),
+        ),
+      ).resolves.toEqual([]);
+    });
+  });
+
   describe("given a replicated ClickHouse with Keeper but no function store in it", () => {
+    /** @scenario "A replicated server with Keeper but no function store in it is not provisionable" */
     it("is not provisionable, since a create would reach one replica only", async () => {
       await expect(
         provisionableOver(
