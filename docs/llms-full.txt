@@ -10601,7 +10601,7 @@ A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to s
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | Refuses a customer-configured provider endpoint that resolves to a private or link-local address                              |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuses a customer-configured provider endpoint that is plain HTTP                                                            |
-| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that may use a private address while the guard is on. Cloud metadata and link-local destinations stay refused |
+| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that pass the endpoint check on a private address while the guard is on. Chat dispatch still refuses private addresses until the guard is off. Cloud metadata and link-local destinations stay refused |
 
 ## Calling the gateway from a browser
 
