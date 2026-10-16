@@ -59,11 +59,14 @@ permissions:
   packages: write
 
 concurrency:
-  group: go-services-${{ github.ref_name }}
+  # Every Dependabot-authored PR shares one group, so one runs at a time (#8638).
+  group: go-services-${{ github.event.pull_request.user.login == 'dependabot[bot]' && 'dependabot-all' || github.ref_name }}
   # Supersede an outdated run on a PR branch, never on main: every commit
   # that lands on main has to keep its own validation, and cancelling here
   # would let a merge silently void the run for the commit before it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.event.pull_request.user.login != 'dependabot[bot]' }}
+  # Dependabot runs wait in line (up to 100) instead of replacing each other.
+  queue: ${{ github.event.pull_request.user.login == 'dependabot[bot]' && 'max' || 'single' }}
 
 jobs:
   changes:
