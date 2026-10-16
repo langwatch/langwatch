@@ -3,6 +3,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { Inbox, MoreVertical } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { SERVICE_LABELS, type License, type Service } from "../../model/license-terms.ts";
 import { AdminDate, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
@@ -22,9 +23,12 @@ export function LicensesTable({
   onOpen,
   onRevoke,
   onResetBinding,
+  emptyState,
 }: {
   licenses: License[];
   isLoading: boolean;
+  /** What an empty list says; the default suits a registry with no licenses at all. */
+  emptyState?: ReactNode;
   onOpen: (id: string) => void;
   onRevoke: (license: License) => void;
   onResetBinding: (license: License) => void;
@@ -45,7 +49,7 @@ export function LicensesTable({
         </ListTable.Row>
       </ListTable.Header>
       <ListTable.Body>
-        {licenses.length === 0 && !isLoading ? <EmptyRow /> : null}
+        {licenses.length === 0 && !isLoading ? <EmptyRow>{emptyState}</EmptyRow> : null}
         {licenses.map((license) => (
           <LicensesTableRow
             key={license.id}
@@ -60,14 +64,16 @@ export function LicensesTable({
   );
 }
 
-function EmptyRow() {
+function EmptyRow({ children }: { children?: ReactNode }) {
   return (
     <ListTable.SpanRow columns={COLUMN_COUNT}>
-      <NoDataInfoBlock
-        icon={<Inbox />}
-        title="No licenses in the registry yet."
-        description="Records will appear here when they are available."
-      />
+      {children ?? (
+        <NoDataInfoBlock
+          icon={<Inbox />}
+          title="No licenses in the registry yet."
+          description="Records will appear here when they are available."
+        />
+      )}
     </ListTable.SpanRow>
   );
 }

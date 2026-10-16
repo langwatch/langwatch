@@ -140,29 +140,29 @@ Contract `../contract/src/license-registry.trpc.ts:36`, router `src/transport/li
 
 ```typescript
 // licenseRegistry.getAll
-// Input: listIssuedLicensesInputSchema, ../../licensing/contract/src/license-registry.ts:26
+// Input: listIssuedLicensesInputSchema, ../../licensing/contract/src/license-registry.ts:28
 interface Input {
-  onlyActive?: boolean;
-  hideInternal?: boolean;
+  status?: "active" | "inactive";
+  audience?: "customer" | "internal";
   page?: number;
   pageSize?: number;
   search?: string;
 }
-type Output = z.infer<typeof issuedLicensePageSchema>; // ../../licensing/contract/src/issued-license.ts:88
+type Output = z.infer<typeof issuedLicensePageSchema>; // ../../licensing/contract/src/issued-license.ts:98
 
 // licenseRegistry.getById
-// Input: licenseIdInputSchema, ../../licensing/contract/src/license-registry.ts:30
+// Input: licenseIdInputSchema, ../../licensing/contract/src/license-registry.ts:32
 interface Input {
   id: string;
 }
 type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.issue
-type Input = z.infer<typeof issueLicenseInputSchema>; // ../../licensing/contract/src/license-registry.ts:45
-type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:122
+type Input = z.infer<typeof issueLicenseInputSchema>; // ../../licensing/contract/src/license-registry.ts:47
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:132
 
 // licenseRegistry.registerLegacy
-// Input: registerLegacyLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:56
+// Input: registerLegacyLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:58
 interface Input {
   licenseKey: string;
   organizationId: string;
@@ -170,7 +170,7 @@ interface Input {
 type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.revoke
-// Input: revokeIssuedLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:66
+// Input: revokeIssuedLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:68
 interface Input {
   id: string;
   reason: string;
@@ -178,7 +178,7 @@ interface Input {
 type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.reissue
-// Input: reissueLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:80
+// Input: reissueLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:82
 interface Input {
   id: string;
   maxMembers?: number;
@@ -186,22 +186,22 @@ interface Input {
   maxMessagesPerMonth?: number;
   expiresAt: string;
 }
-type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:122
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:132
 
 // licenseRegistry.changeSeats
-// Input: changeLicenseSeatsInputSchema, ../../licensing/contract/src/license-registry.ts:90
+// Input: changeLicenseSeatsInputSchema, ../../licensing/contract/src/license-registry.ts:92
 interface Input {
   id: string;
   maxMembers: number;
 }
-type Output = z.infer<typeof seatChangeResultSchema>; // ../../licensing/contract/src/issued-license.ts:139
+type Output = z.infer<typeof seatChangeResultSchema>; // ../../licensing/contract/src/issued-license.ts:149
 
 // licenseRegistry.resetInstanceBinding
-type Input = z.infer<typeof licenseIdInputSchema>; // ../../licensing/contract/src/license-registry.ts:30
+type Input = z.infer<typeof licenseIdInputSchema>; // ../../licensing/contract/src/license-registry.ts:32
 type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.updateTerms
-// Input: updateLicenseTermsInputSchema, ../../licensing/contract/src/license-registry.ts:100
+// Input: updateLicenseTermsInputSchema, ../../licensing/contract/src/license-registry.ts:102
 interface Input {
   id: string;
   services?: ("instant_evals" | "managed_models")[];
@@ -214,7 +214,7 @@ interface Input {
 type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.linkToOrganization
-// Input: linkLicenseToOrganizationInputSchema, ../../licensing/contract/src/license-registry.ts:110
+// Input: linkLicenseToOrganizationInputSchema, ../../licensing/contract/src/license-registry.ts:112
 interface Input {
   id: string;
   organizationId: string;
