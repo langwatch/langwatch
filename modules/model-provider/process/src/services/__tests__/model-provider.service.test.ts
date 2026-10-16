@@ -1708,6 +1708,27 @@ describe("ModelProviderService", () => {
     });
     expect(prepared).not.toHaveProperty("api_key");
   });
+  /** @scenario "A Vertex AI call without a service account, project or location fails by name" */
+  it('refuses a Vertex call with nothing to send instead of sending "invalid"', async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        provider: "vertex_ai",
+        customKeys: null,
+        customModels: [{ id: "gemini-2.5-pro", label: "Gemini", type: "chat" }],
+      }),
+    ];
+
+    await expect(
+      service(providers, new ExecutionCatalog()).prepareExecution({
+        projectId: "project_1",
+        model: "vertex_ai/gemini-2.5-pro",
+      }),
+    ).rejects.toMatchObject({
+      code: "model_provider_invalid",
+      message: expect.stringMatching(/service account JSON, a project and a location/),
+    });
+  });
   it("keeps the Codex refusal for an explicit model-provider row", async () => {
     const providers = new Providers();
     providers.rows = [

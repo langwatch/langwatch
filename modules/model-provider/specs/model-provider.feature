@@ -59,6 +59,28 @@ Feature: Model Provider service
     And the service account is never sent as api_key
 
   @unit
+  Scenario: On the hosted deployment a provider with its own keys never borrows LangWatch's
+    Given the hosted deployment's environment holds LangWatch's own provider credentials
+    And a customer's provider stores its own keys but not every key the call reads
+    When a key the provider does not store is read for a call
+    Then no value comes back
+    And a provider that stores no keys, the system provider, still reads the environment
+
+  @unit
+  Scenario: A self-hosted install fills a provider's missing key from its own environment
+    Given a self-hosted install whose environment holds a provider credential
+    And a provider that stores some keys but not that one
+    When that key is read for a call
+    Then the environment's value comes back
+
+  @unit
+  Scenario: A Vertex AI call without a service account, project or location fails by name
+    Given a project's Vertex AI provider has no service account, project or location to use
+    When a Vertex AI model call is prepared for the project
+    Then it fails with model_provider_invalid naming what Vertex AI needs
+    And nothing is sent to LiteLLM as "invalid"
+
+  @unit
   Scenario: The platform chain borrows the Google credential from data privacy
     Given data privacy holds the deployment's Google application credential
     When the platform provider chain is read

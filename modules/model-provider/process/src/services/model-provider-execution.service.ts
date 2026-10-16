@@ -179,10 +179,19 @@ export class ModelProviderExecutionService {
     const definition = this.options.catalog.pickExecutionDefinition({
       provider: provider.provider,
     });
-    parameters.vertex_credentials =
-      (definition ? this.executionValue(provider, definition.apiKey) : null) ?? "invalid";
-    parameters.vertex_project = this.executionValue(provider, "VERTEXAI_PROJECT") ?? "invalid";
-    parameters.vertex_location = this.executionValue(provider, "VERTEXAI_LOCATION") ?? "invalid";
+    const credentials = definition ? this.executionValue(provider, definition.apiKey) : null;
+    const project = this.executionValue(provider, "VERTEXAI_PROJECT");
+    const location = this.executionValue(provider, "VERTEXAI_LOCATION");
+    // A missing value used to go out as "invalid" and fail inside LiteLLM as a JSON parse error.
+    if (!credentials || !project || !location) {
+      throw new ModelProviderInvalidError(
+        "The Vertex AI provider needs a service account JSON, a project and a location.",
+      );
+    }
+
+    parameters.vertex_credentials = credentials;
+    parameters.vertex_project = project;
+    parameters.vertex_location = location;
   }
 
   private addGeminiParameters(

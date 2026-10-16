@@ -271,6 +271,12 @@ export class RegistryModelProviderCatalogService extends ModelProviderCatalog {
     );
   }
 
+  private static storesOwnKeys(customKeys: Record<string, unknown> | null): boolean {
+    return Object.values(customKeys ?? {}).some(
+      (value) => typeof value === "string" && value.length > 0,
+    );
+  }
+
   private isSystemProviderEnabled(provider: string, apiKey: string): boolean {
     return (
       this.options.isSaas &&
@@ -316,6 +322,16 @@ export class RegistryModelProviderCatalogService extends ModelProviderCatalog {
     const stored = input.customKeys?.[input.key];
     if (typeof stored === "string" && stored.length > 0) {
       return stored;
+    }
+
+    // On the hosted deployment the environment holds LangWatch's own credentials. A provider
+    // that stores its own keys never borrows them: only the system provider, which stores none,
+    // reads the environment. A self-hosted install's environment is its own, so it falls back.
+    if (
+      this.options.isSaas &&
+      RegistryModelProviderCatalogService.storesOwnKeys(input.customKeys)
+    ) {
+      return null;
     }
 
     return this.options.systemProviderEnvironment[input.key] ?? null;
