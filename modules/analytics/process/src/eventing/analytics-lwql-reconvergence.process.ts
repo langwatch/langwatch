@@ -1,78 +1,60 @@
 /**
- * The access-model reconvergence watch (ADR-159): after boot, while a config store owns the
- * LangWatchQL model, probe on a backoff from 5 s to 5 min for 30 min, and re-provision once
- * released. Pure; the probe and the convergence run behind the outbox lease.
+ * The LangWatchQL reconvergence check (ADR-159): every 5 minutes, with no end, one check across
+ * the fleet reads what the app-owned objects lack and converges only then. Pure; the check runs
+ * behind the outbox lease on whichever worker holds it, so nothing here is per process.
  */
 import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { z } from "zod";
 
-export const LWQL_RECONVERGENCE_INITIAL_DELAY_MS = 5_000;
-export const LWQL_RECONVERGENCE_MAX_DELAY_MS = 5 * 60_000;
-export const LWQL_RECONVERGENCE_BUDGET_MS = 30 * 60_000;
+export const LWQL_RECONVERGENCE_INTERVAL_MS = 5 * 60_000;
+/** A safety net under the project-created subscriber: a fill reads every project. */
+export const LWQL_KEY_MAP_REFILL_MS = 24 * 60 * 60_000;
+
+const KEY_MAP_FILL_RETRY_CAP_MS = 2 * 60 * 60_000;
+/** Deliveries of a check whose fill keeps failing; the last lands 22.6 hours after the first. */
+export const LWQL_KEY_MAP_FILL_MAX_ATTEMPTS = 16;
+
+/** 5 minutes, doubling, capped at 2 hours: each retried fill reads every project. */
+export function lwqlKeyMapFillRetryDelayMs({ attempt }: { attempt: number }): number {
+  return Math.min(LWQL_RECONVERGENCE_INTERVAL_MS * 2 ** (attempt - 1), KEY_MAP_FILL_RETRY_CAP_MS);
+}
 
 export const lwqlReconvergenceSchema = z.object({
   scheduledFor: z.number().int(),
-  /** The last probe the budget allows; a model still config-owned then is given up on. */
-  final: z.boolean(),
-  /** A boot's first probe also fills missing key-map rows, as main did at each start. */
+  /** The first check, and the first a day after the last ask, fill missing key-map rows. */
   fillKeyMap: z.boolean().default(false),
 });
 
+/** Defaulted, so a row the earlier boot-scoped watch stored still parses. */
 export const lwqlReconvergenceStateSchema = z.object({
-  /** The boot this schedule belongs to; a new boot starts a fresh watch. */
-  bootedAt: z.number().nullable(),
-  /** Epoch ms of the next probe. */
-  nextAt: z.number(),
-  delayMs: z.number(),
-  elapsedMs: z.number(),
-  gaveUp: z.boolean(),
+  /** Epoch ms of the last check that asked for a key-map fill; null before the first. */
+  keyMapFillAskedAt: z.number().nullable().default(null),
 });
 export type LwqlReconvergenceState = z.infer<typeof lwqlReconvergenceStateSchema>;
 
 export const LWQL_RECONVERGENCE_INITIAL_STATE: LwqlReconvergenceState = {
-  bootedAt: null,
-  nextAt: 0,
-  delayMs: LWQL_RECONVERGENCE_INITIAL_DELAY_MS,
-  elapsedMs: 0,
-  gaveUp: false,
+  keyMapFillAskedAt: null,
 };
 
 type LwqlReconvergenceIntents = {
   reconverge: IntentSpec<typeof lwqlReconvergenceSchema>;
 };
 
-function freshWatch(bootedAt: number): LwqlReconvergenceState {
+/**
+ * Every wake asks for one check, keyed by its slot so two workers' copies of a wake dedupe. The
+ * mark moves when a check is asked to fill: a failed fill throws, and the outbox delivers that
+ * check again, backing off to every 2 hours, until the fill succeeds or the chain ends in a day.
+ */
+export const lwqlReconvergenceWake: WakeHandler<
+  LwqlReconvergenceState,
+  LwqlReconvergenceIntents
+> = (state, ctx) => {
+  const fillKeyMap =
+    state.keyMapFillAskedAt === null || ctx.at - state.keyMapFillAskedAt >= LWQL_KEY_MAP_REFILL_MS;
   return {
-    bootedAt,
-    nextAt: bootedAt + LWQL_RECONVERGENCE_INITIAL_DELAY_MS,
-    delayMs: LWQL_RECONVERGENCE_INITIAL_DELAY_MS,
-    elapsedMs: 0,
-    gaveUp: false,
+    state: { keyMapFillAskedAt: fillKeyMap ? ctx.at : state.keyMapFillAskedAt },
+    intents: [
+      ctx.intent("reconverge", `reconverge:${ctx.at}`, { scheduledFor: ctx.at, fillKeyMap }),
+    ],
   };
-}
-
-/** Probes when due, doubling the delay up to the cap, and stops once the budget would overrun. */
-export function lwqlReconvergenceWake({
-  bootedAt,
-}: {
-  bootedAt: number;
-}): WakeHandler<LwqlReconvergenceState, LwqlReconvergenceIntents> {
-  return (state, ctx) => {
-    const at = Math.max(ctx.at, ctx.now);
-    const watch = state.bootedAt === bootedAt ? state : freshWatch(bootedAt);
-    if (watch.gaveUp || at < watch.nextAt) return { state: watch };
-    const elapsedMs = watch.elapsedMs + watch.delayMs;
-    const delayMs = Math.min(watch.delayMs * 2, LWQL_RECONVERGENCE_MAX_DELAY_MS);
-    const gaveUp = elapsedMs + delayMs > LWQL_RECONVERGENCE_BUDGET_MS;
-    return {
-      state: { bootedAt, nextAt: at + delayMs, delayMs, elapsedMs, gaveUp },
-      intents: [
-        ctx.intent("reconverge", `reconverge:${bootedAt}:${elapsedMs}`, {
-          scheduledFor: at,
-          final: gaveUp,
-          fillKeyMap: watch.elapsedMs === 0,
-        }),
-      ],
-    };
-  };
-}
+};

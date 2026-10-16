@@ -1035,6 +1035,181 @@ test_lwql_upgrade_from_main() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SUITES: rendered-mode LWQL reconverges after a provisioning that failed
+# Prod: provisioning ran while ClickHouse was not ready (669, or a 30s timeout on
+# a terminating replica) and nothing retried, leaving the Postgres-backed views
+# over missing `<x>_pg` tables. Both suites end with NO further deploy.
+# ─────────────────────────────────────────────────────────────────────────────
+# The reconvergence check runs every 5 min with no end (LWQL_RECONVERGENCE_INTERVAL_MS);
+# one full interval plus 5 min for pod boots.
+LWQL_RECONVERGE_WAIT="${LWQL_RECONVERGE_WAIT:-600}"
+LWQL_PG_BASELINE=""
+
+# The PostgreSQL-engine `<x>_pg` tables in the LWQL database, space-separated.
+lwql_pg_tables() {
+  ch_query "$1" "SELECT name FROM system.tables WHERE database='langwatch' AND engine='PostgreSQL' AND endsWith(name, '_pg') ORDER BY name" \
+    | tr '\n' ' ' | sed 's/ *$//'
+}
+
+# Runs a Postgres-backed view as the restricted identity on one pod; echoes the answer or the error.
+lwql_view_answer() {
+  local pod="$1" view="$2" lwql_pw
+  lwql_pw=$(kc get secret "${RELEASE}-lwql-passwords" \
+    -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
+  kc exec "$pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" \
+    -q "SELECT count() FROM langwatch.${view}" 2>&1 | tr -d '\r' | head -3 || true
+}
+
+# A healthy baseline: provision synchronously, then record the `_pg` set every later check expects.
+record_lwql_pg_baseline() {
+  local app_pod ch_pod out
+  app_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-app")
+  ch_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-clickhouse")
+  if out=$(kc exec "$app_pod" -- sh -c 'cd /app/apps/tasks && pnpm run task lwql-provision' 2>&1); then
+    pass "baseline: lwql:provision succeeds on a healthy ClickHouse"
+  else
+    fail "baseline: lwql:provision failed on a healthy ClickHouse:
+$out"
+  fi
+  LWQL_PG_BASELINE=$(lwql_pg_tables "$ch_pod")
+  if grep -qw prompts_pg <<<"$LWQL_PG_BASELINE" && grep -qw topics_pg <<<"$LWQL_PG_BASELINE"; then
+    pass "baseline: _pg engine tables provisioned ($(wc -w <<<"$LWQL_PG_BASELINE") tables)"
+  else
+    fail "baseline: expected prompts_pg and topics_pg among the _pg tables, got '$LWQL_PG_BASELINE'"
+  fi
+  assert_lwql_postgres_views_answer "baseline"
+}
+
+# Every ClickHouse pod carries the whole baseline `_pg` set and answers prompts/topics as langwatch_lwql.
+assert_lwql_postgres_views_answer() {
+  local when="$1" pods p view answer
+  pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
+  for p in $pods; do
+    assert_eq "[$p] every _pg engine table exists ($when)" "$(lwql_pg_tables "$p")" "$LWQL_PG_BASELINE"
+    for view in prompts topics; do
+      answer=$(lwql_view_answer "$p" "$view")
+      if [[ "$answer" =~ ^[0-9]+$ ]]; then
+        pass "[$p] langwatch_lwql reads Postgres-backed view $view ($when, count=$answer)"
+      else
+        fail "[$p] langwatch_lwql cannot read Postgres-backed view $view ($when): $answer"
+      fi
+    done
+  done
+}
+
+# Drops every `_pg` table: the state a provisioning whose CREATEs never landed leaves behind.
+drop_lwql_pg_tables() {
+  local ch_pod t answer
+  ch_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-clickhouse")
+  for t in $LWQL_PG_BASELINE; do
+    ch_query "$ch_pod" "SET check_table_dependencies = 0; DROP TABLE IF EXISTS langwatch.${t} SYNC"
+  done
+  assert_eq "induced: no _pg engine table left" "$(lwql_pg_tables "$ch_pod")" ""
+  answer=$(lwql_view_answer "$ch_pod" prompts)
+  if grep -q 'prompts_pg' <<<"$answer"; then
+    pass "induced: the prompts view fails over its missing prompts_pg table, as in prod"
+  else
+    fail "induced: expected the prompts view to fail on prompts_pg, got: $answer"
+  fi
+}
+
+# Polls (no deploy, no exec into the app) until the `_pg` set is back or the budget runs out.
+wait_lwql_reconverged() {
+  local deadline=$((SECONDS + LWQL_RECONVERGE_WAIT)) ch_pod got=""
+  info "Waiting up to ${LWQL_RECONVERGE_WAIT}s for the app to reconverge LWQL on its own"
+  while [[ $SECONDS -lt $deadline ]]; do
+    ch_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-clickhouse")
+    got=$( [[ -n "$ch_pod" ]] && lwql_pg_tables "$ch_pod" 2>/dev/null || true)
+    [[ "$got" == "$LWQL_PG_BASELINE" ]] && { pass "app reconverged LWQL after $((SECONDS + LWQL_RECONVERGE_WAIT - deadline))s"; return; }
+    sleep 10
+  done
+  fail "no reconvergence after ${LWQL_RECONVERGE_WAIT}s; _pg tables now: '${got}'"
+}
+
+# @scenario "A three-replica deployment reconverges LangWatchQL after provisioning failed during a ClickHouse outage"
+test_lwql_replicas_converge_after_failed_provision() {
+  sep; info "Suite: LWQL reconverges after a failed provisioning (3 replicas, rendered mode)"
+
+  helm_uninstall
+  helm_install --wait-for-jobs \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    -f "$CHART_DIR/tests/values-e2e-replicas.yaml" \
+    --set app.replicaCount=1
+  pass "helm install (chart-managed ClickHouse, replicas=3)"
+  assert_render_job_complete
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 600
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 180
+  record_lwql_pg_baseline
+
+  # Induction, deterministic: drop the `_pg` tables, then boot the app while
+  # every ClickHouse replica is gone, so whatever the boot provisions fails.
+  drop_lwql_pg_tables
+  kc scale statefulset "${RELEASE}-clickhouse" --replicas=0
+  kc wait --for=delete pod -l "app.kubernetes.io/name=${RELEASE}-clickhouse" --timeout=300s \
+    || fail "ClickHouse pods did not go away after scaling to 0"
+  pass "induced: ClickHouse unavailable (0 replicas)"
+  local restarted_at
+  restarted_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  kc rollout restart "deployment/${RELEASE}-app"
+  local attempts=0
+  until kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" -o json | jq -e --arg t "$restarted_at" \
+      '[.items[] | select(.metadata.creationTimestamp >= $t)
+        | select(any(.status.containerStatuses[]?; .state.running != null or .lastState.terminated != null))]
+       | length > 0' >/dev/null; do
+    sleep 5; attempts=$((attempts + 1))
+    [[ $attempts -ge 36 ]] && fail "restarted app pod never started a container while ClickHouse was down"
+  done
+  # A minute against no ClickHouse: the boot's converge fails, and any check in it fails too.
+  sleep 60
+  pass "induced: the app booted and provisioned against an unavailable ClickHouse"
+
+  kc scale statefulset "${RELEASE}-clickhouse" --replicas=3
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 600
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 300
+  pass "ClickHouse healthy again (3 replicas); no further deploy from here"
+
+  wait_lwql_reconverged
+  assert_lwql_postgres_views_answer "after reconvergence"
+}
+
+# @scenario "A single-node upgrade that restarts ClickHouse reconverges LangWatchQL"
+test_lwql_single_node_upgrade_converges() {
+  sep; info "Suite: LWQL reconverges after a single-node upgrade restarts ClickHouse (rendered mode)"
+
+  helm_uninstall
+  helm_install --wait-for-jobs \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    --set app.replicaCount=1
+  pass "helm install (chart-managed ClickHouse, 1 replica)"
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 300
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 180
+  record_lwql_pg_baseline
+
+  # The `_pg` tables an upgrade's image would newly create start out absent, and
+  # the app annotation stands in for that image bump, so the app boots during it.
+  drop_lwql_pg_tables
+  local ch_uid_before
+  ch_uid_before=$(kc get pod "${RELEASE}-clickhouse-0" -o jsonpath='{.metadata.uid}')
+  hc upgrade "$RELEASE" "$CHART_DIR" \
+    --wait-for-jobs \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    --set app.replicaCount=1 \
+    --set-string 'clickhouse.podAnnotations.langwatch\.com/lwql-access-catalog=e2e-single-node-upgrade' \
+    --set-string 'app.pod.annotations.langwatch\.com/e2e-upgrade=single-node' \
+    --wait --timeout "${TIMEOUT}s"
+  pass "helm upgrade with a catalog-annotation bump"
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 300
+  if [[ "$(kc get pod "${RELEASE}-clickhouse-0" -o jsonpath='{.metadata.uid}')" != "$ch_uid_before" ]]; then
+    pass "the upgrade fully restarted the only ClickHouse replica; no further deploy from here"
+  else
+    fail "the catalog-annotation bump did not restart ClickHouse"
+  fi
+
+  wait_lwql_reconverged
+  assert_lwql_postgres_views_answer "after the upgrade"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SUITE: Workers health check
 # Runs after deploy_app_and_workers and verifies the pod reaches Ready.
 # The worker serves one HTTP listener (the metrics port, 2999): /metrics behind
@@ -1353,6 +1528,17 @@ main() {
   fi
   wait_api
 
+  # `tests/e2e.sh <suite>...` runs only those suites; each must install its own release.
+  if [[ $# -gt 0 ]]; then
+    local suite
+    for suite in "$@"; do
+      declare -F "$suite" >/dev/null || fail "unknown suite: $suite"
+      "$suite"
+    done
+    sep; pass "Selected langwatch chart suites passed: $*"
+    return
+  fi
+
   # Install, then three upgrades of the main release; suites sharing a deploy
   # run back to back after it. Order matters: values are cumulative.
   test_install
@@ -1380,6 +1566,9 @@ main() {
   test_lwql_replicas
   test_lwql_upgrade_from_main
   test_lwql_replicas_sql_refused
+  # Rendered-mode reconvergence after a failed provisioning; each installs afresh.
+  test_lwql_replicas_converge_after_failed_provision
+  test_lwql_single_node_upgrade_converges
 
   sep
   pass "All langwatch chart tests passed"

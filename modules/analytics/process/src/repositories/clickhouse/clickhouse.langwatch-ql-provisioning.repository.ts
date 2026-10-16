@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 
 import {
   classifyLwqlAccessModelOwner,
+  clickHouseErrorCodeFields,
   clickHouseErrorSummary,
   type ConfigStoreLwqlEntity,
   configStoreEntitiesFromRows,
@@ -17,7 +18,9 @@ import {
 import {
   type ClickHouseAdminStatements,
   LangWatchQLProvisioningRepository,
+  type LwqlClickHouseInventory,
   type LwqlKeyMapInsertRow,
+  type ProvisioningFailureLevel,
   type RunClickHouseStatementsResult,
   type SkippedProvisioningStatement,
 } from "../langwatch-ql-provisioning.repository.ts";
@@ -25,15 +28,23 @@ import { LWQL_KEY_MAP_INSERT_SETTINGS } from "./clickhouse.langwatch-ql-key-map.
 
 const logger = createLogger("langwatch:analytics:lwql:clickhouseRunner");
 
+/** At warn the check logs its own alert, so a text-only alert must not match this line too. */
+const FAILED_STATEMENT_MESSAGES: Record<ProvisioningFailureLevel, string> = {
+  error: "lwql provisioning failed creating ClickHouse objects",
+  warn: "lwql reconvergence statement failed",
+};
+
 /** Runs each statement, skipping only the config-store failures the inventory explains. */
 async function runClickHouseStatements({
   client,
   statements,
   configStoreEntities = [],
+  failureLevel = "error",
 }: {
   client: ClickHouseAdminStatements;
   statements: readonly string[];
   configStoreEntities?: readonly ConfigStoreLwqlEntity[];
+  failureLevel?: ProvisioningFailureLevel;
 }): Promise<RunClickHouseStatementsResult> {
   const skipped: SkippedProvisioningStatement[] = [];
   for (const [index, statement] of statements.entries()) {
@@ -45,15 +56,16 @@ async function runClickHouseStatements({
       const targets = findStatementTargets(statement);
       const tolerance = decideConfigStoreTolerance({ error, statement, configStoreEntities });
       if (!tolerance.tolerated) {
-        logger.error(
+        logger[failureLevel](
           {
             error: clickHouseErrorSummary(error),
+            ...clickHouseErrorCodeFields(error),
             statement: position,
             kind,
             targets,
             missing: findMissingObjects(error),
           },
-          "lwql provisioning failed creating ClickHouse objects",
+          FAILED_STATEMENT_MESSAGES[failureLevel],
         );
         throw error;
       }
@@ -66,6 +78,37 @@ async function runClickHouseStatements({
     }
   }
   return { skipped };
+}
+
+/** The named relations and the named SQL functions present, from two `system` tables. */
+async function readClickHouseInventory({
+  client,
+  database,
+  relations,
+  functions,
+}: {
+  client: ClickHouseAdminStatements;
+  database: string;
+  relations: readonly string[];
+  functions: readonly string[];
+}): Promise<LwqlClickHouseInventory> {
+  const present = await client.rows(
+    "SELECT name FROM system.tables " +
+      "WHERE database = {database:String} AND has({relations:Array(String)}, name)",
+    { database, relations: [...relations] },
+  );
+  const held =
+    functions.length === 0
+      ? []
+      : await client.rows(
+          "SELECT name FROM system.functions " +
+            "WHERE origin = 'SQLUserDefined' AND has({functions:Array(String)}, name)",
+          { functions: [...functions] },
+        );
+  return {
+    relations: present.map((row) => String(row.name)),
+    functions: held.map((row) => String(row.name)),
+  };
 }
 
 /** An unreadable inventory degrades to "none owned", so the statements then fail loudly. */
@@ -171,8 +214,17 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
   runStatements(input: {
     statements: readonly string[];
     configStoreEntities?: readonly ConfigStoreLwqlEntity[];
+    failureLevel?: ProvisioningFailureLevel;
   }): Promise<RunClickHouseStatementsResult> {
     return runClickHouseStatements({ client: this.client, ...input });
+  }
+
+  readInventory(input: {
+    database: string;
+    relations: readonly string[];
+    functions: readonly string[];
+  }): Promise<LwqlClickHouseInventory> {
+    return readClickHouseInventory({ client: this.client, ...input });
   }
 
   inventoryConfigStore({

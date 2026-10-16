@@ -53,6 +53,9 @@ export const POSTGRES_BASE_ALIAS = "m";
 /** The `DO` block's dollar-quote tag. */
 const APPROVED_VIEW_DOLLAR_TAG = "$lwql$";
 
+/** Quoted identifiers may hold `$`, so the grants block takes a tag no catalog name carries. */
+const READER_GRANTS_DOLLAR_TAG = "$lwql_grants$";
+
 /** Refuses a view body already carrying the outer `DO` block's own tag. */
 function assertNoDollarTagCollision({ view, body }: { view: string; body: string }): void {
   if (body.includes(APPROVED_VIEW_DOLLAR_TAG)) {
@@ -185,7 +188,8 @@ export class LangWatchQLPostgresMappingService {
 
   /**
    * Maps one approved PostgreSQL view into the LangWatchQL database as a PostgreSQL-engine
-   * table.
+   * table. `OR REPLACE` swaps atomically on an Atomic or Replicated database, so a run that fails
+   * (a missing named collection) leaves the working table in place (issue #8726).
    */
   engineTableStatement({
     names,
@@ -223,7 +227,7 @@ export class LangWatchQLPostgresMappingService {
       .join(", ");
 
     return (
-      `CREATE TABLE IF NOT EXISTS ${accessModel.qualified(names, table)} (${columnList}) ` +
+      `CREATE OR REPLACE TABLE ${accessModel.qualified(names, table)} (${columnList}) ` +
       `ENGINE = PostgreSQL(${collection}, table=${clickHouseLiteral(postgresRelation)}) ` +
       `SETTINGS postgresql_connection_pool_size = ${connectionPoolSize}`
     );
@@ -345,6 +349,17 @@ export class LangWatchQLPostgresMappingService {
       );
     }
 
+    // Both revokes are needed, and they are not interchangeable. `ON SCHEMA` covers only
+    // CREATE and USAGE on the schema itself; the relation-level privileges live on the tables
+    // and views and survive it.
+    const grants = [
+      `REVOKE ALL ON SCHEMA ${schema} FROM ${role}`,
+      `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA ${schema} FROM ${role}`,
+      `GRANT USAGE ON SCHEMA ${schema} TO ${role}`,
+      ...reader.approvedViews.map(
+        (view) => `GRANT SELECT ON ${schema}.${sqlText.postgresQuoted(view)} TO ${role}`,
+      ),
+    ];
     // Positive, not merely an integer: PostgreSQL reads `CONNECTION LIMIT -1`
     // as unlimited, which silently inverts the budget this limit exists to hold.
     if (!Number.isInteger(reader.connectionLimit) || reader.connectionLimit < 1) {
@@ -362,15 +377,10 @@ export class LangWatchQLPostgresMappingService {
         `CONNECTION LIMIT ${reader.connectionLimit}`,
       `ALTER ROLE ${role} SET default_transaction_read_only = on`,
       `ALTER ROLE ${role} SET statement_timeout = ${postgresLiteral(reader.statementTimeout)}`,
-      // Both revokes are needed, and they are not interchangeable. `ON SCHEMA` covers only
-      // CREATE and USAGE on the schema itself; the relation-level privileges live on the tables
-      // and views and survive it.
-      `REVOKE ALL ON SCHEMA ${schema} FROM ${role}`,
-      `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA ${schema} FROM ${role}`,
-      `GRANT USAGE ON SCHEMA ${schema} TO ${role}`,
-      ...reader.approvedViews.map(
-        (view) => `GRANT SELECT ON ${schema}.${sqlText.postgresQuoted(view)} TO ${role}`,
-      ),
+      // One statement is one transaction: a live read never sees the revoked, ungranted gap.
+      `DO ${READER_GRANTS_DOLLAR_TAG}\nBEGIN\n` +
+        grants.map((grant) => `  ${grant};\n`).join("") +
+        `END\n${READER_GRANTS_DOLLAR_TAG}`,
     ];
   }
 }

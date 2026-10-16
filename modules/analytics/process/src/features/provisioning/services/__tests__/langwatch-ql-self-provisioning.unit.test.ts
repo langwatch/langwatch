@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { LangWatchQLNames } from "../../../../services/langwatch-ql-access-model.service.ts";
+import { lwqlAppFunctionNames } from "../../../app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { canProvisionAppFunctions } from "../../../app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import { LangWatchQLSelfProvisioningService } from "../langwatch-ql-self-provisioning.service.ts";
 
@@ -231,5 +232,128 @@ describe("given the self-provisioned access model whose DDL embeds passwords", (
       expect(redacted).not.toContain("admin-secret");
       expect(redacted).toContain("CREATE USER langwatch_lwql");
     });
+  });
+});
+
+describe("given the rendered-mode statements a converge runs", () => {
+  /** @scenario "A failed converge never removes a working engine table" */
+  it("replaces each engine table in one statement and drops no app-owned table or view", () => {
+    const statements = selfProvisioning.clickHouseStatements({
+      names: NAMES,
+      restrictedPassword: "restricted-secret",
+      sourceDatabase: SOURCE_DATABASE,
+      postgres: POSTGRES,
+      mode: "rendered",
+    });
+    const engineTables = statements.filter((s) => s.includes("ENGINE = PostgreSQL"));
+
+    expect(engineTables.length).toBeGreaterThan(0);
+    for (const table of engineTables) expect(table).toMatch(/^CREATE OR REPLACE TABLE /);
+    expect(statements.filter((s) => /^\s*DROP\s+(TABLE|VIEW)\b/i.test(s))).toEqual([]);
+  });
+});
+
+describe("given what the reconvergence check finds in ClickHouse", () => {
+  const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
+  const drift = (found: string[], functions: string[] = ["lwql_trace"]) =>
+    selfProvisioning.findDrift({
+      names: NAMES,
+      relations,
+      functions: ["lwql_trace"],
+      found: { relations: found, functions },
+    });
+
+  /** @scenario "The reconvergence check converges nothing while every app-owned LangWatchQL object is in place" */
+  it("finds nothing when every relation and every function exists", () => {
+    expect(drift(relations)).toEqual({ objects: [], isKeyMapMissing: false });
+  });
+
+  /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
+  it("names a missing engine table, a missing view, a missing function and the key map", () => {
+    const engineTable = relations.find((name) => name.endsWith("_pg"));
+    const view = relations.at(-1);
+    if (!engineTable || !view) throw new Error("the catalog maps no PostgreSQL dataset");
+    const found = relations.filter(
+      (name) => ![engineTable, view, NAMES.keyMapTable].includes(name),
+    );
+
+    expect(drift(found, [])).toEqual({
+      objects: [NAMES.keyMapTable, engineTable, view, "lwql_trace"],
+      isKeyMapMissing: true,
+    });
+  });
+});
+
+describe("given the drift a reconvergence check converges", () => {
+  const statementsFor = (only: readonly string[]) =>
+    selfProvisioning.clickHouseStatements({
+      names: NAMES,
+      restrictedPassword: "restricted-secret",
+      sourceDatabase: SOURCE_DATABASE,
+      postgres: POSTGRES,
+      mode: "rendered",
+      only,
+    });
+  const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
+  const engineTables = relations.filter((name) => name.endsWith("_pg"));
+
+  /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
+  it("replaces only the drifted engine table and the views over it", () => {
+    const [engineTable, other] = engineTables;
+    if (!engineTable || !other) throw new Error("the catalog maps too few PostgreSQL datasets");
+
+    const statements = statementsFor([engineTable]);
+    const replaced = statements.filter((s) => s.includes("ENGINE = PostgreSQL"));
+    const views = statements.filter((s) => s.startsWith("CREATE OR REPLACE VIEW"));
+
+    expect(replaced).toHaveLength(1);
+    expect(replaced[0]).toContain(`.${engineTable} (`);
+    expect(views.length).toBeGreaterThan(0);
+    for (const view of views) expect(view).toContain(`.${engineTable} AS`);
+    expect(statements.some((s) => s.includes(`.${other}`))).toBe(false);
+    expect(statements.some((s) => s.startsWith("CREATE OR REPLACE FUNCTION"))).toBe(false);
+    expect(statements.some((s) => s.includes(NAMES.keyMapTable + " ("))).toBe(false);
+    expect(statements.some((s) => /^CREATE DATABASE|^CREATE USER|^GRANT/.test(s))).toBe(false);
+  });
+
+  /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
+  it("creates the key map and a function only when each drifted, and a drifted view alone", () => {
+    const view = relations.at(-1);
+    const [appFunction] = lwqlAppFunctionNames();
+    if (!view || !appFunction) throw new Error("the catalog declares no view or no function");
+
+    expect(statementsFor([appFunction])).toEqual([
+      expect.stringMatching(new RegExp(`^CREATE OR REPLACE FUNCTION ${appFunction} `)),
+    ]);
+    expect(statementsFor([NAMES.keyMapTable])).toEqual([
+      expect.stringMatching(/^CREATE TABLE IF NOT EXISTS .*lwql_api_key_tenant_map /),
+    ]);
+    expect(statementsFor([view])).toEqual([
+      expect.stringMatching(new RegExp(`^CREATE OR REPLACE VIEW ${SOURCE_DATABASE}\\.${view}\\n`)),
+    ]);
+  });
+});
+
+describe("given what the reconvergence check finds in PostgreSQL", () => {
+  const views = selfProvisioning.approvedPostgresViews();
+  const found = views.map((view) => ({ view, granted: true }));
+
+  /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
+  it("finds no gap when every approved view exists and the reader may select it", () => {
+    expect(selfProvisioning.findPostgresGaps({ found })).toEqual([]);
+  });
+
+  /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
+  it("names a missing view as absent and an ungranted one as present", () => {
+    const [missing, ungranted] = views;
+    if (!missing || !ungranted) throw new Error("the catalog maps too few datasets");
+    const gapped = found
+      .filter((view) => view.view !== missing)
+      .map((view) => (view.view === ungranted ? { ...view, granted: false } : view));
+
+    expect(selfProvisioning.findPostgresGaps({ found: gapped })).toEqual([
+      { view: missing, absent: true },
+      { view: ungranted, absent: false },
+    ]);
   });
 });

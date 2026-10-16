@@ -59,6 +59,7 @@ function database(): LwqlProvisioningDatabase {
   return {
     // The Postgres DDL outside the lock is not this suite's subject.
     $executeRawUnsafe: async () => 0,
+    $queryRawUnsafe: async () => [],
     $transaction: (fn, options) => client().$transaction((tx) => fn(tx), options),
   };
 }

@@ -91,11 +91,8 @@ Feature: LangWatchQL access model — one typed definition, two emitters, two de
     Then it still provisions the database, key-map table, app functions, views and postgres-engine tables
     But it skips the restricted user, the settings profile, every grant, both row policies and the named collection
 
-  @unit
-  Scenario: In rendered mode the server does not arm the reconvergence watch
-    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
-    When the app server starts
-    Then it does not arm the LangWatchQL reconvergence watch
+  # The reconvergence check also runs in rendered mode, for the app-owned objects only:
+  # specs/lwql/api.feature, "The reconvergence check converges the app-owned LangWatchQL ...".
 
   @unit
   Scenario: In sql mode the converge runs the full DDL access path
