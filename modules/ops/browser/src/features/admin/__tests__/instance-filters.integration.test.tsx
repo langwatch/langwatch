@@ -13,7 +13,6 @@ import { renderWithOpsHost } from "../../../testing.tsx";
 import type { SelfHostedInstanceFilters } from "../model/self-hosted-instance.ts";
 import { InstanceFilters } from "../ui/elements/instance-filters.tsx";
 
-/** The filters as the view holds them, with every emitted value recorded. */
 function Harness({ emitted }: { emitted: SelfHostedInstanceFilters[] }) {
   const [value, setValue] = useState<SelfHostedInstanceFilters>({ sort: "last_report" });
   return (
