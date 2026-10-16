@@ -12,7 +12,7 @@ export const LWQL_KEY_MAP_REFILL_MS = 24 * 60 * 60_000;
 
 export const lwqlReconvergenceSchema = z.object({
   scheduledFor: z.number().int(),
-  /** The first check, and the first a day after the last fill, fill missing key-map rows. */
+  /** The first check, and the first a day after the last ask, fill missing key-map rows. */
   fillKeyMap: z.boolean().default(false),
 });
 
@@ -31,7 +31,11 @@ type LwqlReconvergenceIntents = {
   reconverge: IntentSpec<typeof lwqlReconvergenceSchema>;
 };
 
-/** Every wake asks for one check, keyed by its slot so two workers' copies of a wake dedupe. */
+/**
+ * Every wake asks for one check, keyed by its slot so two workers' copies of a wake dedupe. The
+ * mark moves when a check is asked to fill: a failed fill throws, and the outbox delivers that
+ * check again every 5 minutes until the fill succeeds or the next day's ask takes over.
+ */
 export const lwqlReconvergenceWake: WakeHandler<
   LwqlReconvergenceState,
   LwqlReconvergenceIntents

@@ -138,6 +138,25 @@ async function convergeStore({
   }
 }
 
+/** Fills the key map; false when the fill failed, which the check throws once it is done. */
+async function fillKeyMapOnce(
+  fillKeyMap: LwqlReconvergenceRunDeps["fillKeyMap"],
+): Promise<boolean> {
+  try {
+    await fillKeyMap();
+    return true;
+  } catch (error) {
+    logger.warn(
+      { error: clickHouseErrorSummary(error) },
+      "lwql key-map fill failed; the outbox delivers the check again in 5 minutes",
+    );
+    return false;
+  }
+}
+
+/** A check called outside the outbox is its first delivery. */
+const FIRST_DELIVERY = { attempt: 1 };
+
 /**
  * One check: read which app-owned objects are absent, converge PostgreSQL then ClickHouse where
  * either does, fill the key map when asked or once a converge repaired it, then the SQL-mode
@@ -145,13 +164,13 @@ async function convergeStore({
  */
 export function runLwqlReconvergence(
   deps: LwqlReconvergenceRunDeps,
-): (payload: { fillKeyMap: boolean }) => Promise<void> {
+): (payload: { fillKeyMap: boolean }, delivery?: { attempt: number }) => Promise<void> {
   const now = deps.now ?? (() => nowInstant().epochMilliseconds);
   const alerts: LwqlAlerts = new Map();
   const converge = (store: LwqlStore, drift: LwqlAppOwnedDrift) =>
     convergeStore({ store, drift, convergeAppOwned: deps.convergeAppOwned, alerts, now });
 
-  return async ({ fillKeyMap }): Promise<void> => {
+  return async ({ fillKeyMap }, { attempt } = FIRST_DELIVERY): Promise<void> => {
     const drift = await deps.findDrift().catch((error: unknown): undefined => {
       logger.warn(
         { error: clickHouseErrorSummary(error) },
@@ -163,17 +182,16 @@ export function runLwqlReconvergence(
     if (drift !== undefined) await converge("postgres", drift);
     const clickHouseConverged = drift === undefined || (await converge("clickHouse", drift));
     const keyMapRepaired = drift?.isKeyMapMissing === true;
-    if ((fillKeyMap || keyMapRepaired) && (!keyMapRepaired || clickHouseConverged)) {
-      await deps.fillKeyMap().catch((error: unknown) => {
-        logger.warn(
-          { error: clickHouseErrorSummary(error) },
-          "lwql key-map fill failed; the next check that asks for one fills again",
-        );
-      });
-    }
+    // Only a failed fill throws, so a redelivery owes the fill its first delivery did not make.
+    const fillOwed = fillKeyMap || keyMapRepaired || attempt > 1;
+    const fillFailed =
+      fillOwed &&
+      (!keyMapRepaired || clickHouseConverged) &&
+      !(await fillKeyMapOnce(deps.fillKeyMap));
     const owner = await deps.probe().catch((): LwqlAccessModelOwner => "config_store");
-    if (owner !== "none") return;
     // Awaited, never fired and forgotten: the worker's drain waits on this intent.
-    await deps.converge();
+    if (owner === "none") await deps.converge();
+    if (fillFailed)
+      throw new Error("lwql key-map fill failed; the outbox delivers the check again");
   };
 }

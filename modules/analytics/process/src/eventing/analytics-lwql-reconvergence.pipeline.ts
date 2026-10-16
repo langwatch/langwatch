@@ -24,6 +24,7 @@ import {
   runLwqlReconvergence,
 } from "./analytics-lwql-reconvergence.intent.ts";
 import {
+  LWQL_KEY_MAP_REFILL_MS,
   LWQL_RECONVERGENCE_INITIAL_STATE,
   LWQL_RECONVERGENCE_INTERVAL_MS,
   lwqlReconvergenceStateSchema,
@@ -74,8 +75,15 @@ export function buildLwqlReconvergence({
             fillKeyMap: () => app.fillLwqlProjectKeys({ dryRun: false }),
           }),
         )
-        // One check at a time; a failed check is not retried, the next one reads afresh.
-        .outbox({ maxAttempts: 1, concurrency: 1, batchSize: 1, leaseDurationMs: 10 * 60 * 1000 }),
+        // One check at a time. Only a failed key-map fill throws: its check is delivered again
+        // every 5 minutes for up to a day, when the wake asks for a fill anew.
+        .outbox({
+          maxAttempts: LWQL_KEY_MAP_REFILL_MS / LWQL_RECONVERGENCE_INTERVAL_MS,
+          retryDelayMs: () => LWQL_RECONVERGENCE_INTERVAL_MS,
+          concurrency: 1,
+          batchSize: 1,
+          leaseDurationMs: 10 * 60 * 1000,
+        }),
     )
     .build();
 }

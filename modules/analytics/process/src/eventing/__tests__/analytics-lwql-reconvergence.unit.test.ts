@@ -10,6 +10,7 @@ import {
   LWQL_RECONVERGENCE_PROCESS_NAME,
   runLwqlReconvergence,
 } from "../analytics-lwql-reconvergence.intent.ts";
+import { buildLwqlReconvergence } from "../analytics-lwql-reconvergence.pipeline.ts";
 import {
   LWQL_KEY_MAP_REFILL_MS,
   LWQL_RECONVERGENCE_INITIAL_STATE,
@@ -382,17 +383,119 @@ describe("given a check over the app-owned objects", () => {
     });
 
     /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
-    it("still probes when the fill fails", async () => {
+    it("still probes when the fill fails, then fails the check so the outbox delivers it again", async () => {
       const probe = vi.fn(() => Promise.resolve<LwqlAccessModelOwner>("sql_store"));
-      await runLwqlReconvergence({
+      const check = runLwqlReconvergence({
         probe,
         converge: () => Promise.resolve(),
         findDrift: () => Promise.resolve(healthy),
         convergeAppOwned: () => Promise.resolve(),
         fillKeyMap: () => Promise.reject(new Error("ECONNREFUSED")),
-      })({ fillKeyMap: true });
+      });
 
+      await expect(check({ fillKeyMap: true })).rejects.toThrow("lwql key-map fill failed");
       expect(probe).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given the pipeline's check, delivered by its outbox", () => {
+  /** The built pipeline over an app whose first `failures` fills fail; drift reads in turn. */
+  function deliveredChecks({
+    failures,
+    drifts = [],
+  }: {
+    failures: number;
+    drifts?: LwqlAppOwnedDrift[];
+  }) {
+    const fill = { failuresLeft: failures, runs: 0 };
+    const processManager = buildLwqlReconvergence({
+      app: {
+        probeLwqlAccessModelOwner: () => Promise.resolve("config_store"),
+        convergeLwqlAccessModel: () => Promise.resolve(),
+        findLwqlAppOwnedDrift: () => Promise.resolve(drifts.shift() ?? healthy),
+        convergeLwqlAppOwnedObjects: () => Promise.resolve(),
+        syncLwqlKeyMapRow: () => Promise.resolve(),
+        fillLwqlProjectKeys: () => {
+          fill.runs += 1;
+          if (fill.failuresLeft === 0) return Promise.resolve({});
+          fill.failuresLeft -= 1;
+          return Promise.reject(new Error("ECONNREFUSED"));
+        },
+      },
+    }).processManagers.get(LWQL_RECONVERGENCE_PROCESS_NAME);
+    const reconverge = processManager?.config.intents.reconverge;
+    const outbox = processManager?.config.outbox;
+    if (!reconverge || !outbox?.maxAttempts || !outbox.retryDelayMs) {
+      throw new Error("the reconvergence pipeline declares no retrying reconverge intent");
+    }
+    const { run } = reconverge;
+    const { maxAttempts, retryDelayMs } = outbox;
+
+    /** One wake's check, delivered again after each failure as the outbox does; its deliveries. */
+    async function deliver(payload: JsonValue): Promise<number> {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const delivery = {
+          processName: LWQL_RECONVERGENCE_PROCESS_NAME,
+          projectId: "__global__",
+          processKey: LWQL_RECONVERGENCE_PROCESS_NAME,
+          tenantId: "__global__",
+          messageKey: "reconverge",
+          attempt,
+        };
+        const settled = await run(payload, delivery).then(
+          () => true,
+          () => false,
+        );
+        if (settled) return attempt;
+      }
+      throw new Error("the check died after every delivery failed");
+    }
+    return { fill, deliver, maxAttempts, retryDelayMs };
+  }
+
+  describe("when an asked-for fill fails", () => {
+    /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
+    it("delivers the check again 5 minutes later until a fill succeeds, for up to a day", async () => {
+      const { fill, deliver, maxAttempts, retryDelayMs } = deliveredChecks({ failures: 2 });
+
+      expect(await deliver({ scheduledFor: FIRST_SLOT, fillKeyMap: true })).toBe(3);
+      expect(fill.runs).toBe(3);
+      expect(retryDelayMs({ attempt: 1 })).toBe(LWQL_RECONVERGENCE_INTERVAL_MS);
+      expect(maxAttempts * LWQL_RECONVERGENCE_INTERVAL_MS).toBe(LWQL_KEY_MAP_REFILL_MS);
+    });
+
+    /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
+    it("asks for no other fill after one succeeds until a day after the ask", async () => {
+      const { fill, deliver } = deliveredChecks({ failures: 3 });
+      const perDay = LWQL_KEY_MAP_REFILL_MS / LWQL_RECONVERGENCE_INTERVAL_MS;
+      let state = LWQL_RECONVERGENCE_INITIAL_STATE;
+      const runsAfter: number[] = [];
+      for (let slot = 0; slot <= perDay; slot++) {
+        const next = wake(state, FIRST_SLOT + slot * LWQL_RECONVERGENCE_INTERVAL_MS);
+        await deliver(next.reconverge.mock.calls[0]?.[1] ?? null);
+        runsAfter.push(fill.runs);
+        state = next.evolution.state;
+      }
+
+      expect(runsAfter[0]).toBe(4);
+      expect(runsAfter[perDay - 1]).toBe(4);
+      expect(runsAfter[perDay]).toBe(5);
+    });
+  });
+
+  describe("when the fill after a converge that repaired the key map fails", () => {
+    /** @scenario "The reconvergence check fills the key-map rows a project lacks" */
+    it("fills on the next delivery, though the key map now reads as present", async () => {
+      const repaired: LwqlAppOwnedDrift = {
+        clickHouse: ["api_key_tenants"],
+        postgres: [],
+        isKeyMapMissing: true,
+      };
+      const { fill, deliver } = deliveredChecks({ failures: 1, drifts: [repaired] });
+
+      expect(await deliver({ scheduledFor: FIRST_SLOT, fillKeyMap: false })).toBe(2);
+      expect(fill.runs).toBe(2);
     });
   });
 });
