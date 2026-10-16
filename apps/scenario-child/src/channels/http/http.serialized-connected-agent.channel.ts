@@ -178,7 +178,12 @@ export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel 
     kind: Exclude<CallKind, "turn">;
     timeoutMs: number;
   }): Promise<{ state?: ConnectedRunState }> {
-    const payload = await this.send({ kind, messages: [], newMessages: [], timeoutMs });
+    const payload = await this.send({
+      kind,
+      messages: [],
+      newMessages: [],
+      hookBudgetMs: timeoutMs,
+    });
     const state = payload.state ?? undefined;
     if (kind === "setup") this.state = state ?? null;
     return state === undefined ? {} : { state };
@@ -190,15 +195,17 @@ export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel 
     newMessages,
     threadId,
     session,
-    timeoutMs = this.config.timeoutMs + REQUEST_SLACK_MS,
+    hookBudgetMs,
   }: {
     kind: CallKind;
     messages: unknown[];
     newMessages: unknown[];
     threadId?: string;
     session?: unknown;
-    timeoutMs?: number;
+    /** A hook's budget, which the relay runs the call under; a turn runs under the agent's. */
+    hookBudgetMs?: number;
   }): Promise<RelayAnswer> {
+    const timeoutMs = (hookBudgetMs ?? this.config.timeoutMs) + REQUEST_SLACK_MS;
     const { headers: propagation } = injectTraceContextHeaders({ headers: {} });
     const traceparent = propagation.traceparent;
     const body = JSON.stringify({
@@ -210,6 +217,7 @@ export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel 
       session,
       state: this.state,
       run: this.run,
+      ...(hookBudgetMs !== undefined ? { timeoutMs: hookBudgetMs } : {}),
       ...(traceparent ? { traceparent } : {}),
     });
     const url = `${this.config.endpoint.replace(/\/$/, "")}/api/v1/agents/${this.config.agentId}/call`;

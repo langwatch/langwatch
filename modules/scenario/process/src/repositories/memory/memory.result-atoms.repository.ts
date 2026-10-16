@@ -105,9 +105,19 @@ function codeTargetName(metadata: unknown): string {
     .join(" vs ");
 }
 
-function outcomeOf(status: string): AtomOutcome {
+/** The live `OUTCOME_EXPR`, not-scored rule included: an ERROR run whose setup did not answer. */
+function outcomeOf({ status, metadata }: { status: string; metadata: unknown }): AtomOutcome {
   if (PASSED_STATUSES.has(status)) return "passed";
+  const setupStatus = jsonString({
+    value: metadata,
+    path: ["langwatch", "hooks", "setup", "status"],
+  });
+  if (status === "ERROR" && setupStatus !== "" && setupStatus !== "ok") return "not_scored";
   return FAILED_STATUSES.has(status) ? "failed" : "pending";
+}
+
+function isGraded(atom: ScopedAtom): boolean {
+  return atom.outcome === "passed" || atom.outcome === "failed";
 }
 
 /** The run's cost and where it came from, in the live `COST_SOURCE_EXPR` order. */
@@ -143,7 +153,7 @@ function toScopedAtom(projection: SimulationRunState): ScopedAtom {
     scenarioRunId: projection.aggregateId || state.ScenarioRunId,
     metadata,
     runAt: state.StartedAt ?? state.CreatedAt,
-    outcome: outcomeOf(state.Status),
+    outcome: outcomeOf({ status: state.Status, metadata }),
     targetReferenceId,
     targetKey:
       stampedKey || targetReferenceId || (targetSlug ? `code:${targetSlug}` : UNKNOWN_TARGET_KEY),
@@ -233,7 +243,7 @@ function tally(atoms: readonly ScopedAtom[]): Tally {
   return {
     Atoms: String(atoms.length),
     Passed: String(atoms.filter((atom) => atom.outcome === "passed").length),
-    Settled: String(atoms.filter((atom) => atom.outcome !== "pending").length),
+    Settled: String(atoms.filter(isGraded).length),
     RunCount: String(new Set(atoms.map((atom) => atom.state.BatchRunId)).size),
     CostTotal: String(atoms.reduce((total, atom) => total + atom.costNumeric, 0)),
     CostUnknown: String(atoms.filter((atom) => atom.costSource === "unknown").length),

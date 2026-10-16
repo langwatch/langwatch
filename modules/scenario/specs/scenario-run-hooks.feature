@@ -124,6 +124,20 @@ Feature: Scenario run hooks: setup and teardown
       Then that run is not in the pass-rate denominator
 
     @unit
+    Scenario: Server-side pass rates leave out a run whose setup failed
+      Given a batch of 3 runs: 1 passed, 1 failed and 1 that finished ERROR because its setup failed
+      When the batch counts, the set roll-up and the results stat strip are read
+      Then the run whose setup failed is neither a failure nor in the pass-rate denominator
+      And the results list reads it as "Not scored"
+
+    @unit
+    Scenario: A run whose setup failed is measured from its queued time
+      Given a run that finished without starting, because its setup failed
+      When its hook results are recorded
+      Then its duration runs from the time it was queued
+      But a run without a hooks record that never started keeps no duration
+
+    @unit
     Scenario: A batch where every setup failed has no pass rate
       Given a batch whose runs all failed in setup
       When the batch summary is computed
@@ -267,6 +281,19 @@ Feature: Scenario run hooks: setup and teardown
       Given a run that finished with the verdict "success"
       When the hook results are recorded
       Then the run keeps its status, its verdict and its finish time
+
+    @unit
+    Scenario: A hook's error is cut to the length the record keeps
+      Given a hook result whose error is longer than 1000 characters
+      When the result is recorded
+      Then the record keeps the first 1000 characters of the error
+
+    @unit
+    Scenario: A failed setup whose record cannot be written is logged as an error
+      Given a run whose setup failed
+      When its hook results cannot be recorded
+      Then the worker logs an error naming the run
+      And the job does not fail
 
     @unit
     Scenario: Hook state over the cap is cut and marked

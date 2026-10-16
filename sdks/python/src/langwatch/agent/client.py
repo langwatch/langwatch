@@ -316,6 +316,7 @@ class AgentClient:
         self._instance_token: str | None = None
         self._poll_task: asyncio.Task[Any] | None = None
         self._session_lost = False
+        self._restart_requested = False
         self._transport_in_use: str | None = None
         self._identity = InstanceIdentity(label=resolve_instance_label(instance_label))
         self._in_flight: dict[str, asyncio.Task[None]] = {}
@@ -371,6 +372,32 @@ class AgentClient:
         if self._disabled_reason is not None:
             return
         self.start()
+
+    def refresh_registration(self) -> None:
+        """Register again after an agent changed, such as a hook declared late.
+
+        The platform ignores a second register on an open socket, so the
+        session restarts and its register carries the agents as they are now.
+        With no agent left to register, the process deregisters instead.
+        """
+        if not self.started:
+            return
+        if self.agents:
+            self._call_soon(self._restart_session)
+        else:
+            self._call_soon(self._shutdown)
+
+    async def _restart_session(self) -> None:
+        socket = self._socket
+        if socket is not None:
+            self._restart_requested = True
+            try:
+                await socket.close()
+            except Exception as error:
+                logger.debug("connect_agent: close failed: %s", error)
+        elif self._poll_task is not None:
+            self._session_lost = True
+            self._poll_task.cancel()
 
     # ----- configuration -----
 
@@ -689,7 +716,8 @@ class AgentClient:
             finally:
                 self._socket = None
                 self._registered.clear()
-            return socket.close_code == GOING_AWAY_CLOSE_CODE
+            restart, self._restart_requested = self._restart_requested, False
+            return restart or socket.close_code == GOING_AWAY_CLOSE_CODE
 
     # ----- HTTP long polling -----
 
@@ -1050,6 +1078,13 @@ def register(agent: ConnectedAgent) -> None:
         logger.error("connect_agent: could not register %s: %s", agent.name, error)
 
 
+def refresh_registration(agent: ConnectedAgent) -> None:
+    """Register the process-wide client again after one of its agents changed."""
+    client = _default_client
+    if client is not None and client._agents.get(agent.key) is agent:
+        client.refresh_registration()
+
+
 def serve(*, poll_seconds: float = 0.5) -> None:
     """Block the calling thread while the agents stay connected.
 
@@ -1083,6 +1118,7 @@ __all__ = [
     "connection_headers",
     "default_client",
     "http_url",
+    "refresh_registration",
     "register",
     "resolve_transport",
     "serve",

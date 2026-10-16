@@ -108,7 +108,7 @@ const resultAtomSchemaDefinition = z
     targetParameters: runParameterValuesSchema.nullable(),
     targetName: z.string().nullable(),
     status: z.string(),
-    outcome: z.enum(["passed", "failed", "pending"]),
+    outcome: z.enum(["passed", "failed", "not_scored", "pending"]),
     durationMs: z.number().nullable(),
     costUsd: z.number().nullable(),
     costSource: z.enum(["run", "traces", "none", "unknown"]),

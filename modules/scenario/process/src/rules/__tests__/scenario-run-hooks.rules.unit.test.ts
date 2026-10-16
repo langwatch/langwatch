@@ -4,7 +4,13 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { adapterDeclaresHooks, capRunHooks, hasHookResults } from "../scenario-run-hooks.rules.ts";
+import {
+  adapterDeclaresHooks,
+  capRunHooks,
+  hasHookResults,
+  hookCallsEnvironment,
+  MAX_HOOK_ERROR_LENGTH,
+} from "../scenario-run-hooks.rules.ts";
 
 const connected = {
   type: "connected" as const,
@@ -30,6 +36,30 @@ describe("capRunHooks()", () => {
         stateTooLarge: true,
         returned: { deleted: 3 },
       });
+    });
+  });
+});
+
+describe("capRunHooks() on a long error", () => {
+  describe("when a hook's error is longer than the record keeps", () => {
+    /** @scenario "A hook's error is cut to the length the record keeps" */
+    it("keeps the first MAX_HOOK_ERROR_LENGTH characters", () => {
+      const capped = capRunHooks({
+        setup: { status: "failed", durationMs: 5, error: "e".repeat(MAX_HOOK_ERROR_LENGTH + 500) },
+      });
+
+      expect(capped.setup?.error).toHaveLength(MAX_HOOK_ERROR_LENGTH);
+    });
+  });
+});
+
+describe("hookCallsEnvironment()", () => {
+  describe("when the child is started for a run", () => {
+    it("flags a run that calls hooks and leaves any other environment as it was", () => {
+      expect(
+        hookCallsEnvironment({ ...connected, hooks: { setup: true, teardown: false } }),
+      ).toEqual({ callsHooks: true });
+      expect(hookCallsEnvironment(connected)).toEqual({});
     });
   });
 });

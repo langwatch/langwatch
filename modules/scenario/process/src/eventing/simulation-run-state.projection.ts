@@ -682,10 +682,10 @@ export class SimulationRunStateFoldProjection
       attachmentCount: event.data.evaluators?.attachments.length ?? 0,
     });
 
-    // A failed setup never starts the scenario, so the queued time marks its start.
-    const runStart = state.StartedAt ?? state.QueuedAt;
     const derivedDurationMs =
-      runStart !== null && event.occurredAt >= runStart ? event.occurredAt - runStart : null;
+      state.StartedAt !== null && event.occurredAt >= state.StartedAt
+        ? event.occurredAt - state.StartedAt
+        : null;
 
     return {
       ...state,
@@ -816,10 +816,20 @@ export class SimulationRunStateFoldProjection
     event: SimulationRunHooksRecordedEvent,
     state: SimulationRunStateData,
   ): SimulationRunStateData {
+    // A failed setup never starts the scenario, so a run with hooks is measured from its queued
+    // time; any other run that never started keeps no duration.
+    const { DurationMs, StartedAt, QueuedAt, FinishedAt } = state;
+    const measuresFromQueue =
+      DurationMs === null &&
+      StartedAt === null &&
+      QueuedAt !== null &&
+      FinishedAt !== null &&
+      FinishedAt >= QueuedAt;
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       Metadata: mergeLangwatchNamespace(state.Metadata, { hooks: event.data.hooks }),
+      DurationMs: measuresFromQueue ? FinishedAt - QueuedAt : DurationMs,
     };
   }
 

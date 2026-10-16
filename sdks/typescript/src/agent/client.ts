@@ -299,6 +299,12 @@ export class AgentClient {
     this.scheduleConnect(0);
   }
 
+  /** Registers the agents again after one changed: a hook declared once the socket opened. */
+  refreshAgents(): void {
+    // The platform ignores a second register on an open socket; a fresh one carries the change.
+    if (this.socket) this.restartSocket();
+  }
+
   /** Closes the socket and connects again at once, keeping the reconnect loop. */
   private restartSocket(): void {
     const socket = this.socket;

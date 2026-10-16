@@ -162,12 +162,34 @@ Feature: Scenario setup and teardown hooks on connected agents (SDK and protocol
     When the platform dispatches it
     Then the call fails with "agent_payload_too_large" and reaches no instance
 
-  @integration @unimplemented
+  @unit
   Scenario: The platform sends no hook call to an agent that did not declare it
-    Given a registered agent that declared hooks setup false
+    Given a registered agent whose live instances declared hooks setup false
     When the platform is asked to call its setup
     Then no call frame is sent
-    And the outcome is "hook not declared"
+    And the call fails with "hook_not_declared"
+
+  @unit
+  Scenario: A hook call reaches only an instance that declared that hook
+    Given two live instances of one agent, one on an SDK without hooks and one that declared teardown
+    When the platform calls teardown several times
+    Then every call goes to the instance that declared teardown
+    And the instance without hooks never runs the agent function for a hook call
+
+  @unit
+  Scenario: A hook call runs under the hook's budget, not the agent's turn timeout
+    Given an agent whose turn timeout is 120 seconds
+    When the scenario child calls setup with a 5 second budget
+    Then the relay call carries the budget
+    And the call envelope's deadline is 5 seconds away
+    And a turn's deadline stays at the agent's timeout
+
+  @unit
+  Scenario: A hook declared after the connection started registers again
+    Given an agent whose connection is already registered
+    When a setup hook is declared on it
+    Then the SDK registers again on a fresh connection, declaring setup
+    But when the hook refuses the agent, the SDK deregisters it instead
 
   @integration
   Scenario: The register frame with hooks is accepted and stored on the agent

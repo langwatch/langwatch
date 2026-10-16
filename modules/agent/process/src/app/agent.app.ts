@@ -472,6 +472,7 @@ export class AgentModule implements AgentApi {
         run: input.run ?? {},
         kind: input.kind,
         state: input.state,
+        timeoutMs: input.timeoutMs,
       },
       signal: context.signal,
     });

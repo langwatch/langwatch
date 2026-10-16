@@ -8760,6 +8760,12 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "timeoutMs": {
+                    "description": "A setup or teardown hook's budget in milliseconds. A turn runs under the agent's own timeout.",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 300000
                   }
                 },
                 "required": [

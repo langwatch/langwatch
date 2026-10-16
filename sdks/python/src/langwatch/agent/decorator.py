@@ -19,7 +19,7 @@ from typing import Any, TypeVar, Union
 
 from pydantic import BaseModel
 
-from .client import register
+from .client import refresh_registration, register
 from .identity import resolve_environment
 from .protocol import AgentRegistration, CallFrame, Message
 from .schema import (
@@ -270,7 +270,9 @@ class ConnectedAgent:
         """Declare a scenario hook, refusing the agent when a parameter clashes.
 
         The refusal is a warning rather than an exception, like every other
-        decoration failure, so the application still imports.
+        decoration failure, so the application still imports. A hook declared
+        after the connection started registers again, and a refused agent
+        leaves the platform.
         """
         if not callable(func):
             raise TypeError(f"{self.name}.scenario.{kind}: the hook must be callable")
@@ -287,6 +289,7 @@ class ConnectedAgent:
             logger.warning(
                 "connect_agent: %s is not registered, %s", self.name, self.refusal
             )
+        refresh_registration(self)
 
     def run_parameters(self) -> AgentSignature:
         """The one run-parameter set of the agent and its hooks."""

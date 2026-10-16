@@ -122,6 +122,20 @@ describe.each(Object.entries(tiers))("ConnectedAgentStateRepository (%s)", (_nam
       ]);
     });
 
+    /** @scenario "A hook call reaches only an instance that declared that hook" */
+    it("keeps the hooks each agent declared, and drops them when saved again without", async () => {
+      const hooks = { [agentId]: { setup: true, teardown: false } };
+      await state.saveInstance({ meta: meta({ hooks }), agentIds: [agentId], ttlSeconds: 30 });
+      expect(await state.findInstance({ projectId, instanceId })).toEqual([
+        { meta: meta({ hooks }), agentIds: [agentId] },
+      ]);
+
+      await state.saveInstance({ meta: meta(), agentIds: [agentId], ttlSeconds: 30 });
+      expect(await state.findInstance({ projectId, instanceId })).toEqual([
+        { meta: meta(), agentIds: [agentId] },
+      ]);
+    });
+
     it("is gone once deleted", async () => {
       await state.saveInstance({ meta: meta(), agentIds: [agentId], ttlSeconds: 30 });
       await state.deleteInstance({ projectId, instanceId });

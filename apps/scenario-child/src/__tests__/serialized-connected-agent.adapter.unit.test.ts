@@ -117,6 +117,20 @@ describe("SerializedConnectedAgentAdapter", () => {
     });
   });
 
+  describe("when a hook is called with its budget", () => {
+    /** @scenario "A hook call runs under the hook's budget, not the agent's turn timeout" */
+    it("sends the budget to the relay for a hook and none for a turn", async () => {
+      const relay = fakeRelay([okReply(), okReply()]);
+      const adapter = adapterWith(relay);
+
+      await adapter.callHook({ kind: "setup", timeoutMs: 45_000 });
+      await adapter.call(turn("thread_a", "hi"));
+
+      expect(relay.sent[0]?.body).toMatchObject({ kind: "setup", timeoutMs: 45_000 });
+      expect(relay.sent[1]?.body).not.toHaveProperty("timeoutMs");
+    });
+  });
+
   describe("when the relay refuses a call with a body that carries the code and the status text", () => {
     /** @scenario "The child names a refused call by the code the relay wrote" */
     it("names the failure by the code, not by the status text beside it", async () => {

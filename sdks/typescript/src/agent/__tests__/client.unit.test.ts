@@ -1096,6 +1096,17 @@ describe("the agent client, given a fake platform", () => {
       expect(register.agents[0]?.hooks).toEqual({ setup: false, teardown: false });
     });
 
+    /** @scenario "A hook declared after the connection started registers again" */
+    it("opens a new socket whose register declares a hook added after the first register", async () => {
+      const { agent } = await connectShop(() => undefined);
+
+      agent.scenario.setup(async () => ({}));
+
+      const second = await platform.nextConnection();
+      const register = await second.nextFrame<RegisterFrame>("register");
+      expect(register.agents[0]?.hooks).toEqual({ setup: true, teardown: false });
+    });
+
     /** @scenario "Setup is called with the run reference and its own parameters" */
     /** @scenario "Setup's return value is sent back as the state" */
     it("calls setup with the run and the parameters, and sends its return as the state", async () => {

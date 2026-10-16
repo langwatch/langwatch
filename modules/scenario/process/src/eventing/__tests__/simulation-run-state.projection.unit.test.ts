@@ -671,8 +671,8 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.DurationMs).toBeNull();
     });
 
-    it("measures from the queued time when the run failed before it started", () => {
-      // A failed setup never starts the scenario, so no started event folds.
+    it("leaves DurationMs null for a run that finished without starting", () => {
+      // Only a run with a hooks record measures from its queued time (ADR-180).
       const state = foldEvents([
         createRunQueuedEvent({}, { occurredAt: 1000 }),
         createRunFinishedEvent(
@@ -682,7 +682,7 @@ describe("simulationRunStateFoldProjection", () => {
       ]);
 
       expect(state.StartedAt).toBeNull();
-      expect(state.DurationMs).toBe(2500);
+      expect(state.DurationMs).toBeNull();
     });
 
     it("leaves DurationMs null when the finish event precedes the start", () => {

@@ -120,6 +120,16 @@ describe("simulationRunStateFoldProjection hooks", () => {
       expect(after.FinishedAt).toBe(before.FinishedAt);
     });
 
+    /** @scenario "A run whose setup failed is measured from its queued time" */
+    it("measures a run that never started from its queued time", () => {
+      const notStarted = fold([queued(), finished("failure")]);
+      expect(notStarted.DurationMs).toBeNull();
+
+      const after = foldProjection.apply(notStarted, hooksRecorded());
+
+      expect(after.DurationMs).toBe(3000 - 500);
+    });
+
     /** @scenario "Each hook result is recorded on the run" */
     it("writes each hook's status, duration, trace, state and error under langwatch.hooks", () => {
       const after = fold([

@@ -170,7 +170,7 @@ const resultsFilterSchemaDefinition = z.object({
   testSuiteIds: z.array(z.string()).optional(),
   scenarioSetIds: z.array(z.string()).optional(),
   targetKeys: z.array(z.string()).optional(),
-  outcome: z.enum(["passed", "failed", "pending"]).optional(),
+  outcome: z.enum(["passed", "failed", "not_scored", "pending"]).optional(),
 });
 export interface ResultsFilterSchema extends Named<typeof resultsFilterSchemaDefinition> {}
 export const resultsFilterSchema: ResultsFilterSchema = resultsFilterSchemaDefinition;

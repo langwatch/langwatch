@@ -160,6 +160,63 @@ def test_hooks_that_disagree_on_a_parameter_type_are_refused(caplog):
     assert client_module.default_client().agents == []
 
 
+class FakeSocket:
+    def __init__(self) -> None:
+        self.closed = False
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+def running_default_client(monkeypatch) -> tuple[AgentClient, list[dict[str, Any]]]:
+    """The default client as if its connection ran: scheduled work runs at once, frames are kept."""
+    client = client_module.default_client()
+    sent: list[dict[str, Any]] = []
+
+    async def send(frame: dict[str, Any]) -> bool:
+        sent.append(frame)
+        return True
+
+    monkeypatch.setattr(AgentClient, "started", property(lambda self: True))
+    monkeypatch.setattr(client, "_send", send)
+    monkeypatch.setattr(client, "_call_soon", lambda factory: asyncio.run(factory()))
+    return client, sent
+
+
+# @scenario "A hook declared after the connection started registers again"
+def test_a_hook_declared_after_start_restarts_the_session(monkeypatch):
+    @connect_agent(name="shop-assistant", environment="development")
+    def agent(messages) -> str:
+        return "ok"
+
+    client, _ = running_default_client(monkeypatch)
+    socket = FakeSocket()
+    client._socket = socket
+
+    @agent.scenario.setup
+    def setup(run):
+        return {}
+
+    assert socket.closed
+    assert client._restart_requested
+    assert agent.registration()["hooks"] == {"setup": True, "teardown": False}
+
+
+# @scenario "A hook declared after the connection started registers again"
+def test_a_hook_that_refuses_the_agent_after_start_deregisters(monkeypatch):
+    @connect_agent(name="shop-assistant", environment="development")
+    def agent(messages, refund_amount: float = 49.95) -> str:
+        return "ok"
+
+    _, sent = running_default_client(monkeypatch)
+
+    @agent.scenario.teardown
+    def teardown(run, state, refund_amount: str = "49.95"):
+        return None
+
+    assert [frame["type"] for frame in sent] == ["deregister"]
+
+
 # @scenario "An integer and a number for one parameter merge as a number"
 def test_an_integer_and_a_number_merge_as_a_number():
     agent = shop_assistant()

@@ -38379,6 +38379,9 @@ type CallConnectedAgentJSONBody struct {
 	// ThreadId The conversation id. Turns of one conversation share it; a new id starts a new one.
 	ThreadId *string `json:"threadId,omitempty"`
 
+	// TimeoutMs A setup or teardown hook's budget in milliseconds. A turn runs under the agent's own timeout.
+	TimeoutMs *int `json:"timeoutMs,omitempty"`
+
 	// Traceparent The W3C trace context the agent adopts, so its spans join this turn's trace.
 	Traceparent *string `json:"traceparent,omitempty"`
 }

@@ -12,6 +12,8 @@ export interface DispatchCall {
   /** Absent means a turn. */
   kind?: CallKind;
   state?: CallEnvelope["state"];
+  /** A hook's own budget; a turn runs under the agent's timeout. */
+  timeoutMs?: number;
 }
 
 /** What the dispatcher needs to know about the agent. */

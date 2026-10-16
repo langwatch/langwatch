@@ -2,6 +2,7 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { AgentCallSignal } from "./connected-agent.connection.ts";
+import { MAX_CALL_TIMEOUT_MS } from "./connected-agent.constants.ts";
 import {
   CALL_KINDS,
   callRunSchema,
@@ -44,6 +45,15 @@ const relayCallBodySchemaDefinition = z.object({
   state: stateSchema.describe(
     "The scenario run's test data: what setup returned, or a turn's latest update.",
   ),
+  timeoutMs: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_CALL_TIMEOUT_MS)
+    .optional()
+    .describe(
+      "A setup or teardown hook's budget in milliseconds. A turn runs under the agent's own timeout.",
+    ),
 });
 export interface RelayCallBodySchema extends Named<typeof relayCallBodySchemaDefinition> {}
 export const relayCallBodySchema: RelayCallBodySchema = relayCallBodySchemaDefinition;

@@ -18,7 +18,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { ScenarioRunSecretSeal } from "../../../repositories/scenario.repository.ts";
-import { adapterDeclaresHooks } from "../../../rules/scenario-run-hooks.rules.ts";
+import { hookCallsEnvironment } from "../../../rules/scenario-run-hooks.rules.ts";
 import { ScenarioExecutionLookupService } from "../../../services/scenario-execution-lookup.service.ts";
 import { ScenarioModelParametersService } from "../../../services/scenario-model-parameters.service.ts";
 import { ScenarioRunKeyService } from "../../../services/scenario-run-key.service.ts";
@@ -189,7 +189,7 @@ export class ScenarioExecutionPrefetcherService {
               endpoint: this.options.config.langwatchEndpoint,
               apiKey,
             },
-            ...("success" in adapter || !adapterDeclaresHooks(adapter) ? {} : { callsHooks: true }),
+            ...("success" in adapter ? {} : hookCallsEnvironment(adapter)),
           };
         })
         .catch(() => null),

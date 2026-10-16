@@ -157,8 +157,8 @@ export interface ConnectedAgent<P, HookP = P> {
   /** The parameter schema as registered. */
   readonly parameters: JsonSchemaObject;
   /**
-   * Declares setup and teardown. Declare them before the process yields, so
-   * the first register carries them.
+   * Declares setup and teardown. Declared before the process yields, they ride
+   * on the first register; declared later, the agents register again.
    */
   readonly scenario: ScenarioHooks<HookP>;
   /** Send deregister and close the socket when this was the last agent of the process. */
@@ -331,20 +331,23 @@ export function connectAgent(
     hooks,
   };
 
+  let detach: (() => Promise<void>) | undefined;
+  let refresh: (() => void) | undefined;
+
   // The register frame is built when the socket opens, so a hook declared
-  // before the process yields rides on the first register.
+  // before the process yields rides on the first register; a later one registers again.
   const scenario: ScenarioHooks<Record<string, AgentParameterValue>> = {
     setup: (hook) => {
       hooks.setup = async ({ run, params }) => hook(run, params);
       runtime.register.hooks = { setup: true, teardown: Boolean(hooks.teardown) };
+      refresh?.();
     },
     teardown: (hook) => {
       hooks.teardown = async ({ run, state, params }) => hook(run, state, params);
       runtime.register.hooks = { setup: Boolean(hooks.setup), teardown: true };
+      refresh?.();
     },
   };
-
-  let detach: (() => Promise<void>) | undefined;
 
   if (!resolveEnabled({ explicit: options.enabled })) {
     logger.debug(`agent "${name}" not connected to LangWatch: the connection is disabled`);
@@ -367,6 +370,7 @@ export function connectAgent(
       });
       client.addAgent(runtime);
       detach = () => client.removeAgent(runtime);
+      refresh = () => client.refreshAgents();
     }
   }
 
@@ -378,6 +382,7 @@ export function connectAgent(
       if (!detach) return;
       const release = detach;
       detach = undefined;
+      refresh = undefined;
       await release();
     },
   });

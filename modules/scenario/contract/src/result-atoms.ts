@@ -20,7 +20,7 @@ export type AtomCostSource = "run" | "traces" | "none" | "unknown";
  * which already holds the evaluator gate — a failed required evaluator
  * already turned it failed, so an atom never reads passed past that.
  */
-export type AtomOutcome = "passed" | "failed" | "pending";
+export type AtomOutcome = "passed" | "failed" | "not_scored" | "pending";
 
 /**
  * One evaluator result on an atom, as much of it as a results table needs:

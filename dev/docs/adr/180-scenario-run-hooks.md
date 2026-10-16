@@ -30,8 +30,9 @@ TypeScript mirrors this on the value `connectAgent` returns. `run` is `{ scenari
 
 ### Protocol
 
-- `register` gains `hooks: { setup: boolean, teardown: boolean }` per agent. The platform sends a hook call only to an agent that declared it.
+- `register` gains `hooks: { setup: boolean, teardown: boolean }` per agent. The platform keeps the declaration per instance, so instances of one agent on older and newer SDKs can run side by side: a hook call goes only to an instance that declared that hook, and when no live instance did, it fails with `hook_not_declared` instead of running the agent function.
 - The `call` envelope gains `kind: "turn" | "setup" | "teardown"` (default `turn`) and `state`. The `result` frame gains `state`: setup's return, or a turn's update.
+- The relay call body gains `timeoutMs`, the hook's budget. The platform sets a hook call's `deadlineAt` from it; a turn keeps the agent's own timeout.
 - State travels in every call, as `session` does, so no sticky routing is needed. A turn receives `state` and may return an update; the platform keeps the latest.
 - State and teardown's returned object are capped at 64 KiB, the `session` cap. Over the cap fails the call as `agent_payload_too_large`.
 - `CALL_ENVELOPE_KEYS` in the connected-agent protocol gains `kind` and `state`; its test changes with it.
@@ -42,11 +43,11 @@ Setup, then turns, then teardown. The simulated user and the judge see the curre
 
 Teardown is always called: after success, after failure, and after a setup failure or timeout (with the partial state, if any). The child runs it in a `finally`. If the child is killed, the parent worker runs a fallback teardown. Decided in principle; the mechanism is open.
 
-Hooks run for scenario runs only. Experiments, the Test button and `langwatch agent run` never call them. Each hook has a 60 s timeout by default; a scenario can set its own.
+Hooks run for scenario runs only. Experiments, the Test button and `langwatch agent run` never call them. Each hook has a 60 s timeout. A timeout set per scenario is not built yet.
 
 ### Outcomes
 
-- Setup failed or timed out (or its agent was offline): the run is not scored and is excluded from the pass rate, in the batch summary and the suite roll-up. It finishes `ERROR` with no verdict, so every reader that counts verdicts leaves it out.
+- Setup failed or timed out (or its agent was offline): the run is not scored and is excluded from the pass rate, in the batch summary and the suite roll-up. It finishes `ERROR` with no verdict, so every reader that counts verdicts leaves it out. Readers that count statuses (the ClickHouse batch and set counts, the results atoms) read `langwatch.hooks.setup.status` on `ERROR` runs and leave a setup that is not `ok` out of the pass rate, as the browser does.
 - Teardown never changes the score. A failed teardown shows its error, the state it was given and the line "Test data may be left behind." A teardown that timed out keeps `timed_out` in the record and reads "Teardown failed" with the timeout error.
 - **Rerun and keep data** skips teardown for that one rerun and is never saved to a plan. The run shows "Teardown skipped" (on purpose). "Teardown not run" means an accident, such as the agent being offline.
 - An agent that declares no hooks runs as today and is marked "No hooks".
@@ -65,7 +66,7 @@ In this series, `{ key: value }` (single braces) in a scenario's situation text 
 
 ## Rationale / Trade-offs
 
-Putting hooks in the customer's process gives them their own database and secrets, which is the point of connected agents. Declaring hooks at `register` stops the platform calling an SDK that cannot answer. Carrying state in every call costs payload but avoids sticky routing and works across N instances, as `session` does. Wrapping the simulated user and the judge in platform adapters keeps the scenario library untouched. Excluding setup failures from the pass rate stops an infrastructure fault reading as an agent failure; teardown not touching the score keeps the score about the agent.
+Putting hooks in the customer's process gives them their own database and secrets, which is the point of connected agents. Declaring hooks at `register` stops the platform calling an SDK that cannot answer. Carrying state in every call costs payload but avoids sticky routing and works across N instances, as `session` does. Wrapping the simulated user and the judge in platform adapters keeps the scenario library untouched. The cost: the state goes into the simulated user's and the judge's prompts on every turn, so it spends tokens, and the test data reaches the model provider. Setup should return references, not bulk data or secrets. Excluding setup failures from the pass rate stops an infrastructure fault reading as an agent failure; teardown not touching the score keeps the score about the agent.
 
 ## Consequences
 

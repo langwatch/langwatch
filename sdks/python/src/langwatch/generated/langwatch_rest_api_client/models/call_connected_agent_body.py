@@ -37,6 +37,8 @@ class CallConnectedAgentBody:
             turn.
         state (CallConnectedAgentBodyStateType0 | None | Unset): The scenario run's test data: what setup returned, or a
             turn's latest update.
+        timeout_ms (int | Unset): A setup or teardown hook's budget in milliseconds. A turn runs under the agent's own
+            timeout.
     """
 
     messages: list[CallConnectedAgentBodyMessagesItem]
@@ -48,6 +50,7 @@ class CallConnectedAgentBody:
     run: CallConnectedAgentBodyRun | Unset = UNSET
     kind: CallConnectedAgentBodyKind | Unset = UNSET
     state: CallConnectedAgentBodyStateType0 | None | Unset = UNSET
+    timeout_ms: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -91,6 +94,8 @@ class CallConnectedAgentBody:
         else:
             state = self.state
 
+        timeout_ms = self.timeout_ms
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -114,6 +119,8 @@ class CallConnectedAgentBody:
             field_dict["kind"] = kind
         if state is not UNSET:
             field_dict["state"] = state
+        if timeout_ms is not UNSET:
+            field_dict["timeoutMs"] = timeout_ms
 
         return field_dict
 
@@ -186,6 +193,8 @@ class CallConnectedAgentBody:
 
         state = _parse_state(d.pop("state", UNSET))
 
+        timeout_ms = d.pop("timeoutMs", UNSET)
+
         call_connected_agent_body = cls(
             messages=messages,
             new_messages=new_messages,
@@ -196,6 +205,7 @@ class CallConnectedAgentBody:
             run=run,
             kind=kind,
             state=state,
+            timeout_ms=timeout_ms,
         )
 
         call_connected_agent_body.additional_properties = d

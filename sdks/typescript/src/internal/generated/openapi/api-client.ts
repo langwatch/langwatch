@@ -2459,6 +2459,8 @@ export interface operations {
                     state?: {
                         [key: string]: unknown;
                     } | null;
+                    /** @description A setup or teardown hook's budget in milliseconds. A turn runs under the agent's own timeout. */
+                    timeoutMs?: number;
                 };
             };
         };
