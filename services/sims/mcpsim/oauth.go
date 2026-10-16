@@ -339,6 +339,11 @@ func (s *Server) approvedProjectID(ctx context.Context, req ConnectRequest) (str
 	if s.cfg.AccessToken == "" || s.cfg.Endpoint == "" {
 		return "", fmt.Errorf("project %q has no id and no access token to look it up", s.cfg.ProjectSlug)
 	}
+	return s.projectIDBySlug(ctx)
+}
+
+// projectIDBySlug looks the configured project slug up through GET /api/projects.
+func (s *Server) projectIDBySlug(ctx context.Context) (string, error) {
 	call, err := http.NewRequestWithContext(ctx, http.MethodGet, s.cfg.Endpoint+"/api/projects?limit=1000", nil)
 	if err != nil {
 		return "", err

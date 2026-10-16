@@ -196,19 +196,27 @@ func findSeededOrg(raw any) (orgID, projectID string, ok bool) {
 			continue
 		}
 		id, _ := org["id"].(string)
-		teams, _ := org["teams"].([]any)
-		for _, teamEntry := range teams {
-			team, _ := teamEntry.(map[string]any)
-			projects, _ := team["projects"].([]any)
-			for _, projectEntry := range projects {
-				project, _ := projectEntry.(map[string]any)
-				if pid, _ := project["id"].(string); id != "" && pid != "" && project["slug"] == SeededProjectSlug {
-					return id, pid, true
-				}
-			}
+		if pid, found := seededProjectID(org); found && id != "" {
+			return id, pid, true
 		}
 	}
 	return "", "", false
+}
+
+// seededProjectID finds the seeded project's id across an organization's teams.
+func seededProjectID(org map[string]any) (string, bool) {
+	teams, _ := org["teams"].([]any)
+	for _, teamEntry := range teams {
+		team, _ := teamEntry.(map[string]any)
+		projects, _ := team["projects"].([]any)
+		for _, projectEntry := range projects {
+			project, _ := projectEntry.(map[string]any)
+			if pid, _ := project["id"].(string); pid != "" && project["slug"] == SeededProjectSlug {
+				return pid, true
+			}
+		}
+	}
+	return "", false
 }
 
 // baseOrg runs the sign-up ceremony: a fresh user, whose onboarding creates

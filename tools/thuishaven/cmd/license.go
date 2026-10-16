@@ -359,8 +359,7 @@ func testingLicenseAfterUp(ctx context.Context, d deps, inv invocation) (wait fu
 	if slug == "" || (!asked && !held) {
 		return noop
 	}
-	lifetime, err := parseLifetime(inv.value("--testing-license"))
-	if err != nil {
+	if _, err := parseLifetime(inv.value("--testing-license")); err != nil {
 		return noop
 	}
 	if _, tokenErr := havenCloudState().token(os.Getenv, time.Now()); asked && tokenErr != nil {
@@ -369,26 +368,36 @@ func testingLicenseAfterUp(ctx context.Context, d deps, inv invocation) (wait fu
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		if !waitStackReady(ctx, d, slug, 5*time.Minute) {
-			fmt.Println("haven: testing license: the stack did not answer in time; `haven license` asks again once it does")
-			return
-		}
-		licenser, err := stackLicenser(d, inv, os.Stdout)
-		if err == nil && asked {
-			err = licenser.ask(ctx, lifetime)
-		} else if err == nil {
-			err = licenser.renew(ctx)
-		}
-		if err != nil && ctx.Err() == nil {
-			fmt.Println("haven: " + licenseSignInHint(err))
-		}
+		runTestingLicense(ctx, d, inv)
 	}()
 	return func() { <-done }
 }
 
+// runTestingLicense waits for the stack, then asks for a license (when --testing-license
+// said so) or renews the held one, saying why when it cannot.
+func runTestingLicense(ctx context.Context, d deps, inv invocation) {
+	if !waitStackReady(ctx, d, d.resolvedStack()) {
+		fmt.Println("haven: testing license: the stack did not answer in time; `haven license` asks again once it does")
+		return
+	}
+	licenser, err := stackLicenser(d, inv, os.Stdout)
+	if err == nil && inv.has("--testing-license") {
+		lifetime, _ := parseLifetime(inv.value("--testing-license"))
+		err = licenser.ask(ctx, lifetime)
+	} else if err == nil {
+		err = licenser.renew(ctx)
+	}
+	if err != nil && ctx.Err() == nil {
+		fmt.Println("haven: " + licenseSignInHint(err))
+	}
+}
+
+// stackReadyTimeout is how long the testing license step waits for the stack to answer.
+const stackReadyTimeout = 5 * time.Minute
+
 // waitStackReady polls the stack's cheap snapshot until every one of its own services answers.
-func waitStackReady(ctx context.Context, d deps, slug string, timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
+func waitStackReady(ctx context.Context, d deps, slug string) bool {
+	deadline := time.Now().Add(stackReadyTimeout)
 	for {
 		if reached(d.orch.SessionSnapshot(slug), "ready") {
 			return true

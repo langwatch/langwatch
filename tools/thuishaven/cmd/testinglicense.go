@@ -69,28 +69,19 @@ func openStackSession(ctx context.Context, stack licenseStack) (stackSession, er
 	return stackSession{app: base.Scheme + "://" + base.Host, http: &http.Client{Timeout: authHTTPTimeout}, cookies: cookies}, nil
 }
 
+// trpcCall names one procedure, whether it is a mutation, and its input.
+type trpcCall struct {
+	procedure string
+	mutation  bool
+	input     any
+}
+
 // trpc calls one procedure as plain JSON, a query by GET and a mutation by POST.
-func (s stackSession) trpc(ctx context.Context, procedure string, isMutation bool, input, out any) error {
-	body, err := json.Marshal(input)
+func (s stackSession) trpc(ctx context.Context, call trpcCall, out any) error {
+	procedure := call.procedure
+	req, err := s.trpcRequest(ctx, call)
 	if err != nil {
 		return err
-	}
-	endpoint := s.app + "/api/trpc/" + procedure
-	var req *http.Request
-	if isMutation {
-		req, err = http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-		if err == nil {
-			req.Header.Set("Content-Type", "application/json")
-		}
-	} else {
-		req, err = http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?input="+url.QueryEscape(string(body)), nil)
-	}
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Origin", s.app)
-	for _, cookie := range s.cookies {
-		req.AddCookie(cookie)
 	}
 	res, err := s.http.Do(req)
 	if err != nil {
@@ -101,6 +92,40 @@ func (s stackSession) trpc(ctx context.Context, procedure string, isMutation boo
 	if err != nil {
 		return err
 	}
+	data, err := s.trpcData(procedure, res, raw)
+	if err != nil || out == nil {
+		return err
+	}
+	return json.Unmarshal(data, out)
+}
+
+func (s stackSession) trpcRequest(ctx context.Context, call trpcCall) (*http.Request, error) {
+	body, err := json.Marshal(call.input)
+	if err != nil {
+		return nil, err
+	}
+	endpoint := s.app + "/api/trpc/" + call.procedure
+	var req *http.Request
+	if call.mutation {
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+		if err == nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+	} else {
+		req, err = http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?input="+url.QueryEscape(string(body)), nil)
+	}
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Origin", s.app)
+	for _, cookie := range s.cookies {
+		req.AddCookie(cookie)
+	}
+	return req, nil
+}
+
+// trpcData reads the procedure's result data out of its answer, or the scrubbed error it carried.
+func (s stackSession) trpcData(procedure string, res *http.Response, raw []byte) (json.RawMessage, error) {
 	var answer struct {
 		Result struct {
 			Data json.RawMessage `json:"data"`
@@ -110,19 +135,16 @@ func (s stackSession) trpc(ctx context.Context, procedure string, isMutation boo
 		} `json:"error"`
 	}
 	if json.Unmarshal(raw, &answer) != nil {
-		return fmt.Errorf("%s answered %s with something haven could not read", procedure, res.Status)
+		return nil, fmt.Errorf("%s answered %s with something haven could not read", procedure, res.Status)
 	}
 	if answer.Error != nil || res.StatusCode/100 != 2 {
 		message := ""
 		if answer.Error != nil {
 			message = answer.Error.Message
 		}
-		return fmt.Errorf("%s answered %s: %s", procedure, res.Status, scrubbed(message, s.scrubs))
+		return nil, fmt.Errorf("%s answered %s: %s", procedure, res.Status, scrubbed(message, s.scrubs))
 	}
-	if out == nil {
-		return nil
-	}
-	return json.Unmarshal(answer.Result.Data, out)
+	return answer.Result.Data, nil
 }
 
 // organizationID is the local organization's id, found by its slug: seeded ids are random.
@@ -131,7 +153,7 @@ func (s stackSession) organizationID(ctx context.Context) (string, error) {
 		ID   string `json:"id"`
 		Slug string `json:"slug"`
 	}
-	if err := s.trpc(ctx, "organization.getAll", false, map[string]any{}, &organizations); err != nil {
+	if err := s.trpc(ctx, trpcCall{procedure: "organization.getAll", input: map[string]any{}}, &organizations); err != nil {
 		return "", err
 	}
 	for _, o := range organizations {
@@ -147,7 +169,7 @@ func (s stackSession) instanceID(ctx context.Context, organizationID string) (st
 	var answer struct {
 		InstanceID string `json:"instanceId"`
 	}
-	if err := s.trpc(ctx, "license.getInstanceId", false, map[string]any{"organizationId": organizationID}, &answer); err != nil {
+	if err := s.trpc(ctx, trpcCall{procedure: "license.getInstanceId", input: map[string]any{"organizationId": organizationID}}, &answer); err != nil {
 		return "", err
 	}
 	if answer.InstanceID == "" {
@@ -166,14 +188,14 @@ type licenseStatus struct {
 
 func (s stackSession) licenseStatus(ctx context.Context, organizationID string) (licenseStatus, error) {
 	var status licenseStatus
-	err := s.trpc(ctx, "license.getStatus", false, map[string]any{"organizationId": organizationID}, &status)
+	err := s.trpc(ctx, trpcCall{procedure: "license.getStatus", input: map[string]any{"organizationId": organizationID}}, &status)
 	return status, err
 }
 
 // uploadLicense stores the key through license.upload; the key never appears in an error.
 func (s stackSession) uploadLicense(ctx context.Context, organizationID, key string) error {
 	s.scrubs = append(s.scrubs, key)
-	return s.trpc(ctx, "license.upload", true, map[string]any{"organizationId": organizationID, "licenseKey": key}, nil)
+	return s.trpc(ctx, trpcCall{procedure: "license.upload", mutation: true, input: map[string]any{"organizationId": organizationID, "licenseKey": key}}, nil)
 }
 
 // renewalDue says whether the stack holds the license haven issued and it ends within a day.
@@ -277,7 +299,7 @@ func (l testingLicenser) ask(ctx context.Context, lifetime time.Duration) error 
 	if err != nil {
 		return err
 	}
-	return l.issueAndStore(ctx, sess, organizationID, token, lifetimeHours(lifetime))
+	return l.issueAndStore(ctx, sess, licenseTarget{organizationID: organizationID, token: token, hours: lifetimeHours(lifetime)})
 }
 
 // renew asks again, for the same lifetime, only when the stack holds the license haven
@@ -310,10 +332,18 @@ func (l testingLicenser) renew(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("the testing license ends %s: %w", held.ExpiresAt.Format(time.RFC3339), err)
 	}
-	return l.issueAndStore(ctx, sess, organizationID, token, held.LifetimeHours)
+	return l.issueAndStore(ctx, sess, licenseTarget{organizationID: organizationID, token: token, hours: held.LifetimeHours})
 }
 
-func (l testingLicenser) issueAndStore(ctx context.Context, sess stackSession, organizationID string, token cloudToken, hours int) error {
+// licenseTarget is the organization a license is issued for, the token that asks and its lifetime.
+type licenseTarget struct {
+	organizationID string
+	token          cloudToken
+	hours          int
+}
+
+func (l testingLicenser) issueAndStore(ctx context.Context, sess stackSession, target licenseTarget) error {
+	organizationID, token, hours := target.organizationID, target.token, target.hours
 	instanceID, err := sess.instanceID(ctx, organizationID)
 	if err != nil {
 		return err

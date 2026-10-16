@@ -242,17 +242,24 @@ func sleepContext(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// post sends one JSON body; bearer, when set, is scrubbed from any error.
-func (c cloudClient) post(ctx context.Context, path, bearer string, body any) (int, []byte, error) {
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return 0, nil, err
-	}
-	return c.send(ctx, http.MethodPost, path, bearer, payload)
+// cloudRequest is one call to Cloud; bearer, when set, is scrubbed from any error and a nil body sends none.
+type cloudRequest struct {
+	method string
+	path   string
+	bearer string
+	body   any
 }
 
-// send makes one request; a nil payload sends no body.
-func (c cloudClient) send(ctx context.Context, method, path, bearer string, payload []byte) (int, []byte, error) {
+// send makes one request.
+func (c cloudClient) send(ctx context.Context, call cloudRequest) (int, []byte, error) {
+	var payload []byte
+	if call.body != nil {
+		var err error
+		if payload, err = json.Marshal(call.body); err != nil {
+			return 0, nil, err
+		}
+	}
+	method, path, bearer := call.method, call.path, call.bearer
 	var body io.Reader
 	if payload != nil {
 		body = bytes.NewReader(payload)
@@ -284,10 +291,10 @@ func clientInfo() map[string]any {
 
 // startLogin opens a device flow for a testing-license token.
 func (c cloudClient) startLogin(ctx context.Context) (pendingLogin, error) {
-	status, raw, err := c.post(ctx, "/api/auth/cli/device-code", "", map[string]any{
+	status, raw, err := c.send(ctx, cloudRequest{method: http.MethodPost, path: "/api/auth/cli/device-code", body: map[string]any{
 		"credential_type": "testing_license",
 		"client_info":     clientInfo(),
-	})
+	}})
 	if err != nil {
 		return pendingLogin{}, err
 	}
@@ -331,7 +338,7 @@ func (c cloudClient) awaitLogin(ctx context.Context, p pendingLogin) (cloudLogin
 		if c.now().After(p.ExpiresAt) {
 			return cloudLogin{}, errors.New("the sign-in expired before it was approved; run `haven login` again")
 		}
-		status, raw, err := c.post(ctx, "/api/auth/cli/exchange", "", body)
+		status, raw, err := c.send(ctx, cloudRequest{method: http.MethodPost, path: "/api/auth/cli/exchange", body: body})
 		if err != nil {
 			return cloudLogin{}, err
 		}
@@ -370,7 +377,7 @@ func (c cloudClient) loginFrom(raw []byte, p pendingLogin) (cloudLogin, error) {
 
 // revoke ends the token on Cloud. A 401 means Cloud already refuses it, which is the goal.
 func (c cloudClient) revoke(ctx context.Context, token string) error {
-	status, raw, err := c.send(ctx, http.MethodDelete, "/api/licensing/testing-licenses/token", token, nil)
+	status, raw, err := c.send(ctx, cloudRequest{method: http.MethodDelete, path: "/api/licensing/testing-licenses/token", bearer: token})
 	if err != nil {
 		return err
 	}
@@ -396,7 +403,7 @@ type issuedLicense struct {
 
 // issue asks Cloud for a testing license with the token.
 func (c cloudClient) issue(ctx context.Context, token string, req issueRequest) (issuedLicense, error) {
-	status, raw, err := c.post(ctx, "/api/licensing/testing-licenses", token, req)
+	status, raw, err := c.send(ctx, cloudRequest{method: http.MethodPost, path: "/api/licensing/testing-licenses", bearer: token, body: req})
 	if err != nil {
 		return issuedLicense{}, err
 	}
