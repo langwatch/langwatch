@@ -39,8 +39,8 @@ import type {
 } from "../repositories/issued-license.repository.ts";
 import { resolveLicenseTerms } from "../rules/issued-license-row.rules.ts";
 import {
-  INTERNAL_LICENSE_EMAIL_SUFFIXES,
   issuedLicenseView,
+  listQueryOf,
   statusOfIssuedLicense,
 } from "../rules/issued-license.rules.ts";
 import type { ContractBudgets } from "./contract-budget.service.ts";
@@ -381,20 +381,11 @@ export class LicenseRegistryService {
     return this.toView(await this.getRow(input.id));
   }
 
-  async list({
-    onlyActive,
-    hideInternal,
-    ...query
-  }: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  } & IssuedLicenseFilters): Promise<IssuedLicensePage> {
-    const { rows, total } = await this.options.repository.listAll({
-      ...query,
-      ...(onlyActive ? { activeAt: this.options.now() } : {}),
-      ...(hideInternal ? { excludeEmailSuffixes: INTERNAL_LICENSE_EMAIL_SUFFIXES } : {}),
-    });
+  async list(
+    input: { page: number; pageSize: number; search?: string } & IssuedLicenseFilters,
+  ): Promise<IssuedLicensePage> {
+    const query = listQueryOf({ ...input, now: this.options.now() });
+    const { rows, total } = await this.options.repository.listAll(query);
     return { licenses: rows.map((row) => this.toView(row)), total };
   }
 
