@@ -74,7 +74,7 @@ export const scenarioProcessModule: PublishedProcessModule<
     }),
   ])
   .withIdIndexes(SCENARIO_ID_INDEXES, {
-    after: ["experiment:fill-id-indexes"],
+    after: ["experiment:fill-second-id-indexes"],
     description:
       "Fills the id index of simulation runs from older rows, then marks them ready on each ClickHouse target.",
   })

@@ -47,7 +47,7 @@ export const analyticsProcessModule: PublishedProcessModule<
     }),
   ])
   .withIdIndexes(ANALYTICS_ID_INDEXES, {
-    after: ["evaluation:fill-id-indexes"],
+    after: ["evaluation:fill-second-id-indexes"],
     description:
       "Fills the evaluation analytics id index from rows older than its view, then turns the lookup on per ClickHouse target.",
   });
