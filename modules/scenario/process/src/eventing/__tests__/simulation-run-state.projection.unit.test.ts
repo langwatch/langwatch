@@ -671,6 +671,20 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.DurationMs).toBeNull();
     });
 
+    it("measures from the queued time when the run failed before it started", () => {
+      // A failed setup never starts the scenario, so no started event folds.
+      const state = foldEvents([
+        createRunQueuedEvent({}, { occurredAt: 1000 }),
+        createRunFinishedEvent(
+          { results: { verdict: "failure", metCriteria: [], unmetCriteria: [] } },
+          { occurredAt: 3500 },
+        ),
+      ]);
+
+      expect(state.StartedAt).toBeNull();
+      expect(state.DurationMs).toBe(2500);
+    });
+
     it("leaves DurationMs null when the finish event precedes the start", () => {
       // Events can arrive out of order. Subtracting these two timestamps would
       // report a negative duration, so the derivation declines instead.

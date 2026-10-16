@@ -200,7 +200,7 @@ export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel 
     timeoutMs?: number;
   }): Promise<RelayAnswer> {
     const { headers: propagation } = injectTraceContextHeaders({ headers: {} });
-    const traceparent = propagation.traceparent ?? null;
+    const traceparent = propagation.traceparent;
     const body = JSON.stringify({
       kind,
       messages,
@@ -210,7 +210,7 @@ export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel 
       session,
       state: this.state,
       run: this.run,
-      traceparent,
+      ...(traceparent ? { traceparent } : {}),
     });
     const url = `${this.config.endpoint.replace(/\/$/, "")}/api/v1/agents/${this.config.agentId}/call`;
     const headers: Record<string, string> = {

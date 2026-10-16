@@ -101,6 +101,22 @@ describe("SerializedConnectedAgentAdapter", () => {
     });
   });
 
+  describe("when a hook is called with no active span", () => {
+    it("sends no traceparent key, which the call schema rejects as null", async () => {
+      const relay = fakeRelay([okReply(), okReply()]);
+      const adapter = adapterWith(relay);
+
+      await adapter.callHook({ kind: "setup", timeoutMs: 1_000 });
+      await adapter.callHook({ kind: "teardown", timeoutMs: 1_000 });
+
+      for (const sent of relay.sent) {
+        expect(sent.body).toMatchObject({ kind: expect.any(String) });
+        expect(sent.body).not.toHaveProperty("traceparent");
+        expect(sent.headers).not.toHaveProperty("traceparent");
+      }
+    });
+  });
+
   describe("when the relay refuses a call with a body that carries the code and the status text", () => {
     /** @scenario "The child names a refused call by the code the relay wrote" */
     it("names the failure by the code, not by the status text beside it", async () => {

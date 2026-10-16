@@ -682,6 +682,11 @@ export class SimulationRunStateFoldProjection
       attachmentCount: event.data.evaluators?.attachments.length ?? 0,
     });
 
+    // A failed setup never starts the scenario, so the queued time marks its start.
+    const runStart = state.StartedAt ?? state.QueuedAt;
+    const derivedDurationMs =
+      runStart !== null && event.occurredAt >= runStart ? event.occurredAt - runStart : null;
+
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
@@ -697,14 +702,8 @@ export class SimulationRunStateFoldProjection
       // event. An evaluated event that folded before this one (business time
       // can land it first) already wrote its results, which stay.
       Evaluations: results?.evaluations ?? state.Evaluations,
-      // Derived because the SDK ingest path never carries it — every real run
-      // derives DurationMs; only a synthetic event supplies one. The fold
-      // already holds both ends, so a supplied value still wins when present.
-      DurationMs:
-        event.data.durationMs ??
-        (state.StartedAt !== null && event.occurredAt >= state.StartedAt
-          ? event.occurredAt - state.StartedAt
-          : null),
+      // The SDK ingest path never carries it; a supplied value still wins.
+      DurationMs: event.data.durationMs ?? derivedDurationMs,
       FinishedAt: event.occurredAt,
     };
   }
