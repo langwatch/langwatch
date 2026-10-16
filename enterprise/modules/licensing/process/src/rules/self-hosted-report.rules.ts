@@ -97,3 +97,48 @@ export function instanceActivity({
   if (age <= 14 * DAY_MS) return "quiet";
   return "gone";
 }
+
+/** The instants `instanceActivity` splits on, for a query that cannot call it per row. */
+export function activityCutoffs(now: Instant): { reportingSince: Instant; quietSince: Instant } {
+  return {
+    reportingSince: now.subtract({ milliseconds: 2 * DAY_MS }),
+    quietSince: now.subtract({ milliseconds: 14 * DAY_MS }),
+  };
+}
+
+/** One activity state as the range of last reports that reads as it. */
+export function lastSeenRangeOf({
+  activity,
+  now,
+}: {
+  activity: SelfHostedInstanceActivity;
+  now: Instant;
+}): { seenSince?: Instant; seenBefore?: Instant } {
+  const { reportingSince, quietSince } = activityCutoffs(now);
+  if (activity === "reporting") return { seenSince: reportingSince };
+  if (activity === "quiet") return { seenSince: quietSince, seenBefore: reportingSince };
+  return { seenBefore: quietSince };
+}
+
+/** New installs in each of the last `weeks` seven-day windows ending now, oldest first. */
+export function newInstallsPerWeek({
+  firstSeen,
+  now,
+  weeks,
+}: {
+  firstSeen: readonly Instant[];
+  now: Instant;
+  weeks: number;
+}): { weekStart: string; count: number }[] {
+  const weekMs = 7 * DAY_MS;
+  const counts = Array.from({ length: weeks }, () => 0);
+  for (const seen of firstSeen) {
+    const weeksAgo = Math.floor((now.epochMilliseconds - seen.epochMilliseconds) / weekMs);
+    const index = weeks - 1 - weeksAgo;
+    if (weeksAgo >= 0 && index >= 0) counts[index] = (counts[index] ?? 0) + 1;
+  }
+  return counts.map((count, index) => ({
+    weekStart: now.subtract({ milliseconds: (weeks - index) * weekMs }).toString(),
+    count,
+  }));
+}
