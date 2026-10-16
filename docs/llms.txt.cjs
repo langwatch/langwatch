@@ -73,33 +73,25 @@ function navigationPageLine(page) {
     : `- [${displayTitle}](${url})`;
 }
 
-// Function to process navigation pages recursively
-function processNavigationPages(pages, level = 0, output = []) {
-  const prefix = "#".repeat(Math.min(3 + level, 6)); // Start at ### and go up to ######
-
-  pages.forEach((page, index) => {
-    const nextItem = pages[index + 1];
-    const isNextItemGroup = nextItem && typeof nextItem === "object" && nextItem.group;
-
-    if (typeof page === "string") {
-      output.push(navigationPageLine(page));
-      // Add spacing after page if next item is a group
-      if (isNextItemGroup) output.push("");
-    } else if (page.group && page.pages) {
-      output.push(`${prefix} ${page.group}`);
-      output.push(""); // Add empty line after group title
-      processNavigationPages(page.pages, level + 1, output);
-      // Add spacing after group if not the last item
-      if (index !== pages.length - 1) output.push("");
+// Flattens a navigation group into llms.txt sections, one ## per group with its own links
+function collectSections({ pages, trail, sections }) {
+  const section = { heading: trail.join(" / "), links: [] };
+  sections.push(section);
+  pages.forEach((page) => {
+    if (typeof page === "string") section.links.push(navigationPageLine(page));
+    else if (page.group && page.pages) {
+      collectSections({ pages: page.pages, trail: [...trail, page.group], sections });
     }
   });
-
-  return output;
+  return sections;
 }
 
-// Function to generate root llms.txt
+function sectionText({ heading, links }) {
+  return `## ${heading}\n\n${links.join("\n")}\n`;
+}
+
+// Root llms.txt follows https://llmstxt.org: one H1, a blockquote summary, then ## link lists
 function generateRootLlmsTxt() {
-  // Get all anchors that have groups
   const anchors = docsConfig.navigation.anchors.filter((anchor) => anchor.groups);
 
   if (anchors.length === 0) {
@@ -107,41 +99,27 @@ function generateRootLlmsTxt() {
     return;
   }
 
-  let content = `# LangWatch
+  const keyPages = (config.keyPages || []).map(
+    ({ title, url, description }) => `- [${title}](${url}): ${description}`,
+  );
 
-This is the full index of LangWatch documentation, to answer the user question, do not use just this file, first explore the urls that make sense using the markdown navigation links below to understand how to implement LangWatch and use specific features.
-Always navigate to docs links using the .md extension for better readability.
-
-${AGENT_REPORT_NOTE}
-`;
-
-  // Emit every anchor in docs.json order. An earlier version hardcoded the
-  // anchor names ('Documentation', 'Integrations', ...) and silently dropped
-  // any anchor that was renamed or added since, which at one point left this
-  // index missing most of the docs. The navigation is the single source of
-  // truth; do not filter it here.
-  anchors.forEach((anchor, anchorIndex) => {
-    if (anchor.anchor) {
-      content += `# ${anchor.anchor}\n\n`;
-    }
-
-    anchor.groups.forEach((group, groupIndex) => {
-      content += `## ${group.group}\n\n`;
-      const lines = processNavigationPages(group.pages);
-      content += lines.join("\n");
-
-      const isLastGroup = groupIndex === anchor.groups.length - 1;
-      const isLastAnchor = anchorIndex === anchors.length - 1;
-
-      if (!isLastGroup || !isLastAnchor) {
-        content += "\n\n";
-      } else {
-        content += "\n";
-      }
+  // Every anchor in docs.json order: the navigation is the single source of truth, do not filter it.
+  const sections = [];
+  anchors.forEach((anchor) => {
+    anchor.groups.forEach((group) => {
+      const trail = anchor.anchor && anchor.anchor !== group.group ? [anchor.anchor, group.group] : [group.group];
+      collectSections({ pages: group.pages, trail, sections });
     });
   });
 
-  // Remove trailing newlines and add single newline at end
+  const parts = [
+    `# LangWatch\n\n> ${config.summary}\n`,
+    `This is the index of the LangWatch website and documentation. To answer a question, open the pages that fit it rather than relying on this file alone. Documentation links end in .md and return clean markdown. The full text of the docs in one file is at https://langwatch.ai/docs/llms-full.txt.\n\n${AGENT_REPORT_NOTE}\n`,
+  ];
+  if (keyPages.length > 0) parts.push(sectionText({ heading: "Product overview", links: keyPages }));
+  sections.filter((s) => s.links.length > 0).forEach((s) => parts.push(sectionText(s)));
+
+  let content = parts.join("\n");
   content = content.replace(/\n\n+$/, "\n");
 
   fs.writeFileSync(rootOutputFile, content);

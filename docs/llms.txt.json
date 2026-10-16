@@ -1,4 +1,102 @@
 {
+  "summary": "LangWatch is an open-source, OpenTelemetry-native platform for testing, evaluating and monitoring AI agents and LLM apps: agent simulation testing, LLM observability and tracing, offline and online evaluations, prompt management, an AI gateway, and usage and governance for coding agents. Use the cloud or self-host it.",
+  "keyPages": [
+    {
+      "title": "Agent simulation testing",
+      "url": "https://langwatch.ai/agentic-ai-testing",
+      "description": "Test AI agents with scenario simulations before they reach production: simulate real conversations, catch regressions and prove agent quality every release."
+    },
+    {
+      "title": "LLM observability",
+      "url": "https://langwatch.ai/llm-observability",
+      "description": "OpenTelemetry-native LLM observability: trace every agent step, monitor cost and latency, and debug AI in production."
+    },
+    {
+      "title": "LLM evaluation",
+      "url": "https://langwatch.ai/llm-evaluation",
+      "description": "Evaluate LLM and agent quality with offline and online evals, custom evaluators and datasets, and catch quality regressions before users do."
+    },
+    {
+      "title": "Prompt management",
+      "url": "https://langwatch.ai/prompt-management",
+      "description": "Prompts as one versioned source of truth: version, review through GitHub, A/B test in production and tie every prompt to its traces."
+    },
+    {
+      "title": "Voice agent testing",
+      "url": "https://langwatch.ai/voice-ai-agent-testing",
+      "description": "Automated testing for voice and chat agents: open-source simulation, latency and quality checks, and production monitoring for voice AI."
+    },
+    {
+      "title": "LLM red-teaming",
+      "url": "https://langwatch.ai/llm-red-teaming",
+      "description": "Open-source adversarial testing for AI agents: multi-turn attacks that surface jailbreaks, prompt extraction and data exfiltration before they ship."
+    },
+    {
+      "title": "Instant Evals",
+      "url": "https://langwatch.ai/instant-evals",
+      "description": "Search your entire production history with on-demand evals: ask one question of every conversation, thread or LLM call."
+    },
+    {
+      "title": "AI Gateway",
+      "url": "https://langwatch.ai/gateway",
+      "description": "An AI gateway that puts every AI call on a budget: limits per person, team and customer, your own provider keys, zero markup."
+    },
+    {
+      "title": "Coding agent usage tracking",
+      "url": "https://langwatch.ai/claude-code-usage",
+      "description": "Trace history, token and cost tracking for Claude Code, Codex, OpenCode, Copilot, Cursor and Pi."
+    },
+    {
+      "title": "Integrations",
+      "url": "https://langwatch.ai/integrations",
+      "description": "Every integration LangWatch ships: Python, TypeScript and Go SDKs, OpenTelemetry, OpenAI, Anthropic, AWS Bedrock, Azure, Vertex, LangGraph, CrewAI, DSPy and more."
+    },
+    {
+      "title": "Pricing",
+      "url": "https://langwatch.ai/pricing",
+      "description": "Free Developer plan to start; paid plans add unlimited evaluations and simulations, enterprise security and self-hosting."
+    },
+    {
+      "title": "Enterprise",
+      "url": "https://langwatch.ai/enterprise",
+      "description": "SSO, SCIM, custom RBAC, audit logs, self-hosting and EU data residency for governing agents at scale."
+    },
+    {
+      "title": "Trust center",
+      "url": "https://langwatch.ai/trust-center",
+      "description": "Security and compliance: ISO 27001, GDPR, SOC 2, encryption, RBAC, SSO and self-hosting options."
+    },
+    {
+      "title": "Langfuse alternative",
+      "url": "https://langwatch.ai/langfuse-alternative",
+      "description": "How LangWatch compares with Langfuse: agent simulations, voice testing, evals that product experts run themselves, CI gates, licensing and EU hosting."
+    },
+    {
+      "title": "LangSmith alternative",
+      "url": "https://langwatch.ai/langsmith-alternative",
+      "description": "How LangWatch compares with LangSmith: framework-agnostic, OpenTelemetry-native and open source, without LangChain lock-in."
+    },
+    {
+      "title": "Braintrust alternative",
+      "url": "https://langwatch.ai/braintrust-alternative",
+      "description": "How LangWatch compares with Braintrust: agent simulation, open source and a workflow for the whole team."
+    },
+    {
+      "title": "Arize alternative",
+      "url": "https://langwatch.ai/arize-alternative",
+      "description": "How LangWatch compares with Arize: built for LLMs and agents rather than retrofitted from classic ML monitoring."
+    },
+    {
+      "title": "The Evals Golden Guide",
+      "url": "https://langwatch.ai/guides/evals-guide",
+      "description": "A practical guide to evaluating LLM applications and AI agents."
+    },
+    {
+      "title": "The AI Agents Guide",
+      "url": "https://langwatch.ai/guides/ai-agent-guide",
+      "description": "A practical guide to building, testing and running AI agents in production."
+    }
+  ],
   "includePaths": [
     "introduction.mdx",
     "concepts.mdx",
@@ -42,5 +140,7 @@
     "pricing.mdx",
     "support.mdx"
   ],
-  "excludePaths": ["**/node_modules/**"]
+  "excludePaths": [
+    "**/node_modules/**"
+  ]
 }

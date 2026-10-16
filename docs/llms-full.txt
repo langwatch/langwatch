@@ -17098,7 +17098,7 @@ export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"
 claude
 ```
 
-The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that. To get an ingest key, open the [ingestion template](/ai-governance/ingestion-templates) install drawer, which mints one scoped to the project it should report to.
 
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Claude Code appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
@@ -22820,7 +22820,7 @@ uv add langwatch openai
 ## Usage
 
 <Info>
-  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable. The OpenAI client reads its own key from `OPENAI_API_KEY`. For a self-hosted LangWatch, also set `LANGWATCH_ENDPOINT` to your instance URL.
 </Info>
 
 Use `autotrack_openai_calls()` to automatically capture all OpenAI calls made with a specific client instance within a trace.
@@ -37848,9 +37848,9 @@ Install the `scenario` library in your project:
 
 
   ### Python
-```bash uv add langwatch-scenario ```
+```bash uv add langwatch-scenario pytest pytest-asyncio litellm ```
   ### TypeScript
-```bash npm install @langwatch/scenario ```
+```bash npm install @langwatch/scenario ai @ai-sdk/openai zod && npm install -D vitest ```
 
 
 ## 2. Configure Environment Variables
@@ -37860,6 +37860,7 @@ Create a `.env` file in the root of your project:
 ```bash title=".env"
 LANGWATCH_API_KEY="your-api-key"
 LANGWATCH_ENDPOINT="https://app.langwatch.ai"
+OPENAI_API_KEY="your-openai-key" # used by the simulated user, the judge and the example agent
 ```
 
 You can find your `LANGWATCH_API_KEY` in your [LangWatch project settings](https://app.langwatch.ai/settings).
@@ -40944,6 +40945,10 @@ curl --request GET \
   --url "https://app.langwatch.ai/api/prompts/{prompt_handle}?version=2" \
   --header "X-Auth-Token: your-api-key"
 ```
+
+<Tip>
+  To fetch whichever version is live in an environment rather than a fixed version ID, tag versions (for example `production` or `staging`) and fetch by tag: `langwatch.prompts.get("customer-support-bot", { tag: "production" })`. See [Tags](/prompt-management/features/essential/tags).
+</Tip>
 
 ## CRUD Operations
 
@@ -51246,7 +51251,7 @@ import json
 # Authenticate with LangWatch
 langwatch.login()
 
-# Create a sample evaluation dataset (or load one from [LangWatch Datasets](https://docs.langwatch.ai/evaluations/experiments/sdk#use-langwatch-datasets)). In a real workflow, you would load this
+# Create a sample evaluation dataset (or load one from [LangWatch Datasets](https://langwatch.ai/docs/evaluations/experiments/sdk#use-langwatch-datasets)). In a real workflow, you would load this
 # from a CSV or directly from LangWatch Datasets.
 data = [
     {
