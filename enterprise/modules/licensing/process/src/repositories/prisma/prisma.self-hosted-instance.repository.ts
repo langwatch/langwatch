@@ -1,14 +1,18 @@
 import { SelfHostedInstanceNotFoundError } from "@langwatch/enterprise-licensing-contract";
+import type { SelfHostedInstanceSort } from "@langwatch/enterprise-licensing-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import {
   Prisma,
   type PrismaClient,
   type SelfHostedInstance,
 } from "@langwatch/prisma-client/generated";
-import { fromDate, toDate } from "@langwatch/time";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import type {
+  SelfHostedInstanceQuery,
   SelfHostedInstanceRecord,
   SelfHostedInstanceRepository,
+  SelfHostedInstanceTally,
   SelfHostedInstanceUpsert,
   SelfHostedReportInsert,
   SelfHostedReportRecord,
@@ -16,8 +20,28 @@ import type {
 
 type SelfHostedInstanceDatabase = Pick<
   PrismaClient,
-  "selfHostedInstance" | "selfHostedInstanceReport"
+  "selfHostedInstance" | "selfHostedInstanceReport" | "$queryRaw"
 >;
+
+/** The registry is the platform's own: an install row belongs to no tenant. */
+const PLATFORM_TABLE = skipTenantCheck({
+  // An install is addressed by the instance id it minted; no organization or project owns the row.
+  SKIP_TENANT_CHECK: true,
+});
+
+/** A number the last report carried under `key`, or null; Prisma cannot order by a JSON path. */
+function reported(key: string): Prisma.Sql {
+  return Prisma.sql`CASE WHEN jsonb_typeof("latestReport"->${key}) = 'number'
+    THEN ("latestReport"->>${key})::float8 END`;
+}
+
+const ORDER_BY: Record<SelfHostedInstanceSort, Prisma.Sql> = {
+  last_report: Prisma.sql`"lastSeenAt" DESC`,
+  newest: Prisma.sql`"firstSeenAt" DESC`,
+  traces_28d: Prisma.sql`${reported("traces_28d")} DESC NULLS LAST, "lastSeenAt" DESC`,
+  users: Prisma.sql`${reported("users")} DESC NULLS LAST, "lastSeenAt" DESC`,
+  active_users_28d: Prisma.sql`${reported("active_users_28d")} DESC NULLS LAST, "lastSeenAt" DESC`,
+};
 
 export class PrismaSelfHostedInstanceRepository implements SelfHostedInstanceRepository {
   static create(database: SelfHostedInstanceDatabase): PrismaSelfHostedInstanceRepository {
@@ -72,22 +96,84 @@ export class PrismaSelfHostedInstanceRepository implements SelfHostedInstanceRep
     });
   }
 
-  async listPage(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<{ rows: SelfHostedInstanceRecord[]; total: number }> {
-    const where = searchWhere(input.search);
-    const [rows, total] = await Promise.all([
-      this.prisma.selfHostedInstance.findMany({
-        where,
-        orderBy: { lastSeenAt: "desc" },
-        skip: input.page * input.pageSize,
-        take: input.pageSize,
-      }),
-      this.prisma.selfHostedInstance.count({ where }),
+  async listPage(
+    input: SelfHostedInstanceQuery,
+  ): Promise<{ rows: SelfHostedInstanceRecord[]; total: number }> {
+    const where = whereOf(input);
+    const [page, [counted]] = await Promise.all([
+      this.prisma.$queryRaw<{ id: string }[]>`
+        ${PLATFORM_TABLE}
+        SELECT "id" FROM "SelfHostedInstance" ${where}
+        ORDER BY ${ORDER_BY[input.sort]}, "id"
+        LIMIT ${input.pageSize} OFFSET ${input.page * input.pageSize}`,
+      this.prisma.$queryRaw<{ total: number }[]>`
+        ${PLATFORM_TABLE}
+        SELECT count(*)::int AS "total" FROM "SelfHostedInstance" ${where}`,
     ]);
-    return { rows: rows.map(recordOf), total };
+    const ids = page.map((row) => row.id);
+    const rows = await this.prisma.selfHostedInstance.findMany({ where: { id: { in: ids } } });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return {
+      rows: ids.flatMap((id) => {
+        const row = byId.get(id);
+        return row ? [recordOf(row)] : [];
+      }),
+      total: counted?.total ?? 0,
+    };
+  }
+
+  async tally({
+    reportingSince,
+    quietSince,
+    releaseLimit,
+  }: {
+    reportingSince: Instant;
+    quietSince: Instant;
+    releaseLimit: number;
+  }): Promise<SelfHostedInstanceTally> {
+    const reportingAt = toDate(reportingSince);
+    const quietAt = toDate(quietSince);
+    const [[counts], signals, releases] = await Promise.all([
+      this.prisma.$queryRaw<Omit<SelfHostedInstanceTally, "signals" | "releases">[]>`
+        ${PLATFORM_TABLE}
+        SELECT
+          count(*)::int AS "total",
+          (count(*) FILTER (WHERE "lastSeenAt" >= ${reportingAt}))::int AS "reporting",
+          (count(*) FILTER (WHERE "lastSeenAt" < ${reportingAt}
+            AND "lastSeenAt" >= ${quietAt}))::int AS "quiet",
+          (count(*) FILTER (WHERE "organizationId" IS NOT NULL))::int AS "licensed",
+          coalesce(sum(${reported("traces_28d")})
+            FILTER (WHERE "lastSeenAt" >= ${reportingAt}), 0)::float8 AS "traces28d"
+        FROM "SelfHostedInstance"`,
+      this.prisma.$queryRaw<{ signal: string; count: number }[]>`
+        ${PLATFORM_TABLE}
+        SELECT "signal", count(*)::int AS "count"
+        FROM "SelfHostedInstance", unnest("raisedSignals") AS "signal"
+        GROUP BY "signal" ORDER BY "count" DESC, "signal"`,
+      this.prisma.$queryRaw<{ version: string; count: number }[]>`
+        ${PLATFORM_TABLE}
+        SELECT "version", count(*)::int AS "count" FROM "SelfHostedInstance"
+        WHERE "version" IS NOT NULL AND "lastSeenAt" >= ${quietAt}
+        GROUP BY "version" ORDER BY "count" DESC, "version" DESC
+        LIMIT ${releaseLimit}`,
+    ]);
+    return {
+      total: counts?.total ?? 0,
+      reporting: counts?.reporting ?? 0,
+      quiet: counts?.quiet ?? 0,
+      licensed: counts?.licensed ?? 0,
+      traces28d: counts?.traces28d ?? 0,
+      signals,
+      releases,
+    };
+  }
+
+  async findFirstSeenSince(since: Instant): Promise<Instant[]> {
+    const rows = await this.prisma.selfHostedInstance.findMany({
+      where: { firstSeenAt: { gte: toDate(since) } },
+      select: { firstSeenAt: true },
+    });
+    return rows.map((row) => fromDate(row.firstSeenAt));
   }
 
   async getById(id: string): Promise<SelfHostedInstanceRecord> {
@@ -160,17 +246,22 @@ function recordOf(row: SelfHostedInstance): SelfHostedInstanceRecord {
   };
 }
 
-/** Part of the id, hostname, release or install method; a domain matches whole. */
-function searchWhere(search: string | undefined): Prisma.SelfHostedInstanceWhereInput {
-  const term = search?.trim();
-  if (!term) return {};
-  return {
-    OR: [
-      { instanceId: { contains: term, mode: "insensitive" } },
-      { hostname: { contains: term, mode: "insensitive" } },
-      { version: { contains: term, mode: "insensitive" } },
-      { installMethod: { contains: term, mode: "insensitive" } },
-      { userDomains: { has: term.toLowerCase() } },
-    ],
-  };
+/** Search is part of the id, hostname, release or install method, or a whole domain. */
+function whereOf(input: SelfHostedInstanceQuery): Prisma.Sql {
+  const conditions: Prisma.Sql[] = [];
+  const term = input.search?.trim();
+  if (term) {
+    const like = `%${term.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+    conditions.push(Prisma.sql`("instanceId" ILIKE ${like} OR "hostname" ILIKE ${like}
+      OR "version" ILIKE ${like} OR "installMethod" ILIKE ${like}
+      OR ${term.toLowerCase()} = ANY("userDomains"))`);
+  }
+  if (input.licensed === true) conditions.push(Prisma.sql`"organizationId" IS NOT NULL`);
+  if (input.licensed === false) conditions.push(Prisma.sql`"organizationId" IS NULL`);
+  if (input.seenSince) conditions.push(Prisma.sql`"lastSeenAt" >= ${toDate(input.seenSince)}`);
+  if (input.seenBefore) conditions.push(Prisma.sql`"lastSeenAt" < ${toDate(input.seenBefore)}`);
+  if (input.signal) conditions.push(Prisma.sql`${input.signal} = ANY("raisedSignals")`);
+  return conditions.length > 0
+    ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`
+    : Prisma.empty;
 }

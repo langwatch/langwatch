@@ -72,7 +72,28 @@ export const selfHostedInstancePageSchema: SelfHostedInstancePageSchema =
   selfHostedInstancePageSchemaDefinition;
 export type SelfHostedInstancePage = z.infer<typeof selfHostedInstancePageSchema>;
 
+/** The orders an operator picks; absent is most recent report first. */
+export const selfHostedInstanceSortSchema = z.enum([
+  "last_report",
+  "newest",
+  "traces_28d",
+  "users",
+  "active_users_28d",
+]);
+export type SelfHostedInstanceSort = z.infer<typeof selfHostedInstanceSortSchema>;
+
+export const selfHostedLicenseFilterSchema = z.enum(["licensed", "open_source"]);
+
+const selfHostedInstanceFiltersSchemaDefinition = z.object({
+  sort: selfHostedInstanceSortSchema.optional(),
+  license: selfHostedLicenseFilterSchema.optional(),
+  activity: selfHostedInstanceActivitySchema.optional(),
+  signal: z.enum(SELF_HOSTED_SIGNALS).optional(),
+});
+export type SelfHostedInstanceFilters = z.infer<typeof selfHostedInstanceFiltersSchemaDefinition>;
+
 const listSelfHostedInstancesInputSchemaDefinition = z.object({
+  ...selfHostedInstanceFiltersSchemaDefinition.shape,
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(100).default(25),
   search: z.string().max(200).optional(),
@@ -114,6 +135,32 @@ export interface SelfHostedInstanceDetailSchema extends Named<
 export const selfHostedInstanceDetailSchema: SelfHostedInstanceDetailSchema =
   selfHostedInstanceDetailSchemaDefinition;
 export type SelfHostedInstanceDetail = z.infer<typeof selfHostedInstanceDetailSchema>;
+
+/** What the registry adds up to: the top of the operator's page. */
+const selfHostedInstanceSummarySchemaDefinition = z.object({
+  total: z.number(),
+  reporting: z.number(),
+  quiet: z.number(),
+  gone: z.number(),
+  licensed: z.number(),
+  newLast7Days: z.number(),
+  newLast30Days: z.number(),
+  /** Traces over 28 days, summed over the installs still reporting. */
+  traces28d: z.number(),
+  /** Oldest first; a week with no new install is a zero, never a gap. */
+  newPerWeek: z.array(z.object({ weekStart: z.string(), count: z.number() })),
+  signals: z.array(z.object({ signal: z.enum(SELF_HOSTED_SIGNALS), count: z.number() })),
+  /** Open source installs still reporting, most traces over 28 days first. */
+  busiestOpenSource: z.array(selfHostedInstanceViewSchema),
+  /** Releases the installs still reporting run, most common first. */
+  releases: z.array(z.object({ version: z.string(), count: z.number() })),
+});
+export interface SelfHostedInstanceSummarySchema extends Named<
+  typeof selfHostedInstanceSummarySchemaDefinition
+> {}
+export const selfHostedInstanceSummarySchema: SelfHostedInstanceSummarySchema =
+  selfHostedInstanceSummarySchemaDefinition;
+export type SelfHostedInstanceSummary = z.infer<typeof selfHostedInstanceSummarySchema>;
 
 /** One report, as the receiver hands it over. */
 export interface IncomingUsageReport {

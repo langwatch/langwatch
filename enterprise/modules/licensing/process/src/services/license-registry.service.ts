@@ -17,6 +17,7 @@ import {
   LicenseKeyInvalidError,
   OrganizationNotFoundError,
   type IssuedLicenseCustomerRecord,
+  type IssuedLicenseFilters,
   type IssuedLicensePage,
   type IssuedLicenseSource,
   type IssuedLicenseView,
@@ -37,7 +38,11 @@ import type {
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
 import { resolveLicenseTerms } from "../rules/issued-license-row.rules.ts";
-import { issuedLicenseView, statusOfIssuedLicense } from "../rules/issued-license.rules.ts";
+import {
+  INTERNAL_LICENSE_EMAIL_SUFFIXES,
+  issuedLicenseView,
+  statusOfIssuedLicense,
+} from "../rules/issued-license.rules.ts";
 import type { ContractBudgets } from "./contract-budget.service.ts";
 import { IssuedLicenseWriterService } from "./issued-license-writer.service.ts";
 
@@ -376,12 +381,20 @@ export class LicenseRegistryService {
     return this.toView(await this.getRow(input.id));
   }
 
-  async list(input: {
+  async list({
+    onlyActive,
+    hideInternal,
+    ...query
+  }: {
     page: number;
     pageSize: number;
     search?: string;
-  }): Promise<IssuedLicensePage> {
-    const { rows, total } = await this.options.repository.listAll(input);
+  } & IssuedLicenseFilters): Promise<IssuedLicensePage> {
+    const { rows, total } = await this.options.repository.listAll({
+      ...query,
+      ...(onlyActive ? { activeAt: this.options.now() } : {}),
+      ...(hideInternal ? { excludeEmailSuffixes: INTERNAL_LICENSE_EMAIL_SUFFIXES } : {}),
+    });
     return { licenses: rows.map((row) => this.toView(row)), total };
   }
 
