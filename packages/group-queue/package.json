@@ -31,9 +31,9 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "catalog:",
-    "fastq": "^1.20.1",
+    "fastq": "^1.20.3",
     "ioredis": "catalog:",
-    "msgpackr": "^2.0.4"
+    "msgpackr": "^2.1.0"
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",

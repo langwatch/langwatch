@@ -57,14 +57,14 @@
     "listr2": "^9.0.4",
     "ora": "catalog:",
     "prompts": "catalog:",
-    "tar": "^7.4.3",
+    "tar": "^7.5.22",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "@types/prompts": "catalog:",
-    "@types/tar": "^6.1.13",
+    "@types/tar": "^7.0.87",
     "esbuild": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
