@@ -15,8 +15,8 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
- * Measured at 1,595 when the aggregated `AppRouter` gave way to per-module maps
- * derived from each contract. A ceiling, not a target. Lower it when earned.
+ * Measured at 1,595 when the aggregated `AppRouter` gave way to per-module maps.
+ * A ceiling, not a target. Lower it when earned; never raise it without saying why.
  * Raised to 1,750 when main plus the scenario run hooks reached 1,700.
  */
 const CEILING = 1_750;

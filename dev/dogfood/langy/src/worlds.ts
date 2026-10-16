@@ -570,7 +570,7 @@ export async function setupWorld({
   world: MatrixWorld;
 }): Promise<WorldState> {
   const spec: WorldSpec = MATRIX_WORLDS[world];
-  const tag = crypto.randomUUID().replace(/-/g, "").slice(0, 6);
+  const tag = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
   const traceName = `checkout-${tag}`;
   const nowMs = Date.now();
   const seen = await seedTraffic({ http, traceName, nowMs });
