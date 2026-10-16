@@ -280,7 +280,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     return this.findHeldTables({
       tenantId: "",
       ...target,
-      tables: this.governedIdIndexes(indexes),
+      tables: this.governedIdIndexes({ indexes, categories: this.idIndexCategories() }),
     });
   }
 
@@ -289,7 +289,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
   ): Promise<string[]> {
     const { indexes, ...target } = input;
     const tenantIds = new Set<string>();
-    for (const index of this.governedIdIndexes(indexes)) {
+    for (const index of this.governedIdIndexes({ indexes, categories: this.idIndexCategories() })) {
       const { rows } = await this.clickhouse.query<unknown>({
         tenantId: "",
         ...target,
@@ -312,14 +312,15 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
   ): Promise<string[]> {
     const { indexes, retentionByTenant, ...target } = input;
     const raised: string[] = [];
-    for (const index of this.governedIdIndexes(indexes)) {
+    const categories = this.idIndexCategories();
+    for (const index of this.governedIdIndexes({ indexes, categories })) {
       if (index === this.eventLogRetention.idIndexTable) {
         raised.push(
           ...(await this.eventLogRetention.raiseIdIndexRetention({ ...target, retentionByTenant })),
         );
         continue;
       }
-      const category = this.idIndexCategories().get(index);
+      const category = categories.get(index);
       if (category === undefined) continue;
       await this.raiseCategoryIdIndex({ target, index, category, retentionByTenant });
       raised.push(index);
@@ -360,10 +361,15 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
   }
 
   /** The named indexes this module raises, in the order named; any other name is dropped. */
-  private governedIdIndexes(indexes: readonly string[]): string[] {
+  private governedIdIndexes({
+    indexes,
+    categories,
+  }: {
+    indexes: readonly string[];
+    categories: ReadonlyMap<string, RetentionCategory>;
+  }): string[] {
     return [...new Set(indexes)].filter(
-      (index) =>
-        index === this.eventLogRetention.idIndexTable || this.idIndexCategories().has(index),
+      (index) => index === this.eventLogRetention.idIndexTable || categories.has(index),
     );
   }
 
