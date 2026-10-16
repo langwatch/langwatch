@@ -1,12 +1,12 @@
 import type { Readable } from "node:stream";
 
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupQueueRuntimeDefinition, JobDelivery } from "../contracts.ts";
 import { GroupQueueProcessor, JOB_RETRY_CONFIG } from "../groupQueue.ts";
 import { encodeJobEnvelope, readJobAttempt, withJobAttempt } from "../jobEnvelope.ts";
-import { gqJobsDroppedTotal } from "../metrics.ts";
 import { GroupStagingScripts } from "../scripts.ts";
 import { createTenantId } from "../storage.ts";
 import { TieredBlobStore } from "../tieredBlobStore.ts";
@@ -50,7 +50,10 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
   let redis: Redis;
   let queues: GroupQueueProcessor<TestPayload>[];
 
+  const meter = createRecordingMeterProvider();
+
   beforeAll(() => {
+    meter.install();
     redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
       maxRetriesPerRequest: 0,
     });
@@ -70,6 +73,7 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
   });
 
   afterAll(async () => {
+    meter.uninstall();
     await redis.quit();
   });
 
@@ -130,8 +134,9 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
   const totalPending = (name: string) => redis.get(`${name}:gq:stats:total-pending`);
 
   async function dropsFor(name: string) {
-    const metric = await gqJobsDroppedTotal.get();
-    return metric.values.filter((v) => v.labels.queue_name === name);
+    return meter.recorded
+      .filter((r) => r.instrument === "gq_jobs_dropped_total" && r.attributes.queue_name === name)
+      .map((r) => ({ labels: r.attributes, value: r.value }));
   }
 
   /** The id `generateStagedJobId` derives for a routed payload. */
