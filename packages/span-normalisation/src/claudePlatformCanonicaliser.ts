@@ -16,6 +16,7 @@ const COUNTED_SPAN_NAMES = new Set([
   "anthropic.session.outcome_evaluation",
 ]);
 
+/** Marks Claude API spans that repeat their children's token usage, so each token counts once. */
 export class ClaudePlatformCanonicaliserService implements AttributeCanonicaliser {
   static create(): ClaudePlatformCanonicaliserService {
     return new ClaudePlatformCanonicaliserService();
