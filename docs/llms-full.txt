@@ -10601,7 +10601,7 @@ A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to s
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | Refuses a customer-configured provider endpoint that resolves to a private or link-local address                              |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuses a customer-configured provider endpoint that is plain HTTP                                                            |
-| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that may use a private address while the guard is on. Cloud metadata and link-local destinations stay refused |
+| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that pass the endpoint check on a private address while the guard is on. Chat dispatch still refuses private addresses until the guard is off. Cloud metadata and link-local destinations stay refused |
 
 ## Calling the gateway from a browser
 
@@ -10697,7 +10697,8 @@ These apply to the base URLs customers configure on their own provider credentia
 | -------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | `false` | Refuse a provider endpoint that resolves to a private, loopback or otherwise non-public address                                     |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme                                                                                 |
-| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed to resolve to a private address while `BLOCK_LOCAL_HTTP_CALLS` is on |
+| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off |
+| `SSL_CERT_DIR`                   | unset   | Colon-separated directories of PEM CA certificates trusted beside the public roots, for provider endpoints on a private CA            |
 
 ## Browser access
 
@@ -11019,9 +11020,25 @@ TLS in front of the gateway is one boundary. The other is the provider endpoints
 | -------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------- |
 | `security.requireHTTPSCustomEndpoints` | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuse a provider base URL with an `http://` scheme                                         |
 | `security.blockLocalHTTPCalls`         | `BLOCK_LOCAL_HTTP_CALLS`         | Refuse a provider base URL that resolves to a private, loopback or other non-public address |
-| `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that may resolve to a private address while the block is on                       |
+| `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that pass the endpoint check on a private address while the block is on. Chat dispatch still refuses them |
 
 Both switches default to `false`, so a self-hosted install can route to a model server on the cluster network. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused with every setting. Setting `ENVIRONMENT` to anything other than `local` requires both switches to be `true`.
+
+### Provider endpoints on a private CA
+
+When a provider endpoint serves TLS from your own certificate authority, put the CA certificates (PEM) in a ConfigMap and name it in `gateway.security.extraCACertsConfigMap`:
+
+```bash
+kubectl -n langwatch create configmap internal-ca --from-file=internal-ca.pem
+```
+
+```yaml
+gateway:
+  security:
+    extraCACertsConfigMap: internal-ca
+```
+
+The chart mounts it at `/etc/langwatch/ca` and sets `SSL_CERT_DIR` to that path. The gateway then trusts those certificates beside the public roots for every outbound call. Outside the chart, mount a directory of PEM files and set `SSL_CERT_DIR` yourself.
 
 ## Common failures
 
@@ -11031,7 +11048,8 @@ Both switches default to `false`, so a self-hosted install can route to a model 
 | Streamed responses arrive all at once | Buffering is on at the proxy | With `ingress.className: nginx` the chart adds `proxy-buffering: "off"` to the gateway Ingress; on another controller, set the equivalent in `ingress.gateway.annotations` |
 | A long stream stops at 60 seconds | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout |
 | CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Set `ingress.gateway.host`, or `gateway.publicUrl` |
-| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Add the hostname to `ALLOWED_PROXY_HOSTS` |
+| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Set `BLOCK_LOCAL_HTTP_CALLS` to `false`. `ALLOWED_PROXY_HOSTS` gets the host past the endpoint check, but chat dispatch refuses private addresses while the block is on |
+| A provider call fails with `x509: certificate signed by unknown authority` | The endpoint's certificate comes from a private CA | Set `gateway.security.extraCACertsConfigMap` (see [Provider endpoints on a private CA](#provider-endpoints-on-a-private-ca)) |
 
 More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).
 
@@ -11253,6 +11271,7 @@ gateway:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    extraCACertsConfigMap: "" # ConfigMap of PEM CA certificates to trust
     corsAllowedOrigins: [] # browser origins allowed to call /v1
 
   # OTLP/HTTP endpoint for the gateway's own spans. Empty disables export.
@@ -11324,6 +11343,7 @@ The chart passes these environment variables to the container. Every other key i
 | `BLOCK_LOCAL_HTTP_CALLS`                               | `security.blockLocalHTTPCalls`                                       | Refuse provider endpoints on private addresses |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS`                       | `security.requireHTTPSCustomEndpoints`                               | Refuse `http://` provider endpoints            |
 | `ALLOWED_PROXY_HOSTS`                                  | `security.allowedProxyHosts`, comma-joined                           | Private hostnames exempt from the block        |
+| `SSL_CERT_DIR`                                         | set to `/etc/langwatch/ca` when `security.extraCACertsConfigMap` is set | Extra CA certificates to trust              |
 | `LW_GATEWAY_CORS_ALLOWED_ORIGINS`                      | `security.corsAllowedOrigins`, comma-joined                          | Browser origins allowed to call `/v1`          |
 | `LW_GATEWAY_INTERNAL_SECRET`                           | Secret `secrets.existingSecretName`, key `secrets.internalSecretKey` | HMAC secret for control plane calls            |
 | `LW_GATEWAY_JWT_SECRET`                                | Secret `secrets.existingSecretName`, key `secrets.jwtSecretKey`      | JWT verification secret                        |
