@@ -1222,6 +1222,8 @@ export interface ScenarioChildEnvironment {
   telemetry: { endpoint: string; apiKey: string };
   /** The caller's provider keys for a voice target's TTS and transcription; never logged. */
   callerEnv?: Record<string, string>;
+  /** The target declares scenario hooks, which only the Node child calls (ADR-180). */
+  callsHooks?: boolean;
 }
 
 export interface ScenarioChildExecutionSession {

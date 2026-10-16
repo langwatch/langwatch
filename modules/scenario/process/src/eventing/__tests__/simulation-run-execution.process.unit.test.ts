@@ -62,6 +62,10 @@ class UnusedScenarioExecutionService extends ScenarioExecutionService {
   recordCutAtLimit(): Promise<void> {
     throw new Error("recordCutAtLimit unexpectedly called in evolve tests");
   }
+
+  recordHooks(): Promise<void> {
+    throw new Error("recordHooks unexpectedly called in evolve tests");
+  }
 }
 
 /**

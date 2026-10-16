@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from ..models.call_connected_agent_response_200_output_type_2_item import (
         CallConnectedAgentResponse200OutputType2Item,
     )
+    from ..models.call_connected_agent_response_200_state_type_0 import CallConnectedAgentResponse200StateType0
 
 
 T = TypeVar("T", bound="CallConnectedAgentResponse200")
@@ -27,15 +28,19 @@ class CallConnectedAgentResponse200:
         instance (CallConnectedAgentResponse200Instance):
         duration_ms (float):
         session (Any | Unset): The agent's per-conversation memory, to send on the next turn.
+        state (CallConnectedAgentResponse200StateType0 | None | Unset): Setup's state, a turn's state update, or the
+            object teardown returned.
     """
 
     output: CallConnectedAgentResponse200OutputType1 | list[CallConnectedAgentResponse200OutputType2Item] | str
     instance: CallConnectedAgentResponse200Instance
     duration_ms: float
     session: Any | Unset = UNSET
+    state: CallConnectedAgentResponse200StateType0 | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.call_connected_agent_response_200_output_type_1 import CallConnectedAgentResponse200OutputType1
+        from ..models.call_connected_agent_response_200_state_type_0 import CallConnectedAgentResponse200StateType0
 
         output: dict[str, Any] | list[dict[str, Any]] | str
         if isinstance(self.output, CallConnectedAgentResponse200OutputType1):
@@ -55,6 +60,14 @@ class CallConnectedAgentResponse200:
 
         session = self.session
 
+        state: dict[str, Any] | None | Unset
+        if isinstance(self.state, Unset):
+            state = UNSET
+        elif isinstance(self.state, CallConnectedAgentResponse200StateType0):
+            state = self.state.to_dict()
+        else:
+            state = self.state
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -66,6 +79,8 @@ class CallConnectedAgentResponse200:
         )
         if session is not UNSET:
             field_dict["session"] = session
+        if state is not UNSET:
+            field_dict["state"] = state
 
         return field_dict
 
@@ -76,6 +91,7 @@ class CallConnectedAgentResponse200:
         from ..models.call_connected_agent_response_200_output_type_2_item import (
             CallConnectedAgentResponse200OutputType2Item,
         )
+        from ..models.call_connected_agent_response_200_state_type_0 import CallConnectedAgentResponse200StateType0
 
         d = dict(src_dict)
 
@@ -116,11 +132,29 @@ class CallConnectedAgentResponse200:
 
         session = d.pop("session", UNSET)
 
+        def _parse_state(data: object) -> CallConnectedAgentResponse200StateType0 | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                state_type_0 = CallConnectedAgentResponse200StateType0.from_dict(data)
+
+                return state_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(CallConnectedAgentResponse200StateType0 | None | Unset, data)
+
+        state = _parse_state(d.pop("state", UNSET))
+
         call_connected_agent_response_200 = cls(
             output=output,
             instance=instance,
             duration_ms=duration_ms,
             session=session,
+            state=state,
         )
 
         return call_connected_agent_response_200

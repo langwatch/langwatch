@@ -8,6 +8,7 @@ import type {
   SimulationQueueRun,
   SimulationRecordAgentInstance,
   SimulationRecordCutAtLimit,
+  SimulationRecordHooks,
   SimulationStartRun,
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
@@ -84,6 +85,9 @@ export class SimulationCommandDispatcherService extends SimulationExecutionRepos
   }
   recordCutAtLimit(input: SimulationRecordCutAtLimit): Promise<void> {
     return this.#send("recordCutAtLimit", input);
+  }
+  recordHooks(input: SimulationRecordHooks): Promise<void> {
+    return this.#send("recordHooks", input);
   }
 
   computeRunMetrics(input: ComputeRunMetricsCommandData): Promise<void> {

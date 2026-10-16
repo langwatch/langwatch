@@ -1202,7 +1202,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:284
+type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:287
 
 // scenarios.getLastResultSummaries
 // Input: inline, ../contract/src/scenario.trpc.ts:305
@@ -1222,7 +1222,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationRunFreshnessSchema, ../contract/src/features/simulation/simulation.ts:319
+// Output: simulationRunFreshnessSchema, ../contract/src/features/simulation/simulation.ts:322
 interface Output {
   lastUpdatedAt: number;
 }
@@ -1237,7 +1237,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationScenarioSetRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:311
+type Output = z.infer<typeof simulationScenarioSetRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:314
 
 // scenarios.getAllScenarioSetRunData
 // Input: inline, ../contract/src/scenario.trpc.ts:346
@@ -1255,7 +1255,7 @@ interface Input {
   projectId: string;
   scenarioRunId: string;
 }
-type Output = z.infer<typeof simulationRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:150
+type Output = z.infer<typeof simulationRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:153
 
 // scenarios.getScenarioSetBatchRunCount
 // Input: inline, ../contract/src/scenario.trpc.ts:354
@@ -1265,7 +1265,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationBatchRunCountSchema, ../contract/src/features/simulation/simulation.ts:327
+// Output: simulationBatchRunCountSchema, ../contract/src/features/simulation/simulation.ts:330
 interface Output {
   count: number;
 }
@@ -1280,7 +1280,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationBatchHistorySchema>; // ../contract/src/features/simulation/simulation.ts:250
+type Output = z.infer<typeof simulationBatchHistorySchema>; // ../contract/src/features/simulation/simulation.ts:253
 
 // scenarios.getBatchRunData
 // Input: inline, ../contract/src/scenario.trpc.ts:373
@@ -1291,7 +1291,7 @@ interface Input {
   sinceTimestamp?: number;
   runTimestamps?: Record<string, number>;
 }
-type Output = z.infer<typeof simulationBatchRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:265
+type Output = z.infer<typeof simulationBatchRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:268
 
 // scenarios.getExternalSetSummaries
 // Input: inline, ../contract/src/scenario.trpc.ts:391
@@ -1318,7 +1318,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:284
+type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:287
 
 // scenarios.onSimulationUpdate
 // Input: inline, ../contract/src/scenario.trpc.ts:413
@@ -1327,7 +1327,7 @@ interface Input {
   tabKey?: string;
   tabId?: string;
 }
-// Output: simulationStreamFrameSchema, ../contract/src/features/simulation/simulation.ts:342
+// Output: simulationStreamFrameSchema, ../contract/src/features/simulation/simulation.ts:345
 interface Output {
   event: unknown;
   timestamp?: number;
@@ -1446,31 +1446,32 @@ Declared at `src/eventing/scenario-lifecycle.pipeline.ts:30`. Events: `scenarioC
 
 ### Pipeline `simulation_processing` (aggregate `simulation_run`)
 
-Declared at `src/eventing/simulation-processing.pipeline.ts:116`. Events: `SimulationRunQueuedEventSchema`, `SimulationRunStartedEventSchema`, `SimulationMessageSnapshotEventSchema`, `SimulationRunFinishedEventSchema`, `SimulationRunEvaluatedEventSchema`, `SimulationTextMessageStartEventSchema`, `SimulationTextMessageEndEventSchema`, `SimulationRunMetricsComputedEventSchema`, `SimulationRunCancelRequestedEventSchema`, `SimulationRunAgentInstanceRecordedEventSchema`, `SimulationRunCutAtLimitRecordedEventSchema`, `SimulationRunDeletedEventSchema`, `SimulationSetArchivedEventSchema`.
+Declared at `src/eventing/simulation-processing.pipeline.ts:117`. Events: `SimulationRunQueuedEventSchema`, `SimulationRunStartedEventSchema`, `SimulationMessageSnapshotEventSchema`, `SimulationRunFinishedEventSchema`, `SimulationRunEvaluatedEventSchema`, `SimulationTextMessageStartEventSchema`, `SimulationTextMessageEndEventSchema`, `SimulationRunMetricsComputedEventSchema`, `SimulationRunCancelRequestedEventSchema`, `SimulationRunAgentInstanceRecordedEventSchema`, `SimulationRunCutAtLimitRecordedEventSchema`, `SimulationRunHooksRecordedEventSchema`, `SimulationRunDeletedEventSchema`, `SimulationSetArchivedEventSchema`.
 
 | Kind                       | Name                                                                                    | Handles                                                                                                                                                                                                                                                                                           | Declared at                                          |
 | -------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:172` |
-| command                    | `startRun`                                                                              | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:177` |
-| command                    | `messageSnapshot`                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:178` |
-| command                    | `textMessageStart`                                                                      | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:179` |
-| command                    | `textMessageEnd`                                                                        | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:180` |
-| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:181` |
-| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:186` |
-| command                    | `cancelRun`                                                                             | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:191` |
-| command                    | `deleteRun`                                                                             | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:192` |
-| command                    | `recordAgentInstance`                                                                   | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:193` |
-| command                    | `recordCutAtLimit`                                                                      | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:194` |
-| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:195` |
-| process manager            | `≈ deps.scenarioRunExecution.name`                                                      | ≈ applier `deps.scenarioRunExecution.process`                                                                                                                                                                                                                                                     | `src/eventing/simulation-processing.pipeline.ts:170` |
-| process manager            | `≈ deps.scenarioEvaluations.name`                                                       | ≈ applier `deps.scenarioEvaluations.process`                                                                                                                                                                                                                                                      | `src/eventing/simulation-processing.pipeline.ts:171` |
-| subscriber                 | `snapshotUpdateBroadcast`                                                               | `lw.simulation_run.queued`, `lw.simulation_run.started`, `lw.simulation_run.message_snapshot`, `lw.simulation_run.text_message_end`, `lw.simulation_run.finished`, `lw.simulation_run.evaluated`, `lw.simulation_run.deleted`, `lw.simulation_run.cancel_requested` from [scenario](../README.md) | `src/eventing/simulation-processing.pipeline.ts:143` |
-| subscriber                 | `traceMetricsSync`                                                                      | `lw.simulation_run.finished` from [scenario](../README.md)                                                                                                                                                                                                                                        | `src/eventing/simulation-processing.pipeline.ts:147` |
-| peer subscriber            | `traceSpanMetricsSync`                                                                  | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                                                                                                                                                                                  | `src/eventing/simulation-processing.pipeline.ts:151` |
-| ClickHouse fold projection | `≈ SimulationRunStateFoldProjection.create({ store: deps.simulationRunStore })`         | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:137` |
-| ClickHouse map projection  | `≈ SimulationRunMetricsMapProjection.create({ store: deps.simulationRunMetricsStore })` | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:140` |
-| lane aliases               | `≈ mainSimulationLaneAliases({ evaluationsProcess: deps.scenarioEvaluations.name })`    | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:209` |
-| retention                  | `≈ deps.retention`                                                                      | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:212` |
+| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:174` |
+| command                    | `startRun`                                                                              | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:179` |
+| command                    | `messageSnapshot`                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:180` |
+| command                    | `textMessageStart`                                                                      | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:181` |
+| command                    | `textMessageEnd`                                                                        | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:182` |
+| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:183` |
+| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:188` |
+| command                    | `cancelRun`                                                                             | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:193` |
+| command                    | `deleteRun`                                                                             | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:194` |
+| command                    | `recordAgentInstance`                                                                   | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:195` |
+| command                    | `recordCutAtLimit`                                                                      | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:196` |
+| command                    | `recordHooks`                                                                           | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:197` |
+| command                    | –                                                                                       | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:198` |
+| process manager            | `≈ deps.scenarioRunExecution.name`                                                      | ≈ applier `deps.scenarioRunExecution.process`                                                                                                                                                                                                                                                     | `src/eventing/simulation-processing.pipeline.ts:172` |
+| process manager            | `≈ deps.scenarioEvaluations.name`                                                       | ≈ applier `deps.scenarioEvaluations.process`                                                                                                                                                                                                                                                      | `src/eventing/simulation-processing.pipeline.ts:173` |
+| subscriber                 | `snapshotUpdateBroadcast`                                                               | `lw.simulation_run.queued`, `lw.simulation_run.started`, `lw.simulation_run.message_snapshot`, `lw.simulation_run.text_message_end`, `lw.simulation_run.finished`, `lw.simulation_run.evaluated`, `lw.simulation_run.deleted`, `lw.simulation_run.cancel_requested` from [scenario](../README.md) | `src/eventing/simulation-processing.pipeline.ts:145` |
+| subscriber                 | `traceMetricsSync`                                                                      | `lw.simulation_run.finished` from [scenario](../README.md)                                                                                                                                                                                                                                        | `src/eventing/simulation-processing.pipeline.ts:149` |
+| peer subscriber            | `traceSpanMetricsSync`                                                                  | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                                                                                                                                                                                  | `src/eventing/simulation-processing.pipeline.ts:153` |
+| ClickHouse fold projection | `≈ SimulationRunStateFoldProjection.create({ store: deps.simulationRunStore })`         | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:139` |
+| ClickHouse map projection  | `≈ SimulationRunMetricsMapProjection.create({ store: deps.simulationRunMetricsStore })` | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:142` |
+| lane aliases               | `≈ mainSimulationLaneAliases({ evaluationsProcess: deps.scenarioEvaluations.name })`    | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:212` |
+| retention                  | `≈ deps.retention`                                                                      | –                                                                                                                                                                                                                                                                                                 | `src/eventing/simulation-processing.pipeline.ts:215` |
 
 ## Configuration
 

@@ -278,6 +278,7 @@ export class ScenarioTargetPrefetchService {
       agentId: agent.id,
       endpoint: this.options.langwatchEndpoint,
       timeoutMs: Math.min(agent.config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
+      ...(agent.config.hooks ? { hooks: agent.config.hooks } : {}),
     };
   }
 

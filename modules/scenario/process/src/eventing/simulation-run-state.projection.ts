@@ -20,6 +20,7 @@ import {
   SimulationRunCutAtLimitRecordedEventSchema,
   SimulationRunDeletedEventSchema,
   SimulationRunEvaluatedEventSchema,
+  SimulationRunHooksRecordedEventSchema,
   SimulationRunFinishedEventSchema,
   SimulationRunMetricsComputedEventSchema,
   SimulationRunQueuedEventSchema,
@@ -35,6 +36,7 @@ import {
   type SimulationRunCutAtLimitRecordedEvent,
   type SimulationRunDeletedEvent,
   type SimulationRunEvaluatedEvent,
+  type SimulationRunHooksRecordedEvent,
   type SimulationRunFinishedEvent,
   type SimulationRunMetricsComputedEvent,
   type SimulationRunQueuedEvent,
@@ -302,6 +304,7 @@ const simulationRunEvents = [
   SimulationRunCancelRequestedEventSchema,
   SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunCutAtLimitRecordedEventSchema,
+  SimulationRunHooksRecordedEventSchema,
   SimulationRunDeletedEventSchema,
 ] as const;
 
@@ -806,6 +809,18 @@ export class SimulationRunStateFoldProjection
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       Metadata: SimulationRunStateFoldProjection.withCutAtLimit(state.Metadata),
+    };
+  }
+
+  /** The hook results land in `langwatch.hooks`; status, verdict and finish time stay. */
+  handleSimulationRunHooksRecorded(
+    event: SimulationRunHooksRecordedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Metadata: mergeLangwatchNamespace(state.Metadata, { hooks: event.data.hooks }),
     };
   }
 

@@ -15,6 +15,11 @@ import {
   type ScenarioChildExecutionSession,
 } from "../app/scenario.app.ts";
 import { isCustomerActionablePrefetchFailure } from "../rules/scenario-prefetch-failure.rules.ts";
+import {
+  adapterDeclaresHooks,
+  capRunHooks,
+  hasHookResults,
+} from "../rules/scenario-run-hooks.rules.ts";
 import type {
   ExecutionJobData,
   ScenarioExecutionPoolService,
@@ -218,6 +223,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
           ...(prefetch.data.adapterData.type === "voice"
             ? { callerEnv: prefetch.data.adapterData.callerEnv }
             : {}),
+          ...(adapterDeclaresHooks(prefetch.data.adapterData) ? { callsHooks: true } : {}),
         },
       });
     }
@@ -337,6 +343,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     if (result.success) {
       this.options.metrics.completed(durationMs);
       await this.handleSucceeded({ jobData, result, jobLogger });
+      await this.recordHooks({ jobData, result, jobLogger });
       jobLogger.info({ success: true, durationMs, childDurationMs }, "Scenario job completed");
 
       return;
@@ -354,6 +361,33 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
       "Scenario job completed with failure",
     );
     await this.handleFailed(jobData, result.error);
+    await this.recordHooks({ jobData, result, jobLogger });
+  }
+
+  /**
+   * Records the setup and teardown results the child reported, on a passing and a failing run
+   * alike. A run without hooks records nothing, and a record that cannot be written never fails
+   * the job.
+   */
+  async recordHooks(input: {
+    jobData: ExecutionJobData;
+    result: ScenarioExecutionResult;
+    jobLogger?: Logger;
+  }): Promise<void> {
+    const { projectId, scenarioRunId } = input.jobData;
+    if (!hasHookResults(input.result.hooks)) return;
+    try {
+      await this.options.execution.recordHooks({
+        projectId,
+        scenarioRunId,
+        hooks: capRunHooks(input.result.hooks),
+      });
+    } catch (error) {
+      (input.jobLogger ?? logger).warn(
+        { err: error, scenarioRunId },
+        "Could not record the run's setup and teardown results",
+      );
+    }
   }
 
   /**

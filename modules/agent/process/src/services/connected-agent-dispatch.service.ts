@@ -140,6 +140,7 @@ export class ConnectedAgentDispatchService {
     const instance = await this.#pickInstance({ ...params, excluded, now });
     const callId = generate(CALL_KSUID_RESOURCE).toString();
     const envelope = buildCallEnvelope({
+      kind: params.call.kind,
       callId,
       agentId: params.agent.id,
       threadId: params.call.threadId,
@@ -147,6 +148,7 @@ export class ConnectedAgentDispatchService {
       newMessages: params.call.newMessages,
       params: params.call.params,
       session: params.call.session,
+      state: params.call.state,
       traceparent: params.call.traceparent,
       deadlineAt,
       run: params.call.run,

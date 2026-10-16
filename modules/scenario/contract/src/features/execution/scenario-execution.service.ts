@@ -8,6 +8,7 @@ import type {
   ScenarioAgentInstance,
   TargetConfig,
 } from "./scenario-execution-data.ts";
+import type { ScenarioRunHooks } from "./scenario-hooks.ts";
 
 export interface ScenarioExecutionJob {
   projectId: string;
@@ -115,4 +116,10 @@ export abstract class ScenarioExecutionService {
   }): Promise<void>;
   /** Marks a voice run LangWatch ended at the maximum call duration (AC28). */
   abstract recordCutAtLimit(input: { projectId: string; scenarioRunId: string }): Promise<void>;
+  /** Records the setup and teardown results the child reported, like the agent instance. */
+  abstract recordHooks(input: {
+    projectId: string;
+    scenarioRunId: string;
+    hooks: ScenarioRunHooks;
+  }): Promise<void>;
 }

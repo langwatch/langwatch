@@ -70,6 +70,7 @@ export class ConnectedAgentAnswerService {
       answer: {
         output: result.output ?? "",
         session: result.session,
+        state: result.state,
         instance: {
           instanceId: instance.instanceId,
           hostname: instance.hostname,

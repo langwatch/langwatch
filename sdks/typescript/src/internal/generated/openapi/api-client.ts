@@ -2450,6 +2450,15 @@ export interface operations {
                         scenarioName?: string;
                         batchRunId?: string;
                     };
+                    /**
+                     * @description A turn, or a scenario run's setup or teardown hook. Defaults to a turn.
+                     * @enum {string}
+                     */
+                    kind?: "turn" | "setup" | "teardown";
+                    /** @description The scenario run's test data: what setup returned, or a turn's latest update. */
+                    state?: {
+                        [key: string]: unknown;
+                    } | null;
                 };
             };
         };
@@ -2473,6 +2482,10 @@ export interface operations {
                         })[];
                         /** @description The agent's per-conversation memory, to send on the next turn. */
                         session?: unknown;
+                        /** @description Setup's state, a turn's state update, or the object teardown returned. */
+                        state?: {
+                            [key: string]: unknown;
+                        } | null;
                         instance: {
                             hostname: string;
                             label: string | null;

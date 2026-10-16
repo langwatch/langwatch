@@ -196,6 +196,30 @@ describe("ConnectedAgentDispatchService", () => {
     });
   });
 
+  describe("when the platform calls a scenario hook", () => {
+    it("sends the kind and the state in the envelope and returns the hook's state", async () => {
+      const envelopes: unknown[] = [];
+      await connectInstance({
+        instanceId: "inst_1",
+        behavior: async (callId, reply) => {
+          const lookup = await runtime.state.readCall({ projectId, callId });
+          if (lookup.kind === "hit") envelopes.push(lookup.value.envelope);
+          await reply.ack();
+          await reply.result({ state: { deleted: 3 } });
+        },
+      });
+
+      const outcome = await runtime.dispatcher.dispatch({
+        projectId,
+        agent: agent(),
+        call: { ...call(), messages: [], newMessages: [], kind: "teardown", state: { id: "c_1" } },
+      });
+
+      expect(envelopes[0]).toMatchObject({ kind: "teardown", state: { id: "c_1" } });
+      expect(outcome.state).toEqual({ deleted: 3 });
+    });
+  });
+
   describe("when the frame never reached the instance", () => {
     /** @scenario "A call the platform proves never arrived runs on another instance" */
     it("dispatches the call again to the other instance", async () => {

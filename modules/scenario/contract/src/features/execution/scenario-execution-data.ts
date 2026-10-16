@@ -1,9 +1,11 @@
+import { agentHooksSchema } from "@langwatch/agent-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { FieldMappingSchema } from "../../resolve-field-mappings.ts";
 import { runParameterValuesSchema } from "../../scenario.parameters.ts";
 import { callerVoiceConfigSchema } from "../../voice/caller-voice.config.ts";
+import { scenarioRunHooksSchema } from "./scenario-hooks.ts";
 
 // ============================================================================
 // Field Mapping Types
@@ -235,6 +237,8 @@ const ConnectedAgentDataSchemaDefinition = z.object({
   endpoint: z.string(),
   /** Per-call budget in milliseconds, already capped by the platform. */
   timeoutMs: z.number().int().positive(),
+  /** The scenario hooks the agent declared; absent means none (ADR-180). */
+  hooks: agentHooksSchema.optional(),
 });
 export interface ConnectedAgentDataSchema extends Named<
   typeof ConnectedAgentDataSchemaDefinition
@@ -456,6 +460,8 @@ const ScenarioExecutionResultSchemaDefinition = z.object({
   agentInstance: ScenarioAgentInstanceSchema.optional(),
   /** A voice run LangWatch ended at VOICE_CALL_MAX_SECONDS (AC28). */
   isCutAtLimit: z.boolean().optional(),
+  /** The setup and teardown hooks the run called, when the agent declared any (ADR-180). */
+  hooks: scenarioRunHooksSchema.optional(),
 });
 export interface ScenarioExecutionResultSchema extends Named<
   typeof ScenarioExecutionResultSchemaDefinition
@@ -532,6 +538,8 @@ const ChildProcessJobDataSchemaDefinition = z
      * from it. Absent for non-voice runs and for a job queued before it existed.
      */
     callerVoice: callerVoiceConfigSchema.optional(),
+    /** Skip the agent's teardown hook so the run's test data stays; absent is false (ADR-180). */
+    keepData: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.script) return;

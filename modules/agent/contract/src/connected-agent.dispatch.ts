@@ -1,4 +1,4 @@
-import type { CallEnvelope, CallOutput } from "./connected-agent.protocol.ts";
+import type { CallEnvelope, CallKind, CallOutput } from "./connected-agent.protocol.ts";
 
 /** What a caller hands the dispatcher for one turn. */
 export interface DispatchCall {
@@ -9,6 +9,9 @@ export interface DispatchCall {
   session: unknown;
   traceparent: string | null;
   run: CallEnvelope["run"];
+  /** Absent means a turn. */
+  kind?: CallKind;
+  state?: CallEnvelope["state"];
 }
 
 /** What the dispatcher needs to know about the agent. */
@@ -26,6 +29,7 @@ export interface DispatchAgent {
 export interface CallOutcome {
   output: CallOutput;
   session?: unknown;
+  state?: CallEnvelope["state"];
   instance: { instanceId: string; hostname: string; label: string | null };
   durationMs: number;
 }

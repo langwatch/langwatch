@@ -15,6 +15,7 @@ export * from "./scenario.config.ts";
 export * from "./scenario.trpc.ts";
 export * from "./scenario.version.ts";
 export * from "./features/execution/scenario-execution-data.ts";
+export * from "./features/execution/scenario-hooks.ts";
 export * from "./features/execution/scenario-execution.constants.ts";
 export * from "./features/execution/scenario-execution.service.ts";
 export * from "./features/execution/scenario-resource-class.ts";

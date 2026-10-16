@@ -11,33 +11,33 @@ Feature: Scenario run hooks: setup and teardown
 
   Rule: Order and state
 
-    @integration @unimplemented
+    @integration
     Scenario: A run calls setup, then the turns, then teardown
       Given a connected agent that declares both hooks
       When a scenario runs against it
       Then the calls arrive in the order setup, turn, turn, teardown
 
-    @integration @unimplemented
+    @integration
     Scenario: The state from setup reaches every turn and the teardown
       Given a setup that returns the state "order 42"
       When a scenario runs with two turns
       Then each turn call carries "order 42"
       And the teardown call carries "order 42"
 
-    @integration @unimplemented
+    @integration
     Scenario: A turn's state update replaces the state for later calls
       Given a turn that returns the state update "order 43"
       When the next turn and the teardown are called
       Then both carry "order 43"
 
-    @unit @unimplemented
+    @unit
     Scenario: The simulated user and the judge see the current state each turn
       Given a run whose state is "order 42"
       When the simulated user and the judge are given a turn
       Then both read "order 42"
       And after a state update both read the update on the next turn
 
-    @unit @unimplemented
+    @unit
     Scenario: Hook parameters use the same value as the agent for the same run
       Given the run parameter loyalty_tier is "gold"
       When setup, a turn and teardown are called
@@ -45,17 +45,17 @@ Feature: Scenario run hooks: setup and teardown
 
   Rule: Teardown always runs
 
-    @integration @unimplemented
+    @integration
     Scenario: Teardown runs after a passing run
       Given a run that passes
       Then teardown was called once
 
-    @integration @unimplemented
+    @integration
     Scenario: Teardown runs after a failing run
       Given a run whose judge fails
       Then teardown was called once
 
-    @integration @unimplemented
+    @integration
     Scenario: Teardown runs after setup fails
       Given a setup that raises an error
       Then no turn is called
@@ -66,7 +66,7 @@ Feature: Scenario run hooks: setup and teardown
       Given a setup that fails after reporting partial state
       Then the teardown call carries that partial state
 
-    @integration @unimplemented
+    @integration
     Scenario: Teardown runs after setup times out
       Given a setup that does not answer within its timeout
       Then teardown was called once
@@ -76,7 +76,7 @@ Feature: Scenario run hooks: setup and teardown
       Given a run cancelled during the turns
       Then teardown was called once
 
-    @unit @unimplemented
+    @unit
     Scenario: The child runs teardown in a finally
       Given a child whose turns throw
       When the child exits its run
@@ -161,7 +161,7 @@ Feature: Scenario run hooks: setup and teardown
 
   Rule: Timeouts
 
-    @unit @unimplemented
+    @unit
     Scenario: Each hook defaults to 60 seconds
       Given a scenario with no hook timeout
       Then the setup and teardown timeouts are 60 seconds
@@ -203,7 +203,7 @@ Feature: Scenario run hooks: setup and teardown
       When a scenario runs against it
       Then the run shows "No hooks"
 
-    @unit @unimplemented
+    @unit
     Scenario: An agent that declared only teardown gets only teardown
       Given an agent that declares teardown and not setup
       When a scenario runs against it
@@ -211,7 +211,7 @@ Feature: Scenario run hooks: setup and teardown
       And teardown is called with no state
 
     # OPEN: agent proposal, not decided by the owner.
-    @integration @unimplemented
+    @integration
     Scenario: A run of an agent with hooks goes to the Node child when the Go runner is on
       Given a project with the release_scenario_go_runner_enabled flag on
       And an agent that declares hooks
@@ -219,7 +219,7 @@ Feature: Scenario run hooks: setup and teardown
       Then the run is routed to the Node child
 
     # OPEN: agent proposal, not decided by the owner.
-    @integration @unimplemented
+    @integration
     Scenario: A run of an agent without hooks still goes to the Go runner when the flag is on
       Given a project with the release_scenario_go_runner_enabled flag on
       And an agent that declares no hooks
@@ -249,31 +249,31 @@ Feature: Scenario run hooks: setup and teardown
 
   Rule: Recording
 
-    @unit @unimplemented
+    @unit
     Scenario: Each hook result is recorded on the run
       Given a child result line with a setup result and a teardown result
       When the job completes
       Then the run records, for each hook, its status, duration, trace, state or returned object and error
 
-    @unit @unimplemented
+    @unit
     Scenario: A result line with no hook results records nothing
       Given a child result line with no hook results
       When the job completes
       Then nothing is recorded on the run
 
-    @unit @unimplemented
+    @unit
     Scenario: Recording hooks after the run finished keeps the run finished
       Given a run that finished with the verdict "success"
       When the hook results are recorded
       Then the run keeps its status, its verdict and its finish time
 
-    @unit @unimplemented
+    @unit
     Scenario: Hook state over the cap is cut and marked
       Given a hook result whose state is over 64 KiB
       When the result is recorded
       Then the record marks the state as too large and keeps no partial copy
 
-    @integration @unimplemented
+    @integration
     Scenario: The processor records hooks off the child's result line
       Given a scenario child that writes a result line naming a setup and a teardown result
       When the processor runs the job and the child exits
