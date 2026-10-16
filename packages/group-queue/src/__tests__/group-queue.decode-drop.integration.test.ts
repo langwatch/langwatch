@@ -111,7 +111,7 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
   async function dropsFor(name: string) {
     return meter.recorded
       .filter((r) => r.instrument === "gq_jobs_dropped_total" && r.attributes.queue_name === name)
-      .map((r) => ({ labels: r.attributes }));
+      .map((r) => ({ labels: r.attributes, value: r.value }));
   }
 
   /**

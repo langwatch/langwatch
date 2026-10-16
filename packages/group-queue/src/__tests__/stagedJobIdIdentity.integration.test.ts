@@ -136,7 +136,7 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
   async function dropsFor(name: string) {
     return meter.recorded
       .filter((r) => r.instrument === "gq_jobs_dropped_total" && r.attributes.queue_name === name)
-      .map((r) => ({ labels: r.attributes }));
+      .map((r) => ({ labels: r.attributes, value: r.value }));
   }
 
   /** The id `generateStagedJobId` derives for a routed payload. */
