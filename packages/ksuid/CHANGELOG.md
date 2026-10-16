@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0](https://github.com/langwatch/langwatch/compare/ksuid@v2.0.2...ksuid@v2.1.0) (2026-10-16)
+
+
+### Features
+
+* **dashboards,insight:** dashboards and insights v1 ([#8545](https://github.com/langwatch/langwatch/issues/8545)) ([7b5e13d](https://github.com/langwatch/langwatch/commit/7b5e13dd84492d526f1442e3360005ff1ed08613))
+
+
+### Code Refactoring
+
+* **stored-object:** mint ids with the storedobject KSUID resource ([#8745](https://github.com/langwatch/langwatch/issues/8745)) ([fc98456](https://github.com/langwatch/langwatch/commit/fc98456981a1c08366095269dd3d56515a976a2e))
+
 ## [2.0.2](https://github.com/langwatch/ksuid/compare/ksuid-javascript/v2.0.1...ksuid-javascript/v2.0.2) (2025-11-13)
 
 ### Bug Fixes
