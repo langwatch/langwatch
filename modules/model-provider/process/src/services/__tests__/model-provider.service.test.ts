@@ -12,6 +12,7 @@ import {
   CODEX_DEFAULT_MODEL,
   DEFAULT_AZURE_API_VERSION,
   expandLatestAlias,
+  findModelProviderDefinition,
   ModelProviderCredentialsUnreadableError,
   ModelProviderNotFoundError,
   ModelDefaultNotFoundError,
@@ -729,7 +730,10 @@ class ExecutionCatalog extends Catalog {
   pickExecutionDefinition(input: {
     provider: string;
   }): { apiKey: string; endpointKey: string | null } | null {
-    return ModelProviderCatalog.prototype.pickExecutionDefinition.call(this, input);
+    const definition = findModelProviderDefinition(input.provider);
+    return definition
+      ? { apiKey: definition.apiKey, endpointKey: definition.endpointKey ?? null }
+      : null;
   }
 }
 class ManagedCatalog extends Catalog {
