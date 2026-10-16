@@ -111,6 +111,13 @@ type BifrostOptions struct {
 	OpenAIBackendURL string
 }
 
+// allowsPrivateNetwork reports whether the egress policy lets any customer
+// endpoint use a private address: the guard is off, or ALLOWED_PROXY_HOSTS
+// names hosts the pre-flight check lets through.
+func (o BifrostOptions) allowsPrivateNetwork() bool {
+	return !o.BlockLocalHTTPCalls || len(o.AllowedEndpointHosts) > 0
+}
+
 // NewBifrostRouter creates a provider router backed by bifrost.
 func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter, error) {
 	pool := opts.InitialPoolSize
@@ -120,9 +127,10 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	compatEndpoints := newAnthropicCompatRegistry(anthropicCompatMaxEndpoints)
 	bf, err := bifrost.Init(ctx, bfschemas.BifrostConfig{
 		Account: &account{
-			anthropicCompat: compatEndpoints,
-			openAIBaseURL:   opts.OpenAIBackendURL,
-			logger:          opts.Logger,
+			anthropicCompat:     compatEndpoints,
+			openAIBaseURL:       opts.OpenAIBackendURL,
+			logger:              opts.Logger,
+			allowPrivateNetwork: opts.allowsPrivateNetwork(),
 		},
 		InitialPoolSize: pool,
 		Logger:          &bifrostLogger{logger: opts.Logger},
@@ -1269,6 +1277,9 @@ type account struct {
 	// number of distinct Azure credential IDs seen over this process's
 	// lifetime, not by request volume.
 	warnedAzureAPIVersionIDs sync.Map
+	// allowPrivateNetwork lifts bifrost's own dial-time private-IP refusal
+	// (see BifrostOptions.allowsPrivateNetwork); link-local stays refused.
+	allowPrivateNetwork bool
 }
 
 func (a *account) GetConfiguredProviders() ([]bfschemas.ModelProvider, error) {
@@ -1364,6 +1375,7 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 	// anything.
 	cfg.NetworkConfig.DefaultRequestTimeoutInSeconds = ProviderRequestTimeoutSeconds
 	cfg.NetworkConfig.StreamIdleTimeoutInSeconds = ProviderRequestTimeoutSeconds
+	cfg.NetworkConfig.AllowPrivateNetwork = a.allowPrivateNetwork
 	if provider == bfschemas.OpenAI && a.openAIBaseURL != "" {
 		cfg.NetworkConfig.BaseURL = a.openAIBaseURL
 	}
