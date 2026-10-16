@@ -1,4 +1,5 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "target": "es2023",
     "module": "esnext",
@@ -7,6 +8,7 @@
     "lib": ["es2023", "dom", "dom.iterable"],
     "types": ["vite/client", "node"],
     "strict": true,
+    "noUncheckedIndexedAccess": false,
     "skipLibCheck": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
@@ -17,7 +19,8 @@
       "virtual:docs-operations": ["./src/app/virtual/docs-operations.d.ts"],
       "virtual:docs-pages": ["./src/app/virtual/docs-pages.d.ts"]
     },
-    "tsBuildInfoFile": "node_modules/.cache/tsconfig.tsbuildinfo"
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuild/tsconfig.tsbuildinfo"
   },
   "include": ["src", "vite.config.ts", "vitest.config.ts"],
   "references": [
