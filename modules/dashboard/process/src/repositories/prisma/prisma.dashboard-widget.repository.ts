@@ -1,9 +1,3 @@
-/**
- * A lean twin of {@link SavedWorkbenchChartService}, kind-scoped by
- * {@link DASHBOARD_SRCDOC_CHART_KIND} + `projectId` so a widget is never
- * touched through the builder or workbench paths (see ../dashboardWidgetDefinition).
- */
-
 import {
   DashboardWidgetNotFoundError,
   DashboardWidgetDefinitionInvalidError,
@@ -20,7 +14,10 @@ import {
   dashboardWidgetDefinitionSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { PrismaRepository } from "@langwatch/prisma-client";
-import type { CustomGraph, Prisma } from "@langwatch/prisma-client/generated";
+import type {
+  DashboardWidget as DashboardWidgetRecord,
+  Prisma,
+} from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
 
 import type {
@@ -28,19 +25,6 @@ import type {
   DashboardWidgetRepository,
   DashboardWidgetRow,
 } from "../dashboard-widget.repository.ts";
-
-/** Reads ownership inside the same transaction as the placement write. */
-class PrismaDashboardOwnershipRepository extends PrismaRepository.for("Dashboard") {
-  static readonly create = this.factory((prisma) => new PrismaDashboardOwnershipRepository(prisma));
-
-  async belongsToProject(input: { dashboardId: string; projectId: string }): Promise<boolean> {
-    const dashboard = await this.prisma.dashboard.findFirst({
-      where: { id: input.dashboardId, projectId: input.projectId },
-      select: { id: true },
-    });
-    return dashboard !== null;
-  }
-}
 
 const graphOf = (input: DashboardWidgetDefinitionInput): Prisma.InputJsonValue => ({
   version: DASHBOARD_WIDGET_DEFINITION_VERSION,
@@ -51,16 +35,35 @@ const graphOf = (input: DashboardWidgetDefinitionInput): Prisma.InputJsonValue =
   ...(input.source === undefined ? {} : { source: input.source }),
 });
 
+/** A transaction over the board table, to check a placement inside the write it guards. */
+type BoardReads = Pick<Prisma.TransactionClient, "dashboardsV2">;
+
+/** Whether the board is one of the project's own Dashboards boards. */
+async function ownsBoard(
+  tx: BoardReads,
+  input: { dashboardId: string; projectId: string },
+): Promise<boolean> {
+  const board = await tx.dashboardsV2.findFirst({
+    where: { id: input.dashboardId, projectId: input.projectId },
+    select: { id: true },
+  });
+  return board !== null;
+}
+
+/**
+ * The Dashboards widgets, in DashboardWidget, placed on DashboardsV2 boards. A widget delete
+ * also removes its stale srcdoc copy left in CustomGraph by the split.
+ */
 export class PrismaDashboardWidgetRepository
-  extends PrismaRepository.transactionalFor("CustomGraph", "Dashboard")
+  extends PrismaRepository.transactionalFor("DashboardWidget", "DashboardsV2", "CustomGraph")
   implements DashboardWidgetRepository
 {
   static readonly create = this.factory((prisma) => new PrismaDashboardWidgetRepository(prisma));
 
   /** Every dashboard widget in a project, ordered as the page shows them. */
   async findAll({ projectId }: { projectId: string }): Promise<DashboardWidgetRow[]> {
-    const rows = await this.prisma.customGraph.findMany({
-      where: { projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+    const rows = await this.prisma.dashboardWidget.findMany({
+      where: { projectId },
       orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
     });
     return rows.map((row) => this.#present(row));
@@ -72,9 +75,7 @@ export class PrismaDashboardWidgetRepository
    *   that id in this project — including when it has that id in another one.
    */
   async getById({ id, projectId }: { id: string; projectId: string }): Promise<DashboardWidgetRow> {
-    const row = await this.prisma.customGraph.findFirst({
-      where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
-    });
+    const row = await this.prisma.dashboardWidget.findFirst({ where: { id, projectId } });
     if (!row) throw new DashboardWidgetNotFoundError();
     return this.#present(row);
   }
@@ -98,34 +99,23 @@ export class PrismaDashboardWidgetRepository
     input: { name: string } & DashboardWidgetDefinitionInput;
   }): Promise<DashboardWidgetRow> {
     const row = await this.transaction(async (tx) => {
-      if (
-        dashboardId !== undefined &&
-        !(await PrismaDashboardOwnershipRepository.create({ prisma: tx }).belongsToProject({
-          dashboardId,
-          projectId,
-        }))
-      ) {
+      if (dashboardId !== undefined && !(await ownsBoard(tx, { dashboardId, projectId }))) {
         throw new DashboardWidgetNotFoundError();
       }
 
-      // Scoped to the placement target: a card on another dashboard must not
-      // push this one down. Unplaced widgets share the kind-scoped authoring
-      // grid; a placed one shares the whole target dashboard's grid.
-      const existing = await tx.customGraph.findMany({
-        where:
-          dashboardId === undefined
-            ? { projectId, kind: DASHBOARD_SRCDOC_CHART_KIND }
-            : { projectId, dashboardId },
+      // Scoped to the placement target: a card on another dashboard must not push this one
+      // down. Unplaced widgets share the project's authoring grid.
+      const existing = await tx.dashboardWidget.findMany({
+        where: dashboardId === undefined ? { projectId } : { projectId, dashboardId },
         select: { gridRow: true, rowSpan: true },
       });
 
-      return tx.customGraph.create({
+      return tx.dashboardWidget.create({
         data: {
           id,
           projectId,
           name: input.name,
-          kind: DASHBOARD_SRCDOC_CHART_KIND,
-          graph: graphOf(input),
+          definition: graphOf(input),
           ...(dashboardId === undefined ? {} : { dashboardId }),
           gridColumn: 0,
           gridRow: chartGridBottomRow(existing),
@@ -152,7 +142,7 @@ export class PrismaDashboardWidgetRepository
     input: { name?: string } & Partial<DashboardWidgetDefinitionInput>;
   }): Promise<DashboardWidgetRow> {
     await this.transaction(async (tx) => {
-      const data: Prisma.CustomGraphUpdateManyMutationInput = {};
+      const data: Prisma.DashboardWidgetUpdateManyMutationInput = {};
       if (input.name !== undefined) data.name = input.name;
 
       const { name: _name, ...definitionFields } = input;
@@ -160,7 +150,7 @@ export class PrismaDashboardWidgetRepository
         (value) => value !== undefined,
       );
       if (touchesDefinition) {
-        data.graph = await this.#mergeDefinitionUpdate({
+        data.definition = await this.#mergeDefinitionUpdate({
           tx,
           id,
           projectId,
@@ -168,10 +158,7 @@ export class PrismaDashboardWidgetRepository
         });
       }
 
-      const result = await tx.customGraph.updateMany({
-        where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
-        data,
-      });
+      const result = await tx.dashboardWidget.updateMany({ where: { id, projectId }, data });
       if (result.count === 0) throw new DashboardWidgetNotFoundError();
     });
     return this.getById({ id, projectId });
@@ -179,7 +166,7 @@ export class PrismaDashboardWidgetRepository
 
   /**
    * A partial update keeps the untouched half: `code` alone must not blank
-   * the stored queries, nor `queries` alone the stored code. The `graph`
+   * the stored queries, nor `queries` alone the stored code. The `definition`
    * column is one JSON blob, re-read and re-merged in the caller's transaction.
    */
   async #mergeDefinitionUpdate({
@@ -188,16 +175,14 @@ export class PrismaDashboardWidgetRepository
     projectId,
     input,
   }: {
-    tx: Pick<Prisma.TransactionClient, "customGraph">;
+    tx: Pick<Prisma.TransactionClient, "dashboardWidget">;
     id: string;
     projectId: string;
     input: Partial<DashboardWidgetDefinitionInput>;
-  }): Promise<Prisma.CustomGraphUpdateManyMutationInput["graph"]> {
-    const current = await tx.customGraph.findFirst({
-      where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
-    });
+  }): Promise<Prisma.DashboardWidgetUpdateManyMutationInput["definition"]> {
+    const current = await tx.dashboardWidget.findFirst({ where: { id, projectId } });
     if (!current) throw new DashboardWidgetNotFoundError();
-    const parsed = dashboardWidgetDefinitionSchema.safeParse(current.graph);
+    const parsed = dashboardWidgetDefinitionSchema.safeParse(current.definition);
     if (!parsed.success) {
       throw new DashboardWidgetDefinitionInvalidError(current.id, { reasons: [parsed.error] });
     }
@@ -216,15 +201,18 @@ export class PrismaDashboardWidgetRepository
   }
 
   /**
-   * Deletes a widget.
+   * Deletes a widget and its stale srcdoc copy, which carries the same id (AC199b).
    * @throws {DashboardWidgetNotFoundError} when nothing was deleted, so a
    *   caller cannot tell a foreign id from a gone one by the status.
    */
   async deleteWidget({ id, projectId }: { id: string; projectId: string }): Promise<void> {
-    const result = await this.prisma.customGraph.deleteMany({
-      where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+    await this.transaction(async (tx) => {
+      const result = await tx.dashboardWidget.deleteMany({ where: { id, projectId } });
+      if (result.count === 0) throw new DashboardWidgetNotFoundError();
+      await tx.customGraph.deleteMany({
+        where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+      });
     });
-    if (result.count === 0) throw new DashboardWidgetNotFoundError();
   }
 
   /**
@@ -242,22 +230,17 @@ export class PrismaDashboardWidgetRepository
     dashboardId: string;
   }): Promise<DashboardWidgetRow> {
     await this.transaction(async (tx) => {
-      if (
-        !(await PrismaDashboardOwnershipRepository.create({ prisma: tx }).belongsToProject({
-          dashboardId,
-          projectId,
-        }))
-      ) {
+      if (!(await ownsBoard(tx, { dashboardId, projectId }))) {
         throw new DashboardWidgetNotFoundError();
       }
-      // Next free row on the TARGET dashboard across every kind (gridRow is shared
-      // between the widget-authoring grid and dashboard grid — accepted prototype coupling).
-      const onDashboard = await tx.customGraph.findMany({
+      // The next free row on the target board (gridRow is shared between the authoring grid
+      // and the board's grid: accepted prototype coupling).
+      const onDashboard = await tx.dashboardWidget.findMany({
         where: { projectId, dashboardId },
         select: { gridRow: true, rowSpan: true },
       });
-      const result = await tx.customGraph.updateMany({
-        where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+      const result = await tx.dashboardWidget.updateMany({
+        where: { id, projectId },
         data: {
           dashboardId,
           gridColumn: 0,
@@ -270,12 +253,12 @@ export class PrismaDashboardWidgetRepository
     return this.getById({ id, projectId });
   }
 
-  /** Kind-scoped `updateMany` per widget in one transaction; a miss updates nothing. */
+  /** One `updateMany` per widget in one transaction; a miss updates nothing. */
   async updateLayouts({ projectId, layouts }: DashboardWidgetLayoutsInput): Promise<void> {
     await this.transaction(async (tx) => {
       for (const { graphId, layout } of layouts) {
-        await tx.customGraph.updateMany({
-          where: { id: graphId, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+        await tx.dashboardWidget.updateMany({
+          where: { id: graphId, projectId },
           data: {
             gridColumn: layout.gridColumn,
             gridRow: layout.gridRow,
@@ -287,12 +270,12 @@ export class PrismaDashboardWidgetRepository
     });
   }
 
-  #present(row: CustomGraph): DashboardWidgetRow {
+  #present(row: DashboardWidgetRecord): DashboardWidgetRow {
     return {
       id: row.id,
       projectId: row.projectId,
       name: row.name,
-      graph: row.graph,
+      graph: row.definition,
       createdAt: fromDate(row.createdAt),
       updatedAt: fromDate(row.updatedAt),
       dashboardId: row.dashboardId,

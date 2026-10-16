@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * From a CLI payload to a drawn card: stamp with `toCliToolResult`, render.
  * Mocks: host, tRPC, router, hydration hook, recharts' ResponsiveContainer.
- * Spec: specs/langy/langy-capability-cards.feature
+ * Spec: specs/langy/langy-capability-cards.feature; picker: dashboards-v2.feature AC199c.
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { toCliToolResult } from "@langwatch/langy-contract";
@@ -69,10 +69,18 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
+// What the "Save to dashboard" picker asked the board list for.
+const boardListInputs = vi.hoisted((): unknown[] => []);
+
 vi.mock("../../../../../../behavior/langy-api.ts", () => ({
   api: {
     dashboards: {
-      getAll: { useQuery: () => ({ data: [] }) },
+      getAll: {
+        useQuery: (input: unknown) => {
+          boardListInputs.push(input);
+          return { data: [] };
+        },
+      },
       create: { useMutation: () => ({ mutateAsync: vi.fn() }) },
     },
     graphs: { create: { useMutation: () => ({ mutateAsync: vi.fn() }) } },
@@ -510,6 +518,32 @@ describe("given the CLI counted distinct ids per day", () => {
 
       expect(screen.queryByText("7")).toBeNull();
       expect(screen.getByText(/spans several periods or groups, so it has no single/)).toBeTruthy();
+    });
+  });
+});
+
+describe("given a chart Langy can save onto a board", () => {
+  describe("when the card offers Save to dashboard", () => {
+    /** @scenario "AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports" */
+    it("lists only the boards made in Analytics Reports", () => {
+      renderCall({
+        name: "langwatch.analytics.query",
+        state: "output-available",
+        input: {},
+        output: null,
+        result: {
+          kind: "card",
+          card: "timeseries",
+          payload: {
+            series: [{ name: "Total cost", points: [{ t: "2026-07-13", v: 0.11 }] }],
+            title: "Total cost",
+            graph: { graphType: "line" },
+          },
+        },
+      });
+
+      expect(screen.getByText("Save to dashboard")).toBeTruthy();
+      expect(boardListInputs.at(-1)).toEqual({ projectId: "p_demo" });
     });
   });
 });

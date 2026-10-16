@@ -80,9 +80,9 @@ function boardServer() {
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
     switch (call.path) {
-      case "dashboards.getAll":
+      case "boards.getAll":
         return Promise.resolve([{ ...BOARD }]);
-      case "dashboards.listStarred":
+      case "boards.listStarred":
         return Promise.resolve([]);
       case "dashboardWidgets.list":
         return Promise.resolve([structuredClone(WIDGET)]);

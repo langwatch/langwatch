@@ -140,7 +140,8 @@ describe("the current dashboard's actions", () => {
     expect(onRename).toHaveBeenCalledOnce();
   });
 
-  it("deletes after confirmation", async () => {
+  /** @scenario "AC199d Split: a Reports delete leaves the Dashboards area unchanged" */
+  it("deletes after confirmation through the Reports procedure alone", async () => {
     const { user, open } = mountActions({ dashboardId: "d2" });
     await open();
     await user.click(screen.getByText("Delete"));

@@ -1,9 +1,7 @@
 import type {
   Dashboard,
-  DashboardScope,
-  DashboardStar,
   DashboardSummary,
-  StarredDashboard,
+  DashboardViewer,
   Graph,
   GraphLayout,
   SavedWorkbenchChart,
@@ -16,22 +14,15 @@ export type DashboardGraphKind = "builder" | "workbench_sql";
 
 export type DashboardRecord = Dashboard;
 
-/** The editable fields of a stored board; an absent key is left as it is. */
-export type DashboardUpdate = Readonly<{
-  name?: string;
-  description?: string | null;
-  createdById?: string;
-  scope?: DashboardScope;
-  organizationId?: string;
-}>;
-/** The stored summary: stars and the owner's name are per reader, so the service adds them. */
-export type DashboardSummaryRecord = Omit<DashboardSummary, "isStarred" | "ownerProject">;
+/** The editable field of a Reports board; its retiring scope columns take no new write. */
+export type DashboardUpdate = Readonly<{ name?: string }>;
+export type DashboardSummaryRecord = DashboardSummary;
 
 /**
- * The project a read is made from. With `organizationId` the read also reaches the
- * Organization boards other projects of that organization own; the service decides who sees what.
+ * Who reads, from which project. Another member's Only me row, and a chart on one, is not there;
+ * nor is any Only me row for a project credential or once its author is erased (AC199m).
  */
-export type DashboardReach = Readonly<{ projectId: string; organizationId?: string }>;
+export type DashboardReach = Readonly<{ projectId: string; viewer?: DashboardViewer }>;
 export type GraphRecord = Graph;
 
 /** The stored chart before its definition is parsed against the contract. */
@@ -39,20 +30,13 @@ export type SavedWorkbenchChartRecord = Omit<SavedWorkbenchChart, "definition"> 
   definition: unknown;
 };
 
-/** One member's stars as one project lists them. */
-export type MemberStars = Readonly<{
-  projectId: string;
-  userId: string;
-  sharedProjectIds?: readonly string[];
-}>;
-
 /**
- * The dashboards, their builder graphs and their saved workbench charts:
- * three shapes over the two tables Dashboard owns. A write naming a row the
- * project lacks raises the feature's own absence — every backend refuses alike.
+ * The Analytics Reports boards, builder graphs and saved workbench charts (Dashboard, CustomGraph).
+ * Reads leave out a board only Dashboards holds and what the reach does not see; a srcdoc row is a
+ * stale copy, never a chart. A write naming a row the project lacks is refused.
  */
 export interface DashboardRepository {
-  /** The project's boards in `order`, then the organization's from other projects. */
+  /** The project's boards in `order`. */
   findAllDashboards(
     input: DashboardReach & { graphKinds: readonly DashboardGraphKind[] },
   ): Promise<DashboardSummaryRecord[]>;
@@ -62,56 +46,34 @@ export interface DashboardRepository {
   /** The rows among these ids the read reaches; an id it does not reach is left out. */
   findDashboards(input: DashboardReach & { dashboardIds: string[] }): Promise<DashboardRecord[]>;
   findLastDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined>;
-  /** No description; `createdById` null and scope Project when absent. */
+  /** At the scope Project with no author: the scope columns are retiring. */
   createDashboard(input: {
     id: string;
     projectId: string;
     name: string;
     order: number;
-    createdById?: string | null;
-    scope?: DashboardScope;
   }): Promise<DashboardRecord>;
   updateDashboard(input: {
     projectId: string;
     dashboardId: string;
     data: DashboardUpdate;
   }): Promise<DashboardRecord>;
-  /** Removes the board, its graphs, and the row from every member's favourites. */
+  /**
+   * The ids among these that only the Dashboards area holds: in DashboardsV2 with no Reports
+   * chart. A Reports write refuses them as absent (AC199j).
+   */
+  findDashboardsOnlyIds(input: {
+    projectId: string;
+    dashboardIds: readonly string[];
+  }): Promise<string[]>;
+  /** The board and its charts; DashboardsV2, its widgets and stars are untouched (AC199d). */
   deleteDashboard(input: { projectId: string; dashboardId: string }): Promise<DashboardRecord>;
   updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void>;
 
+  findAllGraphs(input: DashboardReach & { dashboardId?: string }): Promise<GraphRecord[]>;
+  findGraph(input: DashboardReach & { graphId: string }): Promise<GraphRecord | undefined>;
   /**
-   * The member's stars in their own order; a star on a gone board is skipped. A board's star is
-   * stored under the project that owns the board, so `sharedProjectIds` names the other projects
-   * whose boards this project lists. Template stars are this project's alone.
-   */
-  findStarred(input: MemberStars): Promise<StarredDashboard[]>;
-  /** The board ids the member has starred, for marking a list. */
-  findStarredDashboardIds(input: MemberStars): Promise<string[]>;
-  /**
-   * Appends a star at the end of the member's order; a no-op when already starred. `projectId`
-   * is where the row is stored; `listedInProjectId` is where it was starred, when that differs.
-   */
-  addStar(input: {
-    projectId: string;
-    userId: string;
-    star: DashboardStar;
-    listedInProjectId?: string;
-  }): Promise<void>;
-  removeStar(input: { projectId: string; userId: string; star: DashboardStar }): Promise<void>;
-  /** Sets each given star's position from the order given; other stars are untouched. */
-  reorderStars(input: MemberStars & { stars: DashboardStar[] }): Promise<void>;
-  /** How many members other than this one starred the board. */
-  countOtherStars(input: {
-    projectId: string;
-    dashboardId: string;
-    userId: string;
-  }): Promise<number>;
-
-  findAllGraphs(input: { projectId: string; dashboardId?: string }): Promise<GraphRecord[]>;
-  findGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord | undefined>;
-  /**
-   * The first grid row below every card on the dashboard, whichever kind, so a
+   * The first grid row below every Reports card on the dashboard, builder or workbench, so a
    * new card never lands on a tall one; row 0 on an empty dashboard.
    */
   findNextFreeGridRow(input: { projectId: string; dashboardId: string }): Promise<number>;
@@ -142,11 +104,10 @@ export interface DashboardRepository {
     layouts: { graphId: string; layout: GraphLayout }[];
   }): Promise<void>;
 
-  findAllSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChartRecord[]>;
-  findSavedWorkbenchChart(input: {
-    projectId: string;
-    chartId: string;
-  }): Promise<SavedWorkbenchChartRecord | undefined>;
+  findAllSavedWorkbenchCharts(input: DashboardReach): Promise<SavedWorkbenchChartRecord[]>;
+  findSavedWorkbenchChart(
+    input: DashboardReach & { chartId: string },
+  ): Promise<SavedWorkbenchChartRecord | undefined>;
   createSavedWorkbenchChart(input: {
     id: string;
     projectId: string;
@@ -174,6 +135,9 @@ export interface DashboardRepository {
     projectId: string;
     chartId: string;
   }): Promise<SavedWorkbenchChartRecord>;
-  /** The usage report's count; the caller never passes an empty project list. */
+  /**
+   * The usage report's count: `charts` is Reports charts plus Dashboards widgets, stale srcdoc
+   * copies left out. The caller never passes an empty project list.
+   */
   countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCount>;
 }

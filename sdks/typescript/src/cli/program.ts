@@ -4190,9 +4190,24 @@ function registerDashboardWidgetCommands(program: Command): void {
 
   emitsResult(
     dashboardWidgetCmd
+      .command("boards")
+      .description("List the Dashboards boards a widget can be pinned to")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { listDashboardWidgetBoardsCommand: impl } =
+        await import("./commands/dashboard-widgets/boards.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
       .command("pin <widget>")
-      .description("Add a dashboard widget to a dashboard (widget and dashboard by id or name)")
-      .requiredOption("--dashboard <id-or-name>", "Dashboard to add the widget to")
+      .description(
+        "Add a dashboard widget to a Dashboards board (widget and board by id or name, from `dashboard-widget boards`)",
+      )
+      .requiredOption("--dashboard <id-or-name>", "Dashboards board to add the widget to")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (widget: string, options: { dashboard?: string; project?: string }) => {

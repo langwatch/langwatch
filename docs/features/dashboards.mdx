@@ -216,17 +216,17 @@ the server and set your API key.
 
 Once connected, your agent has these dashboard tools:
 
-- `platform_list_dashboards`: list every dashboard in the project.
-- `platform_get_dashboard`: read one dashboard, including its widgets.
-- `platform_create_dashboard`: create a new, empty dashboard.
-- `platform_rename_dashboard`: rename a dashboard.
-- `platform_delete_dashboard`: delete a dashboard and its widgets.
+- `list_dashboard_boards`: list the project's dashboards, with the id each
+  widget tool takes.
 - `run_query`: run one read-only LangWatchQL (LWQL) statement and see the rows
   it returns. Use this to check a query before it goes into a widget.
 - `add_dashboard_widget`: create a custom widget and add it to a dashboard.
 - `update_dashboard_widget`: change a widget's name, code, queries or
   description. Pass the dashboard id, the widget id, and only the fields to
   change. Every field you leave out keeps its value.
+
+The `platform_*_dashboard` tools work on the dashboards in Analytics Reports,
+which hold charts, not widgets.
 
 ### The widget definition format
 

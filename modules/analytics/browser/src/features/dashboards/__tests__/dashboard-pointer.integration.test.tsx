@@ -45,9 +45,11 @@ function renderPointer({
 }) {
   const host = new StubAnalyticsHost(options);
   const asked: string[] = [];
+  const inputs: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall) => {
     asked.push(call.path);
-    if (call.path === "dashboards.getAll") return Promise.resolve(boards);
+    inputs.push(call);
+    if (call.path === "boards.getAll") return Promise.resolve(boards);
     if (call.path === "dashboardWidgets.list") return Promise.resolve(widgets);
     return NO_PROCEDURES(call);
   };
@@ -64,7 +66,7 @@ function renderPointer({
     host,
     answer,
   });
-  return { host, asked };
+  return { host, asked, inputs };
 }
 
 afterEach(cleanup);
@@ -82,6 +84,17 @@ describe("given an insight that came from a widget on a board", () => {
 
       await userEvent.click(board);
       expect(host.navigations).toEqual(["/test-project/dashboards/board-1"]);
+    });
+  });
+
+  describe("when the board holds only charts made in Analytics Reports", () => {
+    /** @scenario "AC199 Split: Dashboards and Analytics Reports each list and open only their own boards" */
+    it("asks for the Dashboards area's boards alone, so it offers no link to that board", async () => {
+      const { inputs } = renderPointer({ boards: [], widgets: [] });
+
+      expect(await screen.findByText("Checkout health (deleted)")).toBeInTheDocument();
+      expect(inputs.map(({ path }) => path)).toContain("boards.getAll");
+      expect(inputs.map(({ path }) => path)).not.toContain("dashboards.getAll");
     });
   });
 

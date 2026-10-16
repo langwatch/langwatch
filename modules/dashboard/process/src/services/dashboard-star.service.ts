@@ -6,7 +6,7 @@ import {
   type StarredDashboard,
 } from "@langwatch/dashboard-contract";
 
-import type { DashboardRepository } from "../repositories/dashboard.repository.ts";
+import type { BoardRepository } from "../repositories/board.repository.ts";
 import type { DashboardAccessService } from "./dashboard-access.service.ts";
 
 /** The member whose stars these are, and the project they are looking from. */
@@ -18,16 +18,16 @@ type Starring = Readonly<{ projectId: string; userId: string }>;
  * board the member can no longer see keeps its star, unlisted, until its scope widens again.
  */
 export class DashboardStarService {
-  #repository: DashboardRepository;
+  #repository: BoardRepository;
   #access: DashboardAccessService;
 
-  private constructor(repository: DashboardRepository, access: DashboardAccessService) {
+  private constructor(repository: BoardRepository, access: DashboardAccessService) {
     this.#repository = repository;
     this.#access = access;
   }
 
   static create(options: {
-    repository: DashboardRepository;
+    repository: BoardRepository;
     access: DashboardAccessService;
   }): DashboardStarService {
     return new DashboardStarService(options.repository, options.access);
@@ -103,7 +103,6 @@ export class DashboardStarService {
     const { home, guests } = await this.#access.listBoards({
       projectId: input.projectId,
       viewer: { userId: input.userId },
-      graphKinds: [],
     });
     return {
       visibleIds: new Set([...home, ...guests].map((board) => board.id)),

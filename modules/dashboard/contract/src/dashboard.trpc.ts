@@ -1,6 +1,6 @@
 /**
- * Every `dashboards.*` procedure, declared once: its name, its kind, what it
- * takes and what it answers.
+ * Every `dashboards.*` procedure, declared once: the Analytics Reports boards, which have no
+ * scope, and the Flight Deck's source presence. The Dashboards area's boards are `boards.*`.
  * Spec: modules/dashboard/specs/dashboard-service.feature.
  */
 import { defineTrpcContract } from "@langwatch/module";
@@ -12,16 +12,7 @@ import {
   dashboardTrpcRowSchema,
   dashboardTrpcSummarySchema,
 } from "./dashboard.responses.ts";
-import {
-  dashboardDescriptionSchema,
-  dashboardNameSchema,
-  dashboardScopeImpactSchema,
-  dashboardScopeProjectsSchema,
-  dashboardScopeSchema,
-  dashboardSourcePresenceSchema,
-  dashboardStarSchema,
-  starredDashboardSchema,
-} from "./dashboard.ts";
+import { dashboardSourcePresenceSchema } from "./dashboard.ts";
 
 const projectScopeSchema = z.object({ projectId: z.string() });
 const dashboardRefSchema = z.object({
@@ -36,13 +27,7 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
    * draws. `_count.graphs` is the shape the pages have always read.
    */
   .query("getAll")
-  .withInput(
-    z.object({
-      ...projectScopeSchema.shape,
-      /** Also lists the Organization boards other projects own; only the Dashboards area asks. */
-      includeOrganization: z.boolean().optional(),
-    }),
-  )
+  .withInput(projectScopeSchema)
   .withOutput(dashboardTrpcSummarySchema.array())
 
   .query("getById")
@@ -57,15 +42,12 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
   .withInput(z.object({ ...dashboardRefSchema.shape, name: z.string() }))
   .withOutput(dashboardTrpcRowSchema)
 
-  /** Cascades to the dashboard's graphs, and removes it from everyone's stars. */
+  /** Cascades to the board's charts; the Dashboards area's boards and stars stay. */
   .mutation("delete")
   .withInput(dashboardRefSchema)
   .withOutput(dashboardTrpcRowSchema)
 
-  /**
-   * Legacy board ordering, kept for the Analytics reports section only; the
-   * Dashboards feature orders by a member's favourites. Remove with that section.
-   */
+  /** Legacy board ordering, kept for the Analytics reports section only. */
   .mutation("reorderDashboards")
   .withInput(z.object({ ...projectScopeSchema.shape, dashboardIds: z.array(z.string()) }))
   .withOutput(dashboardReorderResponseSchema)
@@ -74,54 +56,6 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
   .query("getOrCreateFirst")
   .withInput(projectScopeSchema)
   .withOutput(dashboardTrpcRowSchema.nullable())
-
-  /**
-   * Dashboards area only, like the two below: refused while `release_dashboards`
-   * is off. The board's inline name and description.
-   */
-  .mutation("updateDetails")
-  .withInput(
-    z.object({
-      ...dashboardRefSchema.shape,
-      name: dashboardNameSchema.optional(),
-      description: dashboardDescriptionSchema.nullable().optional(),
-    }),
-  )
-  .withOutput(dashboardTrpcRowSchema)
-
-  /** Dashboards area. Only the board's author changes its scope, in the project that owns it. */
-  .mutation("setScope")
-  .withInput(z.object({ ...dashboardRefSchema.shape, scope: dashboardScopeSchema }))
-  .withOutput(dashboardTrpcRowSchema)
-
-  /** Dashboards area. What a narrower scope takes from other members; the author's to read. */
-  .query("scopeImpact")
-  .withInput(dashboardRefSchema)
-  .withOutput(dashboardScopeImpactSchema)
-
-  /** Dashboards area. The projects an Organization board can be opened under by this reader. */
-  .query("scopeProjects")
-  .withInput(dashboardRefSchema)
-  .withOutput(dashboardScopeProjectsSchema)
-
-  /** The member's stars for this project, boards and templates, in their own order. */
-  .query("listStarred")
-  .withInput(projectScopeSchema)
-  .withOutput(starredDashboardSchema.array())
-
-  /** Stars a board or a template for the acting member; appends at the end, idempotent. */
-  .mutation("star")
-  .withInput(z.object({ ...projectScopeSchema.shape, star: dashboardStarSchema }))
-  .withOutput(dashboardReorderResponseSchema)
-
-  .mutation("unstar")
-  .withInput(z.object({ ...projectScopeSchema.shape, star: dashboardStarSchema }))
-  .withOutput(dashboardReorderResponseSchema)
-
-  /** Rewrites the member's star order from the stars given, in the order given. */
-  .mutation("reorderStars")
-  .withInput(z.object({ ...projectScopeSchema.shape, stars: z.array(dashboardStarSchema) }))
-  .withOutput(dashboardReorderResponseSchema)
 
   /** Per Flight Deck source, whether the project ever recorded a row. */
   .query("sourcePresence")

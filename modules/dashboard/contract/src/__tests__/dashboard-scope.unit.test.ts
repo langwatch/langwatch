@@ -35,32 +35,21 @@ describe("a board's scope", () => {
   describe("when a board is made", () => {
     /** @scenario "AC170 Scope: a new board starts at Project and My dashboard at Only me" */
     it("starts at Project", () => {
-      const made = { name: "Latency", createdById: AUTHOR.userId, dashboardsEnabled: true };
+      const made = { name: "Latency", createdById: AUTHOR.userId };
 
       expect(newDashboardScope(made)).toBe("PROJECT");
     });
 
     /** @scenario "AC170 Scope: a new board starts at Project and My dashboard at Only me" */
     it("starts a member's My dashboard at Only me", () => {
-      const made = { name: MY_DASHBOARD_NAME, createdById: AUTHOR.userId, dashboardsEnabled: true };
+      const made = { name: MY_DASHBOARD_NAME, createdById: AUTHOR.userId };
 
       expect(newDashboardScope(made)).toBe("PRIVATE");
     });
 
     /** @scenario "AC170 Scope: a new board starts at Project and My dashboard at Only me" */
     it("starts a board made with a project credential at Project, whatever its name", () => {
-      const made = { name: MY_DASHBOARD_NAME, createdById: void 0, dashboardsEnabled: true };
-
-      expect(newDashboardScope(made)).toBe("PROJECT");
-    });
-
-    /** @scenario "AC189 Scope: board scope reaches only a project where Dashboards is switched on" */
-    it("starts a member's My dashboard at Project where Dashboards is switched off", () => {
-      const made = {
-        name: MY_DASHBOARD_NAME,
-        createdById: AUTHOR.userId,
-        dashboardsEnabled: false,
-      };
+      const made = { name: MY_DASHBOARD_NAME, createdById: void 0 };
 
       expect(newDashboardScope(made)).toBe("PROJECT");
     });

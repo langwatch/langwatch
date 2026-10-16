@@ -3,6 +3,8 @@ export * from "./dashboard-scope.ts";
 export * from "./dashboard.errors.ts";
 export * from "./dashboard.responses.ts";
 export * from "./dashboard.trpc.ts";
+export * from "./board.trpc.ts";
+export * from "./board-rest.schemas.ts";
 export * from "./dashboard-widget-rest.schemas.ts";
 export * from "./dashboard-widget.trpc.ts";
 export * from "./graph.ts";

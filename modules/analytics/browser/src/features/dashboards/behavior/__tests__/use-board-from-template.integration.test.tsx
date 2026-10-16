@@ -55,15 +55,15 @@ function inMemoryServer({ refuseWidgets = false }: { refuseWidgets?: boolean } =
     state.calls.push(call);
     const input = (call.input ?? {}) as Record<string, unknown>;
     switch (call.path) {
-      case "dashboards.create": {
+      case "boards.create": {
         const board = { id: `board-${state.boards.length + 1}`, ...input };
         state.boards.push(board);
         return Promise.resolve(board);
       }
-      case "dashboards.updateDetails":
+      case "boards.update":
       case "dashboardWidgets.batchUpdateLayouts":
         return Promise.resolve({ success: true });
-      case "dashboards.delete":
+      case "boards.delete":
         state.boards = state.boards.filter(({ id }) => id !== input.dashboardId);
         return Promise.resolve({ success: true });
       case "dashboardWidgets.create": {
@@ -130,10 +130,10 @@ describe("starting a board from a template", () => {
       await user.click(screen.getByRole("button", { name: "Start from template" }));
 
       await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-1"]));
-      expect(inputsTo(server, "dashboards.create")).toEqual([
+      expect(inputsTo(server, "boards.create")).toEqual([
         { projectId: "proj-1", name: "Small deck" },
       ]);
-      expect(inputsTo(server, "dashboards.updateDetails")).toEqual([
+      expect(inputsTo(server, "boards.update")).toEqual([
         { projectId: "proj-1", dashboardId: "board-1", description: "Two widgets side by side." },
       ]);
       expect(inputsTo(server, "dashboardWidgets.create")).toEqual(
@@ -156,7 +156,7 @@ describe("starting a board from a template", () => {
           })),
         },
       ]);
-      expect(inputsTo(server, "dashboards.star")).toEqual([]);
+      expect(inputsTo(server, "boards.star")).toEqual([]);
       expect(host.failures).toEqual([]);
     });
   });
@@ -171,7 +171,7 @@ describe("starting a board from a template", () => {
       await user.click(screen.getByRole("button", { name: "Start from template" }));
 
       await waitFor(() =>
-        expect(inputsTo(server, "dashboards.create")).toEqual([
+        expect(inputsTo(server, "boards.create")).toEqual([
           { projectId: "proj-1", name: "Small deck 3" },
         ]),
       );
@@ -188,7 +188,7 @@ describe("starting a board from a template", () => {
       await user.click(screen.getByRole("button", { name: "Start from template" }));
 
       await waitFor(() => expect(host.failures).toHaveLength(1));
-      await waitFor(() => expect(inputsTo(server, "dashboards.delete")).toHaveLength(1));
+      await waitFor(() => expect(inputsTo(server, "boards.delete")).toHaveLength(1));
       expect(server.state.boards).toEqual([]);
       expect(host.navigations).toEqual([]);
       await waitFor(() =>

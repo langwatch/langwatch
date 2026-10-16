@@ -39,6 +39,12 @@ function databaseRecording({ failOn }: { failOn?: string } = {}) {
     annotationQueueItem: { updateMany: write("annotationQueueItem.updateMany") },
     auditLog: { updateMany: write("auditLog.updateMany") },
     annotationQueueMembers: { deleteMany: write("annotationQueueMembers.deleteMany") },
+    dashboardsV2: {
+      findMany: async () => [],
+      updateMany: write("dashboardsV2.updateMany"),
+    },
+    dashboardFavourite: { deleteMany: write("dashboardFavourite.deleteMany") },
+    dashboard: { updateMany: write("dashboard.updateMany") },
     teamUser: { deleteMany: write("teamUser.deleteMany") },
     organizationUser: {
       deleteMany: write("organizationUser.deleteMany"),

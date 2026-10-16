@@ -1,7 +1,7 @@
 /**
- * The server half of `dashboards.*`. Reading takes `analytics:view`; creating
- * `analytics:create`, editing `analytics:update`, removing `analytics:delete`. Starring is
- * personal: `analytics:view`, naming the actor. Scope is an edit; the service asks for the author.
+ * The server half of `dashboards.*`, the Analytics Reports boards. Reading takes
+ * `analytics:view`; creating `analytics:create`, editing `analytics:update`, removing
+ * `analytics:delete`.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DashboardApi, dashboardTrpc } from "@langwatch/dashboard-contract";
@@ -15,7 +15,6 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
         projectId: input.projectId,
         graphCountScope: "builder",
         viewer: { userId: actor.id },
-        ...(input.includeOrganization === true ? { includeOrganization: true } : {}),
       });
 
       return dashboards.map(({ graphCount, ...dashboard }) => ({
@@ -36,9 +35,7 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
 
     .procedure("create")
     .withPermission("analytics:create")
-    .handle(async ({ app, input, actor }) =>
-      app.create({ projectId: input.projectId, name: input.name, createdById: actor.id }),
-    )
+    .handle(async ({ app, input }) => app.create({ projectId: input.projectId, name: input.name }))
 
     .procedure("rename")
     .withPermission("analytics:update")
@@ -78,88 +75,6 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
         (
           await app.getOrCreateFirst({ projectId: input.projectId, viewer: { userId: actor.id } })
         )[0] ?? null,
-    )
-
-    .procedure("updateDetails")
-    .withPermission("analytics:update")
-    .handle(async ({ app, input, actor }) =>
-      app.updateDashboardDetails({
-        projectId: input.projectId,
-        dashboardId: input.dashboardId,
-        viewer: { userId: actor.id },
-        ...(input.name === undefined ? {} : { name: input.name }),
-        ...(input.description === undefined ? {} : { description: input.description }),
-      }),
-    )
-
-    .procedure("setScope")
-    .withPermission("analytics:update")
-    .handle(async ({ app, input, actor }) =>
-      app.setDashboardScope({
-        projectId: input.projectId,
-        dashboardId: input.dashboardId,
-        scope: input.scope,
-        viewer: { userId: actor.id },
-      }),
-    )
-
-    .procedure("scopeImpact")
-    .withPermission("analytics:view")
-    .handle(async ({ app, input, actor }) =>
-      app.getDashboardScopeImpact({
-        projectId: input.projectId,
-        dashboardId: input.dashboardId,
-        viewer: { userId: actor.id },
-      }),
-    )
-
-    .procedure("scopeProjects")
-    .withPermission("analytics:view")
-    .handle(async ({ app, input, actor }) =>
-      app.listDashboardScopeProjects({
-        projectId: input.projectId,
-        dashboardId: input.dashboardId,
-        viewer: { userId: actor.id },
-      }),
-    )
-
-    .procedure("listStarred")
-    .withPermission("analytics:view")
-    .handle(async ({ app, input, actor }) =>
-      app.listStarred({ projectId: input.projectId, userId: actor.id }),
-    )
-
-    .procedure("star")
-    .refusedOnAggregate()
-    .withPermission("analytics:view")
-    .handle(async ({ app, input, actor }) =>
-      app.star({
-        projectId: input.projectId,
-        userId: actor.id,
-        star: input.star,
-      }),
-    )
-
-    .procedure("unstar")
-    .refusedOnAggregate()
-    .withPermission("analytics:view")
-    .handle(async ({ app, input, actor }) =>
-      app.unstar({
-        projectId: input.projectId,
-        userId: actor.id,
-        star: input.star,
-      }),
-    )
-
-    .procedure("reorderStars")
-    .refusedOnAggregate()
-    .withPermission("analytics:view")
-    .handle(async ({ app, input, actor }) =>
-      app.reorderStars({
-        projectId: input.projectId,
-        userId: actor.id,
-        stars: input.stars,
-      }),
     )
 
     .procedure("sourcePresence")

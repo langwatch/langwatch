@@ -39,7 +39,7 @@ function inMemoryServer({ boards = [] }: { boards?: { id: string; name: string }
     state.calls.push(call);
     const input = (call.input ?? {}) as Record<string, unknown>;
     switch (call.path) {
-      case "dashboards.getAll":
+      case "boards.getAll":
         return Promise.resolve(
           state.boards.map((board) => ({
             ...HOME_BOARD,
@@ -50,12 +50,12 @@ function inMemoryServer({ boards = [] }: { boards?: { id: string; name: string }
             updatedAt: new Date("2026-01-01"),
           })),
         );
-      case "dashboards.create": {
+      case "boards.create": {
         const board = { id: `board-${state.boards.length + 1}`, name: String(input.name) };
         state.boards.push(board);
         return Promise.resolve(board);
       }
-      case "dashboards.updateDetails":
+      case "boards.update":
       case "dashboardWidgets.batchUpdateLayouts":
         return Promise.resolve({ success: true });
       case "dashboardWidgets.create":
@@ -248,7 +248,7 @@ describe("the templates finder", () => {
       await user.click(screen.getByRole("button", { name: `Add ${READY.name} to this project` }));
 
       await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-1"]));
-      const created = server.state.calls.find(({ path }) => path === "dashboards.create");
+      const created = server.state.calls.find(({ path }) => path === "boards.create");
       expect(created?.input).toEqual({ projectId: "proj-1", name: READY.name });
     });
 

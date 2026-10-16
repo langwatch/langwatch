@@ -34,7 +34,7 @@ type RunBoardWidget = Readonly<{
  * dashboard module's own scope rules answer both: an Only me board is its author's alone.
  */
 type RunBoardReader = {
-  getById(input: {
+  getBoard(input: {
     projectId: string;
     dashboardId: string;
     viewer: Viewer;
@@ -153,7 +153,7 @@ export class InsightRunGateService {
     viewer: Viewer;
   }): Promise<RunGateResult> {
     const { dashboards } = this.members;
-    const stored = await dashboards.getById({ projectId, dashboardId, viewer });
+    const stored = await dashboards.getBoard({ projectId, dashboardId, viewer });
     // Asked by board: the dashboard module then reads an Organization board's own project.
     const onBoard = await dashboards.listDashboardWidgets({
       projectId,

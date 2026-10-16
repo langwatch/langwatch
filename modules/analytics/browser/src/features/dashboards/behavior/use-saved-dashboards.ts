@@ -1,6 +1,6 @@
 /**
  * The boards this project lists for the member and the writes the sidebar and board offer,
- * over the `dashboards.*` procedures: the project's own, and apart from them the Organization
+ * over the `boards.*` procedures: the project's own, and apart from them the Organization
  * boards other projects own. Failures travel raw to the host (#5984).
  */
 
@@ -63,21 +63,21 @@ export function useSavedDashboards() {
   const projectSlug = project?.slug ?? "";
   const utils = analyticsApi.useUtils();
 
-  const list = analyticsApi.dashboards.getAll.useQuery(
+  const list = analyticsApi.boards.getAll.useQuery(
     { projectId, includeOrganization: true },
     { enabled: !!projectId },
   );
-  const create = analyticsApi.dashboards.create.useMutation();
-  const rename = analyticsApi.dashboards.rename.useMutation();
-  const remove = analyticsApi.dashboards.delete.useMutation();
+  const create = analyticsApi.boards.create.useMutation();
+  const rename = analyticsApi.boards.update.useMutation();
+  const remove = analyticsApi.boards.delete.useMutation();
 
   const listed: SavedBoard[] = (list.data ?? []).map(savedBoardOf);
   const boards = listed.filter((board) => board.projectId === projectId);
   const organizationBoards = listed.filter((board) => board.projectId !== projectId);
   const refresh = () =>
     Promise.all([
-      utils.dashboards.getAll.invalidate({ projectId }),
-      utils.dashboards.listStarred.invalidate({ projectId }),
+      utils.boards.getAll.invalidate({ projectId }),
+      utils.boards.listStarred.invalidate({ projectId }),
     ]);
 
   const createBoard = () => {

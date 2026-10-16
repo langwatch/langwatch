@@ -2,7 +2,7 @@ import type { DashboardWidgetDefinitionInput } from "@langwatch/analytics-contra
 import type { GraphLayout } from "@langwatch/dashboard-contract";
 import type { Instant } from "@langwatch/time";
 
-/** The stored CustomGraph representation, before its JSON definition is parsed. */
+/** The stored DashboardWidget row; `graph` is its `definition`, not yet parsed. */
 export interface DashboardWidgetRow {
   readonly id: string;
   readonly projectId: string;
@@ -47,6 +47,7 @@ export interface DashboardWidgetRepository {
   getById(input: DashboardWidgetScope): Promise<DashboardWidgetRow>;
   createWidget(input: CreateDashboardWidgetInput): Promise<DashboardWidgetRow>;
   updateWidget(input: UpdateDashboardWidgetInput): Promise<DashboardWidgetRow>;
+  /** Also deletes the widget's stale srcdoc copy in CustomGraph, which carries its id. */
   deleteWidget(input: DashboardWidgetScope): Promise<void>;
   assignToDashboard(input: AssignDashboardWidgetInput): Promise<DashboardWidgetRow>;
   /** All-or-nothing; an id naming no widget in the project is skipped, never refused. */

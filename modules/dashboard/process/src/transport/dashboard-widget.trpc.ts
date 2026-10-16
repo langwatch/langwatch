@@ -3,7 +3,7 @@
  * procedure. The playground's rollout gate is the widget operations' own.
  * Every call names the member as viewer: blocks on boards they cannot see read as not found.
  */
-import { DASHBOARD_SRCDOC_CHART_KIND, type DashboardWidget } from "@langwatch/analytics-contract";
+import type { DashboardWidget } from "@langwatch/analytics-contract";
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   DashboardApi,
@@ -21,11 +21,11 @@ const wireWidget = ({ createdAt, updatedAt, definition, ...widget }: DashboardWi
   updatedAt: toDate(updatedAt),
 });
 
-/** Main's `list` answered the stored chart rows, the definition under `graph`. */
+/** Main's `list` answered the definition under `graph`. */
 const wireRow = (widget: DashboardWidget): z.infer<typeof dashboardWidgetTrpcRowSchema> => {
   const { definition, ...row } = wireWidget(widget);
 
-  return { ...row, graph: definition, filters: null, kind: DASHBOARD_SRCDOC_CHART_KIND };
+  return { ...row, graph: definition };
 };
 
 export const dashboardWidgetTrpcTransport: TrpcRouterDeclaration<

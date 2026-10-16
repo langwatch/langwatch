@@ -3,7 +3,6 @@
  * `dashboardWidgets.*` path with main's inputs and outputs. The REST family is
  * `dashboard-widget-rest.schemas.ts`. Spec: custom-chart-playground-dashboard-placement.feature.
  */
-import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import {
   chartGridPlacementSchema,
   fitsChartGridWidth,
@@ -56,14 +55,12 @@ export interface DashboardWidgetTrpcSchema extends Named<
 export const dashboardWidgetTrpcSchema: DashboardWidgetTrpcSchema =
   dashboardWidgetTrpcSchemaDefinition;
 
-/** A widget as main's `list` answered it: the stored chart row, its definition under `graph`. */
+/** A widget as main's `list` answered it: its definition under `graph`. */
 const dashboardWidgetTrpcRowSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   name: z.string(),
   graph: dashboardWidgetDefinitionSchema,
-  filters: z.null(),
-  kind: z.literal(DASHBOARD_SRCDOC_CHART_KIND),
   createdAt: z.date(),
   updatedAt: z.date(),
   ...placementShape,
