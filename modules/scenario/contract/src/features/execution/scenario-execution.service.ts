@@ -30,6 +30,8 @@ export interface ScenarioExecutionJob {
   startedByUserId?: string;
   /** The API key that member started it with, which also bounds the run's key. */
   startedByApiKeyId?: string;
+  /** Skip the agent's teardown so the run's test data stays (ADR-180). */
+  keepData?: boolean;
 }
 
 export type ScenarioModelParametersFailureReason =
@@ -93,6 +95,8 @@ export type ScenarioUnsuccessfulExecutionInput = {
   error?: string;
   cancelled?: boolean;
   target?: { type: string; referenceId: string };
+  /** Setup failed or timed out: the run finishes with no verdict, so no pass rate counts it. */
+  notScored?: boolean;
 };
 
 /** Worker-lifecycle boundary recorded in Scenario ADR-002. */

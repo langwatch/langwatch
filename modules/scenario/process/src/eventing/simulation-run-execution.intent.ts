@@ -44,6 +44,7 @@ export function createExecuteRunHandler(
       ...(payload.startedByApiKeyId !== undefined
         ? { startedByApiKeyId: payload.startedByApiKeyId }
         : {}),
+      ...(payload.keepData ? { keepData: true } : {}),
     });
     logger.info(
       { scenarioRunId: payload.scenarioRunId },

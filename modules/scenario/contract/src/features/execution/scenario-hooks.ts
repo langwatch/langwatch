@@ -48,3 +48,12 @@ const scenarioRunHooksSchemaDefinition = z.object({
 export interface ScenarioRunHooksSchema extends Named<typeof scenarioRunHooksSchemaDefinition> {}
 export const scenarioRunHooksSchema: ScenarioRunHooksSchema = scenarioRunHooksSchemaDefinition;
 export type ScenarioRunHooks = z.infer<typeof scenarioRunHooksSchema>;
+
+/**
+ * A run whose setup did not answer (failed, timed out, or its agent was offline) is not scored:
+ * it has no verdict and no pass rate counts it. Teardown never changes the score.
+ */
+export function isRunNotScored(hooks: ScenarioRunHooks | null | undefined): boolean {
+  const setup = hooks?.setup;
+  return setup !== undefined && setup.status !== "ok";
+}

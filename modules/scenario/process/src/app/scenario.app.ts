@@ -917,6 +917,7 @@ export class ScenarioModule implements ScenarioApi {
         ...(input.simulatorModel ? { simulatorModel: input.simulatorModel } : {}),
         ...(input.judgeModel ? { judgeModel: input.judgeModel } : {}),
         ...withResolvedModels(input.resolvedModels),
+        ...(input.keepData ? { keepData: true } : {}),
       },
       ...withNote(input.note),
       ...(Object.keys(input.parameters).length > 0 ? { parameters: input.parameters } : {}),

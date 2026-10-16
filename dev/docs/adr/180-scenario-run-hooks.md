@@ -46,8 +46,8 @@ Hooks run for scenario runs only. Experiments, the Test button and `langwatch ag
 
 ### Outcomes
 
-- Setup failed or timed out: the run is not scored and is excluded from the pass rate, in the batch summary and the suite roll-up.
-- Teardown never changes the score. A failed teardown shows its error, the state it was given and the line "Test data may be left behind."
+- Setup failed or timed out (or its agent was offline): the run is not scored and is excluded from the pass rate, in the batch summary and the suite roll-up. It finishes `ERROR` with no verdict, so every reader that counts verdicts leaves it out.
+- Teardown never changes the score. A failed teardown shows its error, the state it was given and the line "Test data may be left behind." A teardown that timed out keeps `timed_out` in the record and reads "Teardown failed" with the timeout error.
 - **Rerun and keep data** skips teardown for that one rerun and is never saved to a plan. The run shows "Teardown skipped" (on purpose). "Teardown not run" means an accident, such as the agent being offline.
 - An agent that declares no hooks runs as today and is marked "No hooks".
 

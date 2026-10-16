@@ -47,6 +47,7 @@ describe("hasHookResults()", () => {
 
 describe("adapterDeclaresHooks()", () => {
   describe("when the target is a connected agent", () => {
+    /** @scenario 'An agent with no hooks runs as today and is marked "No hooks"' */
     it("is true only when the agent declared setup or teardown", () => {
       expect(adapterDeclaresHooks(connected)).toBe(false);
       expect(adapterDeclaresHooks({ ...connected, hooks: { setup: false, teardown: false } })).toBe(

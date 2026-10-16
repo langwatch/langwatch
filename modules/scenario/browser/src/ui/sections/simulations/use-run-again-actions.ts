@@ -20,11 +20,14 @@ export function useRunAgainActions({
   scenarioId,
   projectId,
   projectSlug,
+  runTarget,
   runCallbacks,
 }: {
   scenarioId: string | undefined;
   projectId: string | undefined;
   projectSlug: string | undefined;
+  /** The target this run was pointed at; "Rerun and keep data" reruns against it. */
+  runTarget?: TargetValue;
   /** Where a finished run goes; the drawer's runs-list navigation when absent. */
   runCallbacks?: RunSettledCallbacks;
 }) {
@@ -59,6 +62,14 @@ export function useRunAgainActions({
     [scenarioId, persistTarget, runScenario],
   );
 
+  // Keep data rides this one run alone: never remembered with the target, never saved to a plan.
+  const handleRunAgainKeepingData = useCallback(() => {
+    if (!scenarioId || !runTarget) return;
+    runScenario({ scenarioId, target: runTarget, keepData: true }).catch((error: unknown) => {
+      logger.error({ error }, "Failed to rerun scenario keeping its data");
+    });
+  }, [scenarioId, runTarget, runScenario]);
+
   const handleRunAgainClick = useCallback(() => {
     if (hasPersistedTarget && persistedTarget) {
       void handleRunAgain(persistedTarget, true);
@@ -74,5 +85,6 @@ export function useRunAgainActions({
     persistedTarget,
     handleRunAgain,
     handleRunAgainClick,
+    handleRunAgainKeepingData,
   };
 }

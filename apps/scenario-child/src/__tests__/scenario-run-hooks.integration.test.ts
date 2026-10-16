@@ -301,6 +301,7 @@ describe("ScenarioRunHooksService over the connected channel", () => {
   });
 
   describe("when the run keeps its data", () => {
+    /** @scenario "Rerun and keep data skips teardown for that rerun" */
     it("skips teardown and records it as skipped", async () => {
       const relay = fakeRelay({ setup: ok({ state: { orderId: "42" } }) });
       const channel = channelOver(relay);

@@ -55,7 +55,7 @@ function queued(metadata?: Record<string, unknown>): SimulationRunQueuedEvent {
   };
 }
 
-function finished(): SimulationRunFinishedEvent {
+function finished(verdict: "success" | "failure" = "success"): SimulationRunFinishedEvent {
   return {
     id: "event-finished",
     aggregateId: RUN_ID,
@@ -67,9 +67,9 @@ function finished(): SimulationRunFinishedEvent {
     version: SIMULATION_EVENT_VERSIONS.FINISHED,
     data: {
       scenarioRunId: RUN_ID,
-      status: "SUCCESS",
+      status: verdict === "success" ? "SUCCESS" : "FAILED",
       results: {
-        verdict: "success",
+        verdict,
         reasoning: "All criteria met",
         metCriteria: ["Answers within the time limit"],
         unmetCriteria: [],
@@ -88,7 +88,7 @@ const HOOKS: ScenarioRunHooks = {
   },
 };
 
-function hooksRecorded(): SimulationRunHooksRecordedEvent {
+function hooksRecorded(hooks: ScenarioRunHooks = HOOKS): SimulationRunHooksRecordedEvent {
   return {
     id: "event-hooks",
     aggregateId: RUN_ID,
@@ -98,7 +98,7 @@ function hooksRecorded(): SimulationRunHooksRecordedEvent {
     occurredAt: 3100,
     type: SIMULATION_RUN_EVENT_TYPES.HOOKS_RECORDED,
     version: SIMULATION_EVENT_VERSIONS.HOOKS_RECORDED,
-    data: { scenarioRunId: RUN_ID, hooks: HOOKS },
+    data: { scenarioRunId: RUN_ID, hooks },
   };
 }
 
@@ -131,6 +131,37 @@ describe("simulationRunStateFoldProjection hooks", () => {
       expect(JSON.parse(after.Metadata ?? "null")).toEqual({
         langwatch: { targetReferenceId: "agent_1", hooks: HOOKS },
       });
+    });
+  });
+
+  describe("when the teardown failed", () => {
+    /** @scenario "A failed teardown leaves a passing verdict passing" */
+    it("leaves a passing run passing", () => {
+      const after = fold([queued(), finished("success"), hooksRecorded()]);
+
+      expect(after.Verdict).toBe("success");
+      expect(after.Status).toBe("SUCCESS");
+    });
+
+    /** @scenario "A failed teardown leaves a failing verdict failing" */
+    it("leaves a failing run failing", () => {
+      const after = fold([queued(), finished("failure"), hooksRecorded()]);
+
+      expect(after.Verdict).toBe("failure");
+      expect(after.Status).toBe("FAILED");
+    });
+  });
+
+  describe("when the teardown timed out", () => {
+    /** @scenario "A teardown that times out counts as failed" */
+    it("keeps the verdict and records the timeout", () => {
+      const timedOut: ScenarioRunHooks = {
+        teardown: { status: "timed_out", durationMs: 60_000, error: "no answer within 60s" },
+      };
+      const after = fold([queued(), finished("success"), hooksRecorded(timedOut)]);
+
+      expect(after.Verdict).toBe("success");
+      expect(JSON.parse(after.Metadata ?? "null").langwatch.hooks).toEqual(timedOut);
     });
   });
 });

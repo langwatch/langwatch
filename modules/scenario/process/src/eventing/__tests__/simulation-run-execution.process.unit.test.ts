@@ -490,6 +490,33 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
     });
   });
 
+  describe("when the queued event records that the run keeps its data", () => {
+    function executeIntentFor(metadata?: Record<string, unknown>) {
+      const evolution = evolveEvent(
+        initialState,
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+          occurredAt: 10_000,
+          data: queuedData(metadata ? { metadata } : {}),
+        }),
+      );
+      return evolution.intents[0]?.payload;
+    }
+
+    /** @scenario "Rerun and keep data skips teardown for that rerun" */
+    it("carries keep data on the execute intent", () => {
+      expect(executeIntentFor({ langwatch: { keepData: true } })).toMatchObject({
+        keepData: true,
+      });
+    });
+
+    it("carries none when the run did not ask to keep its data", () => {
+      expect(executeIntentFor({ langwatch: { targetReferenceId: "agent_1" } })).not.toHaveProperty(
+        "keepData",
+      );
+    });
+  });
+
   describe("when the queued event records the run's secret parameters", () => {
     // They ride beside the metadata, encrypted, and stay encrypted through
     // this hop: the intent payload is persisted verbatim into outbox rows.
@@ -1113,6 +1140,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         secretParameterNames: null,
         startedByUserId: null,
         startedByApiKeyId: null,
+        keepData: false,
         evaluators: null,
         hasOwnEvaluations: false,
       });

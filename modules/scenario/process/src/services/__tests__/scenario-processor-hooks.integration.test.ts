@@ -156,8 +156,11 @@ describe("given a scenario child whose agent declared hooks", () => {
   });
 
   describe("when setup failed and the child exits with an error and the hook results", () => {
-    /** @scenario "The processor records hooks off the child's result line" */
-    it("fails the run with the setup error and still records both hooks", async () => {
+    /**
+     * @scenario "The processor records hooks off the child's result line"
+     * @scenario "A run whose setup failed is not scored"
+     */
+    it("finishes the run not scored and still records both hooks", async () => {
       const hooks = {
         setup: { status: "failed", durationMs: 12, error: "no such customer" },
         teardown: { status: "ok", durationMs: 9 },
@@ -172,13 +175,82 @@ describe("given a scenario child whose agent declared hooks", () => {
       await drained(pool);
 
       expect(finishUnsuccessfulRun).toHaveBeenCalledWith(
-        expect.objectContaining({ error: "Scenario setup failed: no such customer" }),
+        expect.objectContaining({
+          error: "Scenario setup failed: no such customer",
+          notScored: true,
+        }),
       );
       expect(recordHooks).toHaveBeenCalledWith({
         projectId: "proj_hooks",
         scenarioRunId: "scenariorun_hooks",
         hooks,
       });
+    }, 30_000);
+  });
+
+  describe("when setup timed out and the child exits with an error and the hook results", () => {
+    /** @scenario "A run whose setup timed out is not scored" */
+    it("finishes the run not scored and records the timeout", async () => {
+      const hooks = {
+        setup: { status: "timed_out", durationMs: 60_000, error: "no answer within 60s" },
+        teardown: { status: "ok", durationMs: 9 },
+      };
+      childScript.current = childThatReports(
+        { success: false, error: "Scenario setup timed out: no answer within 60s", hooks },
+        1,
+      );
+      const { pool, recordHooks, finishUnsuccessfulRun } = buildProcessor();
+
+      pool.submit(JOB);
+      await drained(pool);
+
+      expect(finishUnsuccessfulRun).toHaveBeenCalledWith(
+        expect.objectContaining({ notScored: true }),
+      );
+      expect(recordHooks).toHaveBeenCalledWith(expect.objectContaining({ hooks }));
+    }, 30_000);
+  });
+
+  describe("when the turns failed after setup answered", () => {
+    it("finishes the run scored, as any failed run", async () => {
+      const hooks = {
+        setup: { status: "ok", durationMs: 12, state: { orderId: "42" } },
+        teardown: { status: "ok", durationMs: 9 },
+      };
+      childScript.current = childThatReports({ success: false, error: "agent crashed", hooks }, 1);
+      const { pool, finishUnsuccessfulRun } = buildProcessor();
+
+      pool.submit(JOB);
+      await drained(pool);
+
+      expect(finishUnsuccessfulRun).toHaveBeenCalledWith(
+        expect.not.objectContaining({ notScored: true }),
+      );
+    }, 30_000);
+  });
+
+  describe("when keep data is asked for", () => {
+    /** @scenario "Rerun and keep data skips teardown for that rerun" */
+    it("hands keep data to the child", async () => {
+      // The child echoes its job's keepData back as the teardown status it would record.
+      childScript.current = `
+        let input = "";
+        process.stdin.on("data", (chunk) => { input += chunk; });
+        process.stdin.on("end", () => {
+          const job = JSON.parse(input);
+          const status = job.keepData === true ? "skipped" : "ok";
+          console.log(JSON.stringify({ success: true, hooks: { teardown: { status, durationMs: 0 } } }));
+          process.exit(0);
+        });
+      `;
+      const { pool, recordHooks } = buildProcessor();
+
+      pool.submit({ ...JOB, keepData: true });
+      await drained(pool);
+
+      expect(recordHooks).toHaveBeenCalledWith(
+        expect.objectContaining({ hooks: { teardown: { status: "skipped", durationMs: 0 } } }),
+      );
     }, 30_000);
   });
 

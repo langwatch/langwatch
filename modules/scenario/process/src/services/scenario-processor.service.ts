@@ -1,9 +1,10 @@
 import { createLogger, type Logger } from "@langwatch/observability";
 import { createContextFromJobData, runWithContext } from "@langwatch/observability/context";
-import type {
-  ScenarioExecutionPrefetchResult,
-  ScenarioExecutionService,
-  ScenarioExecutionResult,
+import {
+  isRunNotScored,
+  type ScenarioExecutionPrefetchResult,
+  type ScenarioExecutionService,
+  type ScenarioExecutionResult,
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -181,7 +182,11 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     this.options.pool.drain();
   }
 
-  async handleFailed(jobData: ExecutionJobData, error: string | undefined): Promise<void> {
+  async handleFailed(
+    jobData: ExecutionJobData,
+    error: string | undefined,
+    outcome: { notScored?: boolean } = {},
+  ): Promise<void> {
     await this.options.execution.finishUnsuccessfulRun({
       projectId: jobData.projectId,
       scenarioId: jobData.scenarioId,
@@ -190,6 +195,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
       scenarioRunId: jobData.scenarioRunId,
       error,
       target: jobData.target,
+      ...(outcome.notScored ? { notScored: true } : {}),
     });
   }
 
@@ -231,6 +237,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     const result = await childSession.execute({
       ...prefetch.data,
       scenarioRunId: jobData.scenarioRunId,
+      ...(jobData.keepData ? { keepData: true } : {}),
     });
     await this.finishExecution({
       jobData,
@@ -360,7 +367,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
       { success: false, error: result.error, durationMs, childDurationMs },
       "Scenario job completed with failure",
     );
-    await this.handleFailed(jobData, result.error);
+    await this.handleFailed(jobData, result.error, { notScored: isRunNotScored(result.hooks) });
     await this.recordHooks({ jobData, result, jobLogger });
   }
 

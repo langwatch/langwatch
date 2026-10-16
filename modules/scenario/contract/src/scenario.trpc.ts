@@ -150,6 +150,8 @@ const scenarioTrpcRunSchemaDefinition = z.object({
   parameters: runParameterValuesSchema.optional(),
   /** One short line describing why this run was started. */
   note: runNoteSchema,
+  /** "Rerun and keep data": skip the agent's teardown for this one run, never kept on a plan. */
+  keepData: z.boolean().optional(),
 });
 export interface ScenarioTrpcRunSchema extends Named<typeof scenarioTrpcRunSchemaDefinition> {}
 export const scenarioTrpcRunSchema: ScenarioTrpcRunSchema = scenarioTrpcRunSchemaDefinition;

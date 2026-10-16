@@ -38,6 +38,8 @@ interface RunScenarioParams {
   note?: string;
   /** Values that override the scenario's own parameter defaults for this run. */
   parameters?: RunParameterValues;
+  /** "Rerun and keep data": skip the agent's teardown for this run only (ADR-180). */
+  keepData?: boolean;
 }
 
 /**
@@ -144,7 +146,7 @@ export function useRunScenario({
 
   const runScenario = useCallback(
     async (params: RunScenarioParams) => {
-      const { scenarioId, target, setId, batchRunId, note, parameters } = params;
+      const { scenarioId, target, setId, batchRunId, note, parameters, keepData } = params;
       if (!projectId || !projectSlug || !target) return;
 
       // Check if model providers are configured before attempting to run
@@ -174,6 +176,7 @@ export function useRunScenario({
             batchRunId,
             note,
             parameters,
+            ...(keepData ? { keepData: true } : {}),
           });
 
         onQueued?.({ setId: returnedSetId, batchRunId: returnedBatchRunId });

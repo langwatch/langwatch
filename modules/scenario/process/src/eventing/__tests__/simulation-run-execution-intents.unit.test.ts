@@ -181,6 +181,16 @@ describe("createExecuteRunHandler", () => {
       );
     });
 
+    /** @scenario "Rerun and keep data skips teardown for that rerun" */
+    it("forwards keep data onto the pool job", async () => {
+      const submit = vi.fn();
+      const run = createExecuteRunHandler(executionService(submit));
+
+      await run(makeExecutePayload({ keepData: true }), makeContext());
+
+      expect(submit).toHaveBeenCalledWith(expect.objectContaining({ keepData: true }));
+    });
+
     it("omits scenarioName when the intent carries no name", async () => {
       const submit = vi.fn();
       const run = createExecuteRunHandler(executionService(submit));

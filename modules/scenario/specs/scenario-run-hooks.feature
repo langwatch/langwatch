@@ -98,32 +98,32 @@ Feature: Scenario run hooks: setup and teardown
 
   Rule: Setup failure and scoring
 
-    @integration @unimplemented
+    @integration
     Scenario: A run whose setup failed is not scored
       Given a setup that fails
       Then the run has no verdict
       And the run shows the setup error
 
-    @integration @unimplemented
+    @integration
     Scenario: A run whose setup timed out is not scored
       Given a setup that exceeds its timeout
       Then the run has no verdict
       And the run shows a timeout error
 
-    @unit @unimplemented
+    @unit
     Scenario: Setup failures are excluded from the batch pass rate
       Given a batch of 4 runs: 2 passed, 1 failed and 1 whose setup failed
       When the batch summary is computed
       Then the pass rate is 2 of 3
       And the summary counts 1 run as not scored
 
-    @unit @unimplemented
+    @unit
     Scenario: Setup failures are excluded from the suite roll-up
       Given a suite whose latest batch has a run whose setup failed
       When the suite roll-up is computed
       Then that run is not in the pass-rate denominator
 
-    @unit @unimplemented
+    @unit
     Scenario: A batch where every setup failed has no pass rate
       Given a batch whose runs all failed in setup
       When the batch summary is computed
@@ -131,30 +131,31 @@ Feature: Scenario run hooks: setup and teardown
 
   Rule: Teardown never changes the score
 
-    @unit @unimplemented
+    @unit
     Scenario: A failed teardown leaves a passing verdict passing
       Given a run that passed and a teardown that raises
       Then the run verdict is still success
       And the run shows the teardown error
 
-    @unit @unimplemented
+    @unit
     Scenario: A failed teardown leaves a failing verdict failing
       Given a run that failed and a teardown that raises
       Then the run verdict is still failure
 
-    @unit @unimplemented
+    @unit
     Scenario: A failed teardown shows the state it was given and a warning
       Given a teardown that raises with the state "order 42"
       Then the run shows the state "order 42"
       And the run shows "Test data may be left behind."
 
-    @integration @unimplemented
+    # The record keeps the status timed_out; the run reads "Teardown failed" with the timeout error.
+    @unit
     Scenario: A teardown that times out counts as failed
       Given a teardown that does not answer within its timeout
-      Then the teardown status is failed with a timeout error
+      Then the run shows "Teardown failed" with the timeout error
       And the verdict is unchanged
 
-    @unit @unimplemented
+    @unit
     Scenario: A teardown's returned object is shown on the run
       Given a teardown that returns { "deleted": 3 }
       Then the run shows { "deleted": 3 } as the teardown result
@@ -190,14 +191,14 @@ Feature: Scenario run hooks: setup and teardown
         | the Test button      |
         | langwatch agent run  |
 
-    @unit @unimplemented
+    @unit
     Scenario: An agent with no hooks runs as today and is marked "No hooks"
       Given a connected agent that declares no hooks
       When a scenario runs against it
       Then only turn calls are made
       And the run shows "No hooks"
 
-    @unit @unimplemented
+    @unit
     Scenario: HTTP and code agents never call hooks
       Given an HTTP agent
       When a scenario runs against it
@@ -228,7 +229,7 @@ Feature: Scenario run hooks: setup and teardown
 
   Rule: Rerun and keep data
 
-    @integration @unimplemented
+    @integration
     Scenario: Rerun and keep data skips teardown for that rerun
       When a person reruns a run with "Rerun and keep data"
       Then setup and the turns run
@@ -241,7 +242,7 @@ Feature: Scenario run hooks: setup and teardown
       When the person saves the run into a plan
       Then the saved plan does not carry keep data
 
-    @unit @unimplemented
+    @unit
     Scenario: A teardown that did not happen by accident reads "Teardown not run"
       Given a run whose agent went offline before teardown
       Then the run shows "Teardown not run"

@@ -115,6 +115,8 @@ const simulationRunMetadataSchemaDefinition = z
         agentInstance: z.object({ hostname: z.string(), label: z.string().nullable() }).optional(),
         /** The setup and teardown results of the run (ADR-180). */
         hooks: scenarioRunHooksSchema.optional(),
+        /** Started with "Rerun and keep data", so its teardown was skipped (ADR-180). */
+        keepData: z.boolean().optional(),
       })
       .optional(),
   })

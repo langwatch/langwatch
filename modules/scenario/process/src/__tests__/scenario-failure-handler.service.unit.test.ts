@@ -106,6 +106,22 @@ describe("ScenarioFailureHandlerService", () => {
     handler = createHandler();
   });
 
+  describe("when the run's setup failed, so it is not scored", () => {
+    /** @scenario "A run whose setup failed is not scored" */
+    it("finishes the run ERROR with no verdict", async () => {
+      await handler.finishUnsuccessfulRun({
+        ...baseParams,
+        error: "Scenario setup failed: no such customer",
+        notScored: true,
+      });
+
+      expect(mockFinishRun).toHaveBeenCalledTimes(1);
+      const input = mockFinishRun.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(input.status).toBe(ScenarioRunStatus.ERROR);
+      expect(input).not.toHaveProperty("results");
+    });
+  });
+
   describe("when called with an error", () => {
     it("dispatches finishRun with ERROR status and a plain-text reasoning", async () => {
       await handler.finishUnsuccessfulRun({
