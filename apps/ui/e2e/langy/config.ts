@@ -44,3 +44,15 @@ export function useAccount({ email, password }: { email: string; password: strin
 // `npx vitest run` against the local haven stack Just Works.
 export const LW_BASE_URL = process.env.LW_BASE_URL ?? APP_BASE;
 export const LANGWATCH_API_KEY = process.env.LANGWATCH_API_KEY ?? "sk-lw-local-development-key";
+
+/**
+ * The key langwatch-api.ts sends, read per request. A suite that seeds its
+ * own project swaps it with `useApiKey`, or every Layer-2 read and seed would
+ * still land on the env project.
+ */
+export const API_CREDENTIALS = { KEY: LANGWATCH_API_KEY };
+
+/** Send every langwatch-api.ts request with this key for the rest of the process. */
+export function useApiKey(key: string): void {
+  API_CREDENTIALS.KEY = key;
+}

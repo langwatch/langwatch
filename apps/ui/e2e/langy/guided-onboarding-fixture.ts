@@ -31,7 +31,7 @@ import {
   GUIDED_PROVIDERS,
   type GuidedProvider,
 } from "../../src/shell/features/guided-onboarding/model/guided-providers.ts";
-import { APP_BASE, CONFIG, useAccount, useProject } from "./config";
+import { APP_BASE, CONFIG, useProject } from "./config";
 import type { LangyAdapter, LangyToolEvent } from "./langy-agent";
 import {
   callDemoChatRoute,
@@ -42,7 +42,8 @@ import {
   openaiKey,
   toolOutputText,
 } from "./local-control-fixture";
-import { getSessionCookie, resetSessionCookie, signUpAccount, trpcMutate, trpcQuery } from "./trpc";
+import { createOrganizationWithProject, signUpAndUseAccount } from "./seed-organization";
+import { getSessionCookie, trpcMutate, trpcQuery } from "./trpc";
 
 // ---------------------------------------------------------------------------
 // The lines the skill says verbatim (skills/guided-onboarding/SKILL.mdx)
@@ -460,81 +461,42 @@ export async function seedGuidedOrganization({
   // process, so no other session signed in on a shared account can land on
   // it and send the kickoff first.
   const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  await signUpAccount({
+  const cookie = await signUpAndUseAccount({
     name: `Riley ${label}`,
     email: `riley+guided-${slug}-${stamp}@acme.test`,
     password: FRESH_ACCOUNT_PASSWORD,
   });
-  useAccount({
-    email: `riley+guided-${slug}-${stamp}@acme.test`,
-    password: FRESH_ACCOUNT_PASSWORD,
-  });
-  resetSessionCookie();
-  const cookie = await getSessionCookie();
   const orgName = `ACME ${label} ${stamp}`;
   const now = new Date().toISOString();
-  const org = await trpcMutate<{
-    organization: { id: string; slug: string };
-    team: { id: string; slug: string };
-  }>({
+  const seededProject = await createOrganizationWithProject({
     cookie,
-    path: "organization.createAndAssign",
-    input: {
-      orgName,
-      primaryIntent: currentPath === "governance" ? "AGENT_GOVERNANCE" : "LLM_OPS",
-      signUpData: {
-        terms: true,
-        usage: "Company",
-        onboardingVariant: "guided",
-        guidedOnboarding: {
-          paths,
-          currentPath,
-          donePaths,
-          ...(withProvider ? { provider: PROVIDER, providerModel: MODEL } : {}),
-          ...(tour === "completed" ? { tourCompletedAt: now } : {}),
-          ...(tour === "skipped" ? { tourSkippedAt: now } : {}),
-        },
+    orgName,
+    primaryIntent: currentPath === "governance" ? "AGENT_GOVERNANCE" : "LLM_OPS",
+    signUpData: {
+      terms: true,
+      usage: "Company",
+      onboardingVariant: "guided",
+      guidedOnboarding: {
+        paths,
+        currentPath,
+        donePaths,
+        ...(withProvider ? { provider: PROVIDER, providerModel: MODEL } : {}),
+        ...(tour === "completed" ? { tourCompletedAt: now } : {}),
+        ...(tour === "skipped" ? { tourSkippedAt: now } : {}),
       },
     },
+    project: { name: "ACME Checkout", language: "python", framework: "langgraph" },
   });
-  const created = await trpcMutate<{ projectSlug: string }>({
-    cookie,
-    path: "project.create",
-    input: {
-      organizationId: org.organization.id,
-      teamId: org.team.id,
-      name: "ACME Checkout",
-      language: "python",
-      framework: "langgraph",
-    },
-  });
-  // The create answers with the slug alone; the id comes from the
-  // organization listing, the way the app resolves the ambient project.
-  const organizations = await trpcQuery<
-    {
-      id: string;
-      teams?: { projects?: { id: string; slug: string }[] }[];
-    }[]
-  >({ cookie, path: "organization.getAll", input: {} });
-  const project = organizations
-    .find((organization) => organization.id === org.organization.id)
-    ?.teams?.flatMap((team) => team.projects ?? [])
-    .find((candidate) => candidate.slug === created.projectSlug);
-  if (!project) {
-    throw new Error(
-      `project ${created.projectSlug} was created but the organization does not list it`,
-    );
-  }
 
   if (withProvider) {
     await attachProvider({
       cookie,
-      organizationId: org.organization.id,
-      projectId: project.id,
+      organizationId: seededProject.organizationId,
+      projectId: seededProject.projectId,
     });
   }
 
-  useProject({ id: project.id, slug: project.slug });
+  useProject({ id: seededProject.projectId, slug: seededProject.projectSlug });
   // The scenario library reports every simulation to the platform, and the
   // folder fixture's demo application needs a key too: both take the same
   // user key bound to this project.
@@ -542,11 +504,7 @@ export async function seedGuidedOrganization({
   process.env.LANGWATCH_API_KEY = await getCliApiKey();
 
   const seeded: GuidedOrganization = {
-    organizationId: org.organization.id,
-    organizationSlug: org.organization.slug,
-    teamId: org.team.id,
-    projectId: project.id,
-    projectSlug: project.slug,
+    ...seededProject,
     orgName,
     paths,
     currentPath,
@@ -557,7 +515,7 @@ export async function seedGuidedOrganization({
 }
 
 /** The provider the takeover connects (README.md "guided-onboarding-fixture.ts"). */
-async function attachProvider({
+export async function attachProvider({
   cookie,
   organizationId,
   projectId,
@@ -579,7 +537,9 @@ async function attachProvider({
         "no OPENAI_API_KEY in the environment or the workspace-root .env; the seeded provider needs one",
       );
     }
-    customKeys = { OPENAI_API_KEY: key };
+    // A gateway virtual key stands in for an OpenAI key when OPENAI_BASE_URL names its gateway.
+    const baseUrl = process.env.OPENAI_BASE_URL;
+    customKeys = { OPENAI_API_KEY: key, ...(baseUrl ? { OPENAI_BASE_URL: baseUrl } : {}) };
   }
   await trpcMutate({
     cookie,
