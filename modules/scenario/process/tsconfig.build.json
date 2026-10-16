@@ -139,9 +139,6 @@
       "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/authorization/tsconfig.build.json"
     }
   ],
@@ -149,6 +146,7 @@
   "nx": {
     "sync": {
       "ignoredDependencies": [
+        "@langwatch/clickhouse-migrations",
         "@langwatch/config",
         "@langwatch/egress",
         "@langwatch/model-provider-process",

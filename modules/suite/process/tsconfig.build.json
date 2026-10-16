@@ -79,9 +79,6 @@
     },
     {
       "path": "../../agent/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
@@ -90,6 +87,7 @@
       "ignoredDependencies": [
         "@langwatch/authorization",
         "@langwatch/authz-contract",
+        "@langwatch/clickhouse-migrations",
         "@langwatch/module",
         "@langwatch/process-stores",
         "@langwatch/secrets",
