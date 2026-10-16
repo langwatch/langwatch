@@ -30,6 +30,7 @@ import {
   violationNames,
 } from "../rules/issued-license.rules.ts";
 import { signedLiteSeats, storedLiteSeats } from "../rules/lite-seats.rules.ts";
+import { TESTING_LICENSE_TERMS } from "../rules/testing-license-issue.rules.ts";
 
 type IssuedLicenseRowDraft = {
   licenseKey: string;
@@ -110,6 +111,38 @@ export class IssuedLicenseWriterService {
       if (isUniqueViolation(error)) throw new LicenseAlreadyReissuedError();
       throw error;
     }
+  }
+
+  /** Signs a testing licence bound to one instance from issue (ADR-180 section 3); unlinked. */
+  async signTesting(input: {
+    instanceId: string;
+    organizationId: string;
+    expiresAt: Instant;
+    issuedById: string;
+  }): Promise<{ licenseKey: string; row: IssuedLicenseRecord }> {
+    const privateKey = this.getSigningKey();
+    const { licenseKey } = this.options.generation.generate({
+      organizationId: input.organizationId,
+      organizationName: TESTING_LICENSE_TERMS.organizationName,
+      email: TESTING_LICENSE_TERMS.email,
+      planType: TESTING_LICENSE_TERMS.planType,
+      ...licenseSeats({
+        members: TESTING_LICENSE_TERMS.maxMembers,
+        membersLite: TESTING_LICENSE_TERMS.maxMembersLite,
+      }),
+      expiresAt: toDate(input.expiresAt),
+      connectServices: [],
+      privateKey,
+      now: toDate(this.options.now()),
+      testing: { instanceId: input.instanceId },
+    });
+    const row = await this.createRow({
+      licenseKey,
+      organizationId: null,
+      source: "BACKOFFICE",
+      issuedById: input.issuedById,
+    });
+    return { licenseKey, row };
   }
 
   async createRow(draft: IssuedLicenseRowDraft): Promise<IssuedLicenseRecord> {

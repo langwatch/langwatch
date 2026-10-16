@@ -37,13 +37,13 @@ import type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
+import { connectedSeatsOf, seatChangesOf } from "../rules/connected-seats.rules.ts";
 import { resolveLicenseTerms } from "../rules/issued-license-row.rules.ts";
 import {
   isStandardLicenseRow,
   issuedLicenseView,
   statusOfIssuedLicense,
 } from "../rules/issued-license.rules.ts";
-import { TESTING_LICENSE_TERMS } from "../rules/testing-license-issue.rules.ts";
 import type { ContractBudgets } from "./contract-budget.service.ts";
 import { IssuedLicenseWriterService } from "./issued-license-writer.service.ts";
 
@@ -121,28 +121,7 @@ export class LicenseRegistryService {
     expiresAt: Instant;
     issuedById: string;
   }): Promise<SignedIssuedLicense> {
-    const privateKey = this.writer.getSigningKey();
-    const { licenseKey } = this.options.generation.generate({
-      organizationId: input.organizationId,
-      organizationName: TESTING_LICENSE_TERMS.organizationName,
-      email: TESTING_LICENSE_TERMS.email,
-      planType: TESTING_LICENSE_TERMS.planType,
-      ...licenseSeats({
-        members: TESTING_LICENSE_TERMS.maxMembers,
-        membersLite: TESTING_LICENSE_TERMS.maxMembersLite,
-      }),
-      expiresAt: toDate(input.expiresAt),
-      connectServices: [],
-      privateKey,
-      now: toDate(this.options.now()),
-      testing: { instanceId: input.instanceId },
-    });
-    const row = await this.writer.createRow({
-      licenseKey,
-      organizationId: null,
-      source: "BACKOFFICE",
-      issuedById: input.issuedById,
-    });
+    const { licenseKey, row } = await this.writer.signTesting(input);
     return { licenseKey, license: this.toView(row) };
   }
 
@@ -275,20 +254,7 @@ export class LicenseRegistryService {
 
   /** Every seat change that raised a linked license, as billing invoices it. */
   async findSeatChanges(input: { organizationId?: string }): Promise<LicenseSeatChange[]> {
-    const rows = await this.options.repository.findAllSeatsRaised(input);
-    return rows.flatMap((row) =>
-      isStandardLicenseRow(row) && row.organizationId !== null && row.seatsRaisedFrom !== null
-        ? [
-            {
-              licenseRowId: row.id,
-              organizationId: row.organizationId,
-              previousSeats: row.seatsRaisedFrom,
-              seats: row.maxMembers,
-              changedAt: row.issuedAt.toString(),
-            },
-          ]
-        : [],
-    );
+    return seatChangesOf(await this.options.repository.findAllSeatsRaised(input));
   }
 
   async resetInstanceBinding(input: { id: string }): Promise<IssuedLicenseView> {
@@ -400,27 +366,10 @@ export class LicenseRegistryService {
     return this.toView(updated);
   }
 
-  /**
-   * Off the active license that runs longest: a reissue leaves both rows active
-   * until the install presents the new one, and summing them counts seats twice.
-   */
+  /** Off the active standard license that runs longest; see `connectedSeatsOf`. */
   async getConnectedSeats(organizationId: string): Promise<ConnectedSeats> {
-    const licenses = (await this.options.repository.findAllByOrganization(organizationId)).filter(
-      isStandardLicenseRow,
-    );
-    const now = this.options.now();
-    const active = licenses.filter((row) => statusOfIssuedLicense(row, now) === "active");
-    const [current] = active.toSorted((a, b) => Temporal.Instant.compare(b.expiresAt, a.expiresAt));
-    const [lastSyncAt] = active
-      .flatMap((row) => (row.lastSyncAt ? [row.lastSyncAt] : []))
-      .toSorted((a, b) => Temporal.Instant.compare(b, a));
-
-    return {
-      licensed: current?.maxMembers ?? 0,
-      reported: current?.lastSyncAt ? (current.reportedMembers ?? 0) : null,
-      lastSyncAt: lastSyncAt?.toString() ?? null,
-      managedVirtualKeyId: licenses.find((row) => row.virtualKeyId)?.virtualKeyId ?? null,
-    };
+    const rows = await this.options.repository.findAllByOrganization(organizationId);
+    return connectedSeatsOf({ rows, now: this.options.now() });
   }
 
   async getById(input: { id: string }): Promise<IssuedLicenseView> {
