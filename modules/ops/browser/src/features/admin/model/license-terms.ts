@@ -2,9 +2,6 @@
  * derived from `RouterOutputs`: model stays pure and behavior depends on it,
  * never the reverse. */
 
-/** What each list filter choice would show, the other applied; `all`: the search alone. */
-export type LicenseCounts = Record<"active" | "inactive" | "customer" | "internal" | "all", number>;
-
 export interface License {
   id: string;
   licenseId: string;
@@ -36,6 +33,9 @@ export interface License {
   status: "active" | "revoked" | "superseded" | "expired";
   hasPendingDelivery: boolean;
 }
+
+/** What each list filter choice would show, the other applied; `all`: the search alone. */
+export type LicenseCounts = Record<"active" | "inactive" | "customer" | "internal" | "all", number>;
 
 /** The hosted services an operator can put on a license (ADR-156); kept a
  * plain array here since a core browser package names no enterprise one. */
