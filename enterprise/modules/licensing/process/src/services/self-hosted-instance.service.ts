@@ -160,7 +160,7 @@ export class SelfHostedInstanceService {
         pageSize: SUMMARY_LIST_LIMIT,
         sort: "traces_28d",
         licensed: false,
-        seenSince: quietSince,
+        seenSince: reportingSince,
       }),
     ]);
     const seenWithin = (days: number) =>

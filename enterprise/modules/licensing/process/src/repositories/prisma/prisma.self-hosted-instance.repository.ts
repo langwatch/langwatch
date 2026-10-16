@@ -23,12 +23,6 @@ type SelfHostedInstanceDatabase = Pick<
   "selfHostedInstance" | "selfHostedInstanceReport" | "$queryRaw"
 >;
 
-/** The registry is the platform's own: an install row belongs to no tenant. */
-const PLATFORM_TABLE = skipTenantCheck({
-  // An install is addressed by the instance id it minted; no organization or project owns the row.
-  SKIP_TENANT_CHECK: true,
-});
-
 /** A number the last report carried under `key`, or null; Prisma cannot order by a JSON path. */
 function reported(key: string): Prisma.Sql {
   return Prisma.sql`CASE WHEN jsonb_typeof("latestReport"->${key}) = 'number'
@@ -102,12 +96,18 @@ export class PrismaSelfHostedInstanceRepository implements SelfHostedInstanceRep
     const where = whereOf(input);
     const [page, [counted]] = await Promise.all([
       this.prisma.$queryRaw<{ id: string }[]>`
-        ${PLATFORM_TABLE}
+        ${skipTenantCheck({
+          // A page of the installs; no organization or project owns an install row.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT "id" FROM "SelfHostedInstance" ${where}
         ORDER BY ${ORDER_BY[input.sort]}, "id"
         LIMIT ${input.pageSize} OFFSET ${input.page * input.pageSize}`,
       this.prisma.$queryRaw<{ total: number }[]>`
-        ${PLATFORM_TABLE}
+        ${skipTenantCheck({
+          // The count behind that page, over the same install rows.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT count(*)::int AS "total" FROM "SelfHostedInstance" ${where}`,
     ]);
     const ids = page.map((row) => row.id);
@@ -135,7 +135,10 @@ export class PrismaSelfHostedInstanceRepository implements SelfHostedInstanceRep
     const quietAt = toDate(quietSince);
     const [[counts], signals, releases] = await Promise.all([
       this.prisma.$queryRaw<Omit<SelfHostedInstanceTally, "signals" | "releases">[]>`
-        ${PLATFORM_TABLE}
+        ${skipTenantCheck({
+          // Activity and licence counts over every install; an install row belongs to no tenant.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT
           count(*)::int AS "total",
           (count(*) FILTER (WHERE "lastSeenAt" >= ${reportingAt}))::int AS "reporting",
@@ -146,12 +149,18 @@ export class PrismaSelfHostedInstanceRepository implements SelfHostedInstanceRep
             FILTER (WHERE "lastSeenAt" >= ${reportingAt}), 0)::float8 AS "traces28d"
         FROM "SelfHostedInstance"`,
       this.prisma.$queryRaw<{ signal: string; count: number }[]>`
-        ${PLATFORM_TABLE}
+        ${skipTenantCheck({
+          // Signals raised across every install, for the platform operator's summary.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT "signal", count(*)::int AS "count"
         FROM "SelfHostedInstance", unnest("raisedSignals") AS "signal"
         GROUP BY "signal" ORDER BY "count" DESC, "signal"`,
       this.prisma.$queryRaw<{ version: string; count: number }[]>`
-        ${PLATFORM_TABLE}
+        ${skipTenantCheck({
+          // Releases across every install still reporting, for the platform operator's summary.
+          SKIP_TENANT_CHECK: true,
+        })}
         SELECT "version", count(*)::int AS "count" FROM "SelfHostedInstance"
         WHERE "version" IS NOT NULL AND "lastSeenAt" >= ${quietAt}
         GROUP BY "version" ORDER BY "count" DESC, "version" DESC

@@ -152,7 +152,7 @@ const selfHostedInstanceSummarySchemaDefinition = z.object({
   signals: z.array(z.object({ signal: z.enum(SELF_HOSTED_SIGNALS), count: z.number() })),
   /** Open source installs still reporting, most traces over 28 days first. */
   busiestOpenSource: z.array(selfHostedInstanceViewSchema),
-  /** Releases the installs still reporting run, most common first. */
+  /** Releases the installs that reported in the last fortnight run, most common first. */
   releases: z.array(z.object({ version: z.string(), count: z.number() })),
 });
 export interface SelfHostedInstanceSummarySchema extends Named<

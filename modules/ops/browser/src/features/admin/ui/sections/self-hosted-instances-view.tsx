@@ -1,3 +1,4 @@
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { useState } from "react";
 import { useDebounce } from "use-debounce";
 
@@ -45,12 +46,16 @@ export default function SelfHostedInstancesView() {
         }}
         searchPlaceholder="Search by domain, hostname, release or instance id"
         summary={
-          <InstancesSummary
-            summary={summary.data}
-            activeSignal={filters.signal}
-            onSignal={(signal) => narrow({ ...filters, signal })}
-            onOpen={setOpenId}
-          />
+          summary.error ? (
+            <HandledErrorAlert error={summary.error} fallbackTitle="Couldn't load the summary" />
+          ) : (
+            <InstancesSummary
+              summary={summary.data}
+              activeSignal={filters.signal}
+              onSignal={(signal) => narrow({ ...filters, signal })}
+              onOpen={setOpenId}
+            />
+          )
         }
         filters={<InstanceFilters value={filters} onChange={narrow} />}
         isLoading={list.isLoading}
