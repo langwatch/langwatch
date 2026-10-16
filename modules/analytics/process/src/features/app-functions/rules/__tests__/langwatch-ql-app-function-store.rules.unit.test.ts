@@ -137,6 +137,22 @@ describe("isFunctionStoreInKeeper", () => {
   });
 });
 
+describe("isFunctionStoreInKeeper given one name with two definitions", () => {
+  /** @scenario "A replicated server whose replicas hold one function with different definitions is not provisionable" */
+  it("is not in Keeper, so the next deploy skips the functions rather than retrying the create", () => {
+    expect(
+      isFunctionStoreInKeeper({
+        storeNodeExists: true,
+        storeEntries: ["function_same_name.sql"],
+        replicas: [
+          { host: "a", functions: { same_name: "CREATE FUNCTION same_name AS () -> 1" } },
+          { host: "b", functions: { same_name: "CREATE FUNCTION same_name AS () -> 2" } },
+        ],
+      }),
+    ).toBe(false);
+  });
+});
+
 describe("findSplitAppFunctions", () => {
   const stored = ["function_f.sql"];
 

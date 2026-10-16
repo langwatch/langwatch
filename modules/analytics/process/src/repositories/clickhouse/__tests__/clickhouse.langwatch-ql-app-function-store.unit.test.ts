@@ -1,7 +1,7 @@
 /**
  * The probe the deploy task and the ops checkup both read, over a driver that answers as
  * ClickHouse 25.10 does: system.server_settings never lists user_defined_zookeeper_path,
- * a server with no Keeper has no system.zookeeper table, and every replica answers alone.
+ * a server with no Keeper has no system.zookeeper table, and the first replica is the one reached.
  */
 import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
@@ -38,16 +38,21 @@ function clickHouse2510({
   clusters = [
     { name: "langwatch", hosts: String(maxTotalReplicas), widest_shard: String(maxTotalReplicas) },
   ],
-  unreachable = false,
+  crossReplicaError,
 }: {
   maxTotalReplicas: number;
   keeper: "absent" | "with-function-store" | "without-function-store";
   replicas?: Replica[];
   storeEntries?: string[];
   clusters?: Record<string, string>[];
-  unreachable?: boolean;
+  /** What clusterAllReplicas fails with; unset, every replica answers. */
+  crossReplicaError?: Error;
 }): QueryDriver {
   const names = (list: string[]) => list.map((name) => ({ name }));
+  const functionsOf = ({ host, functions }: Replica) => ({
+    host,
+    functions: Object.fromEntries(functions.map((name) => [name, `CREATE FUNCTION ${name}`])),
+  });
   return {
     execute<Row>({ sql }: { sql: string }) {
       const answer = (rows: Record<string, unknown>[]) => Promise.resolve({ rows: rows as Row[] });
@@ -57,15 +62,11 @@ function clickHouse2510({
       if (sql.includes("system.server_settings")) return answer([]);
       if (sql.includes("system.clusters")) return answer(clusters);
       if (sql.includes("clusterAllReplicas('langwatch', system.functions)")) {
-        if (unreachable) return Promise.reject(new Error("All connection tries failed: ch-2:9000"));
-        return answer(
-          replicas.map(({ host, functions }) => ({
-            host,
-            functions: Object.fromEntries(
-              functions.map((name) => [name, `CREATE FUNCTION ${name}`]),
-            ),
-          })),
-        );
+        if (crossReplicaError !== undefined) return Promise.reject(crossReplicaError);
+        return answer(replicas.map(functionsOf));
+      }
+      if (sql.includes("FROM system.functions")) {
+        return answer(replicas.slice(0, 1).map(functionsOf));
       }
       if (sql.includes("system.zookeeper")) {
         if (keeper === "absent") return Promise.reject(unknownTable(sql));
@@ -89,11 +90,22 @@ const THREE_EMPTY_REPLICAS: Replica[] = ["ch-0", "ch-1", "ch-2"].map((host) => (
   functions: [],
 }));
 
-function provisionableOver(driver: QueryDriver): Promise<boolean[]> {
-  const repository = ClickHouseLangWatchQLAppFunctionStoreRepository.create(
+/** AUTHENTICATION_FAILED, as a replica answers a cross-replica hop sent as user default. */
+const REFUSED_HOP = Object.assign(
+  new Error("Received from ch-2:9000. default: Authentication failed: password is incorrect"),
+  { code: "516" },
+);
+
+function storeOver(driver: QueryDriver): ClickHouseLangWatchQLAppFunctionStoreRepository {
+  return ClickHouseLangWatchQLAppFunctionStoreRepository.create(
     new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver }),
   );
-  return repository.findProbe().then((probes) => probes.map(canProvisionAppFunctions));
+}
+
+function provisionableOver(driver: QueryDriver): Promise<boolean[]> {
+  return storeOver(driver)
+    .findProbe()
+    .then((probes) => probes.map(canProvisionAppFunctions));
 }
 
 describe("ClickHouseLangWatchQLAppFunctionStoreRepository", () => {
@@ -139,19 +151,70 @@ describe("ClickHouseLangWatchQLAppFunctionStoreRepository", () => {
     });
   });
 
-  describe("given a replicated server where one replica cannot be reached", () => {
-    /** @scenario "A replicated server with an unreachable replica is not checked" */
-    it("answers nothing, so the functions are skipped", async () => {
+  describe("given a replicated server whose replicas refuse the cross-replica read", () => {
+    /** @scenario "A replicated server whose replicas refuse the cross-replica read still gets the functions" */
+    it("compares this server with the Keeper store, as before, and allows the functions", async () => {
       await expect(
         provisionableOver(
-          clickHouse2510({ maxTotalReplicas: 3, keeper: "with-function-store", unreachable: true }),
+          clickHouse2510({
+            maxTotalReplicas: 3,
+            keeper: "with-function-store",
+            replicas: THREE_EMPTY_REPLICAS,
+            crossReplicaError: REFUSED_HOP,
+          }),
         ),
-      ).resolves.toEqual([]);
+      ).resolves.toEqual([true]);
+    });
+
+    /** @scenario "A replicated server whose replicas refuse the cross-replica read still refuses a local store on this server" */
+    it("refuses the functions where this server holds one the Keeper store lacks", async () => {
+      await expect(
+        provisionableOver(
+          clickHouse2510({
+            maxTotalReplicas: 3,
+            keeper: "with-function-store",
+            replicas: [{ host: "ch-0", functions: ["local_only"] }],
+            crossReplicaError: REFUSED_HOP,
+          }),
+        ),
+      ).resolves.toEqual([false]);
+    });
+
+    it("checks a create against this server and Keeper only", async () => {
+      await expect(
+        storeOver(
+          clickHouse2510({
+            maxTotalReplicas: 3,
+            keeper: "with-function-store",
+            replicas: [{ host: "ch-0", functions: ["x"] }],
+            storeEntries: ["function_x.sql"],
+            crossReplicaError: REFUSED_HOP,
+          }),
+        ).findSplitAppFunctions({ names: ["x", "y"] }),
+      ).resolves.toEqual([
+        { name: "y", missingOn: ["ch-0"], inKeeper: false, oneDefinition: true },
+      ]);
+    });
+  });
+
+  describe("given a replicated server where one replica cannot be reached", () => {
+    /** @scenario "A replicated server with an unreachable replica is checked on this server" */
+    it("compares this server with the Keeper store rather than skipping the functions", async () => {
+      await expect(
+        provisionableOver(
+          clickHouse2510({
+            maxTotalReplicas: 3,
+            keeper: "with-function-store",
+            replicas: THREE_EMPTY_REPLICAS,
+            crossReplicaError: new Error("All connection tries failed: ch-2:9000"),
+          }),
+        ),
+      ).resolves.toEqual([true]);
     });
   });
 
   describe("given a replicated server where fewer hosts answer than the cluster has", () => {
-    it("answers nothing rather than trusting the replicas it could see", async () => {
+    it("does not trust the replicas it could see, and compares this server instead", async () => {
       await expect(
         provisionableOver(
           clickHouse2510({
@@ -160,21 +223,22 @@ describe("ClickHouseLangWatchQLAppFunctionStoreRepository", () => {
             replicas: THREE_EMPTY_REPLICAS.slice(0, 2),
           }),
         ),
-      ).resolves.toEqual([]);
+      ).resolves.toEqual([true]);
     });
   });
 
   describe("given a replicated server with no cluster spanning its replicas", () => {
-    it("answers nothing, since no query can reach every replica", async () => {
+    it("compares this server with the Keeper store, since no query can reach every replica", async () => {
       await expect(
         provisionableOver(
           clickHouse2510({
             maxTotalReplicas: 3,
             keeper: "with-function-store",
+            replicas: THREE_EMPTY_REPLICAS,
             clusters: [{ name: "default", hosts: "1", widest_shard: "1" }],
           }),
         ),
-      ).resolves.toEqual([]);
+      ).resolves.toEqual([true]);
     });
   });
 

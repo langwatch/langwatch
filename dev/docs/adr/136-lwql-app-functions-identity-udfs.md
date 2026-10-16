@@ -212,10 +212,23 @@ replica through `clusterAllReplicas` over `system.functions` (origin
 names, or, where it is unset (the ops checkup), the one cluster in
 `system.clusters` whose widest shard equals the widest replica set. Each
 replica's functions must equal the `function_<name>.sql` children of the node,
-both ways. A replica that cannot be reached, fewer hosts answering than the
-cluster has, or no single fitting cluster leaves the probe unanswered; a
-replica that differs is a no. Either way the functions are left out and the
-log names the setting, the path, and the host where it knows one.
+both ways. A replica that differs is a no: the functions are left out and the
+log names the setting, the path and the host.
+
+The cross-replica read is not always possible. It needs inter-server login,
+the `REMOTE` source grant (`READ ON REMOTE`) and every replica up. The
+clickhouse-serverless image 0.4.0 renders the cluster secret as
+`<secret from_file="..."/>`, and ClickHouse substitutes only `incl`, `from_zk`
+and `from_env`, so the secret is empty and each hop logs in as user `default`
+with no password: every replica refuses it with `AUTHENTICATION_FAILED` (516).
+Withholding the functions there would leave LWQL refusing them on every
+self-hosted replicated install. So where the read fails (refused, a replica
+unreachable, fewer hosts answering than the cluster has, or no single fitting
+cluster), the probe and the check after the create compare the server they
+reach with Keeper, as the probe did before it read every replica, and log a
+warning that the other replicas went unchecked. A local store on that server is
+still a no; one on a replica behind a load-balanced URL goes unseen until a
+cross-replica read works.
 
 Names cannot prove which store a replica reads. A replica keeping local copies
 of the same names as Keeper passes, and so does an empty store beside empty
@@ -226,14 +239,12 @@ reached a local store, or reached Keeper while a local replica kept the old
 copy, fails that check. It logs `lwql_app_functions_split` at error with the
 hosts missing the function and fails the step as a failed create does: boot
 continues and the upgrade run fails. The next probe then sees the replica off
-the store and skips the functions until it is fixed. What stays undecidable is
+the store, or one function with two definitions across replicas, and skips the
+functions until it is fixed rather than retrying a create that would split again. What stays undecidable is
 a local replica that matches Keeper by name and definition: no read tells it
 apart until a create or replace changes something, and until then every
 replica answers the same functions. A single node is not asked, because it has
-no `system.zookeeper`. `clusterAllReplicas` needs the `REMOTE` source grant
-(`READ ON REMOTE`), which the chart's `default` user holds; a restricted user
-that lacks it leaves the probe unanswered, which skips the functions as before.
-The ops checkup reads the same probe.
+no `system.zookeeper`. The ops checkup reads the same probe.
 
 ## 5. Caps are refusals, and truncation is never silent
 

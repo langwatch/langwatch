@@ -109,15 +109,30 @@ export function findReplicasOffStore({
     .map((replica) => replica.host);
 }
 
+/** Functions whose `create_query` differs between the replicas that hold them. */
+export function findFunctionsWithSplitDefinitions({
+  replicas,
+}: Pick<AppFunctionStoreReadings, "replicas">): string[] {
+  const definitions = new Map<string, Set<string>>();
+  for (const replica of replicas) {
+    for (const [name, definition] of Object.entries(replica.functions)) {
+      definitions.set(name, (definitions.get(name) ?? new Set()).add(definition));
+    }
+  }
+  return [...definitions].filter(([, held]) => held.size > 1).map(([name]) => name);
+}
+
 /**
- * In Keeper when every replica holds exactly the store's functions, as a Keeper-backed one
- * loads every entry. Same names held locally cannot be told apart by name: ADR-136.
+ * In Keeper when every replica holds exactly the store's functions with one definition
+ * each, as Keeper-backed replicas load the same entries. Same names and definitions held
+ * locally cannot be told apart: ADR-136.
  */
 export function isFunctionStoreInKeeper(readings: AppFunctionStoreReadings): boolean {
   return (
     readings.storeNodeExists &&
     readings.replicas.length > 0 &&
-    findReplicasOffStore(readings).length === 0
+    findReplicasOffStore(readings).length === 0 &&
+    findFunctionsWithSplitDefinitions(readings).length === 0
   );
 }
 

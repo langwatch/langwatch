@@ -38,13 +38,31 @@ const FUNCTION_STORE_CONFIG = `<clickhouse>
   <user_defined_zookeeper_path>/clickhouse/user_defined</user_defined_zookeeper_path>
 </clickhouse>`;
 
+/**
+ * Inter-server login as the clickhouse-serverless image 0.4.0 renders it: ClickHouse
+ * substitutes no `from_file`, so the secret is empty and each hop logs in as user
+ * `default`, which the replicas do not have.
+ */
+const UNRESOLVED_SECRET = `<secret from_file="/mnt/secrets/cluster-secret"/>`;
+
 /** The second replica's view: Keeper on the first, and a cluster of both. */
-function clusterConfig(keeperHost: string): string {
+function clusterConfig({
+  keeperHost,
+  hop,
+}: {
+  keeperHost: string;
+  hop: "credentials" | "unresolved-secret";
+}): string {
+  const login =
+    hop === "credentials"
+      ? `<user>${CREDENTIALS.username}</user><password>${CREDENTIALS.password}</password>`
+      : "";
   const replica = (host: string) =>
-    `<replica><host>${host}</host><port>9000</port><user>${CREDENTIALS.username}</user><password>${CREDENTIALS.password}</password></replica>`;
+    `<replica><host>${host}</host><port>9000</port>${login}</replica>`;
+  const secret = hop === "credentials" ? "" : UNRESOLVED_SECRET;
   return `<clickhouse>
   <zookeeper><node><host>${keeperHost}</host><port>9181</port></node></zookeeper>
-  <remote_servers><${CLUSTER}><shard>${replica(keeperHost)}${replica("localhost")}</shard></${CLUSTER}></remote_servers>
+  <remote_servers><${CLUSTER}>${secret}<shard>${replica(keeperHost)}${replica("localhost")}</shard></${CLUSTER}></remote_servers>
 </clickhouse>`;
 }
 
@@ -79,7 +97,13 @@ async function startNode({
 }
 
 /** Two replicas of one table; the second keeps functions in Keeper or on its local disk. */
-async function startCluster({ second }: { second: "keeper" | "local" }): Promise<Cluster> {
+async function startCluster({
+  second,
+  hop = "credentials",
+}: {
+  second: "keeper" | "local";
+  hop?: "credentials" | "unresolved-secret";
+}): Promise<Cluster> {
   const first = await startNode({
     configs: { keeper: KEEPER_SERVER_CONFIG, "function-store": FUNCTION_STORE_CONFIG },
     replica: "r1",
@@ -87,7 +111,7 @@ async function startCluster({ second }: { second: "keeper" | "local" }): Promise
   const keeperHost = first.container.getIpAddress("bridge");
   const secondNode = await startNode({
     configs: {
-      cluster: clusterConfig(keeperHost),
+      cluster: clusterConfig({ keeperHost, hop }),
       ...(second === "keeper" ? { "function-store": FUNCTION_STORE_CONFIG } : {}),
     },
     replica: "r2",
@@ -161,6 +185,37 @@ describe("ClickHouseLangWatchQLAppFunctionStoreRepository on two replicas sharin
     });
   });
 
+  describe("given both replicas keep functions in Keeper but refuse the cross-replica login", () => {
+    let cluster: Cluster;
+    beforeAll(async () => {
+      cluster = await startCluster({ second: "keeper", hop: "unresolved-secret" });
+      clusters.push(cluster);
+    }, 240_000);
+
+    /** @scenario "A real replicated ClickHouse that refuses the cross-replica login still gets the functions" */
+    it("is refused by clusterAllReplicas, yet allows the functions and checks the create on this server", async () => {
+      await expect(
+        rows(
+          cluster.second.client,
+          `SELECT count() FROM clusterAllReplicas('${CLUSTER}', system.one)`,
+        ),
+      ).rejects.toMatchObject({ code: "516" });
+      await expect(provisionable(cluster)).resolves.toEqual([true]);
+
+      const [definition] = findLangWatchQLAppFunctions("llm_readable_thread");
+      if (definition === undefined) throw new Error("llm_readable_thread is not in the catalogue");
+      await cluster.first.client.command({
+        query: LangWatchQLAppFunctionStatementsService.create().functionStatement(definition),
+      });
+      const store = storeOver(cluster);
+      await expect(
+        verifyAppFunctionsOnEveryReplica({
+          findSplit: () => store.findSplitAppFunctions({ names: ["llm_readable_thread"] }),
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
   describe("given the second replica keeps its functions on local disk", () => {
     let cluster: Cluster;
     beforeAll(async () => {
@@ -207,7 +262,7 @@ describe("ClickHouseLangWatchQLAppFunctionStoreRepository on two replicas sharin
       });
 
       /** @scenario "A replace through a replica on local disk that matched the store by name is caught after the create" */
-      it("passes the probe by name, then catches the replace that reached one replica", async () => {
+      it("passes the probe by name, catches the replace that reached one replica, then refuses", async () => {
         await expect(provisionable(cluster)).resolves.toEqual([true]);
 
         await cluster.second.client.command({
@@ -219,6 +274,7 @@ describe("ClickHouseLangWatchQLAppFunctionStoreRepository on two replicas sharin
         ).resolves.toEqual([
           { name: "same_name", missingOn: [], inKeeper: true, oneDefinition: false },
         ]);
+        await expect(provisionable(cluster)).resolves.toEqual([false]);
       });
     });
   });

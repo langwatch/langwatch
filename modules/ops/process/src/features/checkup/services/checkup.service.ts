@@ -186,11 +186,8 @@ export class CheckupService {
       return {
         outcome: "unchecked",
         detail:
-          "ClickHouse did not answer the provisioning probe from every replica (system.replicas, system.clusters, " +
-          "system.zookeeper, clusterAllReplicas over system.functions).",
-        fix:
-          "Give the app's ClickHouse user read access to those system tables and the REMOTE grant, " +
-          "and check every replica of the cluster is up.",
+          "ClickHouse did not answer the provisioning probe (system.replicas and, when replicated, system.zookeeper and system.functions).",
+        fix: "Give the app's ClickHouse user read access to system.replicas, system.zookeeper and system.functions.",
         docsPath: CHECKUP_DOCS.lwql,
       };
     }

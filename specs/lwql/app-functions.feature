@@ -421,11 +421,30 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     When the function store probe runs
     Then the app functions are not provisionable
 
+  # A cross-replica read needs inter-server auth, the REMOTE grant and every replica up.
+  # Where it fails, the probe compares the server the creates run on with Keeper, as it
+  # did before it read every replica, and warns that other replicas went unchecked.
   @unit
-  Scenario: A replicated server with an unreachable replica is not checked
+  Scenario: A replicated server whose replicas refuse the cross-replica read still gets the functions
+    Given a ClickHouse with three replicas and the function store in Keeper
+    And clusterAllReplicas fails with AUTHENTICATION_FAILED for user default
+    When the function store probe runs
+    Then it compares this server's SQL functions with the Keeper store
+    And the app functions are provisionable
+    And the log warns that the other replicas were not checked
+
+  @unit
+  Scenario: A replicated server whose replicas refuse the cross-replica read still refuses a local store on this server
+    Given a ClickHouse with three replicas where clusterAllReplicas fails
+    And this server holds a SQL function the Keeper store lacks
+    When the function store probe runs
+    Then the app functions are not provisionable
+
+  @unit
+  Scenario: A replicated server with an unreachable replica is checked on this server
     Given a ClickHouse with three replicas where clusterAllReplicas cannot reach one
     When the function store probe runs
-    Then the probe answers nothing, so the app functions are skipped and the log names the host
+    Then it compares this server's SQL functions with the Keeper store, so the app functions are provisionable
 
   @unit
   Scenario: A created app function missing on one replica fails the provisioning step
@@ -449,6 +468,14 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     And the check after the create finds it on every replica
 
   @integration
+  Scenario: A real replicated ClickHouse that refuses the cross-replica login still gets the functions
+    Given two ClickHouse 25.10 replicas sharing Keeper, both with user_defined_zookeeper_path at /clickhouse/user_defined
+    And their cluster carries the secret as the chart renders it, so clusterAllReplicas fails with AUTHENTICATION_FAILED
+    When the function store probe runs through one replica
+    Then the app functions are provisionable
+    And a function created on the other replica passes the check after the create on this server
+
+  @integration
   Scenario: A function created through a replica on local disk is reported missing from the other replicas
     Given two ClickHouse 25.10 replicas sharing Keeper, the second with no user_defined_zookeeper_path
     When a function is created through the second replica
@@ -470,6 +497,14 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Then the app functions are provisionable, since names alone cannot tell the stores apart
     When CREATE OR REPLACE changes that function through the second replica
     Then the check after the create reports that the replicas hold different definitions
+    And the next probe refuses the app functions rather than retrying the create
+
+  @unit
+  Scenario: A replicated server whose replicas hold one function with different definitions is not provisionable
+    Given two replicas that each hold a function of the same name, with different create_query text
+    And the Keeper store holds that function's entry
+    When the function store probe runs
+    Then the app functions are not provisionable, so the next deploy does not retry a create that would split again
 
   @unit
   Scenario: A single-node server is provisioned with the functions
