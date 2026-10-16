@@ -4701,6 +4701,24 @@
           "documentation": "The operator who issued or registered it. Null for the purchase flow and the script."
         },
         {
+          "name": "kind",
+          "columnName": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "`standard` or `testing` (ADR-180). A testing licence is bound to `instanceId` when issued."
+        },
+        {
+          "name": "testingOrganizationId",
+          "columnName": "testingOrganizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The local organization a testing licence is for; `organizationId` names the customer."
+        },
+        {
           "name": "revokedAt",
           "columnName": "revokedAt",
           "type": "DateTime",
@@ -5164,6 +5182,106 @@
         {
           "name": "updatedAt",
           "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "TestingLicenseToken",
+      "tableName": "TestingLicenseToken",
+      "documentation": "A token that can do one thing: ask Cloud for a testing licence (ADR-180 section 2).\nEvery token, personal or service, acts as the person who made it, whose ops permission\nis asked on every use (ADR-180 section 2). Only its hash is stored.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "tokenHash",
+          "columnName": "tokenHash",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "SHA-256 of the token. Looked up on every testing licence asked for."
+        },
+        {
+          "name": "kind",
+          "columnName": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "`personal` or `service`."
+        },
+        {
+          "name": "ownerUserId",
+          "columnName": "ownerUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The person who made the token and whom it acts as (ADR-180 section 2)."
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "A service token's name, such as \"GitHub Actions\". Null on a personal token."
+        },
+        {
+          "name": "expiresAt",
+          "columnName": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "revokedAt",
+          "columnName": "revokedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "revokedById",
+          "columnName": "revokedById",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "lastUsedAt",
+          "columnName": "lastUsedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When the token last issued a testing licence."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,
