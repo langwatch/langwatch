@@ -334,9 +334,6 @@ const LEGACY_UNBOUND: string[] = [
  * spot.
  */
 const LEGACY_INERT: string[] = [
-  // 2026-10-12: the id index (dev/docs/plans/id-index-2026-10-10.md) is planned,
-  // not built; every scenario is @unimplemented. Remove with its first binding.
-  "specs/clickhouse/id-index-reads.feature",
   // 2026-09-30 port of #7532: design-only specs for ADRs 161-163, every
   // scenario @unimplemented until the ADR is accepted and built.
   "modules/authz/specs/access-reviews.feature",

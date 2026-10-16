@@ -1,4 +1,5 @@
 import { nowInstant } from "@langwatch/time";
+import { useState } from "react";
 
 import { useDrawerProjectId } from "../../features/trace-drawer/behavior/use-drawer-project-id.ts";
 import { isPreviewTraceId } from "../../model/preview-trace-id.ts";
@@ -6,6 +7,18 @@ import { LIVE_WINDOW_MS } from "../../model/trace-freshness.ts";
 import { useTraceDrawer } from "../trace-drawer.ts";
 import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import { useTraceViewer } from "./context/trace-viewer-context.tsx";
+
+type Opening = { traceId: string | null; occurredAtMs: number | null };
+
+/** The time known when the drawer opened on this trace: a later header back-fill never counts. */
+function useOpeningOccurredAtMs({ traceId, occurredAtMs }: Opening): number | null {
+  const [opening, setOpening] = useState<Opening>({ traceId, occurredAtMs });
+  if (opening.traceId !== traceId) {
+    setOpening({ traceId, occurredAtMs });
+    return occurredAtMs;
+  }
+  return opening.occurredAtMs;
+}
 
 /**
  * Shared base wiring for the per-trace tRPC queries fired off the open drawer (header,
@@ -25,20 +38,20 @@ export function useTraceQueryArgs() {
   const tenantId =
     addressedTenantId !== null && addressedTenantId !== projectId ? addressedTenantId : null;
 
+  const readOccurredAtMs = useOpeningOccurredAtMs({ traceId, occurredAtMs });
+
   const isLive =
     occurredAtMs !== null && nowInstant().epochMilliseconds - occurredAtMs < LIVE_WINDOW_MS;
 
   const queryArgs = {
     projectId,
     traceId: traceId ?? "",
-    ...(occurredAtMs !== null ? { occurredAtMs } : {}),
+    ...(readOccurredAtMs !== null ? { occurredAtMs: readOccurredAtMs } : {}),
     ...(tenantId !== null ? { tenantId } : {}),
   };
 
   const isReady =
     !!projectId && !!traceId && !isPreviewTraceId(traceId ?? "") && !viewer.isReadOnly;
-  // The header read runs without the partition hint and backfills it; every other read waits.
-  const hintReady = occurredAtMs !== null;
 
   return {
     project,
@@ -48,7 +61,6 @@ export function useTraceQueryArgs() {
     tenantId,
     isLive,
     isReady,
-    hintReady,
     queryArgs,
   };
 }

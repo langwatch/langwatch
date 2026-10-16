@@ -1703,12 +1703,14 @@ read through a narrow single-event read seat beside the producer-only store, wit
 window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
 2026-10-10: identity reads one aggregate's history through the read seat; WEB-9103.
 
-**A trace summary lookup is anchored on its event's time** (Alex, 2026-10-10): a summary is filed
-under its trace's start, which never moves, so a lookup reads windows widening back from the span's
-own occurredAt (3, 7, 21, 30 days, plus 1 day forward), stops at the first hit, and never scans every
-partition. Next: per-owner id index tables (unpartitioned, filled by a materialised view) for one
-exact read by id (`dev/docs/plans/id-index-2026-10-10.md`), replacing this ladder; parked: a
-default retention-period bound on every ClickHouse read.
+**A lookup by id reads through its table's id index** (Alex, 2026-10-11): each time-partitioned
+table looked up by id alone has an unpartitioned `<table>_id_index` (TenantId, id to its time range),
+owned by the table's owner and filled by a materialised view, with one background step per owner
+filling history. A read takes the caller's time when given, else the index's range, else (index not
+yet ready, or a miss) the old anchored or windowed read. Ready means the index holds its marker row
+on that ClickHouse target, written by the fill or, over an empty source, by the first check; never a
+feature flag (Alex, 2026-10-11). `dev/docs/plans/id-index-2026-10-10.md`.
+Parked: a default retention-period bound on every ClickHouse read.
 
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
 round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`

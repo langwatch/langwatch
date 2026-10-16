@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 
 import {
   ClickHouseColumns,
+  type IdBoundOptions,
   queryWindowed,
   type WindowFragment,
 } from "@langwatch/clickhouse-client";
@@ -39,6 +40,18 @@ const INTERNAL_SET_PREFIX = "__internal__";
 export const TABLE_NAME = "simulation_runs" as const;
 
 export const RUN_ID_CAP = 10000;
+
+/**
+ * The id-index markers of the set and batch reads; a caller's own date filter stays beside
+ * them.
+ */
+const SET_BOUND = "{{idBound:simulation_runs.ScenarioSetId:scenarioSetIds}}";
+const SET_BOUND_T = "{{idBound:simulation_runs.ScenarioSetId:scenarioSetIds:t}}";
+const BATCH_BOUND = "{{idBound:simulation_runs.BatchRunId:batchRunId}}";
+const BATCH_BOUND_T = "{{idBound:simulation_runs.BatchRunId:batchRunId:t}}";
+const BATCHES_BOUND = "{{idBound:simulation_runs.BatchRunId:batchRunIds}}";
+const BATCHES_BOUND_T = "{{idBound:simulation_runs.BatchRunId:batchRunIds:t}}";
+const ID_BOUND_READ: { idBound: IdBoundOptions } = { idBound: { fallback: "unbounded" } };
 
 /**
  * Sort key for export sweep: ORDER BY, cursor predicate and returned cursor must align or
@@ -227,12 +240,14 @@ interface PreviewItemRow {
 export type SimulationClickHouseClient = {
   query(input: {
     query: string;
-    query_params: Record<string, string | string[]>;
+    query_params: Record<string, string | string[] | number>;
     format: "JSONEachRow";
     /** A declared tenant set: one organization's projects, bound by `TenantId IN (...)`. */
     tenantIds?: readonly string[];
     /** Set when the read must walk every partition; see the member's cold-scan warning. */
     SKIP_COLD_SCAN_CHECK?: true | undefined;
+    /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
+    idBound?: IdBoundOptions;
   }): Promise<{ json<Result>(): Promise<Result[]> }>;
   /** Absent on a bare driver client (tests): every column is then named. */
   select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
@@ -340,7 +355,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   private async queryRows<T>(
     query: string,
     params: { tenantId: string } & Record<string, string | string[]>,
-    options: { declaresFullScan?: boolean } = {},
+    options: { declaresFullScan?: boolean; idBound?: IdBoundOptions } = {},
   ): Promise<T[]> {
     const client = await this.getClient(params.tenantId);
     const result = await client.query({
@@ -348,6 +363,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       query_params: params,
       format: "JSONEachRow",
       ...(options.declaresFullScan === true ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
+      ...(options.idBound === undefined ? {} : { idBound: options.idBound }),
     });
     return result.json<T>();
   }
@@ -411,22 +427,28 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // entire granules (~8K rows) for dedup, causing OOM on parts with large
     // payloads.
     const criteria = await this.criteriaColumns(projectId);
-    const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
-      `SELECT ${runColumns(criteria)},
+    const client = await this.getClient(projectId);
+    const result = await client.query({
+      query: `SELECT ${runColumns(criteria)},
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          AND t.ScenarioRunId = {scenarioRunId:String}
          AND t.ArchivedAt IS NULL
+         {{idBound:simulation_runs.ScenarioRunId:scenarioRunId:t}}
          AND t.UpdatedAt = (
            SELECT max(s.UpdatedAt)
            FROM ${TABLE_NAME} AS s
            WHERE s.TenantId = {tenantId:String}
              AND s.ScenarioRunId = {scenarioRunId:String}
+             {{idBound:simulation_runs.ScenarioRunId:scenarioRunId:s}}
          )
        LIMIT 1`,
-      { tenantId: projectId, scenarioRunId },
-    );
+      query_params: { tenantId: projectId, scenarioRunId },
+      format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
+    });
+    const rows = await result.json<ClickHouseSimulationRunRow & { ExportSortKey: string }>();
 
     const row = rows[0];
     if (!row) return null;
@@ -487,14 +509,16 @@ export class SimulationClickHouseRepository extends SimulationRepository {
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${SET_BOUND}
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
+         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${SET_BOUND} ${dateFilter.whereClause}`)}`,
       {
         tenantId: projectId,
         scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
         ...dateFilter.params,
       },
+      ID_BOUND_READ,
     );
 
     // Step 1: fetch batch-level aggregates
@@ -503,9 +527,10 @@ export class SimulationClickHouseRepository extends SimulationRepository {
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${SET_BOUND}
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
+         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${SET_BOUND} ${dateFilter.whereClause}`)}
        GROUP BY BatchRunId
        ${combinedHaving}
        ORDER BY LastRunAt DESC, BatchRunId ASC
@@ -517,6 +542,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
         ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
+      ID_BOUND_READ,
     );
 
     const [totalCountRows, batchRows] = await Promise.all([totalCountPromise, batchRowsPromise]);
@@ -558,6 +584,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       isEmpty: (rows) => rows.length === 0,
       run: (window) => {
         const startedAtWindow = SimulationClickHouseRepository.buildStartedAtWindowClause(window);
+        // ID_BOUND_SKIP: bounded by its page's own StartedAt window from step 1.
         return this.queryRows<PreviewItemRow>(
           `SELECT ${PREVIEW_COLUMNS}
        FROM ${TABLE_NAME}
@@ -642,7 +669,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     projectId: string;
     batchRunId: string;
   }): Promise<SimulationBatchSummary | null> {
-    const whereFilters = "TenantId = {tenantId:String} AND BatchRunId = {batchRunId:String}";
+    const whereFilters = `TenantId = {tenantId:String} AND BatchRunId = {batchRunId:String} ${BATCH_BOUND}`;
 
     // The note and the actor are read here and not in BATCH_AGGREGATE_COLUMNS:
     // this query is bounded to one batch, while the history page shares those
@@ -660,6 +687,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          ${SimulationClickHouseRepository.simulationRunDedupPredicate(whereFilters)}
        GROUP BY BatchRunId`,
       { tenantId: projectId, batchRunId },
+      ID_BOUND_READ,
     );
 
     const row = rows[0];
@@ -693,8 +721,10 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND BatchRunId = {batchRunId:String}
+           ${BATCH_BOUND}
            AND ArchivedAt IS NULL`,
         { tenantId: projectId, batchRunId },
+        ID_BOUND_READ,
       );
       const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
       if (lastUpdatedAt <= sinceTimestamp) {
@@ -720,6 +750,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
        WHERE t.TenantId = {tenantId:String}
          ${setFilter("t.")}
          AND t.BatchRunId = {batchRunId:String}
+         ${BATCH_BOUND_T}
          AND t.ArchivedAt IS NULL
          AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
            SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
@@ -727,6 +758,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
            WHERE TenantId = {tenantId:String}
              ${setFilter("")}
              AND BatchRunId = {batchRunId:String}
+             ${BATCH_BOUND}
            GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )
        ORDER BY CreatedAt ASC`,
@@ -735,6 +767,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
         ...(scenarioSetIds ? { scenarioSetIds } : {}),
         batchRunId,
       },
+      ID_BOUND_READ,
     );
 
     const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(row));
@@ -760,14 +793,16 @@ export class SimulationClickHouseRepository extends SimulationRepository {
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${SET_BOUND}
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
+         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${SET_BOUND} ${dateFilter.whereClause}`)}`,
       {
         tenantId: projectId,
         scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
         ...dateFilter.params,
       },
+      ID_BOUND_READ,
     );
     return parseInt(rows[0]?.BatchRunCount ?? "0", 10);
   }
@@ -786,12 +821,14 @@ export class SimulationClickHouseRepository extends SimulationRepository {
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${SET_BOUND_T}
          AND t.ArchivedAt IS NULL
          AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
            SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
            FROM ${TABLE_NAME}
            WHERE TenantId = {tenantId:String}
              AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+             ${SET_BOUND}
            GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )
        ORDER BY BatchRunId ASC, CreatedAt ASC
@@ -800,6 +837,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
         tenantId: projectId,
         scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
       },
+      ID_BOUND_READ,
     );
 
     return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
@@ -853,9 +891,10 @@ export class SimulationClickHouseRepository extends SimulationRepository {
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${SET_BOUND}
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
+         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${SET_BOUND} ${dateFilter.whereClause}`)}
        GROUP BY BatchRunId
        ${combinedHaving}
        ORDER BY MaxCreatedAt DESC, BatchRunId ASC
@@ -867,6 +906,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
         ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
+      ID_BOUND_READ,
     );
 
     const hasMore = batchRows.length > validatedLimit;
@@ -1352,13 +1392,15 @@ export class SimulationClickHouseRepository extends SimulationRepository {
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
                 AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+                ${SET_BOUND}
                 AND ArchivedAt IS NULL
                 ${SimulationClickHouseRepository.simulationRunDedupPredicate(
-                  "TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)})",
+                  `TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${SET_BOUND}`,
                 )}
               LIMIT ${RUN_ID_CAP}`,
       query_params: { tenantId: projectId, scenarioSetIds },
       format: "JSONEachRow",
+      ...ID_BOUND_READ,
     });
     const rows = await result.json<{ ScenarioRunId: string }>();
     const runIds = rows.map((r) => r.ScenarioRunId);
@@ -1410,7 +1452,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     startDate?: number;
     endDate?: number;
   }): Promise<number> {
-    const { stableClause, dateClause, params } = this.buildExportFilters({
+    const { stableClause, setBound, dateClause, params } = this.buildExportFilters({
       scenarioSetId,
       scenarioId,
       startDate,
@@ -1422,10 +1464,12 @@ export class SimulationClickHouseRepository extends SimulationRepository {
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          ${stableClause}
+         ${setBound.outer}
          ${dateClause}
          AND t.ArchivedAt IS NULL
-         ${SimulationClickHouseRepository.qualifiedDedupPredicate(`TenantId = {tenantId:String} ${SimulationClickHouseRepository.unqualify(stableClause)}`)}`,
+         ${SimulationClickHouseRepository.qualifiedDedupPredicate(`TenantId = {tenantId:String} ${SimulationClickHouseRepository.unqualify(stableClause)} ${setBound.inner}`)}`,
       { tenantId: projectId, ...params },
+      ID_BOUND_READ,
     );
 
     return Number(rows[0]?.Total ?? "0");
@@ -1523,7 +1567,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     const validatedLimit = Math.min(Math.max(1, limit), 500);
     const decoded = cursor ? this.decodeExportCursor(cursor) : null;
 
-    const { stableClause, dateClause, params } = this.buildExportFilters({
+    const { stableClause, setBound, dateClause, params } = this.buildExportFilters({
       scenarioSetId,
       scenarioId,
       startDate,
@@ -1544,10 +1588,11 @@ export class SimulationClickHouseRepository extends SimulationRepository {
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          ${stableClause}
+         ${setBound.outer}
          ${dateClause}
          ${cursorPredicate}
          AND t.ArchivedAt IS NULL
-         ${SimulationClickHouseRepository.qualifiedDedupPredicate(`TenantId = {tenantId:String} ${SimulationClickHouseRepository.unqualify(stableClause)}`)}
+         ${SimulationClickHouseRepository.qualifiedDedupPredicate(`TenantId = {tenantId:String} ${SimulationClickHouseRepository.unqualify(stableClause)} ${setBound.inner}`)}
        ORDER BY ${EXPORT_SORT_KEY} ASC, t.ScenarioRunId ASC
        LIMIT {fetchLimit:UInt32}`,
       {
@@ -1556,6 +1601,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
         ...(decoded ? { cursorTs: decoded.ts, cursorRunId: decoded.scenarioRunId } : {}),
         fetchLimit: String(validatedLimit + 1),
       },
+      ID_BOUND_READ,
     );
 
     const hasMore = rows.length > validatedLimit;
@@ -1595,6 +1641,8 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     endDate?: number;
   }): {
     stableClause: string;
+    /** The set's id-index markers, outer (`t`) and inner; empty when no set narrows the read. */
+    setBound: { outer: string; inner: string };
     dateClause: string;
     params: Record<string, string | string[]>;
   } {
@@ -1620,8 +1668,11 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       Object.assign(params, dateFilter.params);
     }
 
+    const exportSetBound = (alias: string) =>
+      scenarioSetId ? `{{idBound:simulation_runs.ScenarioSetId:exportSetIds${alias}}}` : "";
     return {
       stableClause: stableParts.length > 0 ? `AND ${stableParts.join(" AND ")}` : "",
+      setBound: { outer: exportSetBound(":t"), inner: exportSetBound("") },
       dateClause,
       params,
     };
@@ -1704,6 +1755,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          AND t.BatchRunId IN ({batchRunIds:Array(String)})
+         ${BATCHES_BOUND_T}
          ${setFilter}
          AND t.ArchivedAt IS NULL
          AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
@@ -1711,6 +1763,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
            FROM ${TABLE_NAME}
            WHERE TenantId = {tenantId:String}
              AND BatchRunId IN ({batchRunIds:Array(String)})
+             ${BATCHES_BOUND}
              ${innerSetFilter}
            GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )
@@ -1723,6 +1776,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
           ? { scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId) }
           : {}),
       },
+      ID_BOUND_READ,
     );
 
     return rows.map((row) => mapClickHouseRowToScenarioRunData(row));

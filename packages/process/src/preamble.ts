@@ -15,6 +15,7 @@ import {
   secretLogRedactPaths,
 } from "@langwatch/secrets";
 
+import type { IdIndexRetention } from "./migration/id-index-fill-step.ts";
 import {
   assertGatedRole,
   type UpgradeGatedRole,
@@ -103,6 +104,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
       ownsProcess?: boolean;
       environment?: PreambleEnvironment;
       upgradeGate?: Readonly<{ role: UpgradeGatedRole; gate: UpgradeGateFactory<Owners> }>;
+      idIndexRetention?: IdIndexRetention;
     }>,
   ) {}
 
@@ -129,6 +131,14 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
   }>): ServerPreamble<Owners> {
     assertGatedRole(role);
     return new ServerPreamble(this.name, { ...this.state, upgradeGate: { role, gate } });
+  }
+
+  /**
+   * How each module's id-index fill raises its indexes' retention before their ready markers:
+   * the application passes a function over the retention owner's API (id-index plan §3).
+   */
+  withIdIndexRetention(raise: IdIndexRetention): ServerPreamble<Owners> {
+    return new ServerPreamble(this.name, { ...this.state, idIndexRetention: raise });
   }
 
   withTelemetry(
@@ -212,11 +222,13 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
    */
   private bootModulesInTasksRole(): UpgradeGateModules {
     const { owners, chain, environment } = this.state;
+    const { idIndexRetention } = this.state;
     return async (use) => {
       const server = await new ServerPreamble(`${this.name}-upgrade`, {
         owners,
         ...(chain ? { chain } : {}),
         ...(environment ? { environment } : {}),
+        ...(idIndexRetention ? { idIndexRetention } : {}),
         healthPort: 0,
         ownsProcess: false,
       }).start();
@@ -263,6 +275,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
       resolver,
       ownsProcess: this.state.ownsProcess,
       modules: owners.filter(isProcessModule),
+      ...(this.state.idIndexRetention ? { idIndexRetention: this.state.idIndexRetention } : {}),
     };
 
     if (this.state.healthPort !== undefined) {

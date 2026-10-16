@@ -111,9 +111,12 @@ function keyOf({ projectId, runId }: { projectId: string; runId: string }): stri
   return `${projectId}:${runId}`;
 }
 
+/** As ClickHouse orders them (`CreatedAt DESC, RunId DESC`): ids compare by byte, not locale. */
 function newestFirst(left: InstantEvalRunRow, right: InstantEvalRunRow): number {
   const byInstant = right.createdAt.epochMilliseconds - left.createdAt.epochMilliseconds;
-  return byInstant === 0 ? right.id.localeCompare(left.id) : byInstant;
+  if (byInstant !== 0) return byInstant;
+  if (left.id === right.id) return 0;
+  return right.id > left.id ? 1 : -1;
 }
 
 /** The same total order the paged read uses: the instant, then the id. */
