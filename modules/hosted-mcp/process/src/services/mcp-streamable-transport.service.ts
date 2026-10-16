@@ -267,7 +267,7 @@ export class McpStreamableTransportService {
   /**
    * Rebuilds a session from its record, for its own key or a refreshed token of the same person
    * and project. WORKAROUND: the SDK transport starts uninitialized, so its inner state is patched
-   * to accept the existing session id; checked against @modelcontextprotocol/sdk@1.29.0.
+   * to accept the existing session id; checked against @modelcontextprotocol/sdk@1.31.0.
    */
   async #recover(input: {
     sessionId: string;
