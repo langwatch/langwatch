@@ -6,7 +6,7 @@ import { useDebounce } from "use-debounce";
 import { api } from "../../../../behavior/ops-api.ts";
 import { keepPreviousData } from "../../../../model/keep-previous-data.ts";
 import { useLicenseCommands } from "../../behavior/use-license-commands.ts";
-import type { License } from "../../model/license-terms.ts";
+import type { License, LicenseCounts } from "../../model/license-terms.ts";
 import { LicensesTable, type LicensesEmpty } from "../blocks/licenses-table.tsx";
 import { ActivationCodesSection } from "./activation-codes-section.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
@@ -20,7 +20,6 @@ const STATUS_FILTERS = ["active", "inactive", "all"] as const;
 const AUDIENCE_FILTERS = ["customer", "internal", "all"] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
 type AudienceFilter = (typeof AUDIENCE_FILTERS)[number];
-type LicenseCounts = Record<"active" | "inactive" | "customer" | "internal" | "all", number>;
 
 /**
  * Cloud admin's license registry (ADR-156). Every write is a verb with
@@ -138,11 +137,12 @@ export default function LicensesView() {
           onRevoke={setRevoking}
           onResetBinding={(license) => commands.resetInstanceBinding.mutate({ id: license.id })}
           empty={emptyOf({
-            counts,
+            // Counts kept from the previous query would explain the wrong list.
+            counts: list.isPlaceholderData ? undefined : counts,
             searching: debouncedSearch !== "",
             onClearSearch: () => {
               setSearch("");
-              setPage(1);
+              showEverything();
             },
             onShowEverything: showEverything,
           })}

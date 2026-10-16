@@ -1,6 +1,10 @@
 /** A registry row as Cloud admin reads it (ADR-156). Declared here, not
  * derived from `RouterOutputs`: model stays pure and behavior depends on it,
  * never the reverse. */
+
+/** What each list filter choice would show, the other applied; `all`: the search alone. */
+export type LicenseCounts = Record<"active" | "inactive" | "customer" | "internal" | "all", number>;
+
 export interface License {
   id: string;
   licenseId: string;

@@ -8,13 +8,12 @@ import { fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithOpsHost } from "../../../testing.tsx";
+import type { LicenseCounts } from "../model/license-terms.ts";
 import LicensesView from "../ui/sections/licenses-view.tsx";
-
-type Counts = Record<"active" | "inactive" | "customer" | "internal" | "all", number>;
 
 const { asked, answer } = vi.hoisted(() => ({
   asked: [] as Record<string, unknown>[],
-  answer: { counts: {} as Counts },
+  answer: { counts: {} as LicenseCounts },
 }));
 
 vi.mock("../../../behavior/ops-api.ts", () => ({
@@ -27,6 +26,7 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
             data: { licenses: [], total: 0, counts: answer.counts },
             isLoading: false,
             isFetching: false,
+            isPlaceholderData: false,
             error: null,
           };
         },
@@ -53,7 +53,8 @@ describe("LicensesView", () => {
 
   describe("given internal licenses that are all revoked or expired", () => {
     beforeEach(() => {
-      answer.counts = { active: 0, inactive: 2, customer: 0, internal: 0, all: 2 };
+      // What the service answers on the default choices: each count keeps the other filter.
+      answer.counts = { active: 0, inactive: 0, customer: 0, internal: 0, all: 2 };
     });
 
     /** @scenario The console's license filters say what they hide */
@@ -61,8 +62,8 @@ describe("LicensesView", () => {
       renderWithOpsHost(<LicensesView />);
 
       expect(lastAsked()).toMatchObject({ status: "active", audience: "customer" });
-      expect(screen.getByRole("radio", { name: /Revoked or expired\s*2/ })).toBeTruthy();
       expect(screen.getByRole("radio", { name: /Active\s*0/ })).toBeTruthy();
+      expect(screen.getByRole("radio", { name: /Internal tests\s*0/ })).toBeTruthy();
     });
 
     /** @scenario The console's license filters say what they hide */
@@ -70,6 +71,7 @@ describe("LicensesView", () => {
       renderWithOpsHost(<LicensesView />);
 
       expect(screen.getByText(/No licenses match these filters/)).toBeTruthy();
+      expect(screen.getByText(/2 licenses match other choices/)).toBeTruthy();
       fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
 
       expect(lastAsked()).toMatchObject({ status: undefined, audience: undefined });
@@ -93,6 +95,7 @@ describe("LicensesView", () => {
       fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
 
       expect(screen.getByPlaceholderText<HTMLInputElement>(/Search by customer/).value).toBe("");
+      expect(lastAsked()).toMatchObject({ status: undefined, audience: undefined });
     });
   });
 
