@@ -13,7 +13,7 @@ import LicensesView from "../ui/sections/licenses-view.tsx";
 
 const { asked, answer } = vi.hoisted(() => ({
   asked: [] as Record<string, unknown>[],
-  answer: { counts: {} as LicenseCounts },
+  answer: { counts: {} as LicenseCounts, isPlaceholderData: false },
 }));
 
 vi.mock("../../../behavior/ops-api.ts", () => ({
@@ -26,7 +26,7 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
             data: { licenses: [], total: 0, counts: answer.counts },
             isLoading: false,
             isFetching: false,
-            isPlaceholderData: false,
+            isPlaceholderData: answer.isPlaceholderData,
             error: null,
           };
         },
@@ -49,6 +49,7 @@ const lastAsked = () => asked.at(-1);
 describe("LicensesView", () => {
   beforeEach(() => {
     asked.length = 0;
+    answer.isPlaceholderData = false;
   });
 
   describe("given internal licenses that are all revoked or expired", () => {
@@ -108,6 +109,17 @@ describe("LicensesView", () => {
       renderWithOpsHost(<LicensesView />);
 
       expect(screen.getByText(/No licenses in the registry yet/)).toBeTruthy();
+    });
+  });
+
+  describe("given an empty list kept on screen while the next query loads", () => {
+    it("says nothing about the list until the answer arrives", () => {
+      answer.counts = { active: 0, inactive: 0, customer: 0, internal: 0, all: 0 };
+      answer.isPlaceholderData = true;
+      renderWithOpsHost(<LicensesView />);
+
+      expect(screen.queryByText(/No licenses in the registry yet/)).toBeNull();
+      expect(screen.queryByText(/No licenses match/)).toBeNull();
     });
   });
 });

@@ -132,13 +132,13 @@ export default function LicensesView() {
       >
         <LicensesTable
           licenses={list.data?.licenses ?? []}
-          isLoading={list.isLoading}
+          // Rows kept from the previous query are no reason to say the list is empty.
+          isLoading={list.isLoading || list.isPlaceholderData}
           onOpen={setOpenId}
           onRevoke={setRevoking}
           onResetBinding={(license) => commands.resetInstanceBinding.mutate({ id: license.id })}
           empty={emptyOf({
-            // Counts kept from the previous query would explain the wrong list.
-            counts: list.isPlaceholderData ? undefined : counts,
+            counts,
             searching: debouncedSearch !== "",
             onClearSearch: () => {
               setSearch("");
