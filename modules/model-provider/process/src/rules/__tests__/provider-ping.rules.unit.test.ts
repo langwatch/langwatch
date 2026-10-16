@@ -2,7 +2,11 @@
  * Which model a connection ping runs, and how a refused generation is read.
  * Spec: specs/model-providers/credential-validation.feature
  */
-import { getModelsForProvider, type Model } from "@langwatch/model-provider-contract";
+import {
+  getModelsForProvider,
+  isVariablePriceRouter,
+  type Model,
+} from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -37,6 +41,21 @@ describe("given a chat provider", () => {
     it("falls to the row's own custom model when the catalogue knows none", () => {
       const row = { provider: "custom", customModels: [chatModel("my-model")] };
       expect(findPingModels(row)).toEqual(["my-model"]);
+    });
+  });
+});
+
+describe("given a provider whose catalogue lists a router", () => {
+  describe("when the model to ping is picked", () => {
+    // No registered provider lists a router today; this keeps a future one off the ping.
+    it("never picks the router, whose -1 rate is no price", () => {
+      const routers = getModelsForProvider("nvidia").filter((model) =>
+        isVariablePriceRouter(model),
+      );
+      expect(routers.length).toBeGreaterThan(0);
+
+      const [first] = findPingModels({ provider: "nvidia", customModels: [] });
+      expect(routers.map((model) => model.id)).not.toContain(`nvidia/${first}`);
     });
   });
 });

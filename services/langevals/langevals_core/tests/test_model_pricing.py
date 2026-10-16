@@ -74,6 +74,19 @@ class TestToLitellmCostMap:
 
         assert list(cost_map) == ["acme/embed"]
 
+    # @scenario "The evaluator price table skips a router"
+    def test_skips_routers_whose_rates_are_negative(self):
+        # The catalog writes -1 for a router priced by whatever it routes to.
+        # Copied through, LiteLLM would bill every call through it as a refund.
+        cost_map = to_litellm_cost_map(
+            {
+                "acme/router": model("acme/router", -1, -1),
+                "acme/acme-model-1": model("acme/acme-model-1", 0.001, 0.002),
+            }
+        )
+
+        assert list(cost_map) == ["acme/acme-model-1"]
+
 
 class TestRegisterLangwatchModelPricing:
     # @scenario "LangEvals prices model calls from the LangWatch model catalog"

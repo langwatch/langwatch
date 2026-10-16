@@ -29,6 +29,7 @@ import {
   mapLitellmAudioModels,
   type UnrepresentableModel,
 } from "../rules/litellm-audio-prices.rules.ts";
+import { toCatalogPricing, type RawPricing } from "../rules/openrouter-pricing.rules.ts";
 import {
   extractProvider,
   hasVariantSuffix,
@@ -57,9 +58,6 @@ const AUDIT_PATH = fileURLToPath(
 const BASELINE_PATH = fileURLToPath(
   new URL("./model-registry-audit-baseline.json", import.meta.url),
 );
-
-/** Raw pricing keys the OpenRouter SDK's generated schema drops. */
-type RawPricing = Record<string, string | number | undefined>;
 
 const MODELS_ENDPOINT = "https://openrouter.ai/api/v1/models";
 const EMBEDDINGS_ENDPOINT = "https://openrouter.ai/api/v1/embeddings/models";
@@ -129,44 +127,6 @@ async function fetchEmbeddingModels(apiKey: string): Promise<Model[]> {
   }
 }
 
-function transformPricing(pricing: Model["pricing"], raw?: RawPricing): LLMModelPricing {
-  const parsePrice = (value: string | number | undefined): number =>
-    value ? parseFloat(String(value)) || 0 : 0;
-
-  const result: LLMModelPricing = {
-    inputCostPerToken: parsePrice(pricing.prompt),
-    outputCostPerToken: parsePrice(pricing.completion),
-  };
-
-  const inputCacheRead = parsePrice(pricing.inputCacheRead);
-  if (inputCacheRead > 0) result.inputCacheReadPerToken = inputCacheRead;
-
-  const inputCacheWrite = parsePrice(pricing.inputCacheWrite);
-  if (inputCacheWrite > 0) result.inputCacheWritePerToken = inputCacheWrite;
-
-  // The hour-long prompt-cache write rate. Without it the catalog falls back
-  // to a hardcoded 2x-of-input derivation that only covers Anthropic ids.
-  const inputCacheWrite1h = parsePrice(raw?.input_cache_write_1h);
-  if (inputCacheWrite1h > 0) result.inputCacheWrite1hPerToken = inputCacheWrite1h;
-
-  const imageCost = parsePrice(pricing.image);
-  if (imageCost > 0) result.imageCostPerToken = imageCost;
-
-  const imageOutput = parsePrice(pricing.imageOutput);
-  if (imageOutput > 0) result.imageOutputCostPerToken = imageOutput;
-
-  const audioCost = parsePrice(pricing.audio);
-  if (audioCost > 0) result.audioCostPerToken = audioCost;
-
-  const internalReasoning = parsePrice(pricing.internalReasoning);
-  if (internalReasoning > 0) result.internalReasoningCostPerToken = internalReasoning;
-
-  const webSearch = parsePrice(pricing.webSearch);
-  if (webSearch > 0) result.webSearchCostPerQuery = webSearch;
-
-  return result;
-}
-
 function determineMode(modality: string | null): "chat" | "embedding" {
   if (!modality) return "chat";
   return modality.includes("embedding") ? "embedding" : "chat";
@@ -197,7 +157,7 @@ function transformModel(model: Model, raw?: RawPricing): LLMModelEntry {
     id: mappedId,
     name: model.name,
     provider: mappedProvider,
-    pricing: transformPricing(model.pricing, raw),
+    pricing: toCatalogPricing({ pricing: model.pricing, raw }),
     contextLength: model.contextLength ?? 0,
     maxCompletionTokens: model.topProvider?.maxCompletionTokens ?? null,
     supportedParameters: model.supportedParameters ?? [],

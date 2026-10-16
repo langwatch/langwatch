@@ -1,3 +1,4 @@
+import { getVariablePriceRouterIds } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import { spendUsageSchema, type SpendUsage } from "../features/spend/gateway-spend.schemas.ts";
@@ -93,6 +94,36 @@ describe("findSpendRatingFaults", () => {
       expect(
         findSpendRatingFaults({ model: "openai/gpt-image-2", usage: usage({ image_count: 1 }) }),
       ).toEqual([]);
+    });
+  });
+});
+
+describe("given a router the catalog prices at -1 per token", () => {
+  // A router is priced by the model it picks. Read as a rate, -1 per token billed a refund of
+  // $2,000,000 for a million tokens each way.
+  const routerIds = getVariablePriceRouterIds();
+
+  it("has routers to check", () => {
+    expect(routerIds.length).toBeGreaterThan(0);
+  });
+
+  describe("when a request through it is rated", () => {
+    /** @scenario A gateway request through a router is never rated below zero */
+    it.each(routerIds)("never rates %s below zero", (model) => {
+      const { costNanoUsd } = rateSpendNanoUsd({
+        model,
+        usage: usage({ input_tokens: 1_000_000, output_tokens: 1_000_000 }),
+      });
+      expect(costNanoUsd).toBe(0);
+    });
+
+    /** @scenario A gateway request through a router names the missing rule */
+    it.each(routerIds)("names the missing rule for %s", (model) => {
+      const faults = findSpendRatingFaults({
+        model,
+        usage: usage({ input_tokens: 1200, output_tokens: 300 }),
+      });
+      expect(faults.map((fault) => fault.code)).toEqual([NO_RATE_RULE_CODE]);
     });
   });
 });
