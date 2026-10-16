@@ -186,8 +186,8 @@ export class CheckupService {
       return {
         outcome: "unchecked",
         detail:
-          "ClickHouse did not answer the provisioning probe (replica layout in system.replicas and, when replicated, the function store in system.zookeeper).",
-        fix: "Give the app's ClickHouse user read access to system.replicas and system.zookeeper.",
+          "ClickHouse did not answer the provisioning probe (system.replicas and, when replicated, system.zookeeper and system.functions).",
+        fix: "Give the app's ClickHouse user read access to system.replicas, system.zookeeper and system.functions.",
         docsPath: CHECKUP_DOCS.lwql,
       };
     }
@@ -196,7 +196,7 @@ export class CheckupService {
         outcome: "refused",
         code: "checkup_lwql_not_provisionable",
         detail:
-          "ClickHouse is replicated and Keeper has no SQL function store at /clickhouse/user_defined, so LWQL app functions cannot reach every replica.",
+          "ClickHouse is replicated but its SQL functions are not in Keeper at /clickhouse/user_defined, so LWQL app functions cannot reach every replica.",
         fix: "Set user_defined_zookeeper_path to /clickhouse/user_defined in the ClickHouse server configuration on every replica and restart ClickHouse.",
         docsPath: CHECKUP_DOCS.lwql,
       };

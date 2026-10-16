@@ -3,7 +3,10 @@ import { createLogger } from "@langwatch/observability";
 
 import {
   APP_FUNCTION_KEEPER_STORE,
+  APP_FUNCTION_KEEPER_STORE_PATH,
   type AppFunctionStoreProbe,
+  type AppFunctionStoreReadings,
+  isFunctionStoreInKeeper,
   needsKeeperFunctionStore,
 } from "../../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import { LangWatchQLAppFunctionStoreRepository } from "../langwatch-ql-app-function-store.repository.ts";
@@ -20,9 +23,15 @@ const KEEPER_FUNCTION_STORE_SQL =
   "SELECT toString(count()) AS stores FROM system.zookeeper " +
   `WHERE path = '${APP_FUNCTION_KEEPER_STORE.parent}' AND name = '${APP_FUNCTION_KEEPER_STORE.name}'`;
 
+const KEEPER_FUNCTION_ENTRIES_SQL = `SELECT name FROM system.zookeeper WHERE path = '${APP_FUNCTION_KEEPER_STORE_PATH}'`;
+
+// system.functions is local to this server, so it says which store this server reads.
+const SERVER_SQL_FUNCTIONS_SQL =
+  "SELECT name FROM system.functions WHERE origin = 'SQLUserDefined'";
+
 /**
- * Reads the replica layout and, only when replicated, whether Keeper holds the
- * function store: a server with no Keeper has no `system.zookeeper` to ask. A
+ * Reads the replica layout and, only when replicated, whether this server keeps its
+ * functions in Keeper: a server with no Keeper has no `system.zookeeper` to ask. A
  * server that cannot answer answers nothing, so it is never taken for a single node.
  */
 export class ClickHouseLangWatchQLAppFunctionStoreRepository extends LangWatchQLAppFunctionStoreRepository {
@@ -58,14 +67,30 @@ export class ClickHouseLangWatchQLAppFunctionStoreRepository extends LangWatchQL
       if (!needsKeeperFunctionStore(maxTotalReplicas)) {
         return [{ maxTotalReplicas, functionStoreInKeeper: false }];
       }
-      const stores = await this.rows(KEEPER_FUNCTION_STORE_SQL);
-      return [{ maxTotalReplicas, functionStoreInKeeper: Number(stores[0]?.stores ?? "0") > 0 }];
+      const readings = await this.readFunctionStore();
+      return [{ maxTotalReplicas, functionStoreInKeeper: isFunctionStoreInKeeper(readings) }];
     } catch (error) {
       logger.error(
         { error },
-        "Could not read the replica layout from system.replicas or the function store from system.zookeeper, so LangWatchQL app functions are not provisionable until it can",
+        "Could not read the replica layout from system.replicas or the function store from system.zookeeper and system.functions, so LangWatchQL app functions are not provisionable until it can",
       );
       return [];
     }
+  }
+
+  private async readFunctionStore(): Promise<AppFunctionStoreReadings> {
+    const [node] = await this.rows(KEEPER_FUNCTION_STORE_SQL);
+    if (Number(node?.stores ?? "0") === 0) {
+      return { storeNodeExists: false, serverFunctions: [], storeEntries: [] };
+    }
+    const [functions, entries] = await Promise.all([
+      this.rows(SERVER_SQL_FUNCTIONS_SQL),
+      this.rows(KEEPER_FUNCTION_ENTRIES_SQL),
+    ]);
+    return {
+      storeNodeExists: true,
+      serverFunctions: functions.map((row) => String(row.name)),
+      storeEntries: entries.map((row) => String(row.name)),
+    };
   }
 }

@@ -86,6 +86,21 @@ async function provisionable({ client }: ReplicatedServer): Promise<boolean[]> {
   return (await repository.findProbe()).map(canProvisionAppFunctions);
 }
 
+/** Writes a Keeper node as another server would, through the image's own keeper-client. */
+async function writeKeeperNode(
+  { container }: ReplicatedServer,
+  { path, value }: { path: string; value: string },
+): Promise<void> {
+  const { exitCode, output } = await container.exec([
+    "clickhouse",
+    "keeper-client",
+    "--host=localhost",
+    "--port=9181",
+    `--query=create '${path}' '${value}'`,
+  ]);
+  if (exitCode !== 0) throw new Error(`keeper-client could not create ${path}: ${output}`);
+}
+
 async function keeperStoreNodes({ client }: ReplicatedServer): Promise<string[]> {
   const rows = await (
     await client.query({
@@ -139,6 +154,23 @@ describe("ClickHouseLangWatchQLAppFunctionStoreRepository on a replicated ClickH
     /** @scenario "The probe refuses a real replicated ClickHouse with no function store in Keeper" */
     it("finds no store and refuses the app functions", async () => {
       await expect(provisionable(server)).resolves.toEqual([false]);
+    });
+
+    describe("when another server made the Keeper store and this one keeps a function on local disk", () => {
+      beforeAll(async () => {
+        await writeKeeperNode(server, { path: APP_FUNCTION_KEEPER_STORE_PATH, value: "store" });
+        await writeKeeperNode(server, {
+          path: `${APP_FUNCTION_KEEPER_STORE_PATH}/function_x.sql`,
+          value: "CREATE FUNCTION x AS () -> 1",
+        });
+        await server.client.command({ query: "CREATE FUNCTION local_only AS () -> 1" });
+      });
+
+      /** @scenario "The probe refuses a real replicated ClickHouse that keeps its functions locally beside another server's Keeper store" */
+      it("sees the store but refuses the app functions", async () => {
+        await expect(keeperStoreNodes(server)).resolves.toEqual(["function_x.sql"]);
+        await expect(provisionable(server)).resolves.toEqual([false]);
+      });
     });
   });
 });

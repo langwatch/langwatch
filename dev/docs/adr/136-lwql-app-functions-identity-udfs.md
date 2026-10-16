@@ -201,13 +201,21 @@ node there is no ensemble to point at. The cloud's own rendered config
 same path, and lands as its own change.
 
 Before it creates the functions on a server with more than one replica, the
-provisioning task checks that the store really is in Keeper. ClickHouse 25.10
-does not list `user_defined_zookeeper_path` in `system.server_settings`, so the
-check reads `system.zookeeper` for the `/clickhouse/user_defined` node, which the
-server creates at boot when the setting is present, even with no function
-stored. A single node is not asked, because it has no `system.zookeeper`. With no
-node, the functions are left out and the log names the setting and the path.
-The ops checkup reads the same probe.
+provisioning task checks that this server keeps its functions in Keeper.
+ClickHouse 25.10 does not list `user_defined_zookeeper_path` in
+`system.server_settings`, and the `/clickhouse/user_defined` node alone is not
+enough: any configured replica creates it at boot, while the server asked may
+still store functions on its own disk. So the check compares two lists. Every
+SQL function the server knows (`system.functions`, origin `SQLUserDefined`,
+which is local to that server) must have a `function_<name>.sql` child under the
+node in `system.zookeeper`, and every such child must be a function the server
+knows, since a Keeper-backed server loads them all. With no function on either
+side, SQL cannot tell the two stores apart, so the node alone decides. A wrong
+yes there leaves local functions with no Keeper child, so the next deploy and
+the ops checkup refuse. A single node is
+not asked, because it has no `system.zookeeper`. When the check fails, the
+functions are left out and the log names the setting and the path. The ops
+checkup reads the same probe.
 
 ## 5. Caps are refusals, and truncation is never silent
 

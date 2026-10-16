@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canProvisionAppFunctions,
+  isFunctionStoreInKeeper,
   needsKeeperFunctionStore,
 } from "../langwatch-ql-app-function-store.rules.ts";
 
@@ -34,5 +35,59 @@ describe("canProvisionAppFunctions", () => {
 describe("needsKeeperFunctionStore", () => {
   it("asks Keeper only where more than one replica would need the functions", () => {
     expect([0, 1, 2].map(needsKeeperFunctionStore)).toEqual([false, false, true]);
+  });
+});
+
+describe("isFunctionStoreInKeeper", () => {
+  const store = { storeNodeExists: true };
+
+  it("is not in Keeper when the store node is missing", () => {
+    expect(
+      isFunctionStoreInKeeper({ storeNodeExists: false, serverFunctions: [], storeEntries: [] }),
+    ).toBe(false);
+  });
+
+  it("falls back to the node when the store and this server hold no function", () => {
+    expect(isFunctionStoreInKeeper({ ...store, serverFunctions: [], storeEntries: [] })).toBe(true);
+  });
+
+  it("is in Keeper when the store holds exactly the functions this server knows", () => {
+    expect(
+      isFunctionStoreInKeeper({
+        ...store,
+        serverFunctions: ["llm_readable_thread", "odd.name"],
+        storeEntries: ["function_odd%2Ename.sql", "function_llm_readable_thread.sql"],
+      }),
+    ).toBe(true);
+  });
+
+  it("is not in Keeper when this server knows a function the store lacks", () => {
+    expect(
+      isFunctionStoreInKeeper({
+        ...store,
+        serverFunctions: ["local_only"],
+        storeEntries: [],
+      }),
+    ).toBe(false);
+  });
+
+  it("is not in Keeper when the store holds a function this server never loaded", () => {
+    expect(
+      isFunctionStoreInKeeper({
+        ...store,
+        serverFunctions: [],
+        storeEntries: ["function_x.sql"],
+      }),
+    ).toBe(false);
+  });
+
+  it("ignores store children that are not function entries", () => {
+    expect(
+      isFunctionStoreInKeeper({
+        ...store,
+        serverFunctions: ["x"],
+        storeEntries: ["function_x.sql", "lock"],
+      }),
+    ).toBe(true);
   });
 });

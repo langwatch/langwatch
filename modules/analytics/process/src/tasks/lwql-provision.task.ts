@@ -167,7 +167,7 @@ async function appFunctionsProvisionable(
   if (canProvisionAppFunctions(probe)) return true;
   logger.error(
     { maxTotalReplicas: probe.maxTotalReplicas, keeperPath: APP_FUNCTION_KEEPER_STORE_PATH },
-    `lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and no SQL function store in Keeper at ${APP_FUNCTION_KEEPER_STORE_PATH}, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path to ${APP_FUNCTION_KEEPER_STORE_PATH} in the server config on every replica and redeploy; LangWatchQL app functions stay refused until then`,
+    `lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and does not keep its SQL functions in Keeper at ${APP_FUNCTION_KEEPER_STORE_PATH}, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path to ${APP_FUNCTION_KEEPER_STORE_PATH} in the server config on every replica and redeploy; LangWatchQL app functions stay refused until then`,
   );
   return false;
 }

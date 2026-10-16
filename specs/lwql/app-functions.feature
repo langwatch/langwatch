@@ -403,7 +403,7 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     And the rest of the access model is provisioned
 
   # ClickHouse 25.10 lists user_defined_zookeeper_path nowhere in system.server_settings,
-  # so the probe asks Keeper for the store node the setting creates at boot.
+  # so the probe compares the Keeper store with the SQL functions this server knows.
   @unit
   Scenario: A replicated server whose function store is in Keeper is provisioned with the functions
     Given a ClickHouse 25.10 with three replicas and the function store at /clickhouse/user_defined in Keeper
@@ -427,6 +427,14 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
   @integration
   Scenario: The probe refuses a real replicated ClickHouse with no function store in Keeper
     Given a ClickHouse 25.10 with Keeper and a table with two replicas but no user_defined_zookeeper_path
+    When the function store probe runs
+    Then the app functions are not provisionable
+
+  @integration
+  Scenario: The probe refuses a real replicated ClickHouse that keeps its functions locally beside another server's Keeper store
+    Given a ClickHouse 25.10 with Keeper and a table with two replicas but no user_defined_zookeeper_path
+    And another server made /clickhouse/user_defined in Keeper with function_x.sql under it
+    And this server holds a function local_only on its local disk
     When the function store probe runs
     Then the app functions are not provisionable
 

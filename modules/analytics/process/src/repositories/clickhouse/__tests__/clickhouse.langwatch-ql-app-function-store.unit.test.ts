@@ -31,10 +31,15 @@ function unknownTable(sql: string): Error {
 function clickHouse2510({
   maxTotalReplicas,
   keeper,
+  serverFunctions = [],
+  storeEntries = [],
 }: {
   maxTotalReplicas: number;
   keeper: "absent" | "with-function-store" | "without-function-store";
+  serverFunctions?: string[];
+  storeEntries?: string[];
 }): QueryDriver {
+  const names = (list: string[]) => list.map((name) => ({ name }));
   return {
     execute<Row>({ sql }: { sql: string }) {
       const answer = (rows: Record<string, unknown>[]) => Promise.resolve({ rows: rows as Row[] });
@@ -42,12 +47,17 @@ function clickHouse2510({
         return answer([{ max_total_replicas: String(maxTotalReplicas) }]);
       }
       if (sql.includes("system.server_settings")) return answer([]);
+      if (sql.includes("system.functions") && sql.includes("origin = 'SQLUserDefined'")) {
+        return answer(names(serverFunctions));
+      }
       if (sql.includes("system.zookeeper")) {
         if (keeper === "absent") return Promise.reject(unknownTable(sql));
+        const hasStore = keeper === "with-function-store";
+        if (sql.includes("path = '/clickhouse/user_defined'")) {
+          return answer(hasStore ? names(storeEntries) : []);
+        }
         const found =
-          keeper === "with-function-store" &&
-          sql.includes("path = '/clickhouse'") &&
-          sql.includes("name = 'user_defined'");
+          hasStore && sql.includes("path = '/clickhouse'") && sql.includes("name = 'user_defined'");
         return answer([{ stores: found ? "1" : "0" }]);
       }
       return Promise.reject(new Error(`unexpected statement: ${sql}`));
@@ -81,6 +91,21 @@ describe("ClickHouseLangWatchQLAppFunctionStoreRepository", () => {
       expect(statements).toContainEqual(
         expect.stringMatching(/^CREATE OR REPLACE FUNCTION llm_readable_thread /),
       );
+    });
+  });
+
+  describe("given a replicated server whose functions are not the ones in the Keeper store", () => {
+    it("is not provisionable, since this server keeps its functions on local disk", async () => {
+      await expect(
+        provisionableOver(
+          clickHouse2510({
+            maxTotalReplicas: 3,
+            keeper: "with-function-store",
+            serverFunctions: ["local_only"],
+            storeEntries: ["function_other_server.sql"],
+          }),
+        ),
+      ).resolves.toEqual([false]);
     });
   });
 
