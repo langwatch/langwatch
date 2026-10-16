@@ -63,6 +63,7 @@ vi.mock("../../../behavior/topic-api.ts", () => ({
 }));
 
 import { FakeTopicHost, renderWithTopicHost } from "../../../testing.tsx";
+import { MODEL_PROVIDERS_HREF, MODEL_PROVIDERS_LINK_LABEL } from "../topic-clustering-copy.ts";
 import TopicClusteringScreen from "../topic-clustering.screen.tsx";
 
 const settledStatus = (overrides: Record<string, unknown>) => ({
@@ -111,6 +112,51 @@ describe("given the last run failed for a reason the customer can fix", () => {
     renderWithTopicHost(<TopicClusteringScreen />);
 
     expect(screen.getByText("No model is set up for topic clustering")).toBeTruthy();
+  });
+});
+
+describe("given the last run failed because the only configured model is a restricted Codex model", () => {
+  const restrictedRun = {
+    runId: "run_1",
+    startedAt: Date.now() - 60_000,
+    trigger: "manual",
+    outcome: "failed",
+    mode: null,
+    skippedReason: null,
+    errorCode: "model_restricted",
+    isErrorUserActionable: true,
+    tracesProcessed: 0,
+    topicsCount: 0,
+    subtopicsCount: 0,
+  };
+
+  /** @scenario "The settings page shows guidance and a link for a restricted model failure" */
+  it("shows the guidance and a link to Model Providers on the status card", () => {
+    state.status = settledStatus({
+      lastRunOutcome: "failed",
+      lastRunErrorCode: "model_restricted",
+      isLastRunErrorUserActionable: true,
+    });
+
+    renderWithTopicHost(<TopicClusteringScreen />);
+
+    expect(
+      screen.getByText("The topic clustering model is not allowed for this feature"),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: MODEL_PROVIDERS_LINK_LABEL }).getAttribute("href"),
+    ).toBe(MODEL_PROVIDERS_HREF);
+  });
+
+  /** @scenario "The settings page shows guidance and a link for a restricted model failure" */
+  it("shows a link to Model Providers on the run history row", () => {
+    state.pages = [{ outcome: "page", entries: [restrictedRun], hasMore: false, nextCursor: null }];
+
+    renderWithTopicHost(<TopicClusteringScreen />);
+
+    expect(
+      screen.getByRole("link", { name: MODEL_PROVIDERS_LINK_LABEL }).getAttribute("href"),
+    ).toBe(MODEL_PROVIDERS_HREF);
   });
 });
 

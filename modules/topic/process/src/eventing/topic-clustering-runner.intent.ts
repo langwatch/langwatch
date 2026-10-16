@@ -289,11 +289,10 @@ const getProjectTopicClusteringModelProvider = async (
   deps: TopicClusteringRunnerDeps,
   projectId: string,
 ) => {
-  // Resolve the analytics.topic_clustering_llm feature via the models
-  // port. Throws ModelNotConfiguredError when nothing is set at any scope;
-  // nothing here catches it — it propagates to the intent handler, retries
-  // through the outbox, and the run records run_failed with the
-  // user-actionable model_not_configured code (settings-page guidance).
+  // Resolves analytics.topic_clustering_llm via the models port. Nothing catches
+  // ModelNotConfiguredError: it retries through the outbox and the run records
+  // model_not_configured. Only a codex model configured throws
+  // ModelRestrictedForFeatureError, recorded as model_restricted.
   const resolved = await deps.models.resolveClusteringModel(projectId);
   const topicClusteringModel = resolved.model;
   const provider = topicClusteringModel.split("/")[0];

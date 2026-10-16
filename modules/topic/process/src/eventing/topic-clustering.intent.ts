@@ -1,6 +1,9 @@
 import type { IntentContext, IntentExecutor, IntentSpec } from "@langwatch/eventing";
 import { defineCommand } from "@langwatch/eventing";
-import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
+import {
+  ModelNotConfiguredError,
+  ModelRestrictedForFeatureError,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -36,6 +39,15 @@ export function classifyClusteringError(error: unknown): ClassifiedClusteringErr
   if (error instanceof ModelNotConfiguredError) {
     return {
       code: CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
+      isUserActionable: true,
+    };
+  }
+  // Every value the cascade found was a terms-restricted codex model it had to
+  // skip. Something IS configured, so the fix is choosing another model — not
+  // "nothing set". Matched by type, never by message string.
+  if (error instanceof ModelRestrictedForFeatureError) {
+    return {
+      code: CLUSTERING_ERROR_CODES.MODEL_RESTRICTED,
       isUserActionable: true,
     };
   }
