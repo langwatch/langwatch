@@ -676,7 +676,8 @@ class IdIndexFill {
       if (cursor?.complete === true) continue;
       if (!(await this.fillPartition({ target, index, partition, cursor }))) return false;
       this.report.done += 1;
-      // Saved together with `done`, so a walk stopped before the next partition never counts this one twice.
+      // Saved together with `done`, so a walk stopped before the next partition
+      // never counts this one twice.
       const last = this.report.cursor;
       if (
         last !== null &&

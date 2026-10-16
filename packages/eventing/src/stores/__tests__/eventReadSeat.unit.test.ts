@@ -113,7 +113,7 @@ describe("EventLogReadSeat", () => {
       const { seat, eventId, reads } = await seatHolding({
         occurredAt: (t) => t - 90 * DAY_MS,
       });
-      
+
       await expect(read(seat, eventId)).resolves.toMatchObject({ id: eventId });
 
       expect(reads.map((each) => each.occurredAt !== undefined)).toEqual([true, false]);
