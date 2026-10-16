@@ -835,7 +835,6 @@ function forgottenSearchState(s: ExplorerStore): Partial<ExplorerStore> {
   return { ...freshSearchState(lensFilter), draftState: draftsWithoutFilters(s.draftState) };
 }
 
-/** Every draft with its search dropped; a draft left empty goes too. */
 function draftsWithoutFilters(drafts: Map<string, DraftLensState>): Map<string, DraftLensState> {
   const kept = new Map<string, DraftLensState>();
   for (const [lensId, draft] of drafts) {

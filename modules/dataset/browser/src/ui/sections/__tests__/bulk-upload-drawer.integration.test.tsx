@@ -268,6 +268,7 @@ describe("given the bulk upload drawer", () => {
     it("does not open the dataset when the drawer was closed before it was ready", async () => {
       const user = userEvent.setup();
       const onOpenDataset = vi.fn();
+      const onUploaded = vi.fn();
       let finishUpload: (v: unknown) => void = () => {};
       uploadStoredObject.mockReset().mockReturnValue(
         new Promise((resolve) => {
@@ -278,7 +279,14 @@ describe("given the bulk upload drawer", () => {
       function ClosableDrawer() {
         const [open, setOpen] = useState(true);
         closeDrawer = () => setOpen(false);
-        return <BulkUploadDrawer open={open} onClose={vi.fn()} onOpenDataset={onOpenDataset} />;
+        return (
+          <BulkUploadDrawer
+            open={open}
+            onClose={vi.fn()}
+            onUploaded={onUploaded}
+            onOpenDataset={onOpenDataset}
+          />
+        );
       }
       renderWithDatasetHost(<ClosableDrawer />, { project: { id: "proj_1", slug: "proj" } });
       await user.upload(fileInput(), [csv("one.csv")]);
@@ -288,7 +296,7 @@ describe("given the bulk upload drawer", () => {
       act(() => closeDrawer());
       finishUpload({ id: "so_1" });
 
-      await waitFor(() => expect(createFromStoredObject).toHaveBeenCalled());
+      await waitFor(() => expect(onUploaded).toHaveBeenCalled());
       expect(onOpenDataset).not.toHaveBeenCalled();
     });
 
