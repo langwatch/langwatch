@@ -226,7 +226,7 @@ type LwqlProvisioningOperations = Readonly<{
   fillProjectKeys: (input: { dryRun: boolean }) => Promise<LwqlProjectKeyFillReport>;
 }>;
 
-const NO_DRIFT: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], keyMap: false };
+const NO_DRIFT: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], isKeyMapMissing: false };
 
 const lwqlLogger = createLogger("langwatch:analytics:lwql:provisioning");
 

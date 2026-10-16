@@ -265,7 +265,7 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
 
   /** @scenario "The reconvergence check converges nothing while every app-owned LangWatchQL object is in place" */
   it("finds nothing when every relation and every function exists", () => {
-    expect(drift(relations)).toEqual({ objects: [], keyMap: false });
+    expect(drift(relations)).toEqual({ objects: [], isKeyMapMissing: false });
   });
 
   /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
@@ -279,7 +279,7 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
 
     expect(drift(found, [])).toEqual({
       objects: [NAMES.keyMapTable, engineTable, view, "lwql_trace"],
-      keyMap: true,
+      isKeyMapMissing: true,
     });
   });
 });

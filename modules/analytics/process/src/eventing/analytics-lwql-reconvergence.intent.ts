@@ -66,8 +66,8 @@ function driftFields(drift: LwqlAppOwnedDrift) {
 /** One store's share of the drift, so each store's failure is converged and alerted alone. */
 function driftIn(store: LwqlStore, drift: LwqlAppOwnedDrift): LwqlAppOwnedDrift {
   return store === "clickHouse"
-    ? { clickHouse: drift.clickHouse, postgres: [], keyMap: drift.keyMap }
-    : { clickHouse: [], postgres: drift.postgres, keyMap: false };
+    ? { clickHouse: drift.clickHouse, postgres: [], isKeyMapMissing: drift.isKeyMapMissing }
+    : { clickHouse: [], postgres: drift.postgres, isKeyMapMissing: false };
 }
 
 /** Each store's last error-level failure, which rates the next failure's log level. */
@@ -162,7 +162,7 @@ export function runLwqlReconvergence(
     // Unread is not converged: an unreadable catalog leaves the last alert as it was.
     if (drift !== undefined) await converge("postgres", drift);
     const clickHouseConverged = drift === undefined || (await converge("clickHouse", drift));
-    const keyMapRepaired = drift?.keyMap === true;
+    const keyMapRepaired = drift?.isKeyMapMissing === true;
     if ((fillKeyMap || keyMapRepaired) && (!keyMapRepaired || clickHouseConverged)) {
       await deps.fillKeyMap().catch((error: unknown) => {
         logger.warn(

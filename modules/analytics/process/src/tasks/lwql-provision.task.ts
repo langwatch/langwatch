@@ -514,7 +514,7 @@ export async function findLwqlAppOwnedDrift({
     },
   });
   const postgres = await readPostgresGaps({ database, schema: plan.schema });
-  return { clickHouse: clickHouse.objects, postgres, keyMap: clickHouse.keyMap };
+  return { clickHouse: clickHouse.objects, postgres, isKeyMapMissing: clickHouse.isKeyMapMissing };
 }
 
 /** The pool size `DATABASE_URL` names, as plan fields: empty where it names none. */

@@ -45,7 +45,7 @@ const ALERT = "lwql provisioning failed creating ClickHouse objects";
 const POSTGRES_ALERT = "lwql provisioning failed creating PostgreSQL objects";
 const HOUR = 60 * 60_000;
 const FIRST_SLOT = 1_700_000_000_000;
-const healthy: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], keyMap: false };
+const healthy: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], isKeyMapMissing: false };
 const wakeOnce = { fillKeyMap: false };
 
 function wake(state: LwqlReconvergenceState, at: number) {
@@ -72,7 +72,11 @@ function clickHouseWorld({ missing }: { missing: string[] }) {
     ddlRuns: 0,
     async findDrift(): Promise<LwqlAppOwnedDrift> {
       const objects = [...world.missing];
-      return { clickHouse: objects, postgres: [], keyMap: objects.includes("api_key_tenants") };
+      return {
+        clickHouse: objects,
+        postgres: [],
+        isKeyMapMissing: objects.includes("api_key_tenants"),
+      };
     },
     async convergeAppOwned(): Promise<void> {
       world.ddlRuns += 1;
@@ -180,7 +184,11 @@ describe("given a check over the app-owned objects", () => {
   describe("when an engine table is missing", () => {
     /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
     it("converges with the drift it read and leaves the access model to the config store", async () => {
-      const drift: LwqlAppOwnedDrift = { clickHouse: ["agents_pg"], postgres: [], keyMap: false };
+      const drift: LwqlAppOwnedDrift = {
+        clickHouse: ["agents_pg"],
+        postgres: [],
+        isKeyMapMissing: false,
+      };
       const convergeAppOwned = vi.fn((_drift: LwqlAppOwnedDrift) => Promise.resolve());
       const converge = vi.fn(() => Promise.resolve());
       await runLwqlReconvergence({
@@ -301,7 +309,7 @@ describe("given a check over the app-owned objects", () => {
       const drift: LwqlAppOwnedDrift = {
         clickHouse: ["agents_pg"],
         postgres: [gap],
-        keyMap: false,
+        isKeyMapMissing: false,
       };
       const converged: LwqlAppOwnedDrift[] = [];
       await runLwqlReconvergence({
@@ -325,7 +333,9 @@ describe("given a check over the app-owned objects", () => {
           }),
         }),
       ]);
-      expect(converged).toEqual([{ clickHouse: ["agents_pg"], postgres: [], keyMap: false }]);
+      expect(converged).toEqual([
+        { clickHouse: ["agents_pg"], postgres: [], isKeyMapMissing: false },
+      ]);
     });
 
     /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
@@ -336,7 +346,11 @@ describe("given a check over the app-owned objects", () => {
         probe: () => Promise.resolve("config_store"),
         converge: () => Promise.resolve(),
         findDrift: () =>
-          Promise.resolve({ clickHouse: [], postgres: reads.shift() ?? [], keyMap: false }),
+          Promise.resolve({
+            clickHouse: [],
+            postgres: reads.shift() ?? [],
+            isKeyMapMissing: false,
+          }),
         convergeAppOwned,
         fillKeyMap: () => Promise.resolve(),
       });

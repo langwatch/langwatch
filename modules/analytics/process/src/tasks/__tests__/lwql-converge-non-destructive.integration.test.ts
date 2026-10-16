@@ -1,7 +1,5 @@
 /**
- * A converge that fails against a real ClickHouse leaves the working PostgreSQL engine tables in
- * place: the deploy's run once dropped each before recreating it, so a missing named collection
- * left the install with none (issue #8726).
+ * A converge that fails on a real ClickHouse keeps the working PostgreSQL engine tables (#8726).
  * @see specs/lwql/api.feature
  * @vitest-environment node
  */
@@ -155,7 +153,7 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
           database: noPostgres,
           plan: plan(),
           failOnError: true,
-          only: { clickHouse: [engineTable], postgres: [], keyMap: false },
+          only: { clickHouse: [engineTable], postgres: [], isKeyMapMissing: false },
         }),
       ).resolves.toBeUndefined();
 

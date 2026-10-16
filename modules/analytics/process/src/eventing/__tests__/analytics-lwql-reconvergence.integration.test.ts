@@ -1,7 +1,5 @@
 /**
- * The reconvergence check in rendered mode on a real ClickHouse and PostgreSQL: while the named
- * collection is absent each check fails without crashing, and the first after it appears
- * converges everything. No boot; each check is a fresh worker's, sharing only the databases.
+ * Rendered-mode checks on real stores fail safely, then converge once the named collection appears.
  * @see specs/lwql/api.feature
  * @vitest-environment node
  */
@@ -51,7 +49,7 @@ const ENGINE_TABLES = LangWatchQLCatalogShapesService.create()
   .postgresViews(LWQL_VIEW_CATALOG)
   .map((view) => view.sourceTable);
 const READER_PASSWORD = "reader-reconvergence-secret";
-const converged: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], keyMap: false };
+const converged: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], isKeyMapMissing: false };
 
 function repositoryOver(client: ClickHouseClient) {
   return ClickHouseLangWatchQLProvisioningRepository.create({

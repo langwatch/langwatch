@@ -248,7 +248,7 @@ describe("convergeLwqlAccessModel", () => {
     const only = (drift: Partial<LwqlAppOwnedDrift>): LwqlAppOwnedDrift => ({
       clickHouse: [],
       postgres: [],
-      keyMap: false,
+      isKeyMapMissing: false,
       ...drift,
     });
     const engineTable = selfProvisioning
@@ -421,7 +421,11 @@ describe("findLwqlAppOwnedDrift", () => {
     },
     { shape: "fewer columns than this worker's catalog declares", columns: ["TenantId"] },
   ])("finds no drift in objects holding $shape", async ({ columns }) => {
-    expect(await presentWith({ columns })).toEqual({ clickHouse: [], postgres: [], keyMap: false });
+    expect(await presentWith({ columns })).toEqual({
+      clickHouse: [],
+      postgres: [],
+      isKeyMapMissing: false,
+    });
   });
 
   /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */

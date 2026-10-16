@@ -76,7 +76,7 @@ interface LwqlClickHouseDrift {
   /** Each object absent. */
   readonly objects: readonly string[];
   /** The key map was among them, so a converge that repairs it is followed by a fill. */
-  readonly keyMap: boolean;
+  readonly isKeyMapMissing: boolean;
 }
 
 /** An approved view the check repairs: created when absent, then granted to the reader. */
@@ -93,7 +93,7 @@ export interface LwqlPostgresGap {
 export interface LwqlAppOwnedDrift {
   readonly clickHouse: readonly string[];
   readonly postgres: readonly LwqlPostgresGap[] | "unknown";
-  readonly keyMap: boolean;
+  readonly isKeyMapMissing: boolean;
 }
 
 /** The endpoint must be reachable from the ClickHouse server; the chart's cluster DNS is. */
@@ -329,7 +329,7 @@ export class LangWatchQLSelfProvisioningService {
       ...relations.filter((name) => !found.relations.includes(name)),
       ...functions.filter((name) => !found.functions.includes(name)),
     ];
-    return { objects, keyMap: objects.includes(names.keyMapTable) };
+    return { objects, isKeyMapMissing: objects.includes(names.keyMapTable) };
   }
 
   /** The approved views the reader role must select from. */
