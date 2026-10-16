@@ -63,8 +63,10 @@ export type IssuedLicensePage = z.infer<typeof issuedLicensePageSchema>;
 
 const listIssuedLicensesInputSchemaDefinition = z.object({
   page: z.number().int().min(0).default(0),
-  pageSize: z.number().int().min(1).max(200).default(25),
-  search: z.string().optional(),
+  pageSize: z.number().int().min(1).max(100).default(25),
+  search: z.string().max(200).optional(),
+  onlyActive: z.boolean().optional(),
+  hideInternal: z.boolean().optional(),
 });
 export interface ListIssuedLicensesInputSchema extends Named<
   typeof listIssuedLicensesInputSchemaDefinition

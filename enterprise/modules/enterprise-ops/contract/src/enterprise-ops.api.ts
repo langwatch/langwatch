@@ -3,13 +3,16 @@ import type {
   ActivationCodePage,
   ActivationCodeView,
   IssuedActivationCode,
+  IssuedLicenseFilters,
   IssuedLicensePage,
   IssuedLicenseView,
   LicenseCustomer,
   LicenseTermsInput,
   SeatChangeResult,
   SelfHostedInstanceDetail,
+  SelfHostedInstanceFilters,
   SelfHostedInstancePage,
+  SelfHostedInstanceSummary,
   SignedIssuedLicense,
 } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/module";
@@ -22,12 +25,14 @@ import type { OpsOperator } from "@langwatch/ops-contract";
 export interface EnterpriseOpsApi {
   // -- the license registry (ADR-156) ------------------------------------------
 
-  listIssuedLicenses(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-    operator: OpsOperator | null;
-  }): Promise<IssuedLicensePage>;
+  listIssuedLicenses(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+      operator: OpsOperator | null;
+    } & IssuedLicenseFilters,
+  ): Promise<IssuedLicensePage>;
   getIssuedLicense(input: { id: string; operator: OpsOperator | null }): Promise<IssuedLicenseView>;
   issueLicense(input: {
     customer: LicenseCustomer;
@@ -107,16 +112,21 @@ export interface EnterpriseOpsApi {
 
   // -- the registry of self-hosted installs (ADR-156, section 10); read only --
 
-  listSelfHostedInstances(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-    operator: OpsOperator | null;
-  }): Promise<SelfHostedInstancePage>;
+  listSelfHostedInstances(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+      operator: OpsOperator | null;
+    } & SelfHostedInstanceFilters,
+  ): Promise<SelfHostedInstancePage>;
   getSelfHostedInstance(input: {
     id: string;
     operator: OpsOperator | null;
   }): Promise<SelfHostedInstanceDetail>;
+  summarizeSelfHostedInstances(input: {
+    operator: OpsOperator | null;
+  }): Promise<SelfHostedInstanceSummary>;
 }
 
 export const EnterpriseOpsApi = moduleApi<EnterpriseOpsApi>()("enterprise-ops");
