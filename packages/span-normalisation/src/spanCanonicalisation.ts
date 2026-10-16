@@ -14,6 +14,7 @@ import type {
   CanonicalSpanContext,
 } from "./canonicalTypes.ts";
 import { ClaudeCodeCanonicaliserService } from "./claude-code/claudeCodeCanonicaliser.ts";
+import { ClaudePlatformCanonicaliserService } from "./claudePlatformCanonicaliser.ts";
 import { CodexCanonicaliserService } from "./codex/codexCanonicaliser.ts";
 import type { CodexScopes } from "./codex/codexSpan.ts";
 import { CopilotCanonicaliserService } from "./copilotCanonicaliser.ts";
@@ -89,6 +90,7 @@ export function orderedSpanCanonicalisers({
     CodexCanonicaliserService.create({ scopes: codexScopes }),
     // Copilot adds its extras after GenAI establishes the standard attributes.
     CopilotCanonicaliserService.create(),
+    ClaudePlatformCanonicaliserService.create(),
     SpringAICanonicaliserService.create(),
     StrandsCanonicaliserService.create(),
     LogfireCanonicaliserService.create(),
