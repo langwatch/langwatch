@@ -14,6 +14,11 @@ export interface License {
   issuedAt: string;
   expiresAt: string;
   source: string;
+  /** `standard`, `testing` (ADR-180) or a kind a newer release wrote. */
+  kind: string;
+  testingOrganizationId: string | null;
+  issuedById: string | null;
+  issuedByName?: string | null;
   revokedAt: string | null;
   revokedReason: string | null;
   replacesId: string | null;
@@ -102,3 +107,10 @@ export function termsPayload(form: TermsForm) {
     overageMaxUsdCents: form.overageEnabled ? dollarsToCents(form.overageMax) : null,
   };
 }
+
+/** Anything but `standard` is shown apart from customer licenses (ADR-180). */
+export const isStandardLicense = (license: Pick<License, "kind">): boolean =>
+  license.kind === "standard";
+
+/** A known kind reads as a word; one a newer release wrote is shown as stored. */
+export const licenseKindLabel = (kind: string): string => (kind === "testing" ? "Testing" : kind);

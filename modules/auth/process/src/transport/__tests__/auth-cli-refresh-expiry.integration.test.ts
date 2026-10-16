@@ -180,6 +180,9 @@ function refreshWorld() {
     sessions: () => sessions,
     directory: () => directory,
     session: () => Promise.resolve(null),
+
+    holdsOpsManage: () => Promise.resolve(false),
+    mintTestingLicenseToken: () => Promise.reject(new Error("not reached by this test")),
     apiKeys: () => apiKeys,
     ensurePersonalWorkspace: () => Promise.reject(new Error("not reached by a refresh")),
     canViewProject: () => Promise.resolve(false),

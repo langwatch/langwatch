@@ -6189,6 +6189,55 @@ const presentations = {
     title: "License already reissued",
     describe: () => "This license was already reissued. Reissue its replacement instead.",
   },
+  testing_license_binding_reset_refused: {
+    title: "A testing license stays on its instance",
+    describe: () => "A testing license cannot be moved. A new instance needs a new license.",
+  },
+  testing_license_binding_missing: {
+    title: "This license cannot be reissued",
+    describe: () =>
+      "It is not a standard license and names no instance or organization. Issue a new one instead.",
+  },
+  testing_license_instance_override: {
+    title: "Testing licenses are off on this instance",
+    describe: () =>
+      "This instance's id is set by its configuration, so a testing license cannot be used here.",
+  },
+  testing_license_wrong_instance: {
+    title: "This testing license is for a different instance",
+    describe: () => "Ask for a testing license from this instance.",
+  },
+  testing_license_wrong_organization: {
+    title: "This testing license is for a different organization",
+    describe: () => "Activate it on the organization it was approved for.",
+  },
+  testing_license_lifetime_too_long: {
+    title: "A testing license lasts at most 30 days",
+    describe: () => "Ask for a shorter testing license. It can be renewed before it runs out.",
+  },
+  testing_license_service_token_lifetime_too_long: {
+    title: "A service token expires within a year",
+    describe: () => "Choose an expiry of a year or less, and create a new token when it runs out.",
+  },
+  testing_license_token_invalid: {
+    title: "This testing license token is not valid",
+    describe: () =>
+      "Sign in to LangWatch Cloud again, or use a service token an ops manager created.",
+  },
+  testing_license_token_expired: {
+    title: "This testing license token has expired",
+    describe: () =>
+      "Sign in to LangWatch Cloud again, or ask an ops manager for a new service token.",
+  },
+  testing_license_token_revoked: {
+    title: "This testing license token was revoked",
+    describe: () =>
+      "Sign in to LangWatch Cloud again, or ask an ops manager for a new service token.",
+  },
+  testing_license_token_not_found: {
+    title: "Testing license token not found",
+    describe: () => "The token may already have been removed. Refresh the list and try again.",
+  },
   license_overage_max_requires_overage: {
     title: "Overage maximum needs overage enabled",
     describe: () =>

@@ -1579,6 +1579,9 @@ importers:
       '@langwatch/instant-eval-process':
         specifier: workspace:*
         version: link:../../modules/instant-eval/process
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../packages/ksuid
       '@langwatch/langy-process':
         specifier: workspace:*
         version: link:../../modules/langy/process
@@ -1609,6 +1612,9 @@ importers:
       '@langwatch/ops-process':
         specifier: workspace:*
         version: link:../../modules/ops/process
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../modules/organization/contract
       '@langwatch/organization-process':
         specifier: workspace:*
         version: link:../../modules/organization/process
@@ -1690,6 +1696,9 @@ importers:
       '@langwatch/upgrade':
         specifier: workspace:*
         version: link:../../packages/upgrade
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../modules/user/contract
       '@langwatch/user-process':
         specifier: workspace:*
         version: link:../../modules/user/process
@@ -2991,6 +3000,9 @@ importers:
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../../packages/process
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/user/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.5

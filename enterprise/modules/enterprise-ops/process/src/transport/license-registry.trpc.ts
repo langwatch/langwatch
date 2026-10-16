@@ -85,4 +85,23 @@ export const licenseRegistryTrpcTransport: TrpcRouterDeclaration<
   .withMiddlewareContext(operatorContext)
   .withPermission("ops:manage", STAFF)
   .handle(({ app, input }, operator) => app.revokeActivationCode({ ...input, operator }))
+
+  // Testing-licence tokens (ADR-180 section 2): ops managers list, create and revoke them.
+  .procedure("testingLicenseTokens")
+  .withMiddlewareContext(operatorContext)
+  .withPermission("ops:manage", STAFF)
+  .handle(({ app, input }, operator) => app.listTestingLicenseTokens({ ...input, operator }))
+
+  .procedure("createTestingLicenseServiceToken")
+  .mintsCredential("ops:manage")
+  .withMiddlewareContext(operatorContext)
+  .withPermission("ops:manage", STAFF)
+  .handle(({ app, input }, operator) =>
+    app.createTestingLicenseServiceToken({ ...input, operator }),
+  )
+
+  .procedure("revokeTestingLicenseToken")
+  .withMiddlewareContext(operatorContext)
+  .withPermission("ops:manage", STAFF)
+  .handle(({ app, input }, operator) => app.revokeTestingLicenseToken({ ...input, operator }))
   .build();

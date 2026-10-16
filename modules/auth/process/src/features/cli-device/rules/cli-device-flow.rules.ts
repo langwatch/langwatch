@@ -30,6 +30,20 @@ export function normalizeDeviceLabel(raw: string | undefined | null): string | n
   return cleaned.length > 0 ? cleaned : null;
 }
 
+const DEVICE_LABEL_MAX_LENGTH = 80;
+
+/** The device label as display text: control characters dropped, trimmed, capped; "" if none. */
+export function displayDeviceLabel(raw: string | undefined | null): string {
+  return (raw ?? "")
+    .replace(/\p{Cc}+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, DEVICE_LABEL_MAX_LENGTH);
+}
+
+/** The refusal code a testing-licence approval or exchange answers without `ops:manage`. */
+export const TESTING_LICENSE_REFUSED_CODE = "testing_license_requires_ops_manage";
+
 /** Whether the grant behind a device code has already run out of time. */
 export function expired(record: CliDeviceCodeRecord): boolean {
   return nowInstant().epochMilliseconds > record.expires_at;

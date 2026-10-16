@@ -4,8 +4,11 @@
  * keeps one stable address, so a saved password-manager login persists across worktrees.
  */
 
-/** The local-dev admin's fixed id; other seeds add this account to what they create. */
-export const LOCAL_DEV_ADMIN_USER_ID = "local-dev-admin-user";
+/** The local part of the local-dev admin's address; other seeds find the account by it. */
+export const LOCAL_DEV_ADMIN_LOCAL_PART = "admin";
+
+/** The fixed admin id older seeds wrote. Read only, to find that account; never written. */
+export const RETIRED_ADMIN_USER_ID = "local-dev-admin-user";
 
 /** The domain every seeded account uses unless SEED_EMAIL_DOMAIN overrides it. */
 export const DEFAULT_SEED_EMAIL_DOMAIN = "mail.langwatch.localhost";
@@ -29,25 +32,4 @@ export function seedEmailAddress({
   domainOverride?: string;
 }): string {
   return `${localPart}@${domainOverride ?? DEFAULT_SEED_EMAIL_DOMAIN}`;
-}
-
-/**
- * The admin User upsert's where/create/update payload. Keyed on the fixed
- * `adminUserId`, never on email, so a reseed always finds and rewrites THIS
- * account in place — a domain change can never produce a second admin account.
- */
-export function buildAdminUserUpsertArgs({
-  adminUserId,
-  email,
-  name,
-}: {
-  adminUserId: string;
-  email: string;
-  name: string;
-}) {
-  return {
-    where: { id: adminUserId },
-    create: { id: adminUserId, email, name, emailVerified: true },
-    update: { email },
-  };
 }

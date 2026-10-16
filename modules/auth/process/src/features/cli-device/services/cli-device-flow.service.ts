@@ -5,6 +5,7 @@ import {
   denyRequestSchema,
   deviceCodeRequestSchema,
 } from "@langwatch/auth-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { EnsuredPersonalWorkspace } from "@langwatch/organization-contract";
 import type * as zodModule from "zod";
@@ -12,6 +13,7 @@ import type * as zodModule from "zod";
 import type { CliAccessProject } from "../../../services/api-rest-credentials.service.ts";
 import {
   answer,
+  displayDeviceLabel,
   expired,
   posted,
   type CliDeviceFlowAnswer,
@@ -91,6 +93,12 @@ export interface CliDeviceFlowCollaborators {
   }) => Promise<EnsuredPersonalWorkspace>;
   /** Whether the person holds `project:view` there: the bar a project session is bound at. */
   canViewProject: (input: { userId: string; projectId: string }) => Promise<boolean>;
+  /** Whether the person holds `ops:manage` at platform scope: a testing-licence token's bar. */
+  holdsOpsManage: (input: { userId: string }) => Promise<boolean>;
+  /** A personal testing-licence token for the person, shown once. */
+  mintTestingLicenseToken: (input: {
+    userId: string;
+  }) => Promise<Awaited<ReturnType<LicensingApi["mintPersonalTestingLicenseToken"]>>>;
   /** This deployment's flag store, for the device journey's rollout gate. */
   featureFlags: () => Pick<FeatureFlagApi, "isEnabled">;
   /** The deployment's public origin, or none. */
@@ -196,6 +204,7 @@ async function startDeviceFlow({
   const record = await flow.sessions().startDeviceCode({
     credentialType: parsed.data.credential_type,
     management: parsed.data.management,
+    clientInfo: parsed.data.client_info,
   });
   const verificationUri = verificationUriOf(flow);
 
@@ -245,6 +254,8 @@ async function lookupDeviceFlow({
     // The approval screen adds management access to the key's default
     // permissions when the CLI asked for it with `--management`.
     management: record.management === true,
+    // Untrusted text the CLI sent; the page shows it as plain text only.
+    ...deviceLabelOf(record.client_info?.device_label),
   });
 }
 
@@ -268,4 +279,10 @@ async function denyDeviceFlow({
   await flow.sessions().denyDeviceCodeByUserCode(parsed.data.user_code);
 
   return answer({ ok: true });
+}
+
+/** The lookup names the device only when it sent a label with something left once cleaned. */
+function deviceLabelOf(raw: string | undefined): { device_label?: string } {
+  const label = displayDeviceLabel(raw);
+  return label === "" ? {} : { device_label: label };
 }

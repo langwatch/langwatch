@@ -32,3 +32,7 @@ export * from "./license-registry.errors.ts";
 export * from "./license-sync.ts";
 export * from "./self-hosted-instance.ts";
 export * from "./licensing-customer.events.ts";
+
+/** Testing licences issued on Cloud, and the tokens that ask for them (ADR-180). */
+export * from "./testing-license.ts";
+export * from "./testing-license.errors.ts";

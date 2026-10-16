@@ -908,6 +908,20 @@ const registry = {
   license_signing_failed: {
     tips: ["Check that this is the license signing key and that it was copied in full"],
   },
+  testing_license_instance_override: {
+    tips: ["Unset LANGWATCH_CONNECT_INSTANCE_ID and restart, then ask for a testing license again"],
+  },
+  testing_license_wrong_instance: {
+    tips: ["Ask for a testing license from this instance; a new instance needs a new approval"],
+  },
+  testing_license_lifetime_too_long: {
+    tips: ["Ask for 720 hours (30 days) or less; renew it before it runs out"],
+  },
+  testing_license_token_expired: {
+    tips: [
+      "A developer signs in to LangWatch Cloud again; a CI job needs a new service token from an ops manager",
+    ],
+  },
   instant_eval_already_finished: {
     tips: ["Read `meta.status`; the run reached that state before the cancel arrived"],
   },

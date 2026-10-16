@@ -33,6 +33,7 @@ export {
   PRO_TEMPLATE,
   resolveMembersLite,
   statedLiteSeatsSchema,
+  TESTING_LICENSE_SEATS,
   type LicensePlanTemplate,
   type LicenseResourceCounts,
 } from "./licensing.ts";

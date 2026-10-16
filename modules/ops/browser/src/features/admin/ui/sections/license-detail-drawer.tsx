@@ -15,6 +15,8 @@ import { useEffect, useState } from "react";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useLicenseCommands } from "../../behavior/use-license-commands.ts";
 import {
+  isStandardLicense,
+  licenseKindLabel,
   termsFormFrom,
   termsPayload,
   type License,
@@ -25,6 +27,7 @@ import { LicenseTermsFields } from "../blocks/license-terms-fields.tsx";
 import { dateInputToISO, EmptyCell, formatDate, formatDateTime } from "../elements/admin-cells.tsx";
 import { Detail, Section } from "../elements/drawer-sections.tsx";
 import { LicenseStatusBadge } from "../elements/license-status-badge.tsx";
+import { PersonCell } from "../elements/person-cell.tsx";
 import { SignedLicenseOnce } from "../elements/signed-license-once.tsx";
 
 export function LicenseDetailDrawer({
@@ -154,6 +157,21 @@ function LicenseDetails({ license }: { license: License }) {
       <Detail label="Issued">{formatDate(license.issuedAt)}</Detail>
       <Detail label="Term ends">{formatDate(license.expiresAt)}</Detail>
       <Detail label="Source">{license.source}</Detail>
+      <Detail label="Kind">{licenseKindLabel(license.kind)}</Detail>
+      {isStandardLicense(license) ? null : (
+        <>
+          <Detail label="Testing organization">
+            {license.testingOrganizationId ?? <EmptyCell>none</EmptyCell>}
+          </Detail>
+        </>
+      )}
+      <Detail label="Issued by">
+        {license.issuedById ? (
+          <PersonCell id={license.issuedById} name={license.issuedByName} />
+        ) : (
+          <EmptyCell>unknown</EmptyCell>
+        )}
+      </Detail>
       <Detail label="Email">{license.email}</Detail>
       <Detail label="Instance">
         {license.instanceId

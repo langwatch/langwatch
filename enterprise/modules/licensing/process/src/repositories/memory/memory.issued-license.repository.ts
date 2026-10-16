@@ -88,13 +88,16 @@ export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
     page,
     pageSize,
     search,
+    includeTesting,
   }: {
     page: number;
     pageSize: number;
     search?: string;
+    includeTesting?: boolean;
   }): Promise<{ rows: IssuedLicenseRecord[]; total: number }> {
     const term = search?.trim().toLowerCase();
     const matched = this.all()
+      .filter((row) => includeTesting === true || row.kind === "standard")
       .filter((row) => (term ? matches(row, term) : true))
       .toSorted((left, right) => Temporal.Instant.compare(right.createdAt, left.createdAt));
     return {

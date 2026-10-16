@@ -10,6 +10,7 @@ import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 
 import {
+  TESTING_LICENSE_REFUSED_CODE,
   expired,
   posted,
   isPersonOrOrganizationGone,
@@ -173,6 +174,10 @@ async function exchange({
     });
   }
 
+  if (record.credential_type === "testing_license") {
+    return testingLicenseAnswer({ flow, record, userId: user.id });
+  }
+
   const personalProject = await keys.personalProjectFieldsOf({ user, organization });
   // One instant stamps the session and anchors the login key's expiry.
   const sessionStartedAtMs = nowInstant().epochMilliseconds;
@@ -220,6 +225,45 @@ async function exchange({
       ? { cli_api_key: minted.token, cli_api_key_scope: minted.scope }
       : {}),
     endpoint,
+  });
+}
+
+/**
+ * The personal testing-licence token for an approved request. `ops:manage` is asked again
+ * here, as membership is: a person who lost it between approval and exchange gets nothing.
+ */
+async function testingLicenseAnswer({
+  flow,
+  record,
+  userId,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  record: CliDeviceCodeRecord;
+  userId: string;
+}): Promise<CliDeviceFlowAnswer> {
+  if (!(await flow.holdsOpsManage({ userId }))) {
+    await flow.sessions().consumeDeviceCode({ record, alsoPollWindow: true });
+    await flow.sessions().releaseExchangeClaim(record.device_code);
+
+    throw refused(
+      TESTING_LICENSE_REFUSED_CODE,
+      "Testing licenses can only be requested by people with ops permissions on LangWatch Cloud.",
+      403,
+    );
+  }
+
+  const minted = await flow.mintTestingLicenseToken({ userId }).catch(async (error: unknown) => {
+    // Nothing was minted or consumed, so the next poll may try again.
+    await flow.sessions().releaseExchangeClaim(record.device_code);
+    throw error;
+  });
+
+  await flow.sessions().consumeDeviceCode({ record, alsoPollWindow: true });
+
+  return answer({
+    kind: "testing_license" as const,
+    testing_license_token: minted.token,
+    expires_at: minted.expiresAt,
   });
 }
 

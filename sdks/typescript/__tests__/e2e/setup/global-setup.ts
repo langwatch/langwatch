@@ -3,7 +3,13 @@
  */
 import { execFileSync } from "node:child_process";
 
-import { REPO_ROOT, seededProject, startStack, type RunningStack } from "@langwatch/e2e-stack";
+import {
+  REPO_ROOT,
+  seededProject,
+  seededProjectId,
+  startStack,
+  type RunningStack,
+} from "@langwatch/e2e-stack";
 
 import { writeStackHandoff } from "./stack-handoff";
 import { loadWorkspaceEnv } from "./workspace-env";
@@ -63,11 +69,17 @@ export default async function setup(): Promise<() => Promise<void>> {
     }
   }
 
+  const projectId = await seededProjectId({ apiUrl: stack.apiUrl, project }).catch(
+    async (error: unknown) => {
+      await stack.stop();
+      throw error;
+    },
+  );
   writeStackHandoff({
     baseUrl: stack.baseUrl,
     apiKey: project.apiKey,
     organizationApiKey: project.organizationApiKey,
-    projectId: project.projectId,
+    projectId,
   });
 
   process.env.LANGWATCH_ENDPOINT = stack.baseUrl;

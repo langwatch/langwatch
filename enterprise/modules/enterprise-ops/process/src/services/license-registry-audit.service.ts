@@ -8,13 +8,18 @@ import type {
   ActivationCodePage,
   ActivationCodeView,
   IssuedActivationCode,
-  IssuedLicensePage,
-  IssuedLicenseView,
   LicenseTermsInput,
   SeatChangeResult,
   SignedIssuedLicense,
   LicensingApi,
+  IssuedLicenseView,
 } from "@langwatch/enterprise-licensing-contract";
+import type {
+  NamedIssuedLicensePage,
+  NamedIssuedLicenseView,
+} from "@langwatch/enterprise-ops-contract";
+
+import type { PersonNamesService } from "./person-names.service.ts";
 
 type AuditArgs = Readonly<Record<string, AuditLogJsonValue>>;
 type TargetKind = "issuedLicense" | "activationCode";
@@ -42,28 +47,42 @@ export class LicenseRegistryAuditService {
   static create(deps: {
     registry: LicenseRegistry;
     auditLog: Pick<AuditLogApi, "record">;
+    names: PersonNamesService;
   }): LicenseRegistryAuditService {
-    return new LicenseRegistryAuditService(deps.registry, deps.auditLog);
+    return new LicenseRegistryAuditService(deps.registry, deps.auditLog, deps.names);
   }
 
   private constructor(
     private readonly registry: LicenseRegistry,
     private readonly auditLog: Pick<AuditLogApi, "record">,
+    private readonly names: PersonNamesService,
   ) {}
 
   async list(
-    input: Staff & { page: number; pageSize: number; search?: string },
-  ): Promise<IssuedLicensePage> {
+    input: Staff & { page: number; pageSize: number; search?: string; includeTesting?: boolean },
+  ): Promise<NamedIssuedLicensePage> {
     const { operatorId, ...query } = input;
     await this.record(operatorId, "getAll", {
-      args: { page: query.page, pageSize: query.pageSize, hasSearch: Boolean(query.search) },
+      args: {
+        page: query.page,
+        pageSize: query.pageSize,
+        hasSearch: Boolean(query.search),
+        includeTesting: query.includeTesting === true,
+      },
     });
-    return this.registry.listIssuedLicenses(query);
+    const page = await this.registry.listIssuedLicenses(query);
+    const names = await this.names.namesFor({ ids: page.licenses.map((l) => l.issuedById) });
+    return {
+      ...page,
+      licenses: page.licenses.map((license) => withIssuerName({ license, names })),
+    };
   }
 
-  async getById(input: Staff & { id: string }): Promise<IssuedLicenseView> {
+  async getById(input: Staff & { id: string }): Promise<NamedIssuedLicenseView> {
     await this.record(input.operatorId, "getById", { args: { id: input.id }, targetId: input.id });
-    return this.registry.getIssuedLicense({ id: input.id });
+    const license = await this.registry.getIssuedLicense({ id: input.id });
+    const names = await this.names.namesFor({ ids: [license.issuedById] });
+    return withIssuerName({ license, names });
   }
 
   async issue(input: Parameters<LicenseRegistry["issueLicense"]>[0]): Promise<SignedIssuedLicense> {
@@ -294,6 +313,17 @@ export class LicenseRegistryAuditService {
       ...(entry.error === undefined ? {} : { error: entry.error }),
     });
   }
+}
+
+function withIssuerName({
+  license,
+  names,
+}: {
+  license: IssuedLicenseView;
+  names: ReadonlyMap<string, string | null>;
+}): NamedIssuedLicenseView {
+  const issuedByName = license.issuedById === null ? null : (names.get(license.issuedById) ?? null);
+  return { ...license, issuedByName };
 }
 
 /** The terms an operator actually set; an absent field is not written as a key. */

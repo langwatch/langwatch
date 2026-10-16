@@ -96,6 +96,8 @@ async function registryRow(
     reportedMembersLite: null,
     virtualKeyId: "vk-1",
     seatsRaisedFrom: null,
+    kind: "standard",
+    testingOrganizationId: null,
     createdAt: NOW,
     updatedAt: NOW,
     ...rest,

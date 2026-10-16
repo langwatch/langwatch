@@ -1,18 +1,16 @@
 /**
  * The dashboards demo's stable identifiers, value-only: one organization and team, three
  * projects that each run several named agents, and an empty day-zero project. Keys are
- * fixed dev-only values.
+ * fixed dev-only values; the organization and team get random ids, found by slug.
  */
 import type { DashboardsDemoArchetype } from "./dashboards-demo-spec.ts";
 
 export const DASHBOARDS_DEMO_ORGANIZATION = {
-  id: "dashboards-demo-organization",
   slug: "dashboards-demo",
   name: "Dashboards Demo",
 } as const;
 
 export const DASHBOARDS_DEMO_TEAM = {
-  id: "dashboards-demo-team",
   slug: "dashboards-demo-team",
   name: "Dashboards Demo Team",
 } as const;

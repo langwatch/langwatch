@@ -23,6 +23,13 @@ export interface IssuedLicenseRecord {
   issuedAt: Instant;
   expiresAt: Instant;
   source: IssuedLicenseSource;
+  /**
+   * `standard`, `testing`, or a kind a newer release wrote. Anything but `standard` is
+   * treated as testing: bound from issue, never counted, never turned standard (ADR-180).
+   */
+  kind: string;
+  /** The local organization a testing licence is for; `organizationId` names the customer. */
+  testingOrganizationId: string | null;
   issuedById: string | null;
   revokedAt: Instant | null;
   revokedById: string | null;
@@ -67,10 +74,12 @@ export interface IssuedLicenseRepository {
   findAllSeatsRaised(params: { organizationId?: string }): Promise<IssuedLicenseRecord[]>;
   /** Unrevoked licenses bound to one install, the most recently bound first. */
   findAllBoundToInstance(instanceId: string): Promise<IssuedLicenseRecord[]>;
+  /** Rows of any kind but `standard` are left out unless `includeTesting`. */
   listAll(params: {
     page: number;
     pageSize: number;
     search?: string;
+    includeTesting?: boolean;
   }): Promise<{ rows: IssuedLicenseRecord[]; total: number }>;
   update(id: string, data: IssuedLicensePatch): Promise<IssuedLicenseRecord>;
   /** Removes a row a failed flow wrote; a row already gone is not an error. */

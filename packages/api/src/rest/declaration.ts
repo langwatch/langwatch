@@ -229,6 +229,7 @@ export type RestDoorCredential = Extract<
   | "cli_token"
   | "otlp_ingest"
   | "licence_token"
+  | "testing_license_token"
   | "browser"
 >;
 
@@ -249,7 +250,17 @@ export const DOOR_SCOPE_TIER = {
   cli_token: "organization",
   otlp_ingest: "project",
   licence_token: "organization",
+  testing_license_token: null,
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
+
+/**
+ * The doors whose token always belongs to a user (ADR-180 §2): the door hands that user as the
+ * actor, and their routes' declared platform permission is asked of that user on every call
+ * through the request's own decisions. One rule for every token; none is admitted unasked.
+ */
+export const USER_TOKEN_DOORS: ReadonlySet<RestDoorCredential> = new Set<RestDoorCredential>([
+  "testing_license_token",
+]);
 
 /** The scope a handler on `Door` is handed: the tier that door resolves. */
 type DoorScope<Door extends RestDoorCredential> = (typeof DOOR_SCOPE_TIER)[Door] extends null

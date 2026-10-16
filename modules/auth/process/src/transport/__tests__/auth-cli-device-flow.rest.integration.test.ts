@@ -1523,6 +1523,9 @@ function deviceFlowWorld(
           ? null
           : { id: USER_ID, name: "Bob", email: "bob@example.test" },
       ),
+
+    holdsOpsManage: () => Promise.resolve(false),
+    mintTestingLicenseToken: () => Promise.reject(new Error("not reached by this test")),
     apiKeys: () =>
       ({
         mintCliLoginKey: (input: { userId: string; deviceLabel: string } & KeyExpiryInput) => {

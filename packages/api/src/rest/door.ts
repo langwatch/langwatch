@@ -25,6 +25,15 @@ export type DoorContract = {
     presented: Readonly<{ instanceId: string | null; path: string }>;
     session: unknown;
   };
+  /**
+   * A testing-licence token (ADR-180 section 2): personal or service, it always acts as the
+   * person who made it. It names no tenant; its routes ask that person a platform permission.
+   */
+  testing_license_token: {
+    tier: null;
+    presented: Readonly<Record<never, never>>;
+    session: unknown;
+  };
   session_key: {
     tier: "project";
     /** Main's session core: Basic `base64(projectId:token)`, then Bearer with x-project-id. */
@@ -56,9 +65,11 @@ export type DoorPresented<Credential extends DoorCredential> = Readonly<{
 }> &
   DoorContract[Credential]["presented"];
 
-/** What a door answers: the scope at its contract's tier, the actor if any, and its session. */
+/** What a door answers: the scope at its contract's tier (none for no tier), actor and session. */
 export type DoorIdentified<Credential extends DoorCredential> = Readonly<{
-  scope: Extract<AuthzDeclaredScopeId, { tier: DoorContract[Credential]["tier"] }>;
+  scope: DoorContract[Credential]["tier"] extends null
+    ? null
+    : Extract<AuthzDeclaredScopeId, { tier: DoorContract[Credential]["tier"] }>;
   actor?: Actor | null;
   session?: DoorContract[Credential]["session"];
 }>;
@@ -89,6 +100,7 @@ const PRESENTED: {
   [Credential in DoorCredential]: (request: Request) => DoorContract[Credential]["presented"];
 } = {
   scim_token: () => ({}),
+  testing_license_token: () => ({}),
   licence_token: (request) => ({
     instanceId: request.headers.get("x-langwatch-instance"),
     path: new URL(request.url).pathname,

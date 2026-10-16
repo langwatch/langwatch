@@ -47,6 +47,8 @@ function rowFor(overrides: Partial<IssuedLicenseRecord> = {}): IssuedLicenseReco
     reportedMembersLite: null,
     virtualKeyId: "vk-managed",
     seatsRaisedFrom: null,
+    kind: "standard",
+    testingOrganizationId: null,
     createdAt: NOW,
     updatedAt: NOW,
     ...overrides,

@@ -405,6 +405,8 @@ export interface LwqlPrismaRows {
     readonly expiresAt: "DateTime";
     readonly source: "IssuedLicenseSource";
     readonly issuedById: "String?";
+    readonly kind: "String";
+    readonly testingOrganizationId: "String?";
     readonly revokedAt: "DateTime?";
     readonly revokedById: "String?";
     readonly revokedReason: "String?";
@@ -459,6 +461,18 @@ export interface LwqlPrismaRows {
     readonly createdById: "String?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+  };
+  readonly TestingLicenseToken: {
+    readonly id: "String";
+    readonly tokenHash: "String";
+    readonly kind: "String";
+    readonly ownerUserId: "String";
+    readonly name: "String?";
+    readonly expiresAt: "DateTime";
+    readonly revokedAt: "DateTime?";
+    readonly revokedById: "String?";
+    readonly lastUsedAt: "DateTime?";
+    readonly createdAt: "DateTime";
   };
   readonly ConnectedBillingAccount: {
     readonly id: "String";

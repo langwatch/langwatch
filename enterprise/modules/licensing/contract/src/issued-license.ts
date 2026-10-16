@@ -51,6 +51,10 @@ const issuedLicenseViewSchemaDefinition = z.object({
   issuedAt: z.string(),
   expiresAt: z.string(),
   source: issuedLicenseSourceSchema,
+  /** `standard`, `testing` (ADR-180) or a kind a newer release wrote, shown as stored. */
+  kind: z.string(),
+  /** The local organization a testing licence is for; `organizationId` names the customer. */
+  testingOrganizationId: z.string().nullable(),
   issuedById: z.string().nullable(),
   revokedAt: z.string().nullable(),
   revokedById: z.string().nullable(),

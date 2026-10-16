@@ -91,7 +91,14 @@ export function describedRestApplication(modules: readonly InstalledModule[] = p
 
   // A module binds these on a booted process; here every one is closed, as the host's are.
   const moduleDoors = (
-    ["scim_token", "session_key", "cli_token", "otlp_ingest", "licence_token"] as const
+    [
+      "scim_token",
+      "session_key",
+      "cli_token",
+      "otlp_ingest",
+      "licence_token",
+      "testing_license_token",
+    ] as const
   ).map((credential) => bindRestCredential(credential, () => closed));
 
   for (const declaration of declarations) {
