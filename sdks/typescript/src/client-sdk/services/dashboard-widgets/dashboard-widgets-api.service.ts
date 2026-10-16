@@ -16,6 +16,10 @@ export type DashboardWidget =
 export type DashboardBoard =
   paths["/api/v1/projects/{projectId}/analytics/boards"]["get"]["responses"]["200"]["content"]["application/json"]["data"][number];
 
+/** One Dashboards board, as the board route answers it. */
+export type DashboardBoardDetail =
+  paths["/api/v1/projects/{projectId}/analytics/boards/{boardId}"]["get"]["responses"]["200"]["content"]["application/json"];
+
 /** One named LangWatchQL query a widget may run, as a create/update submits it. */
 export type DashboardWidgetQueryInput =
   paths["/api/v1/projects/{projectId}/analytics/dashboard-widgets"]["post"]["requestBody"]["content"]["application/json"]["queries"][number];
@@ -171,6 +175,17 @@ export class DashboardWidgetsApiService {
     );
     if (error) this.handleApiError({ operation: "list dashboards", error, response });
     return data as unknown as { data: DashboardBoard[] };
+  }
+
+  /** One Dashboards board by id; an Analytics Reports board answers 404. */
+  async getBoard(id: string): Promise<DashboardBoardDetail> {
+    const projectId = this.projectId(`get dashboard "${id}"`);
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/projects/{projectId}/analytics/boards/{boardId}",
+      { params: { path: { projectId, boardId: id } } },
+    );
+    if (error) this.handleApiError({ operation: `get dashboard "${id}"`, error, response });
+    return data as unknown as DashboardBoardDetail;
   }
 
   /** Adds a widget to a dashboard at the next free row, keeping its size. */

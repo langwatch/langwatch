@@ -121,6 +121,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And no new widget is left in the project
     # Evidence: the MCP call output and the widget count before and after
 
+  @unit
+  Scenario: AC8c An agent reads a Dashboards board by its id
+    Given a project with a Dashboards board that Analytics Reports does not hold
+    When an agent reads the board by its id with the get_dashboard tool or the dashboard get command
+    Then it receives the board's name, id and link
+    And an id that neither area holds still fails with the not found error
+    # Evidence: the unit tests for get_dashboard and dashboard get
+
   @unit @unimplemented
   Scenario: AC9 The docs explain how to build boards from an agent
     Then the Dashboards docs page has a section that lists the MCP dashboard tools, the widget definition format and the LW widget API
@@ -1579,7 +1587,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 5: "The board uses a wide screen" → Scenario: AC5 The board uses a wide screen
   # AC 6: "Template tables are shorter than template charts" → Scenario: AC6 Template tables are shorter than template charts
   # AC 7: "The board shows data age and can refresh" (changed by langwatch/tasks#911: no data age; Refresh now moves into the period menu) → Scenario: AC7 Refresh sits inside the period menu
-  # AC 8: "An MCP agent adds a widget to a board" → Scenario: AC8 An MCP agent adds a widget to a board; Scenario: AC8b add_dashboard_widget rejects an unknown dashboard
+  # AC 8: "An MCP agent adds a widget to a board" → Scenario: AC8 An MCP agent adds a widget to a board; Scenario: AC8b add_dashboard_widget rejects an unknown dashboard; Scenario: AC8c An agent reads a Dashboards board by its id
   # AC 9: "The docs explain how to build boards from an agent" → Scenario: AC9 The docs explain how to build boards from an agent
   # AC 10: "A non-empty board still offers a way to add a widget" → Scenario: AC10 A non-empty board still offers a way to add a widget
   # AC 19: "One control for range, grain and refresh, with Live" (added by langwatch/tasks#911: the refresh menu moves into the period control) → Scenario: AC19 One control sets the range, the grain and the refresh; Scenario: AC19b A grain that does not fit the range cannot be picked; Scenario: AC19c Live is the last hour, rolling, refreshed every minute
