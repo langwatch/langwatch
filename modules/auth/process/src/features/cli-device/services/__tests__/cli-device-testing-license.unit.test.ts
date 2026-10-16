@@ -151,7 +151,9 @@ describe("the CLI device flow for a testing-licence token", () => {
       await world.approve({ userCode: user_code });
       world.permissions.mintFails = true;
 
-      await expect(world.exchange({ deviceCode: device_code })).rejects.toThrow("licensing unreachable");
+      await expect(world.exchange({ deviceCode: device_code })).rejects.toThrow(
+        "licensing unreachable",
+      );
       world.permissions.mintFails = false;
       const answer = await world.exchange({ deviceCode: device_code });
 
