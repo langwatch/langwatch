@@ -60,7 +60,13 @@ from .protocol import (
     register_frame,
     result_frame,
 )
-from .schema import AgentParameterInvalid, AgentReplyInvalid
+from .schema import (
+    AgentParameterInvalid,
+    AgentPayloadTooLarge,
+    AgentReplyInvalid,
+    AgentStateInvalid,
+    HookNotDeclared,
+)
 
 if TYPE_CHECKING:
     from .decorator import ConnectedAgent
@@ -333,8 +339,9 @@ class AgentClient:
 
     @property
     def agents(self) -> list[ConnectedAgent]:
+        """The agents this process registers: every one not refused locally."""
         with self._lock:
-            return list(self._agents.values())
+            return [a for a in self._agents.values() if a.refusal is None]
 
     @property
     def identity(self) -> InstanceIdentity:
@@ -938,9 +945,14 @@ class AgentClient:
             remaining = _seconds_until(frame.get("deadlineAt"))
             if remaining is not None:
                 timeout = max(0.0, min(agent.timeout, remaining))
-            reply = await asyncio.wait_for(agent.invoke(call), timeout=timeout)
+            answer = await asyncio.wait_for(
+                agent.answer(frame.get("kind") or "turn", call), timeout=timeout
+            )
             result = result_frame(
-                call_id=call_id, output=reply.output, session=reply.session
+                call_id=call_id,
+                output=answer.output,
+                session=answer.session,
+                state=answer.state,
             )
         except asyncio.TimeoutError:
             result = error_result_frame(
@@ -954,11 +966,11 @@ class AgentClient:
                 call_id,
                 time.monotonic() - started,
             )
-        except AgentParameterInvalid as error:
+        except (AgentParameterInvalid, AgentPayloadTooLarge, HookNotDeclared) as error:
             result = error_result_frame(
                 call_id=call_id, code=error.code, message=str(error)
             )
-        except AgentReplyInvalid as error:
+        except (AgentReplyInvalid, AgentStateInvalid) as error:
             logger.warning("connect_agent: %s %s", agent.name, error)
             result = error_result_frame(
                 call_id=call_id, code=error.code, message=f"{agent.name} {error}"

@@ -43,6 +43,21 @@ Feature: Scenario setup and teardown hooks on connected agents (SDK and protocol
     And the agent does not register
 
   @unit
+  Scenario: An integer and a number for one parameter merge as a number
+    Given a setup that declares "refund_amount" as an integer
+    And a teardown that declares "refund_amount" as a number
+    When the SDK builds the register frame
+    Then the parameter schema holds "refund_amount" once, as a number
+
+  @unit
+  Scenario: Two hooks that give a parameter different defaults are refused at decoration
+    Given a setup that declares "loyalty_tier" with the default "none"
+    And a teardown that declares "loyalty_tier" with the default "gold"
+    When the second hook is decorated
+    Then the SDK warns with a message naming "loyalty_tier"
+    And the agent does not register
+
+  @unit
   Scenario: Setup is called with the run reference and its own parameters
     Given a call with kind "setup" and the params loyalty_tier "gold"
     When the SDK handles the call
@@ -134,13 +149,20 @@ Feature: Scenario setup and teardown hooks on connected agents (SDK and protocol
     When the SDK builds the register frame
     Then it declares the same hooks as the Python SDK does for the same functions
 
-  @integration
+  @unit
+  Scenario: The platform checks a result against the kind of call it answers
+    Given a result frame with neither an output nor an error
+    When it answers a turn or a setup
+    Then the call fails as a result LangWatch cannot read
+    But when it answers a teardown it is accepted
+
+  @integration @unimplemented
   Scenario: The platform refuses an envelope whose state is over the cap
     Given a call envelope with more than 64 KiB of state
     When the platform dispatches it
     Then the call fails with "agent_payload_too_large" and reaches no instance
 
-  @integration
+  @integration @unimplemented
   Scenario: The platform sends no hook call to an agent that did not declare it
     Given a registered agent that declared hooks setup false
     When the platform is asked to call its setup

@@ -334,6 +334,11 @@ const LEGACY_UNBOUND: string[] = [
  * spot.
  */
 const LEGACY_INERT: string[] = [
+  // 2026-10-16: ADR-180's later slices (the platform calling the hooks, inline
+  // run parameters) are specified, not built; every scenario is @unimplemented.
+  // Remove each entry with its first binding.
+  "modules/scenario/specs/scenario-inline-params.feature",
+  "modules/scenario/specs/scenario-run-hooks.feature",
   // 2026-10-12: the id index (dev/docs/plans/id-index-2026-10-10.md) is planned,
   // not built; every scenario is @unimplemented. Remove with its first binding.
   "specs/clickhouse/id-index-reads.feature",

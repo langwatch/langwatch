@@ -186,6 +186,7 @@ export class ConnectedAgentRegistrationService {
           timeoutMs: Math.min(agent.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
           concurrency: agent.concurrency,
           sticky: agent.sticky,
+          hooks: agent.hooks,
           sdk: frame.sdk,
         },
         identity: { environment, identityKey, ...scopeColumns(scope) },

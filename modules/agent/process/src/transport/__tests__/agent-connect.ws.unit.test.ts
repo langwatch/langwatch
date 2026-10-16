@@ -534,6 +534,7 @@ describe("AgentSessionService.findCallForSession", () => {
         instanceId: "inst_1",
         replyTo: "pod_solo",
         envelope: {
+          kind: "turn",
           callId: "call_1",
           agentId: "agent_b",
           threadId: "thread_1",

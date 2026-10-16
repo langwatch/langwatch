@@ -675,7 +675,7 @@ describe("ConnectedAgentDispatchService", () => {
 describe("buildCallEnvelope", () => {
   describe("when the relay body carries more than the contract", () => {
     /** @scenario "A call envelope carries only the contract fields" */
-    it("writes exactly the ten contract keys", () => {
+    it("writes exactly the contract keys", () => {
       const body = {
         callId: "call_1",
         agentId: "agent_1",

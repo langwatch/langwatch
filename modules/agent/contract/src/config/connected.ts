@@ -2,6 +2,7 @@ import type { Named } from "@langwatch/module";
 /** SDK-declared configuration; runtime presence is stored separately (ADR-128). */
 import { z } from "zod";
 
+import { agentHooksSchema } from "../connected-agent.protocol.ts";
 import { baseAgentConfigSchema } from "./code.ts";
 
 const connectedParameterValueSchema = z.union([z.string(), z.number(), z.boolean()]);
@@ -33,6 +34,8 @@ const connectedAgentConfigSchemaDefinition = z.object({
   concurrency: z.number().int().positive().optional(),
   /** Whether a thread is pinned to the instance that served its first turn. */
   sticky: z.boolean().optional(),
+  /** The scenario hooks the SDK declared; absent means none (ADR-180). */
+  hooks: agentHooksSchema.optional(),
   sdk: z.object({
     name: z.string(),
     version: z.string(),

@@ -70,6 +70,7 @@ describe("parseServerFrame()", () => {
       expect(frame).toEqual({
         type: "call",
         protocol: 1,
+        kind: "turn",
         callId: "call_1",
         agentId: "agent_1",
         threadId: "thread_1",
@@ -77,6 +78,7 @@ describe("parseServerFrame()", () => {
         newMessages: [{ role: "user", content: "hi" }],
         params: { model: "gpt-5", n: 2, flag: true },
         session: null,
+        state: null,
         traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
         deadlineAt: null,
         run: { scenarioRunId: "run_1" },

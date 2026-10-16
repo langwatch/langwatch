@@ -11,33 +11,33 @@ Feature: Scenario run hooks: setup and teardown
 
   Rule: Order and state
 
-    @integration
+    @integration @unimplemented
     Scenario: A run calls setup, then the turns, then teardown
       Given a connected agent that declares both hooks
       When a scenario runs against it
       Then the calls arrive in the order setup, turn, turn, teardown
 
-    @integration
+    @integration @unimplemented
     Scenario: The state from setup reaches every turn and the teardown
       Given a setup that returns the state "order 42"
       When a scenario runs with two turns
       Then each turn call carries "order 42"
       And the teardown call carries "order 42"
 
-    @integration
+    @integration @unimplemented
     Scenario: A turn's state update replaces the state for later calls
       Given a turn that returns the state update "order 43"
       When the next turn and the teardown are called
       Then both carry "order 43"
 
-    @unit
+    @unit @unimplemented
     Scenario: The simulated user and the judge see the current state each turn
       Given a run whose state is "order 42"
       When the simulated user and the judge are given a turn
       Then both read "order 42"
       And after a state update both read the update on the next turn
 
-    @unit
+    @unit @unimplemented
     Scenario: Hook parameters use the same value as the agent for the same run
       Given the run parameter loyalty_tier is "gold"
       When setup, a turn and teardown are called
@@ -45,52 +45,52 @@ Feature: Scenario run hooks: setup and teardown
 
   Rule: Teardown always runs
 
-    @integration
+    @integration @unimplemented
     Scenario: Teardown runs after a passing run
       Given a run that passes
       Then teardown was called once
 
-    @integration
+    @integration @unimplemented
     Scenario: Teardown runs after a failing run
       Given a run whose judge fails
       Then teardown was called once
 
-    @integration
+    @integration @unimplemented
     Scenario: Teardown runs after setup fails
       Given a setup that raises an error
       Then no turn is called
       And teardown was called once
 
-    @integration
+    @integration @unimplemented
     Scenario: Teardown after a failed setup receives the partial state
       Given a setup that fails after reporting partial state
       Then the teardown call carries that partial state
 
-    @integration
+    @integration @unimplemented
     Scenario: Teardown runs after setup times out
       Given a setup that does not answer within its timeout
       Then teardown was called once
 
-    @integration
+    @integration @unimplemented
     Scenario: Teardown runs when the run is cancelled
       Given a run cancelled during the turns
       Then teardown was called once
 
-    @unit
+    @unit @unimplemented
     Scenario: The child runs teardown in a finally
       Given a child whose turns throw
       When the child exits its run
       Then teardown was attempted before the result line was written
 
     # Decided in principle. The mechanism is open.
-    @integration
+    @integration @unimplemented
     Scenario: A killed child gets a fallback teardown from the parent worker
       Given a child process killed after setup
       When the parent worker sees the child die
       Then the parent worker runs a teardown with the last known state
       And the run records the hook as run by the fallback
 
-    @integration
+    @integration @unimplemented
     Scenario: A killed child that never finished setup gets no fallback teardown call without state
       Given a child killed before setup answered
       When the parent worker sees the child die
@@ -98,32 +98,32 @@ Feature: Scenario run hooks: setup and teardown
 
   Rule: Setup failure and scoring
 
-    @integration
+    @integration @unimplemented
     Scenario: A run whose setup failed is not scored
       Given a setup that fails
       Then the run has no verdict
       And the run shows the setup error
 
-    @integration
+    @integration @unimplemented
     Scenario: A run whose setup timed out is not scored
       Given a setup that exceeds its timeout
       Then the run has no verdict
       And the run shows a timeout error
 
-    @unit
+    @unit @unimplemented
     Scenario: Setup failures are excluded from the batch pass rate
       Given a batch of 4 runs: 2 passed, 1 failed and 1 whose setup failed
       When the batch summary is computed
       Then the pass rate is 2 of 3
       And the summary counts 1 run as not scored
 
-    @unit
+    @unit @unimplemented
     Scenario: Setup failures are excluded from the suite roll-up
       Given a suite whose latest batch has a run whose setup failed
       When the suite roll-up is computed
       Then that run is not in the pass-rate denominator
 
-    @unit
+    @unit @unimplemented
     Scenario: A batch where every setup failed has no pass rate
       Given a batch whose runs all failed in setup
       When the batch summary is computed
@@ -131,54 +131,54 @@ Feature: Scenario run hooks: setup and teardown
 
   Rule: Teardown never changes the score
 
-    @unit
+    @unit @unimplemented
     Scenario: A failed teardown leaves a passing verdict passing
       Given a run that passed and a teardown that raises
       Then the run verdict is still success
       And the run shows the teardown error
 
-    @unit
+    @unit @unimplemented
     Scenario: A failed teardown leaves a failing verdict failing
       Given a run that failed and a teardown that raises
       Then the run verdict is still failure
 
-    @unit
+    @unit @unimplemented
     Scenario: A failed teardown shows the state it was given and a warning
       Given a teardown that raises with the state "order 42"
       Then the run shows the state "order 42"
       And the run shows "Test data may be left behind."
 
-    @integration
+    @integration @unimplemented
     Scenario: A teardown that times out counts as failed
       Given a teardown that does not answer within its timeout
       Then the teardown status is failed with a timeout error
       And the verdict is unchanged
 
-    @unit
+    @unit @unimplemented
     Scenario: A teardown's returned object is shown on the run
       Given a teardown that returns { "deleted": 3 }
       Then the run shows { "deleted": 3 } as the teardown result
 
   Rule: Timeouts
 
-    @unit
+    @unit @unimplemented
     Scenario: Each hook defaults to 60 seconds
       Given a scenario with no hook timeout
       Then the setup and teardown timeouts are 60 seconds
 
-    @unit
+    @unit @unimplemented
     Scenario: A scenario sets its own hook timeout
       Given a scenario that sets a 120 second hook timeout
       Then the setup and teardown timeouts are 120 seconds
 
-    @unit
+    @unit @unimplemented
     Scenario: A hook timeout is never longer than the child's lifetime
       Given a scenario that sets a hook timeout above the child's lifetime
       Then the scenario is refused with a message naming the limit
 
   Rule: Where hooks run
 
-    @unit
+    @unit @unimplemented
     Scenario Outline: Surfaces other than a scenario run never call hooks
       Given a connected agent that declares both hooks
       When it is called from <surface>
@@ -190,20 +190,20 @@ Feature: Scenario run hooks: setup and teardown
         | the Test button      |
         | langwatch agent run  |
 
-    @unit
+    @unit @unimplemented
     Scenario: An agent with no hooks runs as today and is marked "No hooks"
       Given a connected agent that declares no hooks
       When a scenario runs against it
       Then only turn calls are made
       And the run shows "No hooks"
 
-    @unit
+    @unit @unimplemented
     Scenario: HTTP and code agents never call hooks
       Given an HTTP agent
       When a scenario runs against it
       Then the run shows "No hooks"
 
-    @unit
+    @unit @unimplemented
     Scenario: An agent that declared only teardown gets only teardown
       Given an agent that declares teardown and not setup
       When a scenario runs against it
@@ -211,7 +211,7 @@ Feature: Scenario run hooks: setup and teardown
       And teardown is called with no state
 
     # OPEN: agent proposal, not decided by the owner.
-    @integration
+    @integration @unimplemented
     Scenario: A run of an agent with hooks goes to the Node child when the Go runner is on
       Given a project with the release_scenario_go_runner_enabled flag on
       And an agent that declares hooks
@@ -219,7 +219,7 @@ Feature: Scenario run hooks: setup and teardown
       Then the run is routed to the Node child
 
     # OPEN: agent proposal, not decided by the owner.
-    @integration
+    @integration @unimplemented
     Scenario: A run of an agent without hooks still goes to the Go runner when the flag is on
       Given a project with the release_scenario_go_runner_enabled flag on
       And an agent that declares no hooks
@@ -228,20 +228,20 @@ Feature: Scenario run hooks: setup and teardown
 
   Rule: Rerun and keep data
 
-    @integration
+    @integration @unimplemented
     Scenario: Rerun and keep data skips teardown for that rerun
       When a person reruns a run with "Rerun and keep data"
       Then setup and the turns run
       And teardown is not called
       And the run shows "Teardown skipped"
 
-    @unit
+    @unit @unimplemented
     Scenario: Keep data is never saved to a plan
       Given a run started with "Rerun and keep data"
       When the person saves the run into a plan
       Then the saved plan does not carry keep data
 
-    @unit
+    @unit @unimplemented
     Scenario: A teardown that did not happen by accident reads "Teardown not run"
       Given a run whose agent went offline before teardown
       Then the run shows "Teardown not run"
@@ -249,31 +249,31 @@ Feature: Scenario run hooks: setup and teardown
 
   Rule: Recording
 
-    @unit
+    @unit @unimplemented
     Scenario: Each hook result is recorded on the run
       Given a child result line with a setup result and a teardown result
       When the job completes
       Then the run records, for each hook, its status, duration, trace, state or returned object and error
 
-    @unit
+    @unit @unimplemented
     Scenario: A result line with no hook results records nothing
       Given a child result line with no hook results
       When the job completes
       Then nothing is recorded on the run
 
-    @unit
+    @unit @unimplemented
     Scenario: Recording hooks after the run finished keeps the run finished
       Given a run that finished with the verdict "success"
       When the hook results are recorded
       Then the run keeps its status, its verdict and its finish time
 
-    @unit
+    @unit @unimplemented
     Scenario: Hook state over the cap is cut and marked
       Given a hook result whose state is over 64 KiB
       When the result is recorded
       Then the record marks the state as too large and keeps no partial copy
 
-    @integration
+    @integration @unimplemented
     Scenario: The processor records hooks off the child's result line
       Given a scenario child that writes a result line naming a setup and a teardown result
       When the processor runs the job and the child exits

@@ -44,6 +44,7 @@ function call(owner = projectId): StoredCall {
     instanceId,
     replyTo: "pod_a",
     envelope: {
+      kind: "turn",
       callId,
       agentId,
       threadId: "thread_1",
