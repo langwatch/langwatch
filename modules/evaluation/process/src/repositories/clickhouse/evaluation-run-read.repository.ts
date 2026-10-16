@@ -30,6 +30,7 @@ import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repos
 
 const TABLE_NAME = "evaluation_runs" as const;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
+const TRACE_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 const RUNS = "runs" as const;
 const inputsRowSchema = z.object({ TenantId: z.string(), Inputs: z.string().nullable() });
 const inputsRowsSchema = z.array(inputsRowSchema);
@@ -203,18 +204,25 @@ export class EvaluationRunClickHouseReadRepository {
           WHERE ${tenantSet()}
             AND ${RUNS}.ScheduledAt >= now() - INTERVAL 7 DAY
             AND ${RUNS}.TraceId = {traceId:String}
+            {{idBound:evaluation_runs.TraceId:traceId:${RUNS}}}
             AND (${RUNS}.TenantId, ${RUNS}.EvaluationId, ${RUNS}.UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE ${tenantScope("ScheduledAt")}
                 AND ScheduledAt >= now() - INTERVAL 7 DAY
                 AND TraceId = {traceId:String}
+                {{idBound:evaluation_runs.TraceId:traceId}}
               GROUP BY TenantId, EvaluationId
             )
           ORDER BY ${RUNS}.UpdatedAt DESC
         `,
         query_params: { traceId: input.traceId },
         format: "JSONEachRow",
+        idBound: {
+          occurredAtHint: nowInstant().epochMilliseconds,
+          windowMs: TRACE_LOOKBACK_MS,
+          fallback: "none",
+        },
       });
       return (await result.json()).map((row) => this.fromClickHouseRecord(row));
     } catch (error) {

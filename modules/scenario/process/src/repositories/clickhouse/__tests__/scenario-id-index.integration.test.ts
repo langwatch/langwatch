@@ -28,7 +28,10 @@ import { createTenantId } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { SCENARIO_ID_INDEXES } from "../clickhouse.scenario-id-indexes.database.ts";
+import {
+  SCENARIO_ID_INDEXES,
+  SCENARIO_SECOND_ID_INDEXES,
+} from "../clickhouse.scenario-id-indexes.database.ts";
 import { ClickHouseScenarioSession } from "../clickhouse.scenario-session.store.ts";
 import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository.ts";
 import { ClickHouseSimulationSession } from "../clickhouse.simulation-session.store.ts";
@@ -130,10 +133,13 @@ beforeAll(async () => {
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
   clickhouse = await readyIdIndexedClientDouble({
-    indexes: SCENARIO_ID_INDEXES,
+    indexes: [...SCENARIO_ID_INDEXES, ...SCENARIO_SECOND_ID_INDEXES],
     driver: recordingDriver(ch),
   });
-  unready = idIndexedClientDouble({ indexes: SCENARIO_ID_INDEXES, driver: recordingDriver(ch) });
+  unready = idIndexedClientDouble({
+    indexes: [...SCENARIO_ID_INDEXES, ...SCENARIO_SECOND_ID_INDEXES],
+    driver: recordingDriver(ch),
+  });
   setWindowedReadMetrics({ record: (entry) => outcomes.push(entry) });
 
   const groups = [
@@ -166,7 +172,12 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (!ch) return;
-  for (const name of ["simulation_runs", "simulation_runs_id_index"]) {
+  for (const name of [
+    "simulation_runs",
+    "simulation_runs_id_index",
+    "simulation_runs_by_batch_run_id_index",
+    "simulation_runs_by_scenario_set_id_index",
+  ]) {
     await ch.exec({
       query: `ALTER TABLE ${name} DELETE WHERE TenantId = {tenantId:String}`,
       query_params: { tenantId },
@@ -230,6 +241,67 @@ describe("scenario lookups by id with the id index", () => {
         resolveClient: ClickHouseSimulationSession.resolver(unready),
         defaultRetentionDays: () => 308,
       }).findProjection(scenarioRunId, { tenantId: createTenantId(tenantId) });
+      expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
+        await partsAfterPartitionPruning({
+          query: queryRows,
+          request: sourceReadOf("simulation_runs"),
+        }),
+      );
+    });
+  });
+
+  describe("given a batch and a scenario set written eight weeks ago (the second id indexes)", () => {
+    const readyRepository = () =>
+      SimulationClickHouseRepository.create(ClickHouseScenarioSession.resolverOver(clickhouse));
+    const unreadyRepository = () =>
+      SimulationClickHouseRepository.create(ClickHouseScenarioSession.resolverOver(unready));
+    const batchRunId = `${scenarioRunId}-batch`;
+    const scenarioSetId = `${scenarioRunId}-set`;
+
+    /** @scenario "a lookup by id reads only the partitions the index names" */
+    it("reads the batch's summary by batch run id alone inside the batch index's range", async () => {
+      const found = await readyRepository().findBatchSummary({ projectId: tenantId, batchRunId });
+
+      expect(found?.batchRunId).toBe(batchRunId);
+      expect(outcomes).toContainEqual({ table: "simulation_runs", outcome: "index_hit" });
+      const bounded = sourceReadOf("simulation_runs");
+      expect(bounded.params).toMatchObject({
+        idBound_fromMs: eightWeeksAgoMs - DAY_MS,
+        idBound_toMs: eightWeeksAgoMs + DAY_MS,
+      });
+      expect(bounded.sql.match(/idBound_fromMs/g)).toHaveLength(2);
+      statements = [];
+      await unreadyRepository().findBatchSummary({ projectId: tenantId, batchRunId });
+      expect(sourceReadOf("simulation_runs").sql).not.toContain("idBound_fromMs");
+      expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
+        await partsAfterPartitionPruning({
+          query: queryRows,
+          request: sourceReadOf("simulation_runs"),
+        }),
+      );
+    });
+
+    /** @scenario "a lookup by id reads only the partitions the index names" */
+    it("counts the set's batches by scenario set id alone inside the set index's range", async () => {
+      const found = await readyRepository().findBatchRunCountForScenarioSet({
+        projectId: tenantId,
+        scenarioSetId,
+      });
+
+      expect(found).toBe(1);
+      expect(outcomes).toContainEqual({ table: "simulation_runs", outcome: "index_hit" });
+      const bounded = sourceReadOf("simulation_runs");
+      expect(bounded.params).toMatchObject({
+        idBound_fromMs: eightWeeksAgoMs - DAY_MS,
+        idBound_toMs: eightWeeksAgoMs + DAY_MS,
+      });
+      expect(bounded.sql.match(/idBound_fromMs/g)).toHaveLength(2);
+      statements = [];
+      await unreadyRepository().findBatchRunCountForScenarioSet({
+        projectId: tenantId,
+        scenarioSetId,
+      });
+      expect(sourceReadOf("simulation_runs").sql).not.toContain("idBound_fromMs");
       expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
         await partsAfterPartitionPruning({
           query: queryRows,

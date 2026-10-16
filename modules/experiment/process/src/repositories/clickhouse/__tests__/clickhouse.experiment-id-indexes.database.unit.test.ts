@@ -1,21 +1,25 @@
 /** @vitest-environment node */
 
 /**
- * Experiment's declared id indexes against the goose file that creates them (goose 00114): each
- * index the fill visits has a table keyed as declared, and a view that feeds it from the
- * source's own time column.
+ * Experiment's declared id indexes against the goose file that creates them (goose 00114 and
+ * 00119): each index the fill visits has a table keyed as declared, and a view that feeds it
+ * from the source's own time column.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { EXPERIMENT_ID_INDEXES } from "../clickhouse.experiment-id-indexes.database.ts";
+import {
+  EXPERIMENT_ID_INDEXES,
+  EXPERIMENT_SECOND_ID_INDEXES,
+} from "../clickhouse.experiment-id-indexes.database.ts";
 
-const GOOSE = resolve(
+const MIGRATIONS = resolve(
   import.meta.dirname,
-  "../../../../../../../packages/clickhouse-migrations/migrations/00114_experiment_id_indexes.sql",
+  "../../../../../../../packages/clickhouse-migrations/migrations",
 );
+const GOOSE_FILES = ["00114_experiment_id_indexes.sql", "00119_experiment_second_id_index.sql"];
 
 /** The statement block that creates `name`, from its CREATE to its StatementEnd. */
 function blockOf({ migration, create }: { migration: string; create: string }): string {
@@ -25,12 +29,16 @@ function blockOf({ migration, create }: { migration: string; create: string }): 
   return migration.slice(start, end < 0 ? undefined : end);
 }
 
+const ALL_INDEXES = [...EXPERIMENT_ID_INDEXES, ...EXPERIMENT_SECOND_ID_INDEXES];
+
 describe("Experiment id index declarations", () => {
-  const migration = readFileSync(GOOSE, "utf8");
+  const migration = GOOSE_FILES.map((file) => readFileSync(resolve(MIGRATIONS, file), "utf8")).join(
+    "\n",
+  );
 
   describe("given the goose file that creates the indexes", () => {
     it("declares one table per index, keyed by tenant then the declared id columns", () => {
-      for (const declaration of EXPERIMENT_ID_INDEXES) {
+      for (const declaration of ALL_INDEXES) {
         const table = blockOf({
           migration,
           create: `CREATE TABLE IF NOT EXISTS \${CLICKHOUSE_DATABASE}.${declaration.index}\n`,
@@ -47,7 +55,7 @@ describe("Experiment id index declarations", () => {
     });
 
     it("feeds each index from its source's own time column, grouped by the declared key", () => {
-      for (const declaration of EXPERIMENT_ID_INDEXES) {
+      for (const declaration of ALL_INDEXES) {
         const view = blockOf({
           migration,
           create: `CREATE MATERIALIZED VIEW IF NOT EXISTS \${CLICKHOUSE_DATABASE}.${declaration.index}_mv`,
@@ -74,7 +82,7 @@ describe("Experiment id index declarations", () => {
         .toSorted((left, right) => left.localeCompare(right));
 
       expect(
-        EXPERIMENT_ID_INDEXES.map((declaration) => declaration.index).toSorted((left, right) =>
+        ALL_INDEXES.map((declaration) => declaration.index).toSorted((left, right) =>
           left.localeCompare(right),
         ),
       ).toEqual(created);
@@ -83,7 +91,7 @@ describe("Experiment id index declarations", () => {
 
   describe("given each declared index", () => {
     it("copies its source's retention, so the fill raises it per target before the flag", () => {
-      expect(EXPERIMENT_ID_INDEXES.every((index) => index.retention === "copied")).toBe(true);
+      expect(ALL_INDEXES.every((index) => index.retention === "copied")).toBe(true);
     });
   });
 });

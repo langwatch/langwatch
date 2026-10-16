@@ -233,6 +233,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
               FROM experiment_runs
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId IN ({experimentIds:Array(String)})
+                {{idBound:experiment_runs.ExperimentId:experimentIds}}
               GROUP BY ExperimentId, RunId
             )
             GROUP BY ExperimentId
@@ -242,6 +243,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
             experimentIds: input.experimentIds,
           },
           format: "JSONEachRow",
+          idBound: { fallback: "unbounded" },
         });
         const rows = await result.json<{
           ExperimentId: string;
@@ -286,12 +288,14 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
               FROM experiment_runs
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId = {experimentId:String}
+                {{idBound:experiment_runs.ExperimentId:experimentId}}
             `,
               query_params: {
                 tenantId: input.projectId,
                 experimentId: input.experimentId,
               },
               format: "JSONEachRow",
+              idBound: { fallback: "unbounded" },
             }),
             client.query({
               query: `
@@ -299,11 +303,13 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
               FROM experiment_runs AS t
               WHERE t.TenantId = {tenantId:String}
                 AND t.ExperimentId = {experimentId:String}
+                {{idBound:experiment_runs.ExperimentId:experimentId:t}}
                 AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
                   SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
                   FROM experiment_runs
                   WHERE TenantId = {tenantId:String}
                     AND ExperimentId = {experimentId:String}
+                    {{idBound:experiment_runs.ExperimentId:experimentId}}
                   GROUP BY TenantId, RunId, ExperimentId
                 )
               ORDER BY t.CreatedAt DESC, t.RunId DESC
@@ -317,6 +323,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
                 offset,
               },
               format: "JSONEachRow",
+              idBound: { fallback: "unbounded" },
             }),
           ]);
           const [countRows, runRows] = await Promise.all([
@@ -450,11 +457,13 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         FROM experiment_runs AS t
         WHERE t.TenantId = {tenantId:String}
           AND t.ExperimentId IN ({experimentIds:Array(String)})
+          {{idBound:experiment_runs.ExperimentId:experimentIds:t}}
           AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
             SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
             FROM experiment_runs
             WHERE TenantId = {tenantId:String}
               AND ExperimentId IN ({experimentIds:Array(String)})
+              {{idBound:experiment_runs.ExperimentId:experimentIds}}
             GROUP BY TenantId, RunId, ExperimentId
           )
         ORDER BY t.CreatedAt DESC
@@ -465,6 +474,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         experimentIds: input.experimentIds,
       },
       format: "JSONEachRow",
+      idBound: { fallback: "unbounded" },
     });
     return result.json<RunRow>();
   }

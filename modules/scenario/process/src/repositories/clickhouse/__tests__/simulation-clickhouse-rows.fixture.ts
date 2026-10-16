@@ -5,7 +5,10 @@ import { type VendorStatements, vendorQueryClient } from "@langwatch/clickhouse-
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll } from "vitest";
 
-import { SCENARIO_ID_INDEXES } from "../clickhouse.scenario-id-indexes.database.ts";
+import {
+  SCENARIO_ID_INDEXES,
+  SCENARIO_SECOND_ID_INDEXES,
+} from "../clickhouse.scenario-id-indexes.database.ts";
 import {
   ClickHouseSimulationSession,
   type SimulationEventingClickHouseResolver,
@@ -118,6 +121,6 @@ export function scenarioClickHouseOver(
   vendor: VendorStatements,
 ): SimulationEventingClickHouseResolver {
   return ClickHouseSimulationSession.resolver(
-    vendorQueryClient({ vendor, indexes: SCENARIO_ID_INDEXES }),
+    vendorQueryClient({ vendor, indexes: [...SCENARIO_ID_INDEXES, ...SCENARIO_SECOND_ID_INDEXES] }),
   );
 }

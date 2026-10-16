@@ -26,7 +26,10 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
-import { EVALUATION_ID_INDEXES } from "../../repositories/clickhouse/clickhouse.evaluation-id-indexes.database.ts";
+import {
+  EVALUATION_ID_INDEXES,
+  EVALUATION_SECOND_ID_INDEXES,
+} from "../../repositories/clickhouse/clickhouse.evaluation-id-indexes.database.ts";
 import { LiveEvaluationRepositories } from "../../repositories/live/live.evaluation.repositories.ts";
 import { EvaluationRetentionDaysService } from "../../services/evaluation-retention-days.service.ts";
 import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
@@ -174,7 +177,7 @@ describe("given the live run read over a tenant's retention from data retention"
     const repositories = LiveEvaluationRepositories.create({
       prisma: createApiFixture<PrismaClient>(),
       clickhouse: idIndexedClientDouble({
-        indexes: EVALUATION_ID_INDEXES,
+        indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
         driver: {
           execute: async (request: QueryRequest) => {
             const sinceMs = request.params?.sinceMs;

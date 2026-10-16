@@ -21,7 +21,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { startMigratedClickHouse } from "../../../__tests__/support/monitor-performance.fixtures.ts";
-import { EVALUATION_ID_INDEXES } from "../clickhouse.evaluation-id-indexes.database.ts";
+import {
+  EVALUATION_ID_INDEXES,
+  EVALUATION_SECOND_ID_INDEXES,
+} from "../clickhouse.evaluation-id-indexes.database.ts";
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
 
 const clickHouseUrl =
@@ -33,6 +36,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const tenantId = `test-evaluation-id-index-${generate("test").toString()}`;
 const nowMs = Date.now();
 const eightWeeksAgoMs = nowMs - 56 * DAY_MS;
+const twoDaysAgoMs = nowMs - 2 * DAY_MS;
 const retention = {
   findRetentionDays: async () => [365],
   getPlatformDefaultRetentionDays: () => 365,
@@ -58,7 +62,7 @@ function recordingQueryClient({
   const make = ready ? readyIdIndexedClientDouble : idIndexedClientDouble;
   return Promise.resolve(
     make({
-      indexes: EVALUATION_ID_INDEXES,
+      indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
       driver: {
         async execute(request: QueryRequest) {
           statements.push(request);
@@ -109,6 +113,7 @@ const runRow = ({
 describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () => {
   const targetId = `eval-target-${generate("test").toString()}`;
   const decoyId = `eval-decoy-${generate("test").toString()}`;
+  const tracedId = `eval-traced-${generate("test").toString()}`;
 
   beforeAll(async () => {
     clickHouse = await startMigratedClickHouse();
@@ -127,12 +132,17 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
       values: [
         runRow({ evaluationId: targetId, scheduledAtMs: eightWeeksAgoMs }),
         runRow({ evaluationId: decoyId, scheduledAtMs: nowMs - 14 * DAY_MS }),
+        runRow({ evaluationId: tracedId, scheduledAtMs: twoDaysAgoMs }),
       ],
     });
   }, 300_000);
 
   afterAll(async () => {
-    for (const table of ["evaluation_runs", "evaluation_runs_id_index"]) {
+    for (const table of [
+      "evaluation_runs",
+      "evaluation_runs_id_index",
+      "evaluation_runs_by_trace_id_index",
+    ]) {
       await clickHouse?.command({
         query: `ALTER TABLE ${table} DELETE WHERE TenantId = {tenantId:String}`,
         query_params: { tenantId },
@@ -188,6 +198,44 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
       expect(run.evaluationId).toBe(targetId);
       expect(
         statements.some((statement) => statement.sql.includes("evaluation_runs_id_index")),
+      ).toBe(false);
+    });
+  });
+
+  describe("given a run with a trace, read by its trace id alone (the second id index)", () => {
+    /** @scenario "a lookup by id reads only the partitions the index names" */
+    it("bounds the read to the trace index's range inside the seven-day lookback", async () => {
+      statements = [];
+      outcomes.length = 0;
+
+      const runs = await repository.findByTraceId({
+        authorization: ownProof({ projectId: tenantId }),
+        traceId: `trace-${tracedId}`,
+      });
+
+      expect(runs.map((run) => run.evaluationId)).toEqual([tracedId]);
+      const read = statements.find(
+        (statement) => statement.sql.includes("FROM evaluation_runs AS runs") && statement.params,
+      );
+      expect(read?.params).toMatchObject({
+        idBound_fromMs: twoDaysAgoMs - DAY_MS,
+        idBound_toMs: twoDaysAgoMs + DAY_MS,
+      });
+      expect(read?.sql.match(/idBound_fromMs/g)).toHaveLength(2);
+      expect(outcomes).toContainEqual({ table: "evaluation_runs", outcome: "index_hit" });
+    });
+
+    it("reads the same run inside the lookback while the trace index is not ready", async () => {
+      statements = [];
+
+      const runs = await notReady.findByTraceId({
+        authorization: ownProof({ projectId: tenantId }),
+        traceId: `trace-${tracedId}`,
+      });
+
+      expect(runs.map((run) => run.evaluationId)).toEqual([tracedId]);
+      expect(
+        statements.some((statement) => statement.sql.includes("evaluation_runs_by_trace_id_index")),
       ).toBe(false);
     });
   });

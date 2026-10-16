@@ -14,7 +14,10 @@ import { ExperimentModule } from "#app/experiment.app";
 
 import { experimentLifecycleEventing } from "./eventing/experiment-lifecycle.pipeline.ts";
 import { experimentRunProcessingEventing } from "./eventing/experiment-run-processing.pipeline.ts";
-import { EXPERIMENT_ID_INDEXES } from "./repositories/clickhouse/clickhouse.experiment-id-indexes.database.ts";
+import {
+  EXPERIMENT_ID_INDEXES,
+  EXPERIMENT_SECOND_ID_INDEXES,
+} from "./repositories/clickhouse/clickhouse.experiment-id-indexes.database.ts";
 import { experimentRepositories } from "./repositories/experiment-repositories.registry.ts";
 import { batchRecordTrpcTransport } from "./transport/batch-record.trpc.ts";
 import { experimentBatchLogRest } from "./transport/experiment-batch-log.rest.ts";
@@ -91,4 +94,10 @@ export const experimentProcessModule: PublishedProcessModule<
     after: ["analytics:fill-id-indexes"],
     description:
       "Fills the id indexes of experiment runs and DSPy steps from older rows, then marks them ready on each ClickHouse target.",
+  })
+  .withIdIndexes(EXPERIMENT_SECOND_ID_INDEXES, {
+    step: "fill-second-id-indexes",
+    after: ["experiment:fill-id-indexes"],
+    description:
+      "Fills the second id index of experiment runs (by experiment id) from older rows, then marks it ready on each ClickHouse target.",
   });

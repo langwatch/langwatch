@@ -294,6 +294,10 @@ describe("given the ClickHouse migrations that create AggregatingMergeTree table
           "coding_agent_trace_sessions_id_index",
           "gateway_spend_id_index",
           "gateway_budget_ledger_events_id_index",
+          "experiment_runs_by_experiment_id_index",
+          "simulation_runs_by_batch_run_id_index",
+          "simulation_runs_by_scenario_set_id_index",
+          "evaluation_runs_by_trace_id_index",
         ]),
       );
       for (const table of tables) {

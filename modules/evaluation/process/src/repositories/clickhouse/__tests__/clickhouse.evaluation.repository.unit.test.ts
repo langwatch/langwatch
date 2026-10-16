@@ -8,7 +8,10 @@ import {
   ownProof,
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { EvaluationRetentionLookup } from "../../evaluation.repository.ts";
-import { EVALUATION_ID_INDEXES } from "../clickhouse.evaluation-id-indexes.database.ts";
+import {
+  EVALUATION_ID_INDEXES,
+  EVALUATION_SECOND_ID_INDEXES,
+} from "../clickhouse.evaluation-id-indexes.database.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseInsert,
@@ -119,7 +122,7 @@ function harness(rows: Record<string, unknown>[][] = []): {
   };
   const floor = new TestRetention();
   const queryClient = idIndexedClientDouble({
-    indexes: EVALUATION_ID_INDEXES,
+    indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
     driver: { execute: reader },
   });
   return {

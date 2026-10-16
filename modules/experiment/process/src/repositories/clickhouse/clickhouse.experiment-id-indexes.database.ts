@@ -9,3 +9,11 @@ export const EXPERIMENT_ID_INDEXES: readonly IdIndexDeclaration[] = [
   defineIdIndex({ source: "experiment_runs", key: ["RunId"], time: "StartedAt" }),
   defineIdIndex({ source: "dspy_steps", key: ["ExperimentId", "RunId"], time: "CreatedAt" }),
 ];
+
+/**
+ * The second index goose `00119` creates, filled by its own step so a finished first fill never
+ * skips it.
+ */
+export const EXPERIMENT_SECOND_ID_INDEXES: readonly IdIndexDeclaration[] = [
+  defineIdIndex({ source: "experiment_runs", key: ["ExperimentId"], time: "StartedAt", by: true }),
+];

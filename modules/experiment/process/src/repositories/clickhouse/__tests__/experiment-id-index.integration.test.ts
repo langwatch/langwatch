@@ -30,7 +30,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { ClickhouseExperimentClickHouseRepository } from "../clickhouse.experiment-clickhouse.repository.ts";
 import { ClickHouseExperimentDspyRepository } from "../clickhouse.experiment-dspy.repository.ts";
-import { EXPERIMENT_ID_INDEXES } from "../clickhouse.experiment-id-indexes.database.ts";
+import {
+  EXPERIMENT_ID_INDEXES,
+  EXPERIMENT_SECOND_ID_INDEXES,
+} from "../clickhouse.experiment-id-indexes.database.ts";
 import { ClickHouseExperimentIdLookupRepository } from "../clickhouse.experiment-id-lookup.repository.ts";
 import { ClickHouseExperimentRunStateRepository } from "../clickhouse.experiment-run-state.repository.ts";
 import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository.ts";
@@ -41,6 +44,8 @@ const DAY_MS = 86_400_000;
 const tenantId = `${randomUUID()}-experiment-id-index`;
 const experimentId = `${tenantId}-experiment`;
 const runId = `${tenantId}-run`;
+const secondExperimentId = `${tenantId}-experiment-second`;
+const secondRunId = `${tenantId}-run-second`;
 const now = nowInstant().epochMilliseconds;
 const eightWeeksAgoMs = now - 56 * DAY_MS;
 // Each decoy partition holds ids on both sides of every real id, in one part, so the planner
@@ -140,10 +145,13 @@ beforeAll(async () => {
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
   ready = await readyIdIndexedClientDouble({
-    indexes: EXPERIMENT_ID_INDEXES,
+    indexes: [...EXPERIMENT_ID_INDEXES, ...EXPERIMENT_SECOND_ID_INDEXES],
     driver: recordingDriver(ch),
   });
-  unready = idIndexedClientDouble({ indexes: EXPERIMENT_ID_INDEXES, driver: recordingDriver(ch) });
+  unready = idIndexedClientDouble({
+    indexes: [...EXPERIMENT_ID_INDEXES, ...EXPERIMENT_SECOND_ID_INDEXES],
+    driver: recordingDriver(ch),
+  });
   setWindowedReadMetrics({ record: (entry) => outcomes.push(entry) });
 
   for (const group of writeGroups()) {
@@ -183,7 +191,30 @@ beforeAll(async () => {
       })),
     });
   }
+  await writeSecondExperimentRun();
 }, 120_000);
+
+/** A run of an experiment no decoy shares, so the experiment index's range is one point. */
+async function writeSecondExperimentRun(): Promise<void> {
+  await ch.insert({
+    table: "experiment_runs",
+    format: "JSONEachRow",
+    values: [
+      {
+        ProjectionId: `${secondRunId}-projection`,
+        TenantId: tenantId,
+        RunId: secondRunId,
+        ExperimentId: secondExperimentId,
+        Version: "1",
+        Targets: "[]",
+        CreatedAt: iso(eightWeeksAgoMs),
+        UpdatedAt: iso(eightWeeksAgoMs),
+        StartedAt: iso(eightWeeksAgoMs),
+        _retention_days: 308,
+      },
+    ],
+  });
+}
 
 beforeEach(() => {
   statements = [];
@@ -192,13 +223,18 @@ beforeEach(() => {
 
 afterAll(async () => {
   if (!ch) return;
-  for (const table of ["experiment_runs", "dspy_steps"]) {
-    for (const name of [table, `${table}_id_index`]) {
-      await ch.exec({
-        query: `ALTER TABLE ${name} DELETE WHERE TenantId = {tenantId:String}`,
-        query_params: { tenantId },
-      });
-    }
+  const tables = [
+    "experiment_runs",
+    "experiment_runs_id_index",
+    "experiment_runs_by_experiment_id_index",
+    "dspy_steps",
+    "dspy_steps_id_index",
+  ];
+  for (const name of tables) {
+    await ch.exec({
+      query: `ALTER TABLE ${name} DELETE WHERE TenantId = {tenantId:String}`,
+      query_params: { tenantId },
+    });
   }
   await ch.close();
 });
@@ -330,6 +366,51 @@ describe("experiment lookups by id with the id index", () => {
       const summaries = await repository.findAll({ tenantId, experimentId });
       expect(summaries.map((each) => each.runId)).toContain(runId);
       expect(outcomes).toContainEqual({ table: "dspy_steps", outcome: "index_hit" });
+    });
+  });
+
+  describe("given an experiment whose run was written eight weeks ago", () => {
+    const runRepository = (resolve = resolveClient) =>
+      ClickHouseExperimentRunRepository.create({
+        workflowVersions: { findByIds: async () => ({}) },
+        resolveClient: resolve,
+        tupleParam: (values) => values,
+        telemetry: {
+          trace: (_input, operation) => operation(),
+          warnOldRuns: () => undefined,
+          error: () => undefined,
+          warn: () => undefined,
+        },
+      });
+
+    /** @scenario "a lookup by id reads only the partitions the index names" */
+    it("counts its runs by experiment id alone inside the second index's range", async () => {
+      const found = await runRepository().findAggregates({
+        projectId: tenantId,
+        experimentIds: [secondExperimentId],
+      });
+
+      expect(found[secondExperimentId]?.runsCount).toBe(1);
+      expect(outcomes).toContainEqual({ table: "experiment_runs", outcome: "index_hit" });
+      const bounded = sourceReadOf("experiment_runs");
+      expect(bounded.params).toMatchObject({
+        idBound_fromMs: eightWeeksAgoMs - DAY_MS,
+        idBound_toMs: eightWeeksAgoMs + DAY_MS,
+      });
+      expect(bounded.sql.match(/idBound_fromMs/g)).toHaveLength(1);
+      statements = [];
+      const unreadied = await runRepository(resolveUnready).findAggregates({
+        projectId: tenantId,
+        experimentIds: [secondExperimentId],
+      });
+      expect(unreadied[secondExperimentId]?.runsCount).toBe(1);
+      expect(sourceReadOf("experiment_runs").sql).not.toContain("idBound_fromMs");
+      expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
+        await partsAfterPartitionPruning({
+          query: queryRows,
+          request: sourceReadOf("experiment_runs"),
+        }),
+      );
     });
   });
 });

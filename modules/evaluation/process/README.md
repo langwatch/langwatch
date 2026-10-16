@@ -6,7 +6,7 @@ The server half of [evaluation](../README.md). Evaluations: running evaluators a
 
 ## Installation
 
-`defineProcessModule("evaluation").withRepositories(evaluationRepositories).withChannels(evaluationChannels).withApi(EvaluationModule).withTransports(evaluationTrpcTransport, evaluationsLegacyRest).withEventing(evaluationProcessingEventing).withEventing(evaluationLifecycleEventing).withIdIndexes(EVALUATION_ID_INDEXES, …)`, `src/evaluation.module.ts:17`.
+`defineProcessModule("evaluation").withRepositories(evaluationRepositories).withChannels(evaluationChannels).withApi(EvaluationModule).withTransports(evaluationTrpcTransport, evaluationsLegacyRest).withEventing(evaluationProcessingEventing).withEventing(evaluationLifecycleEventing).withIdIndexes(EVALUATION_ID_INDEXES, …).withIdIndexes(EVALUATION_SECOND_ID_INDEXES, …)`, `src/evaluation.module.ts:20`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

@@ -32,7 +32,10 @@ import {
   ExperimentClickHouseRepository,
   type ExperimentEventingClickHouseClient,
 } from "../../experiment-clickhouse.repository.ts";
-import { EXPERIMENT_ID_INDEXES } from "../clickhouse.experiment-id-indexes.database.ts";
+import {
+  EXPERIMENT_ID_INDEXES,
+  EXPERIMENT_SECOND_ID_INDEXES,
+} from "../clickhouse.experiment-id-indexes.database.ts";
 import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository.ts";
 import { ClickHouseExperimentSession } from "../clickhouse.experiment-session.store.ts";
 
@@ -115,7 +118,10 @@ beforeAll(async () => {
   repository = ClickHouseExperimentRunRepository.create({
     workflowVersions: { findByIds: async () => ({}) },
     resolveClient: ClickHouseExperimentSession.resolverOver(
-      vendorQueryClient({ vendor: client, indexes: EXPERIMENT_ID_INDEXES }),
+      vendorQueryClient({
+        vendor: client,
+        indexes: [...EXPERIMENT_ID_INDEXES, ...EXPERIMENT_SECOND_ID_INDEXES],
+      }),
     ),
     tupleParam: (values: string[]) => new TupleParam(values),
     telemetry: {

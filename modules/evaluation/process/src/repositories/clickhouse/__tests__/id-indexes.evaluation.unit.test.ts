@@ -7,7 +7,10 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { EVALUATION_ID_INDEXES } from "../clickhouse.evaluation-id-indexes.database.ts";
+import {
+  EVALUATION_ID_INDEXES,
+  EVALUATION_SECOND_ID_INDEXES,
+} from "../clickhouse.evaluation-id-indexes.database.ts";
 
 const MIGRATIONS = resolve(
   import.meta.dirname,
@@ -20,10 +23,12 @@ function gooseFile({ prefix }: { prefix: string }): string {
   return readFileSync(resolve(MIGRATIONS, file), "utf8");
 }
 
-const migration = gooseFile({ prefix: "00112_" });
+const migration = ["00112_", "00121_"].map((prefix) => gooseFile({ prefix })).join("\n");
+
+const ALL_INDEXES = [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES];
 
 describe("Evaluation's id-index declaration", () => {
-  describe("when it is read against goose 00112", () => {
+  describe("when it is read against goose 00112 and 00121", () => {
     it("names exactly the indexes the file creates", () => {
       const created = [
         ...migration.matchAll(
@@ -31,34 +36,43 @@ describe("Evaluation's id-index declaration", () => {
         ),
       ].map((match) => match[1]);
 
-      expect(EVALUATION_ID_INDEXES.map((each) => each.index)).toEqual(created);
+      expect(ALL_INDEXES.map((each) => each.index)).toEqual(created);
     });
 
     it("orders each index by tenant then its key, and fills it from its source's key", () => {
-      for (const declaration of EVALUATION_ID_INDEXES) {
+      for (const declaration of ALL_INDEXES) {
         const keys = declaration.key.join(", ");
 
         expect(migration, declaration.index).toContain(`ORDER BY (TenantId, ${keys})`);
         expect(migration, declaration.index).toContain(
-          `FROM \${CLICKHOUSE_DATABASE}.${declaration.source}\nGROUP BY TenantId, ${keys}`,
+          `FROM \${CLICKHOUSE_DATABASE}.${declaration.source}\n`,
         );
+        expect(migration, declaration.index).toContain(`GROUP BY TenantId, ${keys}`);
         expect(migration, declaration.index).toContain(
           `min(${declaration.time}) AS FromAt, max(${declaration.time}) AS ToAt`,
         );
       }
+      const filters = ALL_INDEXES.flatMap((declaration) =>
+        declaration.filter === undefined
+          ? []
+          : [{ index: declaration.index, clause: `WHERE ${declaration.filter}` }],
+      );
+      for (const { index, clause } of filters) {
+        expect(migration, index).toContain(clause);
+      }
     });
 
     it("retains on UpdatedAt, the column evaluation_runs expires on, not on ScheduledAt", () => {
-      const [declaration] = EVALUATION_ID_INDEXES;
-
-      expect(declaration?.time).toBe("ScheduledAt");
-      expect(declaration?.retentionAnchor).toBe("UpdatedAt");
+      for (const declaration of ALL_INDEXES) {
+        expect(declaration.time).toBe("ScheduledAt");
+        expect(declaration.retentionAnchor).toBe("UpdatedAt");
+      }
       expect(migration).toContain("max(UpdatedAt) AS RetainAt");
       expect(migration).toContain("toDateTime(RetainAt) + toIntervalDay(_retention_days + 7)");
     });
 
     it("copies the source's retention with keep-forever written as 65535", () => {
-      for (const declaration of EVALUATION_ID_INDEXES) {
+      for (const declaration of ALL_INDEXES) {
         expect(declaration.retention).toBe("copied");
         expect(migration).toContain("max(if(_retention_days = 0, 65535, _retention_days))");
       }

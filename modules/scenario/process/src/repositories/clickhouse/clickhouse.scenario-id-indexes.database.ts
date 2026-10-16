@@ -7,3 +7,12 @@ import { defineIdIndex, type IdIndexDeclaration } from "@langwatch/clickhouse-cl
 export const SCENARIO_ID_INDEXES: readonly IdIndexDeclaration[] = [
   defineIdIndex({ source: "simulation_runs", key: ["ScenarioRunId"], time: "StartedAt" }),
 ];
+
+/**
+ * The second indexes goose `00120` creates (by batch run id, by scenario set id), filled by
+ * their own step.
+ */
+export const SCENARIO_SECOND_ID_INDEXES: readonly IdIndexDeclaration[] = [
+  defineIdIndex({ source: "simulation_runs", key: ["BatchRunId"], time: "StartedAt", by: true }),
+  defineIdIndex({ source: "simulation_runs", key: ["ScenarioSetId"], time: "StartedAt", by: true }),
+];

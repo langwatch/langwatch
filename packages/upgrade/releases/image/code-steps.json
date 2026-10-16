@@ -133,11 +133,27 @@
     "needsOldWritersGone": false
   },
   {
+    "id": "evaluation:fill-second-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "evaluation",
+    "description": "Fills the second id index of evaluation runs (by trace id) from older rows, then marks it ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
     "id": "experiment:fill-id-indexes",
     "kind": "data",
     "mode": "background",
     "owner": "experiment",
     "description": "Fills the id indexes of experiment runs and DSPy steps from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "experiment:fill-second-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "experiment",
+    "description": "Fills the second id index of experiment runs (by experiment id) from older rows, then marks it ready on each ClickHouse target.",
     "needsOldWritersGone": false
   },
   {
@@ -325,6 +341,14 @@
     "mode": "background",
     "owner": "scenario",
     "description": "Fills the id index of simulation runs from older rows, then marks them ready on each ClickHouse target.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "scenario:fill-second-id-indexes",
+    "kind": "data",
+    "mode": "background",
+    "owner": "scenario",
+    "description": "Fills the second id indexes of simulation runs (by batch run id, by scenario set id) from older rows, then marks them ready on each ClickHouse target.",
     "needsOldWritersGone": false
   },
   {

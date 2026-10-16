@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 const MIGRATIONS = resolve(import.meta.dirname, "../../migrations");
 
-/** The final list: 15 indexes across 9 owners' files, `00110` to `00118`. */
+/** The final list: 19 indexes across 12 files, `00110` to `00121`. */
 const EXPECTED_INDEXES = [
   "trace_summaries_id_index",
   "stored_spans_id_index",
@@ -27,6 +27,10 @@ const EXPECTED_INDEXES = [
   "coding_agent_trace_sessions_id_index",
   "gateway_spend_id_index",
   "gateway_budget_ledger_events_id_index",
+  "experiment_runs_by_experiment_id_index",
+  "simulation_runs_by_batch_run_id_index",
+  "simulation_runs_by_scenario_set_id_index",
+  "evaluation_runs_by_trace_id_index",
 ];
 
 const TABLE = /CREATE TABLE IF NOT EXISTS \$\{CLICKHOUSE_DATABASE\}\.(\w+_id_index)\s/g;
@@ -76,11 +80,11 @@ describe("id index migrations", () => {
       }
     });
 
-    // A tenth file or a sixteenth index needs its owner's fill and readiness too (plan §2).
-    it("holds exactly the 15 index tables across 9 files", () => {
+    // A thirteenth file or a twentieth index needs its owner's fill and readiness too (plan §2).
+    it("holds exactly the 19 index tables across 12 files", () => {
       const tables = indexTables();
       expect(tables.map((table) => table.name).toSorted()).toEqual(EXPECTED_INDEXES.toSorted());
-      expect(new Set(tables.map((table) => table.file)).size).toBe(9);
+      expect(new Set(tables.map((table) => table.file)).size).toBe(12);
     });
 
     // The fill marker ('', '__fill_complete__', 65535) has no time; an expiry merge must keep it.

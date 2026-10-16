@@ -2371,6 +2371,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     traceIds: string[];
   }): Promise<ClickHouseEvaluationRunRow[]> {
     const runQuery = async (ids: string[]) => {
+      // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
       const result = await reader.query({
         query: `
           SELECT ${EVALUATION_RUN_COLUMNS_WITH_INPUTS}
