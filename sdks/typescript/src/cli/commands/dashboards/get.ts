@@ -1,5 +1,6 @@
 import chalk from "chalk";
 
+import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
 
 import { resolveCredentials } from "../../utils/apiKey";
@@ -18,7 +19,12 @@ export const getDashboardCommand = async (id: string): Promise<CommandResult | v
   const spinner = createSpinner(`Fetching dashboard "${id}"...`).start();
 
   try {
-    const dashboard = await service.get(id);
+    const dashboard = await service.get(id).catch(async (error: unknown) => {
+      // The Reports API never holds a Dashboards board, so its 404 is not final.
+      const board = await new DashboardWidgetsApiService().getBoard(id).catch(() => null);
+      if (!board) throw error;
+      return { ...board, graphs: [] };
+    });
 
     spinner.succeed(`Found dashboard "${dashboard.name}"`);
 
