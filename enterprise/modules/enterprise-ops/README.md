@@ -11,7 +11,7 @@ Operator views over Enterprise subjects: issued licences and their seats and bin
 | Classification | enterprise (`modules/catalogue.json`)                                                                                            |
 | Subjects       | enterprise-ops                                                                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                              |
-| Api token      | `EnterpriseOpsApi` = `moduleApi<EnterpriseOpsApi>()("enterprise-ops")`, `contract/src/enterprise-ops.api.ts:122` (15 operations) |
+| Api token      | `EnterpriseOpsApi` = `moduleApi<EnterpriseOpsApi>()("enterprise-ops")`, `contract/src/enterprise-ops.api.ts:150` (18 operations) |
 | Installed by   | api, worker, tasks (process)                                                                                                     |
 
 ## What enterprise-ops owns
@@ -27,6 +27,7 @@ Anything else enterprise-ops needs belongs to another module and is reached thro
 | `auditLog`  | `AuditLogApi`  | [audit-log](../../../modules/audit-log/README.md) |
 | `licensing` | `LicensingApi` | [licensing](../licensing/README.md)               |
 | `ops`       | `OpsApi`       | [ops](../../../modules/ops/README.md)             |
+| `user`      | `UserApi`      | [user](../../../modules/user/README.md)           |
 
 ## Who depends on enterprise-ops
 
