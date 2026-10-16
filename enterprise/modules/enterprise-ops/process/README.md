@@ -148,7 +148,7 @@ interface Input {
   pageSize?: number;
   search?: string;
 }
-type Output = z.infer<typeof issuedLicensePageSchema>; // ../../licensing/contract/src/issued-license.ts:98
+type Output = z.infer<typeof issuedLicensePageSchema>; // ../../licensing/contract/src/issued-license.ts:100
 
 // licenseRegistry.getById
 // Input: licenseIdInputSchema, ../../licensing/contract/src/license-registry.ts:32
@@ -159,7 +159,7 @@ type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contra
 
 // licenseRegistry.issue
 type Input = z.infer<typeof issueLicenseInputSchema>; // ../../licensing/contract/src/license-registry.ts:47
-type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:132
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:134
 
 // licenseRegistry.registerLegacy
 // Input: registerLegacyLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:58
@@ -186,7 +186,7 @@ interface Input {
   maxMessagesPerMonth?: number;
   expiresAt: string;
 }
-type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:132
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:134
 
 // licenseRegistry.changeSeats
 // Input: changeLicenseSeatsInputSchema, ../../licensing/contract/src/license-registry.ts:92
@@ -194,7 +194,7 @@ interface Input {
   id: string;
   maxMembers: number;
 }
-type Output = z.infer<typeof seatChangeResultSchema>; // ../../licensing/contract/src/issued-license.ts:149
+type Output = z.infer<typeof seatChangeResultSchema>; // ../../licensing/contract/src/issued-license.ts:151
 
 // licenseRegistry.resetInstanceBinding
 type Input = z.infer<typeof licenseIdInputSchema>; // ../../licensing/contract/src/license-registry.ts:32

@@ -38,12 +38,9 @@ import type {
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
 import { resolveLicenseTerms } from "../rules/issued-license-row.rules.ts";
-import {
-  INTERNAL_LICENSE_EMAIL_SUFFIXES,
-  issuedLicenseView,
-  statusOfIssuedLicense,
-} from "../rules/issued-license.rules.ts";
+import { issuedLicenseView, statusOfIssuedLicense } from "../rules/issued-license.rules.ts";
 import type { ContractBudgets } from "./contract-budget.service.ts";
+import { IssuedLicenseListService } from "./issued-license-list.service.ts";
 import { IssuedLicenseWriterService } from "./issued-license-writer.service.ts";
 
 interface LicenseRegistryOptions {
@@ -69,9 +66,11 @@ export class LicenseRegistryService {
   }
 
   private readonly writer: IssuedLicenseWriterService;
+  private readonly lists: IssuedLicenseListService;
 
   private constructor(private readonly options: LicenseRegistryOptions) {
     this.writer = IssuedLicenseWriterService.create(options);
+    this.lists = IssuedLicenseListService.create(options);
   }
 
   /** Signs a new license for a customer and records it. */
@@ -381,38 +380,11 @@ export class LicenseRegistryService {
     return this.toView(await this.getRow(input.id));
   }
 
-  async list({
-    status,
-    audience,
-    page,
-    pageSize,
-    search,
-  }: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  } & IssuedLicenseFilters): Promise<IssuedLicensePage> {
-    const now = this.options.now();
-    const byStatus = (active: boolean) => ({ status: { at: now, active } });
-    const byAudience = (internal: boolean) => ({
-      emailSuffixes: { suffixes: INTERNAL_LICENSE_EMAIL_SUFFIXES, matching: internal },
-    });
-    const statusPart = status ? byStatus(status === "active") : {};
-    const audiencePart = audience ? byAudience(audience === "internal") : {};
-    const { repository } = this.options;
-    // Each count keeps the other filter, so it says what choosing it would list.
-    const [{ rows, total }, active, inactive, customer, internal] = await Promise.all([
-      repository.listAll({ page, pageSize, search, ...statusPart, ...audiencePart }),
-      repository.countAll({ search, ...audiencePart, ...byStatus(true) }),
-      repository.countAll({ search, ...audiencePart, ...byStatus(false) }),
-      repository.countAll({ search, ...statusPart, ...byAudience(false) }),
-      repository.countAll({ search, ...statusPart, ...byAudience(true) }),
-    ]);
-    return {
-      licenses: rows.map((row) => this.toView(row)),
-      total,
-      counts: { active, inactive, customer, internal },
-    };
+  async list(
+    input: { page: number; pageSize: number; search?: string } & IssuedLicenseFilters,
+  ): Promise<IssuedLicensePage> {
+    const { rows, total, counts } = await this.lists.list(input);
+    return { licenses: rows.map((row) => this.toView(row)), total, counts };
   }
 
   private async resolveCustomer(customer: LicenseCustomer): Promise<IssuedLicenseCustomerRecord> {

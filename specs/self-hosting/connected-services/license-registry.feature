@@ -100,6 +100,17 @@ Feature: License registry
     Then the list says 1 is active and 1 is revoked or expired, among customer licenses
     And it says 1 is a customer license and 1 is internal, among active licenses
 
+  @integration
+  Scenario: The console's license filters say what they hide
+    Given internal licenses that are all revoked or expired
+    When an operator opens the licenses page
+    Then it lists active customer licenses, with how many licenses each filter choice would list
+    And the empty list says the filters hide every license, not that the registry is empty
+    When the operator clears the filters
+    Then every license is listed
+    When the operator searches for something no license matches
+    Then the empty list says the search matched nothing
+
   @unit
   Scenario: The instance admin organizations list does not carry license keys
     When an operator lists organizations in the instance admin

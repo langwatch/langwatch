@@ -200,7 +200,7 @@ describe("the license registry", () => {
       audience: "customer",
     });
 
-    expect(page.counts).toEqual({ active: 1, inactive: 1, customer: 1, internal: 1 });
+    expect(page.counts).toEqual({ active: 1, inactive: 1, customer: 1, internal: 1, all: 3 });
   });
 
   /** @scenario A license is written only once its customer is marked */

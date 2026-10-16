@@ -62,6 +62,8 @@ const issuedLicensePageSchemaDefinition = z.object({
     inactive: z.number(),
     customer: z.number(),
     internal: z.number(),
+    /** What the search alone matches, whatever the filters. */
+    all: z.number(),
   }),
 });
 export interface IssuedLicensePageSchema extends Named<typeof issuedLicensePageSchemaDefinition> {}

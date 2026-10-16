@@ -92,7 +92,7 @@ async function build(registry: Partial<Registry> = {}) {
       return {
         licenses: [],
         total: 0,
-        counts: { active: 0, inactive: 0, customer: 0, internal: 0 },
+        counts: { active: 0, inactive: 0, customer: 0, internal: 0, all: 0 },
       };
     },
     issueLicense: async () => {

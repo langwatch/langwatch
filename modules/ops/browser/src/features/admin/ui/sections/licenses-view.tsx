@@ -1,7 +1,5 @@
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import { SearchX } from "lucide-react";
 import { useState } from "react";
 import { useDebounce } from "use-debounce";
 
@@ -9,7 +7,7 @@ import { api } from "../../../../behavior/ops-api.ts";
 import { keepPreviousData } from "../../../../model/keep-previous-data.ts";
 import { useLicenseCommands } from "../../behavior/use-license-commands.ts";
 import type { License } from "../../model/license-terms.ts";
-import { LicensesTable } from "../blocks/licenses-table.tsx";
+import { LicensesTable, type LicensesEmpty } from "../blocks/licenses-table.tsx";
 import { ActivationCodesSection } from "./activation-codes-section.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 import { LicenseDetailDrawer } from "./license-detail-drawer.tsx";
@@ -18,8 +16,11 @@ import { LicenseRevokeDialog } from "./license-revoke-dialog.tsx";
 
 const PAGE_SIZE = 25;
 
-type StatusFilter = "active" | "inactive" | "all";
-type AudienceFilter = "customer" | "internal" | "all";
+const STATUS_FILTERS = ["active", "inactive", "all"] as const;
+const AUDIENCE_FILTERS = ["customer", "internal", "all"] as const;
+type StatusFilter = (typeof STATUS_FILTERS)[number];
+type AudienceFilter = (typeof AUDIENCE_FILTERS)[number];
+type LicenseCounts = Record<"active" | "inactive" | "customer" | "internal" | "all", number>;
 
 /**
  * Cloud admin's license registry (ADR-156). Every write is a verb with
@@ -50,7 +51,11 @@ export default function LicensesView() {
     { placeholderData: keepPreviousData },
   );
   const counts = list.data?.counts;
-  const filtered = status !== "all" || audience !== "all";
+  const showEverything = () => {
+    setStatus("all");
+    setAudience("all");
+    setPage(1);
+  };
 
   return (
     <>
@@ -69,7 +74,9 @@ export default function LicensesView() {
               aria-label="License status"
               value={status}
               onValueChange={({ value }) => {
-                setStatus(value as StatusFilter);
+                const picked = oneOf(STATUS_FILTERS, value);
+                if (!picked) return;
+                setStatus(picked);
                 setPage(1);
               }}
               items={[
@@ -91,7 +98,9 @@ export default function LicensesView() {
               aria-label="Who the license is for"
               value={audience}
               onValueChange={({ value }) => {
-                setAudience(value as AudienceFilter);
+                const picked = oneOf(AUDIENCE_FILTERS, value);
+                if (!picked) return;
+                setAudience(picked);
                 setPage(1);
               }}
               items={[
@@ -128,35 +137,15 @@ export default function LicensesView() {
           onOpen={setOpenId}
           onRevoke={setRevoking}
           onResetBinding={(license) => commands.resetInstanceBinding.mutate({ id: license.id })}
-          emptyState={
-            filtered || debouncedSearch ? (
-              <NoDataInfoBlock
-                size="inline"
-                icon={<SearchX />}
-                title="No licenses match."
-                description={
-                  filtered
-                    ? "The filters above hide every license that matches; the number on each choice says what it would show."
-                    : "Nothing in the registry matches the search."
-                }
-                primaryAction={
-                  filtered ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setStatus("all");
-                        setAudience("all");
-                        setPage(1);
-                      }}
-                    >
-                      Show every license
-                    </Button>
-                  ) : undefined
-                }
-              />
-            ) : undefined
-          }
+          empty={emptyOf({
+            counts,
+            searching: debouncedSearch !== "",
+            onClearSearch: () => {
+              setSearch("");
+              setPage(1);
+            },
+            onShowEverything: showEverything,
+          })}
         />
       </AdminTable>
 
@@ -189,4 +178,42 @@ function Counted({ text, count }: { text: string; count: number | undefined }) {
 
 function sum(left: number | undefined, right: number | undefined): number | undefined {
   return left === undefined || right === undefined ? undefined : left + right;
+}
+
+/**
+ * Why the list is empty, so it never blames the filters for what the search did:
+ * with nothing matching the search at all, it is the search; otherwise the filters.
+ */
+function emptyOf({
+  counts,
+  searching,
+  onClearSearch,
+  onShowEverything,
+}: {
+  counts: LicenseCounts | undefined;
+  searching: boolean;
+  onClearSearch: () => void;
+  onShowEverything: () => void;
+}): LicensesEmpty | undefined {
+  if (!counts) return undefined;
+  if (counts.all === 0) {
+    return searching
+      ? {
+          state: "no-results",
+          title: "No licenses match the search",
+          description: "Nothing in the registry matches it, whichever filters are chosen.",
+          onClearFilters: onClearSearch,
+        }
+      : undefined;
+  }
+  return {
+    state: "no-results",
+    title: "No licenses match these filters",
+    description: `${counts.all} ${counts.all === 1 ? "license matches" : "licenses match"} other choices; the number on each says how many it shows.`,
+    onClearFilters: onShowEverything,
+  };
+}
+
+function oneOf<T extends string>(choices: readonly T[], value: string | null): T | undefined {
+  return choices.find((choice) => choice === value);
 }

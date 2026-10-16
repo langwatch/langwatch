@@ -1,15 +1,33 @@
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Button, Text, VStack } from "@langwatch/design-system/primitives";
-import { Inbox, MoreVertical } from "lucide-react";
-import type { ReactNode } from "react";
+import { MoreVertical } from "lucide-react";
 
 import { SERVICE_LABELS, type License, type Service } from "../../model/license-terms.ts";
 import { AdminDate, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 import { LicenseStatusBadge } from "../elements/license-status-badge.tsx";
 
 const COLUMN_COUNT = 9;
+
+const LICENSING_DOCS = {
+  kind: "docs",
+  label: "How self-hosted licenses work",
+  href: "https://docs.langwatch.ai/self-hosting/licensing",
+} as const;
+
+/** What an empty list says: an empty registry, or nothing that matches what was asked. */
+export type LicensesEmpty = {
+  state: "empty" | "no-results";
+  title: string;
+  description: string;
+  onClearFilters?: () => void;
+};
+
+const EMPTY_REGISTRY: LicensesEmpty = {
+  state: "empty",
+  title: "No licenses in the registry yet",
+  description: "A license appears here once it is issued or registered.",
+};
 
 interface RowCallbacks {
   onOpen: () => void;
@@ -23,12 +41,12 @@ export function LicensesTable({
   onOpen,
   onRevoke,
   onResetBinding,
-  emptyState,
+  empty = EMPTY_REGISTRY,
 }: {
   licenses: License[];
   isLoading: boolean;
   /** What an empty list says; the default suits a registry with no licenses at all. */
-  emptyState?: ReactNode;
+  empty?: LicensesEmpty;
   onOpen: (id: string) => void;
   onRevoke: (license: License) => void;
   onResetBinding: (license: License) => void;
@@ -49,7 +67,14 @@ export function LicensesTable({
         </ListTable.Row>
       </ListTable.Header>
       <ListTable.Body>
-        {licenses.length === 0 && !isLoading ? <EmptyRow>{emptyState}</EmptyRow> : null}
+        {licenses.length === 0 && !isLoading ? (
+          <ListTable.EmptyRow
+            columns={COLUMN_COUNT}
+            size="block"
+            next={[LICENSING_DOCS]}
+            {...empty}
+          />
+        ) : null}
         {licenses.map((license) => (
           <LicensesTableRow
             key={license.id}
@@ -61,20 +86,6 @@ export function LicensesTable({
         ))}
       </ListTable.Body>
     </ListTable>
-  );
-}
-
-function EmptyRow({ children }: { children?: ReactNode }) {
-  return (
-    <ListTable.SpanRow columns={COLUMN_COUNT}>
-      {children ?? (
-        <NoDataInfoBlock
-          icon={<Inbox />}
-          title="No licenses in the registry yet."
-          description="Records will appear here when they are available."
-        />
-      )}
-    </ListTable.SpanRow>
   );
 }
 
