@@ -83,11 +83,17 @@ export class MemorySelfHostedInstanceRepository implements SelfHostedInstanceRep
       traces28d: reporting
         .flatMap((row) => findReported(row, "traces_28d"))
         .reduce((sum, traces) => sum + traces, 0),
-      signals: countsOf(rows.flatMap((row) => row.raisedSignals)).map(([signal, count]) => ({
+      signals: countsOf({
+        values: rows.flatMap((row) => row.raisedSignals),
+        ties: "ascending",
+      }).map(([signal, count]) => ({
         signal,
         count,
       })),
-      releases: countsOf(live.flatMap((row) => (row.version ? [row.version] : [])))
+      releases: countsOf({
+        values: live.flatMap((row) => (row.version ? [row.version] : [])),
+        ties: "descending",
+      })
         .slice(0, releaseLimit)
         .map(([version, count]) => ({ version, count })),
     };
@@ -177,11 +183,19 @@ function findReported(row: SelfHostedInstanceRecord, key: string): number[] {
   return typeof value === "number" && Number.isFinite(value) ? [value] : [];
 }
 
-/** Each distinct value with how often it appears, most common first. */
-function countsOf(values: readonly string[]): [string, number][] {
+/** Each distinct value with its count, most common first; ties ordered as the Prisma twin does. */
+function countsOf({
+  values,
+  ties,
+}: {
+  values: readonly string[];
+  ties: "ascending" | "descending";
+}): [string, number][] {
   const counts = new Map<string, number>();
   for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
-  return [...counts].toSorted((a, b) => b[1] - a[1] || b[0].localeCompare(a[0]));
+  const byValue = (a: string, b: string) =>
+    ties === "ascending" ? a.localeCompare(b) : b.localeCompare(a);
+  return [...counts].toSorted((a, b) => b[1] - a[1] || byValue(a[0], b[0]));
 }
 
 /** Part of the id, hostname, release or install method; the whole of a domain. */

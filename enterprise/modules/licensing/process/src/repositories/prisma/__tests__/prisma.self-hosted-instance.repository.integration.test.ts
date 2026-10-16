@@ -190,13 +190,22 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry on Postgr
     });
 
     it("tallies the signals and the releases still reporting", async () => {
+      await repository.upsert(
+        upsertOf({
+          instanceId: `${tag}-tallied`,
+          hostname: `tallied.${tag}.test`,
+          lastSeenAt: NOW,
+          version: "3.16.0",
+          raisedSignals: ["sustained_ingestion"],
+        }),
+      );
       const tally = await repository.tally({
         reportingSince: NOW.subtract({ hours: 48 }),
         quietSince: NOW.subtract({ hours: 24 * 14 }),
         releaseLimit: 50,
       });
 
-      expect(tally.total).toBeGreaterThanOrEqual(3);
+      expect(tally.total).toBeGreaterThanOrEqual(1);
       expect(tally.signals).toContainEqual({
         signal: "sustained_ingestion",
         count: expect.any(Number),
