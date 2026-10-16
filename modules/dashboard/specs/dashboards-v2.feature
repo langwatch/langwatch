@@ -774,8 +774,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC171 Scope: an Only me board exists for its author alone
     Given a board its author set to Only me
     When another member of the project, or a project credential, lists the boards or the
-      starred boards, opens the board by its id, renames, deletes, reorders, stars or copies it,
-      or reads, adds, edits, moves or deletes a widget, graph or saved chart on it
+      starred boards, opens the board by its id, renames, deletes, stars or copies it,
+      or reads, adds, edits, moves or deletes a widget on it
     Then every one of these answers as it does for a board that does not exist
     And the author lists it, opens it and edits it as before
     And a LangWatchQL query reads neither the board nor what is placed on it, for any caller:
@@ -931,8 +931,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit
   Scenario: AC189 Scope: board scope reaches only a project where Dashboards is switched on
     Given a project where Dashboards is switched off
-    When a member's My dashboard is made there
-    Then its scope is Project, since nothing there offers the scope to widen it
+    When a member or a project credential makes or deletes a Dashboards board there
+    Then it is refused as dashboards_not_enabled, My dashboard included
     When a member or a project credential of that project lists or opens an Organization board
       another project owns
     Then every answer is the one a board that does not exist gets
@@ -943,10 +943,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC196 Scope: a key that names a person reads and writes as that person over REST
-    Given a board its author set to Only me, with a widget, a graph and a saved chart on it
+    Given a board its author set to Only me, with a widget on it
     When a REST call arrives with the author's own API key or access token
-    Then it lists the board, opens it, and reads and edits what is placed on it
-    And a board made with that key records them as its author
+    Then it lists, reads and edits the widget placed on it
     When a REST call arrives with another person's key
     Then every route answers as it does for a board that does not exist
     # Why: a scheduled Langy run holds its person's key and must read that person's own board
@@ -956,8 +955,137 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a legacy project key, a service key or the key of an unattended run
     When it calls a dashboards, graphs, widgets or saved charts route
     Then it reads Project boards, an Organization board by its id, and never an Only me board
-    And a board it makes has no recorded author and the scope Project
+    And a board it makes is a Reports board, with no recorded author and the scope Project
     And no REST route changes a board's scope, whichever key calls it
+
+  # Dashboards and Analytics Reports keep their boards apart (owner, 2026-10-15). A Dashboards
+  # board lives in DashboardsV2 with its widgets in DashboardWidget; a Reports board stays in
+  # Dashboard with its charts in CustomGraph. The split migration copies each existing board by
+  # what it holds and changes no Reports row, so a board made before it can sit in both areas,
+  # under the same id. Its srcdoc rows left in CustomGraph are stale copies that only a delete in
+  # Dashboards removes.
+
+  @unit @integration
+  Scenario: AC199 Split: Dashboards and Analytics Reports each list and open only their own boards
+    Given a board that holds only charts made in Analytics Reports
+    And a board that holds only widgets
+    And a mixed board that holds widgets and a saved workbench chart
+    When a member lists the boards or reads their starred boards in the Dashboards area
+    Then the board made in Analytics Reports is in neither list
+    And opened by its Dashboards address it is not available, so no delete is offered there
+    And the widgets board and the mixed board are listed, read from DashboardsV2
+    When the member lists the boards in Analytics Reports
+    Then the board made there and the mixed board are listed, read from Dashboard
+    And the widgets board is not, since it holds no chart made in Reports
+
+  @unit @integration
+  Scenario: AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart
+    Given a mixed board, in both areas under one id, whose Reports chart carries an alert
+      that has been sent
+    When a member deletes the board from the Dashboards area
+    Then its DashboardsV2 board, its DashboardWidget rows and the stars on it are deleted
+    And its stale srcdoc rows in CustomGraph are deleted with it
+    And the Reports board, its charts, their Trigger and their TriggerSent rows are unchanged
+    When a member deletes from the Dashboards area a board that holds no chart made in Reports
+    Then its stale Dashboard row is deleted too, so Reports does not list an empty copy
+    When a member deletes from the Dashboards area the id of a board only Reports holds
+    Then it is not available, and that board and its charts are kept
+
+  @unit @integration
+  Scenario: AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports
+    Given a board made in Analytics Reports, a Dashboards board copied from an empty one
+      and a Dashboards board holding widgets
+    When a member opens "Save to dashboard" on a chart Langy drew
+    Then only the Reports list is offered: the board made in Analytics Reports, with "New dashboard"
+    And no Dashboards board is offered, since a builder chart has no place on one
+
+  @unit @integration
+  Scenario: AC199d Split: a Reports delete leaves the Dashboards area unchanged
+    Given a mixed board, in both areas under one id, with widgets and stars in Dashboards
+    And a board made in Analytics Reports
+    When a member deletes either board from Analytics Reports
+    Then the Dashboard row and its charts are deleted, as before
+    And every DashboardsV2, DashboardWidget and DashboardFavourite row is unchanged,
+      the mixed board's Dashboards copy included
+
+  @integration
+  Scenario: AC199e Split: each existing board lands in Dashboards, Reports or both by what it holds
+    Given boards made before the split, one of each class below
+    When the split migration runs
+    Then each lands as follows:
+      | the board holds                                                   | Dashboards | Reports |
+      | widgets only                                                      | yes        | no      |
+      | charts made in Reports only (builder)                             | no         | yes     |
+      | saved workbench charts only                                       | no         | yes     |
+      | widgets and a chart made in Reports                               | yes        | yes     |
+      | charts made in Reports and a star                                 | yes        | yes     |
+      | nothing, and a star                                               | yes        | no      |
+      | nothing, at Only me                                               | yes        | no      |
+      | nothing, with an author, in a project with a widget or a star     | yes        | no      |
+      | nothing, with an author, in a project with neither                | no         | yes     |
+      | nothing, with no author and no Dashboards sign                    | no         | yes     |
+    And a description, a scope other than Project or an organization counts as a star does
+    And every widget is copied to DashboardWidget, placed or not, and no chart made in Reports is
+    And no Dashboard or CustomGraph row is changed or deleted
+    When it runs a second time
+    Then nothing changes: a copy edited since is kept as it is and no row is added
+    # "Reports: no" means Reports hides it: it is in DashboardsV2 and holds no chart made there.
+
+  @integration
+  Scenario: AC199f Split: a copied board and widget keep their ids
+    Given a board and a widget made before the split, a star on the board, an insight pointing
+      at the board and a daily schedule for it
+    When the split migration copies them
+    Then the DashboardsV2 board and the DashboardWidget keep the ids, fields and placement they had
+    And the star, the insight and the schedule still name the board, with no row rewritten
+
+  @unit
+  Scenario: AC199h Split: the LangWatchQL views leave out the stale copies
+    Given a stale srcdoc row in CustomGraph and a board in DashboardsV2 that holds no Reports chart
+    When a member queries the custom_graphs or the dashboards view in LangWatchQL
+    Then custom_graphs leaves out every srcdoc row
+    And dashboards leaves out that board, and lists a mixed board once
+
+  @unit
+  Scenario: AC199i Split: a board made in Analytics Reports is not starred and not Only me
+    Given Dashboards is switched on for the project
+    When a member makes a board in Analytics Reports, named "My dashboard" or not
+    Then it is made at the scope Project with no star
+    And only a board made in the Dashboards area starts starred and at Only me (AC160b, AC170)
+
+  @unit
+  Scenario: AC199j Split: a Reports write refuses the id of a board only Dashboards holds
+    Given a board in DashboardsV2 whose legacy Dashboard row holds no chart made in Reports
+    When any caller renames, deletes or reorders that id through Analytics Reports or its REST routes
+    Then it is not available, as for a board that does not exist
+    And opening the Reports area never lands on that board as its first board
+
+  @unit
+  Scenario: AC199k Split: a saved workbench chart is placed only on a Reports board
+    Given a board made in Analytics Reports and a board only Dashboards holds
+    When a member places a saved workbench chart on either
+    Then the Reports board takes it
+    And the Dashboards board is not available to it, as for a board that does not exist
+
+  @unit @integration
+  Scenario: AC199l Split: the public API reads Dashboards boards apart from the Reports boards
+    Given a board made in Analytics Reports and a Dashboards board holding a widget
+    When an API key lists the boards at /api/v1/projects/{projectId}/analytics/boards
+    Then only the Dashboards board is listed, with its widget count and the address it opens at
+    And reading the Reports board's id there is not found
+    And /api/v1/dashboards still lists only the Reports board
+    When the key adds a widget to either board
+    Then the Dashboards board takes it, and the Reports board is not found
+
+  @unit @integration
+  Scenario: AC199m Split: Analytics Reports keeps another member's Only me board hidden
+    Given a mixed board one member made at Only me before the split, holding a chart made in Reports
+      and a saved workbench chart
+    When another member or a project credential lists, opens or writes the Reports boards, their
+      charts or the saved workbench charts
+    Then that board and its charts are not there, as for a board that does not exist
+    And the member who made it lists, opens and writes it as before
+    And once that member is erased the board is there for nobody
 
   # ---------------------------------------------------------------------------
   # Sidebar, My dashboard, From LangWatch and the ask bar (langwatch/tasks#911)
@@ -1484,6 +1612,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 170-186: "Board scope: Only me, Project, Organization" (owner decisions, 2026-10-09) → Scenario: AC170 Scope: a new board starts at Project and My dashboard at Only me; Scenario: AC171 Scope: an Only me board exists for its author alone; Scenario: AC172 Scope: an Organization board is listed in every project of its organization; Scenario: AC173 Scope: an Organization board is read-only outside the project that owns it; Scenario: AC174 Scope: only the author changes a board's scope; Scenario: AC175 Scope: any board can be set to Only me, My dashboard like any other; Scenario: AC176 Scope: a narrower scope keeps other members' stars; Scenario: AC177 Scope control: the board header shows the scope beside the title; Scenario: AC178 Scope control: the sidebar menu offers the same three choices; Scenario: AC179 Scope change: it asks first only when someone loses the board; Scenario: AC180 Scope change: any other change is made at once and offers Undo; Scenario: AC181 Sidebar: scope marks and the organization's group; Scenario: AC182 Organization board: the Project chip says whose data it shows; Scenario: AC183 A board the reader may not open is not available; Scenario: AC184 View-only: a board the reader cannot edit offers no edit control; Scenario: AC185 View-only: Duplicate to edit makes the reader's own copy; Scenario: AC186 Scope: the migration keeps today's audience
   # AC 187-189: "Board scope: what the access-control review closed" (2026-10-09: automation reads, archived projects, projects with Dashboards off) → Scenario: AC187 Scope: an alert or a scheduled report reads nothing from an Only me board; Scenario: AC188 Scope: an Organization board of an archived project is listed nowhere; Scenario: AC189 Scope: board scope reaches only a project where Dashboards is switched on
   # AC 196-197: "Board scope over REST: a key stands where its person does" (owner, 2026-10-10) → Scenario: AC196 Scope: a key that names a person reads and writes as that person over REST; Scenario: AC197 Scope: a key that names no person stands where a project credential does
+  # AC 199: "Dashboards and Analytics Reports keep their boards apart" (changed on 2026-10-15: Dashboards v2 moves onto DashboardsV2 and DashboardWidget) → Scenario: AC199 Split: Dashboards and Analytics Reports each list and open only their own boards; Scenario: AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart; Scenario: AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports; Scenario: AC199d Split: a Reports delete leaves the Dashboards area unchanged; Scenario: AC199e Split: each existing board lands in Dashboards, Reports or both by what it holds; Scenario: AC199f Split: a copied board and widget keep their ids; Scenario: AC199h Split: the LangWatchQL views leave out the stale copies; Scenario: AC199i Split: a board made in Analytics Reports is not starred and not Only me; Scenario: AC199j Split: a Reports write refuses the id of a board only Dashboards holds; Scenario: AC199k Split: a saved workbench chart is placed only on a Reports board; Scenario: AC199l Split: the public API reads Dashboards boards apart from the Reports boards; Scenario: AC199m Split: Analytics Reports keeps another member's Only me board hidden
   # AC 160-165: "Sidebar, My dashboard and From LangWatch" (langwatch/tasks#911; changed on 2026-10-08: My dashboard starts starred) → Scenario: AC160 The dashboards area lands on My dashboard; Scenario: AC160b A member with no My dashboard gets one made, starred for them; Scenario: AC160c A member who unstars My dashboard keeps it unstarred; Scenario: AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order; Scenario: AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name; Scenario: AC161c Starred shows only when the member has stars, in their own order; Scenario: AC162 The '+' on Your dashboards makes a blank board at once; Scenario: AC163 My dashboard cannot be deleted; Scenario: AC164 From LangWatch folds only when the member clicks it; Scenario: AC165 A star can point at a From LangWatch board
   # Boards, From LangWatch and Langy drafts (langwatch/tasks#911) → the "Boards:", "From LangWatch:" and "Langy drafts:" scenarios
   # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate

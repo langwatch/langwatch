@@ -54,6 +54,8 @@ export const prismaTableCatalogue = {
   "DatasetRecord": "DatasetRecord",
   "Dashboard": "Dashboard",
   "DashboardFavourite": "DashboardFavourite",
+  "DashboardsV2": "DashboardsV2",
+  "DashboardWidget": "DashboardWidget",
   "InsightProjection": "InsightProjection",
   "InsightReaderProjection": "InsightReaderProjection",
   "InsightDailyScheduleProjection": "InsightDailyScheduleProjection",
@@ -1083,6 +1085,30 @@ export const prismaModelFieldCatalogue = {
     "projectId",
     "position",
     "createdAt"
+  ],
+  "DashboardsV2": [
+    "id",
+    "projectId",
+    "name",
+    "description",
+    "createdById",
+    "scope",
+    "organizationId",
+    "createdAt",
+    "updatedAt"
+  ],
+  "DashboardWidget": [
+    "id",
+    "projectId",
+    "dashboardId",
+    "name",
+    "definition",
+    "gridColumn",
+    "gridRow",
+    "colSpan",
+    "rowSpan",
+    "createdAt",
+    "updatedAt"
   ],
   "InsightProjection": [
     "id",
@@ -3207,6 +3233,8 @@ export const prismaRelationCatalogue = {
     "graphs": "CustomGraph"
   },
   "DashboardFavourite": {},
+  "DashboardsV2": {},
+  "DashboardWidget": {},
   "InsightProjection": {},
   "InsightReaderProjection": {},
   "InsightDailyScheduleProjection": {},

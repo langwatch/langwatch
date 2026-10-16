@@ -4822,9 +4822,6 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
-      '@langwatch/feature-flag-client':
-        specifier: workspace:*
-        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -6727,6 +6724,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
+      '@langwatch/clickhouse-markers':
+        specifier: workspace:*
+        version: link:../../../packages/clickhouse-markers
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../contract

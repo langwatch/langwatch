@@ -450,30 +450,23 @@ describe("buildStructuredIoPreview", () => {
 // New tests: non-IO / nested / binary capping (ADR-022 spool-path fix)
 // ---------------------------------------------------------------------------
 
-/** A value that exceeds DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES (256 KB) but not IO_PREVIEW_BYTES is N/A:
- * DEFAULT > IO_PREVIEW, so a value > 256 KB is always > 64 KB too.
- * We make a 300 KB non-IO value — over both thresholds. IO_ATTR_KEYS won't match it,
- * so it goes through the 256 KB cap path, NOT the 64 KB IO preview path. */
+/** A 300 KB non-IO text value: over the 256 KB non-IO budget and over IO_PREVIEW_BYTES. */
 const NON_IO_OVER_256KB = "z".repeat(300 * 1024);
 
-/**
- * non-IO stringValue over 256 KB is capped in the lean output (spool-path fix)
- */
 describe("given a SpanReceived event with a non-IO attribute (langwatch.params) whose stringValue exceeds 256 KB", () => {
   describe("when leanForProjection is applied", () => {
-    it("caps the langwatch.params value in the leaned event to a placeholder", () => {
+    /** @scenario "An oversized non-IO text attribute keeps a preview and a pointer to the full value" */
+    it("replaces the value with a preview under the IO preview budget", () => {
       const event = makeSpanReceivedEvent({
         attributes: { "langwatch.params": NON_IO_OVER_256KB },
       });
 
-      const leaned = leanForProjection(event);
-      const attrs = extractSpanAttributes(leaned);
+      const attrs = extractSpanAttributes(leanForProjection(event));
 
-      // The capped value must be a truncation placeholder, far shorter than the original
-      expect(Buffer.byteLength(attrs["langwatch.params"] ?? "", "utf-8")).toBeLessThan(
-        DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+      expect(Buffer.byteLength(attrs["langwatch.params"] ?? "", "utf-8")).toBeLessThanOrEqual(
+        IO_PREVIEW_BYTES + 4,
       );
-      expect(attrs["langwatch.params"]).toMatch(/\[truncated:/);
+      expect(attrs["langwatch.params"]).toMatch(/^z+…$/);
     });
 
     it("leaves the original input event's langwatch.params value unchanged (clone safety)", () => {
@@ -490,23 +483,39 @@ describe("given a SpanReceived event with a non-IO attribute (langwatch.params) 
 
       leanForProjection(event);
 
-      // Original must be completely unmodified after leanForProjection
       const valueAfter = originalData.span.attributes.find((a) => a.key === "langwatch.params")
         ?.value.stringValue;
       expect(valueAfter).toBe(originalValue);
       expect(valueAfter).toHaveLength(300 * 1024);
     });
 
-    it("does not attach an eventref for the non-IO attribute", () => {
+    it("attaches an eventref for the attribute, so a full read restores it, and no truncation marker", () => {
       const event = makeSpanReceivedEvent({
         attributes: { "langwatch.params": NON_IO_OVER_256KB },
       });
 
-      const leaned = leanForProjection(event);
-      const attrs = extractSpanAttributes(leaned);
+      const attrs = extractSpanAttributes(leanForProjection(event));
 
-      const eventrefKeys = Object.keys(attrs).filter((k) => k.startsWith(EVENTREF_ATTR_PREFIX));
-      expect(eventrefKeys).toHaveLength(0);
+      expect(attrs[`${EVENTREF_ATTR_PREFIX}langwatch.params`]).toBeDefined();
+      expect(attrs["langwatch.truncated_attributes"]).toBeUndefined();
+    });
+  });
+});
+
+describe("given a SpanReceived event with a non-IO base64 data URL over 256 KB", () => {
+  describe("when leanForProjection is applied", () => {
+    /** @scenario "A value cut in the projection names itself on the span" */
+    it("caps it to the placeholder and names it on the span with its original size", () => {
+      const url = `data:image/png;base64,${"A".repeat(300 * 1024)}`;
+      const event = makeSpanReceivedEvent({ attributes: { "langwatch.params": url } });
+
+      const attrs = extractSpanAttributes(leanForProjection(event));
+
+      expect(attrs["langwatch.params"]).toMatch(/^\[truncated: \d+ bytes, image\/png\]$/);
+      expect(attrs[`${EVENTREF_ATTR_PREFIX}langwatch.params`]).toBeUndefined();
+      expect(JSON.parse(attrs["langwatch.truncated_attributes"] ?? "[]")).toEqual([
+        { key: "langwatch.params", bytes: Buffer.byteLength(url, "utf8") },
+      ]);
     });
   });
 });
