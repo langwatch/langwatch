@@ -43,7 +43,7 @@ func TestVoyageClientSharesTimeoutCeiling(t *testing.T) {
 	assert.Equal(t, ProviderRequestTimeoutSeconds*time.Second, newVoyageClient().Timeout)
 }
 
-// @scenario "A provider on a private address is dispatched to when the egress policy allows it"
+// @scenario "A provider on a private address is dispatched to only with the private-network guard off"
 func TestGetConfigForProviderFollowsEgressPolicyForPrivateNetwork(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -51,7 +51,7 @@ func TestGetConfigForProviderFollowsEgressPolicyForPrivateNetwork(t *testing.T) 
 		wantAllow bool
 	}{
 		{name: "guard off", opts: BifrostOptions{BlockLocalHTTPCalls: false}, wantAllow: true},
-		{name: "guard on with allowlist", opts: BifrostOptions{BlockLocalHTTPCalls: true, AllowedEndpointHosts: []string{"llm-proxy.internal"}}, wantAllow: true},
+		{name: "guard on with allowlist", opts: BifrostOptions{BlockLocalHTTPCalls: true, AllowedEndpointHosts: []string{"llm-proxy.internal"}}, wantAllow: false},
 		{name: "guard on without allowlist", opts: BifrostOptions{BlockLocalHTTPCalls: true}, wantAllow: false},
 	}
 	for _, tc := range cases {

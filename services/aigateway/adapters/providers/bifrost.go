@@ -111,11 +111,12 @@ type BifrostOptions struct {
 	OpenAIBackendURL string
 }
 
-// allowsPrivateNetwork reports whether the egress policy lets any customer
-// endpoint use a private address: the guard is off, or ALLOWED_PROXY_HOSTS
-// names hosts the pre-flight check lets through.
+// allowsPrivateNetwork reports whether bifrost may dial private addresses:
+// only with the guard off. Bifrost's setting is per provider, and every
+// custom endpoint shares one, so ALLOWED_PROXY_HOSTS cannot be applied here
+// without lifting the refusal for hosts outside it too.
 func (o BifrostOptions) allowsPrivateNetwork() bool {
-	return !o.BlockLocalHTTPCalls || len(o.AllowedEndpointHosts) > 0
+	return !o.BlockLocalHTTPCalls
 }
 
 // NewBifrostRouter creates a provider router backed by bifrost.
