@@ -19,6 +19,7 @@ import {
   SavedWorkbenchChartDefinitionInvalidError,
   SavedWorkbenchChartNotFoundError,
   SavedWorkbenchChartValidationError,
+  type DashboardViewer,
   type SavedWorkbenchChart,
   type SavedWorkbenchChartDefinition,
   type SavedWorkbenchChartDefinitionUpdate,
@@ -43,7 +44,10 @@ export type SavedWorkbenchChartRepository = Pick<
   | "updateSavedWorkbenchChart"
 >;
 
-/** The saved LangWatchQL charts a project keeps, and their placement on a grid. */
+/**
+ * The saved LangWatchQL charts a project keeps, and their placement on a grid. A chart on another
+ * member's Only me board reads as absent, as on main (AC199m).
+ */
 export class SavedWorkbenchChartService {
   #repository: SavedWorkbenchChartRepository;
   #policy: SavedWorkbenchChartPolicyService;
@@ -67,18 +71,29 @@ export class SavedWorkbenchChartService {
     return new SavedWorkbenchChartService(options.repository, options.policy, options.analytics);
   }
 
-  async getAll(input: { projectId: string }): Promise<SavedWorkbenchChart[]> {
+  async getAll(input: {
+    projectId: string;
+    viewer?: DashboardViewer;
+  }): Promise<SavedWorkbenchChart[]> {
     const rows = await this.#repository.findAllSavedWorkbenchCharts({
       projectId: projectIdSchema.parse(input.projectId),
+      viewer: input.viewer,
     });
 
     return rows.map((row) => present(row));
   }
 
-  async getById(input: { projectId: string; chartId: string }): Promise<SavedWorkbenchChart> {
+  async getById(input: {
+    projectId: string;
+    chartId: string;
+    viewer?: DashboardViewer;
+  }): Promise<SavedWorkbenchChart> {
     const parsed = chartRef(input);
 
-    const chart = await this.#repository.findSavedWorkbenchChart(parsed);
+    const chart = await this.#repository.findSavedWorkbenchChart({
+      ...parsed,
+      viewer: input.viewer,
+    });
     if (!chart) throw new SavedWorkbenchChartNotFoundError();
 
     return present(chart);
@@ -115,10 +130,11 @@ export class SavedWorkbenchChartService {
     chartId: string;
     name?: string;
     definitionUpdate?: SavedWorkbenchChartDefinitionUpdate;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
     const parsed = chartRef(input);
 
-    await this.getById(parsed);
+    await this.getById({ ...parsed, viewer: input.viewer });
 
     const name = input.name === undefined ? undefined : parseName(input.name);
 
@@ -151,6 +167,7 @@ export class SavedWorkbenchChartService {
     gridRow?: number;
     colSpan?: number;
     rowSpan?: number;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
     const ref = chartRef(input);
 
@@ -164,6 +181,7 @@ export class SavedWorkbenchChartService {
 
     const dashboard = await this.#repository.findDashboard({
       projectId: ref.projectId,
+      viewer: input.viewer,
       dashboardId: placement.dashboardId,
     });
     if (!dashboard) throw new SavedWorkbenchChartDashboardNotFoundError();
@@ -195,8 +213,13 @@ export class SavedWorkbenchChartService {
     projectId: string;
     chartId: string;
     execution: LangWatchQLRunContext;
+    viewer?: DashboardViewer;
   }): Promise<LangWatchQLQueryResult> {
-    const chart = await this.getById({ projectId: input.projectId, chartId: input.chartId });
+    const chart = await this.getById({
+      projectId: input.projectId,
+      chartId: input.chartId,
+      viewer: input.viewer,
+    });
 
     return this.#analytics.executeLangWatchQL({
       ...input.execution,

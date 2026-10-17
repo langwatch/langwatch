@@ -71,6 +71,10 @@ export interface IssuedLicenseRepository {
     page: number;
     pageSize: number;
     search?: string;
+    /** Keeps only the rows active at this instant: not revoked, superseded or expired. */
+    activeAt?: Instant;
+    /** Drops the rows whose email ends with any of these, case aside. */
+    excludeEmailSuffixes?: readonly string[];
   }): Promise<{ rows: IssuedLicenseRecord[]; total: number }>;
   update(id: string, data: IssuedLicensePatch): Promise<IssuedLicenseRecord>;
   /** Removes a row a failed flow wrote; a row already gone is not an error. */

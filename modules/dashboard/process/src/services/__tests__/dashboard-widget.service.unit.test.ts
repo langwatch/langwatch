@@ -11,8 +11,8 @@ import {
   createDashboardTestProjects,
   DASHBOARDS_ROLLED_OUT,
 } from "../../app/__tests__/dashboard.fixture.ts";
+import { MemoryBoardRepository } from "../../repositories/memory/memory.board.repository.ts";
 import { MemoryDashboardWidgetRepository } from "../../repositories/memory/memory.dashboard-widget.repository.ts";
-import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
 import { DashboardAccessService } from "../dashboard-access.service.ts";
 import { DashboardWidgetService } from "../dashboard-widget.service.ts";
 
@@ -27,7 +27,7 @@ function setUp() {
     repository,
     analytics: createDashboardTestAnalytics(),
     boards: DashboardAccessService.create({
-      repository: MemoryDashboardRepository.create(),
+      repository: MemoryBoardRepository.create(),
       projects: createDashboardTestProjects(),
       rollout: DASHBOARDS_ROLLED_OUT,
       authz: createDashboardTestAuthz(),
