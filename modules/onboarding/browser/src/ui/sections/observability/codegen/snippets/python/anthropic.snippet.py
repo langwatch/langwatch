@@ -12,7 +12,7 @@ client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 @langwatch.trace(name="Anthropic Call with Community Instrumentor")
 def generate_text_with_community_instrumentor(prompt: str):
     response = client.messages.create(
-        model="claude-sonnet-4-5-20250929",
+        model="claude-sonnet-5-5",
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
     )

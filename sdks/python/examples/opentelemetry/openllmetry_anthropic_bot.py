@@ -24,9 +24,8 @@ async def main(message: cl.Message):
     )
 
     completion = client.messages.create(
-        model="claude-3-5-sonnet-20240620",
+        model="claude-sonnet-5-5",
         max_tokens=1000,
-        temperature=0,
         stream=True,
         system="You are a world-class poet. Respond only with short poems.",
         messages=[
