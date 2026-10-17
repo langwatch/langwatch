@@ -22,8 +22,11 @@ export function buildEnvSnippet(slug: string, endpoint: string, token: string): 
   const base = `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
   if (slug === "claude_code") {
-    // Claude Code OTel trace flags: enable span tracing + full session details
-    // (prompts, tool calls, API bodies).
+    // Claude Code OTel trace flags: enable span tracing + the light session
+    // details (prompts, tool calls, assistant response text). We default
+    // ASSISTANT_RESPONSES, not RAW_API_BODIES — the latter serialises the whole
+    // request+response on every call for content the light events already
+    // carry; set it yourself only to debug the full request JSON (#8284).
     return [
       `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
       `export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`,
@@ -34,7 +37,10 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
       `export OTEL_LOG_USER_PROMPTS=1`,
       `export OTEL_LOG_TOOL_DETAILS=1`,
       `export OTEL_LOG_TOOL_CONTENT=1`,
-      `export OTEL_LOG_RAW_API_BODIES=1`,
+      `export OTEL_LOG_ASSISTANT_RESPONSES=1`,
+      // Pasted by hand, so an older RAW_API_BODIES line is not replaced for
+      // the user; note it rather than `unset` the documented opt-in.
+      `# Upgrading? Remove any older OTEL_LOG_RAW_API_BODIES=1 line from your shell rc unless you intentionally want the full request/response JSON.`,
       base,
       `export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"`,
     ].join("\n");
