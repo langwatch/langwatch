@@ -17,6 +17,7 @@ import {
   LicenseKeyInvalidError,
   OrganizationNotFoundError,
   type IssuedLicenseCustomerRecord,
+  type IssuedLicenseFilters,
   type IssuedLicensePage,
   type IssuedLicenseSource,
   type IssuedLicenseView,
@@ -37,7 +38,11 @@ import type {
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
 import { resolveLicenseTerms } from "../rules/issued-license-row.rules.ts";
-import { issuedLicenseView, statusOfIssuedLicense } from "../rules/issued-license.rules.ts";
+import {
+  issuedLicenseView,
+  listQueryOf,
+  statusOfIssuedLicense,
+} from "../rules/issued-license.rules.ts";
 import type { ContractBudgets } from "./contract-budget.service.ts";
 import { IssuedLicenseWriterService } from "./issued-license-writer.service.ts";
 
@@ -376,12 +381,11 @@ export class LicenseRegistryService {
     return this.toView(await this.getRow(input.id));
   }
 
-  async list(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<IssuedLicensePage> {
-    const { rows, total } = await this.options.repository.listAll(input);
+  async list(
+    input: { page: number; pageSize: number; search?: string } & IssuedLicenseFilters,
+  ): Promise<IssuedLicensePage> {
+    const query = listQueryOf({ ...input, now: this.options.now() });
+    const { rows, total } = await this.options.repository.listAll(query);
     return { licenses: rows.map((row) => this.toView(row)), total };
   }
 

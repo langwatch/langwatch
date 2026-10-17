@@ -16,7 +16,7 @@ export function useBoardProjects({ board }: { board: { id: string; scope: Dashbo
   const projectId = project?.id ?? "";
   const isShared = board.scope === "ORGANIZATION";
 
-  const list = analyticsApi.dashboards.scopeProjects.useQuery(
+  const list = analyticsApi.boards.scopeProjects.useQuery(
     { projectId, dashboardId: board.id },
     { enabled: !!projectId && isShared },
   );

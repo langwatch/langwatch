@@ -329,7 +329,8 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
     const alpha = full.rows.find((row) => row.conversationId === SESSION_ALPHA)!;
     expect(alpha.traceCount).toBe(3);
     expect(alpha.totalCost).toBeCloseTo(6);
-    expect(alpha.totalTokens).toBe(900);
+    // 900 input and output tokens plus the 60,000 cache reads.
+    expect(alpha.totalTokens).toBe(60_900);
     expect(alpha.cacheReadTokens).toBe(60_000);
     expect(alpha.contextSizeTokens).toBe(80_000);
     expect(alpha.totalDurationMs).toBeCloseTo(6000);

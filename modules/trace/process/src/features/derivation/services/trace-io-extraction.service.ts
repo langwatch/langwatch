@@ -1,5 +1,6 @@
 import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import { type NormalizedSpan, type TraceCanonicalisationService } from "@langwatch/trace-contract";
+import { coerceToChatMessages } from "@langwatch/trace-contract/transcript";
 /**
  * FROZEN TWIN of `platform/app/src/server/app-layer/traces/trace-io-extraction.service.ts`. The
  * application keeps its copy while both graphs ingest; edit neither without editing the other.
@@ -285,8 +286,29 @@ export class TraceIOExtractionService implements TraceIoExtraction {
       if (text) {
         return { raw: normalized, text, source: "langwatch" };
       }
+      const chatText = this.#chatMessagesText(normalized, type);
+      if (chatText) {
+        return { raw: normalized, text: chatText, source: "langwatch" };
+      }
     }
 
+    return null;
+  }
+
+  /**
+   * The text of a payload no wrapper heuristic recognised that still reads as
+   * chat messages, such as serialised LangChain messages: the last user message
+   * with text for an input, the last assistant message with text for an output.
+   */
+  #chatMessagesText(value: unknown, type: "input" | "output"): string | null {
+    const messages = coerceToChatMessages(value);
+    if (!messages) return null;
+    const role = type === "input" ? "user" : "assistant";
+    const candidates = messages.filter((message) => message.role === role);
+    for (const message of candidates.toReversed()) {
+      const text = convertMessagesToText([message], type, this.traceCanonicalisation);
+      if (text) return text;
+    }
     return null;
   }
 
