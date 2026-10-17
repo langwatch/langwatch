@@ -38,6 +38,7 @@ export const CONTENT_KEY_CATALOG: Record<ContentCategory, readonly string[]> = {
     "gen_ai.tool.call.result",
     "ai.toolCall",
     "ai.toolCall.args",
+    "anthropic.tool_result.content",
   ],
 };
 

@@ -1,32 +1,26 @@
 /**
- * Verifies the stored_object_read_failures_total Prometheus counter is registered and
- * incremented by the legacy index's telemetry, surfaced at /metrics via prom-client.
+ * Verifies the legacy index's telemetry counts stored_object_read_failures_total
+ * through the OTel metrics facade.
  * @vitest-environment node
  */
 
-import { register } from "prom-client";
-import { beforeEach, describe, expect, it } from "vitest";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { StoredObjectsTelemetryService } from "../stored-objects-telemetry.service.ts";
 
 describe("given the legacy index publishes its read failures", () => {
   const telemetry = StoredObjectsTelemetryService.create();
+  const meter = createRecordingMeterProvider();
 
-  beforeEach(() => {
-    register.resetMetrics();
-  });
-
-  /** @scenario "Prometheus counts a storage read failure on the legacy index" */
-  it("registers stored_object_read_failures_total counter", () => {
-    const metric = register.getSingleMetric("stored_object_read_failures_total");
-    expect(metric).toBeDefined();
-  });
+  beforeEach(() => meter.install());
+  afterEach(() => meter.uninstall());
 
   describe("when a read failure is recorded", () => {
-    it("stored_object_read_failures_total increments without label", async () => {
+    /** @scenario "Prometheus counts a storage read failure on the legacy index" */
+    it("stored_object_read_failures_total increments without label", () => {
       telemetry.recordReadFailure();
-      const lines = await register.getSingleMetricAsString("stored_object_read_failures_total");
-      expect(lines).toContain("stored_object_read_failures_total 1");
+      expect(meter.valueOf("stored_object_read_failures_total")).toBe(1);
     });
   });
 });
