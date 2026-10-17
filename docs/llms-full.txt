@@ -17400,7 +17400,7 @@ Price-card comparisons lie by omission: a provider that halves the per-token pri
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Personal coding-agent usage needs `langwatch login --device`; a team or application project needs `--project <slug>` on the read commands.
+Personal coding-agent usage needs `langwatch login --device` on a laptop; skip it when `LANGWATCH_API_KEY` is set, because that key is the sign-in; a team or application project needs `--project <slug>` on the read commands.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -17768,7 +17768,7 @@ This skill answers one question with the user's own data: at what context size d
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on the read commands when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in; skip it when `LANGWATCH_API_KEY` is set, because that key is the sign-in. Add `--project <slug>` on the read commands when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -19283,7 +19283,7 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on every read command when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in; skip it when `LANGWATCH_API_KEY` is set, because that key is the sign-in. Add `--project <slug>` on every read command when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -19325,7 +19325,7 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the project id is `$LANGWATCH_PROJECT_ID` when set (never run `langwatch whoami` then: it reads only the device login and reports "Not logged in" next to a working key). Without it, the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
 
 `langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
@@ -55510,7 +55510,7 @@ This skill answers one question with the user's own data: at what context size d
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on the read commands when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in; skip it when `LANGWATCH_API_KEY` is set, because that key is the sign-in. Add `--project <slug>` on the read commands when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -55647,7 +55647,7 @@ Price-card comparisons lie by omission: a provider that halves the per-token pri
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Personal coding-agent usage needs `langwatch login --device`; a team or application project needs `--project <slug>` on the read commands.
+Personal coding-agent usage needs `langwatch login --device` on a laptop; skip it when `LANGWATCH_API_KEY` is set, because that key is the sign-in; a team or application project needs `--project <slug>` on the read commands.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -55797,7 +55797,7 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on every read command when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in; skip it when `LANGWATCH_API_KEY` is set, because that key is the sign-in. Add `--project <slug>` on every read command when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -55839,7 +55839,7 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the project id is `$LANGWATCH_PROJECT_ID` when set (never run `langwatch whoami` then: it reads only the device login and reports "Not logged in" next to a working key). Without it, the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
 
 `langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
