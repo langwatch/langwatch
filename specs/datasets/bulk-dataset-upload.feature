@@ -118,6 +118,26 @@ Feature: Bulk dataset upload
     And each row reports its own progress
     And each becomes ready on its own
 
+  @integration
+  Scenario: A single uploaded file opens its dataset once ready
+    Given I have added one file
+    When I start the upload and it becomes ready
+    Then its dataset opens and the drawer closes
+
+  @integration
+  Scenario: A ready row opens its dataset
+    Given I have uploaded several files
+    When one of them is ready
+    Then its row offers to open the dataset
+    And choosing it opens that dataset
+
+  @integration
+  Scenario: A single upload finishing after I closed the drawer stays put
+    Given I have started uploading one file
+    And I closed the drawer before it was ready
+    When it becomes ready
+    Then I stay where I am
+
   @unit
   Scenario: A large batch starts a few files and queues the rest
     Given I have added more files than prepare at once

@@ -54,19 +54,6 @@ describe("the access-model mode", () => {
       ).toBe("rendered");
     });
   });
-
-  describe("when the server decides whether to arm the reconvergence watch", () => {
-    // `start.ts` arms the watch only when `lwqlAccessModelMode() === "sql"`
-    // (see armLwqlReconvergenceWatch): rendered mode ships the model as per-pod
-    // config, so there is no config-store→SQL-store handover to reconverge.
-    /** @scenario "In rendered mode the server does not arm the reconvergence watch" */
-    it("is never sql in rendered mode, the gate that skips arming", () => {
-      expect(selfProvisioning.accessModelMode({ source: {} })).not.toBe("sql");
-      expect(
-        selfProvisioning.accessModelMode({ source: { LWQL_ACCESS_MODEL_MODE: "rendered" } }),
-      ).not.toBe("sql");
-    });
-  });
 });
 
 describe("selfHostedClickHouseProvisioningStatements access-statement gating", () => {

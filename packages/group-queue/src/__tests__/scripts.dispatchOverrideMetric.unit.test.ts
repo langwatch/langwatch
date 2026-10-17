@@ -1,7 +1,7 @@
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { gqJobsDispatchedOverrideTotal } from "../metrics.ts";
 import { GroupStagingScripts } from "../scripts.ts";
 
 /**
@@ -26,9 +26,12 @@ function scriptsReturning(value: unknown): GroupStagingScripts {
   return new GroupStagingScripts(redis, QUEUE_NAME);
 }
 
-async function overrideCount(): Promise<number> {
-  const metric = await gqJobsDispatchedOverrideTotal.get();
-  return metric.values.find((v) => v.labels.queue_name === QUEUE_NAME)?.value ?? 0;
+const OVERRIDE_TOTAL = "gq_jobs_dispatched_override_total";
+
+let meter = createRecordingMeterProvider();
+
+function overrideCount(): number {
+  return meter.valueOf(OVERRIDE_TOTAL, { queue_name: QUEUE_NAME });
 }
 
 async function dispatch(scripts: GroupStagingScripts) {
@@ -41,8 +44,10 @@ async function dispatch(scripts: GroupStagingScripts) {
 
 describe("dispatchBatch override accounting", () => {
   beforeEach(() => {
-    gqJobsDispatchedOverrideTotal.reset();
+    meter = createRecordingMeterProvider();
+    meter.install();
   });
+  afterEach(() => meter.uninstall());
 
   describe("given the override filled otherwise-idle slots", () => {
     describe("when the batch is dispatched", () => {
@@ -52,7 +57,7 @@ describe("dispatchBatch override accounting", () => {
 
         await dispatch(scripts);
 
-        expect(await overrideCount()).toBe(2);
+        expect(overrideCount()).toBe(2);
       });
 
       /** @scenario "Slots filled by the override are counted separately from ordinary dispatch" */
@@ -74,7 +79,7 @@ describe("dispatchBatch override accounting", () => {
 
         await dispatch(scripts);
 
-        expect(await overrideCount()).toBe(0);
+        expect(overrideCount()).toBe(0);
       });
 
       /** @scenario "A saturated fleet records no override dispatches" */
@@ -83,7 +88,7 @@ describe("dispatchBatch override accounting", () => {
 
         await dispatch(scripts);
 
-        expect(await gqJobsDispatchedOverrideTotal.get()).toHaveProperty("values", []);
+        expect(meter.valuesOf(OVERRIDE_TOTAL)).toEqual([]);
       });
     });
   });
@@ -93,12 +98,10 @@ describe("dispatchBatch override accounting", () => {
       /** @scenario "A saturated fleet records no override dispatches" */
       it("dispatches nothing and counts nothing", async () => {
         for (const value of [null, undefined, "unexpected", []]) {
-          gqJobsDispatchedOverrideTotal.reset();
-
           const dispatched = await dispatch(scriptsReturning(value));
 
           expect(dispatched).toEqual([]);
-          expect(await overrideCount()).toBe(0);
+          expect(overrideCount()).toBe(0);
         }
       });
 
@@ -109,7 +112,7 @@ describe("dispatchBatch override accounting", () => {
         const dispatched = await dispatch(scripts);
 
         expect(dispatched).toHaveLength(1);
-        expect(await overrideCount()).toBe(0);
+        expect(overrideCount()).toBe(0);
       });
 
       /** @scenario "A saturated fleet records no override dispatches" */
@@ -119,7 +122,7 @@ describe("dispatchBatch override accounting", () => {
         const dispatched = await dispatch(scripts);
 
         expect(dispatched).toEqual([]);
-        expect(await overrideCount()).toBe(0);
+        expect(overrideCount()).toBe(0);
       });
 
       /** @scenario "A saturated fleet records no override dispatches" */
@@ -129,7 +132,7 @@ describe("dispatchBatch override accounting", () => {
         const dispatched = await dispatch(scripts);
 
         expect(dispatched).toHaveLength(1);
-        expect(await overrideCount()).toBe(0);
+        expect(overrideCount()).toBe(0);
       });
 
       /** @scenario "A saturated fleet records no override dispatches" */
@@ -139,7 +142,7 @@ describe("dispatchBatch override accounting", () => {
         const dispatched = await dispatch(scripts);
 
         expect(dispatched).toEqual([]);
-        expect(await overrideCount()).toBe(0);
+        expect(overrideCount()).toBe(0);
       });
     });
   });

@@ -120,6 +120,7 @@ const sharedSpanDetailSchema = spanDetailSchema.pick({
   outputVisibleTo: true,
   contentPrivacy: true,
   piiAnalysisIncomplete: true,
+  truncatedAttributes: true,
   restrictedAttributes: true,
   error: true,
   metrics: true,

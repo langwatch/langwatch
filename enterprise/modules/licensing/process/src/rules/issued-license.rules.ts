@@ -12,6 +12,43 @@ import { Temporal, type Instant } from "@langwatch/time";
 
 import type { IssuedLicenseRecord } from "../repositories/issued-license.repository.ts";
 
+/** Where our own test licences go: our domains, and the names reserved for testing (RFC 2606). */
+export const INTERNAL_LICENSE_EMAIL_SUFFIXES: readonly string[] = [
+  "@langwatch.ai",
+  "@langwatch.com",
+  ".test",
+  ".example",
+  ".invalid",
+  ".localhost",
+];
+
+/** The console's list query as the repository reads it: filters become an instant and suffixes. */
+export function listQueryOf({
+  onlyActive,
+  hideInternal,
+  now,
+  ...page
+}: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  onlyActive?: boolean;
+  hideInternal?: boolean;
+  now: Instant;
+}): {
+  page: number;
+  pageSize: number;
+  search?: string;
+  activeAt?: Instant;
+  excludeEmailSuffixes?: readonly string[];
+} {
+  return {
+    ...page,
+    ...(onlyActive ? { activeAt: now } : {}),
+    ...(hideInternal ? { excludeEmailSuffixes: INTERNAL_LICENSE_EMAIL_SUFFIXES } : {}),
+  };
+}
+
 /** Revoked wins over superseded, which wins over the term. */
 export function statusOfIssuedLicense(
   row: Pick<IssuedLicenseRecord, "revokedAt" | "supersededAt" | "expiresAt">,
