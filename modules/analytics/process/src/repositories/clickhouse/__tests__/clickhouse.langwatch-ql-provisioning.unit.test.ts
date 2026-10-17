@@ -269,6 +269,61 @@ describe("runClickHouseStatements", () => {
     });
   });
 
+  describe("when a statement fails with a ClickHouse server error", () => {
+    const ENGINE_TABLE =
+      "CREATE TABLE IF NOT EXISTS lw.agents_pg (TenantId String) ENGINE = PostgreSQL(lwql_postgres, password = 'reader-secret')";
+    const failingWith = (error: Error) => ({
+      async command() {
+        throw error;
+      },
+    });
+    const failureLog = () =>
+      logCalls.find((call) => call[1] === "lwql provisioning failed creating ClickHouse objects");
+
+    /** @scenario "A failed provisioning statement logs the ClickHouse error code and name" */
+    it.each([
+      {
+        shape: "the client's typed error",
+        error: Object.assign(new Error(`Code: 669. DB::Exception: while running ${ENGINE_TABLE}`), {
+          code: "669",
+          type: "NAMED_COLLECTION_DOESNT_EXIST",
+        }),
+      },
+      {
+        shape: "a message carrying only the server's suffix",
+        error: new Error(
+          `Code: 669. DB::Exception: while running ${ENGINE_TABLE}. (NAMED_COLLECTION_DOESNT_EXIST) (version 25.10.2.65)`,
+        ),
+      },
+    ])("names code 669 and its name from $shape, never the statement", async ({ error }) => {
+      logCalls.length = 0;
+
+      await expect(
+        provisioning(failingWith(error)).runStatements({ statements: [ENGINE_TABLE] }),
+      ).rejects.toBe(error);
+
+      expect(failureLog()?.[0]).toMatchObject({
+        clickhouseCode: CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_DOESNT_EXIST,
+        clickhouseCodeName: "NAMED_COLLECTION_DOESNT_EXIST",
+      });
+      expect(JSON.stringify(logCalls)).not.toContain("reader-secret");
+      expect(JSON.stringify(logCalls)).not.toContain("ENGINE = PostgreSQL");
+    });
+
+    /** @scenario "A failed provisioning statement logs the ClickHouse error code and name" */
+    it("logs no code where the failure was the client's, as a timeout is", async () => {
+      logCalls.length = 0;
+
+      await expect(
+        provisioning(failingWith(new Error("Timeout error."))).runStatements({
+          statements: [ENGINE_TABLE],
+        }),
+      ).rejects.toBeInstanceOf(Error);
+
+      expect(failureLog()?.[0]).toMatchObject({ clickhouseCode: null, clickhouseCodeName: null });
+    });
+  });
+
   describe("when a view fails because the table it reads does not exist", () => {
     /** @scenario "A provisioning failure over a missing table names both objects" */
     it("logs the view it was creating and the missing table", async () => {

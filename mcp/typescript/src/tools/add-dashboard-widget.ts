@@ -27,7 +27,7 @@ export async function handleAddDashboardWidget(params: AddDashboardWidgetParams)
   const queries = normalizeDashboardWidgetQueries({ queries: params.queries });
 
   const project = await getCurrentProject();
-  await assertDashboardExists({ dashboardId: params.dashboardId });
+  await assertDashboardExists({ projectId: project.id, dashboardId: params.dashboardId });
 
   const widget = await createDashboardWidget({
     projectId: project.id,

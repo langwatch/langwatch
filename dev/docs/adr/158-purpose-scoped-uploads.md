@@ -105,7 +105,7 @@ only object store.
 
 ### 3. Identity and purpose
 
-- **Every stored object's id is a fresh KSUID**: `generate("so")` from `@langwatch/ksuid`, precedent
+- **Every stored object's id is a fresh KSUID**: `generate(KSUID_RESOURCES.STORED_OBJECT)` (`storedobject_`; ids minted before carry `so_`), precedent
   `agent.app.ts:460`. An id is never derived from `projectId`, purpose, digest or any content. This
   covers uploads and in-process writes (`storeFromBytes`) alike.
 - **Purpose is a field on the record**, set once at create and never changed.

@@ -26,14 +26,18 @@ import type {
   TraceListItem,
   TraceLogRecordDto,
   TraceSummaryData,
+  TruncatedAttribute,
 } from "@langwatch/trace-contract";
 import {
   deriveTraceStatus,
   deriveTraceTimestamp,
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
+  TRUNCATED_ATTRIBUTES_KEY,
+  traceTotalTokensOf,
 } from "@langwatch/trace-contract";
 
+import { readTruncatedAttributes } from "./trace-attribute-cap.rules.ts";
 import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
 
 // ---------------------------------------------------------------------------
@@ -137,8 +141,7 @@ export function mapLegacySpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNod
 // ---------------------------------------------------------------------------
 
 export function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
-  const totalTokens =
-    (summary.totalPromptTokenCount ?? 0) + (summary.totalCompletionTokenCount ?? 0);
+  const totalTokens = traceTotalTokensOf(summary);
 
   const status = deriveTraceStatus(summary);
 
@@ -316,6 +319,7 @@ export function mapSpansToDetailDtos(
       detailParams,
       ports.contentPrivacy,
     );
+    redacted.truncatedAttributes = findTruncatedAttributesInParams(detailParams);
     redacted.restrictedAttributes = protections.restrictedAttributes ?? null;
     return redacted;
   });
@@ -766,6 +770,21 @@ export function readPiiIncompleteFromParams(
   contentPrivacy: TraceContentPrivacy,
 ): boolean {
   return findNestedString(params, contentPrivacy.piiIncompleteMarkerAttribute) != null;
+}
+
+/**
+ * The attributes the span's truncation marker names, empty when it names none. Params nest dotted
+ * keys, so the marker sits under `langwatch.truncated_attributes`, as a list or its JSON string.
+ */
+export function findTruncatedAttributesInParams(
+  params: Record<string, unknown> | null | undefined,
+): TruncatedAttribute[] {
+  let node: unknown = params;
+  for (const key of TRUNCATED_ATTRIBUTES_KEY.split(".")) {
+    if (typeof node !== "object" || node === null) return [];
+    node = (node as Record<string, unknown>)[key];
+  }
+  return readTruncatedAttributes(node);
 }
 
 /**

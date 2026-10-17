@@ -44,7 +44,7 @@ export async function handleUpdateDashboardWidget(
       : normalizeDashboardWidgetQueries({ queries: params.queries });
 
   const project = await getCurrentProject();
-  await assertDashboardExists({ dashboardId });
+  await assertDashboardExists({ projectId: project.id, dashboardId });
   const current = await getWidgetOnDashboard({ projectId: project.id, widgetId, dashboardId });
 
   const widget = await updateDashboardWidget({
