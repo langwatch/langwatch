@@ -64,6 +64,30 @@ def test_valid_format_evaluator_python():
     assert "Invalid Python" in result.details  # type: ignore
 
 
+def test_valid_format_evaluator_python_whitespace_only():
+    # Whitespace-only source parses as a valid empty module, but is not valid
+    # Python output — it must not score as passed (#8283).
+    entry = ValidFormatEntry(output="   \n\t\n  ")
+    evaluator = ValidFormatEvaluator(settings=ValidFormatSettings(format="python"))
+    result = evaluator.evaluate(entry)
+
+    assert result.status == "processed"
+    assert result.passed == False
+    assert "Invalid Python" in result.details  # type: ignore
+
+
+def test_valid_format_evaluator_python_comment_only():
+    # Comment-only source also parses to an empty module (comments are not AST
+    # nodes), so it must fail too (#8283).
+    entry = ValidFormatEntry(output="# just a comment\n# another line")
+    evaluator = ValidFormatEvaluator(settings=ValidFormatSettings(format="python"))
+    result = evaluator.evaluate(entry)
+
+    assert result.status == "processed"
+    assert result.passed == False
+    assert "Invalid Python" in result.details  # type: ignore
+
+
 def test_valid_format_evaluator_sql():
     # Test valid SQL
     entry = ValidFormatEntry(output="SELECT * FROM users WHERE age > 18;")
