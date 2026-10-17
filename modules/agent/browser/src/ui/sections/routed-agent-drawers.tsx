@@ -43,7 +43,6 @@ import { AgentWorkflowTargetEditorDrawer } from "./agent-workflow-target-editor-
 import { ConnectFromCodeDrawer } from "./connect-from-code-drawer.tsx";
 import { ConnectedAgentDrawer } from "./connected-agent-drawer.tsx";
 import { WorkflowSelectorDrawer } from "./workflow-selector-drawer.tsx";
-import { EmojiPickerModal } from "./workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx";
 
 /** What a caller hands agent's HTTP or code editor: the agent to edit, and where a save goes. */
 export type AgentEditorDrawerProps = {
@@ -125,7 +124,6 @@ export function RoutedWorkflowSelectorDrawer({ onSave }: WorkflowSelectorDrawerP
       onClose={close}
       {...(goBack ? { onGoBack: goBack } : {})}
       onCreate={workflowAgent.create}
-      renderIconPicker={(picker) => <EmojiPickerModal {...picker} />}
     />
   );
 }

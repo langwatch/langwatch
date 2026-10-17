@@ -7,7 +7,6 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { BarChart2, Bell } from "lucide-react";
 import { useMemo, type MouseEvent } from "react";
 
-import { EditableWidgetName } from "../../features/dashboard-widget/ui/sections/editable-widget-name.tsx";
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { GraphFilterIndicator } from "../elements/graph-filter-indicator.tsx";
@@ -65,7 +64,6 @@ interface GraphCardHeaderProps {
   graphId: string;
   name: string;
   graph: unknown;
-  projectId: string;
   projectSlug: string;
   dashboardId?: string;
   filters: unknown;
@@ -73,18 +71,12 @@ interface GraphCardHeaderProps {
   trigger?: GraphCardTrigger | null;
   /** Whether this card is a saved LangWatchQL chart rather than a builder graph. */
   isWorkbenchChart?: boolean;
-  /** Whether this card is a dashboard widget, which has no `series` to alert on either. */
-  isDashboardWidget?: boolean;
   /** The datapoint step a workbench card runs at, when it has one stored. */
   granularitySeconds?: number;
   /** Optional drag affordances for sortable lists; the dashboard grid supplies its own handle. */
   isDragging?: boolean;
   dragAttributes?: DraggableAttributes;
   dragListeners?: SyntheticListenerMap;
-  /** When present, the menu's Edit runs this in place instead of navigating away. */
-  onEdit?: () => void;
-  /** Renames a dashboard widget from its title; builder titles stay plain text. */
-  onRename?: (name: string) => void;
   onGranularityChange?: (granularitySeconds: number) => void;
   onDelete: () => void;
   isDeleting: boolean;
@@ -94,19 +86,15 @@ export function GraphCardHeader({
   graphId,
   name,
   graph,
-  projectId,
   projectSlug,
   dashboardId,
   filters,
   trigger,
   isWorkbenchChart = false,
-  isDashboardWidget = false,
   granularitySeconds,
   isDragging,
   dragAttributes,
   dragListeners,
-  onEdit,
-  onRename,
   onGranularityChange,
   onDelete,
   isDeleting,
@@ -137,9 +125,8 @@ export function GraphCardHeader({
     [filters],
   );
 
-  // Neither a workbench chart nor a dashboard widget has a builder `series` to threshold.
-  const isSavedGraph =
-    !isWorkbenchChart && !isDashboardWidget && !!(graphId && graphId !== "custom" && graph);
+  // A workbench chart has no builder `series` to threshold.
+  const isSavedGraph = !isWorkbenchChart && !!(graphId && graphId !== "custom" && graph);
 
   return (
     // The header is the card's drag handle: the grid only starts a move from this class.
@@ -152,20 +139,9 @@ export function GraphCardHeader({
       cursor={isDragging ? "grabbing" : "grab"}
     >
       <BarChart2 color="var(--chakra-colors-orange-fg)" />
-      {isDashboardWidget && onRename ? (
-        <EditableWidgetName
-          name={displayName}
-          id={graphId}
-          onRename={onRename}
-          fontSize="sm"
-          fontWeight="bold"
-          shouldTruncate
-        />
-      ) : (
-        <Heading textStyle="cardTitle" marginLeft={2}>
-          {displayName}
-        </Heading>
-      )}
+      <Heading textStyle="cardTitle" marginLeft={2}>
+        {displayName}
+      </Heading>
       <Spacer />
 
       {isSavedGraph && <GraphCardAlertButton graphId={graphId} graph={graph} trigger={trigger} />}
@@ -178,12 +154,9 @@ export function GraphCardHeader({
 
       <GraphCardMenu
         graphId={graphId}
-        projectId={projectId}
         projectSlug={projectSlug}
         dashboardId={dashboardId}
         isWorkbenchChart={isWorkbenchChart}
-        isDashboardWidget={isDashboardWidget}
-        {...(onEdit ? { onEdit } : {})}
         {...(granularitySeconds === undefined ? {} : { granularitySeconds })}
         {...(onGranularityChange ? { onGranularityChange } : {})}
         onDelete={onDelete}
