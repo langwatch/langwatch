@@ -20271,7 +20271,7 @@ uv add langwatch
 ```
 
 ```bash JavaScript
-npm install langwatch @vercel/otel @opentelemetry/api-logs @opentelemetry/instrumentation @opentelemetry/sdk-logs
+npm install langwatch @vercel/otel @ai-sdk/otel @opentelemetry/api-logs @opentelemetry/instrumentation @opentelemetry/sdk-logs
 ```
 ```bash Go
 go get github.com/langwatch/langwatch/sdks/go
@@ -20312,6 +20312,8 @@ module.exports = nextConfig;
 // ./src/instrumentation.ts - Configure LangWatch export
 import { registerOTel } from "@vercel/otel";
 import { LangWatchExporter } from "langwatch";
+import { registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 
 export function register() {
   registerOTel({
@@ -20321,15 +20323,17 @@ export function register() {
       projectId: process.env.LANGWATCH_PROJECT_ID, // Required for service API keys
     }),
   });
+
+  // AI SDK 7 emits no spans until an integration is registered
+  registerTelemetry(new OpenTelemetry());
 }
 
-// ./src/index.ts - Enable telemetry where needed
+// ./src/index.ts - every call now reports automatically
+// (AI SDK 6 and earlier: skip registerTelemetry and pass
+// experimental_telemetry: { isEnabled: true } on each call instead)
 const result = await generateText({
   model: openai("gpt-5"),
   prompt: "How many calories do I burn jumping to conclusions?",
-  experimental_telemetry: {
-    isEnabled: true, // Ensure telemetry is active for relevant operations
-  },
 });
 ```
 ```go Go
@@ -27050,19 +27054,19 @@ The LangWatch library integrates your TypeScript application with LangWatch. The
 
 <CodeGroup>
 ```bash npm
-npm i langwatch ai @ai-sdk/openai
+npm i langwatch ai @ai-sdk/otel @ai-sdk/openai
 ```
 
 ```bash pnpm
-pnpm add langwatch ai @ai-sdk/openai
+pnpm add langwatch ai @ai-sdk/otel @ai-sdk/openai
 ```
 
 ```bash yarn
-yarn add langwatch ai @ai-sdk/openai
+yarn add langwatch ai @ai-sdk/otel @ai-sdk/openai
 ```
 
 ```bash bun
-bun add langwatch ai @ai-sdk/openai
+bun add langwatch ai @ai-sdk/otel @ai-sdk/openai
 ```
 
 </CodeGroup>
@@ -27073,7 +27077,34 @@ bun add langwatch ai @ai-sdk/openai
   The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
 </Info>
 
-Set up observability and enable telemetry on your Vercel AI SDK calls:
+Set up observability and register the OpenTelemetry integration for the Vercel AI SDK (AI SDK 7):
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
+import { openai } from "@ai-sdk/openai";
+
+setupObservability({ serviceName: "<project_name>" });
+registerTelemetry(new OpenTelemetry({ runtimeContext: true }));
+
+async function main(message: string): Promise<string> {
+  const response = await generateText({
+    model: openai("gpt-5-mini"),
+    instructions: "You are a witty assistant.",
+    prompt: message,
+  });
+  return response.text;
+}
+
+console.log(await main("Hey, tell me a joke"));
+```
+
+Once `registerTelemetry` has run, every `generateText` and `streamText` call reports to LangWatch, with no flag to set per call. `instructions` is the AI SDK 7 name for the system prompt. `runtimeContext: true` lets you attach metadata to a call (see [Metadata](#metadata)). For Next.js applications, configure OpenTelemetry in your `instrumentation.ts` file using `LangWatchExporter`.
+
+### AI SDK 6 and earlier
+
+There is no `registerTelemetry` before AI SDK 7. Enable telemetry on each call with `experimental_telemetry` instead, and use `system` for the system prompt:
 
 ```typescript
 import { setupObservability } from "langwatch/observability/node";
@@ -27082,24 +27113,23 @@ import { openai } from "@ai-sdk/openai";
 
 setupObservability({ serviceName: "<project_name>" });
 
-async function main(message: string): Promise<string> {
-  const response = await generateText({
-    model: openai("gpt-5-mini"),
-    prompt: message,
-    experimental_telemetry: { isEnabled: true },
-  });
-  return response.text;
-}
-
-console.log(await main("Hey, tell me a joke"));
+const response = await generateText({
+  model: openai("gpt-5-mini"),
+  system: "You are a witty assistant.",
+  prompt: "Hey, tell me a joke",
+  experimental_telemetry: { isEnabled: true },
+});
 ```
 
-The Vercel AI SDK automatically sends traces to LangWatch when `experimental_telemetry.isEnabled` is set to `true`. For Next.js applications, configure OpenTelemetry in your `instrumentation.ts` file using `LangWatchExporter`.
+<Note>
+  AI SDK 7 emits no spans until an integration is registered, so an AI SDK 6 snippet left
+  unchanged after upgrading to AI SDK 7 sends LangWatch no traces. Add the `registerTelemetry` call
+  shown above when you upgrade.
+</Note>
 
 ## Metadata
 
-Pass `experimental_telemetry.metadata` to tag the call. LangWatch reads these
-keys from it:
+LangWatch reads these keys from the metadata you attach to a call:
 
 | Key           | What it does                                                                      |
 | ------------- | --------------------------------------------------------------------------------- |
@@ -27109,6 +27139,39 @@ keys from it:
 | `customer_id` | The customer or tenant the call belongs to.                                       |
 
 Any other key becomes custom metadata on the trace, filterable by its own name.
+
+### AI SDK 7: runtime context
+
+Pass `runtimeContext` to the call and list the keys you want on the spans in
+`telemetry.includeRuntimeContext`. The integration must be registered with
+`runtimeContext: true`, as in the setup above; it is off by default.
+
+```typescript
+const response = await generateText({
+  model: openai("gpt-5-mini"),
+  prompt: message,
+  runtimeContext: {
+    labels: ["checkout", "beta"],
+    thread_id: "conversation-8f21",
+    user_id: "user-42",
+    tenant: "eu-west",
+  },
+  telemetry: {
+    includeRuntimeContext: {
+      labels: true,
+      thread_id: true,
+      user_id: true,
+      tenant: true,
+    },
+  },
+});
+```
+
+Only keys marked `true` in `includeRuntimeContext` are sent. Each one arrives on the
+span as `ai.settings.context.<key>`, and nested objects are flattened into dotted
+keys such as `ai.settings.context.a.b`.
+
+### AI SDK 6 and earlier: experimental_telemetry
 
 ```typescript
 const response = await generateText({
@@ -27127,15 +27190,16 @@ const response = await generateText({
 ```
 
 `experimental_telemetry` is the AI SDK's own experimental API, and its shape
-can change between AI SDK versions.
+can change between AI SDK versions. It accepts strings, numbers, booleans and
+arrays of them as metadata values. It does not accept a nested object, so
+flatten anything deeper into separate keys.
 
-It accepts strings, numbers, booleans and arrays of them as metadata values. It
-does not accept a nested object, so flatten anything deeper into separate keys.
-A `null` inside a `labels` array is dropped.
+### Precedence
 
-A `thread_id`, `user_id`, `customer_id` or `metadata.<key>` you also set as a
-span attribute wins over the one you pass here. Labels are the exception: the
-two sets are combined, so the trace keeps both. See
+A `null` inside a `labels` array is dropped. A `thread_id`, `user_id`,
+`customer_id` or `metadata.<key>` you also set as a span attribute wins over the
+one you pass here. Labels are the exception: the two sets are combined, so the
+trace keeps both. See
 [Capturing Metadata and Attributes](/integration/typescript/tutorials/capturing-metadata)
 for the attribute names.
 
@@ -27170,10 +27234,13 @@ Put the recording in a `file` part inside the user message. `mediaType` is what 
 ```typescript
 import { readFileSync } from "node:fs";
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 import { setupObservability } from "langwatch/observability/node";
 
 setupObservability({ serviceName: "voice-service" });
+// AI SDK 6 and earlier: skip this and set experimental_telemetry: { isEnabled: true } per call
+registerTelemetry(new OpenTelemetry());
 
 const data = readFileSync("call.wav").toString("base64");
 
@@ -27188,7 +27255,6 @@ const { text } = await generateText({
       ],
     },
   ],
-  experimental_telemetry: { isEnabled: true },
 });
 
 console.log(text);
@@ -27305,10 +27371,13 @@ Put the document in a `file` part inside the user message. `mediaType` is what t
 ```typescript
 import { readFileSync } from "node:fs";
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 import { setupObservability } from "langwatch/observability/node";
 
 setupObservability({ serviceName: "invoice-service" });
+// AI SDK 6 and earlier: skip this and set experimental_telemetry: { isEnabled: true } per call
+registerTelemetry(new OpenTelemetry());
 
 const data = readFileSync("invoice.pdf").toString("base64");
 
@@ -27328,7 +27397,6 @@ const { text } = await generateText({
       ],
     },
   ],
-  experimental_telemetry: { isEnabled: true },
 });
 
 console.log(text);
@@ -27444,15 +27512,18 @@ The examples below use `setupObservability()`. Read [Integration Guide](/integra
 
 ### Vercel AI SDK
 
-Put the image in a `file` part inside the user message. `experimental_telemetry` turns tracing on for the call.
+Put the image in a `file` part inside the user message. `registerTelemetry(new OpenTelemetry())` from `@ai-sdk/otel` turns tracing on for every call.
 
 ```typescript
 import { readFileSync } from "node:fs";
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 import { setupObservability } from "langwatch/observability/node";
 
 setupObservability({ serviceName: "image-service" });
+// AI SDK 6 and earlier: skip this and set experimental_telemetry: { isEnabled: true } per call
+registerTelemetry(new OpenTelemetry());
 
 const data = readFileSync("shapes.png").toString("base64");
 
@@ -27467,7 +27538,6 @@ const { text } = await generateText({
       ],
     },
   ],
-  experimental_telemetry: { isEnabled: true },
 });
 
 console.log(text);
@@ -30408,20 +30478,31 @@ Then work through:
 
 ### Vercel AI SDK
 
-When using the Vercel AI SDK, enable telemetry so usage is captured:
+When using the Vercel AI SDK, register the OpenTelemetry integration once at
+startup so usage is captured:
 
 ```typescript
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 import { openai } from "@ai-sdk/openai";
+
+registerTelemetry(new OpenTelemetry());
 
 const result = await generateText({
   model: openai("gpt-5-mini"),
   prompt: "Hello!",
-  experimental_telemetry: { isEnabled: true },
 });
 ```
 
-Token usage flows through the `ai.usage.promptTokens` / `ai.usage.completionTokens` attributes automatically.
+Token usage then flows through the `gen_ai.usage.input_tokens` /
+`gen_ai.usage.output_tokens` attributes automatically.
+
+<Note>
+  On AI SDK 6 and earlier, drop `registerTelemetry` and set
+  `experimental_telemetry: { isEnabled: true }` on each call instead; usage
+  arrives as `ai.usage.promptTokens` / `ai.usage.completionTokens`. AI SDK 7
+  emits no spans until an integration is registered.
+</Note>
 
 ## Getting Help
 
@@ -30464,7 +30545,8 @@ If your instrumentation already emits any of the signals below, TTFT shows up wi
 
 | Source                              | Signal                                                                  |
 | ----------------------------------- | ----------------------------------------------------------------------- |
-| Vercel AI SDK                       | `ai.response.msToFirstChunk` span attribute                             |
+| Vercel AI SDK 7+                    | `gen_ai.client.operation.time_to_first_chunk` span attribute (seconds)  |
+| Vercel AI SDK 6 and earlier         | `ai.response.msToFirstChunk` span attribute (milliseconds)              |
 | OpenLLMetry / OpenLIT instrumentors | `llm.content.completion.chunk` / `First Token Stream Event` span events |
 | OTel GenAI semconv emitters         | `gen_ai.server.time_to_first_token` span attribute (milliseconds)       |
 | LangWatch SDKs                      | `timestamps.first_token_at` on the span (see below)                     |
@@ -30472,8 +30554,9 @@ If your instrumentation already emits any of the signals below, TTFT shows up wi
 When more than one LLM span in a trace reports a TTFT, the trace-level value is the smallest one, the first token the user could have seen.
 
 <Note>
-  If you stream through the Vercel AI SDK with `experimental_telemetry` enabled, TTFT is captured
-  automatically from `ai.response.msToFirstChunk`, with no extra step.
+  If you stream through the Vercel AI SDK, TTFT is captured automatically, with no extra step. On
+  AI SDK 7 this requires `registerTelemetry(new OpenTelemetry())` from `@ai-sdk/otel` at startup:
+  without it the SDK emits no spans at all.
 </Note>
 
 ## Setting TTFT manually
@@ -32093,9 +32176,21 @@ Only spans created through `lwProvider.getTracer()` go to LangWatch. The global
 provider is untouched.
 
 <Note>
-  Auto-instrumentations that emit spans through the global OTel API (like Vercel AI SDK's
-  `experimental_telemetry`) send spans to the global provider, not the dedicated one. For those, use
-  `lwProvider.getTracer()` directly to create LLM spans on the isolated provider.
+  The Vercel AI SDK's `@ai-sdk/otel` integration sends spans to the global provider by default, but
+  it accepts a custom tracer. Point it at the isolated provider instead of falling back to manual
+  spans:
+
+```typescript
+import { registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
+
+registerTelemetry(new OpenTelemetry({ tracer: lwProvider.getTracer("gen_ai") }));
+```
+
+This keeps the AI SDK's standard GenAI attributes and routes its spans to the dedicated provider.
+It only reconfigures `@ai-sdk/otel`: anything else that emits through the global OTel API needs its
+own provider configuration, or manual spans via `lwProvider.getTracer()` as shown above.
+
 </Note>
 
 ## Alternative: Coexistence (TypeScript)
@@ -40151,12 +40246,17 @@ result = customer_support_generation()
 ```typescript
 import { LangWatch, getLangWatchTracer } from "langwatch";
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateText, registerTelemetry } from "ai";
+import { OpenTelemetry } from "@ai-sdk/otel";
 
 // Initialize LangWatch client
 const langwatch = new LangWatch({
   apiKey: process.env.LANGWATCH_API_KEY,
 });
+
+// AI SDK 7 emits no spans until an integration is registered.
+// On AI SDK 6 and earlier, pass experimental_telemetry: { isEnabled: true } per call instead.
+registerTelemetry(new OpenTelemetry());
 
 const tracer = getLangWatchTracer("customer-support");
 
@@ -40172,11 +40272,13 @@ async function customerSupportGeneration() {
       input: "I need help with my account",
     });
 
-    // Use with AI SDK (native instrumentation support)
+    // Use with AI SDK (native instrumentation support). A compiled prompt
+    // carries your system turn inside `messages`, so AI SDK 7 needs
+    // allowSystemInMessages to accept it.
     const result = await generateText({
       model: openai(prompt.model.replace("openai/", "")),
       messages: compiledPrompt.messages,
-      experimental_telemetry: { isEnabled: true },
+      allowSystemInMessages: true,
     });
 
     return result.text;
