@@ -247,13 +247,9 @@ Feature: MCP HTTP Server In-App Integration (Phase 1)
     Then the response status is 404, as for a session that does not exist
     And the other replica serves no session for that session id
 
-  # --- Streamable HTTP clients given the /sse URL ---
-  #
-  # /sse used to be the older SSE transport's URL, and the setup guide handed
-  # it to every remote client. The SSE transport is now retired, so /sse serves
-  # the Streamable HTTP transport exactly as /mcp does — a client that speaks
-  # only Streamable HTTP posts initialize to the URL it was given and is
-  # answered there (langwatch/tasks#909).
+  # Streamable HTTP clients given the /sse URL. The SSE transport is retired,
+  # so /sse serves Streamable HTTP exactly as /mcp does — a client given that
+  # URL posts initialize there and is answered (langwatch/tasks#909).
 
   @regression @integration
   Scenario: A Streamable HTTP initialize posted to /sse is answered as it is on /mcp

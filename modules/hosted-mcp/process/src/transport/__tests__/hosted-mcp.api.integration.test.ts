@@ -348,12 +348,9 @@ function baseUrlOf(server: Server): string {
 }
 
 /**
- * Reads a streamed body until `marker` appears or the stream ends, and
- * returns the text read so far. An SSE stream never ends on its own, so a
- * response that never sends the marker would keep the read waiting until the
- * vitest timeout. After `timeoutMs` the read is abandoned through `abort`
- * (the request's controller), and the caller's assertion then shows what did
- * arrive.
+ * Reads a streamed body until `marker` appears or the stream ends. A marker
+ * that never arrives would wait out the vitest timeout, so after `timeoutMs`
+ * the read is abandoned through `abort` and the text read so far is returned.
  */
 async function readStreamUntil(
   res: Response,
@@ -1984,13 +1981,9 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
   });
 
-  // --- Streamable HTTP clients given the /sse URL ---
-  //
-  // The setup guide used to hand /sse to every remote client. The older SSE
-  // transport is now retired, so /sse serves the Streamable HTTP transport
-  // exactly as /mcp does — a client that speaks only Streamable HTTP posts
-  // initialize to the URL it was given and is answered there (langwatch/tasks#909).
-
+  // Streamable HTTP clients given the /sse URL. The older SSE transport is
+  // retired, so /sse serves Streamable HTTP exactly as /mcp does — a client
+  // given that URL posts initialize there and is answered (langwatch/tasks#909).
   describe("given a client was given the /sse URL", () => {
     beforeEach(() => {
       handler.clearRateLimiters();
