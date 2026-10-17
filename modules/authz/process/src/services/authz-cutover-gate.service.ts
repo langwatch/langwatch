@@ -1,6 +1,6 @@
 import { createLogger, type Logger } from "@langwatch/observability";
+import { counter } from "@langwatch/observability/metrics";
 import type { Instant } from "@langwatch/time";
-import { Counter, register } from "prom-client";
 
 import type { AuthzCutoverRepository } from "../repositories/authz-cutover.repository.ts";
 import { PerOrganizationCachedGateService } from "./per-organization-cached-gate.service.ts";
@@ -8,12 +8,11 @@ import { PerOrganizationCachedGateService } from "./per-organization-cached-gate
 export const ENGINE_GATE_CACHE_TTL_MS = 60_000;
 
 /** The metric name is an external interface; dashboards and alerts read it. */
-export const authzEngineGateReadFailuresTotal =
-  (register.getSingleMetric("authz_engine_gate_read_failures_total") as Counter | undefined) ??
-  new Counter({
-    name: "authz_engine_gate_read_failures_total",
-    help: "Failed reads of an organization's AuthZ migration state; the organization stays on the legacy path for the cache TTL.",
-  });
+export const authzEngineGateReadFailuresTotal = counter({
+  name: "authz_engine_gate_read_failures_total",
+  description:
+    "Failed reads of an organization's AuthZ migration state; the organization stays on the legacy path for the cache TTL.",
+});
 
 type AuthzCutoverGateOptions = {
   repository: AuthzCutoverRepository;

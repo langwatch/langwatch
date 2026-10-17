@@ -178,7 +178,7 @@ import {
   type LangyServiceCompositionOptions,
 } from "../services/langy-postgres.service.ts";
 import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
-import { LangyRestMetricsPrometheusService } from "../services/langy-rest-metrics-prometheus.service.ts";
+import { LangyRestMetricsOtelService } from "../services/langy-rest-metrics-otel.service.ts";
 import { LangySkillGatesService } from "../services/langy-skill-gates.service.ts";
 import { LangyTitleGeneratorService } from "../services/langy-title-generator.service.ts";
 import type { LangyService, OpenLangyRelay } from "../services/langy.service.ts";
@@ -672,7 +672,7 @@ export class LangyModule implements LangyApiContract {
   private constructor(private readonly dependencies: LangyAppDependencies) {
     this.#internal = LangyInternalService.create(
       dependencies.langy,
-      LangyRestMetricsPrometheusService.create(),
+      LangyRestMetricsOtelService.create(),
     );
   }
 

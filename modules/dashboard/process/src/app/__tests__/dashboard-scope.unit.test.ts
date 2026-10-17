@@ -34,10 +34,9 @@ const WIDGET = {
   queries: [{ name: "usage", sql: "SELECT 1" }],
 };
 const LAYOUT = { gridColumn: 0, gridRow: 0, colSpan: 2, rowSpan: 2 };
-const CHART_ID = "chart-on-board";
 
 type Viewer = { userId: string } | undefined;
-type Target = Readonly<{ dashboardId: string; widgetId: string; graphId: string; chartId: string }>;
+type Target = Readonly<{ dashboardId: string; widgetId: string }>;
 /** A board and an unplaced widget every member of HOME sees, for a move to or from a target. */
 type Open = Readonly<{ dashboardId: string; widgetId: string }>;
 type World = Readonly<{ openProjectIds?: readonly string[]; dashboardsOffIn?: readonly string[] }>;
@@ -59,40 +58,34 @@ function appWith(input: World = {}) {
   return { app, repositories, dashboardsOff };
 }
 
-/** The author's board in HOME with a widget, a graph and a saved chart on it. */
+/**
+ * The author's Dashboards board in HOME with a widget on it. Graphs and saved charts sit on
+ * Reports boards (dashboards-v2.feature AC199).
+ */
 async function boardAt(scope: DashboardScope, world: World = {}) {
   const { app, repositories, dashboardsOff } = appWith(world);
-  const board = await app.create({
+  const board = await app.createBoard({
     projectId: HOME,
     name: "Reports",
     createdById: AUTHOR.userId,
   });
   const on = { projectId: HOME, dashboardId: board.id, viewer: AUTHOR };
   const widget = await app.createDashboardWidget({ ...WIDGET, ...on });
-  const graph = await app.createGraph({ ...on, name: "Latency", graph: { graphType: "line" } });
-  await repositories.dashboards.createSavedWorkbenchChart({
-    id: CHART_ID,
-    projectId: HOME,
-    name: "Spend",
-    definition: { version: 1, sql: "SELECT 1", parameters: {} },
-  });
-  await app.placeSavedWorkbenchChart({ ...on, chartId: CHART_ID });
   await app.star({ projectId: HOME, userId: TEAMMATE.userId, star: starOf(board.id) });
   if (scope !== "PROJECT") await app.setDashboardScope({ ...on, scope });
 
-  const target: Target = {
-    dashboardId: board.id,
-    widgetId: widget.id,
-    graphId: graph.id,
-    chartId: CHART_ID,
-  };
+  const target: Target = { dashboardId: board.id, widgetId: widget.id };
   return { app, repositories, dashboardsOff, board, target };
 }
 
 /** A Project board and an unplaced widget in HOME, made by the author after the target. */
 async function openThings(app: DashboardApi): Promise<Open> {
   const made = { projectId: HOME, viewer: AUTHOR };
-  const board = await app.create({ projectId: HOME, name: "Open", createdById: AUTHOR.userId });
+  const board = await app.createBoard({
+    projectId: HOME,
+    name: "Open",
+    createdById: AUTHOR.userId,
+  });
   const widget = await app.createDashboardWidget({ ...WIDGET, ...made });
   return { dashboardId: board.id, widgetId: widget.id };
 }
@@ -100,12 +93,7 @@ async function openThings(app: DashboardApi): Promise<Open> {
 const NOTHING_OPEN: Open = { dashboardId: "no-open-board", widgetId: "no-open-widget" };
 
 const starOf = (dashboardId: string) => ({ kind: "board" as const, dashboardId });
-const MISSING: Target = {
-  dashboardId: "no-such-board",
-  widgetId: "no-such-widget",
-  graphId: "no-such-graph",
-  chartId: "no-such-chart",
-};
+const MISSING: Target = { dashboardId: "no-such-board", widgetId: "no-such-widget" };
 
 /** The `code` a rejected call carries, or that it resolved. */
 async function codeOf(call: Promise<unknown>): Promise<unknown> {
@@ -140,12 +128,10 @@ function operations({
   const member = viewer ?? TEAMMATE;
   const starring = { projectId, userId: member.userId };
   return {
-    open: ({ dashboardId }) => app.getById({ ...as, dashboardId }),
-    rename: ({ dashboardId }) => app.rename({ ...as, dashboardId, name: "Taken" }),
-    describe: ({ dashboardId }) =>
-      app.updateDashboardDetails({ projectId, dashboardId, viewer: member, description: "Mine" }),
-    delete: ({ dashboardId }) => app.delete({ ...as, dashboardId }),
-    reorder: ({ dashboardId }) => app.reorder({ ...as, dashboardIds: [dashboardId] }),
+    open: ({ dashboardId }) => app.getBoard({ ...as, dashboardId }),
+    rename: ({ dashboardId }) => app.updateBoard({ ...as, dashboardId, name: "Taken" }),
+    describe: ({ dashboardId }) => app.updateBoard({ ...as, dashboardId, description: "Mine" }),
+    delete: ({ dashboardId }) => app.deleteBoard({ ...as, dashboardId }),
     star: ({ dashboardId }) => app.star({ ...starring, star: starOf(dashboardId) }),
     unstar: ({ dashboardId }) => app.unstar({ ...starring, star: starOf(dashboardId) }),
     reorderStars: ({ dashboardId }) =>
@@ -172,30 +158,6 @@ function operations({
         layouts: [{ graphId: widgetId, layout: LAYOUT }],
       }),
     deleteWidget: ({ widgetId }) => app.deleteDashboardWidget({ ...as, id: widgetId }),
-    listBoardGraphs: ({ dashboardId }) => app.listGraphs({ ...as, dashboardId }),
-    addGraph: ({ dashboardId }) =>
-      app.createGraph({ ...as, dashboardId, name: "Errors", graph: { graphType: "line" } }),
-    readGraph: ({ graphId }) => app.getGraph({ ...as, graphId }),
-    editGraph: ({ graphId }) => app.updateGraph({ ...as, graphId, name: "X" }),
-    moveGraph: ({ graphId }) => app.updateGraphLayout({ ...as, graphId, layout: LAYOUT }),
-    moveGraphs: ({ graphId }) =>
-      app.batchUpdateGraphLayouts({ ...as, layouts: [{ graphId, layout: LAYOUT }] }),
-    deleteGraph: ({ graphId }) => app.deleteGraph({ ...as, graphId }),
-    readChart: ({ chartId }) => app.getSavedWorkbenchChart({ ...as, chartId }),
-    editChart: ({ chartId }) => app.updateSavedWorkbenchChart({ ...as, chartId, name: "X" }),
-    memberEditChart: ({ chartId }) =>
-      app.updateMemberSavedWorkbenchChart({
-        ...as,
-        chartId,
-        actorId: member.userId,
-        name: "X",
-      }),
-    runChart: ({ chartId }) =>
-      app.runSavedWorkbenchChart({ ...as, chartId, actorId: member.userId }),
-    placeChart: ({ dashboardId }) =>
-      app.placeSavedWorkbenchChart({ ...as, chartId: CHART_ID, dashboardId }),
-    unplaceChart: ({ chartId }) => app.unplaceSavedWorkbenchChart({ ...as, chartId }),
-    deleteChart: ({ chartId }) => app.deleteSavedWorkbenchChart({ ...as, chartId }),
   };
 }
 
@@ -223,21 +185,13 @@ async function outcomes(input: Asking, target: Target): Promise<Record<string, u
 }
 
 /** The operations that accept an id naming nothing: each changes nothing, or lists nothing. */
-const ACCEPTED_FOR_A_MISSING_ID = [
-  "unstar",
-  "reorderStars",
-  "moveWidget",
-  "moveWidgets",
-  "listBoardGraphs",
-];
+const ACCEPTED_FOR_A_MISSING_ID = ["unstar", "reorderStars", "moveWidget", "moveWidgets"];
 
 const acceptedIn = (told: Record<string, unknown>) =>
   Object.entries(told).flatMap(([name, outcome]) => ("resolved" in Object(outcome) ? [name] : []));
 
 const listedIds = async (app: DashboardApi, projectId: string, viewer: Viewer) =>
-  (
-    await app.getAll({ projectId, graphCountScope: "builder", viewer, includeOrganization: true })
-  ).map(({ id }) => id);
+  (await app.findBoards({ projectId, viewer, includeOrganization: true })).map(({ id }) => id);
 
 describe("board scope on the server", () => {
   describe("when a board is made", () => {
@@ -245,7 +199,7 @@ describe("board scope on the server", () => {
     it("starts at Project, owned by the project it was made in", async () => {
       const { app } = appWith();
 
-      const board = await app.create({
+      const board = await app.createBoard({
         projectId: HOME,
         name: "Reports",
         createdById: AUTHOR.userId,
@@ -258,12 +212,12 @@ describe("board scope on the server", () => {
     it("starts a member's My dashboard at Only me, and a credential's at Project", async () => {
       const { app } = appWith();
 
-      const own = await app.create({
+      const own = await app.createBoard({
         projectId: HOME,
         name: MY_DASHBOARD_NAME,
         createdById: AUTHOR.userId,
       });
-      const credentials = await app.create({ projectId: HOME, name: MY_DASHBOARD_NAME });
+      const credentials = await app.createBoard({ projectId: HOME, name: MY_DASHBOARD_NAME });
 
       expect([own.scope, credentials.scope]).toEqual(["PRIVATE", "PROJECT"]);
     });
@@ -312,7 +266,7 @@ describe("board scope on the server", () => {
       };
       const deleted = async () => {
         const world = await boardAt("PROJECT");
-        await world.app.delete({
+        await world.app.deleteBoard({
           projectId: HOME,
           dashboardId: world.target.dashboardId,
           viewer: AUTHOR,
@@ -335,10 +289,8 @@ describe("board scope on the server", () => {
       const open = await openThings(app);
       const read = { projectId: HOME, viewer: AUTHOR };
       const stored = async () => ({
-        board: await app.getById({ ...read, dashboardId: target.dashboardId }),
+        board: await app.getBoard({ ...read, dashboardId: target.dashboardId }),
         widget: await app.getDashboardWidget({ ...read, id: target.widgetId }),
-        graph: await app.getGraph({ ...read, graphId: target.graphId }),
-        chart: await app.getSavedWorkbenchChart({ ...read, chartId: target.chartId }),
       });
       const before = await stored();
 
@@ -349,8 +301,6 @@ describe("board scope on the server", () => {
       expect(before).toMatchObject({
         board: { name: "Reports", description: null, scope: "PRIVATE" },
         widget: { name: "Usage", dashboardId: target.dashboardId },
-        graph: { name: "Latency", dashboardId: target.dashboardId },
-        chart: { name: "Spend", dashboardId: target.dashboardId },
       });
     });
 
@@ -374,10 +324,8 @@ describe("board scope on the server", () => {
       const lists = async (viewer: Viewer) => ({
         boards: await listedIds(app, HOME, viewer),
         widgets: await app.listDashboardWidgets({ projectId: HOME, viewer }),
-        graphs: await app.listGraphs({ projectId: HOME, viewer }),
-        charts: await app.listSavedWorkbenchCharts({ projectId: HOME, viewer }),
       });
-      const empty = { boards: [], widgets: [], graphs: [], charts: [] };
+      const empty = { boards: [], widgets: [] };
 
       expect({
         teammate: await lists(TEAMMATE),
@@ -394,8 +342,9 @@ describe("board scope on the server", () => {
       expect({
         listed: await listedIds(app, HOME, AUTHOR),
         widgets: (await app.listDashboardWidgets(author)).map(({ id }) => id),
-        renamed: (await app.rename({ ...author, dashboardId: target.dashboardId, name: "Mine" }))
-          .name,
+        renamed: (
+          await app.updateBoard({ ...author, dashboardId: target.dashboardId, name: "Mine" })
+        ).name,
         added: await codeOf(
           app.createDashboardWidget({ ...WIDGET, ...author, dashboardId: target.dashboardId }),
         ),
@@ -414,7 +363,7 @@ describe("board scope on the server", () => {
       expect({
         listed: await listedIds(app, SIBLING, AUTHOR),
         opened: await codeOf(
-          app.getById({ projectId: SIBLING, dashboardId: target.dashboardId, viewer: AUTHOR }),
+          app.getBoard({ projectId: SIBLING, dashboardId: target.dashboardId, viewer: AUTHOR }),
         ),
       }).toEqual({ listed: [], opened: "dashboard_not_found" });
     });
@@ -425,9 +374,8 @@ describe("board scope on the server", () => {
     it("is listed in another project of the organization, marked as owned by its project", async () => {
       const { app, target } = await boardAt("ORGANIZATION");
 
-      const listed = await app.getAll({
+      const listed = await app.findBoards({
         projectId: SIBLING,
-        graphCountScope: "builder",
         viewer: TEAMMATE,
         includeOrganization: true,
       });
@@ -446,9 +394,8 @@ describe("board scope on the server", () => {
     it("names no owner project to a member who cannot open that project", async () => {
       const { app, target } = await boardAt("ORGANIZATION", { openProjectIds: [SIBLING] });
 
-      const listed = await app.getAll({
+      const listed = await app.findBoards({
         projectId: SIBLING,
-        graphCountScope: "builder",
         viewer: TEAMMATE,
         includeOrganization: true,
       });
@@ -460,9 +407,8 @@ describe("board scope on the server", () => {
     it("names no owner project where it is at home", async () => {
       const { app } = await boardAt("ORGANIZATION");
 
-      const [listed] = await app.getAll({
+      const [listed] = await app.findBoards({
         projectId: HOME,
-        graphCountScope: "builder",
         viewer: TEAMMATE,
         includeOrganization: true,
       });
@@ -476,7 +422,7 @@ describe("board scope on the server", () => {
       const opened = async (viewer: Viewer) => {
         const from = { projectId: SIBLING, dashboardId: target.dashboardId, viewer };
         return {
-          board: (await app.getById(from)).id,
+          board: (await app.getBoard(from)).id,
           widgets: (await app.listDashboardWidgets(from)).map(({ id }) => id),
         };
       };
@@ -492,7 +438,7 @@ describe("board scope on the server", () => {
 
       expect({
         listed: await listedIds(app, FAR, TEAMMATE),
-        opened: await codeOf(app.getById(from)),
+        opened: await codeOf(app.getBoard(from)),
         widgets: await codeOf(app.listDashboardWidgets(from)),
       }).toEqual({ listed: [], opened: "dashboard_not_found", widgets: "dashboard_not_found" });
     });
@@ -501,11 +447,7 @@ describe("board scope on the server", () => {
     it("stays out of the list a caller reads without asking for the organization's boards", async () => {
       const { app } = await boardAt("ORGANIZATION");
 
-      const listed = await app.getAll({
-        projectId: SIBLING,
-        graphCountScope: "builder",
-        viewer: TEAMMATE,
-      });
+      const listed = await app.findBoards({ projectId: SIBLING, viewer: TEAMMATE });
 
       expect(listed).toEqual([]);
     });
@@ -521,15 +463,9 @@ describe("board scope on the server", () => {
         describe: "dashboard_read_only_here",
         delete: "dashboard_read_only_here",
         setScope: "dashboard_read_only_here",
-        reorder: "dashboard_reorder_unknown_ids",
         addWidget: "dashboard_read_only_here",
         editWidget: "dashboard_widget_not_found",
         deleteWidget: "dashboard_widget_not_found",
-        addGraph: "dashboard_read_only_here",
-        editGraph: "graph_not_found",
-        moveGraph: "graph_not_found",
-        deleteGraph: "graph_not_found",
-        placeChart: "saved_workbench_chart_dashboard_not_found",
       });
     });
 
@@ -540,7 +476,7 @@ describe("board scope on the server", () => {
 
       const read = { projectId: HOME, viewer: AUTHOR };
       expect({
-        board: await app.getById({ ...read, dashboardId: target.dashboardId }),
+        board: await app.getBoard({ ...read, dashboardId: target.dashboardId }),
         widgets: (await app.listDashboardWidgets({ ...read, dashboardId: target.dashboardId })).map(
           ({ id, name }) => ({ id, name }),
         ),
@@ -557,7 +493,7 @@ describe("board scope on the server", () => {
 
       expect({
         renamed: await codeOf(
-          app.rename({ ...home, dashboardId: target.dashboardId, name: "Ours" }),
+          app.updateBoard({ ...home, dashboardId: target.dashboardId, name: "Ours" }),
         ),
         added: await codeOf(
           app.createDashboardWidget({ ...WIDGET, ...home, dashboardId: target.dashboardId }),
@@ -591,7 +527,7 @@ describe("board scope on the server", () => {
         app.setDashboardScope({ ...on, viewer: TEAMMATE, scope: "PRIVATE" }),
       );
 
-      expect({ refusal, scope: (await app.getById({ ...on, viewer: AUTHOR })).scope }).toEqual({
+      expect({ refusal, scope: (await app.getBoard({ ...on, viewer: AUTHOR })).scope }).toEqual({
         refusal: "dashboard_scope_author_only",
         scope: "PROJECT",
       });
@@ -600,14 +536,14 @@ describe("board scope on the server", () => {
     /** @scenario "AC174 Scope: only the author changes a board's scope" */
     it("refuses everyone on a board with no recorded author, which stays at Project", async () => {
       const { app } = appWith();
-      const board = await app.create({ projectId: HOME, name: "From the API" });
+      const board = await app.createBoard({ projectId: HOME, name: "From the API" });
       const on = { projectId: HOME, dashboardId: board.id };
 
       const refusal = await codeOf(
         app.setDashboardScope({ ...on, viewer: AUTHOR, scope: "PRIVATE" }),
       );
 
-      expect({ refusal, scope: (await app.getById(on)).scope }).toEqual({
+      expect({ refusal, scope: (await app.getBoard(on)).scope }).toEqual({
         refusal: "dashboard_scope_author_only",
         scope: "PROJECT",
       });
@@ -630,8 +566,8 @@ describe("board scope on the server", () => {
       const on = { projectId: HOME, dashboardId: target.dashboardId, viewer: TEAMMATE };
 
       expect({
-        renamed: await codeOf(app.rename({ ...on, name: "Ours" })),
-        deleted: await codeOf(app.delete(on)),
+        renamed: await codeOf(app.updateBoard({ ...on, name: "Ours" })),
+        deleted: await codeOf(app.deleteBoard(on)),
       }).toEqual({ renamed: "<resolved>", deleted: "<resolved>" });
     });
 
@@ -642,7 +578,7 @@ describe("board scope on the server", () => {
       const scopes: DashboardScope[] = [];
 
       for (const name of names) {
-        const board = await app.create({ projectId: HOME, name, createdById: AUTHOR.userId });
+        const board = await app.createBoard({ projectId: HOME, name, createdById: AUTHOR.userId });
         const changed = await app.setDashboardScope({
           projectId: HOME,
           dashboardId: board.id,
@@ -661,7 +597,7 @@ describe("board scope on the server", () => {
     /** @scenario "AC175 Scope: any board can be set to Only me, My dashboard like any other" */
     it("takes a member's My dashboard to Project, to Organization and back to Only me", async () => {
       const { app } = appWith();
-      const own = await app.create({
+      const own = await app.createBoard({
         projectId: HOME,
         name: MY_DASHBOARD_NAME,
         createdById: AUTHOR.userId,
@@ -746,18 +682,16 @@ describe("board scope on the server", () => {
 
   describe("given a project where Dashboards is switched off", () => {
     /** @scenario "AC189 Scope: board scope reaches only a project where Dashboards is switched on" */
-    it("starts a member's My dashboard at Project there, so a teammate lists it", async () => {
+    it("makes no board there, My dashboard included", async () => {
       const { app } = appWith({ dashboardsOffIn: [HOME] });
 
-      const own = await app.create({
-        projectId: HOME,
-        name: MY_DASHBOARD_NAME,
-        createdById: AUTHOR.userId,
-      });
+      const refusal = await codeOf(
+        app.createBoard({ projectId: HOME, name: MY_DASHBOARD_NAME, createdById: AUTHOR.userId }),
+      );
 
-      expect({ scope: own.scope, teammateLists: await listedIds(app, HOME, TEAMMATE) }).toEqual({
-        scope: "PROJECT",
-        teammateLists: [own.id],
+      expect({ refusal, listed: await listedIds(app, HOME, AUTHOR) }).toEqual({
+        refusal: "dashboards_not_enabled",
+        listed: [],
       });
     });
 
@@ -783,7 +717,7 @@ describe("board scope on the server", () => {
       const { app, target, dashboardsOff } = await boardAt("ORGANIZATION");
       dashboardsOff.add(HOME);
       const opened = async (projectId: string) =>
-        (await app.getById({ projectId, dashboardId: target.dashboardId, viewer: TEAMMATE })).id;
+        (await app.getBoard({ projectId, dashboardId: target.dashboardId, viewer: TEAMMATE })).id;
 
       expect({
         home: [await listedIds(app, HOME, TEAMMATE), await opened(HOME)],
@@ -818,7 +752,7 @@ describe("board scope on the server", () => {
     /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
     it("leaves out a project the reader cannot open, and still names the owner", async () => {
       const { app } = appWith({ openProjectIds: [SIBLING] });
-      const shared = await app.create({
+      const shared = await app.createBoard({
         projectId: HOME,
         name: "Reports",
         createdById: AUTHOR.userId,
