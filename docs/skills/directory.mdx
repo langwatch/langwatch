@@ -7607,12 +7607,13 @@ langwatch dashboard-widget list -f json
 langwatch dashboard-widget get <id> -f json      # code, queries, platformUrl
 langwatch dashboard-widget update <id> --code-file widget.tsx --queries-file queries.json
 langwatch dashboard-widget delete <id>
+langwatch dashboard-widget boards -f json                              # the dashboards a widget can go on
 langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
 ```
 
-`pin` reassigns the widget to that dashboard, at the dashboard's next free row — edit it from the widget's menu on that board. See `langwatch dashboard list` for ids.
+`pin` reassigns the widget to that dashboard, at the dashboard's next free row — edit it from the widget's menu on that board. See `langwatch dashboard-widget boards` for ids. `langwatch dashboard list` lists the Analytics Reports dashboards, which hold no widgets, so `pin` does not find them.
 
-**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board with its id in `ref`. Never pick one from `langwatch dashboard list` on your own.
+**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board from `langwatch dashboard-widget boards` with its id in `ref`. Never choose a board for the user.
 
 `update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 

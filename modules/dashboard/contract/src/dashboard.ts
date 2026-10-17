@@ -84,19 +84,27 @@ export interface DashboardProjectSchema extends Named<typeof dashboardProjectSch
 export const dashboardProjectSchema: DashboardProjectSchema = dashboardProjectSchemaDefinition;
 export type DashboardProject = z.infer<typeof dashboardProjectSchema>;
 
+/** A Reports board in a list, with the number of cards its grid draws. */
 const dashboardSummarySchemaDefinition = z
+  .object({ ...dashboardSchema.shape, graphCount: z.number().int().nonnegative() })
+  .strict();
+export interface DashboardSummarySchema extends Named<typeof dashboardSummarySchemaDefinition> {}
+export const dashboardSummarySchema: DashboardSummarySchema = dashboardSummarySchemaDefinition;
+export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
+
+/** A Dashboards board in a list: `graphCount` is its widgets, with the reader's star. */
+const boardSummarySchemaDefinition = z
   .object({
-    ...dashboardSchema.shape,
-    graphCount: z.number().int().nonnegative(),
+    ...dashboardSummarySchema.shape,
     /** Whether the member reading the list has starred this board. */
     isStarred: z.boolean(),
     /** The project that owns an Organization board listed in another project; null at home. */
     ownerProject: dashboardProjectSchema.nullable(),
   })
   .strict();
-export interface DashboardSummarySchema extends Named<typeof dashboardSummarySchemaDefinition> {}
-export const dashboardSummarySchema: DashboardSummarySchema = dashboardSummarySchemaDefinition;
-export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
+export interface BoardSummarySchema extends Named<typeof boardSummarySchemaDefinition> {}
+export const boardSummarySchema: BoardSummarySchema = boardSummarySchemaDefinition;
+export type BoardSummary = z.infer<typeof boardSummarySchema>;
 
 /** What a narrower scope takes from other members, for the confirmation that asks first. */
 const dashboardScopeImpactSchemaDefinition = z

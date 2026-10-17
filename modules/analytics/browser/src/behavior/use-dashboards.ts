@@ -27,20 +27,6 @@ export function useDashboardGraphs({
   );
 }
 
-/** The placed widgets of the project, across dashboards. */
-export function useDashboardWidgets({
-  projectId,
-  enabled,
-}: {
-  projectId: string;
-  enabled: boolean;
-}) {
-  return analyticsApi.dashboardWidgets.list.useQuery(
-    { projectId },
-    { enabled: !!projectId && enabled },
-  );
-}
-
 /** One stored builder graph; a missing one is an error, not a retry. */
 export function useStoredGraph({
   projectId,

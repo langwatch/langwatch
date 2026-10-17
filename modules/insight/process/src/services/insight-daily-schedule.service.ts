@@ -24,7 +24,7 @@ type Reader = { userId: string };
 type InsightDailyScheduleMembers = Readonly<{
   schedules: InsightDailyScheduleRepository;
   commands: InsightDailyRunCommandsService;
-  dashboards: Pick<DashboardApi, "getById">;
+  dashboards: Pick<DashboardApi, "getBoard">;
 }>;
 
 /**
@@ -123,7 +123,7 @@ export class InsightDailyScheduleService {
     board: InsightRunBoard;
   }): Promise<InsightRunBoard> {
     if (board.kind === "template") return board;
-    const stored = await this.members.dashboards.getById({
+    const stored = await this.members.dashboards.getBoard({
       projectId,
       dashboardId: board.id,
       viewer: { userId },

@@ -380,3 +380,75 @@ export const normaliseModelFromAiModelObject = (aiModel: unknown): string | null
 
   return [provider, id].filter(Boolean).join("/") || id;
 };
+
+/** The spans whose canonical input count is already the fresh remainder, so none restates it. */
+const freshInputSpans = new WeakSet<object>();
+
+/** Whether an earlier pass already restated this span's input count as the fresh remainder. */
+export function isInputRestatedAsFresh(ctx: ExtractorContext): boolean {
+  return freshInputSpans.has(ctx.out);
+}
+
+/** Declares the span's input count fresh as its source sends it, so no pass restates it. */
+export function markInputAsFresh(ctx: ExtractorContext, { ruleId }: { ruleId: string }): void {
+  freshInputSpans.add(ctx.out);
+  ctx.recordRule(ruleId);
+}
+
+/**
+ * Whether the span's provider is Anthropic, as named by the GenAI or AI SDK attributes, or by the
+ * `anthropic/` prefix the AI SDK model object gives the canonical model.
+ */
+export function isAnthropicProviderSpan(ctx: ExtractorContext): boolean {
+  const read = (key: string): unknown =>
+    ctx.out[key] !== void 0 ? ctx.out[key] : ctx.bag.attrs.get(key);
+  const model = read(ATTR_KEYS.AI_MODEL);
+  const names = [
+    read(ATTR_KEYS.GEN_AI_PROVIDER_NAME),
+    read(ATTR_KEYS.GEN_AI_SYSTEM),
+    read("ai.model.provider"),
+    isRecord(model) ? model.provider : void 0,
+  ];
+  const requestModel = read(ATTR_KEYS.GEN_AI_REQUEST_MODEL);
+
+  return (
+    names.some((name) => typeof name === "string" && name.toLowerCase().includes("anthropic")) ||
+    (typeof requestModel === "string" && requestModel.startsWith("anthropic/"))
+  );
+}
+
+/** Records the fresh input count a source stated itself, and marks the span as restated. */
+export function setFreshInputTokens(
+  ctx: ExtractorContext,
+  { freshInput, ruleId }: { freshInput: number; ruleId: string },
+): void {
+  freshInputSpans.add(ctx.out);
+  ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, freshInput);
+  ctx.recordRule(ruleId);
+}
+
+/**
+ * Restates an input count that includes the cache reads and writes as the fresh remainder, the
+ * canonical shape, at most once per span. The cache write defaults to the canonical cache-creation
+ * count. An input count smaller than its cache buckets cannot include them and is left.
+ */
+export function restateInputAsFresh(
+  ctx: ExtractorContext,
+  { cacheWrite, ruleId }: { cacheWrite?: number; ruleId: string },
+): void {
+  if (isInputRestatedAsFresh(ctx)) {
+    return;
+  }
+
+  const read = (key: string): number | null =>
+    asNumber(ctx.out[key] !== void 0 ? ctx.out[key] : ctx.bag.attrs.get(key));
+  const input = read(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS);
+  const cached =
+    Math.max(0, read(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS) ?? 0) +
+    Math.max(0, cacheWrite ?? read(ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS) ?? 0);
+  if (input === null || cached === 0 || input < cached) {
+    return;
+  }
+
+  setFreshInputTokens(ctx, { freshInput: input - cached, ruleId });
+}
