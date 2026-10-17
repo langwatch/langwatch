@@ -751,7 +751,7 @@ describe("finishVoiceSession", () => {
         // that ends a call at the limit runs on the browser's. A provider record
         // that rounds a cut call down must not clear the marker.
         const runner = fakeRunner({
-          fetchCallRecord: vi.fn(
+          getCallRecord: vi.fn(
             async (): Promise<CallRecord> => ({
               conversationId: "conv_1",
               transport: "elevenlabs_convai",
@@ -768,7 +768,7 @@ describe("finishVoiceSession", () => {
             }),
           ),
         });
-        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
           async () => {},
         );
         const ports = fakePorts({ runner, over: { writeCallRun } });
