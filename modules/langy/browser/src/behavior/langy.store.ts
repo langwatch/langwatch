@@ -190,7 +190,13 @@ interface LangyState extends TurnPhaseState, LangySliceSurface {
    * Conversations THIS tab created whose read-side projection has not yet been seen.
    */
   unconfirmedConversations: Record<string, true>;
-  /** A durable read or signal proved the conversation's projection exists. */
+  /**
+   * A successful history read proved the projection is readable. Nothing
+   * weaker counts: a freshness signal's cursor proves only that the EVENT LOG
+   * knows the conversation, and the log is ahead of the projection by
+   * definition, so confirming on it would reopen the very window this exists
+   * to cover (#7987).
+   */
   confirmConversation: (id: string) => void;
   /** Start a fresh, empty conversation. */
   startNewConversation: () => void;

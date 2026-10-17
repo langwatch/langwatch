@@ -92,6 +92,7 @@ export class LangyConversationService {
       finalParts,
       runtime,
       turnOrder,
+      events,
     });
     this.lifecycle = LangyConversationLifecycleService.create({
       repository,

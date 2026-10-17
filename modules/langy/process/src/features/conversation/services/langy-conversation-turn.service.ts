@@ -5,7 +5,12 @@ import type {
   LangyMessageRecordedEventData,
   LangyMessageRole,
 } from "@langwatch/langy-contract";
-import { langyJsonValueSchema, LangyTurnErrors } from "@langwatch/langy-contract";
+import {
+  LANGY_CONVERSATION_EVENT_TYPES,
+  langyJsonValueSchema,
+  LangyTurnErrors,
+} from "@langwatch/langy-contract";
+import { createTenantId } from "@langwatch/eventing";
 
 import type { LangyConversationCommands } from "../../../eventing/langy-conversation.commands.ts";
 import type { LangyConversationRepository } from "../../../repositories/langy-conversation-projection.repository.ts";
@@ -16,7 +21,10 @@ import {
 } from "../../../services/langy-final-parts.service.ts";
 import { LangyTurnAccountReaderService } from "../../turn/services/langy-turn-account-reader.service.ts";
 import type { LangyTurnOrderReader } from "../../turn/services/langy-turn-order.service.ts";
-import type { LangyConversationRuntime } from "./langy-conversation.service.ts";
+import type {
+  LangyConversationEventsReader,
+  LangyConversationRuntime,
+} from "./langy-conversation.service.ts";
 
 type LangyConversationTurnOptions = {
   repository: LangyConversationRepository;
@@ -24,6 +32,7 @@ type LangyConversationTurnOptions = {
   finalParts: LangyFinalPartsService;
   runtime: LangyConversationRuntime;
   turnOrder: LangyTurnOrderReader | null;
+  events: LangyConversationEventsReader | null;
 };
 
 /**
@@ -276,7 +285,29 @@ export class LangyConversationTurnService {
     conversationId: string;
     turnId: string;
   }): Promise<boolean> {
-    return this.deps.repository.turnExists({ projectId, conversationId, turnId });
+    // Projection-first (one indexed read, a hit is definitive), then the EVENT
+    // LOG on a miss: the turn projection is an asynchronous fold, and the
+    // durable result path races it — an agent can finish a short turn and post
+    // its final before the fold has landed the turn row. The acceptance event
+    // is the record the projection derives from, so it answers "was this turn
+    // really accepted here?" without waiting, and a finished answer is never
+    // discarded because the projection lags. A reader failure PROPAGATES
+    // rather than answering "no": the route turns false into a terminal 404,
+    // and a dropped final is the one outcome this check exists to prevent.
+    const projected = await this.deps.repository.turnExists({ projectId, conversationId, turnId });
+    if (projected) return true;
+    if (!this.deps.events) return false;
+    const events = await this.deps.events.getEventsOccurredSince({
+      aggregateId: conversationId,
+      context: { tenantId: createTenantId(projectId) },
+      aggregateType: "langy_conversation",
+      occurredAtFromMs: 0,
+    });
+    return events.some(
+      (event) =>
+        event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED &&
+        event.data.turnId === turnId,
+    );
   }
 
   async ingestAgentTurnResult({

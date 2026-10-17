@@ -6,6 +6,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import {
   cursorHasReachedEvent,
+  LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_TURN_EVENT_TYPES,
   type LangyConversationTurnData,
   makeConversationTurnKey,
@@ -34,6 +35,7 @@ import {
   pickLatestControlRequest,
   type LatestControlRequestReading,
 } from "../../../rules/langy-local-control-request-state.rules.ts";
+import type { LangyConversationProcessingEvent } from "../../../eventing/langy-conversation-state.projection.ts";
 import type { LangyConversationEventsReader } from "./langy-conversation.service.ts";
 
 /**
@@ -51,13 +53,61 @@ const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
 const DISPATCH_LAG_ATTEMPTS = 12;
 const DISPATCH_LAG_RETRY_MS = 400;
 /**
- * How many attempts may pass with no admitted-turn receipt before concluding
- * the id is unknown. Cannot be zero: the receipt is written by the send
- * itself, so an immediate read can find no evidence and wrongly return not-found.
+ * How far back the visibility-evidence read looks — the only events that can
+ * answer "is a create in flight for this caller right now?" are the ones a
+ * create in flight just wrote. A create still in the dispatch window is at
+ * most the dispatch budget old, so a lower bound generously past that catches
+ * every in-flight create while bounding the read: an unbounded scan let a long
+ * FOREIGN conversation cost more than an absent id — the very timing signal
+ * this read exists not to emit (CWE-208). An old conversation's
+ * owner-establishing event falls outside the window, so the read finds no
+ * owner and gives up at the grace, exactly as an absent id does.
  */
-const DISPATCH_HANDOFF_GRACE_ATTEMPTS = 3;
+const DISPATCH_EVIDENCE_WINDOW_MS = 5 * 60 * 1000;
+/**
+ * How many attempts may pass with NO evidence that waiting can help before we
+ * conclude the id is simply unknown. Cannot be zero: the evidence — the
+ * aggregate's events — is written by the very dispatch we are waiting on
+ * (commands are queued, so the append trails the accept), so a read that
+ * arrives before it lands finds nothing. It is also the SAME exit for absent,
+ * foreign and archived ids alike — and for a reader outage — so an id nobody
+ * may see never answers on a different clock than an id that does not exist.
+ */
+const DISPATCH_EVIDENCE_GRACE_ATTEMPTS = 3;
 
 const conversationServiceLogger = createLogger("langwatch:langy:conversation-service");
+
+/**
+ * Whether this caller will see the conversation's projection row once the fold
+ * lands it, decided from the raw event log by the fold's own rules: the owner
+ * is named first-writer-wins by a started, forked or message_recorded event
+ * (the last because a lazily created conversation's first message owns it), the
+ * latest metadata word decides shared, and an archive is terminal (there is no
+ * unarchive). message_imported carries no userId and never sets ownership,
+ * exactly like the fold. Only meaningful for a NON-EMPTY log; an empty one says
+ * nothing about whether the conversation exists.
+ */
+function eventLogSaysVisible(
+  events: readonly LangyConversationProcessingEvent[],
+  userId: string,
+): boolean {
+  let owner: string | null = null;
+  let isShared = false;
+  for (const event of events) {
+    if (
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED ||
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED ||
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED
+    ) {
+      owner ??= event.data.userId;
+    } else if (event.type === LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED) {
+      isShared = event.data.isShared ?? isShared;
+    } else if (event.type === LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED) {
+      return false;
+    }
+  }
+  return owner === userId || isShared;
+}
 
 /**
  * Reading a conversation back: one by id, the event tail after a cursor, the local-control
@@ -78,9 +128,15 @@ export class LangyConversationReadService {
   private constructor(private readonly deps: LangyConversationReadOptions) {}
 
   /**
-   * The visibility read, tolerant of the DISPATCH window: a just-admitted
-   * send has a turn receipt before its projection row lands, so "missing row
-   * + receipt" means NOT YET, retried briefly rather than reported as absent.
+   * The visibility read, tolerant of the DISPATCH window. A conversation's
+   * projection row is written by an asynchronous fold, so every read of a
+   * brand-new conversation can run before the row lands. Whether a miss is
+   * worth waiting out is decided from the canonical event log
+   * (`dispatchInFlightEvidence`): a caller the log says will see the row once
+   * it lands waits out the FULL budget; every other miss — absent, foreign and
+   * archived alike — gives up at the same short grace, so timing never becomes
+   * an existence oracle across users. The evidence only ever EXTENDS the wait:
+   * the answer always comes from the retried visibility read.
    */
   private async findVisibleToleratingDispatchLag({
     id,
@@ -91,6 +147,7 @@ export class LangyConversationReadService {
     projectId: string;
     userId: string;
   }) {
+    let waitOutFullBudget = false;
     for (let attempt = 0; attempt <= DISPATCH_LAG_ATTEMPTS; attempt++) {
       const row = await this.deps.repository
         .getVisibleById({ id, projectId, userId })
@@ -104,13 +161,13 @@ export class LangyConversationReadService {
         return row;
       }
 
-      // Re-asked every beat, not once up front: the receipt lands on the same
-      // send we are waiting for, so "no receipt yet" early on means "too soon
-      // to tell", not "no such conversation".
-      const admitted = await this.deps.repository
-        .hasAdmittedTurn({ projectId, conversationId: id, userId })
-        .catch(() => false);
-      if (!admitted && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) {
+      // Short-circuits once the log has said wait: evidence is not re-read
+      // every beat after, only the projection is. Re-asked until then because
+      // commands are queued — the event append can trail the accept by a beat,
+      // so "nothing on the log yet" early on means "too soon to tell".
+      waitOutFullBudget =
+        waitOutFullBudget || (await this.dispatchInFlightEvidence({ id, projectId, userId }));
+      if (!waitOutFullBudget && attempt >= DISPATCH_EVIDENCE_GRACE_ATTEMPTS) {
         return null;
       }
 
@@ -122,6 +179,48 @@ export class LangyConversationReadService {
     }
 
     return null;
+  }
+
+  /**
+   * Whether a projection miss is worth waiting out — the answer to "will this
+   * caller's visibility read succeed once the fold catches up?". The ONLY
+   * source is the canonical event log, the very record the projection is
+   * folded FROM: owned-or-shared and not archived means the visible row WILL
+   * land (`eventLogSaysVisible`), anything else means waiting cannot help. An
+   * EMPTY log is "no evidence", not "no conversation". No reader and a failed
+   * read both answer "no evidence", never a guess: only evidence that
+   * ESTABLISHES the caller's visibility may extend the wait, or the window
+   * itself becomes a timing signal for a foreign caller (CWE-208).
+   */
+  private async dispatchInFlightEvidence({
+    id,
+    projectId,
+    userId,
+  }: {
+    id: string;
+    projectId: string;
+    userId: string;
+  }): Promise<boolean> {
+    if (!this.deps.events) return false;
+    try {
+      const events = await this.deps.events.getEventsOccurredSince({
+        aggregateId: id,
+        context: { tenantId: createTenantId(projectId) },
+        aggregateType: "langy_conversation",
+        occurredAtFromMs: Math.max(0, Date.now() - DISPATCH_EVIDENCE_WINDOW_MS),
+      });
+      return events.length > 0 && eventLogSaysVisible(events, userId);
+    } catch (error) {
+      conversationServiceLogger.warn(
+        {
+          projectId,
+          conversationId: id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Event-log evidence read failed during the dispatch window — treating as no evidence (short grace)",
+      );
+      return false;
+    }
   }
 
   /**
