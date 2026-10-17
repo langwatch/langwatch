@@ -159,13 +159,19 @@ describe("the Cloud admin license registry", () => {
     it("lists licenses and records the read", async () => {
       const { app, entries } = await build();
 
-      await app.listIssuedLicenses({ page: 0, pageSize: 25, search: "acme", operator });
+      await app.listIssuedLicenses({
+        page: 0,
+        pageSize: 25,
+        search: "acme",
+        onlyActive: true,
+        operator,
+      });
 
       expect(entries).toEqual([
         expect.objectContaining({
           userId: "user_olive",
           action: "licenseRegistry.getAll",
-          args: { page: 0, pageSize: 25, hasSearch: true },
+          args: { page: 0, pageSize: 25, hasSearch: true, onlyActive: true, hideInternal: false },
           targetKind: "issuedLicense",
         }),
       ]);

@@ -33,6 +33,7 @@
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/clickhouse-markers": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",

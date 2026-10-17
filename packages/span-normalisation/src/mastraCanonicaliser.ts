@@ -6,7 +6,11 @@ import {
   type ExtractorContext,
   takeAttribute,
 } from "./canonicalAttributes.ts";
-import { recordValueType } from "./canonicalExtraction.ts";
+import {
+  isAnthropicProviderSpan,
+  markInputAsFresh,
+  recordValueType,
+} from "./canonicalExtraction.ts";
 import { asNumber } from "./canonicalGuard.ts";
 import {
   extractLastUserMessageText,
@@ -18,6 +22,13 @@ import { MastraValuesService } from "./mastraValue.ts";
 
 const mastraValuesService = MastraValuesService.create();
 
+/** Whether the span came from Mastra's instrumentation. */
+export function isMastraSpan(ctx: ExtractorContext): boolean {
+  const scopeName = ctx.span.instrumentationScope?.name ?? "";
+
+  return scopeName.startsWith("@mastra/") || ctx.bag.attrs.has(ATTR_KEYS.MASTRA_SPAN_TYPE);
+}
+
 export class MastraCanonicaliserService implements AttributeCanonicaliser {
   static create(): MastraCanonicaliserService {
     return new MastraCanonicaliserService();
@@ -28,7 +39,7 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
   readonly id = "mastra";
 
   apply(ctx: ExtractorContext): void {
-    if (!this.detectMastra(ctx)) {
+    if (!isMastraSpan(ctx)) {
       return;
     }
 
@@ -47,18 +58,6 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
     this.setDisplayName({ ctx, mastraType, modelName, isEvalModelStep, modelStepBody });
     this.extractThreadId(ctx);
     this.mapTokenNames(ctx);
-  }
-
-  /** Detection check: only process spans from Mastra instrumentation. */
-  private detectMastra(ctx: ExtractorContext): boolean {
-    const scopeName = ctx.span.instrumentationScope?.name ?? "";
-
-    return (
-      scopeName === "@mastra/otel" ||
-      scopeName === "@mastra/otel-bridge" ||
-      scopeName.startsWith("@mastra/") ||
-      ctx.bag.attrs.has(ATTR_KEYS.MASTRA_SPAN_TYPE)
-    );
   }
 
   /** Map Mastra's detailed span types to canonical types.
@@ -304,15 +303,22 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
     }
   }
 
-  /** Map non-standard cached_input_tokens to canonical cache_read.input_tokens. */
+  /**
+   * Older releases send the AI SDK's flat `cached_input_tokens` and its input count, which includes
+   * the cache for OpenAI models and excludes it for Anthropic ones.
+   */
   private mapTokenNames(ctx: ExtractorContext): void {
-    const cachedTokens = takeAttribute(ctx.bag.attrs, ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS);
-    if (cachedTokens !== void 0) {
-      const n = asNumber(cachedTokens);
-      if (n !== null) {
-        ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, n);
-        ctx.recordRule(`${this.id}:cached_input_tokens->cache_read.input_tokens`);
-      }
+    const cachedTokens = asNumber(
+      takeAttribute(ctx.bag.attrs, ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS),
+    );
+    if (cachedTokens === null) {
+      return;
+    }
+
+    ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cachedTokens);
+    ctx.recordRule(`${this.id}:cached_input_tokens->cache_read.input_tokens`);
+    if (isAnthropicProviderSpan(ctx)) {
+      markInputAsFresh(ctx, { ruleId: `${this.id}:usage.input_tokens(fresh as sent)` });
     }
   }
 }

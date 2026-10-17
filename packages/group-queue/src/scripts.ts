@@ -31,6 +31,13 @@ const SETTLED_CANDIDATE_DELAY_MS = 3_600_000;
 /** How long a listed run's in-flight group stays out of its scan, unless COMPLETE finds work. */
 const IN_FLIGHT_CANDIDATE_DELAY_MS = 1_000;
 
+/**
+ * How long a listed run's group holding work it can't run yet (parked at its tenant's cap,
+ * blocked, or paused) stays out of its scan. Re-reading such groups on every claim kept the
+ * listed consumer polling every 50ms over the whole parked backlog.
+ */
+const WAITING_CANDIDATE_DELAY_MS = 5_000;
+
 /** Dynamic cap TTL (5x RECONCILE_INTERVAL_MS); fails safe to static cap if stale. */
 export const DYNAMIC_CAP_TTL_MS = 5 * RECONCILE_INTERVAL_MS;
 
@@ -884,7 +891,7 @@ const DISPATCH_BATCH_LUA =
   CLAIMED_RECORD_HELPER_LUA +
   SETTLED_TARGET_HELPER_LUA +
   `
-local function gqCandidateScore(keyPrefix, groupId, readyScore, nowMs)
+local function gqCandidateScore(keyPrefix, blockedKey, groupId, readyScore, nowMs)
   local groupPrefix = keyPrefix .. "group:" .. groupId
   if redis.call("EXISTS", groupPrefix .. ":claimed") > 0 then return nowMs + ${IN_FLIGHT_CANDIDATE_DELAY_MS} end
   -- A retry backoff drops the claim, keeps :active and moves the ready score to its due time.
@@ -892,7 +899,11 @@ local function gqCandidateScore(keyPrefix, groupId, readyScore, nowMs)
     return math.max(nowMs + ${IN_FLIGHT_CANDIDATE_DELAY_MS}, tonumber(readyScore) or 0)
   end
   if redis.call("ZCARD", groupPrefix .. ":jobs") == 0 then return nowMs + ${SETTLED_CANDIDATE_DELAY_MS} end
-  if readyScore and tonumber(readyScore) > nowMs then return tonumber(readyScore) end
+  -- Work out of ready is parked or paused; work in ready may still be blocked.
+  if not readyScore or redis.call("SISMEMBER", blockedKey, groupId) == 1 then
+    return nowMs + ${WAITING_CANDIDATE_DELAY_MS}
+  end
+  if tonumber(readyScore) > nowMs then return tonumber(readyScore) end
   return nowMs
 end
 
@@ -962,6 +973,13 @@ if staticCap > 0 and globalBudget > 0 then
   tenantCap = effectiveCap(keyPrefix, staticCap)
 end
 
+-- A listed run's group this scan parked waits out its delay before the run's scan looks again.
+local function deferCandidate(groupId)
+  if restrictedDispatch then
+    redis.call("ZADD", allowedGroupsKey, nowMs + ${WAITING_CANDIDATE_DELAY_MS}, groupId)
+  end
+end
+
 -- Scan ready in priority order and dispatch up to maxJobs, appending to results.
 -- effCap gates the per-tenant cap (0 = off). bypassPark skips the over-cap PARK
 -- decision (work-conserving override) while still recording the in-flight slot.
@@ -1020,7 +1038,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
         else
           -- Re-queued by when it can next run: a waiting group at its due time, a failed one an
           -- hour back, so a retried job is not stuck behind every group the run already finished.
-          redis.call("ZADD", allowedGroupsKey, gqCandidateScore(keyPrefix, groupId, readyScore, nowMs), groupId)
+          redis.call("ZADD", allowedGroupsKey, gqCandidateScore(keyPrefix, blockedKey, groupId, readyScore, nowMs), groupId)
         end
         removedAllowed = removedAllowed + 1
       end
@@ -1044,6 +1062,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
             if cached then
               tenantOverCap = true
               removed = removed + parkGroup(readyKey, groupId)
+              deferCandidate(groupId)
             end
           end
         end
@@ -1055,6 +1074,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
         if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. parkTenantOf(groupId)) == 1 then
           tenantPaused = true
           removed = removed + parkGroup(readyKey, groupId)
+          deferCandidate(groupId)
         end
       end
 
@@ -1103,6 +1123,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
                 if pausedBy then
                   paused = true
                   removed = removed + parkLaneGroup(readyKey, groupId, pausedBy)
+                  deferCandidate(groupId)
                 end
               end
             end
@@ -1198,7 +1219,9 @@ local overrideDispatched = 0
 -- the idle slots from the least-served over-cap tenant rather than return short
 -- and idle the fleet (the static-cap idle-behind-cap sin). Bounded to the
 -- remaining slots; this pod's free-slot budget keeps the fleet total at G.
-if globalBudget > 0 and tenantCap > 0 and dispatched < maxJobs and redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
+-- Not on a listed run's claim: its scan only runs the run's groups, so the groups it would
+-- unpark go straight back to parked on the next full dispatch.
+if not restrictedDispatch and globalBudget > 0 and tenantCap > 0 and dispatched < maxJobs and redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
   unparkLeastServedParked(readyKey, keyPrefix, pausedJobKey, nowMs, maxJobs - dispatched)
   local beforeOverride = dispatched
   dispatched = scanBatch(tenantCap, true, dispatched)
