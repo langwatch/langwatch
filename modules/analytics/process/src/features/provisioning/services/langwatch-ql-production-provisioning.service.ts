@@ -168,14 +168,12 @@ export class LangWatchQLProductionProvisioningService {
       ),
     ];
 
-    // One guarded block rather than a probe followed by grants: the check and
-    // the grants have to be the same statement, or a role dropped between them
-    // turns a no-op into a failed deploy.
+    // One block keeps the grants atomic and lets PostgreSQL report a missing role instead of
+    // silently treating a vanished reader as converged.
     return [
       `DO $$\nBEGIN\n` +
-        `  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(role)}) THEN\n` +
-        grants.map((grant) => `    EXECUTE ${postgresLiteral(grant)};\n`).join("") +
-        `  END IF;\nEND\n$$`,
+        grants.map((grant) => `  EXECUTE ${postgresLiteral(grant)};\n`).join("") +
+        `END\n$$`,
     ];
   }
 
