@@ -767,7 +767,7 @@ export function Drawer({
       >
         <DrawerCloseTrigger
           disabled={busy}
-          zIndex={glass ? 2 : void 0}
+          zIndex={glass || chrome === "content" ? 2 : void 0}
           data-testid={slot("close")}
         />
         {onSubmit ? (
