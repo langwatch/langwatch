@@ -82,6 +82,14 @@ Feature: License registry
     Then the held copy is erased
 
   @unit
+  Scenario: The license list hides inactive and internal test licenses until asked
+    Given an active customer license, a revoked license and a license issued to a langwatch.ai address
+    When an operator lists only active licenses with internal ones hidden
+    Then only the active customer license is listed
+    When the operator asks for every license
+    Then all three are listed
+
+  @unit
   Scenario: The instance admin organizations list does not carry license keys
     When an operator lists organizations in the instance admin
     Then no organization in the response includes its license key

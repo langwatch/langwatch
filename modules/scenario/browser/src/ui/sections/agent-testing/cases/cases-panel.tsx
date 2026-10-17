@@ -7,11 +7,7 @@
 import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import type { TestCase, TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import type { Period } from "../../../../model/analytics/period.ts";
-import {
-  CONTENT_COLUMN_GUTTER,
-  ContentColumn,
-} from "../../../elements/agent-testing/shared/content-column.tsx";
-import { SUITE_RAIL_WIDTH } from "../suite-rail/suite-rail.tsx";
+import { ContentColumn } from "../../../elements/agent-testing/shared/content-column.tsx";
 import { CasesPanelBody } from "./cases-panel-body.tsx";
 import { CasesPanelHeader } from "./cases-panel-header.tsx";
 import type { CaseLastResult } from "./cases-table.tsx";
@@ -75,10 +71,7 @@ export function CasesPanel(props: CasesPanelProps) {
   const caseCount = isExternal ? props.externalCases.length : props.cases.length;
 
   return (
-    <ContentColumn
-      railWidth={SUITE_RAIL_WIDTH + CONTENT_COLUMN_GUTTER}
-      data-testid="agent-testing-cases-panel"
-    >
+    <ContentColumn data-testid="agent-testing-cases-panel">
       <CasesPanelHeader {...props} isExternal={isExternal} caseCount={caseCount} />
       <CasesPanelBody {...props} isExternal={isExternal} />
     </ContentColumn>

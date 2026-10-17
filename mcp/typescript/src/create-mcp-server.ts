@@ -1404,10 +1404,25 @@ function registerDashboardTools(server: McpServer): void {
   );
 
   server.tool(
+    "list_dashboard_boards",
+    "Lists the project's boards in the Dashboards area, with each one's ID and widget count. Use an ID from here as the dashboardId of add_dashboard_widget and update_dashboard_widget; the analytics dashboards platform_list_dashboards lists hold no widgets.",
+    {},
+    withToolLogging("list_dashboard_boards", async () => {
+      requireApiKey();
+      const { handleListDashboardBoards } = await import("./tools/list-dashboard-boards.js");
+      return {
+        content: [{ type: "text", text: await handleListDashboardBoards() }],
+      };
+    }),
+  );
+
+  server.tool(
     "add_dashboard_widget",
     "Creates a custom dashboard widget and places it on the given dashboard. A widget's `code` is a TSX file run in a sandbox: it receives a global `LW` with `LW.useChartQuery(name)` (reads one of the widget's own named queries), `LW.navigate` and `LW.theme`. `queries` are named LangWatchQL SQL statements the code can read by name — validate each statement's SQL first with run_query before calling this tool, since a query only runs inside the sandbox at render time and a mistake surfaces there, not here. Up to 8 queries per widget.",
     {
-      dashboardId: z.string().describe("The dashboard to add the widget to"),
+      dashboardId: z
+        .string()
+        .describe("The Dashboards board to add the widget to, as list_dashboard_boards lists it"),
       name: z.string().describe("The widget's display name"),
       code: z
         .string()

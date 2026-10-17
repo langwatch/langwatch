@@ -60,10 +60,80 @@ COPY skills ./skills
 COPY sdks/typescript ./sdks/typescript
 RUN find . ! -type d ! -name package.json -delete && find . -depth -type d -empty -delete
 
-# ── Stage 2: build ──────────────────────────────────────────────────
-FROM node:24-alpine AS builder
+# ── Stage 1b: the Node toolchain ────────────────────────────────────
+# What both installs below need: pnpm, and the compilers a dependency's build
+# script (allowBuilds in pnpm-workspace.yaml: bcrypt, node-pty and the rest) falls back to.
+# The pnpm store sits in a BuildKit cache mount at this path on every install,
+# so a lockfile change downloads only what is new.
+FROM node:24-alpine AS node-toolchain
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
 RUN npm install -g pnpm@12.6.0 && npm cache clean --force
+ENV pnpm_config_store_dir=/root/.local/share/pnpm/store
+
+# ── Stage 1c: production dependencies ──────────────────────────────
+# The runtime's node_modules, from install inputs only, so this stage and the
+# runtime layer copying it stay cached until the lockfile or a manifest changes.
+# The workspace members here are manifests; the runtime stage lays their built
+# trees over these node_modules directories.
+FROM node-toolchain AS prod-deps
+WORKDIR /app
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
+COPY patches ./patches
+COPY vendor ./vendor
+COPY --from=manifests /src/ ./
+# The same workspace the builder's production install used to see, so the re-resolve matches it.
+COPY dev/tests/agentic-e2e/package.json ./dev/tests/agentic-e2e/
+COPY dev/tests/e2e-stack/package.json ./dev/tests/e2e-stack/
+COPY tools/seedgen/runner/package.json ./tools/seedgen/runner/
+COPY dev/scripts/package.json ./dev/scripts/
+COPY apps/worker/package.json ./apps/worker/package.json
+COPY apps/api/package.json ./apps/api/package.json
+COPY apps/ui/package.json ./apps/ui/package.json
+COPY apps/tasks/package.json ./apps/tasks/package.json
+COPY apps/backend/package.json ./apps/backend/package.json
+COPY apps/scenario-child/package.json ./apps/scenario-child/package.json
+COPY infra/docker/image.pnpmfile.cjs /tmp/image.pnpmfile.cjs
+COPY infra/docker/check-locked-versions.mjs /tmp/check-locked-versions.mjs
+COPY infra/docker/check-links.mjs /tmp/check-links.mjs
+# Three roles, the backend that hosts two of them and the scenario child the worker spawns;
+# @langwatch/ui is not installed, its bundle is built. --filter-prod, not --filter: with --prod alone
+# a filtered member's devDependencies are still followed. The image pnpmfile drops the peers that resolve to dev tools (see its header); a hook
+# runs only when pnpm resolves, so the lockfile is re-resolved first and the version check fails the
+# build on any version the committed lockfile does not name. Dependency build scripts run here.
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    export pnpm_config_pnpmfile=/tmp/image.pnpmfile.cjs CI=true \
+ && cp pnpm-lock.yaml /tmp/committed-pnpm-lock.yaml \
+ && pnpm install --lockfile-only \
+ && node /tmp/check-locked-versions.mjs /tmp/committed-pnpm-lock.yaml pnpm-lock.yaml \
+ && pnpm install --frozen-lockfile --prod --filter-prod "@langwatch/platform-api..." --filter-prod "@langwatch/worker..." --filter-prod "@langwatch/scenario-child..." --filter-prod "@langwatch/tasks..." --filter-prod "@langwatch/backend..."
+
+# The installed packages' own weight: source maps, declarations, tests, docs and examples, and the
+# query compiler Prisma ships for every database it supports (this image talks to PostgreSQL only).
+RUN find node_modules/.pnpm -type d \( -name test -o -name tests -o -name __tests__ -o -name docs -o -name example -o -name examples \) -prune -exec rm -rf {} + \
+ && find node_modules/.pnpm -type f \( -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.md' \) -delete \
+ && find node_modules/.pnpm -type f -name 'query_compiler_*' ! -name '*postgresql*' -delete \
+ && node /tmp/check-links.mjs /app
+
+# The Prisma CLI is here for `prisma migrate deploy` (the upgrade runs it) and nothing else. Its entry
+# file needs Studio's data modules and the dev server's state module at load; Studio's browser UI,
+# the dev server's bundled database, the query-plan executor and Studio's graph layout go, with the
+# links that pointed at them.
+RUN rm -rf node_modules/.pnpm/@prisma+studio-core@*/node_modules/@prisma/studio-core/dist/ui \
+      node_modules/.pnpm/@prisma+studio-core@*/node_modules/@prisma/studio-core/dist/metafile-*.json \
+      node_modules/.pnpm/@prisma+dev@*/node_modules/@prisma/dev/dist/runtime-assets \
+      node_modules/.pnpm/@prisma+query-plan-executor@* node_modules/.pnpm/@electric-sql+pglite* node_modules/.pnpm/elkjs@* \
+ && find node_modules/.pnpm -type l \( -path '*/@prisma/query-plan-executor' -o -path '*/@electric-sql/pglite*' -o -path '*/node_modules/elkjs' \) -delete \
+ && node /tmp/check-links.mjs /app
+
+# Only node_modules directories leave this stage: the manifests, lockfile and workspace file go (the
+# runtime must carry no pnpm-workspace.yaml, see pnpm_config_verify_deps_before_run there), and so
+# do the member directories that got no node_modules. The runtime stage checks the links once the
+# built trees are in place.
+RUN find . -name node_modules -prune -o ! -type d -exec rm -f {} + \
+ && find . -depth -type d -empty ! -path '*/node_modules/*' -delete
+
+# ── Stage 2: build ──────────────────────────────────────────────────
+FROM node-toolchain AS builder
 
 # Install Goose migration tool (copied to runtime stage later)
 ARG GOOSE_SHA256_ARM64=dfafe0254b0058cabf016234a500df5ada1623ed034e9473cee9fe4ed07ca090
@@ -85,11 +155,6 @@ RUN ARCH=$(uname -m) && \
 
 
 WORKDIR /app
-
-# The pnpm store sits in a BuildKit cache mount at this path on every install,
-# so a lockfile change downloads only what is new. A fresh CI runner starts
-# with the mount empty; there the cached install layer is what saves the work.
-ENV pnpm_config_store_dir=/root/.local/share/pnpm/store
 
 # Install inputs only (ADR-076: one workspace, installed from /app). Nothing
 # here may change on a source-only edit, or the install below re-runs.
@@ -192,66 +257,25 @@ RUN pnpm run ensure:ai-gateway-secrets && pnpm run generate:modules \
  && NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -b --builders 16 modules/*/contract/tsconfig.build.json \
  && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/scenario-child..." run build
 
-# The production tree: every node_modules directory goes, then the three server roles (and the
-# backend that hosts two of them) are installed again with --prod. A fresh install, not a prune
-# of this one: `pnpm prune` has no --filter and reasons about every workspace member, which kept
-# the UI's ~130 MB of browser-only packages in the image, and a --prod pass over the dev install
-# left the devDependencies in the virtual store. @langwatch/ui is not installed here at all; its
-# bundle is already built, and nothing that runs imports it. The pnpm store mount holds every
-# package from the first install, so this one downloads nothing.
-# --filter-prod, not --filter: with --prod alone a filtered member's devDependencies are still
-# followed, which linked the test harness and the design system's tooling in.
-# CI=true: pnpm refuses to purge a modules directory without a TTY unless told it is non-interactive.
+# The built trees leave without node_modules: the runtime stage takes every node_modules directory
+# from prod-deps and lays these trees over them, and a link left here would replace a production one
+# with one into this stage's development install. The UI's source maps go too.
 RUN find . -name node_modules -type d -prune -exec rm -rf {} + \
  && find apps/ui/dist/client -name '*.map' -delete
-# The image's own pnpmfile drops the peer dependencies that resolve to dev tools (see its header).
-# A hook only runs when pnpm resolves, so the lockfile is re-resolved first, keeping every locked
-# version, and then installed frozen: the install itself still takes only what that lockfile names.
-# pnpm_config_pnpmfile is how pnpm 12 takes a hook file; only these two commands set it.
-# The version check fails the build on any version the committed lockfile does not name.
-COPY infra/docker/image.pnpmfile.cjs /tmp/image.pnpmfile.cjs
-COPY infra/docker/check-locked-versions.mjs /tmp/check-locked-versions.mjs
-RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    export pnpm_config_pnpmfile=/tmp/image.pnpmfile.cjs CI=true \
- && cp pnpm-lock.yaml /tmp/committed-pnpm-lock.yaml \
- && pnpm install --lockfile-only \
- && node /tmp/check-locked-versions.mjs /tmp/committed-pnpm-lock.yaml pnpm-lock.yaml \
- && pnpm install --frozen-lockfile --prod --filter-prod "@langwatch/platform-api..." --filter-prod "@langwatch/worker..." --filter-prod "@langwatch/scenario-child..." --filter-prod "@langwatch/tasks..." --filter-prod "@langwatch/backend..."
 
 # What no process runs, removed before the runtime stage copies the trees: the module halves the
 # browser loads (the api serves the built bundle), tests, specs, ADRs, declarations, source maps
-# and the SDKs' sources and examples. Workspace packages nothing links to go too; the link check
-# fails the build if any link in the tree now points at nothing.
-COPY infra/docker/check-links.mjs /tmp/check-links.mjs
+# and the SDKs' sources and examples. Workspace packages nothing links to go too; the runtime
+# stage's link check fails the build if any link now points at nothing.
 RUN rm -rf modules/*/browser modules/*/client enterprise/modules/*/browser enterprise/modules/*/client \
       packages/architecture-enforcer packages/oxlint-rules packages/design-system packages/design-system-internal \
       packages/browser packages/browser-host packages/browser-types packages/sim-console packages/test-harness \
       packages/vitest-config packages/webhook-verify packages/ksuid-python \
- && find sdks/typescript mcp/typescript -mindepth 1 -maxdepth 1 ! -name dist ! -name node_modules ! -name package.json -exec rm -rf {} + \
- && find apps packages modules enterprise -name node_modules -prune -o \
+ && find sdks/typescript mcp/typescript -mindepth 1 -maxdepth 1 ! -name dist ! -name package.json -exec rm -rf {} + \
+ && find apps packages modules enterprise \
       \( -type d \( -name __tests__ -o -name tests -o -name e2e -o -name specs -o -name adrs -o -name docs -o -name examples \) -o \
          -type f \( -name '*.test.*' -o -name '*.spec.*' -o -name '*.feature' -o -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.tsbuildinfo' -o -name '*.md' \) \) \
-      -prune -exec rm -rf {} + \
- && node /tmp/check-links.mjs /app
-
-# The installed packages' own weight: source maps, declarations, tests, docs and examples, and the
-# query compiler Prisma ships for every database it supports (this image talks to PostgreSQL only).
-RUN find node_modules/.pnpm -type d \( -name test -o -name tests -o -name __tests__ -o -name docs -o -name example -o -name examples \) -prune -exec rm -rf {} + \
- && find node_modules/.pnpm -type f \( -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.md' \) -delete \
- && find node_modules/.pnpm -type f -name 'query_compiler_*' ! -name '*postgresql*' -delete \
- && node /tmp/check-links.mjs /app
-
-# The Prisma CLI is here for `prisma migrate deploy` (the upgrade runs it) and nothing else. Its
-# entry file requires Studio's data modules and the dev server's state module at load, so those two
-# packages stay; Studio's browser UI, the dev server's bundled database, the query-plan executor
-# and Studio's graph layout are only reached by the commands that use them. The links that
-# pointed at removed packages go with them, and the link check proves nothing else did.
-RUN rm -rf node_modules/.pnpm/@prisma+studio-core@*/node_modules/@prisma/studio-core/dist/ui \
-      node_modules/.pnpm/@prisma+studio-core@*/node_modules/@prisma/studio-core/dist/metafile-*.json \
-      node_modules/.pnpm/@prisma+dev@*/node_modules/@prisma/dev/dist/runtime-assets \
-      node_modules/.pnpm/@prisma+query-plan-executor@* node_modules/.pnpm/@electric-sql+pglite* node_modules/.pnpm/elkjs@* \
- && find node_modules/.pnpm -type l \( -path '*/@prisma/query-plan-executor' -o -path '*/@electric-sql/pglite*' -o -path '*/node_modules/elkjs' \) -delete \
- && node /tmp/check-links.mjs /app
+      -prune -exec rm -rf {} +
 
 # ── Stage 2b: CDN assets ───────────────────────────────────────────
 # Not part of the runtime image: nothing reaches the default target through it.
@@ -274,58 +298,30 @@ COPY --from=cloudflare/cloudflared:2026.9.3@sha256:072c067d25ccbe61d46e18f0d0723
 
 WORKDIR /app
 
-# Copy built artifacts from builder.
-#
-# /app/node_modules FIRST, and it is not optional. Since ADR-076 the install
-# root is /app, so pnpm's virtual store lives at /app/node_modules/.pnpm and
-# every entry in an application's node_modules is a symlink into it:
-#
-#   apps/api/node_modules/hono -> ../../../node_modules/.pnpm/hono@…/node_modules/hono
-#
-# Copying apps/ without it leaves every one of those links dangling. The image
-# builds clean and dies at boot on the first import — there is no build error to
-# catch it, which is exactly why it is spelled out here.
-COPY --from=builder /app/node_modules ./node_modules
-# mcp/typescript must be copied alongside the applications because pnpm
-# workspace-symlinks @langwatch/mcp-server into
-# modules/hosted-mcp/process/node_modules, which apps/api mounts. langy
-# and handled-error are other root workspace packages linked the same way —
-# handled-error is imported for side effects by the API and worker entry points,
-# so omitting it fails the boot outright.
+# Every node_modules directory, FIRST and in its own layer: prod-deps is built from install inputs
+# only, so this layer is reused, and not pushed again, while the lockfile and manifests stay put.
+# Each member's node_modules links into /app/node_modules/.pnpm and to other members, so the trees
+# below must land on top of these directories, never replace them; the link check after the copies
+# proves every link resolves.
+COPY --from=prod-deps /app ./
+# The Go scenario runner; the worker spawns it in place of the Node child for a
+# project whose release_scenario_go_runner_enabled flag is on. Before the builder's
+# trees, which change on every commit.
+COPY --from=scenariorunner /out/scenariorunner /usr/local/bin/scenariorunner
+ENV SCENARIO_GO_RUNNER_PATH=/usr/local/bin/scenariorunner
+# The built trees from builder, which carry no node_modules. mcp/typescript and the SDK are copied
+# because members link to them (@langwatch/mcp-server, `langwatch: workspace:*`); the whole
+# packages/, modules/ and enterprise/ trees rather than a cherry-picked list, because a forgotten
+# line leaves a dangling link and a boot-time "Cannot find module".
 COPY --from=builder /app/mcp/typescript ./mcp/typescript
-# Same reasoning for the SDK: `langwatch: workspace:*` in a dozen packages means
-# their node_modules/langwatch is a symlink to ../../../sdks/typescript, and a
-# symlink whose target this stage never copies dangles at first import.
 COPY --from=builder /app/sdks/typescript ./sdks/typescript
-# The whole packages/ tree, not a cherry-picked list.
-#
-# Two reasons. First, each package's own node_modules comes with it: langy and
-# handled-error declare zod / @opentelemetry/api as PEERS, and pnpm satisfies
-# those by linking them into the member's own node_modules, pointing at the
-# shared store above. That replaces the hand-built symlinks this stage used to
-# create at /app/node_modules — which would now collide with the real store,
-# and are unnecessary because pnpm already did the job correctly.
-#
-# Second, cherry-picking is the failure mode. Adding a root workspace package
-# as an app dependency and forgetting to add a COPY line here leaves a
-# dangling symlink and a boot-time "Cannot find module" — which is exactly how
-# @langwatch/handled-error broke the workers entry point once already. Copying
-# the tree cannot be forgotten. It costs about 1.3MB; apps/server, the npx CLI,
-# is separate and is the only workspace application the app does not import
-# in hundreds.
 COPY --from=builder /app/packages ./packages
-# The module trees, for the same reason: modules/ and enterprise/ are workspace
-# members outside packages/ since the tree rename.
 COPY --from=builder /app/modules ./modules
 COPY --from=builder /app/enterprise ./enterprise
 # The worker executable runs from source through node, the way apps/api does. The
 # child it spawns is its own app, built into apps/scenario-child/dist.
 COPY --from=builder /app/apps/worker ./apps/worker
 COPY --from=builder /app/apps/scenario-child ./apps/scenario-child
-# The Go scenario runner; the worker spawns it in place of the Node child for a
-# project whose release_scenario_go_runner_enabled flag is on.
-COPY --from=scenariorunner /out/scenariorunner /usr/local/bin/scenariorunner
-ENV SCENARIO_GO_RUNNER_PATH=/usr/local/bin/scenariorunner
 # The task runner. Runs from source through node, like apps/api and apps/worker.
 COPY --from=builder /app/apps/tasks ./apps/tasks
 # Same: run from source through node. The boot command below runs both schema
@@ -338,6 +334,10 @@ COPY --from=builder /app/apps/backend ./apps/backend
 COPY --from=builder /app/apps/ui/dist/client ./apps/ui/dist/client
 COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 COPY --from=builder /app/feature-map.json ./feature-map.json
+# The two halves of /app meet only here, so this is where a dangling link would first exist. The
+# script is mounted, not copied, so the image carries nothing new.
+RUN --mount=type=bind,source=infra/docker/check-links.mjs,target=/tmp/check-links.mjs \
+    node /tmp/check-links.mjs /app
 
 # The default command: the api, or the api and worker in one process under START_WORKERS=true.
 COPY --chmod=755 infra/docker/start.sh /app/start.sh
