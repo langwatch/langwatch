@@ -38,7 +38,7 @@ const mocks = vi.hoisted(() => ({
   rename: { mutate: vi.fn(), isPending: false },
   remove: { mutate: vi.fn(), isPending: false },
   utils: {
-    dashboards: {
+    boards: {
       getAll: { invalidate: vi.fn() },
       listStarred: { invalidate: vi.fn() },
     },
@@ -54,7 +54,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
     useUtils: () => mocks.utils,
-    dashboards: {
+    boards: {
       getAll: {
         useQuery: (input: unknown) => {
           mocks.listInputs.push(input);
@@ -67,7 +67,7 @@ vi.mock("../../../../behavior/analytics-api.ts", () => ({
         },
       },
       create: { useMutation: () => mocks.create },
-      rename: { useMutation: () => mocks.rename },
+      update: { useMutation: () => mocks.rename },
       delete: { useMutation: () => mocks.remove },
     },
   },
@@ -116,5 +116,27 @@ describe("given the project has boards", () => {
       asked: { projectId: "project-1", includeOrganization: true },
       organizationBoards: [mocks.shared],
     });
+  });
+
+  /** @scenario "AC199 Split: Dashboards and Analytics Reports each list and open only their own boards" */
+  it("asks the Dashboards area's own list, never the Analytics Reports one", () => {
+    renderHook(() => useSavedDashboards());
+
+    // The mock answers `boards.getAll` alone; a `dashboards.*` read would throw.
+    expect(mocks.listInputs).not.toHaveLength(0);
+  });
+});
+
+describe("given a member deletes a board", () => {
+  /** @scenario "AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart" */
+  it("deletes through the Dashboards area's own procedure, which keeps a Reports board", () => {
+    const { result } = renderHook(() => useSavedDashboards());
+
+    act(() => result.current.deleteBoard({ dashboardId: "board-1", onDeleted: vi.fn() }));
+
+    expect(mocks.remove.mutate).toHaveBeenCalledWith(
+      { projectId: "project-1", dashboardId: "board-1" },
+      expect.anything(),
+    );
   });
 });

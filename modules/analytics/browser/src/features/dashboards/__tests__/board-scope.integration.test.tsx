@@ -103,24 +103,24 @@ function scopeServer({
     state.calls.push(call);
     const input = (call.input ?? {}) as Input;
     switch (call.path) {
-      case "dashboards.getAll":
+      case "boards.getAll":
         return Promise.resolve(state.boards.map((board) => ({ ...board })));
-      case "dashboards.listStarred":
+      case "boards.listStarred":
         return Promise.resolve(
           state.boards
             .filter((board) => board.isStarred)
             .map((board) => ({ kind: "board", dashboard: { ...board } })),
         );
-      case "dashboards.setScope":
+      case "boards.setScope":
         find(input.dashboardId).scope = input.scope as DashboardScope;
         return Promise.resolve({ ...find(input.dashboardId) });
-      case "dashboards.scopeImpact":
+      case "boards.scopeImpact":
         return Promise.resolve({ otherStars });
-      case "dashboards.scopeProjects": {
+      case "boards.scopeProjects": {
         const board = find(input.dashboardId);
         return Promise.resolve({ ownerProject: board.ownerProject ?? HERE, projects });
       }
-      case "dashboards.create": {
+      case "boards.create": {
         const created = own({
           id: `board-new-${state.boards.length + 1}`,
           name: String(input.name),
@@ -128,7 +128,7 @@ function scopeServer({
         state.boards.push(created);
         return Promise.resolve({ ...created });
       }
-      case "dashboards.updateDetails":
+      case "boards.update":
       case "dashboardWidgets.batchUpdateLayouts":
         return Promise.resolve({ success: true });
       case "dashboardWidgets.list":
@@ -320,7 +320,7 @@ describe("a board's scope in the browser", () => {
       await user.click(await screen.findByRole("menuitemradio", { name: "Organization" }));
 
       await waitFor(() =>
-        expect(inputsTo(server, "dashboards.setScope")).toEqual([
+        expect(inputsTo(server, "boards.setScope")).toEqual([
           { projectId: "proj-1", dashboardId: "board-1", scope: "ORGANIZATION" },
         ]),
       );
@@ -342,7 +342,7 @@ describe("a board's scope in the browser", () => {
 
       expect(await screen.findByText('Make "Weekly review" visible only to you?')).toBeVisible();
       expect(screen.getByText(/2 other people starred it\./)).toBeInTheDocument();
-      expect(inputsTo(server, "dashboards.setScope")).toEqual([]);
+      expect(inputsTo(server, "boards.setScope")).toEqual([]);
     });
 
     /** @scenario "AC179 Scope change: it asks first only when someone loses the board" */
@@ -358,7 +358,7 @@ describe("a board's scope in the browser", () => {
       expect(
         screen.getByText(/People in the other projects of Acme will no longer see it\./),
       ).toBeInTheDocument();
-      expect(inputsTo(server, "dashboards.setScope")).toEqual([]);
+      expect(inputsTo(server, "boards.setScope")).toEqual([]);
     });
 
     /** @scenario "AC179 Scope change: it asks first only when someone loses the board" */
@@ -372,7 +372,7 @@ describe("a board's scope in the browser", () => {
       await waitFor(() =>
         expect(screen.queryByText('Make "Weekly review" visible only to you?')).toBeNull(),
       );
-      expect(inputsTo(server, "dashboards.setScope")).toEqual([]);
+      expect(inputsTo(server, "boards.setScope")).toEqual([]);
     });
 
     /** @scenario "AC179 Scope change: it asks first only when someone loses the board" */
@@ -384,7 +384,7 @@ describe("a board's scope in the browser", () => {
       await user.click(await screen.findByRole("button", { name: "Set to Only me" }));
 
       await waitFor(() =>
-        expect(inputsTo(server, "dashboards.setScope")).toEqual([
+        expect(inputsTo(server, "boards.setScope")).toEqual([
           { projectId: "proj-1", dashboardId: "board-1", scope: "PRIVATE" },
         ]),
       );
@@ -404,8 +404,8 @@ describe("a board's scope in the browser", () => {
         ),
       ).toBeInTheDocument();
       expect({
-        changes: inputsTo(server, "dashboards.setScope"),
-        impactReads: inputsTo(server, "dashboards.scopeImpact"),
+        changes: inputsTo(server, "boards.setScope"),
+        impactReads: inputsTo(server, "boards.scopeImpact"),
       }).toEqual({
         changes: [{ projectId: "proj-1", dashboardId: "board-1", scope: "ORGANIZATION" }],
         impactReads: [],
@@ -420,7 +420,7 @@ describe("a board's scope in the browser", () => {
       await pick(user, "Project", "Only me");
 
       expect(await screen.findByText('Only you can see "Weekly review" now')).toBeInTheDocument();
-      expect(inputsTo(server, "dashboards.setScope")).toEqual([
+      expect(inputsTo(server, "boards.setScope")).toEqual([
         { projectId: "proj-1", dashboardId: "board-1", scope: "PRIVATE" },
       ]);
     });
@@ -434,9 +434,10 @@ describe("a board's scope in the browser", () => {
       await user.click(await screen.findByRole("button", { name: "Undo" }));
 
       await waitFor(() =>
-        expect(
-          inputsTo(server, "dashboards.setScope").map((input) => (input as Input).scope),
-        ).toEqual(["ORGANIZATION", "PROJECT"]),
+        expect(inputsTo(server, "boards.setScope").map((input) => (input as Input).scope)).toEqual([
+          "ORGANIZATION",
+          "PROJECT",
+        ]),
       );
       expect(await screen.findByRole("button", { name: "Scope: Project" })).toBeInTheDocument();
     });
@@ -541,7 +542,7 @@ describe("a board's scope in the browser", () => {
 
       expect({
         chip: screen.queryByRole("button", { name: /^Project:/ }),
-        asked: inputsTo(server, "dashboards.scopeProjects"),
+        asked: inputsTo(server, "boards.scopeProjects"),
       }).toEqual({ chip: null, asked: [] });
     });
   });
@@ -652,7 +653,7 @@ describe("a board's scope in the browser", () => {
         expect(host.navigations).toEqual(["/test-project/dashboards/board-new-2"]),
       );
       expect({
-        board: inputsTo(server, "dashboards.create"),
+        board: inputsTo(server, "boards.create"),
         widgets: inputsTo(server, "dashboardWidgets.create").map((input) => {
           const { projectId, dashboardId, name } = input as Input;
           return { projectId, dashboardId, name };

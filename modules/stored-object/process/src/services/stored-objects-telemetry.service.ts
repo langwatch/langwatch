@@ -1,7 +1,7 @@
 /**
- * The series the legacy index publishes, on Prometheus.
+ * The series the legacy index publishes, through the metrics facade.
  */
-import { Counter, register } from "prom-client";
+import { counter } from "@langwatch/observability/metrics";
 
 /** What the legacy index reports about its own work. */
 export interface StoredObjectsTelemetry {
@@ -9,11 +9,9 @@ export interface StoredObjectsTelemetry {
   recordReadFailure(): void;
 }
 
-// Counter: GET failures (storage backend rejected the read)
-register.removeSingleMetric("stored_object_read_failures_total");
-const storedObjectReadFailuresTotal = new Counter({
+const storedObjectReadFailuresTotal = counter({
   name: "stored_object_read_failures_total",
-  help: "Total getById calls where the storage get rejected the read",
+  description: "Total getById calls where the storage get rejected the read",
 });
 
 export class StoredObjectsTelemetryService implements StoredObjectsTelemetry {

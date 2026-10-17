@@ -28,6 +28,7 @@ function renderBreakdown(props: Partial<Parameters<typeof TokenBreakdownTooltipC
 describe("TokenBreakdownTooltipContent", () => {
   describe("given a turn that reported cache and reasoning tokens", () => {
     describe("when the breakdown renders", () => {
+      /** @scenario "The token breakdown names the fresh input when a cache was used" */
       it("shows every row plus the cache-inclusive total", () => {
         const { getByText } = renderBreakdown({
           inputTokens: 12000,
@@ -38,7 +39,7 @@ describe("TokenBreakdownTooltipContent", () => {
           totalWithCache: 112800,
         });
 
-        expect(getByText("Input")).toBeInTheDocument();
+        expect(getByText("Uncached input")).toBeInTheDocument();
         expect(getByText("12,000")).toBeInTheDocument();
         expect(getByText("Cache read")).toBeInTheDocument();
         expect(getByText("96,000")).toBeInTheDocument();

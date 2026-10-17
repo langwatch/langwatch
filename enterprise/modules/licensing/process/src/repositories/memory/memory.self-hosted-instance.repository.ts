@@ -1,8 +1,14 @@
-import { SelfHostedInstanceNotFoundError } from "@langwatch/enterprise-licensing-contract";
+import {
+  SelfHostedInstanceNotFoundError,
+  type SelfHostedInstanceSort,
+} from "@langwatch/enterprise-licensing-contract";
+import type { Instant } from "@langwatch/time";
 
 import type {
+  SelfHostedInstanceQuery,
   SelfHostedInstanceRecord,
   SelfHostedInstanceRepository,
+  SelfHostedInstanceTally,
   SelfHostedInstanceUpsert,
   SelfHostedReportInsert,
   SelfHostedReportRecord,
@@ -42,23 +48,61 @@ export class MemorySelfHostedInstanceRepository implements SelfHostedInstanceRep
     });
   }
 
-  async listPage({
-    page,
-    pageSize,
-    search,
-  }: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<{ rows: SelfHostedInstanceRecord[]; total: number }> {
-    const term = search?.trim().toLowerCase();
+  async listPage(
+    query: SelfHostedInstanceQuery,
+  ): Promise<{ rows: SelfHostedInstanceRecord[]; total: number }> {
+    const { page, pageSize } = query;
     const matching = [...this.#rows.values()]
-      .filter((row) => !term || matches({ row, term }))
-      .toSorted((a, b) => b.lastSeenAt.epochMilliseconds - a.lastSeenAt.epochMilliseconds);
+      .filter((row) => kept({ row, query }))
+      .toSorted((a, b) => compareBy({ sort: query.sort, a, b }) || a.id.localeCompare(b.id));
     return {
       rows: matching.slice(page * pageSize, (page + 1) * pageSize),
       total: matching.length,
     };
+  }
+
+  async tally({
+    reportingSince,
+    quietSince,
+    releaseLimit,
+  }: {
+    reportingSince: Instant;
+    quietSince: Instant;
+    releaseLimit: number;
+  }): Promise<SelfHostedInstanceTally> {
+    const rows = [...this.#rows.values()];
+    const since = (row: SelfHostedInstanceRecord, at: Instant) =>
+      row.lastSeenAt.epochMilliseconds >= at.epochMilliseconds;
+    const reporting = rows.filter((row) => since(row, reportingSince));
+    const live = rows.filter((row) => since(row, quietSince));
+    return {
+      total: rows.length,
+      reporting: reporting.length,
+      quiet: live.length - reporting.length,
+      licensed: rows.filter((row) => row.organizationId !== null).length,
+      traces28d: reporting
+        .flatMap((row) => findReported(row, "traces_28d"))
+        .reduce((sum, traces) => sum + traces, 0),
+      signals: countsOf({
+        values: rows.flatMap((row) => row.raisedSignals),
+        ties: "ascending",
+      }).map(([signal, count]) => ({
+        signal,
+        count,
+      })),
+      releases: countsOf({
+        values: live.flatMap((row) => (row.version ? [row.version] : [])),
+        ties: "descending",
+      })
+        .slice(0, releaseLimit)
+        .map(([version, count]) => ({ version, count })),
+    };
+  }
+
+  async findFirstSeenSince(since: Instant): Promise<Instant[]> {
+    return [...this.#rows.values()]
+      .filter((row) => row.firstSeenAt.epochMilliseconds >= since.epochMilliseconds)
+      .map((row) => row.firstSeenAt);
   }
 
   async getById(id: string): Promise<SelfHostedInstanceRecord> {
@@ -85,6 +129,73 @@ export class MemorySelfHostedInstanceRepository implements SelfHostedInstanceRep
       .toSorted((a, b) => b.receivedAt.epochMilliseconds - a.receivedAt.epochMilliseconds)
       .slice(0, limit);
   }
+}
+
+function kept({
+  row,
+  query,
+}: {
+  row: SelfHostedInstanceRecord;
+  query: SelfHostedInstanceQuery;
+}): boolean {
+  const term = query.search?.trim().toLowerCase();
+  const seen = row.lastSeenAt.epochMilliseconds;
+  return (
+    (!term || matches({ row, term })) &&
+    (query.licensed === undefined || (row.organizationId !== null) === query.licensed) &&
+    (!query.seenSince || seen >= query.seenSince.epochMilliseconds) &&
+    (!query.seenBefore || seen < query.seenBefore.epochMilliseconds) &&
+    (!query.signal || row.raisedSignals.includes(query.signal))
+  );
+}
+
+const USAGE_KEYS: Partial<Record<SelfHostedInstanceSort, string>> = {
+  traces_28d: "traces_28d",
+  users: "users",
+  active_users_28d: "active_users_28d",
+};
+
+/** The prisma twin's order: a usage order puts a missing number last, then the latest report. */
+function compareBy({
+  sort,
+  a,
+  b,
+}: {
+  sort: SelfHostedInstanceSort;
+  a: SelfHostedInstanceRecord;
+  b: SelfHostedInstanceRecord;
+}): number {
+  const byLastSeen = b.lastSeenAt.epochMilliseconds - a.lastSeenAt.epochMilliseconds;
+  if (sort === "newest") return b.firstSeenAt.epochMilliseconds - a.firstSeenAt.epochMilliseconds;
+  const key = USAGE_KEYS[sort];
+  if (!key) return byLastSeen;
+  const [left] = findReported(a, key);
+  const [right] = findReported(b, key);
+  if (left === right) return byLastSeen;
+  if (left === undefined) return 1;
+  if (right === undefined) return -1;
+  return right - left;
+}
+
+/** The number the last report carried under `key`: one, or none. */
+function findReported(row: SelfHostedInstanceRecord, key: string): number[] {
+  const value = row.latestReport?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? [value] : [];
+}
+
+/** Each distinct value with its count, most common first; ties ordered as the Prisma twin does. */
+function countsOf({
+  values,
+  ties,
+}: {
+  values: readonly string[];
+  ties: "ascending" | "descending";
+}): [string, number][] {
+  const counts = new Map<string, number>();
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  const byValue = (a: string, b: string) =>
+    ties === "ascending" ? a.localeCompare(b) : b.localeCompare(a);
+  return [...counts].toSorted((a, b) => b[1] - a[1] || byValue(a[0], b[0]));
 }
 
 /** Part of the id, hostname, release or install method; the whole of a domain. */

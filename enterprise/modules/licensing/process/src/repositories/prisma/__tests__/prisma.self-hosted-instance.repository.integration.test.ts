@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * @see specs/self-hosting/connected-services/instance-registry.feature
- * The install registry on Postgres: first-seen kept, activity order, domain search.
+ * The install registry on Postgres: first-seen kept, orders, filters, domain search, counts.
  */
 import { nowInstant } from "@langwatch/time";
 import { afterAll, describe, expect, it } from "vitest";
@@ -105,7 +105,12 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry on Postgr
         }),
       );
 
-      const { rows } = await repository.listPage({ page: 0, pageSize: 25, search: RUN });
+      const { rows } = await repository.listPage({
+        page: 0,
+        pageSize: 25,
+        search: RUN,
+        sort: "last_report",
+      });
 
       expect(rows[0]?.instanceId).toBe(`${RUN}-c`);
       expect(rows.at(-1)?.instanceId).toBe(`${RUN}-b`);
@@ -119,10 +124,93 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry on Postgr
         upsertOf({ instanceId: `${RUN}-d`, hostname: null, userEmailDomains: { [domain]: 7 } }),
       );
 
-      const { rows, total } = await repository.listPage({ page: 0, pageSize: 25, search: domain });
+      const { rows, total } = await repository.listPage({
+        page: 0,
+        pageSize: 25,
+        search: domain,
+        sort: "last_report",
+      });
 
       expect(total).toBe(1);
       expect(rows[0]?.instanceId).toBe(`${RUN}-d`);
+    });
+  });
+
+  describe("given installs with different usage, licences and signals", () => {
+    const tag = `${RUN}-u`;
+
+    it("sorts by a reported number with the installs that carried none last, and filters", async () => {
+      await repository.upsert(
+        upsertOf({
+          instanceId: `${tag}-busy`,
+          hostname: `busy.${tag}.test`,
+          latestReport: { traces_28d: 5000 },
+          raisedSignals: ["sustained_ingestion"],
+        }),
+      );
+      await repository.upsert(
+        upsertOf({
+          instanceId: `${tag}-light`,
+          hostname: `light.${tag}.test`,
+          latestReport: { traces_28d: 40 },
+          organizationId: `org-${tag}`,
+        }),
+      );
+      await repository.upsert(
+        upsertOf({
+          instanceId: `${tag}-silent`,
+          hostname: `silent.${tag}.test`,
+          latestReport: { traces_28d: "not a number" },
+        }),
+      );
+      const query = { page: 0, pageSize: 25, search: tag } as const;
+
+      const byTraces = await repository.listPage({ ...query, sort: "traces_28d" });
+      const openSource = await repository.listPage({
+        ...query,
+        sort: "traces_28d",
+        licensed: false,
+      });
+      const signalled = await repository.listPage({
+        ...query,
+        sort: "last_report",
+        signal: "sustained_ingestion",
+      });
+
+      expect(byTraces.rows.map((row) => row.instanceId)).toEqual([
+        `${tag}-busy`,
+        `${tag}-light`,
+        `${tag}-silent`,
+      ]);
+      expect(openSource.rows.map((row) => row.instanceId)).toEqual([
+        `${tag}-busy`,
+        `${tag}-silent`,
+      ]);
+      expect(signalled.rows.map((row) => row.instanceId)).toEqual([`${tag}-busy`]);
+    });
+
+    it("tallies the signals and the releases still reporting", async () => {
+      await repository.upsert(
+        upsertOf({
+          instanceId: `${tag}-tallied`,
+          hostname: `tallied.${tag}.test`,
+          lastSeenAt: NOW,
+          version: "3.16.0",
+          raisedSignals: ["sustained_ingestion"],
+        }),
+      );
+      const tally = await repository.tally({
+        reportingSince: NOW.subtract({ hours: 48 }),
+        quietSince: NOW.subtract({ hours: 24 * 14 }),
+        releaseLimit: 50,
+      });
+
+      expect(tally.total).toBeGreaterThanOrEqual(1);
+      expect(tally.signals).toContainEqual({
+        signal: "sustained_ingestion",
+        count: expect.any(Number),
+      });
+      expect(tally.releases.map((release) => release.version)).toContain("3.16.0");
     });
   });
 });

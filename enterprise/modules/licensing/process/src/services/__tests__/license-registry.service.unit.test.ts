@@ -161,6 +161,26 @@ describe("the license registry", () => {
     expect(contractBudgets.synced).toEqual(["org-acme"]);
   });
 
+  /** @scenario "The license list hides inactive and internal test licenses until asked" */
+  it("keeps only active customer licenses when asked, and every license otherwise", async () => {
+    const { registry } = harness();
+    await registry.issue(issueInput({ email: "ops@customer.com" }));
+    const { license: revoked } = await registry.issue(issueInput({ email: "it@customer.com" }));
+    await registry.revoke({ id: revoked.id, reason: "test", operatorId: "operator-1" });
+    await registry.issue(issueInput({ email: "selfhost-dogfood@langwatch.ai" }));
+
+    const filtered = await registry.list({
+      page: 0,
+      pageSize: 10,
+      onlyActive: true,
+      hideInternal: true,
+    });
+    const everything = await registry.list({ page: 0, pageSize: 10 });
+
+    expect(filtered.licenses.map((license) => license.email)).toEqual(["ops@customer.com"]);
+    expect(everything.total).toBe(3);
+  });
+
   /** @scenario A license is written only once its customer is marked */
   it("writes no row when marking the customer fails, so issuing again is not a duplicate", async () => {
     class FailingCustomers extends RecordingCustomers {
