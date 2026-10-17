@@ -122,6 +122,11 @@ export interface VoiceSessionInfrastructure {
     record: CallRecord;
     scenario: { scenarioId: string; scenarioSetId: string };
     turnTraceIds: readonly string[];
+    /** True when this write is a retry completing a half-written run (#7973
+     *  AC2). The first attempt's started event already set the metadata and is
+     *  first-wins, so this attempt's source / audioUrl / cutoff reach the run
+     *  through a refresh event instead (#8032). */
+    isRedrive?: boolean;
   }): Promise<void>;
   /** The set a scenario's runs are listed under, so a "Call it myself" run
    *  lands beside its simulated runs. Throws `scenario_not_found` when the
@@ -436,6 +441,10 @@ async function finishVoiceSession(
     record,
     turnTraceIds,
     scenario: scenarioContext,
+    // A half-written run already present means this is the retry completing it
+    // (#7973 AC2): its metadata reaches the run through a refresh event, since
+    // the first attempt's started event is first-wins in the fold (#8032).
+    isRedrive: Boolean(existing),
   });
 
   return {

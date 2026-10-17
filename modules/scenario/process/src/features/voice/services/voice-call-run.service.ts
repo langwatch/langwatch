@@ -4,6 +4,7 @@
  * only per-exchange traces.
  */
 
+import { randomUUID } from "node:crypto";
 import {
   VoiceAgentNotFoundError,
   type CallRecord,
@@ -23,7 +24,10 @@ interface VoiceCallRunWriterCollaborators {
   agents: {
     findById(input: { projectId: string; id: string }): Promise<{ id: string } | null>;
   };
-  simulations: Pick<SimulationService, "startRun" | "messageSnapshot" | "finishRun">;
+  simulations: Pick<
+    SimulationService,
+    "startRun" | "messageSnapshot" | "finishRun" | "refreshMetadata"
+  >;
 }
 
 /**
@@ -104,6 +108,7 @@ function createVoiceCallRunWriter(
     record,
     scenario,
     turnTraceIds,
+    isRedrive = false,
   }: {
     projectId: string;
     scenarioRunId: string;
@@ -115,6 +120,11 @@ function createVoiceCallRunWriter(
      *  from {@link recordVoiceCallTraces}. Set on the message and the run's
      *  trace list so the drawer probes the exchange's trace. */
     turnTraceIds: readonly string[];
+    /** True when this write is a retry completing a half-written run (#7973
+     *  AC2). The first attempt's started event already set the metadata and is
+     *  first-wins, so this attempt's `source` / `audioUrl` / cutoff reach the
+     *  run through a refresh event instead (#8032). */
+    isRedrive?: boolean;
   }): Promise<void> {
     // The row id is trusted only as far as the token that carried it; the row
     // itself must exist in this project before a run is written under it.
@@ -166,6 +176,34 @@ function createVoiceCallRunWriter(
       batchRunId: scenarioRunId,
       occurredAt: record.endedAt,
     });
+
+    // On a re-drive the run's metadata was set by the first attempt's started
+    // event, which is first-wins in the fold — so this attempt's source, audio
+    // and cutoff would be lost. A refresh event carries them onto the run, so a
+    // "browser, no recording" first attempt becomes the "provider, with audio"
+    // the retry actually saw (#8032). Skipped on a first write: the started
+    // event already carries these, and there is nothing to refresh over.
+    if (isRedrive) {
+      await collaborators.simulations.refreshMetadata({
+        tenantId: projectId,
+        scenarioRunId,
+        // Each re-drive is its own attempt. The end time is the same on every
+        // re-drive of this call, so it cannot tell two attempts apart; this id
+        // does, so a later re-drive with different recording metadata is not
+        // deduped away as a copy of the first.
+        attemptId: randomUUID(),
+        metadata: {
+          source: record.source,
+          langwatch: { isCutAtLimit: record.isCutAtLimit },
+          // Always carry audioUrl, as null when this attempt has no recording:
+          // a first attempt that had audio then a retry that does not must
+          // clear the stale link, else the run keeps offering a Play control
+          // for a recording that is no longer there (#8032).
+          audioUrl: record.audioUrl ?? null,
+        },
+        occurredAt: record.endedAt,
+      });
+    }
   };
 }
 

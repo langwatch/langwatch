@@ -4,6 +4,7 @@ import {
   simulationDeleteRunSchema,
   simulationRecordAgentInstanceSchema,
   simulationRecordCutAtLimitSchema,
+  simulationRefreshMetadataSchema,
   simulationFinishRunSchema,
   recordEvaluationsCommandDataSchema,
   simulationMessageSnapshotSchema,
@@ -24,6 +25,7 @@ import type {
   SimulationDeleteRun,
   SimulationRecordAgentInstance,
   SimulationRecordCutAtLimit,
+  SimulationRefreshMetadata,
   SimulationExportFilterInput,
   SimulationExportRunsInput,
   SimulationExternalSetCountInput,
@@ -200,5 +202,9 @@ export class SimulationService extends SimulationServiceContract {
 
   recordCutAtLimit(input: SimulationRecordCutAtLimit): Promise<void> {
     return this.execution.recordCutAtLimit(simulationRecordCutAtLimitSchema.parse(input));
+  }
+
+  refreshMetadata(input: SimulationRefreshMetadata): Promise<void> {
+    return this.execution.refreshMetadata(simulationRefreshMetadataSchema.parse(input));
   }
 }

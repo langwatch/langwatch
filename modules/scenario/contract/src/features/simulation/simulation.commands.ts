@@ -144,6 +144,19 @@ export type SimulationRecordAgentInstance = z.infer<typeof simulationRecordAgent
 export const simulationRecordCutAtLimitSchema = simulationRunIdentitySchema;
 export type SimulationRecordCutAtLimit = z.infer<typeof simulationRecordCutAtLimitSchema>;
 
+/**
+ * A later attempt at the same run carrying metadata the first could not (#8032).
+ * `attemptId` is the refresh's idempotency identity: occurredAt is identical
+ * across every re-drive of one call, so two re-drives with different recording
+ * metadata would otherwise collapse to one.
+ */
+export const simulationRefreshMetadataSchema = z.object({
+  ...simulationRunIdentitySchema.shape,
+  attemptId: z.string().min(1),
+  metadata: z.record(z.string(), z.unknown()),
+});
+export type SimulationRefreshMetadata = z.infer<typeof simulationRefreshMetadataSchema>;
+
 const simulationComputeRunMetricsSchemaDefinition = z.object({
   ...simulationRunIdentitySchema.shape,
   traceId: z.string(),
