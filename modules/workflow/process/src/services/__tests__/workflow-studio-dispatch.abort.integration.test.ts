@@ -117,3 +117,67 @@ describe("given a studio run that finishes before any stop", () => {
     });
   });
 });
+
+describe("given a studio run whose abort poll's Redis check rejects (langwatch#8534)", () => {
+  describe("when a pod shutting down closes the connection mid-poll", () => {
+    /**
+     * The poll timer runs detached from any awaited call chain (it is driven
+     * by `setInterval`, not the `Promise.race` it feeds), so an unhandled
+     * rejection there escapes `postEvent`'s own try/catch entirely and crashes
+     * the process — this is what prod saw. A rejected poll check must be
+     * treated as "not aborted" so the run keeps going until the connection
+     * recovers.
+     */
+    it("does not raise an unhandled rejection when the poll's abort check rejects", async () => {
+      // A read that never resolves on its own: only the abort race (the poll
+      // timer) can end the loop. `cancel` resolving lets the test prove
+      // postEvent actually settles, not just that a timeout gave up on it — if
+      // it never settled, its `finally` would never clear the poll's
+      // `setInterval`, leaking a timer that keeps firing past this test.
+      const cancel = vi.fn(async () => undefined);
+      const reader: ReadableStreamDefaultReader<Uint8Array> = {
+        read: () => new Promise<never>(() => undefined),
+        cancel,
+        releaseLock: vi.fn(),
+        closed: Promise.resolve(undefined),
+      };
+      const onEvent = vi.fn<(event: StudioServerEvent) => void>();
+
+      const unhandled: unknown[] = [];
+      const onUnhandledRejection = (reason: unknown) => {
+        unhandled.push(reason);
+      };
+      process.on("unhandledRejection", onUnhandledRejection);
+
+      let callCount = 0;
+      const redisClosed = new Error("Connection is closed.");
+      // The pre-read check (call 1) passes. The next two poll ticks (calls 2
+      // and 3) reject, as a closed Redis connection would while a pod is
+      // shutting down. The connection then "recovers" (call 4 resolves true),
+      // ending the test deterministically instead of on a timeout — proving
+      // the rejecting ticks didn't wedge the poll or leave it unable to
+      // resolve once isAborted succeeds again.
+      const isAborted = vi.fn(async () => {
+        callCount++;
+        if (callCount === 1) return false;
+        if (callCount <= 3) throw redisClosed;
+        return true;
+      });
+
+      try {
+        await dispatch(reader).postEvent({
+          projectId: "project-1",
+          event: blockedCell,
+          onEvent,
+          isAborted,
+        });
+      } finally {
+        process.off("unhandledRejection", onUnhandledRejection);
+      }
+
+      expect(unhandled).toEqual([]);
+      expect(callCount).toBeGreaterThanOrEqual(4);
+      expect(cancel).toHaveBeenCalledTimes(1);
+    }, 10_000);
+  });
+});

@@ -311,11 +311,22 @@ async function readChunkOrAbort(
   let poll: ReturnType<typeof setInterval> | undefined;
   const aborted = new Promise<"aborted">((resolve) => {
     poll = setInterval(() => {
-      void isAborted().then((stop) => {
-        if (stop) {
-          resolve("aborted");
-        }
-      });
+      // isAborted() reads Redis; a pod shutting down mid-poll can close that
+      // connection and reject (ioredis "Connection is closed."). The timer
+      // runs detached from any awaited call chain, so an unhandled rejection
+      // here would escape the surrounding try/catch entirely and crash the
+      // process (langwatch/langwatch#8534). Treat a failed check as "not
+      // aborted" — the next poll, or the per-chunk `isAborted` check in the
+      // loop below, gets another chance once the connection recovers.
+      void isAborted()
+        .then((stop) => {
+          if (stop) {
+            resolve("aborted");
+          }
+        })
+        .catch((error: unknown) => {
+          logger.warn({ error }, "abort poll failed, treating as not aborted");
+        });
     }, ABORT_POLL_INTERVAL_MS);
   });
 
