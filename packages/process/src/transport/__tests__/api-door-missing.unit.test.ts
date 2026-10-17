@@ -27,7 +27,6 @@ describe("given a process whose installed modules bind no API door", () => {
         logger: createLogger("process-server:missing-door-test"),
         stores: { database: false, redis: false },
         bundle: void 0,
-        storage: {},
         instanceAdmin: bearerDoor({ name: "instance-admin", token: void 0 }),
         trustedProxies: void 0,
         executionProxyBaseUrl: void 0,

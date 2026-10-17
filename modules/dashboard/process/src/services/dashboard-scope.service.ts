@@ -13,7 +13,7 @@ import {
 } from "@langwatch/dashboard-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import type { DashboardRepository } from "../repositories/dashboard.repository.ts";
+import type { BoardRepository } from "../repositories/board.repository.ts";
 import type { DashboardAccessService } from "./dashboard-access.service.ts";
 
 /** A board named by a member, from the project they are in. */
@@ -27,13 +27,13 @@ const MAX_SCOPE_PROJECTS = 500;
  * administrator is refused like any other member. Spec: dashboards-v2.feature AC174 to AC182.
  */
 export class DashboardScopeService {
-  #repository: DashboardRepository;
+  #repository: BoardRepository;
   #access: DashboardAccessService;
   #projects: ProjectApi;
   #authz: AuthzApi;
 
   private constructor(options: {
-    repository: DashboardRepository;
+    repository: BoardRepository;
     access: DashboardAccessService;
     projects: ProjectApi;
     authz: AuthzApi;
@@ -45,7 +45,7 @@ export class DashboardScopeService {
   }
 
   static create(options: {
-    repository: DashboardRepository;
+    repository: BoardRepository;
     access: DashboardAccessService;
     projects: ProjectApi;
     authz: AuthzApi;
@@ -62,7 +62,7 @@ export class DashboardScopeService {
     const organizationId =
       scope === "ORGANIZATION" ? await this.#projects.getOrganizationId(board.projectId) : void 0;
 
-    return this.#repository.updateDashboard({
+    return this.#repository.updateBoard({
       projectId: board.projectId,
       dashboardId: board.id,
       data: { scope, ...(organizationId === void 0 ? {} : { organizationId }) },

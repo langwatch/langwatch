@@ -31,7 +31,7 @@ function readOnlyServer() {
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
-    if (call.path === "dashboards.getAll" || call.path === "dashboards.listStarred") {
+    if (call.path === "boards.getAll" || call.path === "boards.listStarred") {
       return Promise.resolve([]);
     }
     return NO_PROCEDURES(call);

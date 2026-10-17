@@ -371,6 +371,10 @@
       "types": "./dist/shiki-chunking.d.ts",
       "default": "./src/shiki-chunking.ts"
     },
+    "./emoji-picker": {
+      "types": "./dist/components/forms/emoji-picker.d.ts",
+      "default": "./src/components/forms/emoji-picker.tsx"
+    },
     "./search-input": {
       "types": "./dist/components/forms/search-input.d.ts",
       "default": "./src/components/forms/search-input.tsx"

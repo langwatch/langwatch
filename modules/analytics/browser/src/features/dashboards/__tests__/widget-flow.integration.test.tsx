@@ -106,9 +106,9 @@ function inMemoryServer() {
   const respond = (call: UiProcedureCall): Promise<unknown> => {
     const input = (call.input ?? {}) as Input;
     switch (call.path) {
-      case "dashboards.getAll":
+      case "boards.getAll":
         return Promise.resolve([{ ...BOARD }]);
-      case "dashboards.listStarred":
+      case "boards.listStarred":
         return Promise.resolve([]);
       case "dashboardWidgets.list":
         return Promise.resolve(

@@ -5,12 +5,15 @@
  * @see specs/self-hosting/connected-services/instance-registry.feature
  */
 
-import type {
-  IncomingUsageReport,
-  SelfHostedInstanceDetail,
-  SelfHostedInstancePage,
-  SelfHostedInstanceView,
-  SelfHostedSignal,
+import {
+  SELF_HOSTED_SIGNALS,
+  type IncomingUsageReport,
+  type SelfHostedInstanceDetail,
+  type SelfHostedInstanceFilters,
+  type SelfHostedInstancePage,
+  type SelfHostedInstanceSummary,
+  type SelfHostedInstanceView,
+  type SelfHostedSignal,
 } from "@langwatch/enterprise-licensing-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
@@ -20,8 +23,12 @@ import type {
   SelfHostedInstanceRepository,
 } from "../repositories/self-hosted-instance.repository.ts";
 import {
+  activityCutoffs,
   carriesOptionalCategory,
   instanceActivity,
+  isReportNumber,
+  lastSeenRangeOf,
+  newInstallsPerWeek,
   reportFieldsOf,
 } from "../rules/self-hosted-report.rules.ts";
 import { signalsRaisedBy } from "../rules/self-hosted-signals.rules.ts";
@@ -30,6 +37,11 @@ import type { SelfHostedCrmService } from "./self-hosted-crm.service.ts";
 
 /** How many history rows the drawer shows. */
 const REPORT_HISTORY_LIMIT = 30;
+/** How far back the summary's new-installs chart reaches. */
+const SUMMARY_WEEKS = 12;
+const SUMMARY_LIST_LIMIT = 5;
+const SUMMARY_RELEASE_LIMIT = 6;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 type SelfHostedInstanceCollaborators = Readonly<{
   repository: SelfHostedInstanceRepository;
@@ -114,13 +126,62 @@ export class SelfHostedInstanceService {
     return signals;
   }
 
-  async list(input: {
+  async list({
+    sort,
+    license,
+    activity,
+    signal,
+    ...page
+  }: {
     page: number;
     pageSize: number;
     search?: string;
-  }): Promise<SelfHostedInstancePage> {
-    const { rows, total } = await this.collaborators.repository.listPage(input);
+  } & SelfHostedInstanceFilters): Promise<SelfHostedInstancePage> {
+    const { rows, total } = await this.collaborators.repository.listPage({
+      ...page,
+      sort: sort ?? "last_report",
+      ...(license ? { licensed: license === "licensed" } : {}),
+      ...(activity ? lastSeenRangeOf({ activity, now: this.#now() }) : {}),
+      ...(signal ? { signal } : {}),
+    });
     return { instances: await this.viewsOf(rows), total };
+  }
+
+  /** The top of the operator's page: counts, arrivals, signals, the busiest open source. */
+  async summarize(): Promise<SelfHostedInstanceSummary> {
+    const { repository } = this.collaborators;
+    const now = this.#now();
+    const { reportingSince, quietSince } = activityCutoffs(now);
+    const [tally, firstSeen, busiest] = await Promise.all([
+      repository.tally({ reportingSince, quietSince, releaseLimit: SUMMARY_RELEASE_LIMIT }),
+      repository.findFirstSeenSince(now.subtract({ milliseconds: SUMMARY_WEEKS * 7 * DAY_MS })),
+      repository.listPage({
+        page: 0,
+        pageSize: SUMMARY_LIST_LIMIT,
+        sort: "traces_28d",
+        licensed: false,
+        seenSince: reportingSince,
+      }),
+    ]);
+    const seenWithin = (days: number) =>
+      firstSeen.filter((seen) => now.epochMilliseconds - seen.epochMilliseconds <= days * DAY_MS)
+        .length;
+    return {
+      total: tally.total,
+      reporting: tally.reporting,
+      quiet: tally.quiet,
+      gone: tally.total - tally.reporting - tally.quiet,
+      licensed: tally.licensed,
+      newLast7Days: seenWithin(7),
+      newLast30Days: seenWithin(30),
+      traces28d: tally.traces28d,
+      newPerWeek: newInstallsPerWeek({ firstSeen, now, weeks: SUMMARY_WEEKS }),
+      signals: tally.signals.flatMap(({ signal, count }) =>
+        isSelfHostedSignal(signal) ? [{ signal, count }] : [],
+      ),
+      busiestOpenSource: await this.viewsOf(busiest.rows.filter(reportedTraffic)),
+      releases: tally.releases,
+    };
   }
 
   async getById({ id }: { id: string }): Promise<SelfHostedInstanceDetail> {
@@ -212,6 +273,15 @@ export class SelfHostedInstanceService {
       }),
     );
   }
+}
+
+function reportedTraffic(row: SelfHostedInstanceRecord): boolean {
+  const traces = row.latestReport?.["traces_28d"];
+  return isReportNumber(traces) && traces > 0;
+}
+
+function isSelfHostedSignal(value: string): value is SelfHostedSignal {
+  return SELF_HOSTED_SIGNALS.some((signal) => signal === value);
 }
 
 function viewOf({
