@@ -828,11 +828,20 @@ function logInvalid({
   );
 }
 
-/** An evaluator that ran out of time is retried exactly once. */
-function timedOut(result: SingleEvaluationResult): boolean {
+/**
+ * An evaluator that ran out of time is retried exactly once.
+ *
+ * `details` is typed as a required string, but an evaluator can return
+ * `status: "error"` with no `details` at runtime (observed in production).
+ * Reading it unguarded threw `TypeError: Cannot read properties of undefined`,
+ * which the dispatch's catch swallowed as a generic INTERNAL_ERROR and hid the
+ * real evaluator error (langwatch/tasks#8507). A missing `details` is treated
+ * as "not a timeout" so the original error result is returned to the caller.
+ */
+export function timedOut(result: SingleEvaluationResult): boolean {
   if (result.status !== "error") return false;
 
-  return result.details.toLowerCase().includes("timed out");
+  return result.details?.toLowerCase().includes("timed out") ?? false;
 }
 
 /** The evaluate doors publish a thrown string as the detail. */
