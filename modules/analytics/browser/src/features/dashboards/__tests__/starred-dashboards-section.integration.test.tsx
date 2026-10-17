@@ -33,7 +33,7 @@ function renderStarred({ stars, fails = false }: { stars: unknown[]; fails?: boo
   let answered = 0;
   const answer = (call: UiProcedureCall) => {
     answered += 1;
-    if (call.path !== "dashboards.listStarred") return NO_PROCEDURES(call);
+    if (call.path !== "boards.listStarred") return NO_PROCEDURES(call);
     return fails ? Promise.reject(new Error("down")) : Promise.resolve(stars);
   };
   renderDashboards({ element: <StarredDashboardsSection />, host, answer });

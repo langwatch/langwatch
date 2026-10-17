@@ -1,13 +1,10 @@
 import chalk from "chalk";
 
 import {
+  type DashboardBoard,
   DashboardWidgetsApiError,
   DashboardWidgetsApiService,
 } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
-import {
-  DashboardsApiService,
-  type DashboardSummary,
-} from "@/client-sdk/services/dashboards/dashboards-api.service";
 
 import { resolveCredentials } from "../../utils/apiKey";
 import { sanitizeTerminalText } from "../../utils/formatting";
@@ -50,15 +47,18 @@ async function resolveWidgetRef({
   return matches[0]!;
 }
 
-/** Resolves a dashboard reference (id or name) to the dashboard it names. */
+/**
+ * Resolves a dashboard reference (id or name) among the Dashboards boards; an Analytics Reports
+ * board holds no widget, so it is never matched.
+ */
 async function resolveDashboardRef({
-  dashboards,
+  widgets,
   ref,
 }: {
-  dashboards: DashboardsApiService;
+  widgets: DashboardWidgetsApiService;
   ref: string;
-}): Promise<DashboardSummary> {
-  const { data } = await dashboards.list();
+}): Promise<DashboardBoard> {
+  const { data } = await widgets.listBoards();
   const byId = data.find((d) => d.id === ref);
   if (byId) return byId;
 
@@ -88,15 +88,11 @@ export const pinDashboardWidgetCommand = async (
   await resolveCredentials({ project: options.project });
 
   const widgets = new DashboardWidgetsApiService();
-  const dashboards = new DashboardsApiService();
   const spinner = createSpinner(`Adding "${widgetRef}" to dashboard...`).start();
 
   try {
     const widgetBefore = await resolveWidgetRef({ widgets, ref: widgetRef });
-    const dashboard = await resolveDashboardRef({
-      dashboards,
-      ref: options.dashboard,
-    });
+    const dashboard = await resolveDashboardRef({ widgets, ref: options.dashboard });
 
     const widget = await widgets.assignDashboard({
       id: widgetBefore.id,

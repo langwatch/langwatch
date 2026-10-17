@@ -3,8 +3,8 @@
  * A lane that fails to stage is recorded in the outbox and re-driven.
  * See specs/durable-handoff.feature.
  */
-import { register } from "prom-client";
-import { describe, expect, it, vi } from "vitest";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import type { Event } from "../../../domain/types.ts";
@@ -105,7 +105,15 @@ const appended = () => createTestEvent(aggregateId, aggregateType, tenantId);
 const appendedAt = (createdAt: number) =>
   createTestEvent(aggregateId, aggregateType, tenantId, TEST_CONSTANTS.EVENT_TYPE_1, createdAt);
 
+let meter = createRecordingMeterProvider();
+
 describe("durable hand-off", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+  });
+  afterEach(() => meter.uninstall());
+
   describe("given every lane stages", () => {
     /** @scenario "A successful hand-off writes nothing to the outbox" */
     it("writes no hand-off row", async () => {
@@ -347,10 +355,13 @@ describe("durable hand-off", () => {
 
       await expect(service.storeEvents([appended()], { tenantId })).resolves.toBeUndefined();
 
-      const counted = await register.getSingleMetricAsString("es_handoff_total");
-      expect(counted).toContain(
-        `pipeline_name="${pipelineName}",lane_kind="subscriber",outcome="unrecorded"`,
-      );
+      expect(
+        meter.valueOf("es_handoff_total", {
+          pipeline_name: pipelineName,
+          lane_kind: "subscriber",
+          outcome: "unrecorded",
+        }),
+      ).toBe(1);
     });
   });
 });

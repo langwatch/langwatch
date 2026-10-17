@@ -23,6 +23,7 @@ import {
   selfHostedInstanceDetailSchema,
   selfHostedInstanceIdInputSchema,
   selfHostedInstancePageSchema,
+  selfHostedInstanceSummarySchema,
 } from "@langwatch/enterprise-licensing-contract";
 /**
  * The license registry surface (ADR-156), as the admin console reads and writes
@@ -30,6 +31,7 @@ import {
  * exactly once, when it is issued or reissued, and never read back.
  */
 import { defineTrpcContract } from "@langwatch/module";
+import { z } from "zod";
 
 export const licenseRegistryTrpc = defineTrpcContract("licenseRegistry")
   .query("getAll")
@@ -96,4 +98,8 @@ export const selfHostedInstancesTrpc = defineTrpcContract("selfHostedInstances")
   .query("getById")
   .withInput(selfHostedInstanceIdInputSchema)
   .withOutput(selfHostedInstanceDetailSchema)
+
+  .query("summary")
+  .withInput(z.void())
+  .withOutput(selfHostedInstanceSummarySchema)
   .build();

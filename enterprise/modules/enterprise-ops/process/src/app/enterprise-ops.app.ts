@@ -110,6 +110,10 @@ export class EnterpriseOpsModule implements EnterpriseOpsApiContract {
     id,
   }) => this.#instances.getById({ id, operatorId: await this.#staff(operator) });
 
+  summarizeSelfHostedInstances: EnterpriseOpsApiContract["summarizeSelfHostedInstances"] = async ({
+    operator,
+  }) => this.#instances.summarize({ operatorId: await this.#staff(operator) });
+
   /** The staff member's id, or not-found; ops admits only where its cloud-ops capability is on (§3.5). */
   async #staff(operator: OpsOperator | null): Promise<string> {
     return (await this.#ops.admitCloudAdmin(operator)).id;

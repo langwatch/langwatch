@@ -276,7 +276,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
     Given the feature flag "release_trace_blob_offload" is disabled
     When a trace with a large output is ingested and then read back
     Then no S3 spool is written
-    And the existing capOversizedAttributes(256 KB) is the only cap in effect
+    And the 8 MiB record cap is the only cap applied before event_log
     And the trace-detail and list reads return the same shapes as before the feature
 
   # ===========================================================================
