@@ -46,7 +46,6 @@ export async function processSurface({
     logger: members.read("logger"),
     stores: { database: true, redis: true },
     bundle,
-    storage: {},
     instanceAdmin,
     trustedProxies: config.trustedProxies,
     executionProxyBaseUrl,

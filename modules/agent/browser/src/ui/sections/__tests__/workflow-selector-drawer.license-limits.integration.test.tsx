@@ -58,10 +58,6 @@ vi.mock("../../../model/workflow/random-workflow-icon.ts", () => ({
   getRandomWorkflowIcon: () => "🧩",
 }));
 
-vi.mock("../workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx", () => ({
-  EmojiPickerModal: () => null,
-}));
-
 vi.mock("../../elements/workflow/code/workflow-code-editor.tsx", () => ({
   WorkflowCodeEditorModal: () => null,
 }));

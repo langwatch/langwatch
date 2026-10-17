@@ -29,21 +29,16 @@ type Reading = Readonly<{ viewer: DashboardViewer | undefined; place: DashboardP
  */
 export type DashboardStanding = "home" | "guest" | "none";
 
-/**
- * The scope a new board starts at: Project, and Only me for a member's own My dashboard where
- * Dashboards is switched on. Where it is off nothing offers the scope, so nobody could widen it.
- */
+/** The scope a new board starts at: Project, and Only me for a member's own My dashboard. */
 export function newDashboardScope({
   name,
   createdById,
-  dashboardsEnabled,
 }: {
   name: string;
   createdById: string | undefined;
-  dashboardsEnabled: boolean;
 }): DashboardScope {
   const ownMyDashboard = name === MY_DASHBOARD_NAME && createdById !== undefined;
-  return ownMyDashboard && dashboardsEnabled ? "PRIVATE" : DEFAULT_DASHBOARD_SCOPE;
+  return ownMyDashboard ? "PRIVATE" : DEFAULT_DASHBOARD_SCOPE;
 }
 
 /** A board with no recorded author has none: a project credential never is one. */

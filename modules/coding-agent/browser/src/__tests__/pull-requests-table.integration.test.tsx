@@ -881,6 +881,7 @@ describe("the personal Pull Requests table", () => {
 
       await user.click(screen.getByRole("button", { name: /all time/i }));
       await user.click(await screen.findByText("Last 7 days"));
+      await periodPopoverClosed();
       expect(screen.queryByText("Untouched for a month")).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /last 7 days/i }));

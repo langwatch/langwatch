@@ -109,7 +109,7 @@ describe("the dashboard widgets tRPC namespace", () => {
   });
 
   describe("when the playground lists the project's widgets", () => {
-    it("answers main's stored chart rows, the definition under graph", async () => {
+    it("answers each widget with its definition under graph", async () => {
       const { call } = mounted(createDashboardTestApp());
       await call("create", WIDGET);
 
@@ -120,8 +120,6 @@ describe("the dashboard widgets tRPC namespace", () => {
       expect(rows).toEqual([
         expect.objectContaining({
           name: "Usage",
-          kind: "dashboard_srcdoc",
-          filters: null,
           graph: { version: 1, code: WIDGET.code, queries: WIDGET.queries },
         }),
       ]);

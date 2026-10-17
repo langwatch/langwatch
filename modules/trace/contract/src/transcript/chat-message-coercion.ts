@@ -1,5 +1,6 @@
 import { isRecord, parseJSON } from "./content-format.ts";
 import { parseContentBlocks } from "./content-parser.ts";
+import { parseLangChainMessage } from "./langchain-messages.ts";
 import type { ChatMessage } from "./types.ts";
 
 const VALID_CHAT_ROLES = new Set(["system", "user", "assistant", "tool", "developer", "function"]);
@@ -22,16 +23,47 @@ function isChatMessagesArray(data: unknown): data is ChatMessage[] {
   return data.every(isOneChatMessage);
 }
 
+/** A batch (`[[...messages]]`, as LangChain records chat model calls) flattened to one list. */
+function flattenBatch(items: unknown[]): unknown[] {
+  return items.length > 0 && items.every(Array.isArray) ? items.flat() : items;
+}
+
+function coerceOneMessage(item: unknown): ChatMessage | null {
+  return isOneChatMessage(item) ? item : parseLangChainMessage(item);
+}
+
+/** Every item as a chat message, or null when any item is not one. */
+function coerceMessageList(items: unknown[]): ChatMessage[] | null {
+  const flat = flattenBatch(items);
+  if (flat.length === 0) return null;
+  const messages: ChatMessage[] = [];
+  for (const item of flat) {
+    const message = coerceOneMessage(item);
+    if (!message) return null;
+    messages.push(message);
+  }
+  return messages;
+}
+
+function isDeclaredChatMessage(item: unknown): item is ChatMessage {
+  if (!isRecord(item)) return false;
+  const content = item.content;
+  const hasContent = content === null || typeof content === "string" || Array.isArray(content);
+  return typeof item.role === "string" || hasContent;
+}
+
 function coerceDeclaredChatMessages(value: unknown[]): ChatMessage[] | null {
-  const messages = value.filter(
-    (item): item is ChatMessage =>
-      typeof item === "object" && item !== null && ("role" in item || "content" in item),
-  );
+  const messages = flattenBatch(value).flatMap((item): ChatMessage[] => {
+    const converted = parseLangChainMessage(item);
+    if (converted) return [converted];
+    return isDeclaredChatMessage(item) ? [item] : [];
+  });
   return messages.length > 0 ? messages : null;
 }
 
 function findNestedChatMessages(obj: Record<string, unknown>): ChatMessage[] | null {
-  for (const key of ["messages", "input", "history", "output", "data", "value", "events"]) {
+  const keys = ["messages", "input", "history", "output", "data", "value", "events", "generations"];
+  for (const key of keys) {
     const candidate = obj[key];
     if (candidate === undefined) continue;
 
@@ -51,7 +83,10 @@ export function coerceToChatMessages(data: unknown): ChatMessage[] | null {
     return null;
   }
   if (isChatMessagesArray(data)) return data;
+  if (Array.isArray(data)) return coerceMessageList(data);
   if (isOneChatMessage(data)) return [data];
+  const langChainMessage = parseLangChainMessage(data);
+  if (langChainMessage) return [langChainMessage];
   if (!isRecord(data)) return null;
   const obj = data;
   if (obj.type === "chat_messages" && Array.isArray(obj.value)) {

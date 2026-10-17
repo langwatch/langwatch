@@ -71,7 +71,8 @@ export interface AuthzApi {
     scope: Extract<AuthzScopeRef, { type: Tier }>;
     proof?: Readonly<{ actor: Actor; purpose: AuthorizationPurpose }>;
   }): Promise<Authorized<Tier, Permission> & Readonly<{ authorization: Authorization | null }>>;
-  /** The own-only proof platform code reads its own project with (ADR-177); evaluates nothing. */
+  /** The own-only proof platform code reads its own project with (ADR-177); evaluates nothing.
+   *  A project that no longer exists throws `ProjectNotFoundError`. */
   authorizeInternal(args: {
     actor: Extract<Actor, { type: "internal" | "system" }>;
     projectId: string;

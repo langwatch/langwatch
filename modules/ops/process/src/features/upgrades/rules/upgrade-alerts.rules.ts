@@ -2,7 +2,15 @@ import { Temporal } from "@langwatch/time";
 import type { UpgradeStatus, UpgradeStepView } from "@langwatch/upgrade/reader";
 
 export type UpgradeAlert =
-  | { kind: "step-failed"; stepId: string; error: string | null }
+  | {
+      kind: "step-failed";
+      stepId: string;
+      error: string | null;
+      description: string | null;
+      release: string | null;
+      mode: string;
+      attempt: number;
+    }
   | { kind: "lease-expired"; owner: string | null; host: string | null };
 
 function isWithin({ iso, since, until }: { iso: string | null; since: number; until: number }) {
@@ -23,13 +31,24 @@ export function upgradeAlertsBetween({
   until,
 }: {
   status: Pick<UpgradeStatus, "lease">;
-  failedSteps: readonly Pick<UpgradeStepView, "id" | "lastError" | "updatedAt" | "finishedAt">[];
+  failedSteps: readonly Pick<
+    UpgradeStepView,
+    "id" | "lastError" | "updatedAt" | "finishedAt" | "description" | "release" | "mode" | "attempt"
+  >[];
   since: number;
   until: number;
 }): UpgradeAlert[] {
   const alerts: UpgradeAlert[] = failedSteps
     .filter((step) => isWithin({ iso: step.updatedAt ?? step.finishedAt, since, until }))
-    .map((step) => ({ kind: "step-failed", stepId: step.id, error: step.lastError }));
+    .map((step) => ({
+      kind: "step-failed",
+      stepId: step.id,
+      error: step.lastError,
+      description: step.description,
+      release: step.release,
+      mode: step.mode,
+      attempt: step.attempt,
+    }));
   const { lease } = status;
   if (lease && isWithin({ iso: lease.expiresAt, since, until })) {
     alerts.push({ kind: "lease-expired", owner: lease.owner, host: lease.host });

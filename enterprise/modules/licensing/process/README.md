@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable signed-license capability supplied to process peers.
 
-Peers call these through the token, declared at `../contract/src/licensing.api.ts:62`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/licensing.api.ts:64`; nothing else in this package is public.
 
 #### `resolve`
 
@@ -187,7 +187,7 @@ getIssuedLicense(input: { id: string }): Promise<IssuedLicenseView>;
 #### `listIssuedLicenses`
 
 ```typescript
-listIssuedLicenses(input: { page: number; pageSize: number; search?: string; }): Promise<IssuedLicensePage>;
+listIssuedLicenses(input: { page: number; pageSize: number; search?: string; } & IssuedLicenseFilters): Promise<IssuedLicensePage>;
 ```
 
 #### `resolveConnectCredential`
@@ -427,13 +427,19 @@ recordUsageReport(input: IncomingUsageReport): Promise<SelfHostedSignal[]>;
 #### `listSelfHostedInstances`
 
 ```typescript
-listSelfHostedInstances(input: { page: number; pageSize: number; search?: string; }): Promise<SelfHostedInstancePage>;
+listSelfHostedInstances(input: { page: number; pageSize: number; search?: string; } & SelfHostedInstanceFilters): Promise<SelfHostedInstancePage>;
 ```
 
 #### `getSelfHostedInstance`
 
 ```typescript
 getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail>;
+```
+
+#### `summarizeSelfHostedInstances`
+
+```typescript
+summarizeSelfHostedInstances(): Promise<SelfHostedInstanceSummary>;
 ```
 
 ## REST transport
@@ -651,8 +657,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                     | Environment variable                 | Declared at                              |
 | ------ | ------------------------ | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:157`           |
-| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:158`           |
+| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:160`           |
+| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:161`           |
 | config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
 | config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:53` |
 | config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:60` |

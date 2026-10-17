@@ -432,6 +432,7 @@ import {
   hiddenAttributeKeyMatcher,
   readDroppedFromParams,
   readPiiIncompleteFromParams,
+  findTruncatedAttributesInParams,
   redactV2Content,
   toConversationContextTurn,
 } from "../rules/trace-read-mappers.rules.ts";
@@ -1883,6 +1884,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       detailParams,
       traceReadMapperPorts.contentPrivacy,
     );
+    redactedDetail.truncatedAttributes = findTruncatedAttributesInParams(detailParams);
     redactedDetail.restrictedAttributes = protections.restrictedAttributes ?? null;
 
     return redactedDetail;

@@ -73,7 +73,6 @@ function servedSurface({ doors }: { doors: RawHttpHost }): NodeHandler {
     logger: createLogger("process-server:mcp-root-paths-test"),
     stores: { database: false, redis: false },
     bundle: void 0,
-    storage: {},
     instanceAdmin: bearerDoor({ name: "instance-admin", token: void 0 }),
     trustedProxies: void 0,
     executionProxyBaseUrl: void 0,
