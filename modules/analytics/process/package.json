@@ -78,7 +78,7 @@
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
     "@testcontainers/clickhouse": "catalog:",
-    "@testcontainers/postgresql": "^12.1.0",
+    "@testcontainers/postgresql": "^12.2.0",
     "@types/js-yaml": "catalog:",
     "@types/node": "catalog:",
     "js-yaml": "catalog:",

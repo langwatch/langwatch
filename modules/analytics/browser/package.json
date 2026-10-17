@@ -64,7 +64,7 @@
     "recharts": "catalog:",
     "usehooks-ts": "catalog:",
     "vega": "catalog:",
-    "vega-embed": "7.1.0",
+    "vega-embed": "7.3.0",
     "vega-lite": "catalog:",
     "zod": "catalog:"
   },
