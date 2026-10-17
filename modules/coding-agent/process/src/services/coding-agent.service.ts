@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import {
   MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE,
   type CodingAgentPersonalPullRequestUsage,
@@ -59,7 +60,9 @@ export interface CodingAgentSessionService {
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>;
   backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void>;
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
-  listForProject(input: CodingAgentSessionsListInput): Promise<CodingAgentSessionListRow[]>;
+  listForProject(
+    input: CodingAgentSessionsListInput & { authorization: Authorization },
+  ): Promise<CodingAgentSessionListRow[]>;
   linkTraceSessionsToPullRequests(
     input: CodingAgentTracePullRequestInput,
   ): Promise<CodingAgentTracePullRequestLink[]>;
@@ -187,7 +190,9 @@ export class CodingAgentFeatureService implements CodingAgentSessionService {
     return this.collaborators.sessionReads.countUsage(input);
   }
 
-  listForProject(input: CodingAgentSessionsListInput): Promise<CodingAgentSessionListRow[]> {
+  listForProject(
+    input: CodingAgentSessionsListInput & { authorization: Authorization },
+  ): Promise<CodingAgentSessionListRow[]> {
     return this.collaborators.pullRequestReads.listForProject(input);
   }
 

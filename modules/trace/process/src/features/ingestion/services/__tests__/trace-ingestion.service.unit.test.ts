@@ -50,6 +50,14 @@ class TestTraceSpanDedup extends TraceSpanDedupRepository {
   releaseOnFailure(): Promise<void> {
     return this.release();
   }
+
+  claimUsageRecord(): Promise<SpanDedupClaim> {
+    return Promise.resolve({ outcome: "acquired" });
+  }
+
+  releaseUsageRecord(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
 /** Says yes to every span, so the test exercises the service's use of the filter. */

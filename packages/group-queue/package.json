@@ -33,8 +33,7 @@
     "@opentelemetry/api": "catalog:",
     "fastq": "^1.20.1",
     "ioredis": "catalog:",
-    "msgpackr": "^2.0.4",
-    "prom-client": "catalog:"
+    "msgpackr": "^2.0.4"
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",

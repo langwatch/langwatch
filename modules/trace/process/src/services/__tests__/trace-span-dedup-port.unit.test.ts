@@ -11,7 +11,7 @@ import {
 } from "../../repositories/trace-span-dedup.repository.ts";
 
 describe("TraceSpanDedupRepository", () => {
-  describe("given a plain object with the port's three methods", () => {
+  describe("given a plain object with the port's methods", () => {
     it("is usable as the port, so a caller needs no adapter class", () => {
       const seen: SpanDedupRef[] = [];
       const dedup: TraceSpanDedupRepository = {
@@ -25,6 +25,10 @@ describe("TraceSpanDedupRepository", () => {
         async releaseOnFailure(span: SpanDedupRef) {
           seen.push(span);
         },
+        async claimUsageRecord(): Promise<SpanDedupClaim> {
+          return { outcome: "acquired" };
+        },
+        async releaseUsageRecord() {},
       };
 
       void dedup.claimProcessing({

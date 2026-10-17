@@ -1,5 +1,9 @@
 import { CODEX_EXEC_SCOPE, isCodexScope } from "@langwatch/coding-agent-contract";
-import { CodexCanonicaliserService } from "@langwatch/span-normalisation";
+import {
+  canonicaliseSpanAttributes,
+  CodexCanonicaliserService,
+  orderedSpanCanonicalisers,
+} from "@langwatch/span-normalisation";
 import { describe, expect, it } from "vitest";
 
 import { createExtractorContext, createLogExtractorContext } from "./test-helpers.ts";
@@ -809,5 +813,62 @@ describe("CodexCanonicaliserService.applyLog reasoning effort", () => {
     CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
     expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("high");
+  });
+});
+
+describe("codex spans through the whole canonicaliser chain", () => {
+  const canonicalisers = orderedSpanCanonicalisers({ codexScopes: scopes });
+  const canonicalise = (name: string, attributes: Record<string, unknown>) =>
+    canonicaliseSpanAttributes({
+      canonicalisers,
+      spanAttributes: attributes,
+      events: [],
+      span: {
+        name,
+        kind: null,
+        instrumentationScope: { name: CODEX_EXEC_SCOPE },
+        statusMessage: null,
+        statusCode: null,
+        parentSpanId: "0000000000000001",
+      },
+    }).attributes;
+
+  /** @scenario "A codex response span's cached input is priced once, not twice" */
+  it("takes the cache read off a response span's whole input", () => {
+    const attributes = canonicalise("handle_responses", {
+      "gen_ai.usage.input_tokens": 13005,
+      "gen_ai.usage.output_tokens": 10,
+      "gen_ai.usage.cache_read.input_tokens": "12032",
+      "codex.usage.total_tokens": "13015",
+    });
+
+    expect(attributes["gen_ai.usage.input_tokens"]).toBe(973);
+    expect(attributes["gen_ai.usage.cache_read.input_tokens"]).toBe(12032);
+  });
+
+  /** @scenario "A codex response span's cached input is priced once, not twice" */
+  it("takes the cache read and write off once when the span also sends a cache write", () => {
+    const attributes = canonicalise("handle_responses", {
+      "gen_ai.usage.input_tokens": 13005,
+      "gen_ai.usage.output_tokens": 240,
+      "gen_ai.usage.cache_read.input_tokens": "12032",
+      "gen_ai.usage.cache_write.input_tokens": "512",
+    });
+
+    expect(attributes["gen_ai.usage.input_tokens"]).toBe(461);
+    expect(attributes["gen_ai.usage.cache_creation.input_tokens"]).toBe(512);
+  });
+
+  /** @scenario "A codex response span's cached input is priced once, not twice" */
+  it("prefers the turn's own non-cached count over the whole input on its gen_ai keys", () => {
+    const attributes = canonicalise("session_task.turn", {
+      "codex.turn.token_usage.non_cached_input_tokens": "5842",
+      "gen_ai.usage.input_tokens": 29906,
+      "gen_ai.usage.output_tokens": 206,
+      "gen_ai.usage.cache_read.input_tokens": "24064",
+    });
+
+    expect(attributes["gen_ai.usage.input_tokens"]).toBe(5842);
+    expect(attributes["gen_ai.usage.cache_read.input_tokens"]).toBe(24064);
   });
 });
