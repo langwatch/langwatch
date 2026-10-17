@@ -35,6 +35,7 @@ export const NATIVE_ONLY_SKILLS = [
   "guided-onboarding",
   "automations",
   "daily-insights",
+  "connect-mcp",
 ] as const;
 
 export interface PublishedSkill {

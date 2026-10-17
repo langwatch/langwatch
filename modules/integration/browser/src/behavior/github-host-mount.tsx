@@ -11,7 +11,9 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import { useLentOperations } from "@langwatch/browser-host/lent";
 import { uiLeaveTo, uiOpenExternal } from "@langwatch/browser-host/navigation";
+import { type LangyAsk, LangyAskToken } from "@langwatch/langy-client";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -29,6 +31,7 @@ class HostServiceGithubHost extends GithubHostApi {
       route: UiRoute;
       feedback: UiFeedback;
       session: UiSession;
+      langy: (() => Promise<LangyAsk>) | undefined;
     },
   ) {
     super();
@@ -65,6 +68,20 @@ class HostServiceGithubHost extends GithubHostApi {
   failed(failure: GithubFailureNotice): void {
     this.deps.feedback.failed(failure);
   }
+
+  canAskLangy(): boolean {
+    return this.deps.langy !== void 0;
+  }
+
+  askLangy(question: string): void {
+    if (!this.deps.langy) return;
+    void this.deps
+      .langy()
+      .then((langy) => langy.ask({ question }))
+      .catch((error: unknown) =>
+        this.deps.feedback.failed({ error, fallbackTitle: "Langy could not open" }),
+      );
+  }
 }
 
 /**
@@ -75,6 +92,7 @@ class HostServiceGithubHost extends GithubHostApi {
 export default function GithubHostMount({ children }: { children?: ReactNode }) {
   const { feedback, route, session } = useUiHostServices();
   const { organizationId } = useUiScope().activeScope();
+  const langy = useLentOperations(LangyAskToken);
   const host = useMemo(
     () =>
       new HostServiceGithubHost({
@@ -82,8 +100,9 @@ export default function GithubHostMount({ children }: { children?: ReactNode }) 
         route,
         feedback,
         session,
+        langy,
       }),
-    [organizationId, route, feedback, session],
+    [organizationId, route, feedback, session, langy],
   );
   return <GithubHostProvider value={host}>{children}</GithubHostProvider>;
 }

@@ -10051,6 +10051,9 @@ importers:
       '@langwatch/github-contract':
         specifier: workspace:*
         version: link:../../github/contract
+      '@langwatch/langy-client':
+        specifier: workspace:*
+        version: link:../../langy/client
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract

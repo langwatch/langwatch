@@ -57,6 +57,12 @@ export abstract class GithubHostApi {
   abstract openExternal(url: string): void;
 
   abstract failed(failure: GithubFailureNotice): void;
+
+  /** Whether Langy is installed to be asked; the page offers it only then. */
+  abstract canAskLangy(): boolean;
+
+  /** Opens Langy and sends it this question. */
+  abstract askLangy(question: string): void;
 }
 
 const GithubHostContext = createContext<GithubHostApi | undefined>(void 0);
