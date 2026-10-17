@@ -264,32 +264,35 @@ const RECORD_ID_PREFIXES = new Set([
 ]);
 
 /**
- * The one stored-object id shape the platform mints. Edge media extraction
- * rewrites span media to `/api/files/{projectId}/so_<id>` references, and the
- * id is a KSUID derived with a FIXED zero timestamp (`deriveStoredObjectId`):
- * 21 bytes whose first 8 are zero, so its 29 base62 digits always open with a
- * run of at least eleven zeros, a shape no vendor's key generator produces.
- *
- * `so` stays OUT of the global leading-prefix exemption on purpose — two
- * letters is exactly the shape a vendor mints keys in, and a bare `so_…` value
- * that looks like a key must keep the generic shape rule's protection. For the
- * same reason the tail exemption below does not trust the `so_` prefix alone:
- * the terminal segment has to BE a stored-object id, or a benign path head
- * followed by a key-shaped `so_` value would smuggle that value past the rule
- * that redacts it on its own.
+ * The platform's stored-object id (`deriveStoredObjectId`): a fixed-zero-time
+ * KSUID, so 29 base62 digits opening with ≥11 zeros. Matched in FULL, not by
+ * the `so_` prefix, so a key-shaped `so_…` value still hits the shape rule (#8077).
  */
 const STORED_OBJECT_ID_RE = /^so_0{11}[0-9A-Za-z]{18}$/;
 
 /**
- * Does the LAST path segment of a span name a record the span points at?
- * That is the tail exemption's whole vocabulary (see `shaped_api_key`): a
- * segment carrying one of {@link RECORD_ID_PREFIXES}, whose values the rule
- * never redacts anyway, or a segment that is a stored-object id (#8077).
+ * A record id's own shape — `<prefix>_<id>`, the id a bounded base62 run —
+ * validated in FULL, never by the prefix alone, so a key-shaped value wearing
+ * a `project_` prefix is not mistaken for a reference (#8077).
+ */
+const RECORD_ID_RE = /^[A-Za-z][A-Za-z0-9]{1,11}[_-][0-9A-Za-z]{1,40}$/;
+
+/**
+ * Does the LAST path segment NAME a record the span points at (see
+ * `shaped_api_key`)? Either a `RECORD_ID_PREFIXES` reference whose id is a
+ * validated record-id shape and not itself key-shaped, or a stored-object id.
  */
 function isRecordReferenceTail(segment: string): boolean {
-  const prefix = /^([A-Za-z][A-Za-z0-9]{1,11})[_-]/.exec(segment)?.[1];
-  if (!prefix) return false;
-  if (RECORD_ID_PREFIXES.has(prefix.toLowerCase())) return true;
+  const match = /^([A-Za-z][A-Za-z0-9]{1,11})[_-](.+)$/.exec(segment);
+  if (!match) return STORED_OBJECT_ID_RE.test(segment);
+  const [, prefix, id] = match;
+  if (
+    RECORD_ID_PREFIXES.has((prefix ?? "").toLowerCase()) &&
+    RECORD_ID_RE.test(segment) &&
+    !isKeyShapedBody(id ?? "")
+  ) {
+    return true;
+  }
   return STORED_OBJECT_ID_RE.test(segment);
 }
 
@@ -576,34 +579,19 @@ const VALUE_RULES: ValueRule[] = [
     accept: (groups) => {
       if (isNonCredentialPrefix(groups[1] ?? "")) return false;
       const body = groups[2] ?? "";
-      // The body class crosses `/`, so a URL path can be swallowed as one
-      // token: `/api/files/local-dev-project/so_<id>` matches with prefix
-      // `local` and a body that runs across the slash, and eating it turns a
-      // media reference into a 404 (#8077). A span whose LAST path segment
-      // names itself a record id is treated as a reference to that record —
-      // but only when the path in FRONT of it is benign. The record id says
-      // what the span POINTS AT, not what the earlier segments carry: a
-      // key-shaped segment ahead of it is still key material
-      // (`acme_<secret>/so_<id>`), and that span is redacted whole, record
-      // reference included — the safe direction, and what this rule always
-      // did to that shape. The guard stays narrow on the tail too — RECORD
-      // ids only, not the wider non-credential family: a digest or uuid
-      // prefix on the terminal segment says nothing about the rest of the
-      // span, and a slash-containing credential that happens to end in
-      // `sha_…` must keep its protection. Nor is a `so_` prefix taken as
-      // proof: the segment has to be a stored-object id in full, else
-      // `<benign path>/so_<key-shaped value>` would carry out a value the
-      // rule redacts when it stands alone.
+      // The body class crosses `/`, so a media path like
+      // `/api/files/<proj>/so_<id>` is swallowed whole and eating it 404s the
+      // reference (#8077). A span whose LAST segment IS a record reference
+      // (see `isRecordReferenceTail`) is exempt only when the path in FRONT is
+      // benign — key material ahead still redacts the span whole (safe way).
       const lastSlash = body.lastIndexOf("/");
       if (
         lastSlash !== -1 &&
         isRecordReferenceTail(body.slice(lastSlash + 1))
       ) {
-        // Key material ahead of the reference keeps its protection whether
-        // it reads as one segment or many: a slash is a valid character in
-        // the bodies this rule accepts, so a credential may itself be split
-        // across segments that are each under the shape floor while the
-        // joint head is unmistakably a key. Check both views.
+        // A slash is valid inside these bodies, so a credential may arrive
+        // split across sub-floor segments whose joint head is a key. Check
+        // both the whole head and each segment.
         const head = body.slice(0, lastSlash);
         return isKeyShapedBody(head) || head.split("/").some(isKeyShapedBody);
       }

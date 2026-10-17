@@ -1121,12 +1121,10 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
   });
 
   describe("given a bare so_-prefixed value that IS key-shaped", () => {
-    // `so` earns no GLOBAL prefix exemption: two letters is exactly the
-    // shape vendors mint keys in, and a stored-object id can never look
-    // like this (fixed zero timestamp = leading zeros, low entropy). The
-    // record-reference exemption applies only to the LAST path segment of
-    // a slash-carrying span, and only when that segment IS a stored-object
-    // id — the prefix alone proves nothing.
+    // `so` earns no global prefix exemption: two letters is the shape vendors
+    // mint keys in, and a real stored-object id never looks like this (leading
+    // zeros, low entropy). The tail exemption needs the LAST segment to BE a
+    // stored-object id — the prefix alone proves nothing.
     it("redacts it like any other unknown-vendor key", () => {
       const input = "creds so_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0 here";
 
@@ -1195,6 +1193,19 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
       const { text, redactedCount } = redactSecretsInText({ text: input });
 
       expect(text).not.toContain("Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("redacts when a record PREFIX fronts a key-shaped id — the prefix alone is no proof", () => {
+      // A `project_` tail must be a validated record-id shape, not any
+      // high-entropy value wearing the prefix; else `/project_<secret>`
+      // launders the key ahead of it just as a bare costume would.
+      const input =
+        "creds acme_Zx9Qm2Lp7Rt4Vw8s/project_Ke6Ng1Jd5Hf0Cu3Tb9Wm4Xp2Zr8Nq1 here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Ke6Ng1Jd5Hf0Cu3Tb9Wm4Xp2Zr8Nq1");
       expect(redactedCount).toBeGreaterThanOrEqual(1);
     });
   });
