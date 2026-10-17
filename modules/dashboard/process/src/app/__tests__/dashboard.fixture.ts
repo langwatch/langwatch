@@ -149,16 +149,15 @@ export function createDashboardTestApp(
   });
 }
 
-/** Memory repositories holding one board, for blocks placed on it. */
+/** Memory repositories holding one Dashboards board, for widgets placed on it. */
 export async function createDashboardTestRepositoriesWithBoard(
   input: Readonly<{ projectId?: string; dashboardId?: string }> = {},
 ): Promise<DashboardRepositories> {
   const repositories = MemoryDashboardRepositories.create();
-  await repositories.dashboards.createDashboard({
+  await repositories.boards.createBoard({
     id: input.dashboardId ?? "dashboard-1",
     projectId: input.projectId ?? "project-1",
     name: "Board",
-    order: 0,
   });
   return repositories;
 }

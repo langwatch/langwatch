@@ -97,9 +97,20 @@ export class ProcessServer implements ProcessBoot {
     if (!this.config.http)
       throw new Error("The HTTP config owner must be installed before exposing transports.");
     const config = this.config.http as ApiHostConfig;
+    const storage = (this.config.stores as StoresConfig | undefined)?.objectStorage;
     return {
       production: this.production,
       assetOrigin: assetBaseOrigin(normalizeAssetBase(config.assetBase)),
+      ...(storage
+        ? {
+            storage: {
+              s3Endpoint: storage.s3.endpoint,
+              s3Region: storage.s3.region,
+              s3Bucket: storage.s3.bucket,
+              azureBlobEndpoint: storage.azure.endpoint,
+            },
+          }
+        : {}),
     };
   }
 

@@ -94,21 +94,35 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
     page,
     pageSize,
     search,
+    activeAt,
+    excludeEmailSuffixes = [],
   }: {
     page: number;
     pageSize: number;
     search?: string;
+    /** Keeps only the rows active at this instant: not revoked, superseded or expired. */
+    activeAt?: Instant;
+    /** Drops the rows whose email ends with any of these, case aside. */
+    excludeEmailSuffixes?: readonly string[];
   }): Promise<{ rows: IssuedLicenseRecord[]; total: number }> {
     const term = search?.trim();
-    const where: Prisma.IssuedLicenseWhereInput = term
-      ? {
-          OR: [
-            { organizationName: { contains: term, mode: "insensitive" } },
-            { email: { contains: term, mode: "insensitive" } },
-            { licenseId: { contains: term, mode: "insensitive" } },
-          ],
-        }
-      : {};
+    const where: Prisma.IssuedLicenseWhereInput = {
+      ...(term
+        ? {
+            OR: [
+              { organizationName: { contains: term, mode: "insensitive" } },
+              { email: { contains: term, mode: "insensitive" } },
+              { licenseId: { contains: term, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+      ...(activeAt
+        ? { revokedAt: null, supersededAt: null, expiresAt: { gt: toDate(activeAt) } }
+        : {}),
+      NOT: excludeEmailSuffixes.map((suffix) => ({
+        email: { endsWith: suffix, mode: "insensitive" as const },
+      })),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.issuedLicense.findMany({
         where,

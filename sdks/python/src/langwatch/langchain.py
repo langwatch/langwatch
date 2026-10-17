@@ -17,6 +17,7 @@ from langchain_core.messages import (
     AIMessage,
     SystemMessage,
     FunctionMessage,
+    ToolMessage,
 )
 from langchain_core.outputs import LLMResult, ChatGeneration
 from langchain_core.agents import AgentAction, AgentFinish
@@ -91,20 +92,36 @@ def langchain_messages_to_chat_messages(
 
 
 def langchain_message_to_chat_message(message: BaseMessage) -> ChatMessage:
-    role: ChatRole = "user"
+    if isinstance(message, FunctionMessage):
+        return ChatMessage(role="assistant", content=message.content, function_call=message.additional_kwargs)  # type: ignore
+    if isinstance(message, ToolMessage):
+        tool_message = ChatMessage(role="tool", content=message.content, tool_call_id=message.tool_call_id)  # type: ignore
+        if message.name:
+            tool_message["name"] = message.name
+        return tool_message
+
+    role: ChatRole = "unknown"
     if isinstance(message, HumanMessage):
         role = "user"
     elif isinstance(message, AIMessage):
         role = "assistant"
     elif isinstance(message, SystemMessage):
         role = "system"
-    elif isinstance(message, FunctionMessage):
-        role = "assistant"
-        return ChatMessage(role="assistant", content=message.content, function_call=message.additional_kwargs)  # type: ignore
-    else:
-        role = "unknown"
-    # TODO: handle function types! where is the name?
-    return ChatMessage(role=role, content=message.content)  # type: ignore
+    chat_message = ChatMessage(role=role, content=message.content)  # type: ignore
+    tool_calls = getattr(message, "tool_calls", None)
+    if tool_calls:
+        chat_message["tool_calls"] = [
+            {
+                "id": tool_call.get("id") or "",
+                "type": "function",
+                "function": {
+                    "name": tool_call["name"],
+                    "arguments": json.dumps(tool_call.get("args", {})),
+                },
+            }
+            for tool_call in tool_calls
+        ]
+    return chat_message
 
 
 class LangChainTracer(BaseCallbackHandler):

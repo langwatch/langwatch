@@ -1,4 +1,5 @@
 import type { TriggerDigestMail } from "./templates/trigger-digest-email.tsx";
+import type { UpgradeAlertEmailProps } from "./templates/upgrade-alert-email.tsx";
 
 /**
  * The messages a backend process asks to render. Abstract class
@@ -21,4 +22,9 @@ export abstract class MailRender {
 
   /** The quiet notice a requester gets when nobody answered in two weeks. */
   abstract renderJoinRequestExpiry(input: { organizationName: string }): Promise<string>;
+
+  /** What went wrong with an upgrade, sent to each of the installation's platform operators. */
+  abstract renderUpgradeAlert(
+    input: UpgradeAlertEmailProps,
+  ): Promise<{ subject: string; html: string }>;
 }
