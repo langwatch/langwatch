@@ -330,11 +330,13 @@ function ComparisonHeadline({
 }
 
 /**
- * Save the plot onto a dashboard — an existing one, or a new one named after it.
+ * Save the plot onto an Analytics Reports board: an existing one, or a new one named after it.
  */
 function SaveToDashboard({ graph, title }: { graph: unknown; title?: string }) {
   const { project } = useOrganizationTeamProject();
   const [saving, setSaving] = useState(false);
+  // `dashboards.getAll` lists the Reports boards alone: a builder chart has no place on a
+  // Dashboards board (AC199c).
   const dashboards = api.dashboards.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id && !!graph },

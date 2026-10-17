@@ -21,4 +21,9 @@ export const selfHostedInstancesTrpcTransport: TrpcRouterDeclaration<
   .withMiddlewareContext(operatorContext)
   .withPermission("ops:view", STAFF)
   .handle(({ app, input }, operator) => app.getSelfHostedInstance({ ...input, operator }))
+
+  .procedure("summary")
+  .withMiddlewareContext(operatorContext)
+  .withPermission("ops:view", STAFF)
+  .handle(({ app }, operator) => app.summarizeSelfHostedInstances({ operator }))
   .build();

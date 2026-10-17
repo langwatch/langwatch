@@ -81,6 +81,36 @@ Feature: The registry of self-hosted installs
     And part of a hostname, a release or an instance id finds it too
 
   @unit
+  Scenario: An operator sorts installs by when they first appeared or by how much they use
+    Given installs that first reported on different days with different usage
+    When the operator sorts by newest
+    Then the install that first reported most recently comes first
+    When the operator sorts by traces over the last 28 days
+    Then the install with the most traces comes first
+    And an install that reported no traces comes last
+
+  @unit
+  Scenario: An operator narrows the list by license, activity or raised signal
+    Given a licensed install, an open source install and an install that went quiet
+    When the operator keeps only open source installs
+    Then the licensed install is not listed
+    When the operator keeps only installs that are reporting
+    Then the quiet install is not listed
+    When the operator keeps only installs that raised sustained ingestion
+    Then only the installs that raised it are listed
+
+  @unit
+  Scenario: The summary counts installs by activity, license, arrival and signal
+    Given installs that are reporting, quiet and gone, some licensed and some new this week
+    When the summary is read
+    Then it counts the installs in each activity state and the licensed ones
+    And it counts the installs that first reported in the last 7 and 30 days
+    And it counts new installs per week for the last 12 weeks, including weeks with none
+    And it counts the installs that raised each signal
+    And it names the busiest open source installs that still report, by traces over 28 days
+    And it counts the releases the installs that still report are running
+
+  @unit
   Scenario: The drawer shows the ladder, the domains and the usage numbers
     When an operator opens an install
     Then the rungs it reached are shown with the day each was reached

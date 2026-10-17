@@ -13,28 +13,12 @@ export const CONTENT_COLUMN_MAX_WIDTH = "1100px";
  */
 export const CONTENT_COLUMN_WIDE_MAX_WIDTH = "1280px";
 
-/** The width from which the rail is paid back on the right. */
-export const CONTENT_COLUMN_CENTERING_WIDTH = 1600;
-
-/**
- * The padding on the left of the column. A rail is paid back together with it,
- * so the column centres on the page rather than on the rail's inner edge.
- */
-export const CONTENT_COLUMN_GUTTER = 32;
-
 export type ContentColumnProps = BoxProps & {
   /** How wide the column may grow. Defaults to the width used beside a rail. */
   columnMaxWidth?: string;
-  /**
-   * The width of the rail on the left of this column, in pixels. The column
-   * pays it back on the right on a wide window. Zero for a surface with no
-   * rail.
-   */
-  railWidth?: number;
 };
 
 export function ContentColumn({
-  railWidth = 0,
   columnMaxWidth = CONTENT_COLUMN_MAX_WIDTH,
   children,
   ...boxProps
@@ -48,15 +32,6 @@ export function ContentColumn({
       overflow="auto"
       paddingX={8}
       paddingY={4}
-      css={
-        railWidth > 0
-          ? {
-              [`@media (min-width: ${CONTENT_COLUMN_CENTERING_WIDTH}px)`]: {
-                paddingRight: `${railWidth}px`,
-              },
-            }
-          : undefined
-      }
       {...boxProps}
     >
       <VStack

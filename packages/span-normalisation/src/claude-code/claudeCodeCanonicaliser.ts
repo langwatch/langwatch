@@ -5,6 +5,7 @@ import {
   type LogExtractorContext,
   takeAttribute,
 } from "../canonicalAttributes.ts";
+import { markInputAsFresh } from "../canonicalExtraction.ts";
 import { asNumber } from "../canonicalGuard.ts";
 import { ClaudeCodeResponseService } from "./claudeCodeResponse.ts";
 
@@ -80,6 +81,8 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
 
     if (fired) {
       ctx.recordRule("claude-code/llm_request");
+      // Claude Code reports the API's input count, which excludes the cache reads and writes.
+      markInputAsFresh(ctx, { ruleId: "claude-code/usage.input_tokens(fresh as sent)" });
     }
   }
 

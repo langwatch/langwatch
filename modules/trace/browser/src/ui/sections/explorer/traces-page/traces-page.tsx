@@ -1,8 +1,8 @@
 import { Box, Flex, HStack, useBreakpointValue, VStack } from "@langwatch/design-system/primitives";
 import { AnimatePresence, motion } from "motion/react";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { useFilterStore, useSelectionStore } from "../../../../behavior/explorer.store.ts";
+import { useExplorerStore, useSelectionStore } from "../../../../behavior/explorer.store.ts";
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
@@ -86,6 +86,21 @@ const DIMMED_PROPS = {
 };
 
 export const TracesPage: React.FC = () => {
+  const { project } = useOrganizationTeamProject();
+  // The address is applied only once the page knows its project, so a late project
+  // never forgets the search a shared link carried (specs/traces-v2/search-scope.feature).
+  if (!project?.id) return null;
+  return <ProjectTracesPage projectId={project.id} />;
+};
+
+const ProjectTracesPage: React.FC<{ projectId: string }> = ({ projectId }) => {
+  const { project } = useOrganizationTeamProject();
+  const setProject = useExplorerStore((s) => s.setProject);
+  // Before every passive effect, so the URL apply never meets another project's search.
+  useLayoutEffect(() => {
+    setProject(projectId);
+  }, [projectId, setProject]);
+
   useURLSync();
   useRollingTimeRange();
   useTraceFreshness();
@@ -103,7 +118,6 @@ export const TracesPage: React.FC = () => {
   useResetSelectionOnViewChange();
   useTracesPageTitle();
 
-  const { project } = useOrganizationTeamProject();
   const { hasAnyTraces } = useProjectHasTraces();
   const setupDismissedByProject = useOnboardingStore((s) => s.setupDismissedByProject);
   const setupDisengaged = useOnboardingStore((s) => s.setupDisengaged);
@@ -143,20 +157,16 @@ export const TracesPage: React.FC = () => {
     hasAnyTraces,
   });
 
-  // Project switches reset the per-project surfaces: the open drawer points at a trace the new
-  // project can't load, and filter facet values may not exist across projects — both would
-  // render as confusing empty/error states if left in place.
+  // A project switch closes the open drawer: it points at a trace the new project can't load.
+  // The search is forgotten by `setProject` above.
   const prevProjectIdRef = useRef<string | null>(null);
   const closeDrawerOnSwitch = useDismissTraceDrawer();
-  const clearFilters = useFilterStore((s) => s.clearAll);
   useEffect(() => {
-    const projectId = project?.id ?? null;
     const prev = prevProjectIdRef.current;
     prevProjectIdRef.current = projectId;
     if (!isProjectSwitch(prev, projectId)) return;
     closeDrawerOnSwitch();
-    clearFilters();
-  }, [project?.id, closeDrawerOnSwitch, clearFilters]);
+  }, [projectId, closeDrawerOnSwitch]);
 
   return (
     <DensityProvider>
