@@ -63,7 +63,7 @@ export class TraceMetadataWriteService {
     });
 
     const now = nowInstant().epochMilliseconds;
-    const nowNano = String(now * 1_000_000);
+    const nowNano = TraceCollectorSpanService.epochMsToOtlpNanos(now);
     const spanId = generateOtelSpanId();
 
     await this.#ingest.recordSpan({
