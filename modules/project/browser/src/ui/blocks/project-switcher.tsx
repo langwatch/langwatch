@@ -28,7 +28,7 @@ export default function ProjectSwitcher() {
 
   if (!current) return null;
 
-  const pathname = route.reading().pathname ?? "";
+  const { pathname = "", query } = route.reading();
   const follow = (href: string) => (event: MouseEvent<HTMLAnchorElement>) => {
     const isModifiedClick = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
     if (isModifiedClick || event.button !== 0) return;
@@ -68,6 +68,7 @@ export default function ProjectSwitcher() {
               {group.projects.map((project) => {
                 const href = projectSwitchHref({
                   pathname,
+                  query,
                   currentProjectSlug: current.slug,
                   targetSlug: project.slug,
                 });

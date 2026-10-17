@@ -350,6 +350,23 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       UpdatedAt: { source: "updatedAt" },
     },
   }),
+  dashboard_widgets: defineTableCatalogue({
+    sourceTable: "DashboardWidget",
+    access: { allOf: ["analytics:view"] },
+    columns: {
+      TenantId: { source: "projectId" },
+      DashboardWidgetId: { source: "id" },
+      DashboardId: { source: "dashboardId" },
+      Name: { source: "name" },
+      Definition: { source: "definition", content: "output" },
+      GridColumn: { source: "gridColumn" },
+      GridRow: { source: "gridRow" },
+      ColSpan: { source: "colSpan" },
+      RowSpan: { source: "rowSpan" },
+      CreatedAt: { source: "createdAt" },
+      UpdatedAt: { source: "updatedAt" },
+    },
+  }),
   dashboards: defineTableCatalogue({
     sourceTable: "Dashboard",
     access: { allOf: ["analytics:view"] },
@@ -361,6 +378,21 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Description: { source: "description", content: "output" },
       CreatedById: { source: "createdById" },
       scope: "omit", // an Only me board is not in the view at all; see the visibility overrides
+      organizationId: "omit", // set only once a board is shared with the organization
+      CreatedAt: { source: "createdAt" },
+      UpdatedAt: { source: "updatedAt" },
+    },
+  }),
+  dashboards_v2: defineTableCatalogue({
+    sourceTable: "DashboardsV2",
+    access: { allOf: ["analytics:view"] },
+    columns: {
+      TenantId: { source: "projectId" },
+      DashboardId: { source: "id" },
+      Name: { source: "name" },
+      Description: { source: "description", content: "output" },
+      CreatedById: { source: "createdById" },
+      Scope: { source: "scope" },
       organizationId: "omit", // set only once a board is shared with the organization
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },

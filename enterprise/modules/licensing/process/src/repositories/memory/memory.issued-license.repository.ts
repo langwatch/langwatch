@@ -88,14 +88,27 @@ export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
     page,
     pageSize,
     search,
+    activeAt,
+    excludeEmailSuffixes = [],
   }: {
     page: number;
     pageSize: number;
     search?: string;
+    /** Keeps only the rows active at this instant: not revoked, superseded or expired. */
+    activeAt?: Instant;
+    /** Drops the rows whose email ends with any of these, case aside. */
+    excludeEmailSuffixes?: readonly string[];
   }): Promise<{ rows: IssuedLicenseRecord[]; total: number }> {
     const term = search?.trim().toLowerCase();
     const matched = this.all()
       .filter((row) => (term ? matches(row, term) : true))
+      .filter((row) => !activeAt || activeAtInstant(row, activeAt))
+      .filter(
+        (row) =>
+          !excludeEmailSuffixes.some((suffix) =>
+            row.email.toLowerCase().endsWith(suffix.toLowerCase()),
+          ),
+      )
       .toSorted((left, right) => Temporal.Instant.compare(right.createdAt, left.createdAt));
     return {
       rows: matched.slice(page * pageSize, page * pageSize + pageSize).map((row) => ({ ...row })),
@@ -174,6 +187,10 @@ export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
       }
     }
   }
+}
+
+function activeAtInstant(row: IssuedLicenseRecord, at: Instant): boolean {
+  return !row.revokedAt && !row.supersededAt && Temporal.Instant.compare(row.expiresAt, at) > 0;
 }
 
 function matches(row: IssuedLicenseRecord, term: string): boolean {

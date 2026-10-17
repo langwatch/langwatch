@@ -1,3 +1,8 @@
+export { AnthropicCanonicaliserService } from "./anthropic/anthropicCanonicaliser.ts";
+export {
+  CLAUDE_PLATFORM_SPAN_NAMES,
+  isClaudePlatformScope,
+} from "./anthropic/claudePlatformSpans.ts";
 export * from "./attributeKeys.ts";
 export * from "./canonicalTypes.ts";
 export * from "./costAttribution.ts";

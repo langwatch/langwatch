@@ -1,6 +1,6 @@
 import type * as observabilityModule from "@langwatch/observability";
-import { register } from "prom-client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTenantId } from "../../domain/tenantId.ts";
 import type { FoldProjectionStore } from "../foldProjection.types.ts";
@@ -75,38 +75,33 @@ function createDurableInnerStore({
   return { store, calls };
 }
 
-/**
- * Reads the dedup-unavailable counter straight off the registry for the
- * `test_table` projection — a spy on a destructured copy would intercept
- * nothing and pass regardless.
- */
-async function dedupUnavailableCount(reason: string): Promise<number> {
-  const metric = await register.getSingleMetric("es_fold_dedup_unavailable_total")?.get();
-  return (
-    metric?.values.find(
-      (v) => v.labels.projection_name === "test_table" && v.labels.reason === reason,
-    )?.value ?? 0
-  );
+let meter = createRecordingMeterProvider();
+
+beforeEach(() => {
+  meter = createRecordingMeterProvider();
+  meter.install();
+});
+afterEach(() => meter.uninstall());
+
+/** The dedup-unavailable counter for `test_table`, read off the recording provider. */
+function dedupUnavailableCount(reason: string): number {
+  return meter.valueOf("es_fold_dedup_unavailable_total", {
+    projection_name: "test_table",
+    reason,
+  });
 }
 
-/** The Redis-operation error counter for `test_table`, read off the registry. */
-async function redisErrorCount(operation: string): Promise<number> {
-  const metric = await register.getSingleMetric("es_fold_cache_redis_error_total")?.get();
-  return (
-    metric?.values.find(
-      (v) => v.labels.projection_name === "test_table" && v.labels.operation === operation,
-    )?.value ?? 0
-  );
+/** The Redis-operation error counter for `test_table`. */
+function redisErrorCount(operation: string): number {
+  return meter.valueOf("es_fold_cache_redis_error_total", {
+    projection_name: "test_table",
+    operation,
+  });
 }
 
-/** The cache-outcome counter for `test_table`, read off the registry too. */
-async function cacheTotalCount(result: string): Promise<number> {
-  const metric = await register.getSingleMetric("es_fold_cache_total")?.get();
-  return (
-    metric?.values.find(
-      (v) => v.labels.projection_name === "test_table" && v.labels.result === result,
-    )?.value ?? 0
-  );
+/** The cache-outcome counter for `test_table`. */
+function cacheTotalCount(result: string): number {
+  return meter.valueOf("es_fold_cache_total", { projection_name: "test_table", result });
 }
 
 function createRedis() {
@@ -204,8 +199,8 @@ describe("RedisCachedFoldStore", () => {
     describe("when the fold reads state", () => {
       /** @scenario an unreadable fold cache is answered from the durable store, and counted apart from a miss */
       it("falls through to the durable store rather than failing the fold", async () => {
-        const before = await cacheTotalCount("fallback_error");
-        const missesBefore = await cacheTotalCount("miss");
+        const before = cacheTotalCount("fallback_error");
+        const missesBefore = cacheTotalCount("miss");
         const redis = createRedis();
         redis.get.mockRejectedValueOnce(new Error("connection lost"));
         const { store, inner } = createStore(redis);
@@ -219,8 +214,8 @@ describe("RedisCachedFoldStore", () => {
         // across the replicas, which is what makes the durable read
         // authoritative. A failed read means nothing of the kind, so the two
         // must stay tellable apart from the outside.
-        expect(await cacheTotalCount("fallback_error")).toBe(before + 1);
-        expect(await cacheTotalCount("miss")).toBe(missesBefore);
+        expect(cacheTotalCount("fallback_error")).toBe(before + 1);
+        expect(cacheTotalCount("miss")).toBe(missesBefore);
       });
     });
   });
@@ -279,16 +274,16 @@ describe("RedisCachedFoldStore", () => {
         const redis = createRedis();
         redis.set.mockRejectedValueOnce(new Error("OOM command not allowed"));
         const { store } = createStore(redis);
-        const errorsBefore = await redisErrorCount("set");
-        const missesBefore = await cacheTotalCount("miss");
-        const fallbacksBefore = await cacheTotalCount("fallback_error");
+        const errorsBefore = redisErrorCount("set");
+        const missesBefore = cacheTotalCount("miss");
+        const fallbacksBefore = cacheTotalCount("fallback_error");
 
         await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
         await store.get("agg-1", CONTEXT);
 
-        expect(await redisErrorCount("set")).toBe(errorsBefore + 1);
-        expect(await cacheTotalCount("miss")).toBe(missesBefore + 1);
-        expect(await cacheTotalCount("fallback_error")).toBe(fallbacksBefore);
+        expect(redisErrorCount("set")).toBe(errorsBefore + 1);
+        expect(cacheTotalCount("miss")).toBe(missesBefore + 1);
+        expect(cacheTotalCount("fallback_error")).toBe(fallbacksBefore);
       });
     });
   });
@@ -369,7 +364,7 @@ describe("RedisCachedFoldStore", () => {
     let store: RedisCachedFoldStore<TestState>;
 
     beforeEach(async () => {
-      before = await dedupUnavailableCount("cache_miss");
+      before = dedupUnavailableCount("cache_miss");
       const redis = createRedis();
       ({ store } = createStore(redis));
     });
@@ -386,13 +381,13 @@ describe("RedisCachedFoldStore", () => {
       });
 
       expect(result.appliedEventIds).toEqual([]);
-      expect(await dedupUnavailableCount("cache_miss")).toBe(before + 1);
+      expect(dedupUnavailableCount("cache_miss")).toBe(before + 1);
     });
 
     it("does not count a fresh delivery, where a miss is unremarkable", async () => {
       await store.getWithApplied("agg-1", { ...CONTEXT, deliveryAttempt: 1 });
 
-      expect(await dedupUnavailableCount("cache_miss")).toBe(before);
+      expect(dedupUnavailableCount("cache_miss")).toBe(before);
     });
   });
 
@@ -400,7 +395,7 @@ describe("RedisCachedFoldStore", () => {
     describe("when a retry misses the cache and the durable set has ids", () => {
       /** @scenario a redelivered batch after a committed write does not double-count */
       it("returns the durable set and does not count dedup unavailable", async () => {
-        const before = await dedupUnavailableCount("cache_miss");
+        const before = dedupUnavailableCount("cache_miss");
 
         const redis = createRedis();
         const inner = createDurableInnerStore({
@@ -417,13 +412,13 @@ describe("RedisCachedFoldStore", () => {
         expect(result.state).toEqual({ count: 1, UpdatedAt: 100 });
         expect(result.appliedEventIds).toEqual(["e1", "e2"]);
         expect(inner.calls.getWithApplied).toEqual(["agg-1"]);
-        expect(await dedupUnavailableCount("cache_miss")).toBe(before);
+        expect(dedupUnavailableCount("cache_miss")).toBe(before);
       });
     });
 
     describe("when a retry misses the cache and the durable set is empty", () => {
       it("still counts dedup unavailable, preserving the blind-reapply signal", async () => {
-        const before = await dedupUnavailableCount("cache_miss");
+        const before = dedupUnavailableCount("cache_miss");
 
         const redis = createRedis();
         const inner = createDurableInnerStore({ appliedEventIds: [] });
@@ -435,7 +430,7 @@ describe("RedisCachedFoldStore", () => {
         });
 
         expect(result.appliedEventIds).toEqual([]);
-        expect(await dedupUnavailableCount("cache_miss")).toBe(before + 1);
+        expect(dedupUnavailableCount("cache_miss")).toBe(before + 1);
       });
     });
   });

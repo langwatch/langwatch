@@ -391,11 +391,11 @@ function scriptedDashboard(world: RunWorld) {
       widget({ boardId: found.id, projectId: found.projectId, at, scripted }),
     );
   const dashboard = createApiFixture<DashboardApi>({
-    getById: async ({ projectId, dashboardId, viewer }) => {
+    getBoard: async ({ projectId, dashboardId, viewer }) => {
       boardReads.push({ read: "board", viewer });
       if (world.boardReadError) throw world.boardReadError;
       const { board: _board, ...found } = boards.open({ projectId, dashboardId, viewer });
-      return { ...found, graphs: [] };
+      return found;
     },
     listDashboardWidgets: async ({ projectId, dashboardId, viewer }) => {
       boardReads.push({ read: "widgets", viewer, ...(dashboardId ? { dashboardId } : {}) });

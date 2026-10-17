@@ -85,11 +85,10 @@ export class GroupQueueMetricsCollector {
     if (this.isCollecting) return;
     this.isCollecting = true;
     try {
-      gqFastqPending.set(
-        { queue_name: this.params.queueName },
-        this.params.processingQueue.length(),
-      );
-      gqFastqActive.set({ queue_name: this.params.queueName }, this.params.activeJobCountFn());
+      gqFastqPending.set(this.params.processingQueue.length(), {
+        queue_name: this.params.queueName,
+      });
+      gqFastqActive.set(this.params.activeJobCountFn(), { queue_name: this.params.queueName });
 
       const keyPrefix = this.params.scripts.getKeyPrefix();
       const readyKey = `${keyPrefix}ready`;
@@ -110,10 +109,10 @@ export class GroupQueueMetricsCollector {
         );
       }
 
-      gqPendingGroups.set({ queue_name: this.params.queueName }, pendingGroupCount);
-      gqBlockedGroups.set({ queue_name: this.params.queueName }, blockedGroupCount);
-      gqParkedGroups.set({ queue_name: this.params.queueName }, parkedGroupCount);
-      gqActiveGroups.set({ queue_name: this.params.queueName }, this.params.activeJobCountFn());
+      gqPendingGroups.set(pendingGroupCount, { queue_name: this.params.queueName });
+      gqBlockedGroups.set(blockedGroupCount, { queue_name: this.params.queueName });
+      gqParkedGroups.set(parkedGroupCount, { queue_name: this.params.queueName });
+      gqActiveGroups.set(this.params.activeJobCountFn(), { queue_name: this.params.queueName });
 
       await this.collectOldestAges({ readyKey, keyPrefix });
       await this.sweepStagingDepth({ keyPrefix });
@@ -154,8 +153,8 @@ export class GroupQueueMetricsCollector {
     );
     const eligibleDueMs = oldestEligible.length >= 2 ? Number(oldestEligible[1]) : null;
     gqOldestPendingAgeMilliseconds.set(
-      { queue_name: this.params.queueName },
       eligibleDueMs === null ? 0 : Math.max(0, nowMs - eligibleDueMs),
+      { queue_name: this.params.queueName },
     );
 
     const oldestDueMs = await this.foldDeferredHeads({
@@ -165,8 +164,8 @@ export class GroupQueueMetricsCollector {
       seed: eligibleDueMs,
     });
     gqOldestBacklogAgeMilliseconds.set(
-      { queue_name: this.params.queueName },
       oldestDueMs === null ? 0 : Math.max(0, nowMs - oldestDueMs),
+      { queue_name: this.params.queueName },
     );
   }
 
@@ -229,11 +228,10 @@ export class GroupQueueMetricsCollector {
       }
     }
 
-    gqGroupStagingDepthMax.set({ queue_name: this.params.queueName }, this.stagingDepthMax);
-    gqGroupsOverStagingDepth.set(
-      { queue_name: this.params.queueName },
-      this.stagingOverThreshold.size,
-    );
+    gqGroupStagingDepthMax.set(this.stagingDepthMax, { queue_name: this.params.queueName });
+    gqGroupsOverStagingDepth.set(this.stagingOverThreshold.size, {
+      queue_name: this.params.queueName,
+    });
 
     this.stagingCursor = nextCursor;
     if (nextCursor === "0") {
