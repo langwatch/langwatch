@@ -37,6 +37,7 @@ import {
   type SimulationRunDeletedEvent,
   type SimulationRunEvaluatedEvent,
   type SimulationRunFinishedEvent,
+  type SimulationRunMetadataRefreshedEvent,
   type SimulationRunMetricsComputedEvent,
   type SimulationRunQueuedEvent,
   type SimulationRunStartedEvent,
