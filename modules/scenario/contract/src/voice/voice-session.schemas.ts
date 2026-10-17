@@ -37,9 +37,12 @@ const voiceSessionFinishInputSchemaDefinition = z.object({
   name: z.string().trim().max(200).optional(),
   conversationId: z.string().trim().max(200).optional(),
   transcript: z.array(voiceTranscriptTurnSchema).default([]),
+  // Whether the limit ended the call is derived on the server from this span
+  // against the configured maximum call duration; the body carries no flag for
+  // it, since a flag was only the browser's claim and could mark a normal call
+  // as cut or hide a real cutoff (#8028).
   startedAt: z.number(),
   endedAt: z.number(),
-  isCutAtLimit: z.boolean().default(false),
   /** Set for a "Call it myself" run: the scenario the call is scored under (AC23). */
   scenarioId: z.string().trim().min(1).optional(),
 });
