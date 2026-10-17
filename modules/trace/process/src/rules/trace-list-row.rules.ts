@@ -18,6 +18,7 @@ import {
   type TraceListSortColumn,
   type TraceMediaRef,
   type TraceSummaryData,
+  traceTotalTokensOf,
 } from "@langwatch/trace-contract";
 
 export const SORT_COLUMN_MAP: Record<string, TraceListSort["column"]> = {
@@ -59,7 +60,7 @@ export function mapToTraceListItem(
 ): Omit<TraceListItem, "evaluations"> {
   const status = deriveTraceStatus(row);
 
-  const totalTokens = (row.totalPromptTokenCount ?? 0) + (row.totalCompletionTokenCount ?? 0);
+  const totalTokens = traceTotalTokensOf(row);
 
   return {
     traceId: row.traceId,
@@ -143,7 +144,7 @@ export function cursorForTraceRow(
       sortValue = row.spanCount;
       break;
     case "TotalTokens":
-      sortValue = (row.totalPromptTokenCount ?? 0) + (row.totalCompletionTokenCount ?? 0);
+      sortValue = traceTotalTokensOf(row);
       break;
     case "TimeToFirstTokenMs":
       sortValue = row.timeToFirstTokenMs ?? 0;

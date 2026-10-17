@@ -12,6 +12,7 @@ import {
   CODEX_DEFAULT_MODEL,
   DEFAULT_AZURE_API_VERSION,
   expandLatestAlias,
+  findModelProviderDefinition,
   ModelProviderCredentialsUnreadableError,
   ModelProviderNotFoundError,
   ModelDefaultNotFoundError,
@@ -724,18 +725,15 @@ class ExecutionCatalog extends Catalog {
     return this.pickStoredExecutionValue(input) ?? this.environment[input.key] ?? null;
   }
 
+  // The real registry's definitions, so a test fails if the key the service reads drifts
+  // from the key a provider is stored under.
   pickExecutionDefinition(input: {
     provider: string;
   }): { apiKey: string; endpointKey: string | null } | null {
-    const definitions: Record<string, { apiKey: string; endpointKey: string | null }> = {
-      anthropic: { apiKey: "ANTHROPIC_API_KEY", endpointKey: "ANTHROPIC_BASE_URL" },
-      azure: { apiKey: "AZURE_OPENAI_API_KEY", endpointKey: "AZURE_OPENAI_ENDPOINT" },
-      bedrock: { apiKey: "AWS_ACCESS_KEY_ID", endpointKey: null },
-      gemini: { apiKey: "GEMINI_API_KEY", endpointKey: null },
-      openai: { apiKey: "OPENAI_API_KEY", endpointKey: "OPENAI_BASE_URL" },
-      vertex_ai: { apiKey: "VERTEXAI_API_KEY", endpointKey: null },
-    };
-    return definitions[input.provider] ?? null;
+    const definition = findModelProviderDefinition(input.provider);
+    return definition
+      ? { apiKey: definition.apiKey, endpointKey: definition.endpointKey ?? null }
+      : null;
   }
 }
 class ManagedCatalog extends Catalog {
@@ -1671,7 +1669,7 @@ describe("ModelProviderService", () => {
       service(
         providers,
         new ExecutionCatalog({
-          VERTEXAI_API_KEY: "vertex-credential",
+          GOOGLE_APPLICATION_CREDENTIALS: "vertex-credential",
           VERTEXAI_LOCATION: "europe-west4",
           VERTEXAI_PROJECT: "vertex-project",
         }),
@@ -1685,6 +1683,34 @@ describe("ModelProviderService", () => {
       vertex_project: "vertex-project",
       vertex_location: "europe-west4",
     });
+  });
+  /** @scenario "A Vertex AI call carries the service account stored on the provider" */
+  it("sends a Vertex row's stored service account as vertex_credentials, never as api_key", async () => {
+    const serviceAccount = '{"type":"service_account","project_id":"acme-ai"}';
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        provider: "vertex_ai",
+        customKeys: {
+          GOOGLE_APPLICATION_CREDENTIALS: serviceAccount,
+          VERTEXAI_PROJECT: "acme-ai",
+          VERTEXAI_LOCATION: "us-central1",
+        },
+        customModels: [{ id: "gemini-2.5-pro", label: "Gemini", type: "chat" }],
+      }),
+    ];
+
+    const prepared = await service(providers, new ExecutionCatalog()).prepareExecution({
+      projectId: "project_1",
+      model: "vertex_ai/gemini-2.5-pro",
+    });
+
+    expect(prepared).toMatchObject({
+      vertex_credentials: serviceAccount,
+      vertex_project: "acme-ai",
+      vertex_location: "us-central1",
+    });
+    expect(prepared).not.toHaveProperty("api_key");
   });
   it("keeps the Codex refusal for an explicit model-provider row", async () => {
     const providers = new Providers();

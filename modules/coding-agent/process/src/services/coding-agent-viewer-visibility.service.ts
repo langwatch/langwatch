@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import type { TraceApi } from "@langwatch/trace-contract";
 
 /** What one viewer may see of one project: the generated titles travel under content visibility. */
@@ -11,6 +12,8 @@ export interface CodingAgentViewerVisibilityReader {
   readVisibility(input: {
     userId: string;
     projectId: string;
+    /** The read's proof: the policy is the strictest across it and `projectId` (ADR-177 d9). */
+    authorization?: Authorization;
   }): Promise<CodingAgentViewerVisibility>;
 }
 
@@ -27,6 +30,7 @@ export class CodingAgentViewerVisibilityService implements CodingAgentViewerVisi
   async readVisibility(input: {
     userId: string;
     projectId: string;
+    authorization?: Authorization;
   }): Promise<CodingAgentViewerVisibility> {
     const protections = await this.traces.resolveViewerProtections(input);
 

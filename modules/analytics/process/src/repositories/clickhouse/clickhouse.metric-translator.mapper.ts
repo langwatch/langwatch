@@ -603,17 +603,6 @@ function translatePerformanceMetric({
         params: {},
       };
 
-    case "performance.total_tokens":
-      // Sum of prompt + completion tokens (the "new content" delta, excludes cache)
-      return {
-        selectExpression: perfAgg(
-          `(coalesce(${ts}.TotalPromptTokenCount, 0) + coalesce(${ts}.TotalCompletionTokenCount, 0))`,
-        ),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
     // Cache + reasoning sums are parked on reserved attribute keys by the fold
     // (they never reach a dedicated column), so read them from the Attributes
     // map at query time — no migration, works on every historical trace. The
@@ -650,6 +639,7 @@ function translatePerformanceMetric({
 
     // Total tokens the model actually processed = input + output + cache read +
     // cache write. Reasoning is a subset of completion, so it is NOT added again.
+    case "performance.total_tokens":
     case "performance.total_processed_tokens":
       return {
         selectExpression: perfAgg(

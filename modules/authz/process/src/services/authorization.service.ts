@@ -13,6 +13,7 @@ import {
   type AuthorizationPurpose,
   type GrantCondition,
   sealAuthorization,
+  ProjectNotFoundError,
 } from "@langwatch/authorization";
 import {
   type AuthzPrincipalRef,
@@ -92,9 +93,7 @@ export class AuthorizationService {
   }): Promise<Authorization> {
     const now = this.now();
     const organizationId = await this.organizationOf({ projectId, now });
-    if (organizationId === undefined) {
-      throw new AccessNotGrantedError(permission);
-    }
+    if (organizationId === undefined) throw new ProjectNotFoundError(projectId);
     return sealAuthorization({
       actor,
       principal:
