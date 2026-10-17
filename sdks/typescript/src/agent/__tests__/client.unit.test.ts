@@ -2,6 +2,7 @@
  * The agent client against a fake platform: a `ws` server on a random port
  * that records what the SDK sends and answers with the frames of ADR-128.
  * @see specs/typescript-sdk/agent-wrapper.feature
+ * @see modules/agent/specs/scenario-hooks-protocol.feature
  */
 import type { IncomingMessage } from "node:http";
 
@@ -20,7 +21,13 @@ import {
   sharedClientForTests,
   shutdownForTests,
 } from "../client";
-import { connectAgent, type AgentCall, type AgentHandler } from "../define";
+import {
+  connectAgent,
+  type AgentCall,
+  type AgentHandler,
+  type ConnectedAgent,
+  type ScenarioRun,
+} from "../define";
 import { PROTOCOL_VERSION, type AgentParameterValue, type RegisterFrame } from "../protocol";
 import { reconnectDelayMs, RECONNECT_BASE_MS, RECONNECT_MAX_MS } from "../reconnect";
 import { NoWebSocketError } from "../transport";
@@ -342,6 +349,7 @@ describe("the agent client, given a fake platform", () => {
           },
           concurrency: 10,
           timeoutMs: 30_000,
+          hooks: { setup: false, teardown: false },
         },
       ]);
 
@@ -483,6 +491,7 @@ describe("the agent client, given a fake platform", () => {
         newMessages: [{ role: "user", content: "hi" }],
         threadId: "thread_1",
         session: { id: "s1" },
+        state: null,
         params: { plan: "pro" },
         traceId: "",
       });
@@ -1021,6 +1030,238 @@ describe("the agent client, given a fake platform", () => {
       } finally {
         process.removeListener("SIGTERM", keepAlive);
       }
+    });
+  });
+
+  describe("when the agent declares scenario hooks", () => {
+    type Shop = ConnectedAgent<Record<string, AgentParameterValue>>;
+
+    /** Defines the agent, declares its hooks before the socket opens, and answers the register. */
+    const connectShop = async (
+      declare: (agent: Shop) => void,
+      handler: AgentHandler<Record<string, AgentParameterValue>> = async ({ params }) =>
+        `${String(params.loyaltyTier)}:hi`,
+    ) => {
+      const agent = define(handler, {
+        parameters: {
+          loyaltyTier: { default: "none" },
+          refundAmount: { type: "number", default: 49.95 },
+        },
+      }) as Shop;
+      declare(agent);
+      const connection = await platform.nextConnection();
+      const register = await connection.nextFrame<RegisterFrame>("register");
+      connection.accept(register);
+      await until(() => sharedClientForTests()?.isRegistered === true);
+      return { agent, connection, register };
+    };
+
+    /** The result frame without the fields every result carries. */
+    const answerTo = async (
+      connection: Connection,
+      overrides: Record<string, unknown>,
+    ): Promise<Record<string, unknown>> => {
+      connection.send(callFrame(overrides));
+      const {
+        type: _type,
+        protocol: _protocol,
+        callId: _callId,
+        ...rest
+      } = await connection.nextFrame("result");
+      return rest;
+    };
+
+    it("lets a setup run past the turn timeout while its own deadline holds", async () => {
+      const agent = define(async () => "hi", { timeoutMs: 60 }) as Shop;
+      agent.scenario.setup(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        return { orderId: "42" };
+      });
+      const connection = await platform.nextConnection();
+      connection.accept(await connection.nextFrame<RegisterFrame>("register"));
+      await until(() => sharedClientForTests()?.isRegistered === true);
+
+      const answer = await answerTo(connection, { kind: "setup", deadlineAt: Date.now() + 5_000 });
+      expect(answer).toMatchObject({ state: { orderId: "42" } });
+    });
+
+    /** @scenario "An agent with both hooks declares both at register" */
+    /** @scenario "The TypeScript SDK mirrors the Python hooks" */
+    it("declares setup and teardown as the Python SDK does for the same functions", async () => {
+      const { register } = await connectShop((agent) => {
+        agent.scenario.setup(async () => ({}));
+        agent.scenario.teardown(async () => undefined);
+      });
+      // The Python SDK's registration()["hooks"] for a setup and a teardown.
+      expect(register.agents[0]?.hooks).toEqual({ setup: true, teardown: true });
+    });
+
+    /** @scenario "An agent with only a teardown declares only that" */
+    it("declares only the teardown", async () => {
+      const { register } = await connectShop((agent) => {
+        agent.scenario.teardown(async () => undefined);
+      });
+      expect(register.agents[0]?.hooks).toEqual({ setup: false, teardown: true });
+    });
+
+    /** @scenario "An agent with no hooks declares none" */
+    it("declares neither hook", async () => {
+      const { register } = await connectShop(() => undefined);
+      expect(register.agents[0]?.hooks).toEqual({ setup: false, teardown: false });
+    });
+
+    /** @scenario "A hook declared after the connection started registers again" */
+    it("opens a new socket whose register declares a hook added after the first register", async () => {
+      const { agent } = await connectShop(() => undefined);
+
+      agent.scenario.setup(async () => ({}));
+
+      const second = await platform.nextConnection();
+      const register = await second.nextFrame<RegisterFrame>("register");
+      expect(register.agents[0]?.hooks).toEqual({ setup: true, teardown: false });
+    });
+
+    /** @scenario "Setup is called with the run reference and its own parameters" */
+    /** @scenario "Setup's return value is sent back as the state" */
+    it("calls setup with the run and the parameters, and sends its return as the state", async () => {
+      const seen: { run?: ScenarioRun; params?: Record<string, AgentParameterValue> } = {};
+      const { connection } = await connectShop((agent) => {
+        agent.scenario.setup(async (run, params) => {
+          Object.assign(seen, { run, params });
+          return { customerId: "c_1" };
+        });
+      });
+
+      expect(
+        await answerTo(connection, {
+          kind: "setup",
+          params: { loyaltyTier: "gold" },
+          run: { scenarioRunId: "run_1", scenarioName: "Refund", batchRunId: "batch_1" },
+        }),
+      ).toEqual({ state: { customerId: "c_1" } });
+      expect(seen).toEqual({
+        run: { scenarioRunId: "run_1", scenarioName: "Refund", batchRunId: "batch_1" },
+        params: { loyaltyTier: "gold", refundAmount: 49.95 },
+      });
+    });
+
+    /** @scenario "Teardown receives the state setup returned" */
+    /** @scenario "Teardown's returned object is sent back" */
+    it("hands teardown the state and sends back what it returns", async () => {
+      const states: unknown[] = [];
+      const { connection } = await connectShop((agent) => {
+        agent.scenario.teardown(async (_run, state) => {
+          states.push(state);
+          return { deleted: ["c_1"] };
+        });
+      });
+
+      expect(
+        await answerTo(connection, { kind: "teardown", state: { customerId: "c_1" } }),
+      ).toEqual({ state: { deleted: ["c_1"] } });
+      expect(states).toEqual([{ customerId: "c_1" }]);
+    });
+
+    /** @scenario "Teardown that returns nothing sends no state" */
+    it("sends a result with no state", async () => {
+      const { connection } = await connectShop((agent) => {
+        agent.scenario.teardown(async () => undefined);
+      });
+      expect(
+        await answerTo(connection, { kind: "teardown", state: { customerId: "c_1" } }),
+      ).toEqual({});
+    });
+
+    /** @scenario "A turn receives the state and may update it" */
+    it("hands the turn the state and sends its update", async () => {
+      const states: unknown[] = [];
+      const { connection } = await connectShop(
+        () => undefined,
+        async ({ state }) => {
+          states.push(state);
+          return { output: "refunded", state: { ...state, refunded: true } };
+        },
+      );
+
+      expect(await answerTo(connection, { kind: "turn", state: { orderId: "o_9" } })).toEqual({
+        output: "refunded",
+        state: { orderId: "o_9", refunded: true },
+      });
+      expect(states).toEqual([{ orderId: "o_9" }]);
+    });
+
+    /** @scenario "A turn that returns no update leaves the state alone" */
+    it("sends no state when the turn returns only a reply", async () => {
+      const { connection } = await connectShop(() => undefined);
+      expect(await answerTo(connection, { kind: "turn", state: { orderId: "o_9" } })).toEqual({
+        output: "none:hi",
+      });
+    });
+
+    /** @scenario "A call with no kind is a turn" */
+    it("runs the handler for a call from a platform that sends no kind", async () => {
+      const { connection } = await connectShop((agent) => {
+        agent.scenario.setup(async () => {
+          throw new Error("a call with no kind must not reach setup");
+        });
+      });
+      expect(await answerTo(connection, { params: { loyaltyTier: "gold" } })).toEqual({
+        output: "gold:hi",
+      });
+    });
+
+    /** @scenario "A hook call for a hook the agent did not declare is answered with an error" */
+    it("answers hook_not_declared", async () => {
+      const { connection } = await connectShop(() => undefined);
+      const answer = await answerTo(connection, { kind: "setup" });
+      expect(answer.error).toMatchObject({ code: "hook_not_declared" });
+    });
+
+    /** @scenario "A hook that raises is answered with an error" */
+    it("answers the hook's error and keeps serving calls", async () => {
+      const { connection } = await connectShop((agent) => {
+        agent.scenario.setup(async () => {
+          throw new Error("database unreachable");
+        });
+      });
+
+      const failed = await answerTo(connection, { kind: "setup" });
+      expect(failed.error).toMatchObject({
+        code: "agent_call_failed",
+        message: expect.stringContaining("database unreachable"),
+      });
+      expect(await answerTo(connection, { callId: "call_2" })).toEqual({ output: "none:hi" });
+    });
+
+    /** @scenario "State over the size cap is refused" */
+    it("refuses a setup state above 64 KiB", async () => {
+      const { connection } = await connectShop((agent) => {
+        agent.scenario.setup(async () => ({ blob: "x".repeat(64 * 1024) }));
+      });
+      const answer = await answerTo(connection, { kind: "setup" });
+      expect(answer.error).toMatchObject({ code: "agent_payload_too_large" });
+      expect(answer).not.toHaveProperty("state");
+    });
+
+    /** @scenario "A teardown object over the size cap is refused" */
+    it("refuses a teardown object above 64 KiB", async () => {
+      const { connection } = await connectShop((agent) => {
+        agent.scenario.teardown(async () => ({ log: "y".repeat(64 * 1024) }));
+      });
+      const answer = await answerTo(connection, { kind: "teardown", state: {} });
+      expect(answer.error).toMatchObject({ code: "agent_payload_too_large" });
+    });
+
+    /** @scenario "State that is not JSON is refused" */
+    it("refuses a state JSON cannot carry, naming the state", async () => {
+      const { connection } = await connectShop((agent) => {
+        agent.scenario.setup(async () => ({ amount: BigInt(4995) }));
+      });
+      const answer = await answerTo(connection, { kind: "setup" });
+      expect(answer.error).toMatchObject({
+        code: "agent_call_failed",
+        message: expect.stringContaining("state"),
+      });
     });
   });
 });

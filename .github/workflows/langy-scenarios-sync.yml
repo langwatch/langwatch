@@ -1,0 +1,92 @@
+# Draft: makes the Langy dogfood project's scenarios and run plan match
+# dev/dogfood/langy/scenarios on every merge to main. Without the three
+# secrets it skips with a notice, so forks and unconfigured repos stay green.
+name: Langy scenarios sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dev/dogfood/langy/scenarios/**"
+      - "dev/dogfood/langy/run-plan.json"
+      - "dev/dogfood/langy/sync.ts"
+      - "dev/dogfood/langy/src/**"
+      - "dev/dogfood/langy/package*.json"
+      - ".github/workflows/langy-scenarios-sync.yml"
+  pull_request:
+    paths:
+      - "dev/dogfood/langy/**"
+      - ".github/workflows/langy-scenarios-sync.yml"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print the changes without writing them"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The SDK is a file: dependency, so npm needs its package.json to link it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            dev/dogfood/langy
+            sdks/typescript
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      # The tests never import the SDK at runtime, so it needs no build.
+      - run: npm ci
+        working-directory: dev/dogfood/langy
+
+      - run: npm test
+        working-directory: dev/dogfood/langy
+
+  sync:
+    needs: test
+    if: github.event_name != 'pull_request'
+    # Only the writes need serialising; PR test runs must not cancel a pending sync.
+    concurrency:
+      group: langy-scenarios-sync
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LANGWATCH_API_KEY: ${{ secrets.LANGY_DOGFOOD_API_KEY }}
+      LANGWATCH_PROJECT_ID: ${{ secrets.LANGY_DOGFOOD_PROJECT_ID }}
+      LANGWATCH_ENDPOINT: ${{ secrets.LANGY_DOGFOOD_ENDPOINT }}
+    steps:
+      - name: Check the secrets
+        id: secrets
+        run: |
+          if [ -z "$LANGWATCH_API_KEY" ] || [ -z "$LANGWATCH_PROJECT_ID" ] || [ -z "$LANGWATCH_ENDPOINT" ]; then
+            echo "::notice::LANGY_DOGFOOD_API_KEY, LANGY_DOGFOOD_PROJECT_ID or LANGY_DOGFOOD_ENDPOINT is not set; skipping the Langy scenarios sync"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: dev/dogfood/langy
+
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      # sync.ts uses only Node built-ins and fetch, so no install step.
+      - name: Sync
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '--dry-run' || '' }}
+        run: node dev/dogfood/langy/sync.ts $DRY_RUN

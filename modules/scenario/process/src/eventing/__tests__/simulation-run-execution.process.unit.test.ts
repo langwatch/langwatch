@@ -62,6 +62,10 @@ class UnusedScenarioExecutionService extends ScenarioExecutionService {
   recordCutAtLimit(): Promise<void> {
     throw new Error("recordCutAtLimit unexpectedly called in evolve tests");
   }
+
+  recordHooks(): Promise<void> {
+    throw new Error("recordHooks unexpectedly called in evolve tests");
+  }
 }
 
 /**
@@ -483,6 +487,33 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       );
       expect(executeIntentFor()).not.toHaveProperty("startedByUserId");
       expect(executeIntentFor()).not.toHaveProperty("startedByApiKeyId");
+    });
+  });
+
+  describe("when the queued event records that the run keeps its data", () => {
+    function executeIntentFor(metadata?: Record<string, unknown>) {
+      const evolution = evolveEvent(
+        initialState,
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+          occurredAt: 10_000,
+          data: queuedData(metadata ? { metadata } : {}),
+        }),
+      );
+      return evolution.intents[0]?.payload;
+    }
+
+    /** @scenario "Rerun and keep data skips teardown for that rerun" */
+    it("carries keep data on the execute intent", () => {
+      expect(executeIntentFor({ langwatch: { keepData: true } })).toMatchObject({
+        keepData: true,
+      });
+    });
+
+    it("carries none when the run did not ask to keep its data", () => {
+      expect(executeIntentFor({ langwatch: { targetReferenceId: "agent_1" } })).not.toHaveProperty(
+        "keepData",
+      );
     });
   });
 
@@ -1109,6 +1140,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         secretParameterNames: null,
         startedByUserId: null,
         startedByApiKeyId: null,
+        keepData: false,
         evaluators: null,
         hasOwnEvaluations: false,
       });

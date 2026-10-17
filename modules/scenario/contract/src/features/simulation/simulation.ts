@@ -5,6 +5,7 @@ import { FieldMappingSchema } from "../../resolve-field-mappings.ts";
 import { scenarioCriterionResultSchema } from "../../scenario-criterion-result.ts";
 import { scenarioEvaluationResultSchema } from "../../scenario-evaluation-result.ts";
 import { runParameterValuesSchema } from "../../scenario.parameters.ts";
+import { scenarioRunHooksSchema } from "../execution/scenario-hooks.ts";
 import { runActorLabelSchema } from "../run/run-actor.ts";
 
 /**
@@ -112,6 +113,10 @@ const simulationRunMetadataSchemaDefinition = z
         actorLabel: runActorLabelSchema.optional(),
         /** The connected agent instance that served the run. */
         agentInstance: z.object({ hostname: z.string(), label: z.string().nullable() }).optional(),
+        /** The setup and teardown results of the run (ADR-180). */
+        hooks: scenarioRunHooksSchema.optional(),
+        /** Started with "Rerun and keep data", so its teardown was skipped (ADR-180). */
+        keepData: z.boolean().optional(),
       })
       .optional(),
   })

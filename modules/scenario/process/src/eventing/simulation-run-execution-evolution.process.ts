@@ -147,6 +147,7 @@ export const handleRunQueued: EventHandler<
         ...(view.secretParameters !== null ? { secretParameters: view.secretParameters } : {}),
         ...(view.startedByUserId !== null ? { startedByUserId: view.startedByUserId } : {}),
         ...(view.startedByApiKeyId !== null ? { startedByApiKeyId: view.startedByApiKeyId } : {}),
+        ...(view.keepData ? { keepData: true } : {}),
       }),
     ],
   };
@@ -533,6 +534,7 @@ export function buildSimulationRunEventView(
     secretParameterNames,
     startedByUserId: actorId === "" ? null : actorId,
     startedByApiKeyId: actorApiKeyId === "" ? null : actorApiKeyId,
+    keepData: reserved.keepData === true,
     evaluators: extractPendingEvaluators(data) ?? null,
     hasOwnEvaluations: unknownRecordSchema.safeParse(data.results).data?.evaluations != null,
   };
