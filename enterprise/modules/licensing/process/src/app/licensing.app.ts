@@ -37,7 +37,9 @@ import {
   type ContractTerms,
   type IncomingUsageReport,
   type SelfHostedInstanceDetail,
+  type SelfHostedInstanceFilters,
   type SelfHostedInstancePage,
+  type SelfHostedInstanceSummary,
   type SelfHostedSignal,
   type IssueLicenseInput,
   type IssuedLicenseView,
@@ -50,6 +52,7 @@ import {
   licensingSecrets,
   type PlatformLicenseAccess,
   type RemoveLicenseResult,
+  type IssuedLicenseFilters,
   type IssuedLicensePage,
   type LicenseStatus,
   type PlanInfo,
@@ -546,11 +549,13 @@ export class LicensingModule implements LicensingApiContract {
     return this.#registry.getById(input);
   }
 
-  listIssuedLicenses(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<IssuedLicensePage> {
+  listIssuedLicenses(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+    } & IssuedLicenseFilters,
+  ): Promise<IssuedLicensePage> {
     return this.#registry.list(input);
   }
 
@@ -737,16 +742,22 @@ export class LicensingModule implements LicensingApiContract {
     return this.#instances.recordReport(input);
   }
 
-  listSelfHostedInstances(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<SelfHostedInstancePage> {
+  listSelfHostedInstances(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+    } & SelfHostedInstanceFilters,
+  ): Promise<SelfHostedInstancePage> {
     return this.#instances.list(input);
   }
 
   getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail> {
     return this.#instances.getById(input);
+  }
+
+  summarizeSelfHostedInstances(): Promise<SelfHostedInstanceSummary> {
+    return this.#instances.summarize();
   }
 }
 

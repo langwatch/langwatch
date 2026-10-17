@@ -49,6 +49,7 @@ import { IdentityApi, type IdentityApi as IdentityApiContract } from "@langwatch
 import { InsightApi } from "@langwatch/insight-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { LangyApi } from "@langwatch/langy-contract";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
@@ -925,6 +926,7 @@ export class OpsModule implements OpsApi {
         ledger: repositories.upgradeLedger,
         operators: platformOperators,
         mail: dependencies.notifications,
+        renderer: ReactEmailMailRenderer.create(),
         upgradesUrl: `${(config.publicBaseUrl ?? "").replace(/\/$/, "")}/ops/upgrades`,
       }),
     });

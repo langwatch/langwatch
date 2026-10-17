@@ -1,6 +1,12 @@
 import { performance } from "node:perf_hooks";
 
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { Authorization } from "@langwatch/authorization";
+import {
+  AuthorizedClickHouse,
+  type ClickHouseQueryClient,
+  type TenantScopedReader,
+} from "@langwatch/clickhouse-client";
+import { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
 import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
@@ -377,6 +383,8 @@ function toRecord({
 
 export class CodingAgentSessionClickHouseRepository implements SessionRepository {
   private readonly clickhouse: ClickHouseQueryClient;
+  /** The same client behind the proof-checked reader a fenced read goes through (ADR-177). */
+  private readonly authorized: AuthorizedClickHouse;
   private readonly defaultTraceRetentionDays: number;
   private readonly metrics: CodingAgentReadMetrics;
   private readonly clock: CodingAgentClock;
@@ -393,9 +401,16 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     clock: CodingAgentClock;
   }) {
     this.clickhouse = clickhouse;
+    this.authorized = new AuthorizedClickHouse({
+      resolveClient: () => Promise.resolve(clickhouse),
+    });
     this.defaultTraceRetentionDays = defaultTraceRetentionDays;
     this.metrics = metrics;
     this.clock = clock;
+  }
+
+  private reader(authorization: Authorization): TenantScopedReader {
+    return this.authorized.as(authorization, { reads: "traces" });
   }
 
   static create(deps: {
@@ -621,6 +636,69 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     observe(rows.length > 0 ? "hit" : "empty");
 
     // Marked sessions left with the dedup group above; this repeats the rule on the settled row.
+    return dedupToLatestPerSession(rows)
+      .map(fromRecord)
+      .filter((row) => !row.auxiliary)
+      .toSorted((a, b) => b.startedAtMs - a.startedAtMs)
+      .slice(0, limit);
+  }
+
+  /**
+   * `findManyRecent` through a proof's fence: the fence picks the tenants, a shared
+   * grant's window cuts `StartedAt`, and the dedup group is bound to the same set.
+   */
+  async findManyRecentFenced({
+    authorization,
+    fromMs,
+    toMs,
+    limit,
+  }: {
+    authorization: Authorization;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }): Promise<CodingAgentSessionRow[]> {
+    const startedAt = performance.now();
+    const observe = (outcome: CodingAgentSessionListReadOutcome) =>
+      this.metrics.observeSessionListRead({
+        table: TABLE_NAME,
+        outcome,
+        durationMs: performance.now() - startedAt,
+      });
+
+    let rows: Record<string, unknown>[];
+    try {
+      const result = await this.reader(authorization).query<Record<string, unknown>>({
+        query: `
+          SELECT *
+          FROM ${TABLE_NAME}
+          WHERE ${tenantScope("StartedAt")}
+            AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
+            AND (TenantId, SessionId, UpdatedAt) IN (
+              SELECT TenantId, SessionId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE ${tenantSet()}
+              GROUP BY TenantId, SessionId
+              HAVING max(toUInt8(Auxiliary)) = 0
+            )
+          ORDER BY StartedAt DESC
+          LIMIT {limit:UInt32}
+        `,
+        query_params: {
+          from: fromMs,
+          to: toMs,
+          // Over-fetched for the same tie `findManyRecent` collapses below.
+          limit: limit * LIST_READ_DEDUP_OVERFETCH,
+        },
+        format: "JSONEachRow",
+      });
+      rows = await result.json();
+    } catch (error) {
+      observe("error");
+      throw error;
+    }
+    observe(rows.length > 0 ? "hit" : "empty");
+
     return dedupToLatestPerSession(rows)
       .map(fromRecord)
       .filter((row) => !row.auxiliary)
@@ -978,9 +1056,11 @@ const asNumberMap = (value: unknown): Record<string, number> => {
 function dedupToLatestPerSession(records: Record<string, unknown>[]): Record<string, unknown>[] {
   const bySession = new Map<string, Record<string, unknown>>();
   for (const record of records) {
-    const sessionId = asString(record.SessionId);
-    const incumbent = bySession.get(sessionId);
-    bySession.set(sessionId, incumbent === undefined ? record : preferredOf(incumbent, record));
+    // Keyed with the tenant: a fenced page spans projects, and one session id
+    // in two of them is two sessions.
+    const key = `${asString(record.TenantId)}\u0000${asString(record.SessionId)}`;
+    const incumbent = bySession.get(key);
+    bySession.set(key, incumbent === undefined ? record : preferredOf(incumbent, record));
   }
   return [...bySession.values()];
 }

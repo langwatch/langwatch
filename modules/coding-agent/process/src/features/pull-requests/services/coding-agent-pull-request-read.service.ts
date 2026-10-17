@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/authorization";
 import {
   codingAgentPullRequestDetailSchema,
   codingAgentPullRequestUsageInputSchema,
@@ -39,7 +40,10 @@ import {
   type CodingAgentModelUsage,
   type CodingAgentUsageRow,
 } from "./coding-agent-pull-request-usage.service.ts";
-import type { CodingAgentSessionListPullRequestService } from "./coding-agent-session-list-pull-request.service.ts";
+import {
+  type CodingAgentSessionListPullRequestService,
+  sessionListKey,
+} from "./coding-agent-session-list-pull-request.service.ts";
 
 export const SESSIONS_LIST_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 export const SESSIONS_LIST_LIMIT = 200;
@@ -89,10 +93,13 @@ export class CodingAgentPullRequestReadService {
     },
   ) {}
 
-  async listForProject(input: { projectId: string }): Promise<CodingAgentSessionListRow[]> {
+  async listForProject(input: {
+    projectId: string;
+    authorization: Authorization;
+  }): Promise<CodingAgentSessionListRow[]> {
     const toMs = this.dependencies.clock.nowMs();
-    const rows = await this.dependencies.sessionReads.listRecent({
-      projectId: input.projectId,
+    const rows = await this.dependencies.sessionReads.listRecentFenced({
+      authorization: input.authorization,
       fromMs: toMs - SESSIONS_LIST_WINDOW_MS,
       toMs,
       limit: SESSIONS_LIST_LIMIT,
@@ -128,7 +135,7 @@ export class CodingAgentPullRequestReadService {
       activeTimeCliSec: row.activeTimeCliSec,
       blockedOnUserMs: row.blockedOnUserMs,
       models: row.models,
-      pullRequests: pullRequests.get(row.sessionId) ?? [],
+      pullRequests: pullRequests.get(sessionListKey(row)) ?? [],
     }));
   }
 
