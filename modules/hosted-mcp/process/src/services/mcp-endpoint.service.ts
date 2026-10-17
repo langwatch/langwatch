@@ -226,7 +226,7 @@ export class McpEndpointService implements McpHandler {
       ["/oauth/token", only("POST", (req, res) => oauth.handleToken(req, res))],
       ["/mcp", streamableVerbs],
       // The SSE transport is retired; a client still configured with its URL is served the
-      // Streamable HTTP transport there.
+      // Streamable HTTP transport there (langwatch/tasks#909).
       ["/sse", streamableVerbs],
     ]);
   }

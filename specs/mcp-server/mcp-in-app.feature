@@ -247,6 +247,45 @@ Feature: MCP HTTP Server In-App Integration (Phase 1)
     Then the response status is 404, as for a session that does not exist
     And the other replica serves no session for that session id
 
+  # Streamable HTTP clients given the /sse URL. The SSE transport is retired,
+  # so /sse serves Streamable HTTP exactly as /mcp does — a client given that
+  # URL posts initialize there and is answered (langwatch/tasks#909).
+
+  @regression @integration
+  Scenario: A Streamable HTTP initialize posted to /sse is answered as it is on /mcp
+    Given a valid project API key
+    When a client posts an MCP initialize request to /sse with that key as a Bearer token
+    Then the response status is 200
+    And the response includes an mcp-session-id header
+    And the initialize result is the one /mcp returns for the same request
+
+  @integration
+  Scenario: An initialize posted to /sse without credentials is challenged as it is on /mcp
+    When a client posts an MCP initialize request to /sse without credentials
+    Then the response status is 401
+    And the WWW-Authenticate header is the one /mcp sends, pointing at the protected resource metadata
+
+  @integration
+  Scenario: A Streamable HTTP session opened on /sse reopens its stream on /sse
+    Given a client opened a Streamable HTTP session by posting initialize to /sse
+    When the client opens /sse with GET carrying that session's mcp-session-id header
+    Then the response is that session's event stream
+    And no SSE transport session is opened for the request
+
+  @integration
+  Scenario: A Streamable HTTP session opened on /sse is closed with DELETE on /sse
+    Given a client opened a Streamable HTTP session by posting initialize to /sse
+    When the client sends DELETE to /sse carrying that session's mcp-session-id header
+    Then the response status is 200
+    And a later request for that session is refused as an expired session
+
+  @integration
+  Scenario: A Streamable HTTP client given the /sse URL connects and lists the tools
+    Given a Streamable HTTP MCP client configured with the /sse URL and a valid project API key
+    When the client connects
+    Then the connection succeeds
+    And the client can list the LangWatch tools
+
   # --- OAuth discovery documents ---
 
   @integration

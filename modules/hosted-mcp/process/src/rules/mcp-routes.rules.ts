@@ -37,6 +37,9 @@ const ROUTE_VERBS: readonly {
 }[] = [
   { path: "/mcp", methods: ["POST", "GET", "DELETE"], policy: BEARER_SESSION_POLICY },
   { path: "/mcp/health", methods: ["GET"], policy: MCP_HEALTH_POLICY },
+  // POST/DELETE on /sse (and a GET carrying mcp-session-id) are Streamable
+  // HTTP, served under the same bearer-session policy as /mcp — a client given
+  // the /sse URL may speak only Streamable HTTP (langwatch/tasks#909).
   { path: "/sse", methods: ["POST", "GET", "DELETE"], policy: BEARER_SESSION_POLICY },
   { path: PROTECTED_RESOURCE_METADATA_PATH, methods: ["GET"], policy: OAUTH_HANDSHAKE_POLICY },
   {
