@@ -56,11 +56,11 @@ export async function runFinish({
       conversationId: refs.conversationId.current,
       transcript: "transcript" in state ? state.transcript : [],
       startedAt: refs.startedAt.current || nowInstant().epochMilliseconds,
-      // The cut-at-limit marker is NOT sent: the server derives it from the
-      // span above against the configured maximum, since a body flag was only
-      // the browser's claim (#8028). `isCutAtLimit` still drives this panel's
-      // own LIMIT_REACHED vs HANG_UP display.
-      endedAt: nowInstant().epochMilliseconds,
+      // The cut-at-limit marker is NOT sent: the server derives it from this
+      // span against the configured maximum (#8028). endedAt is the instant the
+      // call ended, frozen in runEndCall and reused across cleanup and any
+      // name-save retry, so a slow finish cannot inflate a below-limit hang-up.
+      endedAt: refs.endedAt.current || nowInstant().epochMilliseconds,
       ...(props.scenarioId ? { scenarioId: props.scenarioId } : {}),
     });
   } catch (error) {
