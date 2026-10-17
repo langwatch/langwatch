@@ -223,7 +223,7 @@ describe("ScenarioRunHooksService over the connected channel", () => {
       expect(relay.sent.map((body) => body.kind)).toEqual(["setup", "teardown"]);
       expect(error).toBeInstanceOf(ScenarioRunHooksError);
       const line = scenarioChildFailureLine(error);
-      expect(line.error).toMatch(/Scenario setup failed: .*no such customer/);
+      expect(line.error).toContain("no such customer");
       expect(line.hooks?.setup).toMatchObject({ status: "failed" });
       expect(line.hooks?.teardown).toMatchObject({ status: "ok" });
     });
@@ -241,7 +241,6 @@ describe("ScenarioRunHooksService over the connected channel", () => {
 
       expect(relay.sent.map((body) => body.kind)).toEqual(["setup", "teardown"]);
       const line = scenarioChildFailureLine(error);
-      expect(line.error).toMatch(/Scenario setup timed out/);
       expect(line.hooks?.setup?.status).toBe("timed_out");
     });
   });

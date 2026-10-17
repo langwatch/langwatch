@@ -119,14 +119,14 @@ export const langy = connectAgent(
 );
 
 langy.scenario.setup(async (run, params) => {
+  if (process.env.LANGY_DOGFOOD_FAIL_SETUP === "1") {
+    throw new Error("setup failed on purpose (LANGY_DOGFOOD_FAIL_SETUP=1)");
+  }
   const world = parseWorld({ value: params.world });
   if (isMatrixWorld(world)) return toState(await setupWorld({ http, world }));
   if (world === TOPIC_WORLD) return toState(await setupTopicWorld({ http }));
   if (world === QUIET_WORLD) return toState(await setupQuietWorld({ http }));
   if (world === LOGIN_WORLD) return toState(setupLoginWorld());
-  if (process.env.LANGY_DOGFOOD_FAIL_SETUP === "1") {
-    throw new Error("setup failed on purpose (LANGY_DOGFOOD_FAIL_SETUP=1)");
-  }
   return toState(await setupPromptWorld({ http, scenarioRunId: run.scenarioRunId ?? "unknown" }));
 });
 

@@ -5,6 +5,7 @@
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 import pytest
@@ -203,6 +204,22 @@ def test_a_hook_declared_after_start_restarts_the_session(monkeypatch):
 
 
 # @scenario "A hook declared after the connection started registers again"
+def test_a_hook_declared_between_two_polls_ends_the_http_session(monkeypatch):
+    @connect_agent(name="shop-assistant", environment="development")
+    def agent(messages) -> str:
+        return "ok"
+
+    client, _ = running_default_client(monkeypatch)
+    client._http = object()  # an HTTP session with no poll in flight
+
+    @agent.scenario.setup
+    def setup(run):
+        return {}
+
+    assert client._session_lost
+
+
+# @scenario "A hook declared after the connection started registers again"
 def test_a_hook_that_refuses_the_agent_after_start_deregisters(monkeypatch):
     @connect_agent(name="shop-assistant", environment="development")
     def agent(messages, refund_amount: float = 49.95) -> str:
@@ -393,6 +410,20 @@ def test_a_hook_that_raises_is_answered_with_an_error():
     assert without_envelope(answer(agent, call_frame(kind="turn"))) == {
         "output": "none:hi"
     }
+
+
+def test_a_setup_runs_under_its_deadline_not_the_turn_timeout():
+    agent = shop_assistant(timeout=1)
+
+    @agent.scenario.setup
+    async def setup(run):
+        await asyncio.sleep(1.3)
+        return {"order_id": "42"}
+
+    deadline_at = (time.time() + 5) * 1000
+    result = answer(agent, call_frame(kind="setup", deadlineAt=deadline_at))
+
+    assert result.get("state") == {"order_id": "42"}
 
 
 # @scenario "State over the size cap is refused"

@@ -71,6 +71,7 @@ function answeredResult({
   return kind === "setup" ? { ...base, state: answer.state } : { ...base, returned: answer.state };
 }
 
+/** Calls a run's setup before its turns and its teardown after them, recording each (ADR-180). */
 export class ScenarioRunHooksService {
   static create(options: {
     caller: ScenarioHookCaller;

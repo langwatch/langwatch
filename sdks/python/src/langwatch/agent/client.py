@@ -395,9 +395,11 @@ class AgentClient:
                 await socket.close()
             except Exception as error:
                 logger.debug("connect_agent: close failed: %s", error)
-        elif self._poll_task is not None:
+        elif self._http is not None:
+            # Also mid-register or between polls: the poll loop registers again.
             self._session_lost = True
-            self._poll_task.cancel()
+            if self._poll_task is not None:
+                self._poll_task.cancel()
 
     # ----- configuration -----
 
@@ -972,7 +974,11 @@ class AgentClient:
             call = agent.call_from_frame(frame)
             remaining = _seconds_until(frame.get("deadlineAt"))
             if remaining is not None:
-                timeout = max(0.0, min(agent.timeout, remaining))
+                # A hook's deadline is its own budget, never cut to the turn timeout.
+                is_hook = (frame.get("kind") or "turn") != "turn"
+                timeout = max(
+                    0.0, remaining if is_hook else min(agent.timeout, remaining)
+                )
             answer = await asyncio.wait_for(
                 agent.answer(frame.get("kind") or "turn", call), timeout=timeout
             )

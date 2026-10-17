@@ -769,7 +769,11 @@ export class AgentClient {
     runtime: AgentRuntime;
   }): void {
     const fromDeadline = frame.deadlineAt === null ? Infinity : frame.deadlineAt - Date.now();
-    const limit = Math.min(fromDeadline, runtime.timeoutMs);
+    // A hook's deadline is its own budget, never cut to the turn timeout.
+    const limit =
+      frame.kind !== "turn" && frame.deadlineAt !== null
+        ? fromDeadline
+        : Math.min(fromDeadline, runtime.timeoutMs);
     if (!Number.isFinite(limit)) return;
     const timer = setTimeout(
       () => {

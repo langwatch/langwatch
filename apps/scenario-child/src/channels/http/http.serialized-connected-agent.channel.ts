@@ -249,7 +249,8 @@ export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel 
       throw await failureOf(response);
     }
     const payload = (await response.json()) as RelayAnswer;
-    this.served = payload.instance;
+    // A hook may be answered by another instance; the run records the one that served its turns.
+    if (kind === "turn") this.served = payload.instance;
     this.logger.info(
       {
         agentId: this.config.agentId,

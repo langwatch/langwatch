@@ -28,6 +28,11 @@ export LANGWATCH_API_KEY="${LANGWATCH_API_KEY:-sk-lw-LocalDevPrivate1_LocalDevPr
 export LANGWATCH_PROJECT_ID="${LANGWATCH_PROJECT_ID:-local-dev-project}"
 
 cd "$HERE"
-setsid nohup node src/agent.ts >"$LOG_DIR/langy-agent.log" 2>&1 </dev/null &
+# macOS has no setsid; nohup alone still detaches the agent from this shell.
+if command -v setsid >/dev/null 2>&1; then
+  setsid nohup node src/agent.ts >"$LOG_DIR/langy-agent.log" 2>&1 </dev/null &
+else
+  nohup node src/agent.ts >"$LOG_DIR/langy-agent.log" 2>&1 </dev/null &
+fi
 echo $! >"$LOG_DIR/langy-agent.pid"
 echo "langy agent started (pid $!) against $LANGWATCH_ENDPOINT, log $LOG_DIR/langy-agent.log"

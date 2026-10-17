@@ -60,6 +60,7 @@ export class StateAwareJudgeAgent extends ScenarioRunner.JudgeAgentAdapter {
   }
 }
 
+/** Gives the simulated user and the judge of a run with hooks the run's current state. */
 export class RunStateRolesService {
   static create({ readState }: { readState: StateReader }): RunStateRolesService {
     return new RunStateRolesService(readState);

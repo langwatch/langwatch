@@ -62,9 +62,16 @@ src/sync-files.ts    reads and checks the files; src/sync-api.ts the public rout
 
 ## Run it
 
-Stack prerequisites (once per stack) are in `dev/dogfood/langy-hooks/README.md`
-("Stack prerequisites"): `haven up -d +langy`, the two Langy flags on, and a
-model provider for Langy, the simulator and the judge.
+Stack prerequisites (once per stack):
+
+1. `haven up -d +langy` from the worktree root.
+2. The seeded admin must be a platform operator to flip flags:
+   `eval "$(haven env --reveal)"; pnpm --silent --filter @langwatch/tasks task grant-platform-operator admin@mail.langwatch.localhost`
+   (haven does this itself only when it manages the database).
+3. Flags `release_langy_enabled` and `release_langy_api_key_turns_enabled` on
+   (`/ops/feature-flags`, or the `ops.setFeatureFlag` tRPC mutation).
+4. A model provider for Langy, the simulator and the judge, set as the project
+   default through `POST /api/model-defaults`.
 
 ```bash
 make dogfood-langy-hooks                         # or dev/dogfood/langy/run.sh

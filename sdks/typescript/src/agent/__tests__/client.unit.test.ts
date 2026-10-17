@@ -1071,6 +1071,20 @@ describe("the agent client, given a fake platform", () => {
       return rest;
     };
 
+    it("lets a setup run past the turn timeout while its own deadline holds", async () => {
+      const agent = define(async () => "hi", { timeoutMs: 60 }) as Shop;
+      agent.scenario.setup(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        return { orderId: "42" };
+      });
+      const connection = await platform.nextConnection();
+      connection.accept(await connection.nextFrame<RegisterFrame>("register"));
+      await until(() => sharedClientForTests()?.isRegistered === true);
+
+      const answer = await answerTo(connection, { kind: "setup", deadlineAt: Date.now() + 5_000 });
+      expect(answer).toMatchObject({ state: { orderId: "42" } });
+    });
+
     /** @scenario "An agent with both hooks declares both at register" */
     /** @scenario "The TypeScript SDK mirrors the Python hooks" */
     it("declares setup and teardown as the Python SDK does for the same functions", async () => {

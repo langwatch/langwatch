@@ -446,11 +446,9 @@ export class ScenarioChildExecutionService {
 
   static readonly execute = executeScenarioChildValue;
   static readonly flushTraces = flushScenarioOtelTracesValue;
-  static readonly formatError = formatScenarioChildErrorValue;
   static readonly failureLine = failureLineValue;
 }
 
 export const executeScenarioChild = ScenarioChildExecutionService.execute;
 export const flushScenarioOtelTraces = ScenarioChildExecutionService.flushTraces;
-export const formatScenarioChildError = ScenarioChildExecutionService.formatError;
 export const scenarioChildFailureLine = ScenarioChildExecutionService.failureLine;

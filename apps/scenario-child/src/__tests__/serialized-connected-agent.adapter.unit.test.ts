@@ -131,6 +131,21 @@ describe("SerializedConnectedAgentAdapter", () => {
     });
   });
 
+  describe("when teardown is answered by another instance than the turns", () => {
+    it("keeps the instance that served the turns", async () => {
+      const relay = fakeRelay([
+        okReply({ hostname: "laptop", label: null }),
+        okReply({ hostname: "other", label: null }),
+      ]);
+      const adapter = adapterWith(relay);
+
+      await adapter.call(turn("thread_a", "hi"));
+      await adapter.callHook({ kind: "teardown", timeoutMs: 1_000 });
+
+      expect(adapter.servedInstance).toEqual({ hostname: "laptop", label: null });
+    });
+  });
+
   describe("when the relay refuses a call with a body that carries the code and the status text", () => {
     /** @scenario "The child names a refused call by the code the relay wrote" */
     it("names the failure by the code, not by the status text beside it", async () => {

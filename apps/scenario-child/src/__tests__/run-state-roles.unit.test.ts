@@ -6,10 +6,14 @@
  */
 
 import * as ScenarioRunner from "@langwatch/scenario";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { RunStateRolesService } from "../services/run-state-roles.service.ts";
-import { ScenarioRunHooksService } from "../services/scenario-run-hooks.service.ts";
+import {
+  type ScenarioHookCaller,
+  ScenarioRunHooksService,
+} from "../services/scenario-run-hooks.service.ts";
 
 /** A role that remembers the messages it was given on each call. */
 class RecordingUser extends ScenarioRunner.UserSimulatorAgentAdapter {
@@ -105,13 +109,13 @@ describe("ScenarioRunHooksService", () => {
     /** @scenario "Each hook defaults to 60 seconds" */
     it("gives setup and teardown 60 seconds each", async () => {
       const budgets: number[] = [];
-      const caller = {
+      const caller = createApiFixture<ScenarioHookCaller>({
         runState: null,
-        callHook: async ({ timeoutMs }: { kind: "setup" | "teardown"; timeoutMs: number }) => {
+        callHook: async ({ timeoutMs }) => {
           budgets.push(timeoutMs);
           return { state: { orderId: "42" } };
         },
-      };
+      });
 
       await ScenarioRunHooksService.create({
         caller,

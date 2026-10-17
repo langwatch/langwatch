@@ -27,10 +27,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: langy-scenarios-sync
-  cancel-in-progress: false
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -57,6 +53,10 @@ jobs:
   sync:
     needs: test
     if: github.event_name != 'pull_request'
+    # Only the writes need serialising; PR test runs must not cancel a pending sync.
+    concurrency:
+      group: langy-scenarios-sync
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
