@@ -264,6 +264,12 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
       And the address carries the policy, so the same link reopens it
 
     @integration
+    Scenario: An editor opened from a pasted link closes back to the page under it
+      Given carol opened the routing policy editor from a link, with no page handing it a close action
+      When she closes the editor
+      Then the address loses every drawer parameter and keeps the rest of its query
+
+    @integration
     Scenario: A tier name cannot be set twice
       Given carol is editing a routing policy
       When she adds a model name mapping whose name is a reserved tier
