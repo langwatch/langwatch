@@ -16,7 +16,7 @@ def generate_text_with_community_instrumentor(prompt: str):
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.content[0].text
+    return "".join(block.text for block in response.content if block.type == "text")
 
 
 if __name__ == "__main__":

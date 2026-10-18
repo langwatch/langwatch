@@ -37,7 +37,7 @@ async def main(message: cl.Message):
     )
 
     for part in completion:
-        if part.type == "content_block_delta":
+        if part.type == "content_block_delta" and part.delta.type == "text_delta":
             await msg.stream_token(part.delta.text or "")
 
     await msg.update()
