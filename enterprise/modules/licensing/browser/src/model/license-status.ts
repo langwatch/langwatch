@@ -52,13 +52,28 @@ export function licenseMetersSeats(
  * Returns the original string if parsing fails.
  */
 export function formatLicenseDate(isoDate: string): string {
+  return formatLicenseDateWith({ isoDate, month: "long" });
+}
+
+/** The same date with a three-letter month ("Nov 9, 2026"): at most 12 characters, for a tile. */
+export function formatLicenseDateShort(isoDate: string): string {
+  return formatLicenseDateWith({ isoDate, month: "short" });
+}
+
+function formatLicenseDateWith({
+  isoDate,
+  month,
+}: {
+  isoDate: string;
+  month: "long" | "short";
+}): string {
   const epochMilliseconds = toEpochMs(isoDate);
   if (isNaN(epochMilliseconds)) {
     return isoDate;
   }
   return readableDate(epochMilliseconds).toLocaleDateString("en-US", {
     year: "numeric",
-    month: "long",
+    month,
     day: "numeric",
     timeZone: "UTC",
   });
@@ -73,6 +88,19 @@ export function formatLimitOrUnlimited(value: number): string {
     return "Unlimited";
   }
   return value.toLocaleString();
+}
+
+/** Whether a limit is a real count: a license writes "unlimited" as a number of 1M or more. */
+export function isCappedLimit(value: number): boolean {
+  return Number.isFinite(value) && value < 1_000_000;
+}
+
+/** The Lite seats in use against the license's limit, or null when it does not cap them. */
+export function cappedLiteSeatsOf(
+  status: Pick<LicenseStatusWithMetadata, "currentMembersLite" | "maxMembersLite">,
+): { current: number; max: number } | null {
+  if (!isCappedLimit(status.maxMembersLite)) return null;
+  return { current: status.currentMembersLite, max: status.maxMembersLite };
 }
 
 /**
