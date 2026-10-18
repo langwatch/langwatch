@@ -282,6 +282,20 @@ export const goErrorCodes = {
    */
   jsonpath_no_match: { service: "nlpgo", httpStatus: 422 },
   /**
+   * ErrProviderKeyRejected — marks a key the provider refused on a status
+   * other than 401 or 403.
+   *
+   * @source services/langyagent/adapters/otelrelay/llmproxy.go
+   */
+  llm_provider_key_rejected: { service: "langyagent" },
+  /**
+   * ErrProviderOutOfCredit — marks a provider account with no credit or quota
+   * left.
+   *
+   * @source services/langyagent/adapters/otelrelay/llmproxy.go
+   */
+  llm_provider_out_of_credit: { service: "langyagent" },
+  /**
    * llmUpstreamErrorCode — marks a failed mediated LLM call whose response
    * body was NOT the gateway's typed herr envelope — a provider-native error
    * the gateway forwarded verbatim (an Anthropic "credit balance too low", the

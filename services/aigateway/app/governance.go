@@ -2,12 +2,11 @@ package app
 
 import (
 	"errors"
-	"net/http"
-	"strings"
 
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
+	"github.com/langwatch/langwatch/pkg/providererr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -55,29 +54,10 @@ func isAccountExhaustionError(ue *domain.UpstreamError) bool {
 	return isAccountExhaustion(ue.StatusCode, ue.Body)
 }
 
-// isAccountExhaustion reports whether a provider error is a terminal
-// account-level exhaustion (credit / quota / billing) that a governed end user
-// cannot resolve themselves — as opposed to a transient rate limit or a 5xx,
-// which must stay verbatim and retryable. Keyed on the terminal error code,
-// never on bare status: an OpenAI rate_limit 429 is retryable and excluded,
-// while a 429 carrying code/type=insufficient_quota is terminal and included.
+// isAccountExhaustion is a terminal account-level exhaustion a governed end
+// user cannot resolve themselves; a rate limit or a 5xx stays verbatim.
 func isAccountExhaustion(status int, body []byte) bool {
-	if gjson.GetBytes(body, "error.code").String() == "insufficient_quota" ||
-		gjson.GetBytes(body, "error.type").String() == "insufficient_quota" {
-		return true
-	}
-	switch status {
-	case http.StatusPaymentRequired: // 402 — generic billing / account block
-		return true
-	case http.StatusBadRequest:
-		// Anthropic surfaces credit exhaustion as a 400 invalid_request_error
-		// whose message names the credit balance.
-		return strings.Contains(
-			strings.ToLower(gjson.GetBytes(body, "error.message").String()),
-			"credit balance",
-		)
-	}
-	return false
+	return providererr.AccountExhausted(status, body)
 }
 
 // rewriteErrorMessage replaces only the error.message field of a provider
