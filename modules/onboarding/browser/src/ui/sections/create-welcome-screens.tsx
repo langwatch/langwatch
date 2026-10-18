@@ -2,7 +2,7 @@ import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Link } from "@langwatch/browser-host/link";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
-import { Field, Icon, Input, VStack } from "@langwatch/design-system/primitives";
+import { Field, HStack, Icon, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { ExternalLink } from "lucide-react";
 import type React from "react";
 import { Suspense, useMemo } from "react";
@@ -66,10 +66,14 @@ const OrganizationScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
         />
       </Field.Root>
 
-      <Field.Root colorPalette="orange">
+      {/* The box and its sentence are one target; the links sit outside it, so opening a
+          document never toggles the agreement. */}
+      <HStack gap={1} align="center" flexWrap="wrap">
         <Checkbox.Root
-          size="sm"
-          variant="subtle"
+          colorPalette="orange"
+          size="md"
+          variant="solid"
+          cursor="pointer"
           checked={agreement}
           onCheckedChange={(details) => {
             const checked = details.checked === true;
@@ -83,32 +87,29 @@ const OrganizationScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
           }}
         >
           <Checkbox.HiddenInput />
-          <Checkbox.Control>
+          <Checkbox.Control data-testid="terms-agreement-box">
             <Checkbox.Indicator />
           </Checkbox.Control>
           <Checkbox.Label textStyle="bodySm" fontWeight="normal" color="fg.muted">
-            {"I agree to the LangWatch "}
-            <Link href={LEGAL_LINKS.terms.href} isExternal fontWeight="medium" variant="underline">
-              {LEGAL_LINKS.terms.label}
-              <Icon size="xs">
-                <ExternalLink />
-              </Icon>
-            </Link>
-            {" and "}
-            <Link
-              href={LEGAL_LINKS.privacy.href}
-              isExternal
-              fontWeight="medium"
-              variant="underline"
-            >
-              {LEGAL_LINKS.privacy.label}
-              <Icon size="xs">
-                <ExternalLink />
-              </Icon>
-            </Link>
+            I agree to the LangWatch
           </Checkbox.Label>
         </Checkbox.Root>
-      </Field.Root>
+        <Text as="span" textStyle="bodySm" color="fg.muted">
+          <Link href={LEGAL_LINKS.terms.href} isExternal fontWeight="medium" variant="underline">
+            {LEGAL_LINKS.terms.label}
+            <Icon size="xs">
+              <ExternalLink />
+            </Icon>
+          </Link>
+          {" and "}
+          <Link href={LEGAL_LINKS.privacy.href} isExternal fontWeight="medium" variant="underline">
+            {LEGAL_LINKS.privacy.label}
+            <Icon size="xs">
+              <ExternalLink />
+            </Icon>
+          </Link>
+        </Text>
+      </HStack>
     </VStack>
   );
 };
