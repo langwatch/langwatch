@@ -51,19 +51,25 @@ export function buildKickoff({
   };
 }
 
+/** "Later" on Langy's model prompt, with no provider since: the landing leaves the panel alone. */
+function modelPromptPutOff(state: GuidedOnboardingState): boolean {
+  return !!state.providerPromptDismissedAt && !state.provider;
+}
+
 /** The landing has a tour to run when the path has one and none ended yet. */
 export function landingNeedsTour(state: GuidedOnboardingState): boolean {
   return (
     !!state.currentPath &&
     pathHasTour(state.currentPath) &&
     !state.tourCompletedAt &&
-    !state.tourSkippedAt
+    !state.tourSkippedAt &&
+    !modelPromptPutOff(state)
   );
 }
 
 /** Whether the landing still owes the panel its kickoff. */
 export function landingNeedsKickoff(state: GuidedOnboardingState): boolean {
-  return !!state.currentPath && !state.conversationId;
+  return !!state.currentPath && !state.conversationId && !modelPromptPutOff(state);
 }
 
 /**

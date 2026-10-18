@@ -28,7 +28,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { RecordGuidedOnboardingCommandData } from "../../eventing/guided-onboarding-lifecycle.events.ts";
+import type {
+  RecordGuidedOnboardingCommandData,
+  RecordOnboardingVariantAssignedCommandData,
+} from "../../eventing/guided-onboarding-lifecycle.events.ts";
 import { OnboardingModule } from "../onboarding.app.ts";
 
 const ORGANIZATION_ID = "organization_1";
@@ -359,11 +362,14 @@ describe("OnboardingModule", () => {
   });
 });
 
-/** Records what the app sends on the lifecycle pipeline, as the queue would receive it. */
-function connectLifecycle(app: OnboardingModule): RecordGuidedOnboardingCommandData[] {
-  const sent: RecordGuidedOnboardingCommandData[] = [];
-  const sender: EventingCommandSender<RecordGuidedOnboardingCommandData> = {
+/** A sender that keeps what it is handed, as the queue would receive it. */
+function recordingSender<Payload>(
+  sent: Payload[],
+  failure?: Error,
+): EventingCommandSender<Payload> {
+  return {
     send: async (payload) => {
+      if (failure) throw failure;
       sent.push(payload);
     },
     sendBatch: async (payloads) => {
@@ -372,9 +378,100 @@ function connectLifecycle(app: OnboardingModule): RecordGuidedOnboardingCommandD
     close: async () => {},
     waitUntilReady: async () => {},
   };
-  app.connectLifecycleCommands({ recordGuidedOnboarding: sender });
-  return sent;
 }
+
+/** Records the guided writes the app sends on the lifecycle pipeline. */
+function connectLifecycle(app: OnboardingModule): RecordGuidedOnboardingCommandData[] {
+  return connectLifecycleFacts(app).guided;
+}
+
+/** Records every fact the app sends on the lifecycle pipeline, by command. */
+function connectLifecycleFacts(
+  app: OnboardingModule,
+  options: { variantFailure?: Error } = {},
+): {
+  guided: RecordGuidedOnboardingCommandData[];
+  variants: RecordOnboardingVariantAssignedCommandData[];
+} {
+  const guided: RecordGuidedOnboardingCommandData[] = [];
+  const variants: RecordOnboardingVariantAssignedCommandData[] = [];
+  app.connectLifecycleCommands({
+    recordGuidedOnboarding: recordingSender(guided),
+    recordOnboardingVariantAssigned: recordingSender(variants, options.variantFailure),
+  });
+  return { guided, variants };
+}
+
+describe("OnboardingModule records the onboarding variant an organization is created with", () => {
+  const caller = { id: USER_ID, name: "Ada", email: "ada@acme.com" };
+
+  /** @scenario "initializing an organization records the assigned onboarding variant for the user" */
+  it("records the guided variant for the person who created the organization", async () => {
+    const { app } = buildApp();
+    const { variants } = connectLifecycleFacts(app);
+
+    await app.initializeOrganization(
+      { orgName: "ACME", onboardingVariant: "guided", language: "other", framework: "other" },
+      caller,
+    );
+
+    expect(variants).toEqual([
+      expect.objectContaining({
+        tenantId: ORGANIZATION_ID,
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        variant: "guided",
+      }),
+    ]);
+  });
+
+  /** @scenario "initializing a coding-agent organization records the assigned onboarding variant too" */
+  it("records the classic variant on the coding-agent track, which creates no project", async () => {
+    const { app } = buildApp();
+    const { variants } = connectLifecycleFacts(app);
+
+    await app.initializeOrganization(
+      {
+        orgName: "ACME",
+        primaryIntent: "AGENT_GOVERNANCE",
+        onboardingVariant: "classic",
+        language: "other",
+        framework: "other",
+      },
+      caller,
+    );
+
+    expect(variants).toEqual([expect.objectContaining({ userId: USER_ID, variant: "classic" })]);
+  });
+
+  /** @scenario "initializing an organization without a variant records no variant assignment" */
+  it("records nothing for a sign-up outside the experiment", async () => {
+    const { app } = buildApp();
+    const { variants, guided } = connectLifecycleFacts(app);
+
+    await app.initializeOrganization(
+      { orgName: "ACME", language: "other", framework: "other" },
+      caller,
+    );
+
+    expect(variants).toEqual([]);
+    expect(guided).toEqual([]);
+  });
+
+  /** @scenario "a variant assignment that cannot be recorded never fails the sign-up" */
+  it("still creates the first project when the fact cannot be sent", async () => {
+    const { app, createProject } = buildApp();
+    connectLifecycleFacts(app, { variantFailure: new Error("queue down") });
+
+    const initialized = await app.initializeOrganization(
+      { orgName: "ACME", onboardingVariant: "guided", language: "other", framework: "other" },
+      caller,
+    );
+
+    expect(createProject).toHaveBeenCalledTimes(1);
+    expect(initialized.projectSlug).toBe(FIRST_PROJECT.slug);
+  });
+});
 
 describe("OnboardingModule records its guided writes for peers", () => {
   /** @scenario "a guided state write through the procedure reaches Customer.io" */
@@ -412,13 +509,28 @@ describe("OnboardingModule records its guided writes for peers", () => {
     ]);
   });
 
-  it("records the provider skip and the tour skip when the provider is skipped", async () => {
+  /** @scenario "Skip anyway leaves the tour to run" */
+  it("records only the provider skip when the provider is skipped", async () => {
     const { app } = buildApp();
     const sent = connectLifecycle(app);
 
     await app.recordProviderSkipped({ organizationId: ORGANIZATION_ID, userId: USER_ID });
 
-    expect(sent.map((data) => data.event)).toEqual(["provider_skipped", "tour_skipped"]);
+    expect(sent.map((data) => data.event)).toEqual(["provider_skipped"]);
+  });
+
+  /** @scenario "putting off the model prompt is recorded" */
+  it("records putting off the model prompt without announcing it", async () => {
+    const { app } = buildApp();
+    const sent = connectLifecycle(app);
+
+    const state = await app.recordProviderPromptDismissed({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+    });
+
+    expect(state.providerPromptDismissedAt).toEqual(expect.any(String));
+    expect(sent).toEqual([]);
   });
 
   it("leaves the conversation and the key reveal off what it records", async () => {

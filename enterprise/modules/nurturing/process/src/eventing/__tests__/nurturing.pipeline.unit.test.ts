@@ -17,6 +17,9 @@ import {
   GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
   GUIDED_ONBOARDING_RECORDED_EVENT_VERSION,
   type GuidedOnboardingRecordedEventData,
+  ONBOARDING_VARIANT_ASSIGNED_EVENT_TYPE,
+  ONBOARDING_VARIANT_ASSIGNED_EVENT_VERSION,
+  type OnboardingVariantAssignedEventData,
 } from "@langwatch/onboarding-contract";
 import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -382,6 +385,77 @@ describe("nurturing's guidedOnboardingRecorded peer subscriber", () => {
         ["guided_onboarding_tour_replayed", "gateway"],
       ]);
       expect(customerIoFetch).not.toHaveBeenCalled();
+    });
+  });
+});
+
+/** Onboarding's fact for the variant an organization was created with, as it records it. */
+function variantAssignedFact(variant: OnboardingVariantAssignedEventData["variant"]): Event {
+  return {
+    id: `evt-variant-${variant}`,
+    aggregateId: "org-1",
+    aggregateType: GUIDED_ONBOARDING_AGGREGATE_TYPE,
+    tenantId: createTenantId("org-1"),
+    createdAt: 1_000,
+    occurredAt: 1_000,
+    type: ONBOARDING_VARIANT_ASSIGNED_EVENT_TYPE,
+    version: ONBOARDING_VARIANT_ASSIGNED_EVENT_VERSION,
+    data: {
+      tenantId: "org-1",
+      occurredAt: 1_000,
+      organizationId: "org-1",
+      userId: "user-1",
+      variant,
+    },
+    idempotencyKey: "org-1:org-1:variant_assigned",
+  } as Event;
+}
+
+describe("nurturing's onboardingVariantAssigned peer subscriber", () => {
+  describe("when onboarding records the guided variant, delivered twice", () => {
+    /** @scenario "the variant assignment reaches PostHog once with the person property" */
+    it("tracks exactly one onboarding_variant_assigned and tells Customer.io nothing", async () => {
+      const { posthog, customerIoFetch, deliverFact } = nurturingOverMemoryPostHog();
+      const fact = variantAssignedFact("guided");
+
+      await deliverFact(fact);
+      await deliverFact(fact);
+      await settle();
+
+      expect(posthog.tracked).toEqual([
+        {
+          userId: "user-1",
+          event: "onboarding_variant_assigned",
+          properties: {
+            variant: "guided",
+            "$feature/experiment_onboarding_langy_guided": "guided",
+            organization_id: "org-1",
+            $set: { onboarding_variant: "guided" },
+          },
+        },
+      ]);
+      expect(customerIoFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when onboarding records the classic variant", () => {
+    /** @scenario "the variant assignment is the exposure of the experiment" */
+    it("carries the experiment property as control", async () => {
+      const { posthog, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(variantAssignedFact("classic"));
+      await settle();
+
+      expect(posthog.tracked).toEqual([
+        expect.objectContaining({
+          event: "onboarding_variant_assigned",
+          properties: expect.objectContaining({
+            variant: "classic",
+            "$feature/experiment_onboarding_langy_guided": "control",
+            $set: { onboarding_variant: "classic" },
+          }),
+        }),
+      ]);
     });
   });
 });

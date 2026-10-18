@@ -50,6 +50,19 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   }),
 }));
 
+const tour = vi.hoisted(() => ({
+  running: false,
+  replay: () => undefined,
+  putOff: vi.fn<(input: { organizationId: string }) => void>(),
+}));
+vi.mock("../../../behavior/use-guided-tour.ts", () => ({
+  useGuidedTour: () => ({
+    useRunning: () => tour.running,
+    useReplay: () => tour.replay,
+    usePutOffModelPrompt: () => tour.putOff,
+  }),
+}));
+
 vi.mock("../../elements/langy-model-pill.tsx", () => ({
   LangyModelPill: () => <div data-testid="model-pill" />,
 }));
@@ -260,7 +273,14 @@ beforeEach(() => {
   resolvedDefaultRef.current = { data: undefined, isLoading: false, isError: false };
   refetchResolvedDefault.mockClear();
   sendMessage.mockClear();
-  useLangyStore.setState({ isOpen: true, panelMode: "floating", pendingPrompt: null });
+  tour.running = false;
+  tour.putOff.mockClear();
+  useLangyStore.setState({
+    isOpen: true,
+    panelMode: "floating",
+    pendingPrompt: null,
+    pendingKickoff: null,
+  });
 });
 
 afterEach(() => {
@@ -437,6 +457,101 @@ describe("given the project's model resolver fails to answer", () => {
       await waitFor(() => {
         expect(screen.queryByText("Langy needs a model to get started")).not.toBeInTheDocument();
       });
+    });
+  });
+});
+
+const KICKOFF_BRIEF = "Guided onboarding kickoff.\nPath: llmops";
+const GUIDED_LINE =
+  "Now connect me to a model provider so I can integrate your app and start creating evals for you.";
+
+/** The tour has ended: the host queues the kickoff, which waits on a model. */
+function queueKickoff() {
+  act(() => {
+    useLangyStore.getState().queueGuidedKickoff({
+      brief: KICKOFF_BRIEF,
+      parts: [
+        {
+          type: "guided-onboarding-kickoff",
+          path: "llmops",
+          paths: ["llmops"],
+          orgName: "ACME",
+          tourStatus: "completed",
+        },
+        { type: "text", text: KICKOFF_BRIEF },
+      ],
+      conversationId: null,
+    });
+  });
+}
+
+describe("given a guided onboarding whose provider step was skipped", () => {
+  beforeEach(() => {
+    resolvedDefaultRef.current = { data: { model: null }, isLoading: false, isError: false };
+  });
+
+  describe("when the panel renders while the tour plays", () => {
+    /** @scenario "The model setup waits while the guided tour plays" */
+    it("shows the running tour card and no model setup", async () => {
+      tour.running = true;
+      renderPanel();
+
+      expect(await screen.findByText("Doing guided tour")).toBeInTheDocument();
+      expect(screen.queryByText("Langy needs a model to get started")).not.toBeInTheDocument();
+      expect(screen.queryByText(GUIDED_LINE)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("edit-model-provider-form")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the tour has ended and the kickoff waits to send", () => {
+    /** @scenario "After the tour Langy asks for a model inline, below the tour card" */
+    it("asks for a model in the conversation, below the tour card", async () => {
+      renderPanel();
+      queueKickoff();
+
+      const prompt = await screen.findByTestId("langy-guided-model-prompt");
+      const card = screen.getByTestId("guided-tour-card");
+      expect(card.compareDocumentPosition(prompt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(prompt).getByText(GUIDED_LINE)).toBeInTheDocument();
+      expect(within(prompt).getByRole("button", { name: "Later" })).toBeInTheDocument();
+      expect(within(prompt).getByTestId("edit-model-provider-form")).toBeInTheDocument();
+      expect(screen.queryByText("Langy needs a model to get started")).not.toBeInTheDocument();
+      expect(sendMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the user connects a provider from the prompt", () => {
+    /** @scenario "Connecting a provider from the guided prompt sends the kickoff" */
+    it("drops the prompt and sends the kickoff once", async () => {
+      const user = userEvent.setup();
+      renderPanel();
+      queueKickoff();
+      const prompt = await screen.findByTestId("langy-guided-model-prompt");
+
+      await user.click(within(prompt).getByRole("button", { name: "Save and continue" }));
+
+      expect(refetchResolvedDefault).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+      expect(JSON.stringify(sendMessage.mock.calls[0]?.[0])).toContain("guided-onboarding-kickoff");
+      expect(screen.queryByTestId("langy-guided-model-prompt")).not.toBeInTheDocument();
+      expect(useLangyStore.getState().pendingKickoff).toBeNull();
+    });
+  });
+
+  describe("when the user presses Later", () => {
+    /** @scenario "Later puts the guided model prompt away for good" */
+    it("records it on the organization, drops the kickoff unsent and closes the panel", async () => {
+      const user = userEvent.setup();
+      renderPanel();
+      queueKickoff();
+      const prompt = await screen.findByTestId("langy-guided-model-prompt");
+
+      await user.click(within(prompt).getByRole("button", { name: "Later" }));
+
+      expect(tour.putOff).toHaveBeenCalledWith({ organizationId: "org-1" });
+      expect(useLangyStore.getState().pendingKickoff).toBeNull();
+      expect(useLangyStore.getState().isOpen).toBe(false);
+      expect(sendMessage).not.toHaveBeenCalled();
     });
   });
 });

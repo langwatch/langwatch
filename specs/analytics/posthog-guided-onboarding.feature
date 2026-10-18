@@ -13,9 +13,45 @@ Feature: PostHog guided onboarding events
   # Variant assignment
   # ============================================================================
 
-  # The assignment is recorded on the organization when it is created. No
-  # separate exposure event is tracked: every guided onboarding event sets the
-  # onboarding_variant person property and carries the experiment property.
+  # The assignment is recorded on the organization when it is created, and the
+  # onboarding module records it as a fact for the person who created it. The
+  # nurturing delivery tracks that fact once per organization as the exposure
+  # event, for the guided and the classic variant alike.
+
+  @unit
+  Scenario: initializing an organization records the assigned onboarding variant for the user
+    When a user initializes an organization with the guided variant
+    Then onboarding records a variant-assigned fact for that user and organization with variant "guided"
+
+  @unit
+  Scenario: initializing a coding-agent organization records the assigned onboarding variant too
+    When a user initializes an organization with the classic variant and the coding-agent intent
+    Then onboarding records a variant-assigned fact for that user and organization with variant "classic"
+
+  @unit
+  Scenario: initializing an organization without a variant records no variant assignment
+    When a user initializes an organization without an onboarding variant
+    Then onboarding records no variant-assigned fact
+
+  @unit
+  Scenario: a variant assignment that cannot be recorded never fails the sign-up
+    Given the variant-assigned fact cannot be recorded
+    When a user initializes an organization with the guided variant
+    Then the organization and its first project are still created
+
+  @unit
+  Scenario: the variant assignment reaches PostHog once with the person property
+    Given onboarding recorded a variant-assigned fact for a user with variant "guided"
+    When nurturing receives the fact twice
+    Then exactly one "onboarding_variant_assigned" event is tracked for that user with variant "guided" and the organization id
+    And the person property onboarding_variant is set to "guided"
+    And Customer.io receives nothing
+
+  @unit
+  Scenario: the variant assignment is the exposure of the experiment
+    Given onboarding recorded a variant-assigned fact with variant "classic"
+    When nurturing delivers it
+    Then the "onboarding_variant_assigned" event carries $feature/experiment_onboarding_langy_guided "control"
 
   # ============================================================================
   # Guided onboarding steps
@@ -133,9 +169,9 @@ Feature: PostHog guided onboarding events
   # ============================================================================
 
   # The experiment is analysed in PostHog without a PostHog feature flag: the
-  # organization keeps the assignment, the exposure event and every metric
-  # event carry the variant under $feature/experiment_onboarding_langy_guided,
-  # with the classic onboarding named control.
+  # organization keeps the assignment, the exposure event (onboarding_variant_assigned)
+  # and every metric event carry the variant under
+  # $feature/experiment_onboarding_langy_guided, with the classic onboarding named control.
 
   @unit
   Scenario: the experiment property maps the guided variant to guided and the classic variant to control

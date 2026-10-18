@@ -280,6 +280,31 @@ export function fireGuidedOnboardingPostHog({
   };
 }
 
+/**
+ * The experiment's exposure, for either variant: the event the funnel starts from on both
+ * sides, carrying the experiment property and the onboarding_variant person property.
+ */
+export function fireOnboardingVariantAssignedPostHog({
+  userId,
+  organizationId,
+  variant,
+}: {
+  userId: string;
+  organizationId: string;
+  variant: OnboardingVariant;
+}): { userId: string; event: string; properties: Record<string, unknown> } {
+  return {
+    userId,
+    event: "onboarding_variant_assigned",
+    properties: {
+      variant,
+      ...onboardingExperimentProperties(variant),
+      organization_id: organizationId,
+      $set: { onboarding_variant: variant },
+    },
+  };
+}
+
 /** The same for every delivery of one source event, so PostHog keeps exactly one of them. */
 export function postHogUuidFor(sourceEventId: string): string {
   const hex = createHash("sha256").update(`nurturing-guided-turn:${sourceEventId}`).digest("hex");
