@@ -156,4 +156,73 @@ describe("EventLogReadSeat", () => {
       ).resolves.toEqual([]);
     });
   });
+
+  describe("when a page of streams is asked in one read", () => {
+    /** Two streams in two tenants, the first holding two events recorded out of order. */
+    async function pageSeat() {
+      const repository = EventRepositoryMemory.createForTesting();
+      const record = ({
+        tenantId,
+        aggregateId,
+        eventId,
+        at,
+      }: {
+        tenantId: string;
+        aggregateId: string;
+        eventId: string;
+        at: number;
+      }) => ({
+        TenantId: tenantId,
+        AggregateType: "user",
+        AggregateId: aggregateId,
+        EventId: eventId,
+        EventTimestamp: at,
+        EventOccurredAt: at,
+        EventType: "lw.user.deactivated",
+        EventVersion: "2025-12-14",
+        EventPayload: { at },
+        ProcessingTraceparent: "",
+        IdempotencyKey: eventId,
+      });
+      await repository.insertEventRecords([
+        record({ tenantId: "user_sam", aggregateId: "user_sam", eventId: "evt_2", at: 20 }),
+        record({ tenantId: "user_sam", aggregateId: "user_sam", eventId: "evt_1", at: 10 }),
+        record({ tenantId: "user_ana", aggregateId: "user_ana", eventId: "evt_3", at: 30 }),
+      ]);
+      return EventLogReadSeat.create({ repository });
+    }
+
+    /** @scenario "A page of streams is answered in one read, each stream oldest first" */
+    it("answers every asked stream, each oldest first, in its own tenant", async () => {
+      const seat = await pageSeat();
+
+      const events = await seat.findEventsOfAggregates({
+        aggregateType: "user",
+        aggregates: [
+          { tenantId: createTenantId("user_sam"), aggregateId: "user_sam" },
+          { tenantId: createTenantId("user_ana"), aggregateId: "user_ana" },
+        ],
+      });
+
+      const idsOf = (aggregateId: string) =>
+        events.filter((event) => event.aggregateId === aggregateId).map((event) => event.id);
+      expect(idsOf("user_sam")).toEqual(["evt_1", "evt_2"]);
+      expect(idsOf("user_ana")).toEqual(["evt_3"]);
+    });
+
+    /** @scenario "A page of streams answers nothing for a stream asked in another tenant" */
+    it("answers nothing for a stream asked under another tenant or with an empty id", async () => {
+      const seat = await pageSeat();
+
+      await expect(
+        seat.findEventsOfAggregates({
+          aggregateType: "user",
+          aggregates: [
+            { tenantId: createTenantId("user_ana"), aggregateId: "user_sam" },
+            { tenantId: TENANT, aggregateId: " " },
+          ],
+        }),
+      ).resolves.toEqual([]);
+    });
+  });
 });

@@ -25,18 +25,29 @@ export interface AggregateEventsReadInput {
   aggregateId: string;
 }
 
+/** Many streams of one aggregate type, each named by its tenant and id. */
+export interface AggregatesEventsReadInput {
+  aggregates: readonly { tenantId: TenantId; aggregateId: string }[];
+  aggregateType: AggregateType;
+}
+
 /**
  * Reads beside a store that may refuse every read (Q209, 2026-10-06): one event by id, and one
- * aggregate's stream for identity's history panels and SCIM's sync activity (WEB-9103, 2026-10-10).
+ * aggregate's stream (or a page of them) for history panels and upgrade steps (WEB-9103).
  * Spec: packages/eventing/specs/event-read-seat.feature.
  */
 export interface EventReadSeat<EventType extends Event = Event> {
   getEvent(input: EventStoreEventReadInput): Promise<EventType>;
   /** The stream oldest first; an empty aggregate id answers none rather than scanning. */
   findAggregateEvents(input: AggregateEventsReadInput): Promise<readonly EventType[]>;
+  /** Every asked stream in one read, each oldest first; empty aggregate ids are skipped. */
+  findEventsOfAggregates(input: AggregatesEventsReadInput): Promise<readonly EventType[]>;
 }
 
-type SeatRepository = Pick<EventRepository, "getEventRecord" | "getEventRecords">;
+type SeatRepository = Pick<
+  EventRepository,
+  "getEventRecord" | "getEventRecords" | "findEventRecordsOfAggregates"
+>;
 
 /** The seat over an event repository, bounded to the window around the id's KSUID time. */
 export class EventLogReadSeat<EventType extends Event = Event> implements EventReadSeat<EventType> {
@@ -80,6 +91,29 @@ export class EventLogReadSeat<EventType extends Event = Event> implements EventR
     return deduplicateEvents(
       records.map((record) => recordToEvent<EventType>(record, aggregateId)),
     );
+  }
+
+  async findEventsOfAggregates(input: AggregatesEventsReadInput): Promise<readonly EventType[]> {
+    const { aggregateType } = input;
+    for (const { tenantId } of input.aggregates) {
+      EventUtils.validateTenantId({ tenantId }, "EventLogReadSeat.findEventsOfAggregates");
+    }
+    const aggregates = input.aggregates.filter(
+      ({ aggregateId }) => String(aggregateId).trim().length > 0,
+    );
+    if (aggregates.length === 0) return [];
+    const records = await this.repository.findEventRecordsOfAggregates({
+      aggregates,
+      aggregateType,
+    });
+    const byStream = new Map<string, EventType[]>();
+    for (const record of records) {
+      const key = `${record.TenantId}\n${record.AggregateId}`;
+      const events = byStream.get(key) ?? [];
+      events.push(recordToEvent<EventType>(record, record.AggregateId));
+      byStream.set(key, events);
+    }
+    return [...byStream.values()].flatMap((events) => deduplicateEvents(events));
   }
 }
 

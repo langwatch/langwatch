@@ -157,7 +157,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
   /** Reads only, for a read seat: a process that appends nothing states no retention. */
   static createForEventReads(options: {
     resolveClient: EventingClickHouseClientResolver;
-  }): Pick<EventRepository, "getEventRecord" | "getEventRecords"> {
+  }): Pick<EventRepository, "getEventRecord" | "getEventRecords" | "findEventRecordsOfAggregates"> {
     return new EventingClickHouseEventRepository(options.resolveClient, undefined);
   }
 

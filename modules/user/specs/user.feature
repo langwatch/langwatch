@@ -189,6 +189,14 @@ Feature: Canonical user lifecycle
     And an active account whose log ends in a reactivation, or holds no deactivation, records nothing
 
   @unit
+  Scenario: The created-facts step reads user's log from a process that only sends commands
+    Given a process whose event store refuses every read, as the one running upgrade steps does
+    And an account whose log holds a deactivation and then a reactivation
+    When a page of accounts' standing facts is read
+    Then they are answered through the event read seat in one read, oldest first, in each account's own tenant
+    And the same read through the lifecycle pipeline's own event store is refused by name
+
+  @unit
   Scenario: Running the seed step twice records once
     Given the step has run
     When it runs again
