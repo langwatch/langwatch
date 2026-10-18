@@ -50,6 +50,20 @@ describe("renderLwqlAccessConfig", () => {
       expect(contents).toContain("password_sha256_hex");
       expect(contents).not.toContain(CLICKHOUSE_PASSWORD);
     });
+
+    /** @scenario "Rendered mode keeps the named collection released chart installs bound their engine tables to" */
+    it("delivers the named collection as lwql_postgres, the name released installs bound to", async () => {
+      await writeLwqlAccessConfig({ outDir, source: FULL_ENV });
+
+      const contents = await readFile(
+        join(outDir, "config.d", "lwql-named-collection.yaml"),
+        "utf8",
+      );
+      expect(contents).toMatch(/^\s*lwql_postgres:\s*$/m);
+      expect(lwqlAccessModelDefinitionFromSource(FULL_ENV).namedCollection.collection).toBe(
+        "lwql_postgres",
+      );
+    });
   });
 
   describe("when a required input is missing", () => {

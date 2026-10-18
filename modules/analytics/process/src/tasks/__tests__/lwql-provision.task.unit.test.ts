@@ -244,6 +244,28 @@ describe("convergeLwqlAccessModel", () => {
     });
   });
 
+  describe("when an upgrade converges before the ClickHouse pods roll onto the new access config", () => {
+    /** @scenario "Rendered mode keeps the named collection released chart installs bound their engine tables to" */
+    it("succeeds against a server that still mounts only the released lwql_postgres collection", async () => {
+      // Any collection but the one a released config store mounts answers 669.
+      const clickHouse = clickHouseThat({ failing: /ENGINE = PostgreSQL\((?!lwql_postgres,)/ });
+
+      await expect(
+        convergeLwqlAccessModel({
+          database: postgresThat({ refuses: false }).database,
+          plan: clickHouse.plan,
+          failOnError: true,
+        }),
+      ).resolves.toBeUndefined();
+
+      const engineTables = clickHouse.ran.filter((s) => s.includes("ENGINE = PostgreSQL"));
+      expect(engineTables.length).toBeGreaterThan(0);
+      expect(engineTables.every((s) => s.includes("ENGINE = PostgreSQL(lwql_postgres,"))).toBe(
+        true,
+      );
+    });
+  });
+
   describe("when the reconvergence check names only the drift it found", () => {
     const only = (drift: Partial<LwqlAppOwnedDrift>): LwqlAppOwnedDrift => ({
       clickHouse: [],

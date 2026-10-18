@@ -958,10 +958,21 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # every other stack's engine tables at its own PostgreSQL database.
   @unit
   Scenario: Each ClickHouse database provisions its own named collection
-    Given two LangWatchQL databases on the same ClickHouse server
+    Given two LangWatchQL databases on the same ClickHouse server, in sql mode
     When the self-provisioning statements are rendered for each
     Then each creates a named collection whose name carries its own database
     And each database's PostgreSQL-engine tables read only through its own collection
+
+  # A config store belongs to one server, and released chart installs bound their engine
+  # tables to lwql_postgres. ClickHouse refuses to attach a table whose collection is gone,
+  # and the upgrade converges before the ClickHouse pods roll onto the new config.
+  @unit
+  Scenario: Rendered mode keeps the named collection released chart installs bound their engine tables to
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    When the access config is rendered and the provisioning statements run
+    Then the delivered collection and every PostgreSQL-engine table name lwql_postgres
+    And an upgrade's converge that runs before the ClickHouse pods roll finds that collection already mounted
+    And the rolled pods attach every engine table the previous release created
 
   # A 669 outside a NAMED COLLECTION statement means the collection is absent: the
   # engine table was never created, and every view over it would fail later as

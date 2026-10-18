@@ -49,6 +49,9 @@ export const LWQL_SELF_PROVISION_DEFAULTS = {
   postgresReaderRole: LWQL_POSTGRES_READER_ROLE,
 } as const;
 
+/** The collection a config store delivers; every released chart install binds to this name. */
+export const LWQL_RENDERED_NAMED_COLLECTION = "lwql_postgres";
+
 /** The PostgreSQL endpoint the named collection dials, from `DATABASE_URL`. */
 type LwqlPostgresEndpoint = Readonly<{
   host: string;
@@ -150,10 +153,13 @@ export class LangWatchQLSelfProvisioningService {
     return { requested: true, complete: true, connection, postgresReaderPassword, endpoint };
   }
 
-  /** Named collections are server-global: one per ClickHouse database, so stacks sharing a
-   * server never overwrite each other's. */
-  namedCollection({ names }: { names: LangWatchQLNames }): string {
-    return `lwql_postgres_${names.database}`;
+  /**
+   * Rendered mode keeps `lwql_postgres`: the server's own config store holds it, and released
+   * installs bound their engine tables to it, so a rename detaches them on the next restart.
+   * In sql mode one server can hold several stacks, so each database gets its own.
+   */
+  namedCollection({ names, mode }: { names: LangWatchQLNames; mode: LwqlAccessModelMode }): string {
+    return mode === "rendered" ? LWQL_RENDERED_NAMED_COLLECTION : `lwql_postgres_${names.database}`;
   }
 
   accessModelMode({ source }: { source: Record<string, string | undefined> }): LwqlAccessModelMode {
@@ -190,7 +196,7 @@ export class LangWatchQLSelfProvisioningService {
         `lwql self-provisioning: the LangWatchQL database ("${names.database}") must be the application's own ClickHouse database ("${sourceDatabase}")`,
       );
     }
-    const collection = this.namedCollection({ names });
+    const collection = this.namedCollection({ names, mode });
     if (only !== undefined) {
       return this.#driftedStatements({
         names,
