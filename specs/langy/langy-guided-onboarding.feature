@@ -673,6 +673,37 @@ Feature: Langy guides the first setup after sign-up
       And the first option runs git init, a first commit of what is there, and then step 2 as the no-remote path
       And the second ends the turn naming the code access card
 
+    # A test account connected a folder holding a SwiftUI app and ESP32
+    # firmware. Langy read it, said "The tracing setup is not done because
+    # this folder contains ... no LLM agent entry point", and the
+    # conversation stopped with the plan at 1 of 11 and notifications
+    # promising a ready project.
+    @unit
+    Scenario: A folder with no LLM agent gets a question, never a stop
+      When the compiled guided-onboarding skill is read
+      Then a folder where no file calls a model or builds an agent is the fourth unlock question of "When a step fails", asked before the branch and the first edit
+      And the question names the folder by its own name, never "." or the full path, and says there is nothing to trace yet
+      And the options are "Write a starter agent for me" and "I'll connect another folder", plain answers with no ref
+      And the first option writes a small agent in a folder of its own, on the langy branch, and step 2 goes on against it
+      And a starter agent whose provider key is missing from the env file gets a question naming the key, never a start that cannot answer
+      And a "Done" with the key still missing asks the same question again and ends the turn on its card
+      And the second ends the turn saying how to connect the folder that holds the agent
+
+    # Notifications promised "I'll let you know when your project is ready"
+    # and the path stopped on a question nobody saw.
+    @unit
+    Scenario: An unlock question reaches a person who asked for notifications
+      When the compiled guided-onboarding skill is read
+      Then every unlock question is preceded by a notify call when notifications were offered in the conversation
+      And the notify call never claims the project is ready
+
+    @unit
+    Scenario: The mid-setup line answers only a message the person typed
+      When the compiled guided-onboarding skill is read
+      Then the mid-setup line answers a message the person typed while the setup is still going on
+      And a message from LangWatch that says the person sent nothing is never answered with it
+      And a path stopped on a dead end answers with its question, never with a promise to continue
+
     # The facts printed `git branch: unknown` for a folder with no repository,
     # the same as for a machine with no git, so the skill walked into a
     # checkout before it learned. The command line reads the answer and the
@@ -1273,6 +1304,28 @@ Feature: Langy guides the first setup after sign-up
       Given a guided turn that ended bare
       And a newer turn from the user submitted meanwhile
       Then the worker appends no continuation and the newer turn runs
+
+    # A test account connected a folder with a SwiftUI app and firmware and
+    # no LLM agent. Langy said the tracing setup was not done, the guard
+    # continued the turn, and the model answered the guard's message with the
+    # line meant for a typed question: "We'll get to that! Let me finish
+    # getting you set up first, then I'm all yours." The guard then gave up,
+    # and the panel sat idle under a promise nothing was keeping.
+    @unit
+    Scenario: The continuation says the person sent nothing and names the way out
+      Given a guided turn that ended bare
+      When the worker appends its continuation
+      Then the message opens by saying it comes from LangWatch and the person sent nothing
+      And it says that a path that cannot go on asks the matching question of "When a step fails" and ends on its card
+      And it carries what the turn still owes, as before
+
+    @unit
+    Scenario: The mid-setup line is refused in a continued turn
+      Given a guided turn the worker continued after a bare end
+      When Langy says "We'll get to that! Let me finish getting you set up first, then I'm all yours." in it
+      Then the say tool answers an error: the person sent nothing, so do the step the note names or ask the question of a dead end
+      And the panel draws nothing for it
+      And the same line in a turn the person typed, before any continuation, is said as usual
 
     @unit
     Scenario: The step 2 lines the guard checks are the skill's own
