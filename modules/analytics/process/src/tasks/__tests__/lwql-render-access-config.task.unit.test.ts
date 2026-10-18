@@ -60,6 +60,7 @@ describe("renderLwqlAccessConfig", () => {
         "utf8",
       );
       expect(contents).toMatch(/^\s*lwql_postgres:\s*$/m);
+      expect(contents).not.toContain("lwql_postgres_");
       expect(lwqlAccessModelDefinitionFromSource(FULL_ENV).namedCollection.collection).toBe(
         "lwql_postgres",
       );

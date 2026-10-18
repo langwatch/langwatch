@@ -74,9 +74,21 @@ function postgresThat({ refuses }: { refuses: boolean }) {
   return { ran, database };
 }
 
-/** A ClickHouse that records each DDL statement and fails the one that matches `failing`. */
-function clickHouseThat({ failing }: { failing?: RegExp } = {}) {
+/**
+ * A ClickHouse that records each DDL statement and fails the one that matches `failing`. With
+ * `collections`, it holds only those named collections (an engine table on any other answers
+ * 669) and reports each table in `bound` as an engine table on that collection.
+ */
+function clickHouseThat({
+  failing,
+  collections,
+  bound = {},
+}: { failing?: RegExp; collections?: readonly string[]; bound?: Record<string, string> } = {}) {
   const ran: string[] = [];
+  const missingCollection = (statement: string) => {
+    const used = /ENGINE = PostgreSQL\((\w+),/.exec(statement)?.[1];
+    return collections !== undefined && used !== undefined && !collections.includes(used);
+  };
   const plan: LwqlConvergencePlan = {
     request: {
       requested: true,
@@ -99,7 +111,7 @@ function clickHouseThat({ failing }: { failing?: RegExp } = {}) {
       ClickHouseLangWatchQLProvisioningRepository.create({
         statements: {
           async command(statement) {
-            if (failing?.test(statement)) {
+            if (failing?.test(statement) || missingCollection(statement)) {
               throw Object.assign(new Error("Code: 669. DB::Exception: no named collection"), {
                 code: "669",
                 type: "NAMED_COLLECTION_DOESNT_EXIST",
@@ -107,7 +119,18 @@ function clickHouseThat({ failing }: { failing?: RegExp } = {}) {
             }
             ran.push(statement);
           },
-          rows: async () => [],
+          rows: async (sql) => {
+            if (sql.includes("system.named_collections")) {
+              return (collections ?? []).map((name) => ({ name }));
+            }
+            if (sql.includes("engine_full")) {
+              return Object.entries(bound).map(([name, collection]) => ({
+                name,
+                engine_full: `PostgreSQL(${collection}, \`table\` = 'lwql_x') SETTINGS postgresql_connection_pool_size = 2`,
+              }));
+            }
+            return [];
+          },
           insert: async () => undefined,
         },
       }),
@@ -263,6 +286,99 @@ describe("convergeLwqlAccessModel", () => {
       expect(engineTables.every((s) => s.includes("ENGINE = PostgreSQL(lwql_postgres,"))).toBe(
         true,
       );
+    });
+  });
+
+  describe("when the server holds the released name, the per-database alias, or both", () => {
+    const ALIAS = "lwql_postgres_langwatch";
+    const engineTableNames = [
+      ...new Set(
+        selfProvisioning.appOwnedRelations({ names: NAMES }).filter((name) => name.endsWith("_pg")),
+      ),
+    ];
+    const [first, second] = engineTableNames;
+    const bindingsOf = (ran: readonly string[]) =>
+      Object.fromEntries(
+        ran.flatMap((statement) => {
+          const match = /TABLE \S*?\.?`?(\w+)`? \(.*ENGINE = PostgreSQL\((\w+),/.exec(statement);
+          return match ? [[match[1], match[2]]] : [];
+        }),
+      );
+    const converge = async (clickHouse: ReturnType<typeof clickHouseThat>) => {
+      await convergeLwqlAccessModel({
+        database: postgresThat({ refuses: false }).database,
+        plan: clickHouse.plan,
+        failOnError: true,
+      });
+      return bindingsOf(clickHouse.ran);
+    };
+
+    /** @scenario "A rendered converge binds each engine table to a collection the server holds" */
+    it("binds every table to lwql_postgres when only the released name exists", async () => {
+      const bindings = await converge(clickHouseThat({ collections: ["lwql_postgres"] }));
+
+      expect(Object.keys(bindings).length).toBeGreaterThan(0);
+      expect(new Set(Object.values(bindings))).toEqual(new Set(["lwql_postgres"]));
+    });
+
+    /** @scenario "A rendered converge binds each engine table to a collection the server holds" */
+    it("keeps every table on the per-database name when only that name exists", async () => {
+      const bound = Object.fromEntries(engineTableNames.map((table) => [table, ALIAS]));
+      const bindings = await converge(clickHouseThat({ collections: [ALIAS], bound }));
+
+      expect(new Set(Object.values(bindings))).toEqual(new Set([ALIAS]));
+    });
+
+    /** @scenario "A rendered converge binds each engine table to a collection the server holds" */
+    it("keeps each table's binding when both exist, and binds a new table to lwql_postgres", async () => {
+      if (!first || !second) throw new Error("the catalog maps too few PostgreSQL datasets");
+      const bindings = await converge(
+        clickHouseThat({
+          collections: ["lwql_postgres", ALIAS],
+          bound: { [first]: ALIAS, [second]: "lwql_postgres" },
+        }),
+      );
+
+      expect(bindings[first]).toBe(ALIAS);
+      expect(bindings[second]).toBe("lwql_postgres");
+      const unbound = engineTableNames.filter((table) => table !== first && table !== second);
+      expect(unbound.every((table) => bindings[table] === "lwql_postgres")).toBe(true);
+    });
+
+    /** @scenario "A rendered converge binds each engine table to a collection the server holds" */
+    it("rebinds a table whose collection is gone to the one the server holds", async () => {
+      if (!first) throw new Error("the catalog maps no PostgreSQL dataset");
+      const bindings = await converge(
+        clickHouseThat({ collections: [ALIAS], bound: { [first]: "lwql_postgres" } }),
+      );
+
+      expect(bindings[first]).toBe(ALIAS);
+    });
+
+    /** @scenario "A rendered converge binds each engine table to a collection the server holds" */
+    it("repairs a drifted table on the collection the server holds", async () => {
+      if (!first) throw new Error("the catalog maps no PostgreSQL dataset");
+      const clickHouse = clickHouseThat({ collections: [ALIAS] });
+
+      await convergeLwqlAccessModel({
+        database: postgresThat({ refuses: false }).database,
+        plan: clickHouse.plan,
+        failOnError: true,
+        only: { clickHouse: [first], postgres: [], isKeyMapMissing: false },
+      });
+
+      expect(bindingsOf(clickHouse.ran)).toEqual({ [first]: ALIAS });
+    });
+
+    /** @scenario "A rendered converge binds each engine table to a collection the server holds" */
+    it("fails at the engine tables, as before, when neither name exists", async () => {
+      await expect(
+        convergeLwqlAccessModel({
+          database: postgresThat({ refuses: false }).database,
+          plan: clickHouseThat({ collections: [] }).plan,
+          failOnError: true,
+        }),
+      ).rejects.toMatchObject({ code: "669" });
     });
   });
 

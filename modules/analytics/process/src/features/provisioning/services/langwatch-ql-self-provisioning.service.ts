@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 
 import type { LangWatchQLConnection } from "../../../repositories/langwatch-ql-executor.repository.ts";
 import type { LwqlPostgresViewFound } from "../../../repositories/langwatch-ql-postgres.repository.ts";
+import type { LwqlCollectionState } from "../../../repositories/langwatch-ql-provisioning.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../../services/langwatch-ql-access-model-definition.service.ts";
 import {
@@ -51,6 +52,9 @@ export const LWQL_SELF_PROVISION_DEFAULTS = {
 
 /** The collection a config store delivers; every released chart install binds to this name. */
 export const LWQL_RENDERED_NAMED_COLLECTION = "lwql_postgres";
+
+/** Nothing read: every rendered-mode engine table takes the preferred collection. */
+export const NO_COLLECTION_STATE: LwqlCollectionState = { available: [], bound: {} };
 
 /** The PostgreSQL endpoint the named collection dials, from `DATABASE_URL`. */
 type LwqlPostgresEndpoint = Readonly<{
@@ -162,6 +166,38 @@ export class LangWatchQLSelfProvisioningService {
     return mode === "rendered" ? LWQL_RENDERED_NAMED_COLLECTION : `lwql_postgres_${names.database}`;
   }
 
+  /**
+   * Both names a rendered-mode engine table may be bound to, preferred first: the one released
+   * config stores mount, then the per-database one a server outside the chart may hold.
+   */
+  renderedCollectionCandidates({ names }: { names: LangWatchQLNames }): string[] {
+    return [LWQL_RENDERED_NAMED_COLLECTION, this.namedCollection({ names, mode: "sql" })];
+  }
+
+  /**
+   * A rendered-mode engine table keeps its binding while that candidate exists on the server,
+   * else takes the first candidate the server holds. With neither visible it takes the
+   * preferred name, so the statement fails where the collection is truly absent.
+   */
+  renderedCollectionFor({
+    names,
+    table,
+    server,
+  }: {
+    names: LangWatchQLNames;
+    table: string;
+    server: LwqlCollectionState;
+  }): string {
+    const candidates = this.renderedCollectionCandidates({ names });
+    const bound = server.bound[table];
+    if (bound !== undefined && candidates.includes(bound) && server.available.includes(bound)) {
+      return bound;
+    }
+    return (
+      candidates.find((name) => server.available.includes(name)) ?? LWQL_RENDERED_NAMED_COLLECTION
+    );
+  }
+
   accessModelMode({ source }: { source: Record<string, string | undefined> }): LwqlAccessModelMode {
     return source.LWQL_ACCESS_MODEL_MODE === "sql" ? "sql" : "rendered";
   }
@@ -179,6 +215,7 @@ export class LangWatchQLSelfProvisioningService {
     includeAppFunctions = true,
     mode = "sql",
     only,
+    server = NO_COLLECTION_STATE,
   }: {
     names: LangWatchQLNames;
     restrictedPassword: string;
@@ -190,6 +227,8 @@ export class LangWatchQLSelfProvisioningService {
     mode?: LwqlAccessModelMode;
     /** The reconvergence check's drift: only these app-owned objects, never the access entities. */
     only?: readonly string[];
+    /** Rendered mode: the collections the server holds and each engine table's binding. */
+    server?: LwqlCollectionState;
   }): string[] {
     if (names.database !== sourceDatabase) {
       throw new Error(
@@ -197,11 +236,13 @@ export class LangWatchQLSelfProvisioningService {
       );
     }
     const collection = this.namedCollection({ names, mode });
+    const collectionFor = (table: string) =>
+      mode === "rendered" ? this.renderedCollectionFor({ names, table, server }) : collection;
     if (only !== undefined) {
       return this.#driftedStatements({
         names,
         sourceDatabase,
-        collection,
+        collectionFor,
         includeAppFunctions,
         only,
       });
@@ -220,7 +261,11 @@ export class LangWatchQLSelfProvisioningService {
       sourceDatabase,
     });
     const structural = accessModel.setupStatements({ names, sourceDatabase, includeAppFunctions });
-    const engineTables = postgresViews.engineTableStatements({ names, collection });
+    const engineTables = this.#engineTableStatements({
+      names,
+      collectionFor,
+      views: catalogShapes.postgresViews(LWQL_VIEW_CATALOG),
+    });
     const views = viewProvisioning.setupStatements({
       names,
       sourceDatabase,
@@ -236,17 +281,36 @@ export class LangWatchQLSelfProvisioningService {
     ];
   }
 
+  /** One engine table per PostgreSQL dataset, each on the collection `collectionFor` picks. */
+  #engineTableStatements({
+    names,
+    collectionFor,
+    views,
+  }: {
+    names: LangWatchQLNames;
+    collectionFor: (table: string) => string;
+    views: readonly LangWatchQLViewDefinition[];
+  }): string[] {
+    return views.flatMap((view) =>
+      postgresViews.engineTableStatements({
+        names,
+        collection: collectionFor(view.sourceTable),
+        views: [view],
+      }),
+    );
+  }
+
   /** The drifted objects, and every view over an engine table that is about to be replaced. */
   #driftedStatements({
     names,
     sourceDatabase,
-    collection,
+    collectionFor,
     includeAppFunctions,
     only,
   }: {
     names: LangWatchQLNames;
     sourceDatabase: string;
-    collection: string;
+    collectionFor: (table: string) => string;
     includeAppFunctions: boolean;
     only: readonly string[];
   }): string[] {
@@ -268,7 +332,7 @@ export class LangWatchQLSelfProvisioningService {
       ...(drifted.has(names.keyMapTable)
         ? [accessModel.keyMapTableStatement({ names, sourceDatabase })]
         : []),
-      ...postgresViews.engineTableStatements({ names, collection, views: engineTables }),
+      ...this.#engineTableStatements({ names, collectionFor, views: engineTables }),
       ...viewProvisioning.setupStatements({
         names,
         sourceDatabase,

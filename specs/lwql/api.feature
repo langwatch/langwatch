@@ -974,6 +974,17 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And an upgrade's converge that runs before the ClickHouse pods roll finds that collection already mounted
     And the rolled pods attach every engine table the previous release created
 
+  # The config store delivers only lwql_postgres: a config name that matches a SQL-created
+  # collection stops ClickHouse at startup (670). One catalog read per converge.
+  @unit
+  Scenario: A rendered converge binds each engine table to a collection the server holds
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    And the server may hold lwql_postgres, lwql_postgres_<database>, or both
+    When a converge or the reconvergence check creates or replaces an engine table
+    Then the table keeps its current binding while that collection exists on the server
+    And otherwise it binds to lwql_postgres when the server holds it, else to lwql_postgres_<database>
+    And with neither on the server it binds to lwql_postgres and fails with 669, as before
+
   # A 669 outside a NAMED COLLECTION statement means the collection is absent: the
   # engine table was never created, and every view over it would fail later as
   # UNKNOWN_TABLE, naming neither the table nor the collection.
