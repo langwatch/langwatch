@@ -909,6 +909,10 @@ export class OpsModule implements OpsApi {
         cloud: config.isSaas || cloudOps,
         isLocalDevelopment: config.nodeEnvironment === "development",
       },
+      emailIsUnconfigured: async () => {
+        const mail = await dependencies.notifications.getMailDelivery();
+        return mail.provider === undefined && !mail.misconfigured;
+      },
     });
     const app = OpsModule.fromInfrastructure({
       infrastructure,
