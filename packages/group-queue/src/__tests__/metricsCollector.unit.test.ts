@@ -82,6 +82,8 @@ function makeRedis(
     gateFirstCall?: Promise<void>;
     /** Members of the blocked set. */
     blocked?: string[];
+    /** SCARD of the blocked set when it exceeds the members a scan returns. */
+    blockedTotal?: number;
     /** groupId -> the [pipeline, jobType, jobName] its head job's header carries. */
     routing?: Record<string, [string, string, string]>;
     /** tenantId -> parked group count; the keys are the parked-tenants registry. */
@@ -127,7 +129,7 @@ function makeRedis(
       return parkedTenant === undefined ? 0 : (opts.parked?.[parkedTenant] ?? 0);
     }),
     scard: vi.fn(async (key: string) =>
-      key.endsWith("blocked") ? (opts.blocked?.length ?? 0) : 0,
+      key.endsWith("blocked") ? (opts.blockedTotal ?? opts.blocked?.length ?? 0) : 0,
     ),
     smembers: vi.fn(async () => Object.keys(opts.parked ?? {})),
     evalsha: vi.fn(
@@ -799,6 +801,29 @@ describe("GroupQueueMetricsCollector — blocked groups by pipeline and job", ()
         expect(
           blockedFor({ pipeline_name: "unknown", job_type: "unknown", job_name: "unknown" }),
         ).toBe(1);
+      });
+    });
+  });
+
+  describe("given more blocked groups than the scan returns", () => {
+    describe("when a cycle runs", () => {
+      /** @scenario "A blocked group without routing metadata counts as unknown" */
+      it("attributes the remainder to unknown so the series still sum to SCARD", async () => {
+        const { redis } = makeRedis({
+          blocked: ["t1/a", "t2/a"],
+          blockedTotal: 5,
+          routing: {
+            "t1/a": ["trace_processing", "projection", "traceSummary"],
+            "t2/a": ["trace_processing", "projection", "traceSummary"],
+          },
+        });
+
+        await runCollect(redis);
+
+        expect(blockedFor(traceFold)).toBe(2);
+        expect(
+          blockedFor({ pipeline_name: "unknown", job_type: "unknown", job_name: "unknown" }),
+        ).toBe(3);
       });
     });
   });

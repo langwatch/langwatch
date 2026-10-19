@@ -18,11 +18,15 @@ export const gqGroupsBlockedTotal = counter({
   description: "Total number of groups that have been blocked due to exhausted retries",
 });
 
-/** One series per pipeline/job of the blocked groups' head jobs; sum by queue_name for the total. */
+/**
+ * One series per pipeline/job of the blocked groups' head jobs. Every worker
+ * publishes the same shared counts: total with max by (queue_name) over the
+ * per-instance sum, never a bare sum.
+ */
 export const gqBlockedGroups = gauge({
   name: "gq_blocked_groups",
   description:
-    "Number of groups currently in the blocked state (jobs exhausted retries, awaiting manual unblock), by the pipeline and job of each group's head job; sum by queue_name for the queue total",
+    "Number of groups currently in the blocked state (jobs exhausted retries, awaiting manual unblock), by the pipeline and job of each group's head job; every worker publishes the same shared counts, so take max by (queue_name) over the per-instance sum, not a bare sum",
 });
 
 export const gqParkedGroups = gauge({
