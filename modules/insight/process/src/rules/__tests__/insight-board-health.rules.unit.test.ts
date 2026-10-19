@@ -75,6 +75,10 @@ describe("given a statement's result", () => {
     ["no rows", { rows: [] }],
     ["rows whose every value is null", { rows: [{ a: null, b: null }, { a: null }] }],
     [
+      "no rows beside a report of a missing field",
+      { rows: [], completeness: { state: "missing" } },
+    ],
+    [
       "one row of zeros beside a report of no traffic",
       { rows: [{ count: 0, total: "0", avg: null }], completeness: { state: "no_traffic" } },
     ],
@@ -96,6 +100,24 @@ describe("given a statement's result", () => {
     ["a report of partial traffic", { rows: [{ count: 0 }], completeness: { state: "partial" } }],
   ])("reads one row of zeros beside %s as unchecked", (_shape, result) => {
     expect(readResult(result)).toEqual({ kind: "unchecked" });
+  });
+
+  /** @scenario "An empty answer over a period with traffic is not checked" */
+  it.each([
+    ["no rows beside a report of traffic", { rows: [], completeness: { state: "complete" } }],
+    [
+      "no rows beside a report of partial traffic",
+      { rows: [], completeness: { state: "partial" } },
+    ],
+    [
+      "a row of nulls beside a report of traffic",
+      { rows: [{ avg: null }], completeness: { state: "complete" } },
+    ],
+  ])("reads %s as unchecked, so the widget files no card", (_shape, result) => {
+    const outcome = readResult(result);
+
+    expect(outcome).toEqual({ kind: "unchecked" });
+    expect(widgetHealth([outcome])).toBe("unchecked");
   });
 
   it("reads several rows of zeros and a non-zero row as data", () => {
@@ -227,7 +249,8 @@ describe("given more broken widgets than the cap", () => {
       "board-health:more:dashboard-1",
     ]);
     const rest = cards.at(-1);
-    expect(rest).toMatchObject({ title: "3 more widgets on this board need a look", tone: "bad" });
+    expect(rest).toMatchObject({ title: "More widgets on this board need a look", tone: "bad" });
+    expect(rest?.body).toContain("These 3 widgets");
     expect(rest?.widget).toBeNull();
     for (const id of ["5", "6", "7"]) expect(rest?.body).toContain(`"Widget widget-${id}"`);
     expect(boardHealthCards({ boardId: BOARD_ID, broken: widgets.slice(0, 5) })).toHaveLength(5);

@@ -83,7 +83,8 @@ id (a retry); any other is renewed, with no reader named, so a card marked done 
 Marked done is not resolved: a widget is resolved when no run saw it broken for 3 days.
 
 **At most 5 cards per board per run.** With more than 5 broken widgets, the first 4 in board
-order get a card each and one card, keyed `board-health:more:<board id>`, names the rest. A
+order get a card each and one card, keyed `board-health:more:<board id>`, names the rest. Its
+title holds no count: a renewal keeps an insight's title, so only the body counts the rest. A
 From LangWatch board, checked once the server can read its widgets, can hold many widgets for
 sources a person does not use; the cap keeps that to 5 cards.
 

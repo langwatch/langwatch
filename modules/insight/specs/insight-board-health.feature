@@ -86,7 +86,7 @@ Feature: The daily run checks the board's widgets
     # The board shows "No traces in this period" for the same shape: a count over nothing.
     @unit
     Scenario: A widget whose every statement comes back empty shows no data
-      Given statements that each return one of: no rows, rows whose every value is null, one row whose every value is 0 or null beside a report of no traffic, or a report of no traffic in the period
+      Given statements that each return one of: no rows or rows whose every value is null beside no report or a report of a missing field, one row whose every value is 0 or null beside a report of no traffic, or a report of no traffic in the period
       When the widget's health is read
       Then it shows no data
 
@@ -95,6 +95,14 @@ Feature: The daily run checks the board's widgets
     Scenario: A zero with no report of no traffic is not checked
       Given a statement that returns one row whose every value is 0
       And the analytics module reports traffic in the period, or makes no report
+      When the widget's health is read
+      Then it is not checked, and no card is filed for it
+
+    # A filtered widget, such as errors by tier in a month with no errors, is right to be empty.
+    @unit
+    Scenario: An empty answer over a period with traffic is not checked
+      Given a statement that returns no rows, or rows whose every value is null
+      And the analytics module reports traffic in the period, complete or partial
       When the widget's health is read
       Then it is not checked, and no card is filed for it
 
@@ -204,6 +212,7 @@ Feature: The daily run checks the board's widgets
       When the run decides its cards
       Then the first 4 in board order get a card each
       And one more card names the other 3
+      And its title holds no count, since a renewal keeps the title, and its body counts 3
 
   Rule: Langy neither sees the check's cards nor reports the same widgets
 

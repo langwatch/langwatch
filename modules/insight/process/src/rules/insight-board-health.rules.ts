@@ -109,9 +109,9 @@ function isZero(value: unknown): boolean {
 }
 
 /**
- * Empty for no rows, rows of nulls, or a report of no traffic. One row of zeros beside no such
- * report (a rollup view has none, a report can fail) is unchecked: a zero over a busy month
- * must never file "no data".
+ * Empty for a report of no traffic, or no rows or rows of nulls beside no report of traffic.
+ * Beside one, a filter that matched nothing answered, and one row of zeros beside no report (a
+ * rollup view has none) may be a count: both are unchecked, never "no data".
  */
 export function readResult({
   rows,
@@ -121,8 +121,9 @@ export function readResult({
   completeness?: Readonly<{ state: string }>;
 }>): Extract<StatementOutcome, { kind: "data" | "empty" | "unchecked" }> {
   if (completeness?.state === "no_traffic") return { kind: "empty" };
+  const hadTraffic = completeness?.state === "complete" || completeness?.state === "partial";
   const allNothing = rows.every((row) => Object.values(row).every(isNothing));
-  if (allNothing) return { kind: "empty" };
+  if (allNothing) return hadTraffic ? { kind: "unchecked" } : { kind: "empty" };
   const [only, ...rest] = rows;
   if (only === undefined || rest.length > 0) return { kind: "data" };
   const isZeroRow = Object.values(only).every((value) => isNothing(value) || isZero(value));
@@ -236,9 +237,10 @@ function restCard({ boardId, rest }: { boardId: string; rest: readonly BrokenWid
     `- "${cut(widget.name, MAX_TITLE_NAME_LENGTH)}": ${reason === "error" ? "fails to load" : "shows no data"}`;
   return {
     key: boardHealthRestKey({ boardId }),
-    title: `${rest.length} more widgets on this board need a look`,
+    // A renewal keeps the title, so only the body, which it renews, carries the count.
+    title: "More widgets on this board need a look",
     body: [
-      "These widgets failed to load or showed no data over the last 30 days:",
+      `These ${rest.length} widgets failed to load or showed no data over the last 30 days:`,
       [...named.map(line), ...(others > 0 ? [`- and ${others} more`] : [])].join("\n"),
     ].join("\n\n"),
     tone: rest.some(({ reason }) => reason === "error") ? "bad" : "watch",
