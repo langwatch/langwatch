@@ -26,7 +26,7 @@ import {
   refusal,
   RUN_CALLER,
 } from "./insight-daily-run.fixture.ts";
-import { PROJECT } from "./insight.fixture.ts";
+import { filing, PROJECT } from "./insight.fixture.ts";
 
 const { FILED, RENEWED } = INSIGHT_EVENT_TYPES;
 const HOUR_MS = 3_600_000;
@@ -445,6 +445,23 @@ describe("given a card the check filed yesterday", () => {
     expect((await insightsOf()).map(({ id }) => id)).toEqual([card?.id]);
     expect(await eventsOf(card?.id ?? "")).toEqual([FILED, RENEWED]);
     expect(await lastRunOf()).toMatchObject({ filedCount: 0, renewedCount: 1 });
+  });
+
+  /** @scenario "A card is found by its key, however many insights are newer" */
+  it("renews that card behind 500 newer insights, and files no second card", async () => {
+    const [card] = await insightsOf();
+    // As many as a read of the newest 500 takes, so the card is left out of that page.
+    for (let at = 1; at <= 500; at += 1) {
+      vi.setSystemTime(DAY_1 + at * 60_000);
+      await installed.app.fileInsight({ ...filing(), userId: MEMBER });
+    }
+
+    await runAt({ now: DAY_2 });
+
+    expect(await eventsOf(card?.id ?? "")).toEqual([FILED, RENEWED]);
+    expect(await lastRunOf()).toMatchObject({ filedCount: 0, renewedCount: 1 });
+    const newest = await insightsOf();
+    expect(newest.filter(({ findingKey }) => findingKey === NO_DATA_KEY)).toEqual([]);
   });
 
   /** @scenario "A card marked done stays done while the widget stays broken" */

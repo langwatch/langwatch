@@ -250,7 +250,6 @@ function contractCases(backend: Backend): void {
   });
 
   describe("when the owner's insights are read by their keys", () => {
-    /** @scenario "A card is found by its key, however many insights are newer" */
     it("answers the owner's insights holding those keys, newest first, whatever their age", async () => {
       const key = "board-health:widget-1:no_data";
       const old = await file({ findingKey: key, filedAt: FILED_AT - 90 * 24 * HOUR_MS });
