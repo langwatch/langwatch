@@ -58,6 +58,13 @@ Feature: A parked group keeps its jobs for as long as it is parked
     Then its jobs and data keys still have no TTL
 
   @integration
+  Scenario: A group lane-parked before lane parks were counted keeps its keys
+    Given a group parked behind a paused lane before the queue counted lane parks
+    When another job is staged into the group
+    Then its jobs and data keys still have no TTL
+    And once the lane is unpaused they carry the safety-net TTL again
+
+  @integration
   Scenario: An unpaused lane's group gets its safety-net expiry back
     Given a group parked behind a paused lane
     When the lane is unpaused and the dispatcher runs

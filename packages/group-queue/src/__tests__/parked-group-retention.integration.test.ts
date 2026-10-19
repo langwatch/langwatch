@@ -191,6 +191,29 @@ describe("given a group parked behind a paused lane", () => {
     });
   });
 
+  describe("when it was parked before the queue counted lane parks", () => {
+    beforeEach(async () => {
+      await redis.del(
+        `${keyPrefix()}lane-parked-groups`,
+        `${keyPrefix()}lane-parked-groups:counted`,
+      );
+    });
+
+    /** @scenario "A group lane-parked before lane parks were counted keeps its keys" */
+    it("keeps them without a TTL when another job is staged, and expires them once unpaused", async () => {
+      await stage({ groupId: laneParked, stagedJobId: "lane-3", jobDataJson: pausedLaneJob });
+      expect(await keyTtls(laneParked)).toEqual([-1, -1]);
+
+      await scripts.removePauseKey(PAUSE_KEY);
+      await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+
+      expect(await redis.hexists(`${keyPrefix()}lane-parked-groups`, laneParked)).toBe(0);
+      const [jobsTtl, dataTtl] = await keyTtls(laneParked);
+      expect(jobsTtl).toBeGreaterThan(0);
+      expect(dataTtl).toBeGreaterThan(0);
+    });
+  });
+
   describe("when the lane is unpaused", () => {
     /** @scenario "An unpaused lane's group gets its safety-net expiry back" */
     it("restores the group with a TTL on its keys", async () => {

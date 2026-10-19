@@ -70,8 +70,24 @@ local function releaseLaneParked(kp, groupId)
   end
 end
 
+-- Groups lane-parked before lane-parked-groups existed carry no count. Once per queue,
+-- recount every lane set from scratch (HSET, so a park counted meanwhile is not doubled).
+local function countLaneParksOnce(kp)
+  if redis.call("SET", kp .. "lane-parked-groups:counted", "1", "NX") == false then return end
+  local counts = {}
+  for _, pauseKey in ipairs(redis.call("SMEMBERS", kp .. "parked-lanes")) do
+    for _, groupId in ipairs(redis.call("ZRANGE", kp .. "parked-lane:" .. pauseKey, 0, -1)) do
+      counts[groupId] = (counts[groupId] or 0) + 1
+    end
+  end
+  for groupId, count in pairs(counts) do
+    redis.call("HSET", kp .. "lane-parked-groups", groupId, count)
+  end
+end
+
 -- Whether the group sits in its tenant's parked set or in a paused lane's.
 local function isParkedGroupAt(kp, groupId)
+  countLaneParksOnce(kp)
   local tenantId = groupId
   local slashPos = string.find(groupId, "/", 1, true)
   if slashPos and slashPos > 1 then tenantId = string.sub(groupId, 1, slashPos - 1) end
