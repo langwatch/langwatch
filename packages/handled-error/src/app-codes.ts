@@ -217,6 +217,7 @@ export const APP_ERROR_CODES = [
   "dataset_duplicate_record_id",
   "dataset_import_source_refused",
   "dataset_inline_file_unreadable",
+  "dataset_invalid_column",
   "dataset_name_taken",
   "dataset_not_found",
   "dataset_not_ready",

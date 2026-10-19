@@ -1,0 +1,140 @@
+import type { AnnotationApi } from "@langwatch/annotation-contract";
+import {
+  type Dataset,
+  type DatasetApi,
+  DatasetNotFoundError,
+  InvalidColumnError,
+} from "@langwatch/dataset-contract";
+import { DispatchError } from "@langwatch/eventing";
+import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it } from "vitest";
+
+import { AutomationDispatchErrorsService } from "../../../settlement/services/automation-dispatch-errors.service.ts";
+import { PersistActionWriterService } from "../persist-action-writer.service.ts";
+
+const errors = AutomationDispatchErrorsService.create();
+
+function datasetWith(columns: string[]): Dataset {
+  return {
+    id: "dataset-1",
+    name: "qa",
+    columnTypes: columns.map((name) => ({ name, type: "string" })),
+  } as Dataset;
+}
+
+function writerOver(datasets: Partial<DatasetApi>) {
+  const { logger, lines } = createTestLogger();
+  const writer = PersistActionWriterService.create({
+    datasets: createApiFixture<DatasetApi>(datasets),
+    annotations: createApiFixture<AnnotationApi>(),
+    logger,
+  });
+  const warnings = () => lines.filter((line) => line.level === 40);
+
+  return { writer, warnings };
+}
+
+async function refusalOf(write: Promise<void>): Promise<unknown> {
+  return write.then(
+    () => undefined,
+    (error: unknown) => error,
+  );
+}
+
+const write = {
+  datasetId: "dataset-1",
+  projectId: "project-1",
+  triggerId: "trigger-1",
+  datasetRecords: [{ id: "trigger-1-trace-1-0", question: "why", input: "secret value" }],
+};
+
+describe("PersistActionWriterService.addToDataset", () => {
+  describe("given a mapping that names a column the dataset no longer has", () => {
+    /** @scenario "A stale mapping column is dropped and the row is still written" */
+    it("writes the row with only the dataset's columns and warns with the dropped names", async () => {
+      const appended: Parameters<DatasetApi["batchCreateRecords"]>[0][] = [];
+      const { writer, warnings } = writerOver({
+        findBySlugOrId: async () => datasetWith(["question"]),
+        batchCreateRecords: async (input) => {
+          appended.push(input);
+          return [];
+        },
+      });
+
+      await writer.addToDataset(write);
+
+      expect(appended.map(({ entries }) => entries)).toEqual([
+        [{ id: "trigger-1-trace-1-0", question: "why" }],
+      ]);
+      expect(warnings()).toEqual([
+        expect.objectContaining({
+          triggerId: "trigger-1",
+          datasetId: "dataset-1",
+          droppedColumns: ["input"],
+        }),
+      ]);
+      expect(JSON.stringify(warnings())).not.toContain("secret value");
+    });
+
+    it("does not warn when every mapped key is a column", async () => {
+      const { writer, warnings } = writerOver({
+        findBySlugOrId: async () => datasetWith(["question", "input"]),
+        batchCreateRecords: async () => [],
+      });
+
+      await writer.addToDataset(write);
+
+      expect(warnings()).toEqual([]);
+    });
+  });
+
+  describe("given the dataset refuses the write", () => {
+    /** @scenario "A dataset refusal of an automation's rows is not retried" */
+    it("turns a column refusal into a terminal dispatch failure", async () => {
+      const { writer } = writerOver({
+        findBySlugOrId: async () => datasetWith(["question", "input"]),
+        batchCreateRecords: async () => {
+          throw new InvalidColumnError({
+            columnName: "input",
+            datasetName: "qa",
+            validColumns: ["question"],
+          });
+        },
+      });
+
+      const refusal = await refusalOf(writer.addToDataset(write));
+
+      expect(refusal).toBeInstanceOf(DispatchError);
+      expect(errors.isTerminal(refusal)).toBe(true);
+    });
+
+    it("treats a dataset that is gone, before or during the write, as terminal", async () => {
+      const gone = writerOver({ findBySlugOrId: async () => null });
+      const raced = writerOver({
+        findBySlugOrId: async () => datasetWith(["question"]),
+        batchCreateRecords: async () => {
+          throw new DatasetNotFoundError();
+        },
+      });
+
+      expect(errors.isTerminal(await refusalOf(gone.writer.addToDataset(write)))).toBe(true);
+      expect(errors.isTerminal(await refusalOf(raced.writer.addToDataset(write)))).toBe(true);
+    });
+
+    it("leaves a failure the dataset did not name retryable", async () => {
+      const outage = new Error("connection reset");
+      const { writer } = writerOver({
+        findBySlugOrId: async () => datasetWith(["question"]),
+        batchCreateRecords: async () => {
+          throw outage;
+        },
+      });
+
+      const refusal = await refusalOf(writer.addToDataset(write));
+
+      expect(refusal).toBe(outage);
+      expect(errors.isTerminal(refusal)).toBe(false);
+    });
+  });
+});

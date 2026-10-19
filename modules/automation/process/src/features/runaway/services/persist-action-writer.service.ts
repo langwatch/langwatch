@@ -1,25 +1,34 @@
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { DatasetApi, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { DispatchError } from "@langwatch/eventing";
+import { createLogger, type Logger } from "@langwatch/observability";
 
 import { AutomationPersistActionRepository } from "../../../repositories/automation-persist-action.repository.ts";
 
 const ANNOTATOR_REFERENCE_INVALID = "annotation_annotator_reference_invalid";
+const DATASET_REFUSALS = new Set(["dataset_invalid_column", "dataset_not_found"]);
+
+type DatasetPeer = Pick<DatasetApi, "batchCreateRecords" | "findBySlugOrId">;
 
 /** The two persist writes, through the dataset and annotation owners' own operations. */
 export class PersistActionWriterService extends AutomationPersistActionRepository {
   static create(peers: {
-    datasets: Pick<DatasetApi, "batchCreateRecords">;
+    datasets: DatasetPeer;
     annotations: Pick<AnnotationApi, "queueTraces">;
+    logger?: Logger;
   }): PersistActionWriterService {
-    return new PersistActionWriterService(peers);
+    return new PersistActionWriterService(
+      peers,
+      peers.logger ?? createLogger("langwatch:automation:persist-action-writer"),
+    );
   }
 
   private constructor(
     private readonly peers: Readonly<{
-      datasets: Pick<DatasetApi, "batchCreateRecords">;
+      datasets: DatasetPeer;
       annotations: Pick<AnnotationApi, "queueTraces">;
     }>,
+    private readonly logger: Logger,
   ) {
     super();
   }
@@ -48,13 +57,76 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
     datasetId: string;
     projectId: string;
     datasetRecords: DatasetRecordEntry[];
+    triggerId: string;
   }): Promise<void> {
-    await this.peers.datasets.batchCreateRecords({
+    const dataset = await this.peers.datasets.findBySlugOrId({
       slugOrId: input.datasetId,
       projectId: input.projectId,
-      entries: input.datasetRecords,
     });
+    if (!dataset) throw datasetRefusal({ datasetId: input.datasetId });
+
+    // A mapping saved before a column was removed still names it; the row is kept without it.
+    const columns = new Set(dataset.columnTypes.map((column) => column.name));
+    const dropped = new Set<string>();
+    const entries = input.datasetRecords.map((record) => keepDefined({ record, columns, dropped }));
+    if (dropped.size > 0) {
+      this.logger.warn(
+        {
+          triggerId: input.triggerId,
+          datasetId: input.datasetId,
+          droppedColumns: [...dropped],
+        },
+        "ADD_TO_DATASET mapping names columns the dataset no longer has; they were dropped",
+      );
+    }
+
+    try {
+      await this.peers.datasets.batchCreateRecords({
+        slugOrId: input.datasetId,
+        projectId: input.projectId,
+        entries,
+      });
+    } catch (error) {
+      const code = readCode(error);
+      if (typeof code !== "string" || !DATASET_REFUSALS.has(code)) throw error;
+      throw datasetRefusal({ datasetId: input.datasetId, cause: error });
+    }
   }
+}
+
+function keepDefined({
+  record,
+  columns,
+  dropped,
+}: {
+  record: DatasetRecordEntry;
+  columns: ReadonlySet<string>;
+  dropped: Set<string>;
+}): DatasetRecordEntry {
+  const kept: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (key === "id" || columns.has(key)) kept[key] = value;
+    else dropped.add(key);
+  }
+
+  return { ...kept, id: record.id };
+}
+
+/** The dataset refused the write for a reason a redelivery cannot change. */
+function datasetRefusal({
+  datasetId,
+  cause,
+}: {
+  datasetId: string;
+  cause?: unknown;
+}): DispatchError {
+  return new DispatchError({
+    message:
+      `The dataset "${datasetId}" this automation appends to refused the rows: it is gone, archived, or ` +
+      "no longer has the columns they name. Re-save the automation with a dataset and mapping that exist.",
+    retryable: false,
+    cause,
+  });
 }
 
 function readCode(error: unknown): unknown {

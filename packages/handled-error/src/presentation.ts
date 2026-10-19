@@ -3858,6 +3858,10 @@ const presentations = {
     describe: () =>
       "This dataset has no failed or stuck import. Upload the file again to add its rows.",
   },
+  dataset_invalid_column: {
+    title: "That column is not in this dataset",
+    describe: () => "Add the column to the dataset, or remove it from the row, and try again.",
+  },
   dataset_name_taken: {
     title: "That name is taken",
     describe: () => "Pick a different name for this dataset.",

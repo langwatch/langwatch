@@ -160,8 +160,10 @@ export class MalformedColumnTypesError extends Error {
 
 /**
  * Thrown when a record entry contains a column name not defined in the dataset schema.
+ * The caller can fix the entry, so it is a handled 422; REST still answers it 400 by name.
  */
-export class InvalidColumnError extends Error {
+export class InvalidColumnError extends HandledError {
+  declare readonly code: "dataset_invalid_column";
   readonly columnName: string;
   readonly validColumns: string[];
 
@@ -176,7 +178,9 @@ export class InvalidColumnError extends Error {
   }) {
     const validColumnsList = validColumns.length > 0 ? validColumns.join(", ") : "(none)";
     super(
+      "dataset_invalid_column",
       `Column "${columnName}" is not defined in the "${datasetName}" dataset schema. Valid columns: ${validColumnsList}`,
+      { httpStatus: 422, fault: "customer" },
     );
     this.name = "InvalidColumnError";
     this.columnName = columnName;
