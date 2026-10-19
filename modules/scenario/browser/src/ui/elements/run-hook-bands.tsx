@@ -4,6 +4,7 @@
  * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 
+import type { ChipTone } from "@langwatch/design-system/chip";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ScenarioHookResult } from "@langwatch/scenario-contract";
@@ -33,6 +34,14 @@ const TONE_EDGE: Record<HookTone, string> = {
   warn: "orange.solid",
   danger: "red.solid",
   muted: "border.emphasized",
+};
+
+/** The chip tone of a run's hook tag ("Setup failed", "Teardown timed out"). */
+export const HOOK_TAG_TONE: Record<HookTone, ChipTone> = {
+  ok: "green",
+  warn: "yellow",
+  danger: "red",
+  muted: "neutral",
 };
 
 const LEFT_BEHIND = "Test data may be left behind.";
@@ -146,6 +155,7 @@ function HookBand({
         >
           {phase}
         </Text>
+        {/* A real space, so the band reads "Setup failed" to screen readers. */}{" "}
         <HStack gap={1} color={TONE_FG[tone]} fontWeight="medium">
           {icon && <Icon as={icon} boxSize={3.5} />}
           <Text>{detail}</Text>

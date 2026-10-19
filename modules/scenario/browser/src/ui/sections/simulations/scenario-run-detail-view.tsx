@@ -3,7 +3,7 @@
  * sections. The run detail drawer and the standalone run page both render it.
  */
 
-import { Chip, type ChipTone } from "@langwatch/design-system/chip";
+import { Chip } from "@langwatch/design-system/chip";
 import { ConversationExpandContext } from "@langwatch/design-system/conversation-expand-context";
 import { CopyButton } from "@langwatch/design-system/copy-button";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
@@ -22,14 +22,19 @@ import { ChevronsDownUp, ChevronsUpDown, CircleSlash, Inbox } from "lucide-react
 import { type ReactNode, useState } from "react";
 
 import type { ScenarioRunState } from "../../../behavior/simulations/use-run-state-stream.ts";
-import { type HookTone, type RunHooksView, runHooksViewOf } from "../../../model/run-hooks.ts";
+import { type RunHooksView, runHooksViewOf } from "../../../model/run-hooks.ts";
 import { hasNoResults } from "../../../model/scenario-run-status.utils.ts";
 import { CopyIdChip } from "../../elements/copy-id-chip.tsx";
 import { CutAtLimitBadge, isCutAtLimitOf } from "../../elements/cut-at-limit-badge.tsx";
 import { ParameterRow, SECRET_VALUE_MASK } from "../../elements/parameter-row.tsx";
 import { RunCriteriaChip } from "../../elements/run-criteria-chip.tsx";
 import { RunDetailSection } from "../../elements/run-detail-section.tsx";
-import { NoHooksBand, SetupBand, TeardownBand } from "../../elements/run-hook-bands.tsx";
+import {
+  HOOK_TAG_TONE,
+  NoHooksBand,
+  SetupBand,
+  TeardownBand,
+} from "../../elements/run-hook-bands.tsx";
 import { ScenarioRunActions } from "../../elements/scenario-run-actions.tsx";
 import { ScenarioRunStatusIcon } from "../../elements/scenario-run-status-icon.tsx";
 import { SimulationConsole } from "../../elements/simulation-console/simulation-console.tsx";
@@ -42,13 +47,6 @@ import type { ScenarioRunDetail } from "./use-scenario-run-detail.ts";
 function formatResultsForCopy(results: unknown): string {
   return JSON.stringify(results, null, 2);
 }
-
-const HOOK_TAG_TONE: Record<HookTone, ChipTone> = {
-  ok: "green",
-  warn: "yellow",
-  danger: "red",
-  muted: "neutral",
-};
 
 function RunDetailChips({
   scenarioState,

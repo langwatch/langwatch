@@ -41,7 +41,7 @@ TypeScript mirrors this on the value `connectAgent` returns. `run` is `{ scenari
 
 Setup, then turns, then teardown. The simulated user and the judge see the current state on every turn: the platform wraps them in its own adapters in `apps/scenario-child`, so the external scenario library does not change.
 
-Teardown is always called: after success, after failure, and after a setup failure or timeout (with the partial state, if any). The child runs it in a `finally`. If the child is killed, the parent worker should run a fallback teardown. Decided in principle; not built yet (https://github.com/langwatch/langwatch/issues/8781).
+The child attempts teardown after success, after failure, and after a setup failure or timeout (with the partial state, if any). The child runs it in a `finally`. If the child is killed, the parent worker should run a fallback teardown. Decided in principle; not built yet (https://github.com/langwatch/langwatch/issues/8781).
 
 Hooks run for scenario runs only. Experiments, the Test button and `langwatch agent run` never call them. Each hook has a 60 s timeout. A timeout set per scenario is not built yet.
 

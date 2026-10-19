@@ -174,6 +174,12 @@ Feature: Scenario run hooks: setup and teardown
       Given a teardown that returns { "deleted": 3 }
       Then the run shows { "deleted": 3 } as the teardown result
 
+    @integration
+    Scenario: A run opened from Agent testing shows its hooks
+      Given a run opened from Agent testing whose setup failed and whose teardown returned an object
+      Then the wide run drawer shows "Not scored", the Setup band with its error and the Teardown band with the object
+      And it does not show "No response"
+
   Rule: Timeouts
 
     @unit

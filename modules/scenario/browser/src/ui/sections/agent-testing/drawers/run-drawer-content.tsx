@@ -16,11 +16,13 @@ import {
 } from "@langwatch/design-system/primitives";
 import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
 
+import { runHooksViewOf, type RunHooksView } from "../../../../model/run-hooks.ts";
 import { RunStartingSteps } from "../../../elements/agent-testing/drawers/run-starting-steps.tsx";
 import { RunVerdictPanel } from "../../../elements/agent-testing/drawers/run-verdict-panel.tsx";
 import { nextSpeakerOf } from "../../../elements/next-speaker.ts";
 import { ParameterRow, SECRET_VALUE_MASK } from "../../../elements/parameter-row.tsx";
 import { RunDetailSection } from "../../../elements/run-detail-section.tsx";
+import { NoHooksBand, SetupBand, TeardownBand } from "../../../elements/run-hook-bands.tsx";
 import { ScenarioMessageRenderer } from "../../simulations/scenario-message-renderer.tsx";
 import { isHumanCallerRun } from "../results/caller-display.ts";
 import { hasVerdict, type RunDetail, type RunScenarioState } from "./use-run-drawer-state.ts";
@@ -107,10 +109,29 @@ function EmptyConversation({
  * the conversation, so a header over it says only what the reader can see.
  */
 function ConversationSection({ detail }: { detail: RunDetail }) {
+  const { scenarioState } = detail;
+  if (!scenarioState) return null;
+  const hooks = runHooksViewOf({ metadata: scenarioState.metadata, status: scenarioState.status });
+  const openHookTrace = (traceId: string) => detail.openDrawer("traceV2Details", { traceId });
+
+  return (
+    <>
+      {hooks.setup && <SetupBand result={hooks.setup} onOpenTrace={openHookTrace} />}
+      {hooks.noHooks && <NoHooksBand />}
+      <ConversationBody detail={detail} hooks={hooks} />
+      {hooks.teardown && <TeardownBand result={hooks.teardown} onOpenTrace={openHookTrace} />}
+    </>
+  );
+}
+
+function ConversationBody({ detail, hooks }: { detail: RunDetail; hooks: RunHooksView }) {
   const { scenarioState, project } = detail;
   if (!scenarioState) return null;
 
-  if (detail.shouldShowNoResponse) {
+  // A run whose setup failed never spoke, so there is no silence to report.
+  if (hooks.notScored && !detail.hasConversation) return null;
+
+  if (detail.shouldShowNoResponse && !hooks.notScored) {
     return (
       <ConversationBox>
         <ConversationEmptyState
