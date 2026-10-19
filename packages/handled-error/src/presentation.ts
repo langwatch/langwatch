@@ -243,6 +243,14 @@ export const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
   "llm_provider_out_of_credit",
 ]);
 
+/** The providers' own limit codes: when one is named, it says more than the proxy's reason. */
+const PROVIDER_LIMIT_CODES: ReadonlySet<string> = new Set([
+  "usage_limit_reached",
+  "codex_plan_limit",
+  "insufficient_quota",
+  "billing_hard_limit_reached",
+]);
+
 /**
  * What a provider slot is missing when the gateway answers
  * `provider_config_invalid`, as `meta.problem` (ConfigProblem in
@@ -5786,11 +5794,11 @@ const presentations = {
     title: "The model provider rejected that",
     // A refused key has one fix, so the headline names it like the body does.
     titleFor: (error) => {
-      if (hasReasonCode(error.reasons, new Set(["llm_provider_out_of_credit"]))) {
-        return "This provider account is out of credit";
+      if (hasReasonCode(error.reasons, PROVIDER_LIMIT_CODES)) {
+        return "This provider account has no allowance left";
       }
       if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
-        return "This provider account has no allowance left";
+        return "This provider account is out of credit";
       }
       return hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
         ? "This provider rejected the API key"
