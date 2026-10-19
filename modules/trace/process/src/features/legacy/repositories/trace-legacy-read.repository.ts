@@ -127,6 +127,8 @@ export abstract class TraceLegacyReadRepository {
       projectId: string;
       threadIds: string[];
       maxTraces?: number | undefined;
+      /** False answers each trace's summary with no spans, reading no span at all. */
+      withSpans?: boolean | undefined;
     },
   ): Promise<TraceLegacyRow[]>;
 

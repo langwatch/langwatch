@@ -148,6 +148,7 @@ export class TraceContentReadService {
     protections: unknown;
     withEditOverlay?: boolean;
     maxTraces?: number;
+    withSpans?: boolean;
   }): Promise<Trace[]> {
     return this.read.getTracesWithSpansByThreadIds({
       authorization: input.authorization,
@@ -156,6 +157,7 @@ export class TraceContentReadService {
       protections: input.protections,
       opts: {
         full: true,
+        ...(input.withSpans === false ? { withSpans: false } : {}),
         ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
         ...(input.maxTraces !== undefined ? { maxTraces: input.maxTraces } : {}),
       },

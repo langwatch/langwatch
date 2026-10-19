@@ -143,13 +143,18 @@ export class LegacyTraceMappingService {
     projectId: string;
     threadIds: string[];
     protections: Protections;
-    opts?: { resolveBlobs?: boolean | undefined; maxTraces?: number | undefined };
+    opts?: {
+      resolveBlobs?: boolean | undefined;
+      maxTraces?: number | undefined;
+      withSpans?: boolean | undefined;
+    };
   }): Promise<Trace[]> {
     const rows = await this.repository.findTracesWithSpansByThreadIds({
       authorization,
       projectId,
       threadIds,
       maxTraces: opts?.maxTraces,
+      withSpans: opts?.withSpans,
       retentionDays: this.retentionDays,
     });
     const traces = await this.resolveAndMerge({

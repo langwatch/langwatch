@@ -23,7 +23,10 @@ import type { TraceIOExtractionService } from "#features/derivation/services/tra
 
 import type { TraceEvaluationRunsReadRepository } from "../../../repositories/trace-evaluation-runs.repository.ts";
 import { mapTraceEvaluationsToLegacyEvaluations } from "../../../rules/trace-evaluation-mapping.rules.ts";
-import { type TraceLogRecordReader } from "../../claude-code/rules/claude-code-log-enrichment.rules.ts";
+import {
+  type TraceLogRecordBatchReader,
+  type TraceLogRecordReader,
+} from "../../claude-code/rules/claude-code-log-enrichment.rules.ts";
 import type { TraceEditOverlayService } from "../../edit-overlay/services/trace-edit-overlay.service.ts";
 import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
 import { TraceReadEnrichmentService } from "../../read/services/trace-read-enrichment.service.ts";
@@ -136,7 +139,7 @@ export class TraceLegacyReadService {
     mapping: LegacyTraceMappingService;
     /** Reviewer corrections, applied only where a caller opts in. */
     editOverlay: TraceEditOverlayService;
-    logRecordStorage?: TraceLogRecordReader;
+    logRecordStorage?: TraceLogRecordReader & TraceLogRecordBatchReader;
     /** Evaluation's shared runs (R40); every single-trace read resolves its evaluations. */
     evaluationRuns: Pick<TraceEvaluationRunsReadRepository, "findTraceEvaluations">;
   }): TraceLegacyReadService {
@@ -382,7 +385,7 @@ export class TraceLegacyReadService {
     projectId: string;
     threadIds: string[];
     protections: Protections;
-    opts?: { full?: boolean; withEditOverlay?: boolean; maxTraces?: number };
+    opts?: { full?: boolean; withEditOverlay?: boolean; maxTraces?: number; withSpans?: boolean };
   }): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpansByThreadIds",
@@ -401,6 +404,7 @@ export class TraceLegacyReadService {
           opts: {
             resolveBlobs: opts?.full,
             ...(opts?.maxTraces === undefined ? {} : { maxTraces: opts.maxTraces }),
+            ...(opts?.withSpans === false ? { withSpans: false } : {}),
           },
         });
         const enriched = await this.enrichment.enrichCodingAgentTraces(projectId, traces);

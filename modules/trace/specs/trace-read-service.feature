@@ -110,3 +110,10 @@ Feature: Trace span-tree read service
     When one of its traces is read with its spans
     Then the read is refused with private_dataplane_unavailable (503)
     And it is not wrapped into a bare internal_error
+
+  @unit
+  Scenario: A thread read without spans reads only the traces' summaries
+    Given a thread holding a trace
+    When a caller reads the thread's traces without their spans
+    Then the trace answers with its summary and no spans
+    And no span is read from the store

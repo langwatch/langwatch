@@ -79,6 +79,8 @@ export interface LangWatchQLAppFunctionDefinition {
   /** ClickHouse type of the hydrated column, which the result re-declares. */
   readonly returns: string;
   readonly encoding: LangWatchQLAppFunctionEncoding;
+  /** False when the value needs only the traces' summaries, so hydration reads no span for it. */
+  readonly readsSpans?: false;
   /**
    * Permissions a caller must hold, all of them, to call it at all: a function
    * returning captured content is as restricted as a column holding it.

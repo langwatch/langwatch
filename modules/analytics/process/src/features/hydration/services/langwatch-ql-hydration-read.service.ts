@@ -47,6 +47,8 @@ export type LangWatchQLThreadTraceReadInput = {
   protections: LangWatchQLProtections;
   /** The most traces the read may answer with, sized by the threads asked for. */
   maxTraces: number;
+  /** False when every thread value needs only the traces' summaries, never their spans. */
+  withSpans: boolean;
 };
 
 export interface LangWatchQLTraceSource {
@@ -152,6 +154,10 @@ export class LangWatchQLHydrationReadService {
     signal?: AbortSignal;
   }): Promise<LangWatchQLFetchedTraces> {
     const { traceIds, threadKeys } = langWatchQLDistinctKeys(resolved);
+    const threadsNeedSpans = resolved.some(
+      ({ keyKind, definition, source }) =>
+        keyKind === "thread" && (source ?? definition).readsSpans !== false,
+    );
     const budget = createReadBudget({ maxBytes: maxReadBytes });
     // One signal over every read — the caller's cancel and the budget's own
     // refusal — so a chunk that crosses the line stops the sibling readers.
@@ -183,6 +189,7 @@ export class LangWatchQLHydrationReadService {
                   threadKeys: chunk,
                   protections,
                   maxTraces: chunk.length * LWQL_TRACES_PER_THREAD_CEILING,
+                  withSpans: threadsNeedSpans,
                 }),
             }),
           ),

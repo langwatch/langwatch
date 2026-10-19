@@ -104,6 +104,7 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
     keyKind: "thread",
     returns: "Array(String)",
     encoding: "text",
+    readsSpans: false,
     gates: [],
     example: (database) =>
       lwqlThreadExample({

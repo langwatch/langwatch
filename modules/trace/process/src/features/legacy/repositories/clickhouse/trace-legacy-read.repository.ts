@@ -1035,12 +1035,14 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     projectId,
     threadIds,
     maxTraces,
+    withSpans,
     retentionDays,
   }: {
     authorization: Authorization;
     projectId: string;
     threadIds: string[];
     maxTraces?: number | undefined;
+    withSpans?: boolean | undefined;
     retentionDays: RetentionDaysProvider | undefined;
   }): Promise<TraceLegacyRow[]> {
     return this.tracer.withActiveSpan(
@@ -1087,6 +1089,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
           if (traceIds.length === 0) {
             return [];
+          }
+          if (withSpans === false) {
+            return await this.readSummariesOnly({ reader, projectId, traceIds });
           }
 
           return await this.findTracesWithSpans({
@@ -2543,6 +2548,24 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         }
       },
     );
+  }
+
+  /** The traces' summaries with empty span lists: the summary read alone, no span scan. */
+  private async readSummariesOnly({
+    reader,
+    projectId,
+    traceIds,
+  }: {
+    reader: TenantScopedReader;
+    projectId: string;
+    traceIds: string[];
+  }): Promise<TraceLegacyRow[]> {
+    const { summaryRows } = await this.readJoinedSummaryRows({
+      reader,
+      effectiveOccurredAt: await this.resolveOccurredAtOrNone({ reader, projectId, traceIds }),
+      batchTraceIds: traceIds,
+    });
+    return summaryRows.map((row) => ({ summary: this.rowToTraceSummaryData(row), spans: [] }));
   }
 
   private async resolveOccurredAtOrNone({

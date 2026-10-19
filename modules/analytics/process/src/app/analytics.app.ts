@@ -366,12 +366,14 @@ class TraceApiHydrationSource implements LangWatchQLTraceSource {
     threadKeys,
     protections,
     maxTraces,
+    withSpans,
   }: LangWatchQLThreadTraceReadInput): Promise<readonly Trace[]> {
     return this.traces.readThreadsTraces({
       projectId,
       threadIds: [...threadKeys],
       protections,
       maxTraces,
+      withSpans,
     });
   }
 }

@@ -32,6 +32,8 @@ function makeService({ storedRows = [row] } = {}) {
   const repository: LogRecordStorageRepository = {
     findLogsByTraceId: getLogsByTraceId,
     findLogRecordsByTraceId: getLogRecordsByTraceId,
+    findLogsByTraceIds: vi.fn().mockResolvedValue([]),
+    findLogRecordsByTraceIds: vi.fn().mockResolvedValue([]),
   };
   return {
     service: LogRecordStorageService.create({ repository }),
@@ -124,6 +126,63 @@ describe("LogRecordStorageService.getLogsByTraceId", () => {
       const rows = await service.getLogsByTraceId({ tenantId: "project-1", traceId: "trace-1" });
 
       expect(rows.map((stored) => stored.body)).toEqual(["log-body"]);
+    });
+  });
+});
+
+describe("LogRecordStorageService.getLogsByTraceIds", () => {
+  describe("when reading three traces' logs at once", () => {
+    /** @scenario "A batch read answers each trace's own records in one read per table" */
+    it("reads each table once and answers each trace only its own records, oldest first", async () => {
+      const repository = MemoryLogRecordStorageRepository.create({
+        storedLogRecords: [
+          { ...recordOf({ body: "t2-legacy", timeUnixMs: 500 }), traceId: "trace-2" },
+        ],
+        logRecords: [
+          recordOf({ body: "t1-later", timeUnixMs: 2_000 }),
+          recordOf({ body: "t1-earlier", timeUnixMs: 1_000 }),
+          { ...recordOf({ body: "t2-log", timeUnixMs: 1_500 }), traceId: "trace-2" },
+          { ...recordOf({ body: "t3-log", timeUnixMs: 3_000 }), traceId: "trace-3" },
+          { ...recordOf({ body: "other-trace", timeUnixMs: 100 }), traceId: "trace-9" },
+        ],
+      });
+      const legacyBatch = vi.spyOn(repository, "findLogsByTraceIds");
+      const logBatch = vi.spyOn(repository, "findLogRecordsByTraceIds");
+      const single = vi.spyOn(repository, "findLogRecordsByTraceId");
+      const service = LogRecordStorageService.create({ repository });
+
+      const byTrace = await service.getLogsByTraceIds({
+        tenantId: "project-1",
+        traces: [
+          { traceId: "trace-1", occurredAtMs: 1_000 },
+          { traceId: "trace-2", occurredAtMs: 1_500 },
+          { traceId: "trace-3" },
+        ],
+      });
+
+      expect(legacyBatch).toHaveBeenCalledTimes(1);
+      expect(logBatch).toHaveBeenCalledTimes(1);
+      expect(single).not.toHaveBeenCalled();
+      expect(byTrace.get("trace-1")?.map((stored) => stored.body)).toEqual([
+        "t1-earlier",
+        "t1-later",
+      ]);
+      expect(byTrace.get("trace-2")?.map((stored) => stored.body)).toEqual(["t2-legacy", "t2-log"]);
+      expect(byTrace.get("trace-3")?.map((stored) => stored.body)).toEqual(["t3-log"]);
+      expect(byTrace.has("trace-9")).toBe(false);
+    });
+  });
+
+  describe("when no trace is asked for", () => {
+    it("reads nothing", async () => {
+      const repository = MemoryLogRecordStorageRepository.create();
+      const logBatch = vi.spyOn(repository, "findLogRecordsByTraceIds");
+      const service = LogRecordStorageService.create({ repository });
+
+      const byTrace = await service.getLogsByTraceIds({ tenantId: "project-1", traces: [] });
+
+      expect(byTrace.size).toBe(0);
+      expect(logBatch).not.toHaveBeenCalled();
     });
   });
 });

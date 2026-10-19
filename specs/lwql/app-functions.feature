@@ -207,6 +207,18 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Then it succeeds, because the cap counts distinct keys
 
   @unit
+  Scenario: A content-free thread function reads no span
+    Given a query whose only thread function is thread_traces
+    When hydration reads the conversations
+    Then each thread read asks for the traces' summaries only, without their spans
+
+  @unit
+  Scenario: A thread function that renders content still reads the spans
+    Given a query calling thread_traces and conversation over the same threads
+    When hydration reads the conversations
+    Then each thread read asks for the traces with their spans
+
+  @unit
   Scenario: A page of conversations never loses a trace to the read's ceiling
     Given two hundred conversations holding more than a thousand traces between them
     When their traces are read for hydration

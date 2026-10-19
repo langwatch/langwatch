@@ -72,6 +72,8 @@ export type TraceReadThreadsTracesInput = {
   protections: unknown;
   withEditOverlay?: boolean;
   maxTraces?: number;
+  /** False reads the traces' summaries only: no spans, so no span content is resolved. */
+  withSpans?: boolean;
 };
 
 export type TraceReadSampleTracesInput = {

@@ -5,11 +5,13 @@ import {
   enrichClaudeInteractionInputs,
   enrichSpansWithClaudeLogContent,
   hasCodingAgentJoinableSpans,
+  type TraceLogRecordBatchReader,
   type TraceLogRecordReader,
+  type TraceLogRecordReadRow,
 } from "../rules/claude-code-log-enrichment.rules.ts";
 
 type ClaudeCodeLogEnrichmentDependencies = {
-  logRecords: TraceLogRecordReader;
+  logRecords: TraceLogRecordReader & Partial<TraceLogRecordBatchReader>;
   traceCanonicalisation: TraceCanonicalisationService;
   logger?: Logger;
 };
@@ -68,5 +70,59 @@ export class ClaudeCodeLogEnrichmentService {
 
       return enrichClaudeInteractionInputs(spans);
     }
+  }
+
+  /**
+   * {@link enrichCodingAgentSpansFromLogs} for a batch of traces, reading all their logs in one
+   * statement per store rather than one per trace, answering each trace's spans in input order.
+   * Without a batch reader it reads trace by trace. A failed read keeps attribute-only inputs.
+   */
+  async enrichManyCodingAgentSpansFromLogs({
+    tenantId,
+    traces,
+  }: {
+    tenantId: string;
+    traces: readonly { traceId: string; spans: Span[]; occurredAtMs?: number }[];
+  }): Promise<Span[][]> {
+    const { logRecords, traceCanonicalisation, logger } = this.#dependencies;
+    const joinable = traces.filter(({ spans }) => hasCodingAgentJoinableSpans(spans));
+    if (joinable.length === 0) return traces.map(({ spans }) => spans);
+    if (!logRecords.getLogsByTraceIds) {
+      const enriched: Span[][] = [];
+      for (const trace of traces) {
+        enriched.push(await this.enrichCodingAgentSpansFromLogs({ tenantId, ...trace }));
+      }
+      return enriched;
+    }
+
+    let logsByTrace: ReadonlyMap<string, readonly TraceLogRecordReadRow[]>;
+    try {
+      logsByTrace = await logRecords.getLogsByTraceIds({
+        tenantId,
+        traces: joinable.map(({ traceId, occurredAtMs }) => ({ traceId, occurredAtMs })),
+      });
+    } catch (error) {
+      logger?.warn(
+        {
+          tenantId,
+          traceCount: joinable.length,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Claude Code log enrichment skipped: failed to read the batch's trace logs",
+      );
+      return traces.map(({ spans }) =>
+        hasCodingAgentJoinableSpans(spans) ? enrichClaudeInteractionInputs(spans) : spans,
+      );
+    }
+
+    return traces.map(({ traceId, spans }) =>
+      hasCodingAgentJoinableSpans(spans)
+        ? enrichSpansWithClaudeLogContent({
+            spans,
+            logRows: [...(logsByTrace.get(traceId) ?? [])],
+            traceCanonicalisation,
+          })
+        : spans,
+    );
   }
 }

@@ -376,6 +376,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     protections: unknown;
     withEditOverlay?: boolean;
     maxTraces?: number;
+    /** False reads the traces' summaries only: no spans, so no span content is resolved. */
+    withSpans?: boolean;
   }): Promise<Trace[]>;
   readSampleTraces(input: {
     query: TraceLegacyListInput;

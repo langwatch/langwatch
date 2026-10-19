@@ -10,11 +10,18 @@ import { applyOverlayToTrace } from "@langwatch/trace-contract";
 
 import {
   CODING_AGENT_ORIGIN,
+  type TraceLogRecordBatchReader,
   type TraceLogRecordReader,
 } from "../../claude-code/rules/claude-code-log-enrichment.rules.ts";
 import { ClaudeCodeLogEnrichmentService } from "../../claude-code/services/claude-code-log-enrichment.service.ts";
 import { redactPatchForViewer } from "../../edit-overlay/rules/trace-edit-overlay-redaction.rules.ts";
 import type { TraceEditOverlayService } from "../../edit-overlay/services/trace-edit-overlay.service.ts";
+
+/**
+ * Coding-agent traces per log read. Raw bodies run to 60 KB a row, so the batch bounds what one
+ * read holds in memory; sequential batches keep one read per store in flight per page.
+ */
+const CODING_AGENT_LOG_READ_BATCH = 10;
 
 export class TraceReadEnrichmentService {
   private readonly logger = createLogger("langwatch:traces:read-enrichment");
@@ -22,7 +29,7 @@ export class TraceReadEnrichmentService {
   private constructor(
     private readonly traceCanonicalisation: TraceCanonicalisationService,
     private readonly editOverlay: TraceEditOverlayService,
-    private readonly injectedLogRecordStorage?: TraceLogRecordReader,
+    private readonly injectedLogRecordStorage?: TraceLogRecordReader & TraceLogRecordBatchReader,
   ) {}
 
   static create({
@@ -32,7 +39,7 @@ export class TraceReadEnrichmentService {
   }: {
     traceCanonicalisation: TraceCanonicalisationService;
     editOverlay: TraceEditOverlayService;
-    logRecordStorage?: TraceLogRecordReader;
+    logRecordStorage?: TraceLogRecordReader & TraceLogRecordBatchReader;
   }): TraceReadEnrichmentService {
     return new TraceReadEnrichmentService(traceCanonicalisation, editOverlay, logRecordStorage);
   }
@@ -40,7 +47,7 @@ export class TraceReadEnrichmentService {
   /**
    * The log-record store for read-time Claude Code content enrichment.
    */
-  private logRecordStorageService(): TraceLogRecordReader {
+  private logRecordStorageService(): TraceLogRecordReader & TraceLogRecordBatchReader {
     const injected = this.injectedLogRecordStorage;
     if (!injected) {
       throw new Error(
@@ -125,31 +132,38 @@ export class TraceReadEnrichmentService {
   }
 
   /**
-   * Batch sibling of {@link enrichCodingAgentTrace} for the multi-trace read paths, enriching each
-   * coding-agent trace with its own lazy, time-capped log read a bounded few at a time. The
-   * upfront origin check skips even the fan-out on an all-non-coding-agent page. Best-effort.
+   * Batch sibling of {@link enrichCodingAgentTrace} for the multi-trace read paths: the
+   * coding-agent traces are enriched a batch at a time, one log read per store per batch, so a
+   * page of thousands of traces costs a few statements in flight rather than one per trace.
    */
   async enrichCodingAgentTraces(projectId: string, traces: Trace[]): Promise<Trace[]> {
-    const hasCodingAgentTrace = traces.some(
-      (trace) => trace.metadata?.["langwatch.origin"] === CODING_AGENT_ORIGIN,
+    const codingAgent = traces.flatMap((trace, index) =>
+      trace.metadata?.["langwatch.origin"] === CODING_AGENT_ORIGIN ? [{ trace, index }] : [],
     );
-    if (!hasCodingAgentTrace) {
+    if (codingAgent.length === 0) {
       return traces;
     }
 
-    // Bounded fan-out: each enrichment holds a heavy log read (raw bodies run to 60 KB a row) in
-    // memory, so an unbounded Promise.all over a big page multiplies that by the page size. Five
-    // in flight keeps a bounded memory ceiling; non-coding-agent traces cost nothing.
-    const enrichConcurrency = 5;
+    const enrichment = ClaudeCodeLogEnrichmentService.create({
+      logRecords: this.logRecordStorageService(),
+      logger: this.logger,
+      traceCanonicalisation: this.traceCanonicalisation,
+    });
     const enriched: Trace[] = [...traces];
-    for (let start = 0; start < traces.length; start += enrichConcurrency) {
-      const chunk = traces.slice(start, start + enrichConcurrency);
-      const results = await Promise.all(
-        chunk.map((trace) => this.enrichCodingAgentTrace(projectId, trace)),
-      );
-      for (let offset = 0; offset < results.length; offset++) {
-        enriched[start + offset] = results[offset]!;
-      }
+    for (let start = 0; start < codingAgent.length; start += CODING_AGENT_LOG_READ_BATCH) {
+      const batch = codingAgent.slice(start, start + CODING_AGENT_LOG_READ_BATCH);
+      const spans = await enrichment.enrichManyCodingAgentSpansFromLogs({
+        tenantId: projectId,
+        traces: batch.map(({ trace }) => ({
+          traceId: trace.trace_id,
+          spans: trace.spans,
+          occurredAtMs: trace.timestamps.started_at,
+        })),
+      });
+      batch.forEach(({ trace, index }, offset) => {
+        const traceSpans = spans[offset]!;
+        enriched[index] = traceSpans === trace.spans ? trace : { ...trace, spans: traceSpans };
+      });
     }
 
     return enriched;
