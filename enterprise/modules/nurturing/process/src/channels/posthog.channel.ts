@@ -1,3 +1,5 @@
+import type { Instant } from "@langwatch/time";
+
 /**
  * Nurturing's product-analytics sink: one fire-and-forget track call per
  * milestone. Separate from `modules/onboarding`'s PostHog channel: a
@@ -9,6 +11,8 @@ export interface PostHogEventInput {
   readonly properties?: Record<string, unknown>;
   /** PostHog keeps one event per uuid, so a redelivered source event is counted once. */
   readonly uuid?: string;
+  /** When it happened; PostHog dedupes on uuid only together with the timestamp. */
+  readonly timestamp?: Instant;
 }
 
 /** A person's properties, so PostHog learns them before any event names them. */

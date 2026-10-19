@@ -13,7 +13,7 @@ import {
   type GuidedPath,
   type OnboardingVariant,
 } from "@langwatch/onboarding-contract";
-import { nowInstant } from "@langwatch/time";
+import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
 /**
  * One campaign trigger per path. Marketing runs one campaign off each of
@@ -288,16 +288,26 @@ export function fireOnboardingVariantAssignedPostHog({
   userId,
   organizationId,
   variant,
+  occurredAt,
 }: {
   userId: string;
   organizationId: string;
   variant: OnboardingVariant;
-}): { userId: string; event: string; properties: Record<string, unknown>; uuid: string } {
+  occurredAt: number;
+}): {
+  userId: string;
+  event: string;
+  properties: Record<string, unknown>;
+  uuid: string;
+  timestamp: Instant;
+} {
   return {
     userId,
     event: "onboarding_variant_assigned",
-    // One per organization, so a replay after the delivery claim expires is still one event.
+    // One uuid and timestamp per organization, so a replay after the delivery
+    // claim expires is still one event.
     uuid: postHogUuidFor(`onboarding-variant-assigned:${organizationId}`),
+    timestamp: Temporal.Instant.fromEpochMilliseconds(occurredAt),
     properties: {
       variant,
       ...onboardingExperimentProperties(variant),

@@ -49,7 +49,7 @@ Feature: PostHog guided onboarding events
     Given onboarding recorded a variant-assigned fact for a user with variant "guided"
     When nurturing receives the fact twice
     Then exactly one "onboarding_variant_assigned" event is tracked for that user with variant "guided" and the organization id
-    And it carries a uuid derived from the organization, so PostHog keeps one even after the delivery claim expires
+    And it carries a uuid derived from the organization and the assignment time as its timestamp, so PostHog keeps one even after the delivery claim expires
     And the person property onboarding_variant is set to "guided"
     And Customer.io receives nothing
 

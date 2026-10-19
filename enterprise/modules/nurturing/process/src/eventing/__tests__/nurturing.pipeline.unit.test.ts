@@ -23,6 +23,7 @@ import {
 } from "@langwatch/onboarding-contract";
 import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
 import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   TRACE_RECEIVED_EVENT_TYPE,
@@ -428,6 +429,7 @@ describe("nurturing's onboardingVariantAssigned peer subscriber", () => {
           userId: "user-1",
           event: "onboarding_variant_assigned",
           uuid: postHogUuidFor("onboarding-variant-assigned:org-1"),
+          timestamp: Temporal.Instant.fromEpochMilliseconds(1_000),
           properties: {
             variant: "guided",
             "$feature/experiment_onboarding_langy_guided": "guided",
