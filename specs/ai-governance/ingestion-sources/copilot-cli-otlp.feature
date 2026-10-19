@@ -101,6 +101,14 @@ Feature: Copilot CLI OTLP spans canonicalize on the unified substrate
       When the canonicalisation chain runs
       Then the canonical span carries the repository remote URL as metadata
 
+    @unit
+    Scenario: A captured Copilot tool run is a tool span that keeps its name and session key
+      Given a redacted execute_tool span captured from Copilot CLI
+      And a redacted execute_tool span captured from VS Code Copilot Chat
+      When the canonicalisation chain runs on each
+      Then each is typed as a tool span
+      And each keeps its tool name and conversation id
+
   Rule: oversized copilot content cannot destabilize the pipeline
 
     @unit

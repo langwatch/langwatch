@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { canonicalisation } from "./canonicalisation/test-helpers.ts";
 import cliChatSpan from "./fixtures/copilot-cli-b.chat.json";
+import cliToolSpan from "./fixtures/copilot-cli-b.execute-tool.json";
 import cliAgentWithGitSpan from "./fixtures/copilot-cli-b.invoke-agent.git-context.json";
 import cliAgentSpan from "./fixtures/copilot-cli-b.invoke-agent.json";
+import vscodeToolSpan from "./fixtures/copilot-vscode-b.execute-tool.json";
 import vscodeAgentSpan from "./fixtures/copilot-vscode-b.invoke-agent.json";
 
 /** A redacted span from a real Copilot build; `vendorVersion` names the build (#8803). */
@@ -89,6 +91,28 @@ describe("Copilot canonicalisation over real captures", () => {
       it("carries the repository remote URL as metadata", () => {
         expect(attributes["metadata.copilot_repository"]).toBe(
           "https://github.com/example-org/repo-b.git",
+        );
+      });
+    });
+  });
+
+  describe.each([
+    { surface: "Copilot CLI 1.0.100", captured: cliToolSpan },
+    { surface: "VS Code Copilot Chat 0.67", captured: vscodeToolSpan },
+  ])("given an execute_tool span captured from $surface", ({ captured }) => {
+    describe("when the canonicalisation chain runs", () => {
+      const attributes = canonicalizeCaptured(captured);
+
+      /** @scenario A captured Copilot tool run is a tool span that keeps its name and session key */
+      it("types the span as a tool", () => {
+        expect(attributes["langwatch.span.type"]).toBe("tool");
+      });
+
+      /** @scenario A captured Copilot tool run is a tool span that keeps its name and session key */
+      it("keeps the tool name and the conversation id", () => {
+        expect(attributes["gen_ai.tool.name"]).toBe(captured.attributes["gen_ai.tool.name"]);
+        expect(attributes["gen_ai.conversation.id"]).toBe(
+          captured.attributes["gen_ai.conversation.id"],
         );
       });
     });

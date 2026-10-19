@@ -52,11 +52,34 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
       When the receiver applies key provenance
       Then the foreign scopes are dropped and only Copilot's own scopes are recorded
 
+    @unit @unimplemented
+    Scenario: Copilot Chat's copilot-chat scope counts as Copilot's own on a copilot_vscode key
+      Given a copilot_vscode ingest key receives spans under the copilot-chat scope
+      When the receiver applies key provenance
+      Then the spans are recorded
+      And a copilot_cli or copilot_app key still drops the copilot-chat scope
+
     @integration @unimplemented
     Scenario: The source is stamped at the receiver, not taken from the payload
       Given a copilot-chat span whose payload claims sourceType "copilot_cli"
       When the span is ingested with the copilot_vscode ingest key
       Then the recorded span is stamped with sourceType "copilot_vscode"
+
+  Rule: a VS Code turn is typed and counted like a CLI turn
+    ADR-039 §Extension #3. Each scenario replays a redacted VS Code Copilot Chat
+    0.67 capture from #8803.
+
+    @unit @unimplemented
+    Scenario: A VS Code agent rollup is not counted on top of its chat spans
+      Given a redacted invoke_agent span captured from VS Code Copilot Chat
+      When the canonicalisation chain runs
+      Then the span is flagged to skip token accumulation
+
+    @unit @unimplemented
+    Scenario: A VS Code hook run is not typed as a model call
+      Given a redacted execute_hook span captured from VS Code Copilot Chat
+      When the canonicalisation chain runs
+      Then the span is not typed as an LLM span
 
   Rule: captured content is protected at the receiver
 
