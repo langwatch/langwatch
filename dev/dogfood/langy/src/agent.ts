@@ -23,7 +23,9 @@ import {
 } from "./quiet-world.ts";
 import {
   isResourcesWorldState,
+  parseSeed,
   readResourceFacts,
+  RESOURCE_SEEDS,
   setupResourcesWorld,
   teardownResourcesWorld,
 } from "./resources-world.ts";
@@ -83,6 +85,11 @@ export const langy = connectAgent(
         default: PROMPT_WORLD,
         description: `The test world setup builds: ${WORLD_NAMES.join(", ")}`,
       },
+      seed: {
+        options: RESOURCE_SEEDS,
+        default: "none",
+        description: "What the resources world makes before the first turn",
+      },
     },
   },
   async ({ messages, newMessages, threadId, state }) => {
@@ -135,7 +142,9 @@ langy.scenario.setup(async (run, params) => {
   if (world === TOPIC_WORLD) return toState(await setupTopicWorld({ http }));
   if (world === QUIET_WORLD) return toState(await setupQuietWorld({ http }));
   if (world === LOGIN_WORLD) return toState(setupLoginWorld());
-  if (world === RESOURCES_WORLD) return toState(await setupResourcesWorld({ http }));
+  if (world === RESOURCES_WORLD) {
+    return toState(await setupResourcesWorld({ http, seed: parseSeed({ value: params.seed }) }));
+  }
   return toState(await setupPromptWorld({ http, scenarioRunId: run.scenarioRunId ?? "unknown" }));
 });
 

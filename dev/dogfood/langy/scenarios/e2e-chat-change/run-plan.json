@@ -1,0 +1,6 @@
+{
+  "name": "Langy e2e chat: change existing",
+  "description": "Wave 1b slice 2: 5 runs moved from apps/ui/e2e/langy/ that change or read something setup made first, against the connected agent langy (dev/dogfood/langy) in the world resources with the seed parameter: seeded names hold the per-run tag, the facts read the seeded items, and teardown deletes what holds the tag or was seeded.",
+  "agent": "langy",
+  "repeatCount": 1
+}

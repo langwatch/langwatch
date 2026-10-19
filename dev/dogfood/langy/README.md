@@ -47,7 +47,12 @@ src/sync-files.ts    reads and checks the files; src/sync-api.ts the public rout
   - `W1`: 5 traces with a per-run name, the newest about 7 hours old.
   - `C1`: nothing; the question alone leads Langy to `langwatch whoami`.
   - `resources`: a tag (`e2e` and 6 hex digits) the user puts in every name it
-    asks for, the setup time, and the ids of the project's agents.
+    asks for, the setup time, and the ids of the project's agents. The `seed`
+    parameter adds tagged items first: `evaluator_pair` (a target and a
+    bystander exact-match evaluator), `evaluator`, `prompt`, `trace` (one trace
+    a minute old) or `stale_traces` (3 traces about 8 hours old under the label
+    `e2e-stale-<tag>`). A seeded trace that does not read back within 60 s fails
+    setup, so the run is not scored.
 - **After each turn** the world's code-check facts go in the state as
   `facts_now` and `facts_after_turn`, so the judge grades the world, not only
   Langy's words: per-board widgets added, changed or removed, what the newest
@@ -55,11 +60,15 @@ src/sync-files.ts    reads and checks the files; src/sync-api.ts the public rout
   the newest trace's age (W1); login or no-tools phrases in the reply (C1);
   `new_<kind>` (`{name, id}`, plus `recordCount` for a dataset) for each
   dataset, evaluator, scenario, monitor, prompt, dashboard, trigger and agent
-  whose name holds the tag, and `agents_since_setup` (resources).
+  whose name holds the tag, and `agents_since_setup` (resources); per seed,
+  `target_exists` and `bystander_exists`, `seeded_evaluator` (by id),
+  `trace_annotations`, or `runs_of_new_scenario` (runs of a tagged scenario in
+  the newest 100 simulation runs, `null` if the listing is refused).
 - **Teardown** returns the final facts, what it deleted or restored, and what
   it left behind (traces and saved charts have no delete route). In
-  `resources` it deletes every item whose name holds the tag, and the
-  evaluator a tagged monitor runs; a 404 counts as gone.
+  `resources` it deletes every item whose name holds the tag, every seeded
+  item (a rename may drop the tag), the evaluator a tagged monitor runs and the
+  annotations on a seeded trace; a 404 counts as gone. Seeded traces stay.
 
 | Row                    | Labels           | Asks Langy to                            | Passes when                                                          |
 | ---------------------- | ---------------- | ---------------------------------------- | -------------------------------------------------------------------- |
@@ -186,9 +195,27 @@ the default world. Names are `E2E <group> <line>: ...`, the line being the
   whose name holds the tag. `agents_since_setup` (not in the setup snapshot and
   created after setup) is shown for the reader but not graded: another run in
   the shared project can add an agent at any time.
-- Left for later slices: the boundary runs (`langy-boundary.scenario.test.ts`
-  25, `langy.scenario.test.ts` 404 and 645, `langy-current-surfaces.scenario.test.ts`
-  114), `langy-quality.scenario.test.ts` 216 and the workbench runs. The original `it(` blocks stay until each plan passes live twice.
+- Left for later slices: the workbench runs. The original `it(` blocks stay
+  until each plan passes live twice.
+
+### Wave 1b, slice 2: runs that change something setup made
+
+`e2e-chat-change` (5, world `resources` with a `seed`), labelled `e2e-migrated`:
+
+- `langy-boundary.scenario.test.ts` 25 (`evaluator_pair`): delete the target by
+  name. The original's "nothing else deleted" check over every evaluator is
+  `bystander_exists` now: in a shared project only a seeded bystander is safe
+  to watch.
+- `langy.scenario.test.ts` 404 (`evaluator`): rename the seeded evaluator to
+  `langy-renamed-<tag>`; graded on `seeded_evaluator.name`. The original renamed
+  whatever evaluator was listed first.
+- `langy-current-surfaces.scenario.test.ts` 114 (`trace`): annotate the seeded
+  trace; graded on `trace_annotations`. The original used the newest trace.
+- `langy.scenario.test.ts` 645 (`prompt`): create a scenario, then run it
+  against the seeded prompt; graded on `new_scenario`. `runs_of_new_scenario`
+  is shown but not graded: the original asserted only the new scenario.
+- `langy-quality.scenario.test.ts` 216 (`stale_traces`): judge-only, as the
+  original.
 
 ### Not moved yet
 
