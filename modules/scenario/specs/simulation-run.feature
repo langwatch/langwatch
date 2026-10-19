@@ -52,3 +52,16 @@ Feature: A simulation run reports its true state and never leaks secrets
     When the set list is read with no start date
     Then every set the tenant ever ran is listed, as on main, declared a full scan
     And a list read from a start date declares nothing, so the date prunes
+
+  # The read schema tolerates what stored rows and SDK events hold; the event intake stays strict.
+  @unit
+  Scenario: A run stamped with a target type outside today's set still reads, with no target
+    Given a stored run whose platform namespace names a target type the platform does not know, or none
+    When the run is read
+    Then the run reads with no target instead of failing the read
+
+  @unit
+  Scenario: A run stamped with a target type in another case reads as that target
+    Given a stored run whose platform namespace names a known target type in upper case
+    When the run is read
+    Then the run reads as that target

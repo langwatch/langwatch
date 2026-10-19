@@ -1,5 +1,6 @@
 /**
  * @see specs/scenarios/secret-run-parameters.feature
+ * @see modules/scenario/specs/simulation-run.feature
  */
 import { describe, expect, it } from "vitest";
 
@@ -60,6 +61,41 @@ describe("mapClickHouseRowToScenarioRunData", () => {
       expect(served).not.toContain("tok-live-1");
       expect(served).not.toContain("secretParameters");
       expect(data.metadata).toMatchObject({ secretParameterNames: ["api_token"] });
+    });
+  });
+
+  describe("given a stored run whose platform namespace names a target type the platform does not know", () => {
+    const stored = (langwatch: Record<string, unknown>) =>
+      row({ Metadata: JSON.stringify({ name: "Refund flow", langwatch }) });
+
+    /** @scenario "A run stamped with a target type outside today's set still reads, with no target" */
+    it("reads the run with no target instead of refusing it", () => {
+      const data = mapClickHouseRowToScenarioRunData(
+        stored({ targetReferenceId: "agent_1", targetType: "agent", actorId: "user-1" }),
+      );
+
+      expect(data.scenarioRunId).toBe("run-1");
+      expect(data.metadata?.name).toBe("Refund flow");
+      expect(data.metadata?.langwatch).toBeUndefined();
+    });
+
+    /** @scenario "A run stamped with a target type outside today's set still reads, with no target" */
+    it("reads a run whose namespace carries no target type at all", () => {
+      const data = mapClickHouseRowToScenarioRunData(stored({ targetReferenceId: "agent_1" }));
+
+      expect(data.metadata?.langwatch).toBeUndefined();
+    });
+
+    /** @scenario "A run stamped with a target type in another case reads as that target" */
+    it("reads a target type written in another case as the known type", () => {
+      const data = mapClickHouseRowToScenarioRunData(
+        stored({ targetReferenceId: "agent_1", targetType: " HTTP " }),
+      );
+
+      expect(data.metadata?.langwatch).toMatchObject({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+      });
     });
   });
 });

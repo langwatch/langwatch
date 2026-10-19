@@ -1,5 +1,9 @@
 import { createTenantId } from "@langwatch/eventing";
-import { SimulationRunStatus, type SimulationRunData } from "@langwatch/scenario-contract";
+import {
+  SimulationRunStatus,
+  simulationRunDataSchema,
+  type SimulationRunData,
+} from "@langwatch/scenario-contract";
 import {
   SUITE_RUN_EVENT_TYPES,
   SUITE_RUN_EVENT_VERSIONS,
@@ -270,6 +274,79 @@ describe("SuiteRunReplayService", () => {
 
       expect(report.openRuns).toBe(0);
       expect(suite.sent).toEqual([]);
+    });
+  });
+
+  describe("when a scenario run of the batch was stamped with a target type outside today's set", () => {
+    /** @scenario "A scenario run stamped with an unknown target type does not stop the replay" */
+    it("reads the run through the scenario read schema and counts it", async () => {
+      const suite = suiteOverMemory(openRun({ Total: 1 }));
+      await suite.seed();
+      const stored = simulationRunDataSchema.parse({
+        ...scenarioRun({ scenarioRunId: "run-legacy", status: SimulationRunStatus.SUCCESS }),
+        metadata: { langwatch: { targetReferenceId: "agent_1", targetType: "agent" } },
+        results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+      });
+      const { run } = replayOver({ suite, runs: [stored] });
+
+      const report = await run(false);
+
+      expect(report).toMatchObject({ behindRuns: 1, unreadableRuns: 0 });
+      expect(await suite.current()).toMatchObject({ StartedCount: 1, CompletedCount: 1 });
+    });
+  });
+
+  describe("when one open suite run's scenario runs do not read at all", () => {
+    /** @scenario "An open suite run whose scenario runs do not read is skipped and counted" */
+    it("skips that run, counts it and replays the others", async () => {
+      const suite = suiteOverMemory(openRun());
+      await suite.seed();
+      const unreadable = openRun({ SuiteRunId: "suite-run-0", BatchRunId: "batch-unreadable" });
+      const service = SuiteRunReplayService.create({
+        suites: { findProjectIdsHoldingSuites: async () => [TENANT] },
+        runs: { findOpenRuns: async () => [unreadable, await suite.current()] },
+        scenarios: {
+          getRunDataForBatchRun: async ({ batchRunId }) => {
+            if (batchRunId === "batch-unreadable") {
+              simulationRunDataSchema.parse({ ...scenarioRun({}), status: "NOT_A_STATUS" });
+            }
+            return { changed: true, lastUpdatedAt: 3000, runs: inFlight };
+          },
+        },
+        runItems: suite.runItems,
+      });
+
+      const report = await service.replayOpenRuns({
+        dryRun: false,
+        signal: new AbortController().signal,
+        afterTenantId: null,
+        onTenantDone: async () => {},
+      });
+
+      expect(report).toMatchObject({ openRuns: 2, unreadableRuns: 1, behindRuns: 1 });
+      expect(await suite.current()).toMatchObject({ StartedCount: 2, CompletedCount: 1 });
+    });
+
+    it("still throws when the read fails for any other reason", async () => {
+      const service = SuiteRunReplayService.create({
+        suites: { findProjectIdsHoldingSuites: async () => [TENANT] },
+        runs: { findOpenRuns: async () => [openRun()] },
+        scenarios: {
+          getRunDataForBatchRun: async () => {
+            throw new Error("store unavailable");
+          },
+        },
+        runItems: suiteOverMemory(openRun()).runItems,
+      });
+
+      await expect(
+        service.replayOpenRuns({
+          dryRun: false,
+          signal: new AbortController().signal,
+          afterTenantId: null,
+          onTenantDone: async () => {},
+        }),
+      ).rejects.toThrow("store unavailable");
     });
   });
 });

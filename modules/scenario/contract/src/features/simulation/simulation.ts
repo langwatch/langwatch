@@ -72,6 +72,50 @@ export const simulationRunResultSchema: SimulationRunResultSchema =
   simulationRunResultSchemaDefinition;
 export type SimulationRunResult = z.infer<typeof simulationRunResultSchema>;
 
+const runTargetTypes = ["prompt", "http", "code", "workflow", "connected", "voice"] as const;
+
+/** The reserved namespace the queue path stamps on a run. */
+const runLangwatchNamespaceSchema = z.looseObject({
+  targetReferenceId: z.string(),
+  targetType: z.enum(runTargetTypes),
+  /**
+   * The key the target folds under: the reference id alone, or the
+   * reference id and a hash of its parameter overrides. Absent on runs
+   * recorded before targets carried parameters.
+   */
+  targetKey: z.string().optional(),
+  /** The overrides of this target alone, so a reader can name the variant. */
+  targetParameters: runParameterValuesSchema.optional(),
+  simulationSuiteId: z.string().optional(),
+  /** The scenario version the run was queued from. */
+  scenarioVersion: z.number().int().optional(),
+  /** The models the run plan was CONFIGURED with. */
+  simulatorModel: z.string().optional(),
+  judgeModel: z.string().optional(),
+  /** The models the run actually RESOLVED and ran on. */
+  resolvedSimulatorModel: z.string().optional(),
+  resolvedJudgeModel: z.string().optional(),
+  /** Who started the run, and the surface they acted through. */
+  actorId: z.string().optional(),
+  actorLabel: runActorLabelSchema.optional(),
+  /** The connected agent instance that served the run. */
+  agentInstance: z.object({ hostname: z.string(), label: z.string().nullable() }).optional(),
+});
+
+/**
+ * A stored or SDK-sent namespace is read, never refused: the target type is matched case-blind,
+ * and a namespace that still does not read is an absent target, so one row cannot fail a read.
+ * @see modules/scenario/specs/simulation-run.feature
+ */
+function readRunLangwatchNamespace(value: unknown): unknown {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record: Record<string, unknown> = { ...value };
+  if (typeof record.targetType === "string") {
+    record.targetType = record.targetType.trim().toLowerCase();
+  }
+  return runLangwatchNamespaceSchema.safeParse(record).success ? record : undefined;
+}
+
 /** Platform metadata carried with runs started by a simulation suite. */
 const simulationRunMetadataSchemaDefinition = z
   .looseObject({
@@ -87,32 +131,7 @@ const simulationRunMetadataSchemaDefinition = z
      * The reserved namespace the queue path stamps.
      */
     langwatch: z
-      .looseObject({
-        targetReferenceId: z.string(),
-        targetType: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
-        /**
-         * The key the target folds under: the reference id alone, or the
-         * reference id and a hash of its parameter overrides. Absent on runs
-         * recorded before targets carried parameters.
-         */
-        targetKey: z.string().optional(),
-        /** The overrides of this target alone, so a reader can name the variant. */
-        targetParameters: runParameterValuesSchema.optional(),
-        simulationSuiteId: z.string().optional(),
-        /** The scenario version the run was queued from. */
-        scenarioVersion: z.number().int().optional(),
-        /** The models the run plan was CONFIGURED with. */
-        simulatorModel: z.string().optional(),
-        judgeModel: z.string().optional(),
-        /** The models the run actually RESOLVED and ran on. */
-        resolvedSimulatorModel: z.string().optional(),
-        resolvedJudgeModel: z.string().optional(),
-        /** Who started the run, and the surface they acted through. */
-        actorId: z.string().optional(),
-        actorLabel: runActorLabelSchema.optional(),
-        /** The connected agent instance that served the run. */
-        agentInstance: z.object({ hostname: z.string(), label: z.string().nullable() }).optional(),
-      })
+      .preprocess(readRunLangwatchNamespace, runLangwatchNamespaceSchema.optional())
       .optional(),
   })
   .nullable()

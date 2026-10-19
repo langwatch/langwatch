@@ -1,6 +1,8 @@
+import { createLogger } from "@langwatch/observability";
 import type { ScenarioApi, SimulationRunData } from "@langwatch/scenario-contract";
 import { TERMINAL_STATUSES } from "@langwatch/scenario-contract";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
+import { z } from "zod";
 
 import type { SuiteRepository } from "../repositories/suite.repository.ts";
 import type { SuiteRunItemCommandsService } from "./suite-run-item-commands.service.ts";
@@ -15,6 +17,8 @@ type SuiteRunItemSenders = Pick<
   "recordSuiteRunItemStarted" | "completeSuiteRunItem"
 >;
 
+const logger = createLogger("langwatch:suite-run:replay");
+
 /** Scenario statuses a run holds before its started fact. */
 const NOT_STARTED_STATUSES: readonly string[] = ["QUEUED", "PENDING"];
 
@@ -25,6 +29,15 @@ type SuiteRunReplayReport = {
   startsSent: number;
   finishesSent: number;
   gradeDriftRuns: number;
+  /** Open runs skipped because scenario's stored runs of the batch did not read. */
+  unreadableRuns: number;
+};
+
+type ReplayRunInput = {
+  tenantId: string;
+  run: SuiteRunStateData;
+  dryRun: boolean;
+  report: SuiteRunReplayReport;
 };
 
 /**
@@ -68,24 +81,14 @@ export class SuiteRunReplayService {
     return report;
   }
 
-  private async replayRun({
-    tenantId,
-    run,
-    dryRun,
-    report,
-  }: {
-    tenantId: string;
-    run: SuiteRunStateData;
-    dryRun: boolean;
-    report: SuiteRunReplayReport;
-  }): Promise<void> {
+  private async replayRun({ tenantId, run, dryRun, report }: ReplayRunInput): Promise<void> {
     report.openRuns += 1;
-    const data = await this.deps.scenarios.getRunDataForBatchRun({
-      projectId: tenantId,
-      scenarioSetId: run.ScenarioSetId,
-      batchRunId: run.BatchRunId,
-    });
-    const plan = planReplay({ run, runs: data.changed ? data.runs : [] });
+    const runs = await this.readBatchRuns({ tenantId, run });
+    if (runs === "unreadable") {
+      report.unreadableRuns += 1;
+      return;
+    }
+    const plan = planReplay({ run, runs });
     if (plan.gradeDrift) report.gradeDriftRuns += 1;
     if (plan.starts.length + plan.finishes.length === 0) return;
     report.behindRuns += 1;
@@ -94,6 +97,31 @@ export class SuiteRunReplayService {
     if (dryRun) return;
     for (const item of plan.starts) await this.sendStarted({ tenantId, item });
     for (const item of plan.finishes) await this.sendFinished({ tenantId, item });
+  }
+
+  /** A batch whose stored runs do not parse is skipped and counted; any other failure throws. */
+  private async readBatchRuns({
+    tenantId,
+    run,
+  }: {
+    tenantId: string;
+    run: SuiteRunStateData;
+  }): Promise<readonly SimulationRunData[] | "unreadable"> {
+    try {
+      const data = await this.deps.scenarios.getRunDataForBatchRun({
+        projectId: tenantId,
+        scenarioSetId: run.ScenarioSetId,
+        batchRunId: run.BatchRunId,
+      });
+      return data.changed ? data.runs : [];
+    } catch (error) {
+      if (!(error instanceof z.ZodError)) throw error;
+      logger.warn(
+        { error, tenantId, batchRunId: run.BatchRunId },
+        "Skipped an open suite run whose scenario runs did not read",
+      );
+      return "unreadable";
+    }
   }
 
   private sendStarted({ tenantId, item }: { tenantId: string; item: SimulationRunData }) {
@@ -136,7 +164,14 @@ function planReplay({ run, runs }: { run: SuiteRunStateData; runs: readonly Simu
 }
 
 function emptyReport(): SuiteRunReplayReport {
-  return { openRuns: 0, behindRuns: 0, startsSent: 0, finishesSent: 0, gradeDriftRuns: 0 };
+  return {
+    openRuns: 0,
+    behindRuns: 0,
+    startsSent: 0,
+    finishesSent: 0,
+    gradeDriftRuns: 0,
+    unreadableRuns: 0,
+  };
 }
 
 function isFinished(item: SimulationRunData): boolean {
