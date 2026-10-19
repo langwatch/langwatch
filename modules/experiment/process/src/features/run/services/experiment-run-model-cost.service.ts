@@ -68,8 +68,8 @@ export class ExperimentRunModelCostService extends ExperimentModelCost {
     const priced = this.modelProviders.estimateCost({
       attrs: {
         ...customRates,
-        [CACHE_READ_TOKENS_ATTR]: cacheReadTokens,
-        [CACHE_CREATION_TOKENS_ATTR]: cacheCreationTokens,
+        ...(cacheReadTokens > 0 ? { [CACHE_READ_TOKENS_ATTR]: cacheReadTokens } : {}),
+        ...(cacheCreationTokens > 0 ? { [CACHE_CREATION_TOKENS_ATTR]: cacheCreationTokens } : {}),
       },
       model,
       promptTokens: Math.max(0, inputTokens - cacheReadTokens - cacheCreationTokens),
