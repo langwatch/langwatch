@@ -521,7 +521,23 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
     });
 
     /** @scenario "The derivation read never asks for the nested columns" */
-    it("keeps the lazy-materialization lock on the single-span fetch", async () => {
+    it("takes the latest version only", async () => {
+      const { clickhouse, repo } = readRepository();
+      clickhouse.rows = [storedRow()];
+
+      await repo.findNormalizedSpanById({
+        authorization,
+        traceId: "trace-1",
+        spanId: "span-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
+
+      expect(clickhouse.queries[0]?.query).toContain("ORDER BY UpdatedAt DESC");
+      expect(clickhouse.queries[0]?.query).toContain("LIMIT 1");
+    });
+
+    /** @scenario "A single-span read never defers its columns to the lazy reader" */
+    it("turns lazy materialization off and keeps the memory ceiling", async () => {
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
@@ -533,10 +549,9 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       });
 
       expect(clickhouse.queries[0]?.settings).toMatchObject({
-        query_plan_optimize_lazy_materialization: "1",
+        query_plan_optimize_lazy_materialization: "0",
+        max_memory_usage: expect.any(String),
       });
-      expect(clickhouse.queries[0]?.query).toContain("ORDER BY UpdatedAt DESC");
-      expect(clickhouse.queries[0]?.query).toContain("LIMIT 1");
     });
 
     /** @scenario "The referenced span is read back inside its own partition window" */

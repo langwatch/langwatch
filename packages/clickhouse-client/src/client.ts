@@ -62,6 +62,22 @@ function isServerOverload(error: unknown): error is Error {
 
 const now = (): number => globalThis.performance.now();
 
+/**
+ * A refused connection is the one insert failure that provably sent nothing: no socket opened,
+ * so no row can have landed. Anything later (a reset, a hang up, a cancelled query, a timeout)
+ * may have written the batch, and with no insert dedup token a retry in place would write it twice.
+ */
+function wasRefusedBeforeSending(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === "ECONNREFUSED";
+}
+
+/** Carries an insert failure past the retry policy untouched, so it is not retried in place. */
+class InsertNotRetriedInPlace extends Error {
+  constructor(readonly failure: unknown) {
+    super("insert not retried in place");
+  }
+}
+
 export class ClickHouseQueryClient {
   private readonly driver: QueryDriver;
   private readonly tenantGuard: TenantGuard;
@@ -215,25 +231,39 @@ export class ClickHouseQueryClient {
   /**
    * Writes one batch under every policy this client was given, same order as
    * {@link query}: the guard refuses a multi-tenant batch before it costs a
-   * slot or socket, and a retrying insert keeps its slot.
+   * slot or socket. An insert is retried in place only when the connection was refused
+   * before anything was sent; every other failure goes to the caller, whose job retries
+   * the whole write. Spec: specs/background/worker-graceful-shutdown.feature
    */
   async insert(request: InsertRequest): Promise<void> {
     this.tenantGuard.assertInsert(request);
     if (request.rows.length === 0) return;
 
     const runOnce = () => this.driver.insert(request);
-    const withRetries = () =>
-      this.retries === undefined
-        ? runOnce()
-        : this.retries.run(runOnce, {
-            signal: request.signal,
-            request: {
-              tenantId: request.tenantId,
-              sql: `INSERT INTO ${request.table}`,
-              table: request.table,
-              kind: "write",
-            },
-          });
+    const refusedOnly = async (): Promise<void> => {
+      try {
+        await runOnce();
+      } catch (error) {
+        if (wasRefusedBeforeSending(error)) throw error;
+        throw new InsertNotRetriedInPlace(error);
+      }
+    };
+    const withRetries = async (): Promise<void> => {
+      if (this.retries === undefined) return runOnce();
+      try {
+        await this.retries.run(refusedOnly, {
+          signal: request.signal,
+          request: {
+            tenantId: request.tenantId,
+            sql: `INSERT INTO ${request.table}`,
+            table: request.table,
+            kind: "write",
+          },
+        });
+      } catch (error) {
+        throw error instanceof InsertNotRetriedInPlace ? error.failure : error;
+      }
+    };
     const withReport = () =>
       this.reported({ operation: "insert", params: { table: request.table }, task: withRetries });
 

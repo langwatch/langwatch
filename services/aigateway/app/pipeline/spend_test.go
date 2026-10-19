@@ -215,3 +215,34 @@ func TestSpendOutcomeDuration(t *testing.T) {
 	require.Len(t, rec.confirms, 1)
 	assert.GreaterOrEqual(t, rec.confirms[0].Duration, 15*time.Millisecond)
 }
+
+/** @scenario A request that names no model opens no spend record */
+func TestSpendSkipsARequestThatNamesNoModel(t *testing.T) {
+	missing := errors.New("missing model")
+
+	t.Run("sync", func(t *testing.T) {
+		rec := &recordingEmitter{}
+		call := spendTestCall()
+		call.Request.Model = ""
+		next := func(ctx context.Context, call *Call) (*domain.Response, error) {
+			return nil, missing
+		}
+		_, err := Spend(rec).Sync(next)(context.Background(), call)
+		require.ErrorIs(t, err, missing)
+		assert.Empty(t, rec.admitted)
+		assert.Empty(t, rec.fails)
+	})
+
+	t.Run("stream", func(t *testing.T) {
+		rec := &recordingEmitter{}
+		call := spendTestCall()
+		call.Request.Model = ""
+		next := func(ctx context.Context, call *Call) (domain.StreamIterator, error) {
+			return nil, missing
+		}
+		_, err := Spend(rec).Stream(next)(context.Background(), call)
+		require.ErrorIs(t, err, missing)
+		assert.Empty(t, rec.admitted)
+		assert.Empty(t, rec.fails)
+	})
+}

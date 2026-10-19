@@ -30,6 +30,8 @@ import {
   canonicalErrorAnswer,
   IdempotencyLedger,
   type IdempotentRunner,
+  loggerMiddleware,
+  recordAnsweredCause,
   RestHost,
 } from "@langwatch/api/rest";
 import {
@@ -41,6 +43,7 @@ import {
 } from "@langwatch/api/trpc";
 import type { Logger } from "@langwatch/observability";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
+import { TRPCError } from "@trpc/server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -378,6 +381,11 @@ const answerApiFailure: HttpFailureAnswer = (failure) => canonicalErrorAnswer(fa
 function trpcLanes(trpc: TrpcHost): Hono {
   const app = new Hono();
   app.onError((failure) => answerApiFailure(failure));
+  // The same access record every REST family writes, so a dashboard 5xx is seen and alerted
+  // on; the procedure's own failure line stays tRPC's (policy.ts). Spec:
+  // specs/observability/request-log-cause-and-level.feature
+  app.use(`${TrpcHost.path}/*`, loggerMiddleware({ name: "trpc" }));
+  app.use("/api/sse/*", loggerMiddleware({ name: "sse" }));
 
   app.all(`${TrpcHost.path}/*`, async (context) => {
     const request = context.req.raw;
@@ -399,6 +407,7 @@ function trpcLanes(trpc: TrpcHost): Hono {
       ...(await trpc.sessionVersionHeaders({ context: createContext })),
       ...trpc.schemaHashHeaders({ path }),
     };
+    let failure: unknown;
     const response = await fetchRequestHandler({
       endpoint: TrpcHost.path,
       req: bodylessAsNoInput(request),
@@ -406,8 +415,16 @@ function trpcLanes(trpc: TrpcHost): Hono {
       createContext,
       allowBatching: false,
       responseMeta: ({ errors }) => ({ headers: trpc.retryAfterHeaders({ errors }) }),
+      onError: ({ error }) => {
+        failure = error;
+      },
     });
     for (const [name, value] of Object.entries(versionHeaders)) response.headers.set(name, value);
+    if (failure !== undefined && response.status >= 400) {
+      // The handled cause, not tRPC's wrapper, so the record carries its code and fault.
+      const cause = failure instanceof TRPCError && failure.cause ? failure.cause : failure;
+      recordAnsweredCause(context, { error: cause, status: response.status });
+    }
 
     return response;
   });

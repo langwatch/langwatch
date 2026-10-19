@@ -4,6 +4,14 @@ import { summarizeError } from "./errorSummary.ts";
 import type { RequestAttribution } from "./trafficAttribution.ts";
 
 /**
+ * The one logger name every HTTP access record is written under, whatever family or lane
+ * answered: the request-failure alerts filter on it, so it must not vary per family. The
+ * family travels as the record's `family` field instead.
+ * Spec: specs/observability/request-log-cause-and-level.feature
+ */
+export const REQUEST_LOGGER_NAME = "langwatch:api:hono";
+
+/**
  * Common request logging data structure.
  */
 export interface RequestLogData {

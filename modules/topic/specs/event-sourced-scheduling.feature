@@ -78,6 +78,22 @@ Feature: Event-sourced topic clustering scheduling
     And the record is logged below error level
     And it is counted apart from the failures that page us
 
+  # langevals names a model-provider refusal with a stable code in its error
+  # detail. That code is evidence; prose quoting a provider error is not.
+  @unit
+  Scenario: A model provider refusal named by the clustering service is the customer's to fix
+    Given the clustering service refused a page because the model provider rejected the credentials
+    When the page fails
+    Then the failure carries the provider-authentication code
+    And it is marked as something the customer can resolve
+
+  @unit
+  Scenario: A clustering service failure without a provider code stays ours
+    Given the clustering service refused a page with a request the provider called malformed
+    When the page fails
+    Then the failure carries the clustering-service code
+    And it is not marked as something the customer can resolve
+
   Scenario: A failure the user can fix shows guidance, not a stack trace
     Given clustering failed because no default model is configured
     When the user opens the topic clustering settings page

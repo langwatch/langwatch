@@ -195,6 +195,37 @@ describe("EventingRecordSpanAdapter", () => {
     });
   });
 
+  describe("when the spool object a command names is gone", () => {
+    /** @scenario A spooled command whose spool object is gone completes without retrying */
+    it.each(["StoredObjectNotFoundError", "ObjectNotFoundError", "NoSuchKey"])(
+      "records nothing and completes on %s",
+      async (errorName) => {
+        const spool = new SpoolFake();
+        const missing = Object.assign(new Error("not found"), { name: errorName });
+        spool.read.mockRejectedValueOnce(missing);
+        const test = harness(spool);
+
+        const events = await test.handler.handle(command(commandData({ spoolRef: "spool:v2" })));
+
+        expect(events).toEqual([]);
+        expect(test.piiRedaction.redact).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  describe("when reading the spool object fails for another reason", () => {
+    /** @scenario A spool read that fails for another reason is retried */
+    it("rethrows so the queue retries the command", async () => {
+      const spool = new SpoolFake();
+      spool.read.mockRejectedValueOnce(new Error("connection reset"));
+      const test = harness(spool);
+
+      await expect(
+        test.handler.handle(command(commandData({ spoolRef: "spool:v2" }))),
+      ).rejects.toThrow("connection reset");
+    });
+  });
+
   it("rejects a spool marker when spool members is absent", async () => {
     const { handler } = harness();
     const queued = command(commandData({ spoolRef: "sha256:abc" }));

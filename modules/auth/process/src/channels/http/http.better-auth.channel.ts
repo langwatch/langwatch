@@ -95,6 +95,30 @@ import { socialProviderBasesPlugin } from "./http.social-provider-bases.channel.
 const logger = createLogger("langwatch:better-auth");
 
 /**
+ * Refusals better-auth logs at error that answer the caller and need nothing from us: a return
+ * address its origin check refuses ("Invalid callbackURL: ..."), and a sign-in state it cannot
+ * read back, an expired or tampered attempt the person starts again.
+ */
+const CALLER_REFUSAL_MESSAGES = [
+  /^Invalid (?:callbackURL|errorCallbackURL|newUserCallbackURL|redirectURL)\b/,
+  /^Failed to parse state\b/,
+];
+
+/** The level a better-auth log line is written at here: its own, but caller refusals warn. */
+export function betterAuthLogLevel({
+  level,
+  message,
+}: {
+  level: string | undefined;
+  message: string;
+}): "error" | "warn" | "info" {
+  if (level === "error") {
+    return CALLER_REFUSAL_MESSAGES.some((pattern) => pattern.test(message)) ? "warn" : "error";
+  }
+  return level === "warn" ? "warn" : "info";
+}
+
+/**
  * Everything about this deployment the option set is built from.
  */
 export type BetterAuthDeploymentConfiguration = Readonly<{
@@ -763,8 +787,9 @@ export const createAuthOptions = ({
   // BetterAuth logger wiring
   logger: {
     disabled: false,
-    log: (level, message, ...args) => {
+    log: (stated, message, ...args) => {
       idTokenIssuerRefusals?.note([message, ...args]);
+      const level = betterAuthLogLevel({ level: stated, message });
       if (level === "error") {
         logger.error({ args }, message);
       } else if (level === "warn") {

@@ -2429,6 +2429,11 @@ const presentations = {
         : "Ask an organization admin to grant you access to this project.";
     },
   },
+  evaluation_report_unavailable: {
+    title: "The result could not be saved",
+    describe: () =>
+      "The evaluation ran, but its result could not be recorded just now. Send the same request again in a few seconds.",
+  },
   evaluation_trace_not_evaluatable: {
     title: "This trace cannot be evaluated",
     describe: () =>
@@ -4943,6 +4948,10 @@ const presentations = {
       const field = label(USER_VISIBLE_FIELDS, str(error, "field", ""));
       return field ? `There's a problem with ${field}.` : "Some of the values aren't valid.";
     },
+  },
+  request_body_unreadable: {
+    title: "The request did not arrive in full",
+    describe: () => "The connection closed before the whole request was sent. Send it again.",
   },
   malformed_request: {
     title: "That request couldn't be read",

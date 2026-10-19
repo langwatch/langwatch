@@ -706,6 +706,24 @@ async function reportVerdict({
       { err: eventError, projectId, evaluationId },
       "Failed to emit evaluation reported event",
     );
+    // A 200 here would lose the verdict for good; a retryable 503 lets the caller send it again.
+    throw new EvaluationReportUnavailableError();
+  }
+}
+
+/**
+ * The verdict was computed but could not be recorded (the event pipeline refused it, for
+ * example while a deploy drains its queues). Retrying is safe and is what recovers it.
+ * Spec: modules/evaluation/specs/evaluation-service.feature
+ */
+class EvaluationReportUnavailableError extends HandledError {
+  constructor() {
+    super(
+      "evaluation_report_unavailable",
+      "The evaluation result could not be recorded. Retry the request.",
+      { httpStatus: 503, fault: "platform", retryable: true },
+    );
+    this.name = "EvaluationReportUnavailableError";
   }
 }
 

@@ -2,6 +2,7 @@ package httpmiddleware
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"net"
 	"net/http"
@@ -51,7 +52,8 @@ func Telemetry() func(http.Handler) http.Handler {
 			// provider faults are incidents and log at error; a handled error
 			// with no fault annotation stays at info; a plain (unhandled)
 			// error — the "unknown" WriteHTTP hides behind a generic 500 —
-			// always logs at error for alerting.
+			// always logs at error for alerting. A client abort (the request's
+			// context canceled) is the exception: it logs at info.
 			level := zapcore.InfoLevel
 			if rec.err != nil {
 				var e herr.E
@@ -76,6 +78,12 @@ func Telemetry() func(http.Handler) http.Handler {
 				} else {
 					level = zapcore.ErrorLevel
 					fields = append(fields, zap.NamedError("error", rec.err))
+				}
+				// A request whose context was canceled is the caller going
+				// away, not a failure of ours: nobody's fault, nothing to page.
+				if errors.Is(rec.err, context.Canceled) {
+					level = zapcore.InfoLevel
+					fields = append(fields, zap.Bool("client_aborted", true))
 				}
 			}
 

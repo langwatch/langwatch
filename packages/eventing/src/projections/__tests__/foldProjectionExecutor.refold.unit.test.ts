@@ -344,6 +344,67 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
         expect(result.sequence).toEqual([1_000, 2_000, CHECKPOINT_MS, 3_000, 4_000]);
         expect(refoldMetric).toHaveBeenCalledWith("run", "incomplete");
       });
+
+      describe("when the event log kept a different event under an applied idempotency key", () => {
+        /** @scenario "A re-fold accounts for an applied event the event log kept under its idempotency key" */
+        it("replays the history instead of reporting it incomplete", async () => {
+          vi.useRealTimers();
+          const strictExecutor = new FoldProjectionExecutor({
+            refoldHistoryRetryDelaysMs: [],
+          });
+          const checkpointEvent = eventAt(CHECKPOINT_MS);
+          // The fold applied one event under "snapshot-key"; the log kept its
+          // twin, which carries the same key under another id.
+          const keptTwin = { ...eventAt(4_000), id: "evt-twin", idempotencyKey: "snapshot-key" };
+          const { fold } = makeAppliedFold({
+            historyReads: [[eventAt(2_000), keptTwin, checkpointEvent]],
+            appliedEventIds: ["snapshot-key", checkpointEvent.id],
+          });
+
+          const result = await strictExecutor.execute(fold, eventAt(3_000), context);
+
+          expect(result.sequence).toEqual([2_000, 3_000, 4_000, CHECKPOINT_MS]);
+          expect(refoldMetric).not.toHaveBeenCalledWith("run", "incomplete");
+        });
+      });
+
+      describe("when a folded event carries an idempotency key", () => {
+        /** @scenario "A commit records each folded event under its idempotency key" */
+        it("commits the key, not the id, in the applied set", async () => {
+          const { fold, store } = makeAppliedFold({
+            historyReads: [[]],
+            appliedEventIds: [],
+          });
+          const keyed = { ...eventAt(6_000), idempotencyKey: "span-key" };
+
+          await executor.execute(fold, keyed, context);
+
+          const committed = vi.mocked(store.store).mock.calls[0]![1];
+          expect(committed.appliedEventIds).toEqual(["span-key"]);
+        });
+      });
+
+      describe("when an already-applied event is delivered again", () => {
+        /** @scenario "A redelivered event is recognised under its id or its idempotency key" */
+        it.each([
+          ["its id, as sets committed before keys were recorded hold", "evt-redelivered"],
+          ["its idempotency key", "redelivered-key"],
+        ])("skips it when the set holds %s", async (_label, token) => {
+          const redelivered = {
+            ...eventAt(6_000),
+            id: "evt-redelivered",
+            idempotencyKey: "redelivered-key",
+          };
+          const { fold, store } = makeAppliedFold({
+            historyReads: [[]],
+            appliedEventIds: [token],
+          });
+
+          await executor.execute(fold, redelivered, context);
+
+          expect(store.store).not.toHaveBeenCalled();
+        });
+      });
     });
 
     describe("when a delivered event shares its occurred-at with a returned one", () => {

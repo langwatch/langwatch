@@ -126,10 +126,11 @@ class ComputeRunMetricsAdapter implements CommandHandler<
             retryCount: data.retryCount + 1,
           });
         } else {
-          // Error, not warn: giving up here means this run's cost and
-          // latency never exist, with no later event to repair it. Logged
-          // with the waited window, since "too slow" and "never arrived" differ.
-          logger.error(
+          // Warn, not error: the usual cause is a trace that was never
+          // instrumented or reported under another trace id, which no retry
+          // or code change repairs. Logged with the waited window, since "too
+          // slow" and "never arrived" differ.
+          logger.warn(
             {
               tenantId,
               scenarioRunId,
@@ -155,39 +156,24 @@ class ComputeRunMetricsAdapter implements CommandHandler<
           foldVersion: traceSummary.spanCount,
         });
 
-      // Summary exists but not yet populated (cost enrichment still in progress).
-      // Treat like missing summary — schedule retry so we pick it up later.
-      // Role latency is enough on its own: a scenario trace can have
-      // role-bearing spans with latency but no cost (totalCost null, roleCosts
-      // empty), and those metrics are still worth emitting.
+      // Summary exists with nothing to aggregate: no span carries a scenario
+      // role and the trace has no cost. That is the trace's settled shape, not
+      // a summary still filling in, so retrying only repeats the same read. A
+      // trace whose spans are still arriving settles later, and the
+      // span-settle reaction (`createTraceSpanMetricsSyncHandler`) computes
+      // again then. No zero-metrics event either: it would take this run's
+      // idempotency key, and the event log would drop the real metrics if a
+      // later settle found any. Role latency alone is enough to emit: a
+      // scenario trace can have role-bearing spans with latency but no cost.
       if (
         Object.keys(roleCosts).length === 0 &&
         Object.keys(roleLatencies).length === 0 &&
         traceSummary.totalCost === null
       ) {
-        logger.debug(
+        logger.info(
           { tenantId, scenarioRunId, traceId, retryCount: data.retryCount },
-          "Trace summary exists but has no metrics yet",
+          "Trace has no role-attributed spans and no cost, so this run has no cost or latency from it",
         );
-
-        if (data.retryCount < MAX_RETRIES) {
-          await this.deps.scheduleRetry({
-            ...data,
-            retryCount: data.retryCount + 1,
-          });
-        } else {
-          logger.error(
-            {
-              tenantId,
-              scenarioRunId,
-              traceId,
-              attempts: MAX_RETRIES,
-              waitedMs: MAX_RETRIES * COMPUTE_METRICS_RETRY_DELAY_MS,
-            },
-            "Gave up computing trace metrics: the trace summary stayed empty, so this run has no cost or latency",
-          );
-        }
-
         return [];
       }
 

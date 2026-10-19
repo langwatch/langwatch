@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository.ts";
+import {
+  ClickHouseExperimentRunRepository,
+  RUN_PAIRS_PER_ENRICHMENT_QUERY,
+} from "../clickhouse.experiment-run.repository.ts";
 
 describe("ClickHouseExperimentRunRepository", () => {
   const options = {
@@ -124,5 +127,66 @@ describe("ClickHouseExperimentRunRepository", () => {
     expect(queries[1]).toMatch(/max\(OccurredAt\)/);
     expect(queries[1]).toContain("(ExperimentId, RunId) IN {runPairs");
     expect(queries[1]).toContain("OccurredAt >= {minOccurredAt:DateTime64(3)}");
+  });
+
+  describe("when the listed runs outnumber one enrichment lookup", () => {
+    /** @scenario "Listing a project with many runs reads their costs and scores in bounded batches" */
+    it("reads costs and scores in bounded batches and joins each run to its own", async () => {
+      const runCount = RUN_PAIRS_PER_ENRICHMENT_QUERY * 2 + 1;
+      const runRows = Array.from({ length: runCount }, (_, index) => ({
+        TenantId: "project_1",
+        ExperimentId: "experiment_1",
+        RunId: `run_${index}`,
+        WorkflowVersionId: null,
+        Total: 1,
+        Progress: 1,
+        Targets: "[]",
+        CreatedAt: "2026-01-01 00:00:00.000",
+        UpdatedAt: "2026-01-01 00:00:00.000",
+        FinishedAt: null,
+        StoppedAt: null,
+      }));
+      const pairCounts: number[] = [];
+      const repository = ClickHouseExperimentRunRepository.create({
+        ...options,
+        resolveClient: async () => ({
+          query: async ({ query, query_params }) => {
+            if (query.includes("FROM experiment_runs")) {
+              return { json: async <T>() => runRows as T[] };
+            }
+            const pairs = query_params.runPairs as string[][];
+            pairCounts.push(pairs.length);
+            const isCostQuery = query.includes("datasetCost");
+            return {
+              json: async <T>() =>
+                (isCostQuery
+                  ? pairs.map(([experimentId, runId]) => ({
+                      ExperimentId: experimentId,
+                      RunId: runId,
+                      datasetCost: Number(runId!.slice("run_".length)),
+                      evaluationsCost: null,
+                      datasetAverageCost: null,
+                      datasetAverageDuration: null,
+                      evaluationsAverageCost: null,
+                      evaluationsAverageDuration: null,
+                    }))
+                  : []) as T[],
+            };
+          },
+        }),
+      });
+
+      const grouped = await repository.findAll({
+        projectId: "project_1",
+        experimentIds: ["experiment_1"],
+      });
+
+      expect(Math.max(...pairCounts)).toBeLessThanOrEqual(RUN_PAIRS_PER_ENRICHMENT_QUERY);
+      expect(pairCounts.reduce((sum, count) => sum + count, 0)).toBe(runCount * 2);
+      const runs = grouped.experiment_1 ?? [];
+      expect(runs).toHaveLength(runCount);
+      const last = runs.find((run) => run.runId === `run_${runCount - 1}`);
+      expect(last?.summary.datasetCost).toBe(runCount - 1);
+    });
   });
 });

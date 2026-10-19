@@ -426,12 +426,26 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
   return { members: source, operatorReads };
 }
 
-/** Host before the runtime so its stores close after the runtime stops; ready once they answer. */
-export function hostedStores(source: ProcessMemberSource) {
+/** The queue's own default drain (group-queue), when SHUTDOWN_DRAIN_TIMEOUT_MS is unset. */
+const DEFAULT_QUEUE_DRAIN_MS = 25_000;
+/** Room above the queue drain for closing Redis, Prisma and ClickHouse once eventing drained. */
+const STORE_CLOSE_MARGIN_MS = 5_000;
+
+/**
+ * Host before the runtime so its stores close after the runtime stops; ready once they answer.
+ * Closing them drains eventing's queues, so the phase gets the queue's drain budget, not the
+ * runner's 10s default. Spec: specs/background/worker-graceful-shutdown.feature
+ */
+export function hostedStores({
+  source,
+  drainTimeoutMs,
+}: Readonly<{ source: ProcessMemberSource; drainTimeoutMs?: number | undefined }>) {
   return {
     name: "process stores",
     stopping: () => source.beginClose?.(),
     stop: () => source.close(),
+    drain: true,
+    timeoutMs: (drainTimeoutMs ?? DEFAULT_QUEUE_DRAIN_MS) + STORE_CLOSE_MARGIN_MS,
     ...(source.answer === undefined
       ? {}
       : {
