@@ -179,7 +179,9 @@ export class LangWatchQLSelfProvisioningService {
    * the per-database name still attaches once the pods roll onto this one.
    */
   renderedCollectionAliases({ names }: { names: LangWatchQLNames }): string[] {
-    return this.renderedCollectionCandidates({ names }).slice(1);
+    return this.renderedCollectionCandidates({ names }).filter(
+      (name) => name !== LWQL_RENDERED_NAMED_COLLECTION,
+    );
   }
 
   /**

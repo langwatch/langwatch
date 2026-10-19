@@ -184,9 +184,7 @@ export class LangWatchQLAccessModelDefinitionService {
       grants: this.#grants({ names, sourceDatabase, views }),
       rowPolicies: this.#rowPolicies({ names, sourceDatabase, views }),
       namedCollection,
-      namedCollectionAliases: namedCollectionAliases.filter(
-        (alias) => alias !== namedCollection.collection,
-      ),
+      namedCollectionAliases,
     };
   }
 
