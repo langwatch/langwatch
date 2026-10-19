@@ -231,7 +231,7 @@ Feature: Scenario run hooks: setup and teardown
       Then no setup call is made
       And teardown is called with no state
 
-    # OPEN: agent proposal, not decided by the owner.
+    # Decided 2026-10-19 by Drew's assistant under delegation (reversible); see ADR 180.
     @integration
     Scenario: A run of an agent with hooks goes to the Node child when the Go runner is on
       Given a project with the release_scenario_go_runner_enabled flag on
@@ -239,7 +239,7 @@ Feature: Scenario run hooks: setup and teardown
       When a scenario runs against it
       Then the run is routed to the Node child
 
-    # OPEN: agent proposal, not decided by the owner.
+    # Decided 2026-10-19 by Drew's assistant under delegation (reversible); see ADR 180.
     @integration
     Scenario: A run of an agent without hooks still goes to the Go runner when the flag is on
       Given a project with the release_scenario_go_runner_enabled flag on
