@@ -1203,6 +1203,14 @@ Feature: The daily insights run
       And it compares the run's start with the time the server recorded the request
       And the Langy panel opens on that run's conversation
 
+    @integration
+    Scenario: Run now waits past a lost run settled before its own starts
+      Given a board that is on, whose run in flight is lost
+      And the member chose Run now
+      When the worker records the lost run as timed out, with no conversation, before it starts theirs
+      Then the board keeps waiting instead of taking the lost run for theirs
+      And the Langy panel opens on their run's conversation once it starts
+
     @unit
     Scenario: Run now on a board whose run is already going follows that run
       Given a board that is on, whose run is in flight before the page shows it

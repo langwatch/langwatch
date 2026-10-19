@@ -320,6 +320,22 @@ describe("given a member chose Run now, and the server answered request-1", () =
     });
   });
 
+  describe("when a lost run is settled after the request, before its own run starts", () => {
+    it("keeps waiting, then follows its own run once that starts", () => {
+      const lostSettled = lastRun({ at: NOW, runId: "run-lost", conversationId: null });
+
+      expect(awaited(setting({ lastRun: lostSettled }))).toBeUndefined();
+      expect(
+        awaited(
+          setting({
+            lastRun: lostSettled,
+            runInFlight: { runId: REQUEST, conversationId: "conversation-7", startedAt: NOW },
+          }),
+        ),
+      ).toEqual({ conversationId: "conversation-7" });
+    });
+  });
+
   describe("when a scheduled run settled before the request and before the first read", () => {
     it("keeps waiting, then follows its own run once that starts", () => {
       const scheduledSettled = lastRun({

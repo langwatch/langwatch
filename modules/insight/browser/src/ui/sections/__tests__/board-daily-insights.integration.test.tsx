@@ -736,6 +736,50 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
     });
   });
 
+  describe("when the board's run in flight was lost, and is settled before their run starts", () => {
+    /** @scenario "Run now waits past a lost run settled before its own starts" */
+    it("keeps waiting through the lost run's outcome, then opens Langy on its own run", async () => {
+      let read = ON;
+      const requestedAt = nowInstant().epochMilliseconds;
+      const board = openBoard({
+        setting: () => read,
+        host: ASKER,
+        write: () => runNowAnswer({ requestedAt }),
+      });
+      const dropdown = await openDropdown(board.user);
+      await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+      await waitFor(() => expect(board.reads()).toHaveLength(2));
+
+      // The worker records the lost run's timeout, with no conversation, before it starts ours.
+      const lost = ranToday({
+        at: requestedAt + 1_000,
+        outcome: "failed",
+        reason: "timeout",
+        runId: "run-lost",
+      });
+      read = lost;
+      await board.readHint();
+      const waiting = await openDropdown(board.user);
+      expect(waiting.getByText("Starting a run.")).toBeInTheDocument();
+      expect(board.host.queries).toEqual([]);
+
+      read = {
+        ...lost,
+        runInFlight: {
+          runId: "request-1",
+          conversationId: "conversation-7",
+          startedAt: requestedAt + 2_000,
+        },
+      };
+      await board.readHint();
+
+      await waitFor(() =>
+        expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
+      );
+      expect(board.host.failures).toEqual([]);
+    });
+  });
+
   describe("when the run they asked for shows neither a start nor an outcome", () => {
     /** @scenario "Run now asks for a run and opens Langy on it" */
     it("follows it for as long as a run can last, then says it could not be started", async () => {
