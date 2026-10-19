@@ -768,7 +768,6 @@ export class AnalyticsModule
     return buildQueryReference({
       protections: input.protections,
       lwqlEnabled: input.canRunLangWatchQL,
-      database,
       schema: input.canRunLangWatchQL
         ? await input.schema()
         : { database, functions: [], views: [], appFunctions: [] },

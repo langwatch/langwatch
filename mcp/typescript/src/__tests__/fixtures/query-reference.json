@@ -19213,7 +19213,7 @@
         "errors",
         "starter"
       ],
-      "text": "SELECT TraceId, TraceName, OccurredAt, TotalDurationMs\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\n  AND ContainsErrorStatus\nORDER BY OccurredAt DESC\nLIMIT 100",
+      "text": "SELECT TraceId, TraceName, OccurredAt, TotalDurationMs\nFROM traces\nWHERE OccurredAt >= subtractDays(now(), 1)\n  AND ContainsErrorStatus\nORDER BY OccurredAt DESC\nLIMIT 100",
       "parameters": [],
       "requires": {
         "gates": [],
@@ -19231,7 +19231,7 @@
         "time-series",
         "rates"
       ],
-      "text": "SELECT\n  toStartOfDay(OccurredAt) AS day,\n  count() AS traces,\n  countIf(ContainsErrorStatus) AS errors\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 30)\nGROUP BY day\nORDER BY day",
+      "text": "SELECT\n  toStartOfDay(OccurredAt) AS day,\n  count() AS traces,\n  countIf(ContainsErrorStatus) AS errors\nFROM traces\nWHERE OccurredAt >= subtractDays(now(), 30)\nGROUP BY day\nORDER BY day",
       "parameters": [],
       "requires": {
         "gates": [],
@@ -19249,7 +19249,7 @@
         "latency",
         "percentiles"
       ],
-      "text": "SELECT\n  quantile(0.5)(TotalDurationMs) AS p50_ms,\n  quantile(0.95)(TotalDurationMs) AS p95_ms,\n  quantile(0.99)(TotalDurationMs) AS p99_ms\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 7)",
+      "text": "SELECT\n  quantile(0.5)(TotalDurationMs) AS p50_ms,\n  quantile(0.95)(TotalDurationMs) AS p95_ms,\n  quantile(0.99)(TotalDurationMs) AS p99_ms\nFROM traces\nWHERE OccurredAt >= subtractDays(now(), 7)",
       "parameters": [],
       "requires": {
         "gates": [],
@@ -19266,7 +19266,7 @@
         "time-series",
         "rollups"
       ],
-      "text": "SELECT\n  toStartOfHour(BucketStart) AS hour,\n  sum(TraceCount) AS traces,\n  sum(ErrorCount) AS errors\nFROM analytics.trace_metrics_by_minute\nWHERE BucketStart >= subtractDays(now(), 2)\nGROUP BY hour\nORDER BY hour",
+      "text": "SELECT\n  toStartOfHour(BucketStart) AS hour,\n  sum(TraceCount) AS traces,\n  sum(ErrorCount) AS errors\nFROM trace_metrics_by_minute\nWHERE BucketStart >= subtractDays(now(), 2)\nGROUP BY hour\nORDER BY hour",
       "parameters": [],
       "requires": {
         "gates": [],
@@ -19285,7 +19285,7 @@
         "models",
         "rollups"
       ],
-      "text": "SELECT\n  Model,\n  sum(CostSum) AS cost_usd,\n  sum(PromptTokensSum + CompletionTokensSum) AS tokens\nFROM analytics.model_usage_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nGROUP BY Model\nORDER BY cost_usd DESC\nLIMIT 50",
+      "text": "SELECT\n  Model,\n  sum(CostSum) AS cost_usd,\n  sum(PromptTokensSum + CompletionTokensSum) AS tokens\nFROM model_usage_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nGROUP BY Model\nORDER BY cost_usd DESC\nLIMIT 50",
       "parameters": [],
       "requires": {
         "gates": [
@@ -19304,7 +19304,7 @@
       "tags": [
         "conversations"
       ],
-      "text": "SELECT\n  ConversationId,\n  count() AS turns,\n  min(OccurredAt) AS started_at,\n  max(OccurredAt) AS last_turn\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\n  AND ConversationId IS NOT NULL\nGROUP BY ConversationId\nORDER BY turns DESC\nLIMIT 50",
+      "text": "SELECT\n  ConversationId,\n  count() AS turns,\n  min(OccurredAt) AS started_at,\n  max(OccurredAt) AS last_turn\nFROM trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\n  AND ConversationId IS NOT NULL\nGROUP BY ConversationId\nORDER BY turns DESC\nLIMIT 50",
       "parameters": [],
       "requires": {
         "gates": [],
@@ -19322,7 +19322,7 @@
         "evaluations",
         "rates"
       ],
-      "text": "SELECT\n  EvaluatorName,\n  count() AS evaluations,\n  countIf(Passed = 1) AS passed\nFROM analytics.evaluations\nWHERE ScheduledAt >= subtractDays(now(), 7)\n  AND Status = 'processed'\nGROUP BY EvaluatorName\nORDER BY evaluations DESC\nLIMIT 50",
+      "text": "SELECT\n  EvaluatorName,\n  count() AS evaluations,\n  countIf(Passed = 1) AS passed\nFROM evaluations\nWHERE ScheduledAt >= subtractDays(now(), 7)\n  AND Status = 'processed'\nGROUP BY EvaluatorName\nORDER BY evaluations DESC\nLIMIT 50",
       "parameters": [],
       "requires": {
         "gates": [],
@@ -19341,7 +19341,7 @@
         "spans",
         "joins"
       ],
-      "text": "SELECT\n  t.TraceId AS TraceId,\n  t.TraceName AS TraceName,\n  count() AS spans,\n  max(s.DurationMs) AS slowest_span_ms\nFROM analytics.traces AS t\nINNER JOIN analytics.spans AS s\n  ON s.TenantId = t.TenantId AND s.TraceId = t.TraceId\nWHERE t.OccurredAt >= subtractDays(now(), 1)\n  AND s.StartTime >= subtractDays(now(), 1)\nGROUP BY TraceId, TraceName\nORDER BY slowest_span_ms DESC\nLIMIT 50",
+      "text": "SELECT\n  t.TraceId AS TraceId,\n  t.TraceName AS TraceName,\n  count() AS spans,\n  max(s.DurationMs) AS slowest_span_ms\nFROM traces AS t\nINNER JOIN spans AS s\n  ON s.TenantId = t.TenantId AND s.TraceId = t.TraceId\nWHERE t.OccurredAt >= subtractDays(now(), 1)\n  AND s.StartTime >= subtractDays(now(), 1)\nGROUP BY TraceId, TraceName\nORDER BY slowest_span_ms DESC\nLIMIT 50",
       "parameters": [],
       "requires": {
         "gates": [],
@@ -19360,7 +19360,7 @@
         "attributes",
         "parameters"
       ],
-      "text": "SELECT\n  TraceId,\n  OccurredAt,\n  Attributes['langwatch.user_id'] AS user_id\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), {days:UInt32})\n  AND Attributes['langwatch.user_id'] = {user_id:String}\nORDER BY OccurredAt DESC\nLIMIT 100",
+      "text": "SELECT\n  TraceId,\n  OccurredAt,\n  Attributes['langwatch.user_id'] AS user_id\nFROM traces\nWHERE OccurredAt >= subtractDays(now(), {days:UInt32})\n  AND Attributes['langwatch.user_id'] = {user_id:String}\nORDER BY OccurredAt DESC\nLIMIT 100",
       "parameters": [
         {
           "name": "days",
@@ -19388,7 +19388,7 @@
       "tags": [
         "simulations"
       ],
-      "text": "SELECT ScenarioRunId, Name, Verdict, StartedAt\nFROM analytics.simulations\nWHERE StartedAt >= subtractDays(now(), 7)\n  AND Verdict = 'failure'\nORDER BY StartedAt DESC\nLIMIT 50",
+      "text": "SELECT ScenarioRunId, Name, Verdict, StartedAt\nFROM simulations\nWHERE StartedAt >= subtractDays(now(), 7)\n  AND Verdict = 'failure'\nORDER BY StartedAt DESC\nLIMIT 50",
       "parameters": [],
       "requires": {
         "gates": [],
@@ -19406,7 +19406,7 @@
         "paging",
         "parameters"
       ],
-      "text": "SELECT OccurredAt AS after_ts, TraceId AS after_id, CapturedInput, CapturedOutput\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 7)\n  AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})\nORDER BY OccurredAt, TraceId\nLIMIT 1000",
+      "text": "SELECT OccurredAt AS after_ts, TraceId AS after_id, CapturedInput, CapturedOutput\nFROM traces\nWHERE OccurredAt >= subtractDays(now(), 7)\n  AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})\nORDER BY OccurredAt, TraceId\nLIMIT 1000",
       "parameters": [
         {
           "name": "after_ts",

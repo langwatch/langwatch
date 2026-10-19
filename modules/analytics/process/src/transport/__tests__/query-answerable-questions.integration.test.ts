@@ -1493,7 +1493,6 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       const reference = buildQueryReference({
         protections,
         lwqlEnabled: true,
-        database,
         schema: service.describeSchema({ protections }),
         limits: {
           maxStatementLength: MAX_LWQL_LENGTH,

@@ -190,7 +190,7 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
         name: "span_id",
         role: "key",
         type: "string",
-        description: "The span id, as `analytics.spans.SpanId` reports it.",
+        description: "The span id, as `spans.SpanId` reports it.",
       },
     ],
     keyKind: "span",

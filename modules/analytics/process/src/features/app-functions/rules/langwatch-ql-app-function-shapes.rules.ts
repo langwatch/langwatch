@@ -114,7 +114,7 @@ export const LWQL_THREAD_KEY_PARAMETER: LangWatchQLAppFunctionParameter = {
   name: "thread_key",
   role: "key",
   type: "string",
-  description: "The conversation id, as `analytics.trace_metrics.ConversationId` reports it.",
+  description: "The conversation id, as `trace_metrics.ConversationId` reports it.",
 };
 
 export const LWQL_TRACE_KEY_PARAMETER: LangWatchQLAppFunctionParameter = {
