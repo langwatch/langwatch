@@ -22,21 +22,22 @@ function fakeRedis(state: {
   const deleted: string[] = [];
   const written: Record<string, string> = {};
   const jobs = { ...state.jobs };
+  const membersOf = (key: string): readonly string[] | undefined => {
+    if (key === `${PREFIX}ready`) return state.ready;
+    if (key.startsWith(`${PREFIX}parked:`))
+      return state.parked?.[key.slice(`${PREFIX}parked:`.length)];
+    if (key.startsWith(`${PREFIX}parked-lane:`)) {
+      return state.laneParked?.[key.slice(`${PREFIX}parked-lane:`.length)];
+    }
+    return undefined;
+  };
   const redis = redisDouble({
     scan: vi.fn(async () => [
       "0",
       Object.keys(jobs).map((groupId) => `${PREFIX}group:${groupId}:jobs`),
     ]),
     zscore: vi.fn(async (key: string, groupId: string) => {
-      const members =
-        key === `${PREFIX}ready`
-          ? state.ready
-          : key.startsWith(`${PREFIX}parked:`)
-            ? state.parked?.[key.slice(`${PREFIX}parked:`.length)]
-            : key.startsWith(`${PREFIX}parked-lane:`)
-              ? state.laneParked?.[key.slice(`${PREFIX}parked-lane:`.length)]
-              : undefined;
-      return members?.includes(groupId) ? "1" : null;
+      return membersOf(key)?.includes(groupId) ? "1" : null;
     }),
     smembers: vi.fn(async (key: string) =>
       key === `${PREFIX}parked-lanes` ? Object.keys(state.laneParked ?? {}) : [],

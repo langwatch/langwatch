@@ -60,7 +60,7 @@ export class HandBackGroupQueueError extends Error {
   }
 }
 
-/** The fault kinds a refusal names when its cause may pass on its own (HandledError's vocabulary). */
+/** Fault kinds a refusal names when its cause may pass on its own (HandledError's vocabulary). */
 const TRANSIENT_FAULTS: ReadonlySet<unknown> = new Set([
   "platform",
   "presumed_platform",

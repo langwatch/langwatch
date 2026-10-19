@@ -22,7 +22,10 @@ import type {
 /** Main's 30s quiet window per trace, before the trace's monitors are offered it. */
 export const TRACE_EVALUATION_TRIGGER_SETTLE_MS = 30_000;
 
-/** Twelve retries, about 27 minutes of the queue's 500ms-doubling backoff capped at 600s, for a fold that lags the settle (a backlog). */
+/**
+ * Twelve retries: about 27 minutes of the queue's 500ms-doubling backoff, capped at 600s,
+ * for a fold that lags the settle under a backlog.
+ */
 export const TRACE_EVALUATION_TRIGGER_SUMMARY_ATTEMPTS = 13;
 
 /** All of span_received the trigger reads: the span's name and its attributes. */
