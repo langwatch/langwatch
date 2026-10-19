@@ -1,0 +1,19 @@
+{
+  "name": "E2E quality 112: vague opener gets a reply",
+  "source": "apps/ui/e2e/langy/langy-quality.scenario.test.ts:112",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'hm'. Once Langy has answered, write exactly: 'ok so what now'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Every one of Langy's replies contains readable text — no reply is blank.",
+    "Langy responds to the vague opener with something actionable or orienting rather than silence.",
+    "Langy's reply to 'ok so what now' is not empty."
+  ],
+  "labels": ["e2e-migrated", "langy-quality"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 3
+}

@@ -1,0 +1,19 @@
+{
+  "name": "E2E core 139: reports average latency",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:139",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'what's my average latency?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy returns a latency figure (ms or seconds) or 'no data'.",
+    "Langy does not ask which metric or which time range.",
+    "Langy stays on topic — does not pivot to costs or traces."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

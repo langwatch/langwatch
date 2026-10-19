@@ -1,0 +1,18 @@
+{
+  "name": "E2E core 1155: remembers the traces across turns",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:1155",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'show me recent traces'. Once Langy has answered, write exactly: 'which one had the highest latency?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy answers turn 2 directly without asking the user to clarify which traces they meant.",
+    "Langy's turn-2 answer is concretely about a specific trace's latency."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 3
+}

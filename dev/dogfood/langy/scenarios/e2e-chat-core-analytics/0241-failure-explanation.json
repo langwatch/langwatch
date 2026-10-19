@@ -1,0 +1,17 @@
+{
+  "name": "E2E core 241: explains recent failures",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:241",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'find traces that failed recently and tell me why'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy gave a useful answer: either explained at least one failure (error type / status code / evaluator name / plain-language reason) when failures existed, OR clearly said no failures were found in the time window. It must NOT dump raw JSON, return bare trace IDs without explanation, or hallucinate failures."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

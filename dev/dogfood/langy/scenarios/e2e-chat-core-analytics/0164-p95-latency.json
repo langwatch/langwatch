@@ -1,0 +1,18 @@
+{
+  "name": "E2E core 164: reports p95 latency",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:164",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'what is my p95 latency?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy returns a p95 latency figure or 'no data'.",
+    "Langy does not confuse p95 with average — it specifically addressed p95."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

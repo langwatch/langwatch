@@ -1,0 +1,18 @@
+{
+  "name": "E2E core 304: details of the most recent trace",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:304",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'show me recent traces'. Once Langy has answered, write exactly: 'get the full details of the most recent one'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy returned details about a specific trace (input, output, latency, or span info).",
+    "Langy did NOT just list all traces — it retrieved and displayed details."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 3
+}

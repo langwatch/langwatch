@@ -20,6 +20,20 @@ interface LangyTurnAnswer {
   reply?: { role: "assistant"; text: string } | null;
 }
 
+/**
+ * What the app shows for a turn that ends `langy_github_not_connected`: an install prompt, not an
+ * error (presentation.ts / remediation.ts). It is the only user-action code the app suppresses.
+ */
+const GITHUB_NOT_CONNECTED_REPLY =
+  "Connect GitHub to continue. Langy needs the LangWatch GitHub App installed to open pull requests. " +
+  "Install the LangWatch GitHub App (Settings → Integrations), then ask me again.";
+
+function endedForGithubConnect({ error }: { error: unknown }): boolean {
+  if (error === undefined || error === null) return false;
+  const raw = typeof error === "string" ? error : JSON.stringify(error);
+  return raw.includes("langy_github_not_connected");
+}
+
 /** The plain text of one message: a string, or the text parts of a part list. */
 export function textOf({ message }: { message: AgentMessage }): string {
   const { content } = message;
@@ -87,6 +101,9 @@ export async function askLangy({
       // Same idempotency key: the second POST waits on the same turn, it does not start one.
       if (leftMs > 20_000) continue;
       throw new Error(`Langy did not settle within ${TURN_BUDGET_MS / 1000}s: ${answer.text}`);
+    }
+    if (!body.reply?.text && endedForGithubConnect({ error: body.error })) {
+      return { text: GITHUB_NOT_CONNECTED_REPLY, conversationId: body.conversationId };
     }
     if (!body.reply?.text) {
       throw new Error(`Langy turn ${body.status ?? "unknown"}: ${JSON.stringify(body.error)}`);

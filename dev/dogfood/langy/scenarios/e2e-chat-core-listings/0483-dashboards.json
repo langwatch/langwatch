@@ -1,0 +1,18 @@
+{
+  "name": "E2E core 483: lists dashboards",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:483",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'show my dashboards'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy reports dashboard count or a clear empty-state.",
+    "Langy doesn't pivot to analytics or monitors."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

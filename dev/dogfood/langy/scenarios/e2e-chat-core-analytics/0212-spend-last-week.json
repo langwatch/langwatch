@@ -1,0 +1,18 @@
+{
+  "name": "E2E core 212: honours last week",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:212",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'how much did I spend last week?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy returns a cost or trace-count figure.",
+    "Langy used 'last week' (or 7 days) as the time range — not 24h."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

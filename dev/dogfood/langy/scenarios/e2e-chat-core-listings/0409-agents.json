@@ -1,0 +1,18 @@
+{
+  "name": "E2E core 409: lists agents",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:409",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'show me my agents'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy reports agent count or a clear empty state.",
+    "Langy doesn't confuse agents with evaluators or scenarios."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

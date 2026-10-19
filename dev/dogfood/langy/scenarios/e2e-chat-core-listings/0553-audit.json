@@ -1,0 +1,19 @@
+{
+  "name": "E2E core 553: audits the setup",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:553",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'audit my setup, what's the biggest gap?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy synthesized a finding from more than one part of the setup (traces, evaluators, scenarios, datasets, prompts) and names one specific gap.",
+    "Langy leads with a specific gap it found in this project and says what to do about it — not an unranked inventory of everything missing.",
+    "Langy didn't ask the user what 'audit' means."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

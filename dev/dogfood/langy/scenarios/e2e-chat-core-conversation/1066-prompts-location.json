@@ -1,0 +1,20 @@
+{
+  "name": "E2E core 1066: where prompts live",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:1066",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'where in LangWatch can I see my prompts?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy tells the user where prompts live in the product (naming the Prompts section/page).",
+    "Langy does not respond with vague 'go to settings' instructions.",
+    "Langy does not ask which project.",
+    "The reply contains no worker-side address: no localhost, no 127.0.0.1, no container port, no raw environment-variable placeholder standing in for a host."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

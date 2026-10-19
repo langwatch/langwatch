@@ -1,0 +1,18 @@
+{
+  "name": "E2E core 1511: no trailing next actions",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:1511",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'what's my average latency?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy returned the result and stopped — no trailing 'would you like me to...' or 'here are your next options'.",
+    "Langy did NOT end with a list of follow-up actions."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

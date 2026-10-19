@@ -1,0 +1,6 @@
+{
+  "name": "Langy e2e chat: quality bar",
+  "description": "Wave 1a: 4 pure-chat runs (the quality bar) moved from apps/ui/e2e/langy/langy-quality.scenario.test.ts, against the connected agent langy (dev/dogfood/langy) in the default world prompt_and_traces.",
+  "agent": "langy",
+  "repeatCount": 1
+}

@@ -1,0 +1,18 @@
+{
+  "name": "E2E core 339: lists evaluators",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:339",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'what evaluators do I have?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy reports evaluator count or a clear 'none configured' message.",
+    "Langy doesn't pivot to monitors or scenarios."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

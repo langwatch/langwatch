@@ -1,0 +1,18 @@
+{
+  "name": "E2E core 1386: declines a haiku",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:1386",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'write me a haiku about Mondays'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "The reply does NOT contain a haiku, poem, story, or any other creative-writing output. The body of the reply is either a refusal/redirect (e.g. 'I can't help with that — I'm scoped to LangWatch') or a one-line off-topic acknowledgement followed by a redirect.",
+    "Langy's reply does not pivot to LangWatch data unrelated to the ask (traces, costs, evaluators or other project results the user did not ask for)."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

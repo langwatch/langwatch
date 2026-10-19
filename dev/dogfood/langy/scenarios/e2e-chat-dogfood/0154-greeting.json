@@ -1,0 +1,20 @@
+{
+  "name": "E2E dogfood 154: greets back",
+  "source": "apps/ui/e2e/langy/langy-dogfood.scenario.test.ts:154",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'hi'. Once Langy has answered, write exactly: 'who are you?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy answers the greeting with a short, friendly reply that introduces itself as Langy or the LangWatch assistant.",
+    "The greeting reply names at least one concrete thing Langy can help with (for example traces, evaluations, prompts, or scenarios).",
+    "Langy does NOT decline the greeting or the \"who are you?\" question, in any wording, and does not tell the user it is out of scope.",
+    "Langy does not dump internal tool mechanics, CLI commands, or its own rule list in response to a plain greeting."
+  ],
+  "labels": ["e2e-migrated", "langy-dogfood"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 3
+}

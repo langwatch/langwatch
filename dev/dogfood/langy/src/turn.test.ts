@@ -139,4 +139,25 @@ describe("askLangy", () => {
       askLangy({ http, conversationId: "c-thread", text: "x", idempotencyKey: "k1" }),
     ).rejects.toThrow(/Langy turn failed/);
   });
+
+  it("answers a GitHub-not-connected turn with the connect prompt", async () => {
+    const { http } = fakeHttp([
+      {
+        status: 200,
+        body: {
+          conversationId: "c",
+          turnId: "t",
+          status: "failed",
+          error: JSON.stringify({ code: "langy_github_not_connected", kind: "langy_github_not_connected" }),
+          reply: null,
+        },
+        text: "",
+      },
+    ]);
+
+    const reply = await askLangy({ http, conversationId: "c-thread", text: "x", idempotencyKey: "k1" });
+
+    expect(reply.text).toMatch(/Connect GitHub/);
+    expect(reply.conversationId).toBe("c");
+  });
 });
