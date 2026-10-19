@@ -30,6 +30,13 @@ Feature: Shared Dataset service
     And it does not expose Prisma records
 
   @unit
+  Scenario: Records created at the same instant read back in creation order
+    Given two records created in one batch with the same creation time
+    And their ids differ only where one has "Z" and the other "a"
+    When the records are read, a page at a time or all at once
+    Then the record whose id sorts first by code unit comes first
+
+  @unit
   Scenario: Dataset copy remains a Dataset operation
     When a caller copies a dataset to another project
     Then the service creates the target through its own repository

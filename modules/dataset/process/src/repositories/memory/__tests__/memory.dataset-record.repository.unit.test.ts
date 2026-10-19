@@ -29,6 +29,7 @@ async function seedLaterFirst() {
 describe("MemoryDatasetRecordRepository", () => {
   describe("given two records created at the same instant whose ids differ only at Z versus a", () => {
     describe("when createMany returns them", () => {
+      /** @scenario "Records created at the same instant read back in creation order" */
       it("orders them by code-unit id", async () => {
         const repository = MemoryDatasetRecordRepository.create({
           database: MemoryDatasetDatabase.create(),
@@ -47,6 +48,7 @@ describe("MemoryDatasetRecordRepository", () => {
     });
 
     describe("when findPage reads them", () => {
+      /** @scenario "Records created at the same instant read back in creation order" */
       it("returns the Z id before the a id", async () => {
         const repository = await seedLaterFirst();
 
@@ -57,6 +59,7 @@ describe("MemoryDatasetRecordRepository", () => {
     });
 
     describe("when findPage continues after the Z id", () => {
+      /** @scenario "Records created at the same instant read back in creation order" */
       it("returns the a id", async () => {
         const repository = await seedLaterFirst();
 
@@ -67,6 +70,7 @@ describe("MemoryDatasetRecordRepository", () => {
     });
 
     describe("when listAll reads them", () => {
+      /** @scenario "Records created at the same instant read back in creation order" */
       it("returns the Z id before the a id", async () => {
         const repository = await seedLaterFirst();
 
