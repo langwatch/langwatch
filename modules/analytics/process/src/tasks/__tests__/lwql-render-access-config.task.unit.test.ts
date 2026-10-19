@@ -60,10 +60,23 @@ describe("renderLwqlAccessConfig", () => {
         "utf8",
       );
       expect(contents).toMatch(/^\s*lwql_postgres:\s*$/m);
-      expect(contents).not.toContain("lwql_postgres_");
       expect(lwqlAccessModelDefinitionFromSource(FULL_ENV).namedCollection.collection).toBe(
         "lwql_postgres",
       );
+    });
+
+    /** @scenario "Rendered mode also delivers the per-database collection name a previous config bound tables to" */
+    it("delivers lwql_postgres_<database> beside it with the same connection", async () => {
+      await writeLwqlAccessConfig({ outDir, source: FULL_ENV });
+
+      const contents = await readFile(
+        join(outDir, "config.d", "lwql-named-collection.yaml"),
+        "utf8",
+      );
+      const definition = lwqlAccessModelDefinitionFromSource(FULL_ENV);
+      expect(definition.namedCollectionAliases).toEqual(["lwql_postgres_langwatch"]);
+      expect(contents).toMatch(/^\s*lwql_postgres_langwatch:\s*$/m);
+      expect(contents.match(/host: "pg\.internal"/g)).toHaveLength(2);
     });
   });
 

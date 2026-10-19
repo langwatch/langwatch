@@ -175,6 +175,14 @@ export class LangWatchQLSelfProvisioningService {
   }
 
   /**
+   * The names config.d delivers beside `lwql_postgres`, so a table a previous config bound to
+   * the per-database name still attaches once the pods roll onto this one.
+   */
+  renderedCollectionAliases({ names }: { names: LangWatchQLNames }): string[] {
+    return this.renderedCollectionCandidates({ names }).slice(1);
+  }
+
+  /**
    * A rendered-mode engine table keeps its binding while that candidate exists on the server,
    * else takes the first candidate the server holds. With neither visible it takes the
    * preferred name, so the statement fails where the collection is truly absent.

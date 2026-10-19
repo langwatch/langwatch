@@ -974,8 +974,17 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And an upgrade's converge that runs before the ClickHouse pods roll finds that collection already mounted
     And the rolled pods attach every engine table the previous release created
 
-  # The config store delivers only lwql_postgres: a config name that matches a SQL-created
-  # collection stops ClickHouse at startup (670). One catalog read per converge.
+  # A server whose previous config delivered only lwql_postgres_<database> keeps its tables
+  # bound to that name through the pre-roll converge, so the new config must deliver it too.
+  # Only a hand-made SQL collection of that name on a chart ClickHouse would clash (670).
+  @unit
+  Scenario: Rendered mode also delivers the per-database collection name a previous config bound tables to
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    When the access config is rendered
+    Then config.d delivers lwql_postgres_<database> beside lwql_postgres with the same connection
+    And a table bound to either name still attaches once the ClickHouse pods roll
+
+  # One catalog read per converge.
   @unit
   Scenario: A rendered converge binds each engine table to a collection the server holds
     Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"

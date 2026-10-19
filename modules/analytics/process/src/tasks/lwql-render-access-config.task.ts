@@ -51,6 +51,7 @@ export function lwqlAccessModelDefinitionFromSource(
       user: LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole,
       password: request.postgresReaderPassword,
     },
+    namedCollectionAliases: selfProvisioning.renderedCollectionAliases({ names }),
     sourceDatabase: names.database,
   });
 }

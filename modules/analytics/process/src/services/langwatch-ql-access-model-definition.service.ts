@@ -65,6 +65,8 @@ export interface LwqlAccessModelDefinition {
   readonly grants: readonly LwqlGrantTarget[];
   readonly rowPolicies: readonly LwqlRowPolicyTarget[];
   readonly namedCollection: PostgresNamedCollection;
+  /** Further names config.d delivers with the same connection, for tables bound to them. */
+  readonly namedCollectionAliases: readonly string[];
 }
 
 export interface RenderedConfigFile {
@@ -162,6 +164,7 @@ export class LangWatchQLAccessModelDefinitionService {
     names,
     passwordSha256Hex,
     namedCollection,
+    namedCollectionAliases = [],
     sourceDatabase,
     limits = DEFAULT_LWQL_RESOURCE_LIMITS,
     views = LWQL_VIEW_CATALOG,
@@ -169,6 +172,7 @@ export class LangWatchQLAccessModelDefinitionService {
     names: LangWatchQLNames;
     passwordSha256Hex: string;
     namedCollection: PostgresNamedCollection;
+    namedCollectionAliases?: readonly string[];
     sourceDatabase: string;
     limits?: LangWatchQLResourceLimits;
     views?: readonly LangWatchQLViewDefinition[];
@@ -180,6 +184,9 @@ export class LangWatchQLAccessModelDefinitionService {
       grants: this.#grants({ names, sourceDatabase, views }),
       rowPolicies: this.#rowPolicies({ names, sourceDatabase, views }),
       namedCollection,
+      namedCollectionAliases: namedCollectionAliases.filter(
+        (alias) => alias !== namedCollection.collection,
+      ),
     };
   }
 
@@ -270,17 +277,19 @@ export class LangWatchQLAccessModelDefinitionService {
 
   renderNamedCollectionConfig(definition: LwqlAccessModelDefinition): string {
     const collection = definition.namedCollection;
-    return yamlDocument({
-      named_collections: {
-        [collection.collection]: {
-          host: collection.host,
-          port: collection.port,
-          database: collection.database,
-          user: collection.user,
-          password: collection.password,
-        },
-      },
-    });
+    const connection = {
+      host: collection.host,
+      port: collection.port,
+      database: collection.database,
+      user: collection.user,
+      password: collection.password,
+    };
+    const named: Record<string, YamlValue> = { [collection.collection]: connection };
+    for (const alias of definition.namedCollectionAliases) {
+      sqlText.assertIdentifier(alias, "named collection");
+      named[alias] = connection;
+    }
+    return yamlDocument({ named_collections: named });
   }
 
   /** Key map, each source (column-scoped on ClickHouse), each joined side, then each view. */

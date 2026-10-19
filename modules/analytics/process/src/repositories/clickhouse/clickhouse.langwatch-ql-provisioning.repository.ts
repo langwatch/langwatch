@@ -151,12 +151,7 @@ async function readLwqlCollectionState({
       bound[String(row.name)] = collection;
     }
   }
-  return {
-    available: collections
-      .map((row) => String(row.name))
-      .filter((name) => candidates.includes(name)),
-    bound,
-  };
+  return { available: collections.map((row) => String(row.name)), bound };
 }
 
 /** An unreadable inventory degrades to "none owned", so the statements then fail loudly. */

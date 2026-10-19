@@ -582,6 +582,8 @@ test_lwql() {
     # below and by the app's own suites.
     assert_eq "[$p] named collection lwql_postgres exists" \
       "$(ch_query "$p" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
+    assert_eq "[$p] per-database alias lwql_postgres_langwatch exists" \
+      "$(ch_query "$p" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres_langwatch'")" "1"
     # The restricted identity, on this pod: authenticates, reads zero key-map
     # rows without a tenant capability (row policy default-deny), no admin surface.
     assert_eq "[$p] restricted identity authenticates" \
