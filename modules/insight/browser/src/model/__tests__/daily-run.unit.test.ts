@@ -5,6 +5,7 @@
  */
 
 import {
+  type InsightDailyRunSetting,
   INSIGHT_RUN_SKIP_REASONS,
   INSIGHT_SCHEDULE_OFF_REASONS,
   INSIGHT_SCHEDULE_STATES,
@@ -18,6 +19,7 @@ import {
   type InsightLastRun,
   lastRunWords,
   OFF_REASON_WORDS,
+  requestedRunOf,
   RUN_HOURS,
   RUN_MAXIMUMS,
   runMaximum,
@@ -251,6 +253,62 @@ describe("given a daily run the system turned off", () => {
       expect(OFF_REASON_WORDS.skipped_days).toBe(
         "Turned off after 7 days in a row without a run. Turn it on to try again.",
       );
+    });
+  });
+});
+
+describe("given a member chose Run now", () => {
+  const EARLIER = NOW - DAY_MS;
+  const setting = (overrides: Partial<InsightDailyRunSetting>): InsightDailyRunSetting => ({
+    state: "on",
+    settings: { hour: 9, timezone: AMSTERDAM, maxInsights: 3 },
+    lastRun: lastRun({ at: EARLIER }),
+    offReason: null,
+    runInFlight: null,
+    ...overrides,
+  });
+
+  describe("when the read shows a run in flight", () => {
+    it("follows that run to its conversation", () => {
+      const running = setting({
+        runInFlight: { conversationId: "conversation-7", startedAt: NOW },
+      });
+
+      expect(requestedRunOf({ setting: running, lastRunAtBefore: EARLIER })).toEqual({
+        conversationId: "conversation-7",
+      });
+    });
+  });
+
+  describe("when the run settled before a read saw it start", () => {
+    it("follows the newer last run to its conversation", () => {
+      const settled = setting({ lastRun: lastRun({ at: NOW, conversationId: "conversation-8" }) });
+
+      expect(requestedRunOf({ setting: settled, lastRunAtBefore: EARLIER })).toEqual({
+        conversationId: "conversation-8",
+      });
+      expect(requestedRunOf({ setting: settled, lastRunAtBefore: null })).toEqual({
+        conversationId: "conversation-8",
+      });
+    });
+
+    it("ends the wait with no conversation for a run that never reached Langy", () => {
+      const skipped = setting({
+        lastRun: lastRun({ at: NOW, outcome: "skipped", reason: "board_empty" }),
+      });
+
+      expect(requestedRunOf({ setting: skipped, lastRunAtBefore: EARLIER })).toEqual({
+        conversationId: null,
+      });
+    });
+  });
+
+  describe("when the read shows neither a run in flight nor a newer last run", () => {
+    it("keeps waiting, with or without a run before", () => {
+      expect(requestedRunOf({ setting: setting({}), lastRunAtBefore: EARLIER })).toBeUndefined();
+      expect(
+        requestedRunOf({ setting: setting({ lastRun: null }), lastRunAtBefore: null }),
+      ).toBeUndefined();
     });
   });
 });

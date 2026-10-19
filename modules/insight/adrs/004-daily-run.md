@@ -197,6 +197,23 @@ operator's run is no scheduled run and takes no date from the schedule. A run th
 schedule that is on and no other; a run on a template keeps ending `skipped` with
 `template_board` and the schedule stays on.
 
+**Run now asks for the same run.** The board's dropdown offers Run now to a person who
+holds `analytics:view` and `langy:create`, on a board that is on with no run in flight.
+`runBoardDailyRunNow` sends the request an operator's task sends, for the caller alone, so
+the run files into the same inbox. The browser then reads the board until the run shows:
+in flight, it opens Langy on the run's conversation; settled first, it ends the wait. A run
+that shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost, and the browser says the
+run could not be started. While a run is in flight the dropdown offers to open it instead.
+
+**The row names the run in flight.** `run_started` writes `runInFlightId`,
+`runInFlightConversationId` and `runInFlightStartedAt`, and the `run_settled` of that run
+clears them. The read names no run in flight once its start is older than
+`INSIGHT_DAILY_RUN_EXPIRY_MS`, a run that is lost.
+
+**Insights runs are exempt from the unattended-turn rate limit.** This is an owner
+decision: what is worth running is not known yet. A run starts its turn with
+`isExemptFromRateLimit`, so it is not counted against `langyUnattendedTurnsPerMinute`.
+
 **A reconcile pass arms what lost its wake.** `dailyInsightsScheduleReconcile` is a
 scheduled singleton on the same pipeline, hourly and once across the fleet, as topic
 clustering's schedule seed is. A pass reads every row that is on, in every project, and
@@ -351,5 +368,10 @@ contract; insight knows nothing of ops.
 - The clean-up reads a member's rows per project of the organisation. The row has no
   index on the person; a project's rows that are on are few.
 - There is still no cap on how many boards a person turns on.
+- `InsightDailyScheduleProjection` gained `runInFlightId`, `runInFlightConversationId` and
+  `runInFlightStartedAt` (migration `20261014090000`), all nullable. A row folded before the
+  migration names no run in flight until its next run starts.
+- With no rate limit, a person can start Insights runs as fast as they choose Run now; one
+  run in flight per board is the only bound. Revisit once what is worth running is known.
 - The run events and a pass's request are per-run rows and age with the `traces`
   retention class. `configured` and `turned_off` are a person's setting and never expire.

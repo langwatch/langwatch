@@ -5,10 +5,11 @@
  * @see modules/insight/adrs/004-daily-run.md
  */
 
-import type {
-  InsightDailyRunSetting,
-  InsightRunBoard,
-  InsightRunSettings,
+import {
+  INSIGHT_DAILY_RUN_EXPIRY_MS,
+  type InsightDailyRunSetting,
+  type InsightRunBoard,
+  type InsightRunSettings,
 } from "@langwatch/insight-contract";
 import { LANGY_CONVERSATION_PARAM } from "@langwatch/langy-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
@@ -27,9 +28,10 @@ const NEVER_DECIDED: InsightDailyRunSetting = {
   runInFlight: null,
 };
 
-/** How often Run now asks whether its run started, and how long before it stops asking. */
+/** How often Run now asks whether its run started. */
 const RUN_START_POLL_MS = 2_000;
-const RUN_START_WAIT_MS = 2 * 60_000;
+
+const RUN_NOT_STARTED = "Couldn't start the run";
 
 /** Langy's panel opens on `?langyConversation=` wherever a project page is. */
 function openInLangy({ host, conversationId }: { host: InsightHostApi; conversationId: string }) {
@@ -76,11 +78,18 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
       openInLangy({ host, conversationId: requestedConversationId });
     }
   }, [hasRequestedRunShown, requestedConversationId, host]);
+  // A run that showed neither start nor outcome within a run's expiry is lost, so say so.
   useEffect(() => {
     if (!awaitedRun) return;
-    const giveUp = setTimeout(() => setAwaitedRun(null), RUN_START_WAIT_MS);
-    return () => clearTimeout(giveUp);
-  }, [awaitedRun]);
+    const lost = setTimeout(() => {
+      setAwaitedRun(null);
+      host.failed({
+        error: new Error("The requested run never showed"),
+        fallbackTitle: RUN_NOT_STARTED,
+      });
+    }, INSIGHT_DAILY_RUN_EXPIRY_MS);
+    return () => clearTimeout(lost);
+  }, [awaitedRun, host]);
 
   const write = ({ next, send, done, fallbackTitle }: Write) => {
     const before = utils.insights.getBoardDailyRun.getData(scope);
@@ -150,7 +159,7 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
       }),
     /** A run is a Langy turn, so Run now asks what turning the run on asks. */
     mayRunNow: host.hasPermission("langy:create"),
-    /** True from Run now until its run shows, or the wait for it ends. */
+    /** True from Run now until its run shows, or a run's expiry passes without it. */
     isStartingRun: awaitedRun !== null,
     runNow: () => {
       setAwaitedRun({ lastRunAtBefore: query.data?.lastRun?.at ?? null });
@@ -160,7 +169,7 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
           onSuccess: () => void utils.insights.getBoardDailyRun.invalidate(scope),
           onError: (error) => {
             setAwaitedRun(null);
-            host.failed({ error, fallbackTitle: "Couldn't start the run" });
+            host.failed({ error, fallbackTitle: RUN_NOT_STARTED });
           },
         },
       );

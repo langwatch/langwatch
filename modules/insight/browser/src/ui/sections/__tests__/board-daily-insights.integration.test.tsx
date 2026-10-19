@@ -7,6 +7,7 @@
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import {
+  INSIGHT_DAILY_RUN_EXPIRY_MS,
   INSIGHT_RUN_SKIP_REASONS,
   type InsightDailyRunSetting,
   type InsightEntry,
@@ -15,7 +16,7 @@ import { currentTimeZone, format, nowInstant } from "@langwatch/time";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OFF_REASON_WORDS, SKIP_REASON_WORDS } from "../../../model/daily-run.ts";
 import {
@@ -107,7 +108,7 @@ function openBoard({
   ...board
 }: {
   /** What the read answers; a function answers what holds when the read is asked. */
-  setting?: InsightDailyRunSetting | (() => InsightDailyRunSetting);
+  setting?: InsightDailyRunSetting | (() => InsightDailyRunSetting | Promise<never>);
   widgets?: number | "loading";
   entries?: InsightEntry[];
   /** How the server answers a write; it accepts unless a test says otherwise. */
@@ -551,6 +552,40 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
         },
       ]);
       expect(board.host.failures).toEqual([]);
+    });
+  });
+
+  describe("when the run they asked for shows neither a start nor an outcome", () => {
+    /** @scenario "Run now asks for a run and opens Langy on it" */
+    it("follows it for as long as a run can last, then says it could not be started", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        let isRequested = false;
+        const board = openBoard({
+          // Once asked, the read never answers: the poll joins it and draws nothing for an hour.
+          setting: () => (isRequested ? new Promise<never>(() => {}) : ON),
+          host: ASKER,
+          write: () => {
+            isRequested = true;
+            return Promise.resolve({ requestId: "request-1" });
+          },
+        });
+        const dropdown = await openDropdown(board.user);
+        await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+        await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(1));
+
+        await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS - 60_000);
+        expect(board.host.failures).toEqual([]);
+        await vi.advanceTimersByTimeAsync(60_000);
+
+        await waitFor(() => expect(board.host.failures).toHaveLength(1));
+        expect(board.host.failures[0]?.fallbackTitle).toBe("Couldn't start the run");
+        const again = await openDropdown(board.user);
+        expect(again.getByRole("button", { name: "Run now" })).toBeInTheDocument();
+        expect(board.host.queries).toEqual([]);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

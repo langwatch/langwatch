@@ -4,20 +4,21 @@
  */
 
 import type { IntentContext } from "@langwatch/eventing";
-import { insightRunBoardSchema, insightRunMaxInsightsSchema } from "@langwatch/insight-contract";
+import {
+  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
+  insightRunBoardSchema,
+  insightRunMaxInsightsSchema,
+} from "@langwatch/insight-contract";
 import { z } from "zod";
 
 export const INSIGHT_DAILY_RUN_INTENT = "runBoard" as const;
 
-/** A model call that fails for good is not worth a fourth try. */
-export const INSIGHT_DAILY_RUN_MAX_ATTEMPTS = 3;
-
-/** Longer than a run may wait for Langy, so a slow run is never handed to a second pod. */
-export const INSIGHT_DAILY_RUN_LEASE_MS = 20 * 60_000;
-
-/** A run that recorded no outcome within every attempt's lease is lost, and blocks no more. */
-export const INSIGHT_DAILY_RUN_EXPIRY_MS =
-  INSIGHT_DAILY_RUN_LEASE_MS * INSIGHT_DAILY_RUN_MAX_ATTEMPTS;
+/** In the contract, so the browser follows a Run now for as long as a run can last. */
+export {
+  INSIGHT_DAILY_RUN_EXPIRY_MS,
+  INSIGHT_DAILY_RUN_LEASE_MS,
+  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
+} from "@langwatch/insight-contract";
 
 export const runBoardIntentSchema = z.object({
   scheduleId: z.string().min(1),

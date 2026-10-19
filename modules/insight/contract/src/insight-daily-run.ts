@@ -101,6 +101,16 @@ export type InsightRunReason = z.infer<typeof insightRunReasonSchema>;
 /** A schedule whose runs ended `skipped` on this many scheduled days in a row turns itself off. */
 export const INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF = 7;
 
+/** A model call that fails for good is not worth a fourth try. */
+export const INSIGHT_DAILY_RUN_MAX_ATTEMPTS = 3;
+
+/** Longer than a run may wait for Langy, so a slow run is never handed to a second pod. */
+export const INSIGHT_DAILY_RUN_LEASE_MS = 20 * 60_000;
+
+/** A run that recorded no outcome within every attempt's lease is lost, and blocks no more. */
+export const INSIGHT_DAILY_RUN_EXPIRY_MS =
+  INSIGHT_DAILY_RUN_LEASE_MS * INSIGHT_DAILY_RUN_MAX_ATTEMPTS;
+
 /**
  * Why the system turned a schedule off. `board_deleted`: a run found its board gone.
  * `skipped_days`: its runs were skipped too many days in a row. `member_removed` and
