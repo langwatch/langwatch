@@ -1,4 +1,8 @@
-import type { SecretApi } from "@langwatch/secret-contract";
+import {
+  SecretLimitReachedError,
+  SecretNotFoundError,
+  type SecretApi,
+} from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -20,8 +24,14 @@ const httpConfig = (token: string) => ({
   auth: { type: "bearer" as const, token },
 });
 
-async function build(options: { refusedProjectId?: string; savedDuringMove?: boolean } = {}) {
-  const values: Record<string, Record<string, string>> = {};
+async function build(
+  options: {
+    refused?: { projectId: string; error: unknown };
+    savedDuringMove?: boolean;
+    stored?: Record<string, Record<string, string>>;
+  } = {},
+) {
+  const values: Record<string, Record<string, string>> = { ...options.stored };
   const secrets = createApiFixture<SecretApi>({
     list: async ({ projectId }) =>
       Object.keys(values[projectId] ?? {}).map((name) =>
@@ -32,7 +42,7 @@ async function build(options: { refusedProjectId?: string; savedDuringMove?: boo
         Object.entries(values[projectId] ?? {}).filter(([name]) => names.includes(name)),
       ),
     create: async (input) => {
-      if (input.projectId === options.refusedProjectId) throw new Error("secret limit");
+      if (input.projectId === options.refused?.projectId) throw options.refused.error;
       values[input.projectId] = { ...values[input.projectId], [input.name]: input.value };
 
       return createApiFixture<SecretRow>({ id: input.name, name: input.name });
@@ -118,9 +128,13 @@ describe("the agent credential step moving inline HTTP agent credentials to proj
 
   /** @scenario "An agent credential that cannot be moved holds the agent credential step" */
   it("moves every other agent, then fails with progress kept before the held project", async () => {
-    const { run, values, saved, configOf } = await build({ refusedProjectId: "project_a" });
+    const { run, values, saved, configOf } = await build({
+      refused: { projectId: "project_a", error: new Error("connection reset") },
+    });
 
-    await expect(run()).rejects.toThrow(/1 HTTP agent credential\(s\) could not be stored/);
+    await expect(run()).rejects.toThrow(
+      /1 HTTP agent credential\(s\) could not be stored .*agent agent_a in project project_a: Error/,
+    );
 
     expect(await configOf("agent_a", "project_a")).toContain(TOKEN);
     expect(values).toEqual({ project_b: { HTTP_AGENT_B_AUTH_TOKEN: TOKEN } });
@@ -146,5 +160,55 @@ describe("the agent credential step moving inline HTTP agent credentials to proj
 
     expect(await configOf("agent_a", "project_a")).toContain(TOKEN);
     expect(values).toEqual({ project_b: { HTTP_AGENT_B_AUTH_TOKEN: TOKEN } });
+  });
+
+  /** @scenario "An agent credential that can never be moved is left in place and the step completes" */
+  it("completes, keeping the literal and reporting why, when the agent's project is an orphan", async () => {
+    const { run, values, saved, configOf } = await build({
+      refused: { projectId: "project_a", error: new SecretNotFoundError() },
+    });
+
+    const report = await run();
+
+    expect(report).toMatchObject({
+      moved: 1,
+      held: 0,
+      afterProjectId: "project_b",
+      kept: [{ agentId: "agent_a", projectId: "project_a", reason: "project_not_found" }],
+      failed: [],
+    });
+    expect(await configOf("agent_a", "project_a")).toContain(TOKEN);
+    expect(values).toEqual({ project_b: { HTTP_AGENT_B_AUTH_TOKEN: TOKEN } });
+    expect(saved.map((progress) => progress.afterProjectId)).toEqual(["project_a", "project_b"]);
+  });
+
+  /** @scenario "An agent credential that can never be moved is left in place and the step completes" */
+  it("completes with the agent reported when its project is at the secret limit", async () => {
+    const { run, configOf } = await build({
+      refused: { projectId: "project_a", error: new SecretLimitReachedError() },
+    });
+
+    const report = await run();
+
+    expect(report.kept).toEqual([
+      { agentId: "agent_a", projectId: "project_a", reason: "secret_limit_reached" },
+    ]);
+    expect(await configOf("agent_a", "project_a")).toContain(TOKEN);
+  });
+
+  /** @scenario "A credential already stored as a project secret is referenced, not stored again" */
+  it("references a secret already holding the value instead of storing it again", async () => {
+    const { run, values, configOf } = await build({
+      stored: { project_a: { HTTP_AGENT_A_AUTH_TOKEN: TOKEN } },
+      refused: { projectId: "project_a", error: new Error("no write expected") },
+    });
+
+    const report = await run();
+
+    expect(report).toMatchObject({ moved: 2, held: 0, kept: [] });
+    expect(values.project_a).toEqual({ HTTP_AGENT_A_AUTH_TOKEN: TOKEN });
+    expect(await configOf("agent_a", "project_a")).toContain(
+      "{{ secrets.HTTP_AGENT_A_AUTH_TOKEN }}",
+    );
   });
 });

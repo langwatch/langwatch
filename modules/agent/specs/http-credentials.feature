@@ -70,10 +70,26 @@ Feature: HTTP agent credentials
 
   @unit
   Scenario: An agent credential that cannot be moved holds the agent credential step
-    Given an HTTP agent whose credential cannot be stored as a project secret
+    Given an HTTP agent whose credential cannot be stored as a project secret for a reason a retry may clear
     When the agent credential upgrade step runs
     Then that agent keeps its credential and every other agent is moved
-    And the step fails saying how many agents were held, with its progress kept before that agent's project
+    And the step fails saying how many agents were held, naming each held agent and why
+    And its progress is kept before that agent's project
+
+  @unit
+  Scenario: An agent credential that can never be moved is left in place and the step completes
+    Given an HTTP agent whose credential a retry can never store as a project secret
+    And the reason is that its project belongs to no organisation, has no team member, is at the secret limit, cannot read its stored secrets, or its agent or config is gone or invalid
+    When the agent credential upgrade step runs
+    Then that agent keeps its credential and every other agent is moved
+    And the step completes, its report naming the agent, its project and a stable reason code
+    And its progress moves past that agent's project
+
+  @unit
+  Scenario: A credential already stored as a project secret is referenced, not stored again
+    Given an HTTP agent whose literal credential is already the value of its project secret
+    When the agent credential upgrade step runs
+    Then the agent references that secret and no secret is written
 
   @unit
   Scenario: An agent saved while its credential is being moved keeps the newer save
