@@ -306,3 +306,24 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     And the seeded admin's verified address is not on langwatch.ai
     When grant-platform-operator runs with that address
     Then the account is granted
+
+  # ============================================================================
+  # A self-hosted operator is not LangWatch staff
+  # ============================================================================
+  # Every grant path writes the one platform-operator role (ops:view, ops:manage). What only
+  # LangWatch staff do on the hosted cloud (licences, self-hosted instances, subscriptions, the
+  # bug-report inbox) is Cloud admin, behind ops's cloud-ops capability, not behind the role.
+  # Switching it on needs the private key of the release's licence public key (cloud-ops.feature).
+
+  @unit @operator-scope
+  Scenario: A self-hosted operator is refused Cloud admin
+    Given a self-hosted install, where the cloud-ops capability is off
+    And a user the seed, the recovery task or the page granted the platform-operator role
+    When they ask for a Cloud admin surface
+    Then the call is refused with not_found, though they hold ops:view and ops:manage
+
+  @unit @operator-scope
+  Scenario: A grant names the account and nothing more
+    When the page or authz is asked to grant the platform-operator role with a role, a permission or a scope beside the account
+    Then the input is refused before anything is granted
+    And no grant path can confer more than ops:view and ops:manage
