@@ -123,7 +123,7 @@ Feature: The daily insights run
     @unit
     Scenario: A board that cannot be read in the project skips the run
       Given a project where dashboards or custom charts are off
-      When a run is requested on a board
+      When a run is requested on a stored board or on a From LangWatch board
       Then it is recorded as skipped with the reason board_unreadable
       And Langy is never called
 
@@ -135,11 +135,18 @@ Feature: The daily insights run
       And Langy is never called
 
     @unit
-    Scenario: A From LangWatch board is skipped with its own reason
+    Scenario: A From LangWatch board is read from the catalogue
       Given a run requested on a From LangWatch board, named by its template id
       When the run is carried out
-      Then it is recorded as skipped with the reason template_board
-      And the run's row names the template board
+      Then Langy is briefed on the board's widgets from the catalogue, in reading order
+      And each widget is named template:<templateId>:<key>
+      And the run's row names the template board by its name now
+
+    @unit
+    Scenario: A From LangWatch board no longer offered reads as deleted
+      Given a run requested on a template id the catalogue no longer offers
+      When the run is carried out
+      Then it is recorded as skipped with the reason board_deleted
       And Langy is never called
 
     @unit
@@ -966,10 +973,10 @@ Feature: The daily insights run
       Then their setting stays as it was
 
     @unit
-    Scenario: A From LangWatch board that is on is skipped each day and stays on
+    Scenario: A From LangWatch board that is on runs each day and stays on
       Given a member turned their daily run on for a From LangWatch board
       When the slot's run is carried out
-      Then it is recorded as skipped with the reason template_board
+      Then Langy reads the board and the run files what it found
       And the member reads on, and the next day's slot is armed
 
   Rule: A reconcile pass arms a schedule that lost its wake
@@ -1131,14 +1138,6 @@ Feature: The daily insights run
       Given a From LangWatch board
       When a member turns its daily run on
       Then the setting is sent with the kind template and the template's id
-      And after a run it says calmly that Langy cannot read From LangWatch boards yet
-
-    @integration
-    Scenario: A From LangWatch board says before the answer that no run reads it yet
-      Given a From LangWatch board a member never answered for
-      When the offer opens
-      Then it says Langy cannot read From LangWatch boards yet and a run files nothing for now
-      And the offer on a stored board says no such thing
 
     @integration
     Scenario: The control is absent without the flag, the grant or a project that takes runs

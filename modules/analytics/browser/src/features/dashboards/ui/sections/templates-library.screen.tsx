@@ -4,6 +4,13 @@
  * Adding one makes a board for the whole project and drafts its report in Langy (AC140).
  */
 
+import {
+  filterCatalogue,
+  type Trunk,
+  TRUNK_PITCHES,
+  TRUNK_QUESTIONS,
+  trunkCounts,
+} from "@langwatch/analytics-catalogue";
 import { Box, Button, Grid, Heading, Text, VStack } from "@langwatch/design-system/primitives";
 import { type ReactNode, useId } from "react";
 
@@ -11,11 +18,9 @@ import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts"
 import { useBoardPeriod } from "../../behavior/use-board-period.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useTemplateLibraryFilters } from "../../behavior/use-template-library-filters.ts";
-import { TRUNK_PITCHES, TRUNK_QUESTIONS, type Trunk } from "../../catalogue/index.ts";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import { boardPromptDraft, boardSubject } from "../../langy/model/board-langy.ts";
 import { boardFromTemplateId, dashboardsPath } from "../../model/boards.ts";
-import { filterCatalogue, trunkCounts } from "../../model/catalogue-filter.ts";
 import {
   finderPool,
   type LibraryTemplate,

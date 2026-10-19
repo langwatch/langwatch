@@ -6,6 +6,11 @@
  * @see modules/dashboard/specs/dashboards-v1.feature
  */
 
+import {
+  AGENT_KIND_CHIP_LABELS,
+  PICKER_QUESTIONS,
+  PICKER_SECTIONS,
+} from "@langwatch/analytics-catalogue";
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -13,7 +18,6 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
-import { AGENT_KIND_CHIP_LABELS, PICKER_QUESTIONS, PICKER_SECTIONS } from "../catalogue/index.ts";
 import { boardSubject } from "../langy/model/board-langy.ts";
 import { BlockPickerDialog } from "../ui/sections/block-picker-dialog.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";

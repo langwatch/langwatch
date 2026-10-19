@@ -555,48 +555,6 @@ describe("given a From LangWatch board", () => {
       ]);
     });
   });
-
-  describe("when a member is offered its daily run", () => {
-    /** @scenario "A From LangWatch board says before the answer that no run reads it yet" */
-    it("says in the offer that a run on this board files nothing for now", async () => {
-      openBoard({ kind: "template", id: "release" });
-
-      const offer = await screen.findByRole("dialog", { name: OFFER });
-
-      expect(
-        within(offer).getByText(
-          "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.",
-        ),
-      ).toBeInTheDocument();
-    });
-
-    /** @scenario "A From LangWatch board says before the answer that no run reads it yet" */
-    it("says no such thing on a stored board", async () => {
-      openBoard();
-
-      const offer = await screen.findByRole("dialog", { name: OFFER });
-
-      expect(within(offer).queryByText(/cannot read From LangWatch boards/)).toBeNull();
-    });
-  });
-
-  describe("when its run was skipped because no server reads a template yet", () => {
-    /** @scenario "A From LangWatch board takes the control and is named by its template id" */
-    it("says calmly that Langy cannot read From LangWatch boards yet", async () => {
-      const board = openBoard({
-        kind: "template",
-        id: "release",
-        setting: ranToday({ outcome: "skipped", reason: "template_board" }),
-      });
-
-      const dropdown = await openDropdown(board.user);
-
-      expect(
-        dropdown.getByText(`Did not run ${RAN_AT} · Langy cannot read From LangWatch boards yet`),
-      ).toBeInTheDocument();
-      expect(board.host.failures).toEqual([]);
-    });
-  });
 });
 
 describe("given a board whose header is drawn where insights are not available", () => {

@@ -55,3 +55,16 @@ Feature: Editing a dashboard widget from an agent, and where each widget came fr
   Scenario: A widget saved before sources existed still reads
     Given a stored widget definition with no source
     Then it parses, and the widget has no source
+
+  @integration
+  Scenario: A From LangWatch widget is read over the API by its template widget id
+    Given a project key with analytics:view
+    When it gets the widget "template:<templateId>:<key>" of a From LangWatch board
+    Then it answers the widget's name and stored queries from the catalogue
+    And changing or deleting it is refused as not found
+
+  @integration
+  Scenario: A From LangWatch widget is refused without analytics:view
+    Given a project key without analytics:view
+    When it gets a From LangWatch widget by its template widget id
+    Then the request is refused as forbidden
