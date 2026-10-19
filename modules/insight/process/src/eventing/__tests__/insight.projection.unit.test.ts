@@ -184,17 +184,19 @@ describe("given an insight a run filed with a key and a query", () => {
       expect(applyInsightEvent(filed, renewal).tone).toBe("bad");
     });
 
-    it("keeps the source it holds when a board check's renewal names none", () => {
-      const withSource = applyInsightEvent(filed, renewedAfter(1));
-      const stored = renewedAfter(2);
+    /** @scenario "A renewal with no conversation keeps the insight's source" */
+    it("keeps the source an earlier renewal gave it when a renewal names none", () => {
+      const renewedEarlier = applyInsightEvent(filed, renewedAfter(9));
+      const stored = renewedAfter(10);
       const renewal = InsightRenewedEventSchema.parse({
         ...stored,
         data: { ...stored.data, source: null },
       });
 
-      expect(applyInsightEvent(withSource, renewal).source).toEqual({
-        conversationId: "conversation-1",
-        messageId: "message-1",
+      expect(renewedEarlier.source).not.toEqual(filed.source);
+      expect(applyInsightEvent(renewedEarlier, renewal).source).toEqual({
+        conversationId: "conversation-9",
+        messageId: "message-9",
       });
     });
 
