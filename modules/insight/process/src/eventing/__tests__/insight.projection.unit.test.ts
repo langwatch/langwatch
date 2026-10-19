@@ -184,6 +184,20 @@ describe("given an insight a run filed with a key and a query", () => {
       expect(applyInsightEvent(filed, renewal).tone).toBe("bad");
     });
 
+    it("keeps the source it holds when a board check's renewal names none", () => {
+      const withSource = applyInsightEvent(filed, renewedAfter(1));
+      const stored = renewedAfter(2);
+      const renewal = InsightRenewedEventSchema.parse({
+        ...stored,
+        data: { ...stored.data, source: null },
+      });
+
+      expect(applyInsightEvent(withSource, renewal).source).toEqual({
+        conversationId: "conversation-1",
+        messageId: "message-1",
+      });
+    });
+
     /** @scenario "Renewal changes nothing the person did with the insight" */
     it("leaves a reader's seen, done and kept state as it was", () => {
       const reader = { seenAt: FILED_AT + 1, archivedAt: null, keptAt: FILED_AT + 2 };
