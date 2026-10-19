@@ -140,21 +140,22 @@ describe("ModelProviderEvaluatorModelEnvService", () => {
       name: "Vertex AI",
       models: ["gemini-2.5-pro", "my-tuned-endpoint"],
     });
-    const prepare = (model: string, maxTokens: number) =>
+    const prepare = (model: string, maxTokens?: number) =>
       service({ vertex_ai: vertex }).prepare({
         ...base,
         model,
-        settings: { max_tokens: maxTokens },
+        settings: maxTokens === undefined ? {} : { max_tokens: maxTokens },
       });
 
     /** @scenario "An evaluator's max tokens fits the model it runs on, Vertex AI included" */
-    it("sends the model's output limit, or nothing for an unknown model unless the user set it", async () => {
+    it("sends nothing when max tokens is not set, and a set value held to the model's limit", async () => {
+      expect(await prepare("vertex_ai/my-tuned-endpoint")).not.toHaveProperty(
+        "X_LITELLM_max_tokens",
+      );
+      expect(await prepare("vertex_ai/gemini-2.5-pro")).not.toHaveProperty("X_LITELLM_max_tokens");
       expect(await prepare("vertex_ai/gemini-2.5-pro", 128000)).toMatchObject({
         X_LITELLM_max_tokens: "65536",
       });
-      expect(await prepare("vertex_ai/my-tuned-endpoint", 128000)).not.toHaveProperty(
-        "X_LITELLM_max_tokens",
-      );
       expect(await prepare("vertex_ai/my-tuned-endpoint", 4000)).toMatchObject({
         X_LITELLM_max_tokens: "4000",
       });

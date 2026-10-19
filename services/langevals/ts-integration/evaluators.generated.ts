@@ -506,7 +506,10 @@ const evaluatorsSchemaDefinition = z.object({
   "langevals/competitor_llm": z.object({
     settings: z.object({
       model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
-      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
+      max_tokens: z
+        .number()
+        .optional()
+        .describe("Max tokens allowed for evaluation; unset reads as 128000"),
       name: z.string().describe("The name of your company").default("LangWatch"),
       description: z
         .string()
@@ -517,7 +520,10 @@ const evaluatorsSchemaDefinition = z.object({
   "langevals/competitor_llm_function_call": z.object({
     settings: z.object({
       model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
-      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
+      max_tokens: z
+        .number()
+        .optional()
+        .describe("Max tokens allowed for evaluation; unset reads as 128000"),
       name: z.string().describe("The name of your company").default("LangWatch"),
       description: z
         .string()
@@ -548,7 +554,10 @@ const evaluatorsSchemaDefinition = z.object({
   "langevals/llm_answer_match": z.object({
     settings: z.object({
       model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
-      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
+      max_tokens: z
+        .number()
+        .optional()
+        .describe("Max tokens allowed for evaluation; unset reads as 128000"),
       prompt: z
         .string()
         .describe("Prompt for the comparison")
@@ -560,7 +569,10 @@ const evaluatorsSchemaDefinition = z.object({
   "langevals/llm_boolean": z.object({
     settings: z.object({
       model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
-      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
+      max_tokens: z
+        .number()
+        .optional()
+        .describe("Max tokens allowed for evaluation; unset reads as 128000"),
       prompt: z
         .string()
         .describe("The system prompt to use for the LLM to run the evaluation")
@@ -572,7 +584,10 @@ const evaluatorsSchemaDefinition = z.object({
   "langevals/llm_category": z.object({
     settings: z.object({
       model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
-      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
+      max_tokens: z
+        .number()
+        .optional()
+        .describe("Max tokens allowed for evaluation; unset reads as 128000"),
       prompt: z
         .string()
         .describe("The system prompt to use for the LLM to run the evaluation")
@@ -594,7 +609,10 @@ const evaluatorsSchemaDefinition = z.object({
   "langevals/llm_score": z.object({
     settings: z.object({
       model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
-      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
+      max_tokens: z
+        .number()
+        .optional()
+        .describe("Max tokens allowed for evaluation; unset reads as 128000"),
       prompt: z
         .string()
         .describe("The system prompt to use for the LLM to run the evaluation")
@@ -611,7 +629,10 @@ const evaluatorsSchemaDefinition = z.object({
   "langevals/off_topic": z.object({
     settings: z.object({
       model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
-      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
+      max_tokens: z
+        .number()
+        .optional()
+        .describe("Max tokens allowed for evaluation; unset reads as 128000"),
       allowed_topics: z
         .array(z.object({ topic: z.string(), description: z.string() }))
         .describe(
@@ -629,7 +650,10 @@ const evaluatorsSchemaDefinition = z.object({
   "langevals/pairwise_compare": z.object({
     settings: z.object({
       model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
-      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
+      max_tokens: z
+        .number()
+        .optional()
+        .describe("Max tokens allowed for evaluation; unset reads as 128000"),
       prompt: z
         .string()
         .describe("Judge prompt template (golden-aware by default)")
@@ -661,13 +685,19 @@ const evaluatorsSchemaDefinition = z.object({
   "langevals/query_resolution": z.object({
     settings: z.object({
       model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
-      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
+      max_tokens: z
+        .number()
+        .optional()
+        .describe("Max tokens allowed for evaluation; unset reads as 128000"),
     }),
   }),
   "langevals/select_best_compare": z.object({
     settings: z.object({
       model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
-      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
+      max_tokens: z
+        .number()
+        .optional()
+        .describe("Max tokens allowed for evaluation; unset reads as 128000"),
       prompt: z
         .string()
         .describe(
@@ -1488,8 +1518,8 @@ This evaluator use an LLM-as-judge to check if the conversation is related to co
         default: "openai/gpt-5-mini",
       },
       max_tokens: {
-        description: "Max tokens allowed for evaluation",
-        default: 128000,
+        description: "Max tokens allowed for evaluation; unset reads as 128000",
+        default: undefined,
       },
       name: {
         description: "The name of your company",
@@ -1526,8 +1556,8 @@ This evaluator implements LLM-as-a-judge with a function call approach to check 
         default: "openai/gpt-5-mini",
       },
       max_tokens: {
-        description: "Max tokens allowed for evaluation",
-        default: 128000,
+        description: "Max tokens allowed for evaluation; unset reads as 128000",
+        default: undefined,
       },
       name: {
         description: "The name of your company",
@@ -1599,8 +1629,8 @@ Uses an LLM to check if the generated output answers a question correctly the sa
         default: "openai/gpt-5-mini",
       },
       max_tokens: {
-        description: "Max tokens allowed for evaluation",
-        default: 128000,
+        description: "Max tokens allowed for evaluation; unset reads as 128000",
+        default: undefined,
       },
       prompt: {
         description: "Prompt for the comparison",
@@ -1631,8 +1661,8 @@ Use an LLM as a judge with a custom prompt to do a true/false boolean evaluation
         default: "openai/gpt-5-mini",
       },
       max_tokens: {
-        description: "Max tokens allowed for evaluation",
-        default: 128000,
+        description: "Max tokens allowed for evaluation; unset reads as 128000",
+        default: undefined,
       },
       prompt: {
         description: "The system prompt to use for the LLM to run the evaluation",
@@ -1663,8 +1693,8 @@ Use an LLM as a judge with a custom prompt to classify the message into custom d
         default: "openai/gpt-5-mini",
       },
       max_tokens: {
-        description: "Max tokens allowed for evaluation",
-        default: 128000,
+        description: "Max tokens allowed for evaluation; unset reads as 128000",
+        default: undefined,
       },
       prompt: {
         description: "The system prompt to use for the LLM to run the evaluation",
@@ -1708,8 +1738,8 @@ Use an LLM as a judge with custom prompt to do a numeric score evaluation of the
         default: "openai/gpt-5-mini",
       },
       max_tokens: {
-        description: "Max tokens allowed for evaluation",
-        default: 128000,
+        description: "Max tokens allowed for evaluation; unset reads as 128000",
+        default: undefined,
       },
       prompt: {
         description: "The system prompt to use for the LLM to run the evaluation",
@@ -1748,8 +1778,8 @@ This evaluator checks if the user message is concerning one of the allowed topic
         default: "openai/gpt-5-mini",
       },
       max_tokens: {
-        description: "Max tokens allowed for evaluation",
-        default: 128000,
+        description: "Max tokens allowed for evaluation; unset reads as 128000",
+        default: undefined,
       },
       allowed_topics: {
         description:
@@ -1808,8 +1838,8 @@ better one. Superseded by Comparison, which judges two or more candidates.
         default: "openai/gpt-5-mini",
       },
       max_tokens: {
-        description: "Max tokens allowed for evaluation",
-        default: 128000,
+        description: "Max tokens allowed for evaluation; unset reads as 128000",
+        default: undefined,
       },
       prompt: {
         description: "Judge prompt template (golden-aware by default)",
@@ -1862,8 +1892,8 @@ This evaluator checks if all the user queries in the conversation were resolved.
         default: "openai/gpt-5-mini",
       },
       max_tokens: {
-        description: "Max tokens allowed for evaluation",
-        default: 128000,
+        description: "Max tokens allowed for evaluation; unset reads as 128000",
+        default: undefined,
       },
     },
     envVars: [],
@@ -1890,8 +1920,8 @@ for that row when the two checks disagree, rather than guessing.
         default: "openai/gpt-5-mini",
       },
       max_tokens: {
-        description: "Max tokens allowed for evaluation",
-        default: 128000,
+        description: "Max tokens allowed for evaluation; unset reads as 128000",
+        default: undefined,
       },
       prompt: {
         description:
