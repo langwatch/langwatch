@@ -9,6 +9,9 @@ import type { TraceProjectMilestonesService } from "./trace-project-milestones.s
 
 const PROJECT_PAGE_SIZE = 500;
 
+/** How many skipped project ids the report names; the count covers the rest. */
+export const ORPHAN_IDS_REPORTED = 20;
+
 /** What the step saves after each page of trace ids and returns at the end. */
 export const traceMonthIdsReportSchema = z.object({
   month: z.string(),
@@ -21,6 +24,9 @@ export const traceMonthIdsReportSchema = z.object({
   projects: z.number(),
   traceIds: z.number(),
   events: z.number(),
+  /** Projects no organisation owns (their team is gone), so their data has nowhere to route. */
+  skippedOrphans: z.number().default(0),
+  orphanProjectIds: z.array(z.string()).default([]),
 });
 export type TraceMonthIdsReport = z.infer<typeof traceMonthIdsReportSchema>;
 
@@ -33,7 +39,8 @@ export interface TraceMonthIdsInput {
 }
 
 type TraceMonthIdsDependencies = Readonly<{
-  projects: Pick<ProjectApi, "listAllIds">;
+  projects: Pick<ProjectApi, "listAllWithOrganization">;
+  logger: Readonly<{ warn(payload: Readonly<Record<string, unknown>>, message: string): void }>;
   usageCount: Pick<TraceUsageCountRepository, "findTraceIdsFirstSeen">;
   milestones: Pick<TraceProjectMilestonesService, "recordMonthTraceIds">;
   now?: () => number;
@@ -70,8 +77,12 @@ export class TraceMonthIdsMigrationService {
     let report = resumeFrom ?? this.firstReport();
     let after = report.afterProjectId ?? undefined;
     do {
-      const page = await this.deps.projects.listAllIds({ after, limit: this.pageSize });
-      for (const projectId of page.ids) {
+      const page = await this.deps.projects.listAllWithOrganization({
+        after,
+        limit: this.pageSize,
+      });
+      report = await this.skipOrphans({ orphanIds: page.orphanIds, report, dryRun, onPage });
+      for (const { id: projectId } of page.projects) {
         report = await this.sendProject({ projectId, report, dryRun, signal, onPage });
         if (signal.aborted) return report;
         report = { ...report, afterProjectId: projectId, inProject: null };
@@ -94,7 +105,42 @@ export class TraceMonthIdsMigrationService {
       projects: 0,
       traceIds: 0,
       events: 0,
+      skippedOrphans: 0,
+      orphanProjectIds: [],
     };
+  }
+
+  /**
+   * Counts and names a page's projects no organisation owns, before anything routes their data:
+   * the ClickHouse router rightly refuses such a tenant. They never move the cursor, so a resumed
+   * run meets them again; one the report already names is not counted twice.
+   */
+  private async skipOrphans({
+    orphanIds,
+    report,
+    dryRun,
+    onPage,
+  }: {
+    orphanIds: readonly string[];
+    report: TraceMonthIdsReport;
+    dryRun: boolean;
+    onPage: (report: TraceMonthIdsReport) => Promise<void>;
+  }): Promise<TraceMonthIdsReport> {
+    const fresh = orphanIds.filter((id) => !report.orphanProjectIds.includes(id));
+    if (fresh.length === 0) return report;
+    for (const projectId of fresh) {
+      this.deps.logger.warn(
+        { projectId },
+        "the month trace ids step skipped a project whose team no longer exists",
+      );
+    }
+    const next = {
+      ...report,
+      skippedOrphans: report.skippedOrphans + fresh.length,
+      orphanProjectIds: [...report.orphanProjectIds, ...fresh].slice(0, ORPHAN_IDS_REPORTED),
+    };
+    if (!dryRun) await onPage(next);
+    return next;
   }
 
   /** Sends one project's ids page by page, saving after each page it sends. */

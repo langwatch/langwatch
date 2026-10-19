@@ -41,6 +41,7 @@ import {
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import type {
+  ProjectBackfillPage,
   ProjectBackfillRow,
   ProjectRepository,
   ProjectWithOrgAdmin,
@@ -151,10 +152,15 @@ export class PrismaProjectRepository
       ...(after === undefined ? {} : { where: { id: { gt: after } } }),
       ...(limit === undefined ? {} : { take: limit + 1 }),
     });
-    const projects = rows.map((row) => ({ id: row.id, organizationId: row.team.organizationId }));
-    if (limit === undefined || projects.length <= limit) return { projects, next: null };
-    const page = projects.slice(0, limit);
-    return { projects: page, next: page[page.length - 1]?.id ?? null };
+    const more = limit !== undefined && rows.length > limit;
+    const page = more ? rows.slice(0, limit) : rows;
+    // relationMode "prisma" keeps no foreign keys, so a deleted team leaves its projects behind.
+    const projects = page.flatMap((row) => {
+      const organizationId = row.team?.organizationId;
+      return organizationId ? [{ id: row.id, organizationId }] : [];
+    });
+    const orphanIds = page.filter((row) => !row.team?.organizationId).map((row) => row.id);
+    return { projects, orphanIds, next: more ? (page.at(-1)?.id ?? null) : null };
   }
 
   async listAllWithPrivateS3({
@@ -403,13 +409,13 @@ export class PrismaProjectRepository
     };
   }
 
-  async findBackfillPage({
+  async listBackfillPage({
     afterId,
     limit,
   }: {
     afterId: string | null;
     limit: number;
-  }): Promise<ProjectBackfillRow[]> {
+  }): Promise<ProjectBackfillPage> {
     const rows = await this.prisma.project.findMany({
       where: afterId === null ? {} : { id: { gt: afterId } },
       orderBy: { id: "asc" },
@@ -439,17 +445,28 @@ export class PrismaProjectRepository
         },
       },
     });
-    return rows.map((row) => ({
-      id: row.id,
-      createdAt: fromDate(row.createdAt),
-      organizationId: row.team.organizationId,
-      teamId: row.teamId,
-      isPersonal: row.isPersonal,
-      departmentId: row.departmentId,
-      presenceEnabled: row.presenceEnabled,
-      isArchived: row.archivedAt !== null,
-      adminUserId: row.team.organization.members[0]?.userId ?? null,
-    }));
+    const projects: ProjectBackfillRow[] = [];
+    const orphanIds: string[] = [];
+    for (const row of rows) {
+      // relationMode "prisma" keeps no foreign keys: a deleted team or organization leaves this.
+      const organization = row.team?.organization;
+      if (!organization) {
+        orphanIds.push(row.id);
+        continue;
+      }
+      projects.push({
+        id: row.id,
+        createdAt: fromDate(row.createdAt),
+        organizationId: row.team.organizationId,
+        teamId: row.teamId,
+        isPersonal: row.isPersonal,
+        departmentId: row.departmentId,
+        presenceEnabled: row.presenceEnabled,
+        isArchived: row.archivedAt !== null,
+        adminUserId: organization.members[0]?.userId ?? null,
+      });
+    }
+    return { projects, orphanIds, lastId: rows.at(-1)?.id ?? null };
   }
 
   async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {

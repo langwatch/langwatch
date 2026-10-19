@@ -59,6 +59,17 @@ export type ProjectBackfillRow = Readonly<{
   adminUserId: string | null;
 }>;
 
+/**
+ * A page of the projects table for the facts step. `orphanIds` are projects whose team or
+ * organization is gone, so nothing can be recorded for them; `lastId` is the page's last id of
+ * either kind, the cursor that continues it, and null once nothing is left.
+ */
+export type ProjectBackfillPage = Readonly<{
+  projects: ProjectBackfillRow[];
+  orphanIds: string[];
+  lastId: string | null;
+}>;
+
 /** Persistence owned by the Project module. It never crosses into a caller. */
 export interface ProjectRepository {
   findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
@@ -98,7 +109,7 @@ export interface ProjectRepository {
   touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void>;
   findWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
   /** Every project, archived ones included, in id order after `afterId`. */
-  findBackfillPage(input: { afterId: string | null; limit: number }): Promise<ProjectBackfillRow[]>;
+  listBackfillPage(input: { afterId: string | null; limit: number }): Promise<ProjectBackfillPage>;
   findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null>;
   searchByQuery(input: {
     query: string;
@@ -179,7 +190,10 @@ export interface ProjectRepository {
   }): Promise<string[]>;
   /** Every project id, archived included, ordered by id and paged by cursor. */
   listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage>;
-  /** Every project with its team's organisation, archived included, paged like `listAllIds`. */
+  /**
+   * Every project with its team's organisation, archived included, paged like `listAllIds`; a
+   * project whose team is gone is named in `orphanIds` instead.
+   */
   listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
   listAllWithPrivateS3(input?: ProjectIdPageInput): Promise<ProjectPrivateS3Page>;
   listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage>;

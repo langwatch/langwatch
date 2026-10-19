@@ -87,17 +87,26 @@ function factsStep() {
   });
   const step = ProjectFactsBackfillService.create({
     projects: {
-      findBackfillPage: async ({ afterId, limit }) =>
-        rows.filter((row) => afterId === null || row.id > afterId).slice(0, limit),
+      listBackfillPage: async ({ afterId, limit }) => {
+        const projects = rows.filter((row) => afterId === null || row.id > afterId).slice(0, limit);
+        return { projects, orphanIds: [], lastId: projects.at(-1)?.id ?? null };
+      },
     },
     lifecycle: notice,
+    logger: { warn: vi.fn() },
   });
   const runStep = () =>
     step.recordExisting({
       dryRun: false,
       signal: new AbortController().signal,
       afterProjectId: null,
-      countedBefore: { projects: 0, departmentAssignments: 0, presenceSettings: 0 },
+      countedBefore: {
+        projects: 0,
+        departmentAssignments: 0,
+        presenceSettings: 0,
+        skippedOrphans: 0,
+        orphanProjectIds: [],
+      },
       onPageDone: async () => {},
     });
   const loseNextCreated = async ({ projectId }: { projectId: string }) => {
