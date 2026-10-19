@@ -1,8 +1,8 @@
+import type { Named } from "@langwatch/module";
 // Generated from langevals (see services/langevals/scripts/generate_evaluators_ts.py).
 // Zod-first: the schemas below are the source of truth and the TypeScript types
 // are inferred with z.infer. Do not edit by hand.
 import { z } from "zod";
-import type { Named } from "@langwatch/module";
 
 export const evaluatorTypesSchema = z.string();
 
@@ -30,8 +30,11 @@ const evaluationResultSkippedSchemaDefinition = z.object({
   details: z.string().nullish(),
   cost: moneySchema.nullish(),
 });
-export interface EvaluationResultSkippedSchema extends Named<typeof evaluationResultSkippedSchemaDefinition> {}
-export const evaluationResultSkippedSchema: EvaluationResultSkippedSchema = evaluationResultSkippedSchemaDefinition;
+export interface EvaluationResultSkippedSchema extends Named<
+  typeof evaluationResultSkippedSchemaDefinition
+> {}
+export const evaluationResultSkippedSchema: EvaluationResultSkippedSchema =
+  evaluationResultSkippedSchemaDefinition;
 
 const evaluationResultErrorSchemaDefinition = z.object({
   status: z.literal("error"),
@@ -39,238 +42,31 @@ const evaluationResultErrorSchemaDefinition = z.object({
   details: z.string(),
   traceback: z.array(z.string()),
 });
-export interface EvaluationResultErrorSchema extends Named<typeof evaluationResultErrorSchemaDefinition> {}
-export const evaluationResultErrorSchema: EvaluationResultErrorSchema = evaluationResultErrorSchemaDefinition;
+export interface EvaluationResultErrorSchema extends Named<
+  typeof evaluationResultErrorSchemaDefinition
+> {}
+export const evaluationResultErrorSchema: EvaluationResultErrorSchema =
+  evaluationResultErrorSchemaDefinition;
 
 const singleEvaluationResultSchemaDefinition = z.union([
   evaluationResultSchema,
   evaluationResultSkippedSchema,
   evaluationResultErrorSchema,
 ]);
-export interface SingleEvaluationResultSchema extends Named<typeof singleEvaluationResultSchemaDefinition> {}
-export const singleEvaluationResultSchema: SingleEvaluationResultSchema = singleEvaluationResultSchemaDefinition;
+export interface SingleEvaluationResultSchema extends Named<
+  typeof singleEvaluationResultSchemaDefinition
+> {}
+export const singleEvaluationResultSchema: SingleEvaluationResultSchema =
+  singleEvaluationResultSchemaDefinition;
 
 const batchEvaluationResultSchemaDefinition = z.array(singleEvaluationResultSchema);
-export interface BatchEvaluationResultSchema extends Named<typeof batchEvaluationResultSchemaDefinition> {}
-export const batchEvaluationResultSchema: BatchEvaluationResultSchema = batchEvaluationResultSchemaDefinition;
+export interface BatchEvaluationResultSchema extends Named<
+  typeof batchEvaluationResultSchemaDefinition
+> {}
+export const batchEvaluationResultSchema: BatchEvaluationResultSchema =
+  batchEvaluationResultSchemaDefinition;
 
 const evaluatorsSchemaDefinition = z.object({
-  "openai/moderation": z.object({
-    settings: z.object({
-      model: z
-        .union([z.literal("text-moderation-stable"), z.literal("text-moderation-latest")])
-        .describe(
-          "The model version to use, `text-moderation-latest` will be automatically upgraded over time, while `text-moderation-stable` will only be updated with advanced notice by OpenAI.",
-        )
-        .default("text-moderation-stable"),
-      categories: z
-        .object({
-          harassment: z.boolean().default(true),
-          harassment_threatening: z.boolean().default(true),
-          hate: z.boolean().default(true),
-          hate_threatening: z.boolean().default(true),
-          self_harm: z.boolean().default(true),
-          self_harm_instructions: z.boolean().default(true),
-          self_harm_intent: z.boolean().default(true),
-          sexual: z.boolean().default(true),
-          sexual_minors: z.boolean().default(true),
-          violence: z.boolean().default(true),
-          violence_graphic: z.boolean().default(true),
-        })
-        .describe("The categories of content to check for moderation.")
-        .default({
-          harassment: true,
-          harassment_threatening: true,
-          hate: true,
-          hate_threatening: true,
-          self_harm: true,
-          self_harm_instructions: true,
-          self_harm_intent: true,
-          sexual: true,
-          sexual_minors: true,
-          violence: true,
-          violence_graphic: true,
-        }),
-    }),
-  }),
-  "ragas/bleu_score": z.object({ settings: z.record(z.string(), z.never()) }),
-  "ragas/context_f1": z.object({
-    settings: z.object({
-      distance_measure: z
-        .union([
-          z.literal("levenshtein"),
-          z.literal("hamming"),
-          z.literal("jaro"),
-          z.literal("jaro_winkler"),
-        ])
-        .default("levenshtein"),
-    }),
-  }),
-  "ragas/context_precision": z.object({
-    settings: z.object({
-      distance_measure: z
-        .union([
-          z.literal("levenshtein"),
-          z.literal("hamming"),
-          z.literal("jaro"),
-          z.literal("jaro_winkler"),
-        ])
-        .default("levenshtein"),
-    }),
-  }),
-  "ragas/context_recall": z.object({
-    settings: z.object({
-      distance_measure: z
-        .union([
-          z.literal("levenshtein"),
-          z.literal("hamming"),
-          z.literal("jaro"),
-          z.literal("jaro_winkler"),
-        ])
-        .default("levenshtein"),
-    }),
-  }),
-  "ragas/factual_correctness": z.object({
-    settings: z.object({
-      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe(
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        )
-        .default(2048),
-      mode: z
-        .union([z.literal("f1"), z.literal("precision"), z.literal("recall")])
-        .describe("The mode to use for the factual correctness metric.")
-        .default("f1"),
-      atomicity: z
-        .union([z.literal("low"), z.literal("high")])
-        .describe("The level of atomicity for claim decomposition.")
-        .default("low"),
-      coverage: z
-        .union([z.literal("low"), z.literal("high")])
-        .describe("The level of coverage for claim decomposition.")
-        .default("low"),
-    }),
-  }),
-  "ragas/faithfulness": z.object({
-    settings: z.object({
-      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe(
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        )
-        .default(2048),
-      autodetect_dont_know: z
-        .boolean()
-        .describe(
-          "Whether to autodetect 'I don't know' in the output to avoid failing the evaluation.",
-        )
-        .default(true),
-    }),
-  }),
-  "ragas/response_context_precision": z.object({
-    settings: z.object({
-      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe(
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        )
-        .default(2048),
-    }),
-  }),
-  "ragas/response_context_recall": z.object({
-    settings: z.object({
-      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe(
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        )
-        .default(2048),
-    }),
-  }),
-  "ragas/response_relevancy": z.object({
-    settings: z.object({
-      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe(
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        )
-        .default(2048),
-      embeddings_model: z
-        .string()
-        .describe("The model to use for embeddings.")
-        .default("openai/text-embedding-ada-002"),
-    }),
-  }),
-  "ragas/rouge_score": z.object({
-    settings: z.object({
-      rouge_type: z
-        .union([z.literal("rouge1"), z.literal("rougeL")])
-        .describe("ROUGE type")
-        .default("rouge1"),
-      measure_type: z
-        .union([z.literal("fmeasure"), z.literal("precision"), z.literal("recall")])
-        .describe("ROUGE measure type")
-        .default("fmeasure"),
-    }),
-  }),
-  "ragas/rubrics_based_scoring": z.object({
-    settings: z.object({
-      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe(
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        )
-        .default(2048),
-      rubrics: z.array(z.object({ description: z.string() })).default([
-        { description: "The response is incorrect, irrelevant." },
-        {
-          description:
-            "The response partially answers the question but includes significant errors, omissions, or irrelevant information.",
-        },
-        {
-          description:
-            "The response partially answers the question but includes minor errors, omissions, or irrelevant information.",
-        },
-        {
-          description:
-            "The response fully answers the question and includes minor errors, omissions, or irrelevant information.",
-        },
-        {
-          description:
-            "The response fully answers the question and includes no errors, omissions, or irrelevant information.",
-        },
-      ]),
-    }),
-  }),
-  "ragas/sql_query_equivalence": z.object({
-    settings: z.object({
-      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe(
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        )
-        .default(2048),
-    }),
-  }),
-  "ragas/summarization_score": z.object({
-    settings: z.object({
-      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe(
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        )
-        .default(2048),
-    }),
-  }),
   "presidio/pii_detection": z.object({
     settings: z.object({
       entities: z
@@ -367,109 +163,7 @@ const evaluatorsSchemaDefinition = z.object({
     }),
   }),
   "azure/jailbreak": z.object({ settings: z.record(z.string(), z.never()) }),
-  "azure/prompt_injection": z.object({
-    settings: z.record(z.string(), z.never()),
-  }),
-  "lingua/language_detection": z.object({
-    settings: z.object({
-      check_for: z
-        .union([z.literal("input_matches_output"), z.literal("output_matches_language")])
-        .describe("What should be checked")
-        .default("input_matches_output"),
-      expected_language: z
-        .union([
-          z.literal("AF"),
-          z.literal("AR"),
-          z.literal("AZ"),
-          z.literal("BE"),
-          z.literal("BG"),
-          z.literal("BN"),
-          z.literal("BS"),
-          z.literal("CA"),
-          z.literal("CS"),
-          z.literal("CY"),
-          z.literal("DA"),
-          z.literal("DE"),
-          z.literal("EL"),
-          z.literal("EN"),
-          z.literal("EO"),
-          z.literal("ES"),
-          z.literal("ET"),
-          z.literal("EU"),
-          z.literal("FA"),
-          z.literal("FI"),
-          z.literal("FR"),
-          z.literal("GA"),
-          z.literal("GU"),
-          z.literal("HE"),
-          z.literal("HI"),
-          z.literal("HR"),
-          z.literal("HU"),
-          z.literal("HY"),
-          z.literal("ID"),
-          z.literal("IS"),
-          z.literal("IT"),
-          z.literal("JA"),
-          z.literal("KA"),
-          z.literal("KK"),
-          z.literal("KO"),
-          z.literal("LA"),
-          z.literal("LG"),
-          z.literal("LT"),
-          z.literal("LV"),
-          z.literal("MI"),
-          z.literal("MK"),
-          z.literal("MN"),
-          z.literal("MR"),
-          z.literal("MS"),
-          z.literal("NB"),
-          z.literal("NL"),
-          z.literal("NN"),
-          z.literal("PA"),
-          z.literal("PL"),
-          z.literal("PT"),
-          z.literal("RO"),
-          z.literal("RU"),
-          z.literal("SK"),
-          z.literal("SL"),
-          z.literal("SN"),
-          z.literal("SO"),
-          z.literal("SQ"),
-          z.literal("SR"),
-          z.literal("ST"),
-          z.literal("SV"),
-          z.literal("SW"),
-          z.literal("TA"),
-          z.literal("TE"),
-          z.literal("TH"),
-          z.literal("TL"),
-          z.literal("TN"),
-          z.literal("TR"),
-          z.literal("TS"),
-          z.literal("UK"),
-          z.literal("UR"),
-          z.literal("VI"),
-          z.literal("XH"),
-          z.literal("YO"),
-          z.literal("ZH"),
-          z.literal("ZU"),
-        ])
-        .optional()
-        .describe("The specific language that the output is expected to be"),
-      min_words: z
-        .number()
-        .describe(
-          "Minimum number of words to check, as the language detection can be unreliable for very short texts. Inputs shorter than the minimum will be skipped.",
-        )
-        .default(7),
-      threshold: z
-        .number()
-        .describe(
-          "Minimum confidence threshold for the language detection. If the confidence is lower than this, the evaluation will be skipped.",
-        )
-        .default(0.25),
-    }),
-  }),
+  "azure/prompt_injection": z.object({ settings: z.record(z.string(), z.never()) }),
   "langevals/basic": z.object({
     settings: z.object({
       rules: z
@@ -486,13 +180,7 @@ const evaluatorsSchemaDefinition = z.object({
           }),
         )
         .describe("List of rules to check, the message must pass all of them")
-        .default([
-          {
-            field: "output",
-            rule: "not_contains",
-            value: "artificial intelligence",
-          },
-        ]),
+        .default([{ field: "output", rule: "not_contains", value: "artificial intelligence" }]),
     }),
   }),
   "langevals/competitor_blocklist": z.object({
@@ -599,10 +287,7 @@ const evaluatorsSchemaDefinition = z.object({
         .describe("The categories to use for the evaluation")
         .default([
           { name: "smalltalk", description: "Smalltalk with the user" },
-          {
-            name: "company",
-            description: "Questions about the company, what we do, etc",
-          },
+          { name: "company", description: "Questions about the company, what we do, etc" },
         ]),
     }),
   }),
@@ -640,10 +325,7 @@ const evaluatorsSchemaDefinition = z.object({
         )
         .default([
           { topic: "simple_chat", description: "Smalltalk with the user" },
-          {
-            topic: "company",
-            description: "Questions about the company, what we do, etc",
-          },
+          { topic: "company", description: "Questions about the company, what we do, etc" },
         ]),
     }),
   }),
@@ -782,6 +464,324 @@ const evaluatorsSchemaDefinition = z.object({
         .describe("JSON schema to validate against when format is 'json'"),
     }),
   }),
+  "ragas/bleu_score": z.object({ settings: z.record(z.string(), z.never()) }),
+  "ragas/context_f1": z.object({
+    settings: z.object({
+      distance_measure: z
+        .union([
+          z.literal("levenshtein"),
+          z.literal("hamming"),
+          z.literal("jaro"),
+          z.literal("jaro_winkler"),
+        ])
+        .default("levenshtein"),
+    }),
+  }),
+  "ragas/context_precision": z.object({
+    settings: z.object({
+      distance_measure: z
+        .union([
+          z.literal("levenshtein"),
+          z.literal("hamming"),
+          z.literal("jaro"),
+          z.literal("jaro_winkler"),
+        ])
+        .default("levenshtein"),
+    }),
+  }),
+  "ragas/context_recall": z.object({
+    settings: z.object({
+      distance_measure: z
+        .union([
+          z.literal("levenshtein"),
+          z.literal("hamming"),
+          z.literal("jaro"),
+          z.literal("jaro_winkler"),
+        ])
+        .default("levenshtein"),
+    }),
+  }),
+  "ragas/factual_correctness": z.object({
+    settings: z.object({
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+      mode: z
+        .union([z.literal("f1"), z.literal("precision"), z.literal("recall")])
+        .describe("The mode to use for the factual correctness metric.")
+        .default("f1"),
+      atomicity: z
+        .union([z.literal("low"), z.literal("high")])
+        .describe("The level of atomicity for claim decomposition.")
+        .default("low"),
+      coverage: z
+        .union([z.literal("low"), z.literal("high")])
+        .describe("The level of coverage for claim decomposition.")
+        .default("low"),
+    }),
+  }),
+  "ragas/faithfulness": z.object({
+    settings: z.object({
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+      autodetect_dont_know: z
+        .boolean()
+        .describe(
+          "Whether to autodetect 'I don't know' in the output to avoid failing the evaluation.",
+        )
+        .default(true),
+    }),
+  }),
+  "ragas/response_context_precision": z.object({
+    settings: z.object({
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "ragas/response_context_recall": z.object({
+    settings: z.object({
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "ragas/response_relevancy": z.object({
+    settings: z.object({
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+      embeddings_model: z
+        .string()
+        .describe("The model to use for embeddings.")
+        .default("openai/text-embedding-ada-002"),
+    }),
+  }),
+  "ragas/rouge_score": z.object({
+    settings: z.object({
+      rouge_type: z
+        .union([z.literal("rouge1"), z.literal("rougeL")])
+        .describe("ROUGE type")
+        .default("rouge1"),
+      measure_type: z
+        .union([z.literal("fmeasure"), z.literal("precision"), z.literal("recall")])
+        .describe("ROUGE measure type")
+        .default("fmeasure"),
+    }),
+  }),
+  "ragas/rubrics_based_scoring": z.object({
+    settings: z.object({
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+      rubrics: z
+        .array(z.object({ description: z.string() }))
+        .default([
+          { description: "The response is incorrect, irrelevant." },
+          {
+            description:
+              "The response partially answers the question but includes significant errors, omissions, or irrelevant information.",
+          },
+          {
+            description:
+              "The response partially answers the question but includes minor errors, omissions, or irrelevant information.",
+          },
+          {
+            description:
+              "The response fully answers the question and includes minor errors, omissions, or irrelevant information.",
+          },
+          {
+            description:
+              "The response fully answers the question and includes no errors, omissions, or irrelevant information.",
+          },
+        ]),
+    }),
+  }),
+  "ragas/sql_query_equivalence": z.object({
+    settings: z.object({
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "ragas/summarization_score": z.object({
+    settings: z.object({
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "lingua/language_detection": z.object({
+    settings: z.object({
+      check_for: z
+        .union([z.literal("input_matches_output"), z.literal("output_matches_language")])
+        .describe("What should be checked")
+        .default("input_matches_output"),
+      expected_language: z
+        .union([
+          z.literal("AF"),
+          z.literal("AR"),
+          z.literal("AZ"),
+          z.literal("BE"),
+          z.literal("BG"),
+          z.literal("BN"),
+          z.literal("BS"),
+          z.literal("CA"),
+          z.literal("CS"),
+          z.literal("CY"),
+          z.literal("DA"),
+          z.literal("DE"),
+          z.literal("EL"),
+          z.literal("EN"),
+          z.literal("EO"),
+          z.literal("ES"),
+          z.literal("ET"),
+          z.literal("EU"),
+          z.literal("FA"),
+          z.literal("FI"),
+          z.literal("FR"),
+          z.literal("GA"),
+          z.literal("GU"),
+          z.literal("HE"),
+          z.literal("HI"),
+          z.literal("HR"),
+          z.literal("HU"),
+          z.literal("HY"),
+          z.literal("ID"),
+          z.literal("IS"),
+          z.literal("IT"),
+          z.literal("JA"),
+          z.literal("KA"),
+          z.literal("KK"),
+          z.literal("KO"),
+          z.literal("LA"),
+          z.literal("LG"),
+          z.literal("LT"),
+          z.literal("LV"),
+          z.literal("MI"),
+          z.literal("MK"),
+          z.literal("MN"),
+          z.literal("MR"),
+          z.literal("MS"),
+          z.literal("NB"),
+          z.literal("NL"),
+          z.literal("NN"),
+          z.literal("PA"),
+          z.literal("PL"),
+          z.literal("PT"),
+          z.literal("RO"),
+          z.literal("RU"),
+          z.literal("SK"),
+          z.literal("SL"),
+          z.literal("SN"),
+          z.literal("SO"),
+          z.literal("SQ"),
+          z.literal("SR"),
+          z.literal("ST"),
+          z.literal("SV"),
+          z.literal("SW"),
+          z.literal("TA"),
+          z.literal("TE"),
+          z.literal("TH"),
+          z.literal("TL"),
+          z.literal("TN"),
+          z.literal("TR"),
+          z.literal("TS"),
+          z.literal("UK"),
+          z.literal("UR"),
+          z.literal("VI"),
+          z.literal("XH"),
+          z.literal("YO"),
+          z.literal("ZH"),
+          z.literal("ZU"),
+        ])
+        .optional()
+        .describe("The specific language that the output is expected to be"),
+      min_words: z
+        .number()
+        .describe(
+          "Minimum number of words to check, as the language detection can be unreliable for very short texts. Inputs shorter than the minimum will be skipped.",
+        )
+        .default(7),
+      threshold: z
+        .number()
+        .describe(
+          "Minimum confidence threshold for the language detection. If the confidence is lower than this, the evaluation will be skipped.",
+        )
+        .default(0.25),
+    }),
+  }),
+  "openai/moderation": z.object({
+    settings: z.object({
+      model: z
+        .union([z.literal("text-moderation-stable"), z.literal("text-moderation-latest")])
+        .describe(
+          "The model version to use, `text-moderation-latest` will be automatically upgraded over time, while `text-moderation-stable` will only be updated with advanced notice by OpenAI.",
+        )
+        .default("text-moderation-stable"),
+      categories: z
+        .object({
+          harassment: z.boolean().default(true),
+          harassment_threatening: z.boolean().default(true),
+          hate: z.boolean().default(true),
+          hate_threatening: z.boolean().default(true),
+          self_harm: z.boolean().default(true),
+          self_harm_instructions: z.boolean().default(true),
+          self_harm_intent: z.boolean().default(true),
+          sexual: z.boolean().default(true),
+          sexual_minors: z.boolean().default(true),
+          violence: z.boolean().default(true),
+          violence_graphic: z.boolean().default(true),
+        })
+        .describe("The categories of content to check for moderation.")
+        .default({
+          harassment: true,
+          harassment_threatening: true,
+          hate: true,
+          hate_threatening: true,
+          self_harm: true,
+          self_harm_instructions: true,
+          self_harm_intent: true,
+          sexual: true,
+          sexual_minors: true,
+          violence: true,
+          violence_graphic: true,
+        }),
+    }),
+  }),
 });
 export interface EvaluatorsSchema extends Named<typeof evaluatorsSchemaDefinition> {}
 export const evaluatorsSchema: EvaluatorsSchema = evaluatorsSchemaDefinition;
@@ -826,447 +826,6 @@ export type EvaluatorDefinition<T extends EvaluatorTypes> = {
 export const AVAILABLE_EVALUATORS: {
   [K in EvaluatorTypes]: EvaluatorDefinition<K>;
 } = {
-  "openai/moderation": {
-    name: `OpenAI Moderation`,
-    description: `
-This evaluator uses OpenAI's moderation API to detect potentially harmful content in text,
-including harassment, hate speech, self-harm, sexual content, and violence.
-`,
-    category: "safety",
-    docsUrl: "https://platform.openai.com/docs/guides/moderation/overview",
-    isGuardrail: true,
-    requiredFields: [],
-    optionalFields: ["input", "output"],
-    settings: {
-      model: {
-        description:
-          "The model version to use, `text-moderation-latest` will be automatically upgraded over time, while `text-moderation-stable` will only be updated with advanced notice by OpenAI.",
-        default: "text-moderation-stable",
-      },
-      categories: {
-        description: "The categories of content to check for moderation.",
-        default: {
-          harassment: true,
-          harassment_threatening: true,
-          hate: true,
-          hate_threatening: true,
-          self_harm: true,
-          self_harm_instructions: true,
-          self_harm_intent: true,
-          sexual: true,
-          sexual_minors: true,
-          violence: true,
-          violence_graphic: true,
-        },
-      },
-    },
-    envVars: ["OPENAI_API_KEY"],
-    result: {
-      score: {
-        description:
-          "The model's confidence on primary category where the input violates the OpenAI's policy. The value is between 0 and 1, where higher values denote higher confidence.",
-      },
-      passed: {
-        description: "Fails if any moderation category is flagged",
-      },
-    },
-  },
-  "ragas/bleu_score": {
-    name: `BLEU Score`,
-    description: `
-Traditional NLP metric. BLEU score for evaluating the similarity between two strings.
-`,
-    category: "quality",
-    docsUrl:
-      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/traditional/#bleu-score",
-    isGuardrail: false,
-    requiredFields: ["output", "expected_output"],
-    optionalFields: [],
-    settings: {},
-    envVars: [],
-    result: {
-      score: {
-        description: "BLEU similarity score",
-      },
-    },
-  },
-  "ragas/context_f1": {
-    name: `Context F1`,
-    description: `
-Balances between precision and recall for context retrieval, increasing it means a better signal-to-noise ratio. Uses traditional string distance metrics.
-`,
-    category: "rag",
-    docsUrl:
-      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/context_F1/#non-llm-based-context-F1",
-    isGuardrail: false,
-    requiredFields: ["contexts", "expected_contexts"],
-    optionalFields: [],
-    settings: {
-      distance_measure: {
-        description: undefined,
-        default: "levenshtein",
-      },
-    },
-    envVars: [],
-    result: {
-      score: {
-        description: "A score between 0.0 and 1.0 indicating the F1 score.",
-      },
-    },
-  },
-  "ragas/context_precision": {
-    name: `Context Precision`,
-    description: `
-Measures how accurate is the retrieval compared to expected contexts, increasing it means less noise in the retrieval. Uses traditional string distance metrics.
-`,
-    category: "rag",
-    docsUrl:
-      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/context_precision/#non-llm-based-context-precision",
-    isGuardrail: false,
-    requiredFields: ["contexts", "expected_contexts"],
-    optionalFields: [],
-    settings: {
-      distance_measure: {
-        description: undefined,
-        default: "levenshtein",
-      },
-    },
-    envVars: [],
-    result: {
-      score: {
-        description: "A score between 0.0 and 1.0 indicating the precision score.",
-      },
-    },
-  },
-  "ragas/context_recall": {
-    name: `Context Recall`,
-    description: `
-Measures how many relevant contexts were retrieved compared to expected contexts, increasing it means more signal in the retrieval. Uses traditional string distance metrics.
-`,
-    category: "rag",
-    docsUrl:
-      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/context_recall/#non-llm-based-context-recall",
-    isGuardrail: false,
-    requiredFields: ["contexts", "expected_contexts"],
-    optionalFields: [],
-    settings: {
-      distance_measure: {
-        description: undefined,
-        default: "levenshtein",
-      },
-    },
-    envVars: [],
-    result: {
-      score: {
-        description: "A score between 0.0 and 1.0 indicating the Recall score.",
-      },
-    },
-  },
-  "ragas/factual_correctness": {
-    name: `LLM Factual Match`,
-    description: `
-Computes with an LLM how factually similar the generated answer is to the expected output.
-`,
-    category: "quality",
-    docsUrl:
-      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/factual_correctness/",
-    isGuardrail: false,
-    requiredFields: ["output", "expected_output"],
-    optionalFields: [],
-    settings: {
-      model: {
-        description: "The model to use for evaluation.",
-        default: "openai/gpt-5-mini",
-      },
-      max_tokens: {
-        description:
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        default: 2048,
-      },
-      mode: {
-        description: "The mode to use for the factual correctness metric.",
-        default: "f1",
-      },
-      atomicity: {
-        description: "The level of atomicity for claim decomposition.",
-        default: "low",
-      },
-      coverage: {
-        description: "The level of coverage for claim decomposition.",
-        default: "low",
-      },
-    },
-    envVars: [],
-    result: {
-      score: {
-        description:
-          "A score between 0.0 and 1.0 indicating how factually similar the generated answer is to the expected output.",
-      },
-    },
-  },
-  "ragas/faithfulness": {
-    name: `Ragas Faithfulness`,
-    description: `
-This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations.
-`,
-    category: "rag",
-    docsUrl: "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/",
-    isGuardrail: false,
-    requiredFields: ["output", "contexts"],
-    optionalFields: ["input"],
-    settings: {
-      model: {
-        description: "The model to use for evaluation.",
-        default: "openai/gpt-5-mini",
-      },
-      max_tokens: {
-        description:
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        default: 2048,
-      },
-      autodetect_dont_know: {
-        description:
-          "Whether to autodetect 'I don't know' in the output to avoid failing the evaluation.",
-        default: true,
-      },
-    },
-    envVars: [],
-    result: {
-      score: {
-        description: "A score between 0.0 and 1.0 indicating the faithfulness of the answer.",
-      },
-    },
-  },
-  "ragas/response_context_precision": {
-    name: `Ragas Response Context Precision`,
-    description: `
-Uses an LLM to measure the proportion of chunks in the retrieved context that were relevant to generate the output or the expected output.
-`,
-    category: "rag",
-    docsUrl:
-      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/context_precision/#context-precision-without-reference",
-    isGuardrail: false,
-    requiredFields: ["input", "contexts"],
-    optionalFields: ["output", "expected_output"],
-    settings: {
-      model: {
-        description: "The model to use for evaluation.",
-        default: "openai/gpt-5-mini",
-      },
-      max_tokens: {
-        description:
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        default: 2048,
-      },
-    },
-    envVars: [],
-    result: {
-      score: {
-        description:
-          "A score between 0.0 and 1.0 indicating the precision of the retrieved context.",
-      },
-    },
-  },
-  "ragas/response_context_recall": {
-    name: `Ragas Response Context Recall`,
-    description: `
-Uses an LLM to measure how many of relevant documents attributable the claims in the output were successfully retrieved in order to generate an expected output.
-`,
-    category: "rag",
-    docsUrl:
-      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/context_recall/#llm-based-context-recall",
-    isGuardrail: false,
-    requiredFields: ["input", "output", "contexts", "expected_output"],
-    optionalFields: [],
-    settings: {
-      model: {
-        description: "The model to use for evaluation.",
-        default: "openai/gpt-5-mini",
-      },
-      max_tokens: {
-        description:
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        default: 2048,
-      },
-    },
-    envVars: [],
-    result: {
-      score: {
-        description: "A score between 0.0 and 1.0 indicating the recall of the retrieved context.",
-      },
-    },
-  },
-  "ragas/response_relevancy": {
-    name: `Ragas Response Relevancy`,
-    description: `
-Evaluates how pertinent the generated answer is to the given prompt. Higher scores indicate better relevancy.
-`,
-    category: "quality",
-    docsUrl: "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/answer_relevance/",
-    isGuardrail: false,
-    requiredFields: ["input", "output"],
-    optionalFields: [],
-    settings: {
-      model: {
-        description: "The model to use for evaluation.",
-        default: "openai/gpt-5-mini",
-      },
-      max_tokens: {
-        description:
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        default: 2048,
-      },
-      embeddings_model: {
-        description: "The model to use for embeddings.",
-        default: "openai/text-embedding-ada-002",
-      },
-    },
-    envVars: [],
-    result: {
-      score: {
-        description: "A score between 0.0 and 1.0 indicating the relevance of the answer.",
-      },
-    },
-  },
-  "ragas/rouge_score": {
-    name: `ROUGE Score`,
-    description: `
-Traditional NLP metric. ROUGE score for evaluating the similarity between two strings.
-`,
-    category: "quality",
-    docsUrl:
-      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/traditional/#rouge-score",
-    isGuardrail: false,
-    requiredFields: ["output", "expected_output"],
-    optionalFields: [],
-    settings: {
-      rouge_type: {
-        description: "ROUGE type",
-        default: "rouge1",
-      },
-      measure_type: {
-        description: "ROUGE measure type",
-        default: "fmeasure",
-      },
-    },
-    envVars: [],
-    result: {
-      score: {
-        description: "ROUGE similarity score",
-      },
-    },
-  },
-  "ragas/rubrics_based_scoring": {
-    name: `Rubrics Based Scoring`,
-    description: `
-Rubric-based evaluation metric that is used to evaluate responses. The rubric consists of descriptions for each score, typically ranging from 1 to 5
-`,
-    category: "quality",
-    docsUrl:
-      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/general_purpose/#rubrics-based-criteria-scoring",
-    isGuardrail: false,
-    requiredFields: ["input", "output"],
-    optionalFields: ["expected_output"],
-    settings: {
-      model: {
-        description: "The model to use for evaluation.",
-        default: "openai/gpt-5-mini",
-      },
-      max_tokens: {
-        description:
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        default: 2048,
-      },
-      rubrics: {
-        description: undefined,
-        default: [
-          {
-            description: "The response is incorrect, irrelevant.",
-          },
-          {
-            description:
-              "The response partially answers the question but includes significant errors, omissions, or irrelevant information.",
-          },
-          {
-            description:
-              "The response partially answers the question but includes minor errors, omissions, or irrelevant information.",
-          },
-          {
-            description:
-              "The response fully answers the question and includes minor errors, omissions, or irrelevant information.",
-          },
-          {
-            description:
-              "The response fully answers the question and includes no errors, omissions, or irrelevant information.",
-          },
-        ],
-      },
-    },
-    envVars: [],
-    result: {
-      score: {
-        description: "A score according to the rubrics, typically between 1 and 5.",
-      },
-    },
-  },
-  "ragas/sql_query_equivalence": {
-    name: `SQL Query Equivalence`,
-    description: `
-Checks if the SQL query is equivalent to a reference one by using an LLM to infer if it would generate the same results given the table schemas.
-`,
-    category: "quality",
-    docsUrl:
-      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/sql/#sql-query-semantic-equivalence",
-    isGuardrail: false,
-    requiredFields: ["output", "expected_output", "expected_contexts"],
-    optionalFields: [],
-    settings: {
-      model: {
-        description: "The model to use for evaluation.",
-        default: "openai/gpt-5-mini",
-      },
-      max_tokens: {
-        description:
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        default: 2048,
-      },
-    },
-    envVars: [],
-    result: {
-      passed: {
-        description: "Whether the SQL query is equivalent to the expected one.",
-      },
-    },
-  },
-  "ragas/summarization_score": {
-    name: `Summarization Score`,
-    description: `
-Measures how well the summary captures important information from the retrieved contexts.
-`,
-    category: "quality",
-    docsUrl:
-      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/summarization_score/",
-    isGuardrail: false,
-    requiredFields: ["output", "contexts"],
-    optionalFields: [],
-    settings: {
-      model: {
-        description: "The model to use for evaluation.",
-        default: "openai/gpt-5-mini",
-      },
-      max_tokens: {
-        description:
-          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-        default: 2048,
-      },
-    },
-    envVars: [],
-    result: {
-      score: {
-        description: "A score between 0.0 and 1.0 indicating the summarization quality.",
-      },
-    },
-  },
   "presidio/pii_detection": {
     name: `Presidio PII Detection`,
     description: `
@@ -1401,49 +960,6 @@ This evaluator checks for prompt injection attempt in the input and the contexts
       passed: {
         description:
           "If true then no prompt injection was detected, if false then a prompt injection was detected",
-      },
-    },
-  },
-  "lingua/language_detection": {
-    name: `Lingua Language Detection`,
-    description: `
-This evaluator detects the language of the input and output text to check for example if the generated answer is in the same language as the prompt,
-or if it's in a specific expected language.
-`,
-    category: "quality",
-    docsUrl: "https://github.com/pemistahl/lingua-py",
-    isGuardrail: true,
-    requiredFields: ["output"],
-    optionalFields: ["input"],
-    settings: {
-      check_for: {
-        description: "What should be checked",
-        default: "input_matches_output",
-      },
-      expected_language: {
-        description: "The specific language that the output is expected to be",
-        default: undefined,
-      },
-      min_words: {
-        description:
-          "Minimum number of words to check, as the language detection can be unreliable for very short texts. Inputs shorter than the minimum will be skipped.",
-        default: 7,
-      },
-      threshold: {
-        description:
-          "Minimum confidence threshold for the language detection. If the confidence is lower than this, the evaluation will be skipped.",
-        default: 0.25,
-      },
-    },
-    envVars: [],
-    result: {
-      passed: {
-        description:
-          "Passes if the detected language on the output matches the detected language on the input, or if the output matches the expected language",
-      },
-      label: {
-        description:
-          "Language detected on the input for input_matches_output, or language detected on the output for output_matches_language",
       },
     },
   },
@@ -2079,6 +1595,490 @@ For JSON, can optionally validate against a provided schema.
     result: {
       passed: {
         description: "True if the output is formatted correctly, False otherwise",
+      },
+    },
+  },
+  "ragas/bleu_score": {
+    name: `BLEU Score`,
+    description: `
+Traditional NLP metric. BLEU score for evaluating the similarity between two strings.
+`,
+    category: "quality",
+    docsUrl:
+      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/traditional/#bleu-score",
+    isGuardrail: false,
+    requiredFields: ["output", "expected_output"],
+    optionalFields: [],
+    settings: {},
+    envVars: [],
+    result: {
+      score: {
+        description: "BLEU similarity score",
+      },
+    },
+  },
+  "ragas/context_f1": {
+    name: `Context F1`,
+    description: `
+Balances between precision and recall for context retrieval, increasing it means a better signal-to-noise ratio. Uses traditional string distance metrics.
+`,
+    category: "rag",
+    docsUrl:
+      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/context_F1/#non-llm-based-context-F1",
+    isGuardrail: false,
+    requiredFields: ["contexts", "expected_contexts"],
+    optionalFields: [],
+    settings: {
+      distance_measure: {
+        description: undefined,
+        default: "levenshtein",
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description: "A score between 0.0 and 1.0 indicating the F1 score.",
+      },
+    },
+  },
+  "ragas/context_precision": {
+    name: `Context Precision`,
+    description: `
+Measures how accurate is the retrieval compared to expected contexts, increasing it means less noise in the retrieval. Uses traditional string distance metrics.
+`,
+    category: "rag",
+    docsUrl:
+      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/context_precision/#non-llm-based-context-precision",
+    isGuardrail: false,
+    requiredFields: ["contexts", "expected_contexts"],
+    optionalFields: [],
+    settings: {
+      distance_measure: {
+        description: undefined,
+        default: "levenshtein",
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description: "A score between 0.0 and 1.0 indicating the precision score.",
+      },
+    },
+  },
+  "ragas/context_recall": {
+    name: `Context Recall`,
+    description: `
+Measures how many relevant contexts were retrieved compared to expected contexts, increasing it means more signal in the retrieval. Uses traditional string distance metrics.
+`,
+    category: "rag",
+    docsUrl:
+      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/context_recall/#non-llm-based-context-recall",
+    isGuardrail: false,
+    requiredFields: ["contexts", "expected_contexts"],
+    optionalFields: [],
+    settings: {
+      distance_measure: {
+        description: undefined,
+        default: "levenshtein",
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description: "A score between 0.0 and 1.0 indicating the Recall score.",
+      },
+    },
+  },
+  "ragas/factual_correctness": {
+    name: `LLM Factual Match`,
+    description: `
+Computes with an LLM how factually similar the generated answer is to the expected output.
+`,
+    category: "quality",
+    docsUrl:
+      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/factual_correctness/",
+    isGuardrail: false,
+    requiredFields: ["output", "expected_output"],
+    optionalFields: [],
+    settings: {
+      model: {
+        description: "The model to use for evaluation.",
+        default: "openai/gpt-5-mini",
+      },
+      max_tokens: {
+        description:
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        default: 2048,
+      },
+      mode: {
+        description: "The mode to use for the factual correctness metric.",
+        default: "f1",
+      },
+      atomicity: {
+        description: "The level of atomicity for claim decomposition.",
+        default: "low",
+      },
+      coverage: {
+        description: "The level of coverage for claim decomposition.",
+        default: "low",
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description:
+          "A score between 0.0 and 1.0 indicating how factually similar the generated answer is to the expected output.",
+      },
+    },
+  },
+  "ragas/faithfulness": {
+    name: `Ragas Faithfulness`,
+    description: `
+This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations.
+`,
+    category: "rag",
+    docsUrl: "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/",
+    isGuardrail: false,
+    requiredFields: ["output", "contexts"],
+    optionalFields: ["input"],
+    settings: {
+      model: {
+        description: "The model to use for evaluation.",
+        default: "openai/gpt-5-mini",
+      },
+      max_tokens: {
+        description:
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        default: 2048,
+      },
+      autodetect_dont_know: {
+        description:
+          "Whether to autodetect 'I don't know' in the output to avoid failing the evaluation.",
+        default: true,
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description: "A score between 0.0 and 1.0 indicating the faithfulness of the answer.",
+      },
+    },
+  },
+  "ragas/response_context_precision": {
+    name: `Ragas Response Context Precision`,
+    description: `
+Uses an LLM to measure the proportion of chunks in the retrieved context that were relevant to generate the output or the expected output.
+`,
+    category: "rag",
+    docsUrl:
+      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/context_precision/#context-precision-without-reference",
+    isGuardrail: false,
+    requiredFields: ["input", "contexts"],
+    optionalFields: ["output", "expected_output"],
+    settings: {
+      model: {
+        description: "The model to use for evaluation.",
+        default: "openai/gpt-5-mini",
+      },
+      max_tokens: {
+        description:
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        default: 2048,
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description:
+          "A score between 0.0 and 1.0 indicating the precision of the retrieved context.",
+      },
+    },
+  },
+  "ragas/response_context_recall": {
+    name: `Ragas Response Context Recall`,
+    description: `
+Uses an LLM to measure how many of relevant documents attributable the claims in the output were successfully retrieved in order to generate an expected output.
+`,
+    category: "rag",
+    docsUrl:
+      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/context_recall/#llm-based-context-recall",
+    isGuardrail: false,
+    requiredFields: ["input", "output", "contexts", "expected_output"],
+    optionalFields: [],
+    settings: {
+      model: {
+        description: "The model to use for evaluation.",
+        default: "openai/gpt-5-mini",
+      },
+      max_tokens: {
+        description:
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        default: 2048,
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description: "A score between 0.0 and 1.0 indicating the recall of the retrieved context.",
+      },
+    },
+  },
+  "ragas/response_relevancy": {
+    name: `Ragas Response Relevancy`,
+    description: `
+Evaluates how pertinent the generated answer is to the given prompt. Higher scores indicate better relevancy.
+`,
+    category: "quality",
+    docsUrl: "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/answer_relevance/",
+    isGuardrail: false,
+    requiredFields: ["input", "output"],
+    optionalFields: [],
+    settings: {
+      model: {
+        description: "The model to use for evaluation.",
+        default: "openai/gpt-5-mini",
+      },
+      max_tokens: {
+        description:
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        default: 2048,
+      },
+      embeddings_model: {
+        description: "The model to use for embeddings.",
+        default: "openai/text-embedding-ada-002",
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description: "A score between 0.0 and 1.0 indicating the relevance of the answer.",
+      },
+    },
+  },
+  "ragas/rouge_score": {
+    name: `ROUGE Score`,
+    description: `
+Traditional NLP metric. ROUGE score for evaluating the similarity between two strings.
+`,
+    category: "quality",
+    docsUrl:
+      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/traditional/#rouge-score",
+    isGuardrail: false,
+    requiredFields: ["output", "expected_output"],
+    optionalFields: [],
+    settings: {
+      rouge_type: {
+        description: "ROUGE type",
+        default: "rouge1",
+      },
+      measure_type: {
+        description: "ROUGE measure type",
+        default: "fmeasure",
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description: "ROUGE similarity score",
+      },
+    },
+  },
+  "ragas/rubrics_based_scoring": {
+    name: `Rubrics Based Scoring`,
+    description: `
+Rubric-based evaluation metric that is used to evaluate responses. The rubric consists of descriptions for each score, typically ranging from 1 to 5
+`,
+    category: "quality",
+    docsUrl:
+      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/general_purpose/#rubrics-based-criteria-scoring",
+    isGuardrail: false,
+    requiredFields: ["input", "output"],
+    optionalFields: ["expected_output"],
+    settings: {
+      model: {
+        description: "The model to use for evaluation.",
+        default: "openai/gpt-5-mini",
+      },
+      max_tokens: {
+        description:
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        default: 2048,
+      },
+      rubrics: {
+        description: undefined,
+        default: [
+          {
+            description: "The response is incorrect, irrelevant.",
+          },
+          {
+            description:
+              "The response partially answers the question but includes significant errors, omissions, or irrelevant information.",
+          },
+          {
+            description:
+              "The response partially answers the question but includes minor errors, omissions, or irrelevant information.",
+          },
+          {
+            description:
+              "The response fully answers the question and includes minor errors, omissions, or irrelevant information.",
+          },
+          {
+            description:
+              "The response fully answers the question and includes no errors, omissions, or irrelevant information.",
+          },
+        ],
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description: "A score according to the rubrics, typically between 1 and 5.",
+      },
+    },
+  },
+  "ragas/sql_query_equivalence": {
+    name: `SQL Query Equivalence`,
+    description: `
+Checks if the SQL query is equivalent to a reference one by using an LLM to infer if it would generate the same results given the table schemas.
+`,
+    category: "quality",
+    docsUrl:
+      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/sql/#sql-query-semantic-equivalence",
+    isGuardrail: false,
+    requiredFields: ["output", "expected_output", "expected_contexts"],
+    optionalFields: [],
+    settings: {
+      model: {
+        description: "The model to use for evaluation.",
+        default: "openai/gpt-5-mini",
+      },
+      max_tokens: {
+        description:
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        default: 2048,
+      },
+    },
+    envVars: [],
+    result: {
+      passed: {
+        description: "Whether the SQL query is equivalent to the expected one.",
+      },
+    },
+  },
+  "ragas/summarization_score": {
+    name: `Summarization Score`,
+    description: `
+Measures how well the summary captures important information from the retrieved contexts.
+`,
+    category: "quality",
+    docsUrl:
+      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/summarization_score/",
+    isGuardrail: false,
+    requiredFields: ["output", "contexts"],
+    optionalFields: [],
+    settings: {
+      model: {
+        description: "The model to use for evaluation.",
+        default: "openai/gpt-5-mini",
+      },
+      max_tokens: {
+        description:
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        default: 2048,
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description: "A score between 0.0 and 1.0 indicating the summarization quality.",
+      },
+    },
+  },
+  "lingua/language_detection": {
+    name: `Lingua Language Detection`,
+    description: `
+This evaluator detects the language of the input and output text to check for example if the generated answer is in the same language as the prompt,
+or if it's in a specific expected language.
+`,
+    category: "quality",
+    docsUrl: "https://github.com/pemistahl/lingua-py",
+    isGuardrail: true,
+    requiredFields: ["output"],
+    optionalFields: ["input"],
+    settings: {
+      check_for: {
+        description: "What should be checked",
+        default: "input_matches_output",
+      },
+      expected_language: {
+        description: "The specific language that the output is expected to be",
+        default: undefined,
+      },
+      min_words: {
+        description:
+          "Minimum number of words to check, as the language detection can be unreliable for very short texts. Inputs shorter than the minimum will be skipped.",
+        default: 7,
+      },
+      threshold: {
+        description:
+          "Minimum confidence threshold for the language detection. If the confidence is lower than this, the evaluation will be skipped.",
+        default: 0.25,
+      },
+    },
+    envVars: [],
+    result: {
+      passed: {
+        description:
+          "Passes if the detected language on the output matches the detected language on the input, or if the output matches the expected language",
+      },
+      label: {
+        description:
+          "Language detected on the input for input_matches_output, or language detected on the output for output_matches_language",
+      },
+    },
+  },
+  "openai/moderation": {
+    name: `OpenAI Moderation`,
+    description: `
+This evaluator uses OpenAI's moderation API to detect potentially harmful content in text,
+including harassment, hate speech, self-harm, sexual content, and violence.
+`,
+    category: "safety",
+    docsUrl: "https://platform.openai.com/docs/guides/moderation/overview",
+    isGuardrail: true,
+    requiredFields: [],
+    optionalFields: ["input", "output"],
+    settings: {
+      model: {
+        description:
+          "The model version to use, `text-moderation-latest` will be automatically upgraded over time, while `text-moderation-stable` will only be updated with advanced notice by OpenAI.",
+        default: "text-moderation-stable",
+      },
+      categories: {
+        description: "The categories of content to check for moderation.",
+        default: {
+          harassment: true,
+          harassment_threatening: true,
+          hate: true,
+          hate_threatening: true,
+          self_harm: true,
+          self_harm_instructions: true,
+          self_harm_intent: true,
+          sexual: true,
+          sexual_minors: true,
+          violence: true,
+          violence_graphic: true,
+        },
+      },
+    },
+    envVars: ["OPENAI_API_KEY"],
+    result: {
+      score: {
+        description:
+          "The model's confidence on primary category where the input violates the OpenAI's policy. The value is between 0 and 1, where higher values denote higher confidence.",
+      },
+      passed: {
+        description: "Fails if any moderation category is flagged",
       },
     },
   },
