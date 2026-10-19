@@ -202,3 +202,90 @@ describe("given a file that is not a module class artifact", () => {
     expect(report("export function isActive() { return true; }", RULES)).toEqual([]);
   });
 });
+
+// ADR-181: `relay` opts into the feature layout; `eventing` is a framework that has not.
+const framework = createFixtureWorkspace({
+  files: {
+    "packages/relay/package.json": JSON.stringify({
+      name: "@langwatch/relay",
+      exports: { ".": { default: "./src/index.ts" } },
+      langwatch: { group: "framework", layout: "features" },
+    }),
+    "packages/eventing/package.json": JSON.stringify({
+      name: "@langwatch/eventing",
+      langwatch: { group: "framework" },
+    }),
+    "packages/relay/src/index.ts": [
+      'export { GroupStagingScripts } from "./features/keyspace/repositories/redis/redis.group-staging.repository.ts";',
+      'export * from "./app/relay.app.ts";',
+    ].join("\n"),
+    "packages/relay/src/app/relay.app.ts":
+      "export class RelayProcessor {\n  constructor(readonly name: string) {}\n}\n",
+  },
+});
+
+afterAll(() => framework.cleanup());
+
+function frameworkReport(code, filename) {
+  return located(runRule(moduleClassesRule, { code, cwd: framework.cwd, filename }));
+}
+
+const RELAY = "packages/relay/src";
+
+describe("given an opted-in framework package", () => {
+  describe("when a concern's service has a public constructor beside static create", () => {
+    /** @scenario "A framework class takes the module's shape unless an entry publishes it" */
+    it("reports publicConstructor", () => {
+      const code = [
+        "export class ClaimService {",
+        "  constructor() {}",
+        "  static create() { return new ClaimService(); }",
+        "}",
+      ].join("\n");
+      expect(frameworkReport(code, `${RELAY}/features/claim/services/claim.service.ts`)).toEqual([
+        ["publicConstructor", 2],
+      ]);
+    });
+  });
+
+  describe("when a tier repository nobody publishes has no create", () => {
+    /** @scenario "A framework class takes the module's shape unless an entry publishes it" */
+    it("reports create", () => {
+      const code = "export class RedisClaimRepository {\n  constructor() {}\n}";
+      expect(
+        frameworkReport(
+          code,
+          `${RELAY}/features/claim/repositories/redis/redis.claim.repository.ts`,
+        ),
+      ).toEqual([["create", 1]]);
+    });
+  });
+
+  describe("when an entry publishes the class by name or through export *", () => {
+    /** @scenario "A framework class takes the module's shape unless an entry publishes it" */
+    it("keeps its name and its public constructor", () => {
+      const staging =
+        "export class GroupStagingScripts {\n  constructor(readonly name: string) {}\n}";
+      expect(
+        frameworkReport(
+          staging,
+          `${RELAY}/features/keyspace/repositories/redis/redis.group-staging.repository.ts`,
+        ),
+      ).toEqual([]);
+      const processor = "export class RelayProcessor {\n  constructor(readonly name: string) {}\n}";
+      expect(frameworkReport(processor, `${RELAY}/app/relay.app.ts`)).toEqual([]);
+    });
+  });
+});
+
+describe("given a framework package that has not opted in", () => {
+  /** @scenario "A framework package that has not opted in is left alone by the layered rules" */
+  it("reports nothing for a service class without create", () => {
+    expect(
+      frameworkReport(
+        "export class ClaimService {}",
+        "packages/eventing/src/services/claim.service.ts",
+      ),
+    ).toEqual([]);
+  });
+});

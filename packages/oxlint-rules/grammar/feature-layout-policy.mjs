@@ -157,15 +157,17 @@ function channelHomes(prefix) {
 // its events, its projections, its subscribers, its process managers and its
 // commands through `definePipeline` from `@langwatch/eventing`; the files
 // beside it hold what that declaration names.
-const EVENTING_HOMES = [
-  new RegExp(`^${FEATURE_PREFIX}eventing/${NAME}\\.pipeline\\.ts$`),
-  new RegExp(
-    `^${FEATURE_PREFIX}eventing/${NAME}\\.(?:events|commands|schemas|projection|subscriber|process|intent|store)\\.ts$`,
-  ),
-  new RegExp(
-    `^${FEATURE_PREFIX}eventing/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:events|commands|schemas|projection|subscriber|process|intent|store)\\.ts$`,
-  ),
-];
+function eventingHomes(prefix) {
+  return [
+    new RegExp(`^${prefix}eventing/${NAME}\\.pipeline\\.ts$`),
+    new RegExp(
+      `^${prefix}eventing/${NAME}\\.(?:events|commands|schemas|projection|subscriber|process|intent|store)\\.ts$`,
+    ),
+    new RegExp(
+      `^${prefix}eventing/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:events|commands|schemas|projection|subscriber|process|intent|store)\\.ts$`,
+    ),
+  ];
+}
 
 export const PROCESS_PATTERNS = [
   /^index\.ts$/,
@@ -182,7 +184,7 @@ export const PROCESS_PATTERNS = [
   SERVICE_HOME,
   ...REPOSITORY_HOMES,
   ...channelHomes(""),
-  ...EVENTING_HOMES,
+  ...eventingHomes(FEATURE_PREFIX),
   TASK_HOME,
   // Flat API declarations and explicit WebSocket protocol integrations.
   new RegExp(`^transport/${NAME}\\.(?:rest|trpc|ws)\\.ts$`),
@@ -237,30 +239,36 @@ export function entrySourcePaths(exportsField) {
 export const FRAMEWORK_HOMES =
   "the entry files the package.json `exports` names (`export ... from` lines only), " +
   "app/<name>.app.ts, vocabulary/<name>.ts (or <name>.errors.ts, <name>.schemas.ts), " +
-  "telemetry/<name>.metrics.ts, tasks/<name>.task.ts, services/<name>.service.ts, " +
-  "repositories/ (interfaces, the bundle, the registry, a tier folder beside them, and Lua as " +
+  "rules/<name>.rules.ts, telemetry/<name>.metrics.ts, tasks/<name>.task.ts, " +
+  "repositories/ (interfaces and a tier folder beside them, Lua as " +
   "repositories/redis/redis.<name>.script.ts), " +
-  "channels/ (the interface, the bundle, the registry, and a tier folder beside them), " +
-  "eventing/<name>.pipeline.ts and what it names, rules/<name>.rules.ts, " +
-  "features/<concern>/ holding that concern's own services/, repositories/, channels/, rules/, " +
-  "eventing/ and vocabulary/ (one level, nothing else nests)";
+  "channels/ (interfaces and a tier folder beside them), " +
+  "features/<concern>/ holding that concern's services/<name>.service.ts, " +
+  "eventing/<name>.pipeline.ts and what it names, and its own vocabulary/, rules/, " +
+  "repositories/ and channels/ (one level, nothing else nests; no registry or bundle file)";
+
+const CONCERN_PREFIX = `features/${NAME}/`;
 
 /**
- * A framework package that opts in nests like a process half (ADR-181). Unlike a
- * module, a concern also nests its channels and its vocabulary; app/, telemetry/
- * and tasks/ stay at the top. The entry files are homes too, read per package.
+ * A framework package that opts in nests like a process half (ADR-181 decision 1):
+ * services and eventing live only under a concern, and nothing selects a tier by
+ * registry or bundle (coordinator, 2026-10-19). Entry files are homes, read per package.
  */
 export const FRAMEWORK_PATTERNS = [
   APP_HOME,
   new RegExp(`^${FEATURE_PREFIX}vocabulary/${NAME}(?:\\.(?:errors|schemas))?\\.ts$`),
   new RegExp(`^telemetry/${NAME}\\.metrics\\.ts$`),
   TASK_HOME,
-  SERVICE_HOME,
-  ...REPOSITORY_HOMES,
+  new RegExp(`^${CONCERN_PREFIX}services/${NAME}\\.service\\.ts$`),
+  new RegExp(`^${FEATURE_PREFIX}repositories/${NAME}(?:\\.${NAME})?\\.repository\\.ts$`),
+  new RegExp(
+    `^${FEATURE_PREFIX}repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:database|mapper|repository|store)\\.ts$`,
+  ),
   // Plain Lua strings beside the Redis repository that runs them, one script per method.
   new RegExp(`^${FEATURE_PREFIX}repositories/redis/redis\\.${NAME}\\.script\\.ts$`),
-  ...channelHomes(FEATURE_PREFIX),
-  ...EVENTING_HOMES,
+  new RegExp(`^${FEATURE_PREFIX}channels/${NAME}(?:\\.${NAME})?\\.channel\\.ts$`),
+  new RegExp(`^${FEATURE_PREFIX}channels/(${CHANNEL_TIER})/\\1\\.${NAME}\\.channel\\.ts$`),
+  ...eventingHomes(CONCERN_PREFIX),
 ];
 
 /**

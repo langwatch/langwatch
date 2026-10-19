@@ -3095,6 +3095,8 @@ with its reason, in the stand-in-cast rule's audited boundaries (Alex, 2026-09-2
 A stand-in a test needs is a real fixture or builder, never a new contract type: types do not change
 for tests (Alex, 2026-09-29). A test never `vi.spyOn`s a real service; it drives memory twins and
 fixtures instead (Alex, 2026-09-29).
+group-queue's `processClaimedJob` characterization harness stays pinned until the processor
+carve-up ends (Alex, 2026-10-19; ADR-181).
 A module exports no `./testing` subpath: a fixture another module's tests need lives in that consumer
 (Alex, 2026-10-06, round 4, Q208; §3).
 A scenario bound from a package's tests counts toward feature parity like one bound from a module's
@@ -3112,6 +3114,8 @@ A product that disagrees with its scenario is a behaviour question for the coord
 bind and never a rewording. The `spec-binding-review` skill keeps the detail.
 Every repository has a real memory twin, gateway's included, and unit tests build over the memory
 registry; there is no refusing stand-in tier (coordinator, members wave, 2026-10-05).
+The Lua keyspace repositories of an opted-in framework package are the exception; the Redis
+integration suites are their proof (Alex, 2026-10-19; ADR-181).
 The "New Experiment" button stays solid primary; its e2e expectation is updated (Alex, 2026-10-05).
 
 The installation test boots the installed list over memory stores, with no server
@@ -3355,7 +3359,7 @@ multi-line why (Alex, 2026-10-05). The `feature-configuration` policy demands no
 feature layout (§3.4) also has a strict source and a layer (`packages/oxlint-rules/src/classify.mjs`):
 the grammar's `FRAMEWORK_PATTERNS` and the entry files its `exports` names are its homes, the layer
 tables add `vocabulary` and `telemetry` rows, and `service-ceilings` measures its services. The
-`process`-gated rules take the role as each gains its framework branch (Alex, 2026-10-19; ADR-181).
+`process`-gated rules take the role too (Alex, 2026-10-19; ADR-181).
 
 **House rules are strict; a disable is very rare** (Alex, 2026-10-05). Most `langwatch/*` rules must not be
 ignored: a disable directive naming one is itself an error (`langwatch/suppression-states-why`). Only a few

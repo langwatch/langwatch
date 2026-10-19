@@ -45,6 +45,7 @@ describe("service ceilings", () => {
   });
 
   describe("when a framework package opts into the feature layout", () => {
+    /** @scenario "An opted-in framework package's services are held to the same ceiling" */
     it("measures its services and leaves a framework package that has not opted in alone", () => {
       const fixtureRoot = mkdtempSync(join(tmpdir(), "service-ceilings-framework-"));
       const packages = [

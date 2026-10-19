@@ -2,6 +2,7 @@ import {
   CONTRACT_ARTIFACT,
   CONTRACT_ARTIFACT_ONLY,
   CONTRACT_ARTIFACT_SUFFIX,
+  FRAMEWORK_HOMES,
   PROCESS_HOMES,
   PROCESS_MANAGER_SERVICE_PATTERN,
   PROCESS_ONLY_ARTIFACT_LIST,
@@ -9,6 +10,7 @@ import {
   PROCESS_PATTERNS,
   PURE_VALUE_CONSTRUCTORS,
   RULES_PATTERN,
+  isFrameworkHome,
   isLowerKebabFilename,
   isFeatureApiContract,
 } from "../../grammar/feature-layout-policy.mjs";
@@ -116,6 +118,16 @@ export const featureSourceLayoutRule = defineRule({
         " becomes `transport/<feature>.<rest|trpc|ws>.ts`; a file with no artifact" +
         " suffix moves into the module that already uses it.",
     },
+    frameworkPath: {
+      what: `\`{{path}}\` has no home in the framework feature layout. Only this shape is allowed: ${FRAMEWORK_HOMES}.`,
+      why: "An opted-in framework package nests like a process half, so each file's folder says what it is (ADR-181).",
+      fix:
+        "Move `{{path}}` into the home its role names: a service to" +
+        " `features/<concern>/services/<name>.service.ts`, owned state to" +
+        " `repositories/<tier>/<tier>.<subject>.repository.ts`, a message to what the package" +
+        " does not own to `channels/<tier>/<tier>.<subject>.channel.ts`, a type, builder or error" +
+        " to `vocabulary/`. Read the `process-module` skill.",
+    },
   },
   create(context, file) {
     const source = file.strictSource;
@@ -124,7 +136,7 @@ export const featureSourceLayoutRule = defineRule({
 
     if (role === "contract") return contractVisitors(context, source);
 
-    if (role !== "process") return {};
+    if (role !== "process" && role !== "framework") return {};
 
     if (PROCESS_MANAGER_SERVICE_PATTERN.test(sourcePath)) {
       return {
@@ -169,14 +181,17 @@ export const featureSourceLayoutRule = defineRule({
       };
     }
 
-    const hasProcessHome = PROCESS_PATTERNS.some((pattern) => pattern.test(sourcePath));
-    if (hasProcessHome) return {};
+    const hasHome =
+      role === "framework"
+        ? isFrameworkHome(source)
+        : PROCESS_PATTERNS.some((pattern) => pattern.test(sourcePath));
+    if (hasHome) return {};
 
     return {
       Program(node) {
         context.report({
           node,
-          messageId: "processPath",
+          messageId: role === "framework" ? "frameworkPath" : "processPath",
           data: { path: sourcePath },
         });
       },

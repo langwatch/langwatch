@@ -13,6 +13,7 @@ describe("given the framework layer rows", () => {
   describe("when vocabulary imports", () => {
     const sourcePath = "vocabulary/eventing.ts";
 
+    /** @scenario "A framework's vocabulary and telemetry are leaf layers" */
     it("takes vocabulary, rules and telemetry", () => {
       for (const specifier of [
         "./event.ts",
@@ -23,6 +24,7 @@ describe("given the framework layer rows", () => {
       }
     });
 
+    /** @scenario "A framework's vocabulary and telemetry are leaf layers" */
     it("reports a repository, a channel or a service it names as a value", () => {
       expect(
         crossing({
@@ -39,6 +41,7 @@ describe("given the framework layer rows", () => {
       ).toBe("a service");
     });
 
+    /** @scenario "A framework's vocabulary and telemetry are leaf layers" */
     it("lets a type cross", () => {
       expect(
         crossing({
@@ -52,6 +55,7 @@ describe("given the framework layer rows", () => {
   });
 
   describe("when telemetry imports", () => {
+    /** @scenario "A framework's vocabulary and telemetry are leaf layers" */
     it("takes only telemetry as a value", () => {
       const sourcePath = "telemetry/eventing.metrics.ts";
       expect(

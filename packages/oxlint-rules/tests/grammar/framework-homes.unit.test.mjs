@@ -23,13 +23,11 @@ const TOP_LEVEL = [
   "vocabulary/event.schemas.ts",
   "telemetry/eventing.metrics.ts",
   "tasks/reap-stranded-groups.task.ts",
-  "services/fold-dispatch.service.ts",
   "repositories/lua-script.repository.ts",
   "repositories/redis/redis.lua-script.store.ts",
   "repositories/redis/redis.group-helpers.script.ts",
   "channels/lane-queue.channel.ts",
   "channels/redis/redis.lane-queue.channel.ts",
-  "eventing/read-hints.pipeline.ts",
   "rules/compare-ordinal.rules.ts",
 ];
 
@@ -74,6 +72,22 @@ const REFUSED = [
   "features/metrics/telemetry/group-queue.metrics.ts",
 ];
 
+// No top-level services or eventing, and no registry or bundle (ADR-181 decision 1).
+const TOP_LEVEL_AND_BUNDLES_REFUSED = [
+  "services/fold-dispatch.service.ts",
+  "eventing/read-hints.pipeline.ts",
+  "eventing/read-hints.projection.ts",
+  "repositories/event.registry.ts",
+  "repositories/event-repositories.registry.ts",
+  "repositories/event.repositories.ts",
+  "repositories/redis/redis.event.repositories.ts",
+  "channels/lane.registry.ts",
+  "channels/lane.channels.ts",
+  "channels/redis/redis.lane.channels.ts",
+  "features/replay/repositories/replay.registry.ts",
+  "features/replay/channels/replay.channels.ts",
+];
+
 const NESTED_REFUSED = [
   "features/claim/features/retry/services/retry.service.ts",
   "features/claim/app/claim.app.ts",
@@ -98,10 +112,12 @@ function hasHome(sourcePath) {
 
 describe("given the closed framework allowlist", () => {
   describe("when a path names one of the allowed homes", () => {
+    /** @scenario "An opted-in framework package has its own closed list of homes" */
     it("accepts every top-level home the message names", () => {
       expect(TOP_LEVEL.filter((path) => !hasHome(path))).toEqual([]);
     });
 
+    /** @scenario "An opted-in framework package has its own closed list of homes" */
     it("accepts a concern's own services, repositories, channels, rules, eventing and vocabulary", () => {
       expect(NESTED.filter((path) => !hasHome(path))).toEqual([]);
       expect(FRAMEWORK_HOMES).toContain("features/<concern>/");
@@ -109,6 +125,7 @@ describe("given the closed framework allowlist", () => {
   });
 
   describe("when a path names a folder the grammar closed", () => {
+    /** @scenario "An opted-in framework package has its own closed list of homes" */
     it("refuses it and never names it in the message", () => {
       expect(REFUSED.filter(hasHome)).toEqual([]);
       for (const folder of ["ports/", "adapters/", "stores/", "utils/", "domain/", "server/"]) {
@@ -116,12 +133,20 @@ describe("given the closed framework allowlist", () => {
       }
     });
 
+    /** @scenario "A framework package has no top-level service or pipeline and no registry or bundle file" */
+    it("refuses a top-level service or pipeline and every registry or bundle file", () => {
+      expect(TOP_LEVEL_AND_BUNDLES_REFUSED.filter(hasHome)).toEqual([]);
+      expect(FRAMEWORK_HOMES).toContain("no registry or bundle file");
+    });
+
+    /** @scenario "An opted-in framework package has its own closed list of homes" */
     it("refuses a second level and an app, task, index or unknown tier under a concern", () => {
       expect(NESTED_REFUSED.filter(hasHome)).toEqual([]);
     });
   });
 
   describe("when the package's exports name a file as an entry", () => {
+    /** @scenario "An opted-in framework package has its own closed list of homes" */
     it("accepts that file wherever it sits and names entries in the message", () => {
       expect(isFrameworkHome({ entry: true, sourcePath: "server/index.ts" })).toBe(true);
       expect(isFrameworkHome({ entry: false, sourcePath: "server/index.ts" })).toBe(false);
@@ -130,6 +155,7 @@ describe("given the closed framework allowlist", () => {
   });
 
   describe("when a module's process grammar reads a framework-only home", () => {
+    /** @scenario "A module's process grammar gains no framework home" */
     it("still refuses it, so no module gains a home", () => {
       const processHome = (path) =>
         PROCESS_PATTERNS.some((pattern) => pattern.test(path)) || RULES_PATTERN.test(path);
@@ -152,6 +178,7 @@ describe("given the script artifact", () => {
 
 describe("given a package manifest", () => {
   describe("when it is read for the opt-in", () => {
+    /** @scenario "A package opts in only through its own manifest's layout key" */
     it("opts in only on layout features under the langwatch key", () => {
       expect(optsIntoFeatureLayout({ langwatch: { group: "framework", layout: "features" } })).toBe(
         true,
@@ -163,6 +190,7 @@ describe("given a package manifest", () => {
   });
 
   describe("when its exports are read for entry files", () => {
+    /** @scenario "A package opts in only through its own manifest's layout key" */
     it("collects every src target and skips dist, wildcards and other trees", () => {
       const exportsField = {
         ".": { types: "./dist/index.d.ts", default: "./src/index.ts" },
