@@ -1796,10 +1796,12 @@ user exists. Users with no organization yet also wait; only a decision latches (
 Where no email is configured no address can be verified, so a named active user is seeded unverified;
 the account must already exist, the seed never creates one (Rogerio, 2026-10-18). An unverified one is
 seeded only as the install's oldest active account, as the first user is, since anyone can register a
-named address first on an install that cannot verify it (Rogerio, 2026-10-19).
+named address first on an install that cannot verify it (Rogerio, 2026-10-19). There the recovery task
+also grants an unverified active account, since shell access naming it is the check, so a seed that
+waits stays recoverable; the page still grants verified accounts only (Rogerio, 2026-10-19).
 On a deployment LangWatch runs (the seed's `cloud`, a developer's local stack excepted) the page and the
-recovery task grant only an account whose verified address is on `langwatch.ai`; the task, like the page,
-grants verified accounts only, everywhere. `can()` asks nothing more than the live grant (Alex, 2026-10-14).
+recovery task grant only an account whose verified address is on `langwatch.ai`; the page grants
+verified accounts only, everywhere, and the task too wherever email is configured. `can()` asks nothing more than the live grant (Alex, 2026-10-14).
 Deactivating a user ends their sessions and CLI tokens before user's fact is sent, without an outbox;
 user's lifecycle facts carry the database clock. The back office refuses bulk user writes, a deliberate
 difference from main (Alex, 2026-10-01).
