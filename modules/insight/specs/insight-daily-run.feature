@@ -1177,6 +1177,14 @@ Feature: The daily insights run
       And once the run has started, the Langy panel opens on the run's conversation
 
     @integration
+    Scenario: Run now opens Langy when the start's hint arrives before its run is stored
+      Given a board that is on, with no run in flight
+      And the member chose Run now
+      When the hint that the run started reaches the board before the run is stored
+      Then the board reads its run once more
+      And the Langy panel opens on the run's conversation without waiting for the run to end
+
+    @integration
     Scenario: Run now waits for the run it asked for, not one that settled meanwhile
       Given a board that is on, with no run in flight
       And the member chooses Run now

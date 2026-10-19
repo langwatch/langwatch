@@ -18,6 +18,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { REQUESTED_RUN_REREAD_MS } from "../../../behavior/use-board-daily-insights.ts";
 import { OFF_REASON_WORDS, SKIP_REASON_WORDS } from "../../../model/daily-run.ts";
 import {
   insightEntry,
@@ -554,6 +555,38 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
         },
       ]);
       expect(board.host.failures).toEqual([]);
+    });
+  });
+
+  describe("when the start's hint reaches the board before the worker stored the run", () => {
+    /** @scenario "Run now opens Langy when the start's hint arrives before its run is stored" */
+    it("reads the board once more, and opens Langy on the run without waiting for its outcome", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        let isStored = false;
+        const board = openBoard({
+          setting: () => (isStored ? RUNNING : ON),
+          host: ASKER,
+          write: () => Promise.resolve({ requestId: "request-1" }),
+        });
+        const dropdown = await openDropdown(board.user);
+        await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+        await waitFor(() => expect(board.reads()).toHaveLength(2));
+
+        await board.readHint();
+        expect(board.reads()).toHaveLength(3);
+        isStored = true;
+        await vi.advanceTimersByTimeAsync(REQUESTED_RUN_REREAD_MS);
+
+        await waitFor(() =>
+          expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
+        );
+        await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS);
+        expect(board.reads()).toHaveLength(4);
+        expect(board.host.failures).toEqual([]);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

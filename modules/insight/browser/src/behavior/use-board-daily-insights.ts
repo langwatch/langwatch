@@ -14,7 +14,7 @@ import {
 import { LANGY_CONVERSATION_PARAM } from "@langwatch/langy-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { currentTimeZone } from "@langwatch/time";
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { defaultRunSettings, requestedRunOf, runTimeWords } from "../model/daily-run.ts";
 import { type InsightHostApi, useInsightHost } from "../model/insight-host.ts";
@@ -30,9 +30,48 @@ const NEVER_DECIDED: InsightDailyRunSetting = {
 
 const RUN_NOT_STARTED = "Couldn't start the run";
 
+/** A hint can reach the tab before the worker stored the row it names; this outlasts that gap. */
+export const REQUESTED_RUN_REREAD_MS = 2_000;
+
 /** Langy's panel opens on `?langyConversation=` wherever a project page is. */
 function openInLangy({ host, conversationId }: { host: InsightHostApi; conversationId: string }) {
   host.setQuery({ ...host.query(), [LANGY_CONVERSATION_PARAM]: conversationId });
+}
+
+/**
+ * A hint races the row it names (ADR-004): a read it brought back without the awaited run is
+ * asked once more. Answers that re-read for Run now to ask with, as no own read is repeated.
+ */
+function useRereadWhileAwaiting({
+  scope: {
+    projectId,
+    board: { kind, id },
+  },
+  answeredAt,
+  isAwaitingRun,
+}: {
+  scope: { projectId: string; board: { kind: InsightRunBoard["kind"]; id: string } };
+  /** When the read last answered. */
+  answeredAt: number;
+  isAwaitingRun: boolean;
+}): () => void {
+  const utils = insightApi.useUtils();
+  const seenAnswer = useRef(answeredAt);
+  const isOwnRead = useRef(false);
+  const readAgain = useCallback(() => {
+    isOwnRead.current = true;
+    void utils.insights.getBoardDailyRun.invalidate({ projectId, board: { kind, id } });
+  }, [utils, projectId, kind, id]);
+  useEffect(() => {
+    if (answeredAt === seenAnswer.current) return;
+    seenAnswer.current = answeredAt;
+    const isOwn = isOwnRead.current;
+    isOwnRead.current = false;
+    if (!isAwaitingRun || isOwn) return;
+    const reread = setTimeout(readAgain, REQUESTED_RUN_REREAD_MS);
+    return () => clearTimeout(reread);
+  }, [answeredAt, isAwaitingRun, readAgain]);
+  return readAgain;
 }
 
 type Write = {
@@ -53,7 +92,7 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     host.isEnabled() === true &&
     host.hasPermission("analytics:view");
   const scope = { projectId, board: { kind: board.kind, id: board.id } };
-  // The run's start and outcome reach the read as hints, so nothing here asks again on a timer.
+  // The run's start and outcome reach the read as hints; no timer asks again, bar one re-read.
   const query = insightApi.insights.getBoardDailyRun.useQuery(scope, { enabled: available });
   const utils = insightApi.useUtils();
   const configure = insightApi.insights.configureBoardDailyRun.useMutation();
@@ -69,6 +108,11 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
   const hasRequestedRunShown = requested !== undefined;
   const requestedConversationId = requested?.conversationId ?? null;
   const isAwaitingRun = runNowRequest.isSuccess && !hasRequestedRunShown;
+  const readAgain = useRereadWhileAwaiting({
+    scope,
+    answeredAt: query.dataUpdatedAt,
+    isAwaitingRun,
+  });
   useEffect(() => {
     if (!hasRequestedRunShown) return;
     endRunNow();
@@ -163,7 +207,7 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
       runNowRequest.mutate(
         { projectId, board, maxInsights: settings.maxInsights },
         {
-          onSuccess: () => void utils.insights.getBoardDailyRun.invalidate(scope),
+          onSuccess: readAgain,
           onError: (error) => host.failed({ error, fallbackTitle: RUN_NOT_STARTED }),
         },
       ),
