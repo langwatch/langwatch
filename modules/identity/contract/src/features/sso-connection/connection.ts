@@ -253,7 +253,7 @@ export const SSO_CONNECTION_EVENT_VERSION_LATEST = "2026-08-24" as const;
  *  history is legible without joining anything. */
 const sourced = { source: ssoConnectionSourceSchema };
 
-const connectionRegisteredPayloadSchemaDefinition = z.object({
+const connectionRegisteredFieldsSchema = z.object({
   connectionId: z.string().min(1),
   organizationId: z.string().min(1),
   type: ssoConnectionTypeSchema,
@@ -263,6 +263,23 @@ const connectionRegisteredPayloadSchemaDefinition = z.object({
   actor: ledgerActorSchema,
   ...sourced,
 });
+
+/**
+ * Registrations stored before the arrival policy (2026-08-25 to 2026-09-21) carry a boolean
+ * `allowsJit` and no `arrivalPolicy`; the log is immutable, so every read upcasts them: `true`
+ * admits, anything else is the default. Spec: modules/identity/specs/sso-connection-legacy-registration.feature
+ */
+export function upcastLegacyRegistration(data: unknown): unknown {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return data;
+  const { allowsJit, ...rest } = data as Record<string, unknown>;
+  if (rest.arrivalPolicy !== undefined && rest.arrivalPolicy !== null) return rest;
+  return { ...rest, arrivalPolicy: allowsJit === true ? "admit" : DEFAULT_SSO_ARRIVAL_POLICY };
+}
+
+const connectionRegisteredPayloadSchemaDefinition = z.preprocess(
+  upcastLegacyRegistration,
+  connectionRegisteredFieldsSchema,
+);
 export interface ConnectionRegisteredPayloadSchema extends Named<
   typeof connectionRegisteredPayloadSchemaDefinition
 > {}
@@ -601,7 +618,7 @@ export const connectionIdpUpdatedPayloadSchema: ConnectionIdpUpdatedPayloadSchem
   connectionIdpUpdatedPayloadSchemaDefinition;
 
 const replacementConnectionRegisteredPayloadSchemaDefinition = z.object({
-  ...connectionRegisteredPayloadSchema.shape,
+  ...connectionRegisteredFieldsSchema.shape,
   replacesConnectionId: z.string().min(1),
   inheritedDomainVerifications: z.array(ssoDomainVerificationSchema).default([]),
 });
