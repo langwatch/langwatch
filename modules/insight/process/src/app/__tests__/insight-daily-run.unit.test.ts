@@ -1071,7 +1071,7 @@ describe("given delivery at least once", () => {
     const runIds = (await installed.intentsOf()).map(
       ({ payload }) => (payload as { runId: string }).runId,
     );
-    expect(answer).toEqual({ requestId: expect.any(String) });
+    expect(answer).toEqual({ requestId: expect.any(String), requestedAt: expect.any(Number) });
     expect(runIds).toEqual([inFlight.runId]);
     expect(runIds).not.toContain(answer.requestId);
   });
