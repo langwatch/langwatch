@@ -388,7 +388,7 @@ hasAnyAccount(): Promise<boolean>;
 
 #### `isFirstCreatedAccount`
 
-Whether this account is the install's first-created one, deactivated or not.
+Whether this account is the install's first-created one, deactivated or not. Once the first account was erased no remaining one is.
 
 ```typescript
 isFirstCreatedAccount(input: { userId: string }): Promise<boolean>;

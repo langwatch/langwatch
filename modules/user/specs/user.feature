@@ -36,6 +36,15 @@ Feature: Canonical user lifecycle
     Then only the earliest-created account answers yes, deactivated or not
     And with no account at all none does
 
+  # Erasure deletes the row, so user keeps the erased account's creation time alone (Rogerio, 2026-10-19).
+  @unit @integration
+  Scenario: An erased first account leaves no account first-created
+    Given accounts created one after another
+    When the first of them is erased
+    Then the erasure keeps that account's creation time and nothing else about it
+    And no remaining account answers yes to being the install's first-created one
+    And erasing a later account leaves the first one first-created
+
   # Addresses are stored lower-cased (Alex, 2026-10-13): every lookup is a plain match on the
   # unique index first; only a miss asks again case aside, for rows not lower-cased yet.
   @unit

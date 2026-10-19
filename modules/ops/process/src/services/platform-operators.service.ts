@@ -277,7 +277,7 @@ export class PlatformOperatorsService {
     const reason = isLaterUnverifiedSkipped
       ? "the unverified account ADMIN_EMAILS names is not the install's first-created account, " +
         "and with no email configured only that first account is seeded unverified, never a later " +
-        `one, even once the first is deactivated; ${RECOVERY_HINT}`
+        `one, even once the first is deactivated or erased; ${RECOVERY_HINT}`
       : "no user named by ADMIN_EMAILS has an active account yet, verified where email is configured";
     if (this.#loggedWaitReason !== reason) {
       this.#loggedWaitReason = reason;
@@ -297,8 +297,8 @@ export class PlatformOperatorsService {
 
   /**
    * The active users the list names whose address is verified. With no email configured an
-   * unverified one counts only as the install's first-created account, as the first user does:
-   * a later sign-up on a named address proves nothing, even once the first one is deactivated.
+   * unverified one counts only as the install's first-created account, as the first user does: a
+   * later sign-up on a named address proves nothing, even once the first is deactivated or erased.
    */
   async #seedableUsersNamed(adminEmails: readonly string[]): Promise<NamedSeedables> {
     const active: UserProfile[] = [];
