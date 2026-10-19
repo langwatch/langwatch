@@ -5,7 +5,11 @@
  */
 import { nowInstant } from "@langwatch/time";
 
-import type { ProjectBackfillRow, ProjectRepository } from "../repositories/project.repository.ts";
+import type {
+  ProjectBackfillEntry,
+  ProjectBackfillRow,
+  ProjectRepository,
+} from "../repositories/project.repository.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 
 const PAGE_SIZE = 2000;
@@ -70,22 +74,12 @@ export class ProjectFactsBackfillService {
       const page = await this.deps.projects.findBackfillPage({ afterId: cursor, limit: PAGE_SIZE });
       const last = page.at(-1);
       if (!last) break;
-      const projects: ProjectBackfillRow[] = [];
-      const orphanIds: string[] = [];
-      for (const entry of page) {
-        if (entry.kind === "whole") projects.push(entry.project);
-        else orphanIds.push(entry.id);
-      }
+      const { projects, orphanIds } = splitEntries(page);
       const live: ProjectBackfillRow[] = projects.filter((project) => !project.isArchived);
       if (!dryRun && projects.length > 0) {
         await this.deps.lifecycle.recordBackfillPage({ created: projects, live, occurredAt });
       }
-      for (const projectId of orphanIds) {
-        this.deps.logger.warn(
-          { projectId },
-          "the project facts step skipped a project whose team or organization no longer exists",
-        );
-      }
+      this.warnSkipped(orphanIds);
       report.projects += projects.length;
       report.departmentAssignments += live.length;
       report.presenceSettings += live.length;
@@ -99,4 +93,27 @@ export class ProjectFactsBackfillService {
     }
     return report;
   }
+
+  private warnSkipped(orphanIds: readonly string[]): void {
+    for (const projectId of orphanIds) {
+      this.deps.logger.warn(
+        { projectId },
+        "the project facts step skipped a project whose team or organization no longer exists",
+      );
+    }
+  }
+}
+
+/** A page's whole projects and the ids of its orphans, each in id order. */
+function splitEntries(page: readonly ProjectBackfillEntry[]): {
+  projects: ProjectBackfillRow[];
+  orphanIds: string[];
+} {
+  const projects: ProjectBackfillRow[] = [];
+  const orphanIds: string[] = [];
+  for (const entry of page) {
+    if (entry.kind === "whole") projects.push(entry.project);
+    else orphanIds.push(entry.id);
+  }
+  return { projects, orphanIds };
 }
