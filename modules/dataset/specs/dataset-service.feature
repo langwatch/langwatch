@@ -37,6 +37,13 @@ Feature: Shared Dataset service
     And it does not construct a Dataset Record feature
 
   @unit
+  Scenario: A copied dataset lists its records in the source's order
+    Given a dataset whose records were written in one batch, so they share one creation time
+    And record ids minted in that second sort differently under a collation than in minting order
+    When a caller copies the dataset
+    Then the copy lists its records in the source's order
+
+  @unit
   Scenario: Compatibility transports share one service
     When the tRPC or REST Dataset transport handles a request
     Then it reads the process-owned Dataset service
