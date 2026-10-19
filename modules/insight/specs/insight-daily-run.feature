@@ -1177,6 +1177,21 @@ Feature: The daily insights run
       And once the run has started, the Langy panel opens on the run's conversation
 
     @integration
+    Scenario: Run now waits for the run it asked for, not one that settled meanwhile
+      Given a board that is on, with no run in flight
+      And the member chooses Run now
+      When a scheduled run settles before the board reads its run again
+      Then the board shows that run as the last run and keeps waiting
+      And the Langy panel opens only once the run that Run now asked for has started
+
+    @unit
+    Scenario: Run now on a board whose run is already going follows that run
+      Given a board that is on, whose run is in flight before the page shows it
+      When the member chooses Run now
+      Then no run is requested
+      And Run now answers the id of the run in flight, so the board follows that run
+
+    @integration
     Scenario: A run in flight is opened, not started again
       Given a board that is on, with a run in flight
       When the member opens the dropdown
@@ -1214,6 +1229,7 @@ Feature: The daily insights run
       Given a member whose daily run on a board is off, or never decided
       When they ask to run that board now
       Then the request is refused with validation_error and no run is requested
+      And the refusal tells them to turn the board's daily insights on first
       And an operator's run of the same board is still requested
 
     @unit

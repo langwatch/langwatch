@@ -44,6 +44,7 @@ function lastRun(overrides: Partial<InsightLastRun> = {}): InsightLastRun {
     filedCount: 0,
     renewedCount: 0,
     conversationId: null,
+    runId: "run-earlier",
     ...overrides,
   };
 }
@@ -257,8 +258,9 @@ describe("given a daily run the system turned off", () => {
   });
 });
 
-describe("given a member chose Run now", () => {
+describe("given a member chose Run now, and the server answered request-1", () => {
   const EARLIER = NOW - DAY_MS;
+  const REQUEST = "request-1";
   const setting = (overrides: Partial<InsightDailyRunSetting>): InsightDailyRunSetting => ({
     state: "on",
     settings: { hour: 9, timezone: AMSTERDAM, maxInsights: 3 },
@@ -268,46 +270,73 @@ describe("given a member chose Run now", () => {
     ...overrides,
   });
 
-  describe("when the read shows a run in flight", () => {
+  describe("when the read shows its run in flight", () => {
     it("follows that run to its conversation", () => {
       const running = setting({
-        runInFlight: { conversationId: "conversation-7", startedAt: NOW },
+        runInFlight: { runId: REQUEST, conversationId: "conversation-7", startedAt: NOW },
       });
 
-      expect(requestedRunOf({ setting: running, lastRunAtBefore: EARLIER })).toEqual({
+      expect(requestedRunOf({ setting: running, requestId: REQUEST })).toEqual({
         conversationId: "conversation-7",
       });
     });
   });
 
-  describe("when the run settled before a read saw it start", () => {
-    it("follows the newer last run to its conversation", () => {
-      const settled = setting({ lastRun: lastRun({ at: NOW, conversationId: "conversation-8" }) });
-
-      expect(requestedRunOf({ setting: settled, lastRunAtBefore: EARLIER })).toEqual({
-        conversationId: "conversation-8",
+  describe("when its run settled before a read saw it start", () => {
+    it("follows the settled run to its conversation", () => {
+      const settled = setting({
+        lastRun: lastRun({ at: NOW, runId: REQUEST, conversationId: "conversation-8" }),
       });
-      expect(requestedRunOf({ setting: settled, lastRunAtBefore: null })).toEqual({
+
+      expect(requestedRunOf({ setting: settled, requestId: REQUEST })).toEqual({
         conversationId: "conversation-8",
       });
     });
 
     it("ends the wait with no conversation for a run that never reached Langy", () => {
       const skipped = setting({
-        lastRun: lastRun({ at: NOW, outcome: "skipped", reason: "board_empty" }),
+        lastRun: lastRun({ at: NOW, runId: REQUEST, outcome: "skipped", reason: "board_empty" }),
       });
 
-      expect(requestedRunOf({ setting: skipped, lastRunAtBefore: EARLIER })).toEqual({
+      expect(requestedRunOf({ setting: skipped, requestId: REQUEST })).toEqual({
         conversationId: null,
       });
     });
   });
 
-  describe("when the read shows neither a run in flight nor a newer last run", () => {
+  describe("when a scheduled run settled after the request and before the first read", () => {
+    it("keeps waiting, then follows its own run once that starts", () => {
+      const scheduledSettled = lastRun({
+        at: NOW,
+        runId: "run-scheduled",
+        conversationId: "conversation-6",
+      });
+      const raced = setting({ lastRun: scheduledSettled });
+      const ownStarted = setting({
+        lastRun: scheduledSettled,
+        runInFlight: { runId: REQUEST, conversationId: "conversation-7", startedAt: NOW },
+      });
+
+      expect(requestedRunOf({ setting: raced, requestId: REQUEST })).toBeUndefined();
+      expect(requestedRunOf({ setting: ownStarted, requestId: REQUEST })).toEqual({
+        conversationId: "conversation-7",
+      });
+    });
+
+    it("does not take another run in flight for its own", () => {
+      const other = setting({
+        runInFlight: { runId: "run-scheduled", conversationId: "conversation-6", startedAt: NOW },
+      });
+
+      expect(requestedRunOf({ setting: other, requestId: REQUEST })).toBeUndefined();
+    });
+  });
+
+  describe("when the read shows neither its run in flight nor settled", () => {
     it("keeps waiting, with or without a run before", () => {
-      expect(requestedRunOf({ setting: setting({}), lastRunAtBefore: EARLIER })).toBeUndefined();
+      expect(requestedRunOf({ setting: setting({}), requestId: REQUEST })).toBeUndefined();
       expect(
-        requestedRunOf({ setting: setting({ lastRun: null }), lastRunAtBefore: null }),
+        requestedRunOf({ setting: setting({ lastRun: null }), requestId: REQUEST }),
       ).toBeUndefined();
     });
   });

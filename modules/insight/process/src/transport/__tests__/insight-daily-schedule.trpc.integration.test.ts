@@ -18,7 +18,7 @@ import {
 } from "@langwatch/insight-contract";
 import { extractLangyTextFromParts, type LangyTurnSettlementWait } from "@langwatch/langy-contract";
 import { testAuthorizeDefaults, trpcTestMembers } from "@langwatch/test-harness/trpc-members";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   answerWith,
@@ -408,31 +408,47 @@ async function carryOutRequest(daily: InstalledDailyRuns, requestId: string) {
   return daily.carryOut(intent.payload);
 }
 
+/** A member's Run now on a board that is on, its run started and held in Langy's turn. */
+async function startHeldRunNow() {
+  const { as, daily } = await project();
+  const member = as({ userId: MEMBER });
+  await member.configureBoardDailyRun({ ...ON, maxInsights: 3 });
+  const { release } = heldTurn(daily);
+  const { requestId } = await member.runBoardDailyRunNow(RUN_NOW);
+  const running = carryOutRequest(daily, requestId);
+  await vi.waitFor(async () => expect(await daily.runEventsOf()).toContain(RUN_STARTED));
+  const settle = async () => {
+    release();
+    await running;
+  };
+  return { daily, member, requestId, settle };
+}
+
 describe("given a member with analytics:view and langy:create, and a board that is on", () => {
   describe("when they run the board now", () => {
+    let run: Awaited<ReturnType<typeof startHeldRunNow>>;
+
+    beforeEach(async () => {
+      run = await startHeldRunNow();
+    });
+
     /** @scenario "Run now asks for a run and opens Langy on it" */
     it("requests a run for them, names its conversation while it runs, and none once it settled", async () => {
-      const { as, daily } = await project();
-      const member = as({ userId: MEMBER });
-      await member.configureBoardDailyRun({ ...ON, maxInsights: 3 });
-      const { release } = heldTurn(daily);
-
-      const { requestId } = await member.runBoardDailyRunNow(RUN_NOW);
-      const running = carryOutRequest(daily, requestId);
-      await vi.waitFor(async () => expect(await daily.runEventsOf()).toContain(RUN_STARTED));
+      const { daily, member, requestId } = run;
       const during = await member.getBoardDailyRun(SCOPE);
-      release();
-      await running;
+      await run.settle();
 
       expect(requestId).toEqual(expect.any(String));
+      // The run a request starts carries the request's id, so the browser can tell it apart.
       expect(during.runInFlight).toEqual({
+        runId: requestId,
         conversationId: "conversation-1",
         startedAt: expect.any(Number),
       });
       expect(daily.langy.starts).toEqual([expect.objectContaining({ userId: MEMBER })]);
       expect(await member.getBoardDailyRun(SCOPE)).toMatchObject({
         runInFlight: null,
-        lastRun: { outcome: "nothing", conversationId: "conversation-1" },
+        lastRun: { runId: requestId, outcome: "nothing", conversationId: "conversation-1" },
       });
       expect(await daily.runEventsOf()).toEqual([
         CONFIGURED,
@@ -443,22 +459,13 @@ describe("given a member with analytics:view and langy:create, and a board that 
     });
 
     it("names no run in flight once it started longer ago than a run may take", async () => {
-      const { as, daily } = await project();
-      const member = as({ userId: MEMBER });
-      await member.configureBoardDailyRun({ ...ON, maxInsights: 3 });
-      const { release } = heldTurn(daily);
-      const { requestId } = await member.runBoardDailyRunNow(RUN_NOW);
-      const running = carryOutRequest(daily, requestId);
-      await vi.waitFor(async () => expect(await daily.runEventsOf()).toContain(RUN_STARTED));
-
       vi.useFakeTimers({ toFake: ["Date"] });
       try {
         vi.setSystemTime(Date.now() + INSIGHT_DAILY_RUN_EXPIRY_MS);
-        expect((await member.getBoardDailyRun(SCOPE)).runInFlight).toBeNull();
+        expect((await run.member.getBoardDailyRun(SCOPE)).runInFlight).toBeNull();
       } finally {
         vi.useRealTimers();
-        release();
-        await running;
+        await run.settle();
       }
     });
   });

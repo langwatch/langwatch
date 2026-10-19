@@ -64,13 +64,17 @@ export class InsightDailyScheduleService {
   }
 
   /**
-   * Run now, as the person asks it: refused unless their run on the board is on, so the route
-   * cannot start Langy for a board they turned off or never decided on. An operator's run is
-   * asked through {@link requestRun}, which asks no setting.
+   * Run now, as the person asks it: refused unless their run on the board is on. A run already
+   * in flight answers its own id and requests nothing, since the process would start none; the
+   * caller follows that run. An operator's run is asked through {@link requestRun}.
    */
   async runNow(input: RequestInsightDailyRunInput): Promise<{ requestId: string }> {
-    const { state } = await this.getSetting(input);
-    if (state !== "on") throw new ValidationError(DAILY_RUN_NOT_ON);
+    const { state, runInFlight } = await this.getSetting(input);
+    // The presentation reads `formErrors`, so the caller is told what to do, not only the code.
+    if (state !== "on") {
+      throw new ValidationError(DAILY_RUN_NOT_ON, { meta: { formErrors: [DAILY_RUN_NOT_ON] } });
+    }
+    if (runInFlight !== null) return { requestId: runInFlight.runId };
     return this.requestRun(input);
   }
 

@@ -199,14 +199,22 @@ schedule that is on and no other; a run on a template keeps ending `skipped` wit
 
 **Run now asks for the same run.** The board's dropdown offers Run now to a person who
 holds `analytics:view` and `langy:create`, on a board that is on with no run in flight.
-`runBoardDailyRunNow` sends the request an operator's task sends, for the caller alone, so
-the run files into the same inbox. The server refuses it with `validation_error` unless the
-caller's run on the board is on; an operator's request asks no setting. The browser then
-waits for the run to show, with no poll: `run_started` and `run_settled` hint the board's
+`runBoardDailyRunNow` sends the request an operator's task sends, for the caller alone,
+so the run files into the same inbox. The server refuses it with `validation_error`
+unless the caller's run on the board is on, its sentence in `meta.formErrors` for the
+caller to show; an operator's request asks no setting. The request answers its
+`requestId`, and the run it starts takes that id as its `runId`, so the board's read
+names `runId` on both `runInFlight` and `lastRun`. The browser then waits for the run
+with that id to show, with no poll: `run_started` and `run_settled` hint the board's
 read, which is read again. In flight, it opens Langy on the run's conversation; settled
-first, it ends the wait. A run that shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is
-lost, and the browser says the run could not be started. While a run is in flight the
-dropdown offers to open it instead.
+first, it ends the wait. Any other run is not this request's: a scheduled run that
+settles after the click and before the next read is shown as the last run, and the wait
+goes on. While a run is in flight, `runNow` requests nothing and answers that run's id,
+so the browser follows it. A run that starts between that read and the request is a
+narrow window we accept: the request starts nothing, and the wait ends at the deadline.
+A run that shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost, and the browser
+says the run could not be started. While a run is in flight the dropdown offers to open
+it instead.
 
 **The row names the run in flight.** `run_started` writes `runInFlightId`,
 `runInFlightConversationId` and `runInFlightStartedAt`, and the `run_settled` of that run

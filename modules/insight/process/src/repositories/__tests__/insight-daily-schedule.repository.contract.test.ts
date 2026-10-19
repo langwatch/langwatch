@@ -302,6 +302,7 @@ function contractCases(backend: Backend): void {
             filedCount: 2,
             renewedCount: 1,
             conversationId: "conversation-1",
+            runId: "run-1",
           },
           offReason: null,
           runInFlight: null,

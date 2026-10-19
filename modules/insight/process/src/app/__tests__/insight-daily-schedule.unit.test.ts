@@ -107,6 +107,7 @@ describe("given a member whose daily run on a board is not on", () => {
 
       await expect(installed.app.runDailyRunNow(scope)).rejects.toMatchObject({
         code: "validation_error",
+        meta: { formErrors: ["Turn this board's daily insights on before running them now."] },
       });
       const refused = await runRequestsOf();
       await installed.app.requestDailyRun(scope);
@@ -152,6 +153,7 @@ describe("given a member turned their daily run on for a board", () => {
         filedCount: 2,
         renewedCount: 0,
         conversationId: "conversation-1",
+        runId: expect.any(String),
       },
       offReason: null,
       runInFlight: null,

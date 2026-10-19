@@ -58,15 +58,13 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
   const utils = insightApi.useUtils();
   const configure = insightApi.insights.configureBoardDailyRun.useMutation();
   const turnOffRun = insightApi.insights.turnOffBoardDailyRun.useMutation();
-  // The request keeps the last run the person saw, so a newer one is the run they asked for.
-  const runNowRequest = insightApi.insights.runBoardDailyRunNow.useMutation({
-    onMutate: () => ({ lastRunAtBefore: query.data?.lastRun?.at ?? null }),
-  });
+  const runNowRequest = insightApi.insights.runBoardDailyRunNow.useMutation();
   const { reset: endRunNow } = runNowRequest;
 
+  // Matched by the request's id: a run settling meanwhile is not the one asked for (ADR-004).
   const requested =
-    runNowRequest.isSuccess && runNowRequest.context && query.data
-      ? requestedRunOf({ setting: query.data, ...runNowRequest.context })
+    runNowRequest.data && query.data
+      ? requestedRunOf({ setting: query.data, requestId: runNowRequest.data.requestId })
       : undefined;
   const hasRequestedRunShown = requested !== undefined;
   const requestedConversationId = requested?.conversationId ?? null;

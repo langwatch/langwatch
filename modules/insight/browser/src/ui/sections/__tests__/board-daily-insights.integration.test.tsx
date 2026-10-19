@@ -47,7 +47,7 @@ const ON: InsightDailyRunSetting = {
 };
 const RUNNING: InsightDailyRunSetting = {
   ...ON,
-  runInFlight: { conversationId: "conversation-7", startedAt: NOW },
+  runInFlight: { runId: "request-1", conversationId: "conversation-7", startedAt: NOW },
 };
 /** A member who may also ask Langy, which a run is. */
 const ASKER: StubInsightHostOptions = { permissions: ["analytics:view", "langy:create"] };
@@ -64,6 +64,7 @@ function ranToday(overrides: Partial<LastRun>): InsightDailyRunSetting {
       filedCount: 0,
       renewedCount: 0,
       conversationId: null,
+      runId: "run-1",
       ...overrides,
     },
   };
@@ -552,6 +553,38 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
           maxInsights: 3,
         },
       ]);
+      expect(board.host.failures).toEqual([]);
+    });
+  });
+
+  describe("when a scheduled run settles after they chose Run now, before the board read it", () => {
+    /** @scenario "Run now waits for the run it asked for, not one that settled meanwhile" */
+    it("keeps waiting, and opens Langy on the run it asked for once that starts", async () => {
+      let read = ON;
+      const board = openBoard({
+        setting: () => read,
+        host: ASKER,
+        write: () => {
+          read = ranToday({ runId: "run-scheduled", conversationId: "conversation-6" });
+          return Promise.resolve({ requestId: "request-1" });
+        },
+      });
+      const dropdown = await openDropdown(board.user);
+
+      await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+      await waitFor(() => expect(board.reads()).toHaveLength(2));
+      const waiting = await openDropdown(board.user);
+      // The scheduled run shows as the last run, and the board still waits for its own.
+      expect(await waiting.findByText(`Ran ${RAN_AT} · nothing new`)).toBeInTheDocument();
+      expect(waiting.getByText("Starting a run.")).toBeInTheDocument();
+      expect(waiting.queryByRole("button", { name: "Run now" })).toBeNull();
+      expect(board.host.queries).toEqual([]);
+      read = { ...ranToday({ runId: "run-scheduled" }), runInFlight: RUNNING.runInFlight };
+      await board.readHint();
+
+      await waitFor(() =>
+        expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
+      );
       expect(board.host.failures).toEqual([]);
     });
   });
