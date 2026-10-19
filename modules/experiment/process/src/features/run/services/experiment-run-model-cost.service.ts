@@ -4,7 +4,10 @@ import {
   type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import { ATTR_KEYS } from "@langwatch/span-normalisation";
+import {
+  ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+} from "@opentelemetry/semantic-conventions/incubating";
 
 import {
   customRateAttributesOf,
@@ -68,10 +71,10 @@ export class ExperimentRunModelCostService extends ExperimentModelCost {
       attrs: {
         ...customRates,
         ...(cacheReadTokens > 0
-          ? { [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: cacheReadTokens }
+          ? { [ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: cacheReadTokens }
           : {}),
         ...(cacheCreationTokens > 0
-          ? { [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: cacheCreationTokens }
+          ? { [ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: cacheCreationTokens }
           : {}),
       },
       model,
