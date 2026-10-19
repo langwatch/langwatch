@@ -4,6 +4,7 @@ import {
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "@langwatch/langy-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -31,9 +32,8 @@ type Row = {
 function makeRepo(
   overrides: Partial<LangyConversationRepository> = {},
 ): LangyConversationRepository {
-  const defaults: LangyConversationRepository = {
+  const defaults = createApiFixture<LangyConversationRepository>({
     countUsage: vi.fn(async () => ({ turns: 0, activeUsers: 0 })),
-    findRunConversationIds: vi.fn(async () => []),
     getVisibleById: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
     findOwnership: vi.fn(async () => "missing" as const),
     findAllForUser: vi.fn(async () => []),
@@ -41,7 +41,7 @@ function makeRepo(
     getResumeState: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
     hasAdmittedTurn: vi.fn(async () => false),
     turnExists: vi.fn(async () => false),
-  };
+  });
   return Object.assign(defaults, overrides);
 }
 

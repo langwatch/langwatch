@@ -158,6 +158,10 @@ describe("given a failure of a statement", () => {
     expect(classifyStatementFailure(error).kind).toBe("platform");
   });
 
+  it("reads a failure that is not a handled error as the platform's, with no code", () => {
+    expect(classifyStatementFailure(new Error("socket hang up"))).toEqual({ kind: "platform" });
+  });
+
   it("reads a refusal the person can fix as an error, with its code and message", () => {
     expect(
       classifyStatementFailure(refusal({ code: "lwql_unknown_identifier", httpStatus: 400 })),
@@ -196,6 +200,13 @@ describe("given a failure of a statement", () => {
       false,
     );
     expect(isPlatformWide([failing, failing, failing, { kind: "unchecked" }])).toBe(true);
+  });
+
+  /** @scenario "When most statements fail with the same code, the whole check is the platform's" */
+  it("reads failures with no code as one code", () => {
+    const unhandled: StatementOutcome = { kind: "platform" };
+    expect(isPlatformWide([unhandled, unhandled, unhandled, { kind: "data" }])).toBe(true);
+    expect(isPlatformWide([unhandled, unhandled, { kind: "data" }])).toBe(false);
   });
 });
 

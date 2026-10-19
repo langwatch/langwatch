@@ -36,12 +36,15 @@ const PLATFORM_WIDE_MIN_FAILURES = 3;
 
 export type BoardHealthReason = "error" | "no_data";
 
+/** Ours, under the refusal's code; a failure that was never a handled error carries none. */
+type PlatformFailure = Readonly<{ kind: "platform"; code?: string }>;
+
 /** What one statement of a widget came to. */
 export type StatementOutcome =
   | Readonly<{ kind: "data" }>
   | Readonly<{ kind: "empty" }>
   | Readonly<{ kind: "error"; code: string; message: string }>
-  | Readonly<{ kind: "platform"; code: string }>
+  | PlatformFailure
   | Readonly<{ kind: "unchecked" }>;
 
 /** How a failure reads: a refusal to report, ours, or a reason to stop or skip the statement. */
@@ -49,7 +52,7 @@ export type StatementFailure =
   | Readonly<{ kind: "off" }>
   | Readonly<{ kind: "window_full"; retryAfterSeconds: number }>
   | Readonly<{ kind: "unchecked" }>
-  | Readonly<{ kind: "platform"; code: string }>
+  | PlatformFailure
   | Readonly<{ kind: "error"; code: string; message: string }>;
 
 export type WidgetHealth = "healthy" | BoardHealthReason | "platform" | "unchecked";
@@ -82,7 +85,7 @@ function retryAfterOf(error: HandledError): number {
 
 /** Reads one failure of a statement's validation or execution. */
 export function classifyStatementFailure(error: unknown): StatementFailure {
-  if (!HandledError.isHandled(error)) return { kind: "platform", code: "unhandled" };
+  if (!HandledError.isHandled(error)) return { kind: "platform" };
   const { code } = error;
   if (code === "lwql_not_enabled") return { kind: "off" };
   if (code === "lwql_rate_limited") {
@@ -137,11 +140,11 @@ export function widgetHealth(outcomes: readonly StatementOutcome[]): WidgetHealt
 
 /**
  * Whether one code failed most of what ran: a view we renamed, or an outage, breaks every
- * board at once, so the check then files nothing.
+ * board at once, so the check then files nothing. Failures with no code count as one code.
  */
 export function isPlatformWide(outcomes: readonly StatementOutcome[]): boolean {
   const ran = outcomes.filter((outcome) => outcome.kind !== "unchecked");
-  const counts = new Map<string, number>();
+  const counts = new Map<string | undefined, number>();
   for (const outcome of ran) {
     if (outcome.kind !== "error" && outcome.kind !== "platform") continue;
     counts.set(outcome.code, (counts.get(outcome.code) ?? 0) + 1);

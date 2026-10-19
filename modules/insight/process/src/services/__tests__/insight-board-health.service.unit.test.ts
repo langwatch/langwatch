@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * The board check's wait for a full query window, which the installed module makes in real
- * seconds: here the wait moves a fake clock.
+ * seconds: here fake timers run the wait and move the clock with it.
  * @see modules/insight/specs/insight-board-health.feature
  */
 
@@ -11,6 +11,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { InsightRepository } from "../../repositories/insight.repository.ts";
+import { InsightMemoryStore } from "../../repositories/memory/insight-memory.store.ts";
+import { MemoryInsightRepository } from "../../repositories/memory/memory.insight.repository.ts";
 import { InsightBoardHealthService } from "../insight-board-health.service.ts";
 import type { InsightCommandsService } from "../insight-commands.service.ts";
 import { InsightDailyRunMetricsService } from "../insight-daily-run-metrics.service.ts";
@@ -39,7 +41,6 @@ function harness({
   store?: Partial<{ readFails: boolean; writeFails: boolean }>;
 }) {
   const started: { sql: string; at: number }[] = [];
-  const waits: number[] = [];
   const filed: unknown[] = [];
   let refusals = 0;
   const service = InsightBoardHealthService.create({
@@ -73,12 +74,14 @@ function harness({
         };
       },
     }),
-    insights: createApiFixture<Pick<InsightRepository, "findByFindingKeys">>({
-      findByFindingKeys: async () => {
-        if (store.readFails) throw new Error("postgres unavailable");
-        return [];
-      },
-    }),
+    // The twin cannot fail, so only the outage stands in for it.
+    insights: store.readFails
+      ? createApiFixture<Pick<InsightRepository, "findByFindingKeys">>({
+          findByFindingKeys: async () => {
+            throw new Error("postgres unavailable");
+          },
+        })
+      : MemoryInsightRepository.create({ rows: InsightMemoryStore.create() }),
     commands: createApiFixture<Pick<InsightCommandsService, "fileInsight" | "renewInsight">>({
       fileInsight: async (input) => {
         if (store.writeFails) throw new Error("command bus unavailable");
@@ -86,12 +89,18 @@ function harness({
       },
     }),
     metrics: InsightDailyRunMetricsService.create(),
-    pause: async (ms) => {
-      waits.push(ms);
-      vi.setSystemTime(Date.now() + ms);
-    },
   });
-  return { service, started, waits, filed };
+  return { service, started, filed };
+}
+
+/** Runs the check to its end, firing each wait's timer as it is set. */
+async function checked(
+  service: InsightBoardHealthService,
+  input: Parameters<InsightBoardHealthService["check"]>[0],
+) {
+  const report = service.check(input);
+  await vi.runAllTimersAsync();
+  return report;
 }
 
 const widget = (id: string) => ({ id, name: id, statements: [{ sql: `query of ${id}` }] });
@@ -108,7 +117,7 @@ const CHECK = {
 };
 
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.useFakeTimers({ toFake: ["Date", "setTimeout"] });
   vi.setSystemTime(START);
 });
 
@@ -119,11 +128,10 @@ afterEach(() => {
 describe("given the project's query window refuses the check, to be retried after 20 seconds", () => {
   /** @scenario "A full query window pauses the check until it opens again" */
   it("waits 20 seconds and runs the same statement again", async () => {
-    const { service, started, waits, filed } = harness({ fullFor: 1 });
+    const { service, started, filed } = harness({ fullFor: 1 });
 
-    const report = await service.check({ ...CHECK, widgets: [widget("widget-1")] });
+    const report = await checked(service, { ...CHECK, widgets: [widget("widget-1")] });
 
-    expect(waits).toEqual([20_000]);
     expect(started).toEqual([
       { sql: "query of widget-1", at: START },
       { sql: "query of widget-1", at: START + 20_000 },
@@ -133,16 +141,16 @@ describe("given the project's query window refuses the check, to be retried afte
   });
 
   it("starts no statement after 3 minutes, and files nothing for the widgets left", async () => {
-    const { service, started, waits, filed } = harness({ fullFor: 100 });
+    const { service, started, filed } = harness({ fullFor: 100 });
 
-    const report = await service.check({
+    const report = await checked(service, {
       ...CHECK,
       widgets: [widget("widget-1"), widget("widget-2")],
     });
 
     expect(started.every(({ at }) => at < START + 180_000)).toBe(true);
     expect(started.map(({ sql }) => sql).every((sql) => sql === "query of widget-1")).toBe(true);
-    expect(waits.reduce((total, ms) => total + ms, 0)).toBeLessThan(180_000);
+    expect(Date.now()).toBeLessThan(START + 180_000);
     expect(report).toEqual({ filedCount: 0, renewedCount: 0, reported: [] });
     expect(filed).toEqual([]);
   });
@@ -156,7 +164,7 @@ describe("given a widget that shows no data", () => {
   ])("reports no card when the insights store fails to %s it", async (_step, store) => {
     const { service, filed } = harness({ fullFor: 0, store });
 
-    const report = await service.check({ ...CHECK, widgets: [widget("widget-1")] });
+    const report = await checked(service, { ...CHECK, widgets: [widget("widget-1")] });
 
     expect(report).toEqual({ filedCount: 0, renewedCount: 0, reported: [] });
     expect(filed).toEqual([]);

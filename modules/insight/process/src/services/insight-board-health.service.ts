@@ -86,8 +86,6 @@ type InsightBoardHealthMembers = Readonly<{
   insights: Pick<InsightRepository, "findByFindingKeys">;
   commands: Pick<InsightCommandsService, "fileInsight" | "renewInsight">;
   metrics: Pick<InsightDailyRunMetricsService, "boardHealthChecked">;
-  /** Injected by tests that cannot wait for a query window to open. */
-  pause?: (ms: number) => Promise<void>;
 }>;
 
 function sleep(ms: number): Promise<void> {
@@ -215,7 +213,7 @@ export class InsightBoardHealthService {
     context: CheckContext;
     statement: Statement;
   }): Promise<StatementOutcome | Stop> {
-    const { analytics, pause = sleep } = this.members;
+    const { analytics } = this.members;
     const { input, caller, startedAt } = context;
     const deadline = startedAt + CHECK_BUDGET_MS;
     while (nowInstant().epochMilliseconds < deadline) {
@@ -237,7 +235,7 @@ export class InsightBoardHealthService {
         if (failure.kind !== "window_full") throw error;
         const waitMs = failure.retryAfterSeconds * 1000;
         if (nowInstant().epochMilliseconds + waitMs >= deadline) return "budget";
-        await pause(waitMs);
+        await sleep(waitMs);
       }
     }
     return "budget";
