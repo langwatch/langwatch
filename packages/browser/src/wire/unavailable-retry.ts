@@ -19,7 +19,7 @@ function isLifecycleRefusal(response: Response): boolean {
 /** A plain-text 503 the client would fail to parse as JSON: the sentence becomes a tRPC error. */
 function isPlainTextUnavailable(response: Response): boolean {
   if (response.status !== 503) return false;
-  return (response.headers.get("content-type") ?? "").startsWith("text/plain");
+  return (response.headers.get("content-type") ?? "").toLowerCase().startsWith("text/plain");
 }
 
 function waitMsOf(response: Response): number {

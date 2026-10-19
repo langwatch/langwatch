@@ -1,16 +1,14 @@
 import { createTRPCUntypedClient, httpLink, TRPCClientError } from "@trpc/client";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  NOT_HANDLED_HEADER,
-  UNAVAILABLE_MAX_ATTEMPTS,
-  unavailableRetryFetch,
-} from "../src/wire/unavailable-retry.ts";
+import { UNAVAILABLE_MAX_ATTEMPTS, unavailableRetryFetch } from "../src/wire/unavailable-retry.ts";
 
+// Spelled out, as packages/process/src/__tests__/server.unit.test.ts asserts it, so a
+// rename on either side fails a test.
 const shuttingDown = (headers: Record<string, string> = {}) =>
   new Response("langwatch-api is shutting down", {
     status: 503,
-    headers: { "Content-Type": "text/plain", [NOT_HANDLED_HEADER]: "draining", ...headers },
+    headers: { "Content-Type": "text/plain", "x-langwatch-not-handled": "draining", ...headers },
   });
 const answer = () =>
   new Response(JSON.stringify({ result: { data: { ok: true } } }), {
@@ -116,6 +114,23 @@ describe("unavailableRetryFetch", () => {
       expect(send).toHaveBeenCalledTimes(1);
       expect((failure as TRPCClientError<never>).data).toMatchObject({ httpStatus: 503 });
       expect((failure as Error).message).toBe("upstream timed out");
+    });
+
+    /** @scenario "A plain-text 503 that may have reached a handler is never resent" */
+    it("reads the media type whatever its case", async () => {
+      const send = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(
+        new Response("upstream timed out", {
+          status: 503,
+          headers: { "Content-Type": "Text/Plain; charset=utf-8" },
+        }),
+      );
+
+      const response = await unavailableRetryFetch({ fetch: send, sleep: noWait })(
+        "/api/trpc/trace.list",
+      );
+
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(response.headers.get("content-type")).toBe("application/json");
     });
   });
 });
