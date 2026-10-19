@@ -161,7 +161,7 @@ type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:1
 type Output = unknown;
 
 // insights.getBoardDailyRun
-// Input: insightBoardDailyRunScopeSchema, ../contract/src/insight-daily-run.ts:234
+// Input: insightBoardDailyRunScopeSchema, ../contract/src/insight-daily-run.ts:237
 interface Input {
   projectId: string;
   board: {
@@ -169,15 +169,15 @@ interface Input {
     id: string;
   };
 }
-type Output = z.infer<typeof insightDailyRunSettingSchema>; // ../contract/src/insight-daily-run.ts:196
+type Output = z.infer<typeof insightDailyRunSettingSchema>; // ../contract/src/insight-daily-run.ts:199
 
 // insights.configureBoardDailyRun
-type Input = z.infer<typeof configureInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:247
+type Input = z.infer<typeof configureInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:250
 // Output: inline, ../contract/src/insight.trpc.ts:56
 type Output = unknown;
 
 // insights.turnOffBoardDailyRun
-type Input = z.infer<typeof turnOffInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:259
+type Input = z.infer<typeof turnOffInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:262
 // Output: inline, ../contract/src/insight.trpc.ts:60
 type Output = unknown;
 ```

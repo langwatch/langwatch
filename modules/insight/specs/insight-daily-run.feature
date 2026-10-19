@@ -143,10 +143,11 @@ Feature: The daily insights run
       And the run's row names the template board by its name now
 
     @unit
-    Scenario: A From LangWatch board no longer offered reads as deleted
+    Scenario: A From LangWatch board no longer offered reads as unreadable
       Given a run requested on a template id the catalogue no longer offers
       When the run is carried out
-      Then it is recorded as skipped with the reason board_deleted
+      Then it is recorded as skipped with the reason board_unreadable
+      And the schedule is not turned off by that run alone
       And Langy is never called
 
     @unit

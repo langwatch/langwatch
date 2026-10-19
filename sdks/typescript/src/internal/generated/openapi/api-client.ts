@@ -327,7 +327,7 @@ export interface paths {
         };
         /**
          * Get a dashboard widget
-         * @description Returns one dashboard widget with its React source and named queries. A widget saved in another project is reported as not found.
+         * @description Returns one dashboard widget with its React source and named queries. A widget saved in another project is reported as not found. It also answers the read-only template:<templateId>:<key> ids of the From LangWatch boards, which the list route never lists and on which PATCH and DELETE answer 404.
          */
         get: operations["getApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
         put?: never;
