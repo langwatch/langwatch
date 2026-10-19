@@ -38,7 +38,8 @@ automatic send does not, and the step page shows exactly what was sent:
 | instance id                                               | `InstanceIdentityService` (licensing)                                                                           |
 
 Not sent: organisation, project or user names, row contents, environment
-variables, anything outside the ledger.
+variables, anything outside the ledger, with two named exceptions: the ops config
+facts (release, chart version, install method) and the instance id above.
 
 There is **no per-step worker log** stored today: worker lines go to stdout or
 OpenTelemetry only. A "recent worker log lines for this step" field needs either a

@@ -169,8 +169,13 @@ const servingSentence = ({
   isSingleStep: boolean;
 }) => {
   const count = isSingleStep ? "One" : `${failedSteps.length}`;
-  if (failedSteps.some((step) => step.mode === "blocking")) {
+  const blocking = failedSteps.filter((step) => step.mode === "blocking").length;
+  if (blocking === failedSteps.length) {
     return `${count} ${isSingleStep ? "step" : "steps"} of the LangWatch upgrade at ${installation} didn't finish. LangWatch can't start serving the new version until ${isSingleStep ? "it finishes" : "they finish"}.`;
+  }
+  if (blocking > 0) {
+    const isSingleBlocking = blocking === 1;
+    return `${count} steps of the LangWatch upgrade at ${installation} didn't finish. LangWatch can't start serving the new version until the ${isSingleBlocking ? "step it waits on finishes" : `${blocking} steps it waits on finish`}; the others run in the background.`;
   }
   return `${count} background ${isSingleStep ? "step" : "steps"} of the LangWatch upgrade at ${installation} didn't finish. LangWatch keeps running, but the work ${isSingleStep ? "this step does is" : "these steps do is"} not complete until ${isSingleStep ? "it finishes" : "they finish"}.`;
 };

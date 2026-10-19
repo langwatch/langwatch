@@ -130,6 +130,13 @@ Feature: The transactional messages LangWatch sends
     And it does not say LangWatch keeps running
 
   @unit
+  Scenario: A self-hosted upgrade alert for mixed failures names only the blocking step as holding the new version
+    Given a blocking and a background upgrade step failed on a self-hosted installation
+    When the upgrade alert is rendered
+    Then it says the new version waits on the blocking step
+    And it says the other step runs in the background
+
+  @unit
   Scenario: A self-hosted upgrade alert falls back to the step id when a step has no description
     Given a failed upgrade step that declares no description
     When the self-hosted upgrade alert is rendered
