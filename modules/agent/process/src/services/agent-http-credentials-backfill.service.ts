@@ -17,15 +17,21 @@ import type { AgentHttpSecretsService } from "./agent-http-secrets.service.ts";
 
 const logger = createLogger("langwatch:agent:http-credentials-backfill");
 
+/** How many kept and held agents the report names; `keptCount` and `held` cover the rest. */
+export const NAMED_AGENTS_REPORTED = 20;
+
 /** What one pass did; the ledger keeps it. Ids, counts and reason codes, never a credential. */
 export type AgentHttpCredentialsBackfillReport = {
   afterProjectId: string | null;
   projects: number;
   moved: number;
+  /** Every held agent; these fail the pass. */
   held: number;
-  /** Left in place for good: a retry can never move them. */
+  /** Every agent left in place for good: no action can ever move them. */
+  keptCount: number;
+  /** The first kept agents only. */
   kept: AgentCredentialOutcome[];
-  /** Held for a retry: these fail the pass. */
+  /** The first held agents only. */
   failed: AgentCredentialOutcome[];
 };
 
@@ -38,8 +44,8 @@ type MoveOutcome =
 /**
  * Stores credentials typed inline into HTTP agents as project secrets
  * (modules/agent/specs/http-credentials.feature). Level-triggered: an agent counts as moved only
- * when a re-read holds no literal. A permanent refusal keeps the literal and is reported; anything
- * else is held and fails the pass for a retry.
+ * when a re-read holds no literal. A refusal no action can fix keeps the literal and is reported;
+ * anything else, operator-fixable refusals included, is held and fails the pass for a retry.
  */
 export class AgentHttpCredentialsBackfillService {
   static create(deps: {
@@ -75,6 +81,7 @@ export class AgentHttpCredentialsBackfillService {
       projects: 0,
       moved: 0,
       held: 0,
+      keptCount: 0,
       kept: [],
       failed: [],
     };
@@ -86,9 +93,10 @@ export class AgentHttpCredentialsBackfillService {
       await this.moveProject({ projectId, dryRun, report });
       // The cursor stops before the first project with held work, so a retry revisits it.
       if (report.held === 0) report.afterProjectId = projectId;
-      if (!dryRun) await onProjectDone({ ...report });
+      if (!dryRun)
+        await onProjectDone({ ...report, kept: [...report.kept], failed: [...report.failed] });
     }
-    if (report.held > 0) throw new Error(heldMessageOf(report.failed));
+    if (report.held > 0) throw new Error(heldMessageOf(report));
 
     return report;
   }
@@ -166,11 +174,16 @@ export class AgentHttpCredentialsBackfillService {
     if (outcome.kind === "written") {
       report.moved += 1;
     } else if (outcome.kind === "kept") {
-      report.kept.push({ ...agent, reason: outcome.reason });
+      report.keptCount += 1;
+      if (report.kept.length < NAMED_AGENTS_REPORTED) {
+        report.kept.push({ ...agent, reason: outcome.reason });
+      }
       logger.warn({ ...agent, reason: outcome.reason }, "agent credentials left in place for good");
     } else {
       report.held += 1;
-      report.failed.push({ ...agent, reason: outcome.reason });
+      if (report.failed.length < NAMED_AGENTS_REPORTED) {
+        report.failed.push({ ...agent, reason: outcome.reason });
+      }
       logger.warn({ ...agent, reason: outcome.reason }, "agent credentials held for a retry");
     }
   }

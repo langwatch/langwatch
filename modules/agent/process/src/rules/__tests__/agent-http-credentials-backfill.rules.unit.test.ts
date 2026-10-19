@@ -1,4 +1,4 @@
-import { SecretNotFoundError } from "@langwatch/secret-contract";
+import { SecretLimitReachedError, SecretNotFoundError } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -13,7 +13,7 @@ describe("the agent credential step's failure reasons", () => {
     /** @scenario "An agent credential that can never be moved is left in place and the step completes" */
     it("names the reason by code, whether or not the error crossed a boundary", () => {
       expect(keptReasonOf(new SecretNotFoundError())).toBe("project_not_found");
-      expect(keptReasonOf({ code: "secret_limit_reached" })).toBe("secret_limit_reached");
+      expect(keptReasonOf({ code: "agent_not_found" })).toBe("agent_not_found");
     });
 
     /** @scenario "A config the credential step produced that fails validation holds the step" */
@@ -22,6 +22,19 @@ describe("the agent credential step's failure reasons", () => {
 
       expect(keptReasonOf(schemaError)).toBeUndefined();
       expect(failureReasonOf(schemaError)).toBe("ZodError");
+    });
+  });
+
+  describe("when an operator can fix the refusal", () => {
+    /** @scenario "An agent credential an operator can unblock holds the step, naming the agent and why" */
+    it("holds it under a stable reason code instead of keeping it for good", () => {
+      expect(keptReasonOf(new SecretLimitReachedError())).toBeUndefined();
+      expect(failureReasonOf(new SecretLimitReachedError())).toBe("secret_limit_reached");
+      expect(failureReasonOf({ code: "authenticated_actor_required" })).toBe(
+        "project_has_no_member",
+      );
+      expect(failureReasonOf({ code: "secret_already_exists" })).toBe("secret_name_taken");
+      expect(failureReasonOf({ code: "secret_unreadable" })).toBe("secret_unreadable");
     });
   });
 
@@ -43,7 +56,7 @@ describe("the agent credential step's failure reasons", () => {
         reason: "P1001",
       }));
 
-      const message = heldMessageOf(failed);
+      const message = heldMessageOf({ failed, held: failed.length });
 
       expect(message).toContain("7 HTTP agent credential(s) could not be stored");
       expect(message).toContain("agent agent_4 in project project_a: P1001");

@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
 import {
   AgentHttpCredentialsBackfillService,
+  NAMED_AGENTS_REPORTED,
   type AgentHttpCredentialsBackfillReport,
 } from "../agent-http-credentials-backfill.service.ts";
 import { AgentHttpSecretsService } from "../agent-http-secrets.service.ts";
@@ -31,6 +32,7 @@ async function build(
     storedConfig?: { config: unknown };
     producedConfig?: unknown;
     stored?: Record<string, Record<string, string>>;
+    extraAgentsInProjectA?: number;
   } = {},
 ) {
   const values: Record<string, Record<string, string>> = { ...options.stored };
@@ -56,6 +58,9 @@ async function build(
   await seed({ id: "agent_a", projectId: "project_a", token: TOKEN });
   await seed({ id: "agent_b", projectId: "project_b", token: TOKEN });
   await seed({ id: "agent_ref", projectId: "project_b", token: "{{ secrets.ALREADY }}" });
+  for (let index = 0; index < (options.extraAgentsInProjectA ?? 0); index++) {
+    await seed({ id: `agent_extra_${index}`, projectId: "project_a", token: TOKEN });
+  }
 
   const agents = AgentService.create(repository);
   const realSecrets = AgentHttpSecretsService.create({ secrets, agents });
@@ -189,6 +194,7 @@ describe("the agent credential step moving inline HTTP agent credentials to proj
       moved: 1,
       held: 0,
       afterProjectId: "project_b",
+      keptCount: 1,
       kept: [{ agentId: "agent_a", projectId: "project_a", reason: "project_not_found" }],
       failed: [],
     });
@@ -197,18 +203,46 @@ describe("the agent credential step moving inline HTTP agent credentials to proj
     expect(saved.map((progress) => progress.afterProjectId)).toEqual(["project_a", "project_b"]);
   });
 
-  /** @scenario "An agent credential that can never be moved is left in place and the step completes" */
-  it("completes with the agent reported when its project is at the secret limit", async () => {
-    const { run, configOf } = await build({
+  /** @scenario "An agent credential an operator can unblock holds the step, naming the agent and why" */
+  it("moves every other agent, then fails naming the agent at the secret limit", async () => {
+    const { run, values, saved, configOf } = await build({
       refused: { projectId: "project_a", error: new SecretLimitReachedError() },
+    });
+
+    await expect(run()).rejects.toThrow(
+      /1 HTTP agent credential\(s\) could not be stored .*agent agent_a in project project_a: secret_limit_reached/,
+    );
+
+    expect(await configOf("agent_a", "project_a")).toContain(TOKEN);
+    expect(values).toEqual({ project_b: { HTTP_AGENT_B_AUTH_TOKEN: TOKEN } });
+    expect(saved.at(-1)).toMatchObject({ afterProjectId: null, held: 1, keptCount: 0, kept: [] });
+  });
+
+  /** @scenario "The agent credential step's report names a bounded number of agents" */
+  it("names at most 20 kept agents and counts all 25", async () => {
+    const { run, saved } = await build({
+      refused: { projectId: "project_a", error: new SecretNotFoundError() },
+      extraAgentsInProjectA: 24,
     });
 
     const report = await run();
 
-    expect(report.kept).toEqual([
-      { agentId: "agent_a", projectId: "project_a", reason: "secret_limit_reached" },
-    ]);
-    expect(await configOf("agent_a", "project_a")).toContain(TOKEN);
+    expect(report).toMatchObject({ moved: 1, held: 0, keptCount: 25 });
+    expect(report.kept).toHaveLength(NAMED_AGENTS_REPORTED);
+    expect(saved.every((progress) => progress.kept.length <= NAMED_AGENTS_REPORTED)).toBe(true);
+  });
+
+  /** @scenario "The agent credential step's report names a bounded number of agents" */
+  it("names at most 20 held agents and counts all 25 in the failure", async () => {
+    const { run, saved } = await build({
+      refused: { projectId: "project_a", error: new SecretLimitReachedError() },
+      extraAgentsInProjectA: 24,
+    });
+
+    await expect(run()).rejects.toThrow(/^25 HTTP agent credential\(s\).*and 20 more/);
+
+    expect(saved.at(-1)?.held).toBe(25);
+    expect(saved.at(-1)?.failed).toHaveLength(NAMED_AGENTS_REPORTED);
   });
 
   /** @scenario "An agent credential that can never be moved is left in place and the step completes" */
