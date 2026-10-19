@@ -79,9 +79,9 @@ Feature: Process wakes are claimed by one worker at a time
       And its commit schedules the next wake from that time
 
     @unit
-    Scenario: A worker leaves the tail of a batch its claim has run out on
+    Scenario: A worker starts no wake once less than the claim's safety margin remains
       Given a worker claimed a batch of due wakes
-      And handling the first wake outlasted the claim
+      And handling the first wake left less than the claim's safety margin
       When the worker reaches the rest of the batch
       Then it hands none of them to their handlers
       And it releases their claims back to the times they were due

@@ -137,7 +137,7 @@ describe("ProcessWakeWorker claims", () => {
 
   describe("given a worker claimed a batch and handling the first wake ate into the claim's safety margin", () => {
     describe("when the worker reaches the rest of the batch", () => {
-      /** @scenario "A worker leaves the tail of a batch its claim has run out on" */
+      /** @scenario "A worker starts no wake once less than the claim's safety margin remains" */
       it("releases the rest unhandled, back to the times they were due", async () => {
         const { store, service } = await pilotWorld({ conversations: ["conv_a", "conv_b"] });
         let clock = DUE_AT + 1_000;

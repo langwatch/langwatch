@@ -115,7 +115,7 @@ export class ProcessWakeWorker {
         if (this.now() >= claimedUntil - WAKE_CLAIM_SAFETY_MARGIN_MS) {
           this.logger.warn(
             { unhandled: due.length - index, leaseMs: WAKE_CLAIM_LEASE_MS },
-            "Wake claim ran out before its batch was handled; releasing the rest for a later poll",
+            "Wake claim is inside its safety margin; releasing the rest of the batch for a later poll",
           );
           for (const unhandled of due.slice(index)) await this.release(unhandled, claimedUntil);
           return;
