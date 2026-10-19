@@ -125,7 +125,9 @@ npm run sync                # write them
 - It reads `LANGWATCH_ENDPOINT`, `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID`
   (`.env` or the environment). It uses Node built-ins only, so CI runs it
   without an install: `.github/workflows/langy-scenarios-sync.yml` (a draft)
-  syncs on a push to main and skips with a notice when the
+  syncs when started by hand (`workflow_dispatch`, a dry run by default); a PR
+  that touches `dev/dogfood/langy` runs only the connector tests. It skips with
+  a notice when the
   `LANGY_DOGFOOD_API_KEY`, `LANGY_DOGFOOD_PROJECT_ID` or
   `LANGY_DOGFOOD_ENDPOINT` secret is missing.
 

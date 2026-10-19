@@ -59,6 +59,7 @@ The child's result line carries each hook's result to the parent, which records 
 ### Open items
 
 - **OPEN, proposed by the agent, not decided by the owner:** hooks run on the Node child only in v1. A project with `release_scenario_go_runner_enabled` routes runs of agents that declare hooks to the Node child. Go parity comes later.
+- **OPEN, proposed by the agent, not decided by the owner:** the run record keeps the first 1,000 characters of a hook error, since the text comes from the agent with no size limit. Spec: `modules/scenario/specs/scenario-run-hooks.feature`.
 
 ### Inline run parameters in situation text (decided by the owner)
 

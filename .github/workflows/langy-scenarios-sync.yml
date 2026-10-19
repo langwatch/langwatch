@@ -1,6 +1,7 @@
 # Draft: makes the Langy dogfood project's scenarios and run plan match
-# dev/dogfood/langy/scenarios when run by hand (workflow_dispatch). Without the
-# three secrets it skips with a notice, so forks and unconfigured repos stay green.
+# dev/dogfood/langy/scenarios when run by hand (workflow_dispatch). A PR that
+# touches dev/dogfood/langy runs only the connector tests. Without the three
+# secrets the sync skips with a notice, so forks and unconfigured repos stay green.
 name: Langy scenarios sync
 
 on:
@@ -43,7 +44,7 @@ jobs:
 
   sync:
     needs: test
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch'
     # Only the writes need serialising; PR test runs must not cancel a pending sync.
     concurrency:
       group: langy-scenarios-sync
