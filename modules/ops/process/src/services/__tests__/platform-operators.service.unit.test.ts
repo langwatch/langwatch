@@ -84,10 +84,9 @@ function world({
     },
     revokePlatformOperator: vi.fn(async () => undefined),
   };
-  const directory: Pick<
-    UserApi,
-    "findByEmail" | "findById" | "countUsage" | "isOldestActiveAccount"
-  > = {
+  const directory = createApiFixture<
+    Pick<UserApi, "findByEmail" | "findById" | "countUsage" | "isOldestActiveAccount">
+  >({
     countUsage: async () => {
       const emailDomains: Record<string, number> =
         users.length > 0 ? { "acme.com": users.length } : {};
@@ -100,7 +99,7 @@ function world({
       users
         .filter((candidate) => candidate.deactivatedAt === null)
         .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]?.id === userId,
-  };
+  });
   const mail = createApiFixture<Pick<NotificationApi, "getMailDelivery">>({
     getMailDelivery: async () => ({
       ...(isEmailUnconfigured ? {} : { provider: "smtp" as const }),
@@ -516,6 +515,58 @@ describe("PlatformOperatorsService", () => {
         meta: { userId: "squatter" },
       });
       expect(granted).toEqual([]);
+    });
+
+    describe("given the install has no email configured", () => {
+      /** @scenario "With no email configured the recovery task grants an unverified account" */
+      it("grants the unverified account the seed passed over, as the system", async () => {
+        const { service, granted } = world({
+          users: [
+            user("first", { createdAt: new Date("2024-01-01T00:00:00Z") }),
+            user("ana", { emailVerified: false }),
+          ],
+          isEmailUnconfigured: true,
+        });
+
+        const result = await service.grantAsSystem({ email: "ana@acme.com" });
+
+        expect(result).toMatchObject({ userId: "ana" });
+        expect(granted).toEqual([
+          expect.objectContaining({
+            principal: { type: "user", id: "ana" },
+            caller: { type: "system" },
+            actor: PLATFORM_OPERATOR_TASK_ACTOR,
+          }),
+        ]);
+      });
+
+      /** @scenario "With no email configured the recovery task grants an unverified account" */
+      it("names the task in the seed's wait reason", async () => {
+        const { service } = world({
+          users: [
+            user("first", { createdAt: new Date("2024-01-01T00:00:00Z") }),
+            user("ana", { emailVerified: false }),
+          ],
+          isEmailUnconfigured: true,
+        });
+
+        const outcome = await service.seedOnce({ adminEmails: ["ana@acme.com"], cloud: false });
+
+        expect(outcome.reason).toMatch(/grant-platform-operator/);
+      });
+
+      /** @scenario "With no email configured the recovery task grants an unverified account" */
+      it("still refuses a deactivated account", async () => {
+        const { service, granted } = world({
+          users: [user("gone", { emailVerified: false, deactivatedAt: new Date() })],
+          isEmailUnconfigured: true,
+        });
+
+        await expect(service.grantAsSystem({ email: "gone@acme.com" })).rejects.toMatchObject({
+          code: "platform_operator_user_not_found",
+        });
+        expect(granted).toEqual([]);
+      });
     });
   });
 

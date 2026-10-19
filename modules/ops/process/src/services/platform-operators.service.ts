@@ -133,9 +133,14 @@ export class PlatformOperatorsService {
     });
   }
 
-  /** The recovery task: lockout on self-hosted, staff at the cloud cutover. */
+  /**
+   * The recovery task: lockout on self-hosted, staff at the cloud cutover. With no email
+   * configured no address can verify, so shell access naming the account is the check.
+   */
   async grantAsSystem({ email }: { email: string }): Promise<OpsPlatformOperator> {
-    const user = await this.#eligibleUserOf(email);
+    const user = await this.#eligibleUserOf(email, {
+      canGrantUnverified: await this.#isEmailUnconfigured(),
+    });
     const held = await this.options.authz.grantPlatformOperator({
       principal: { type: "user", id: user.id },
       caller: { type: "system" },
@@ -271,7 +276,7 @@ export class PlatformOperatorsService {
   }): PlatformOperatorSeedOutcome {
     const reason = isLaterUnverifiedSkipped
       ? "the unverified account ADMIN_EMAILS names is not the install's oldest active account, " +
-        "and with no email configured only that first account is seeded unverified"
+        `and with no email configured only that first account is seeded unverified; ${RECOVERY_HINT}`
       : "no user named by ADMIN_EMAILS has an active account yet, verified where email is configured";
     if (this.#loggedWaitReason !== reason) {
       this.#loggedWaitReason = reason;
@@ -300,17 +305,23 @@ export class PlatformOperatorsService {
       const user = await this.options.users.findByEmail({ email });
       if (user && user.deactivatedAt === null) active.push(user);
     }
+    const verifiedIds = active.filter((user) => user.emailVerified).map((user) => user.id);
     const unverified = active.filter((user) => !user.emailVerified);
-    const canSeedUnverified =
-      unverified.length > 0 &&
-      isEmailUnconfigured({ mail: await this.options.mail.getMailDelivery() });
-    const seedable = active.filter((user) => user.emailVerified);
+    if (unverified.length === 0 || !(await this.#isEmailUnconfigured())) {
+      return { userIds: [...new Set(verifiedIds)], isLaterUnverifiedSkipped: false };
+    }
+    const seedable = [...verifiedIds];
     let isLaterUnverifiedSkipped = false;
-    for (const user of canSeedUnverified ? unverified : []) {
-      if (await this.options.users.isOldestActiveAccount({ userId: user.id })) seedable.push(user);
+    for (const user of unverified) {
+      if (await this.options.users.isOldestActiveAccount({ userId: user.id }))
+        seedable.push(user.id);
       else isLaterUnverifiedSkipped = true;
     }
-    return { userIds: [...new Set(seedable.map((user) => user.id))], isLaterUnverifiedSkipped };
+    return { userIds: [...new Set(seedable)], isLaterUnverifiedSkipped };
+  }
+
+  async #isEmailUnconfigured(): Promise<boolean> {
+    return isEmailUnconfigured({ mail: await this.options.mail.getMailDelivery() });
   }
 
   async #oldestActiveAdministrator({
@@ -330,11 +341,15 @@ export class PlatformOperatorsService {
   /**
    * Who the page and the task may grant: an active account with a verified address, since
    * whoever registered an unclaimed one first would operate; where grants are staff-only, staff.
+   * `canGrantUnverified` lifts only the verified rule, for the task on an install with no email.
    */
-  async #eligibleUserOf(email: string): Promise<UserProfile> {
+  async #eligibleUserOf(
+    email: string,
+    { canGrantUnverified = false }: { canGrantUnverified?: boolean } = {},
+  ): Promise<UserProfile> {
     const user = await this.options.users.findByEmail({ email });
     if (!user) throw new PlatformOperatorUserNotFoundError();
-    if (user.deactivatedAt !== null || !user.emailVerified) {
+    if (user.deactivatedAt !== null || (!user.emailVerified && !canGrantUnverified)) {
       throw new PlatformOperatorUserNotFoundError({ userId: user.id });
     }
     if (grantsAreStaffOnly(this.options.deployment) && !isStaffAccount(user)) {

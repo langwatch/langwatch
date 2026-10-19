@@ -198,9 +198,19 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
 
   @unit @operator-recovery
   Scenario: The recovery task refuses an account whose address was never verified
-    Given an active account holds the address but never verified it
+    Given the installation has email configured
+    And an active account holds the address but never verified it
     When grant-platform-operator runs with that address, on any deployment
     Then it fails with platform_operator_user_not_found and nothing is granted
+
+  @unit @operator-recovery
+  Scenario: With no email configured the recovery task grants an unverified account
+    Given the installation has no email configured, so no account can verify its address
+    And the seed waits because the named unverified account is not the install's oldest active account
+    When grant-platform-operator runs with that account's address
+    Then the account is granted by the system, since shell access naming it is the check
+    And the seed's wait reason names the grant-platform-operator task
+    And a deactivated account is still refused
 
   @unit @operator-recovery
   Scenario: The recovery task waits for a grant that is still being applied
