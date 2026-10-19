@@ -1,6 +1,8 @@
 import { counter, gauge, histogram } from "@langwatch/observability/metrics";
 import { nowInstant } from "@langwatch/time";
 
+import { GroupQueueError, NonRetryableGroupQueueError } from "./errors.ts";
+
 export const gqActiveGroups = gauge({
   name: "gq_active_groups",
   description: "Number of groups currently being processed",
@@ -16,16 +18,17 @@ export const gqGroupsBlockedTotal = counter({
   description: "Total number of groups that have been blocked due to exhausted retries",
 });
 
+/** One series per pipeline/job of the blocked groups' head jobs; sum by queue_name for the total. */
 export const gqBlockedGroups = gauge({
   name: "gq_blocked_groups",
   description:
-    "Number of groups currently in the blocked state (jobs exhausted retries, awaiting manual unblock)",
+    "Number of groups currently in the blocked state (jobs exhausted retries, awaiting manual unblock), by the pipeline and job of each group's head job; sum by queue_name for the queue total",
 });
 
 export const gqParkedGroups = gauge({
   name: "gq_parked_groups",
   description:
-    "Number of groups parked out of the ready scan because their tenant is at the in-flight soft cap. A sustained spike is the over-cap signal that previously surfaced only as an invisible dispatch-write storm; a non-draining floor flags a parked-group strand.",
+    "Number of groups parked out of the ready scan because their tenant is at the in-flight soft cap, per queue only (a per-job breakdown would read every parked group each cycle). A sustained spike is the over-cap signal that previously surfaced only as an invisible dispatch-write storm; a non-draining floor flags a parked-group strand.",
 });
 
 export const gqJobsStagedTotal = counter({
@@ -77,8 +80,28 @@ export const gqJobsExhaustedTotal = counter({
 
 export const gqJobsNonRetryableTotal = counter({
   name: "gq_jobs_non_retryable_total",
-  description: "Total number of jobs that failed with non-retryable (critical) errors",
+  description:
+    "Total number of jobs that failed with non-retryable (critical) errors (reason: non_retryable_error | group_queue_error | classified)",
 });
+
+/** Why a failure was not retried, by error TYPE: error text would make the label unbounded. */
+export type NonRetryableReason = "non_retryable_error" | "group_queue_error" | "classified";
+
+export function nonRetryableReasonOf(error: unknown): NonRetryableReason {
+  if (error instanceof NonRetryableGroupQueueError) return "non_retryable_error";
+  if (error instanceof GroupQueueError) return "group_queue_error";
+  return "classified";
+}
+
+export function recordNonRetryableJob({
+  labels,
+  error,
+}: {
+  labels: { queue_name: string; pipeline_name: string; job_type: string; job_name: string };
+  error: unknown;
+}): void {
+  gqJobsNonRetryableTotal.inc({ ...labels, reason: nonRetryableReasonOf(error) });
+}
 
 export const gqFastqPending = gauge({
   name: "gq_fastq_pending",
@@ -133,7 +156,8 @@ export const gqJobDurationMilliseconds = histogram({
 // --- Oldest pending age gauge ---
 export const gqOldestPendingAgeMilliseconds = gauge({
   name: "gq_oldest_pending_age_milliseconds",
-  description: "Age of the oldest pending job in the ready sorted set (milliseconds)",
+  description:
+    "Age of the oldest pending job in the ready sorted set (milliseconds), labelled with that group's pipeline and job; earlier holders read 0, so take max by queue_name",
 });
 
 /**

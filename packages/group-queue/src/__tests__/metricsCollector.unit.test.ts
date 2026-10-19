@@ -1,4 +1,5 @@
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { createTestLogger, type TestLogLines } from "@langwatch/test-harness";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
@@ -79,6 +80,12 @@ function makeRedis(
      * whether a second gets past the in-flight guard.
      */
     gateFirstCall?: Promise<void>;
+    /** Members of the blocked set. */
+    blocked?: string[];
+    /** groupId -> the [pipeline, jobType, jobName] its head job's header carries. */
+    routing?: Record<string, [string, string, string]>;
+    /** tenantId -> parked group count; the keys are the parked-tenants registry. */
+    parked?: Record<string, number>;
   } = {},
 ) {
   let gateUsed = false;
@@ -95,9 +102,12 @@ function makeRedis(
     // Answering per key is what makes "swept the wrong index" visible: a
     // group that is parked, blocked or claimed is in pending-groups and in
     // no ready set at all.
-    const members = String(args[0]).endsWith("pending-groups")
+    const key = String(args[0]);
+    const members = key.endsWith("pending-groups")
       ? (opts.pendingGroups ?? readyMembers)
-      : readyMembers;
+      : key.endsWith("blocked")
+        ? (opts.blocked ?? [])
+        : readyMembers;
     const cursor = Number(args[1]);
     const countIdx = args.indexOf("COUNT");
     const pageSize = opts.scanPageSize ?? (countIdx >= 0 ? Number(args[countIdx + 1]) : 10);
@@ -106,15 +116,24 @@ function makeRedis(
     return [nextCursor, page];
   });
   const redis = redisDouble({
-    zcard: vi.fn(async () => {
+    zcard: vi.fn(async (key: string) => {
       if (opts.gateFirstCall && !gateUsed) {
         gateUsed = true;
         await opts.gateFirstCall;
       }
-      return 0;
+      const parkedTenant = key.startsWith(`${PREFIX}parked:`)
+        ? key.slice(`${PREFIX}parked:`.length)
+        : undefined;
+      return parkedTenant === undefined ? 0 : (opts.parked?.[parkedTenant] ?? 0);
     }),
-    scard: vi.fn(async () => 0),
-    smembers: vi.fn(async () => [] as string[]),
+    scard: vi.fn(async (key: string) =>
+      key.endsWith("blocked") ? (opts.blocked?.length ?? 0) : 0,
+    ),
+    smembers: vi.fn(async () => Object.keys(opts.parked ?? {})),
+    evalsha: vi.fn(
+      async (_sha: string, _numKeys: number, _key: string, _prefix: string, ...ids: string[]) =>
+        ids.flatMap((id) => opts.routing?.[id] ?? ["", "", ""]),
+    ),
     zrangebyscore,
     sscan,
     pipeline: vi.fn(() => {
@@ -697,5 +716,217 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         expect(readOverThreshold()).toBe(0);
       });
     });
+  });
+});
+
+describe("GroupQueueMetricsCollector — blocked groups by pipeline and job", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+    vi.useFakeTimers({ now: Date.now() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    meter.uninstall();
+  });
+
+  const traceFold = {
+    pipeline_name: "trace_processing",
+    job_type: "projection",
+    job_name: "traceSummary",
+  };
+  const evalHandler = { pipeline_name: "evaluation", job_type: "handler", job_name: "runEval" };
+
+  function blockedFor(labels: Record<string, string>): number | undefined {
+    return meter.valuesOf("gq_blocked_groups", { queue_name: QUEUE, ...labels }).at(-1);
+  }
+
+  describe("given blocked groups from two jobs", () => {
+    describe("when a cycle runs", () => {
+      /** @scenario "Blocked groups are counted per pipeline and job" */
+      it("publishes one series per pipeline and job of the groups' head jobs", async () => {
+        const { redis } = makeRedis({
+          blocked: ["t1/a", "t2/a", "t1/b"],
+          routing: {
+            "t1/a": ["trace_processing", "projection", "traceSummary"],
+            "t2/a": ["trace_processing", "projection", "traceSummary"],
+            "t1/b": ["evaluation", "handler", "runEval"],
+          },
+        });
+
+        await runCollect(redis);
+
+        expect(blockedFor(traceFold)).toBe(2);
+        expect(blockedFor(evalHandler)).toBe(1);
+      });
+    });
+  });
+
+  describe("given a job whose blocked groups were all unblocked", () => {
+    describe("when the next cycle runs", () => {
+      /** @scenario "A cleared job's blocked series drops to zero" */
+      it("sets that job's series to 0 instead of leaving its last value", async () => {
+        const blocked = ["t1/a", "t1/b"];
+        const { redis } = makeRedis({
+          blocked,
+          routing: {
+            "t1/a": ["trace_processing", "projection", "traceSummary"],
+            "t1/b": ["evaluation", "handler", "runEval"],
+          },
+        });
+        const collector = makeCollector({ redis });
+        await collector.collect();
+        expect(blockedFor(evalHandler)).toBe(1);
+
+        blocked.splice(1, 1);
+        await collector.collect();
+
+        expect(blockedFor(evalHandler)).toBe(0);
+        expect(blockedFor(traceFold)).toBe(1);
+      });
+    });
+  });
+
+  describe("given a group whose head job carries no routing header", () => {
+    describe("when a cycle runs", () => {
+      /** @scenario "A blocked group without routing metadata counts as unknown" */
+      it("counts it under unknown so the series still sum to the queue total", async () => {
+        const { redis } = makeRedis({ blocked: ["t1/legacy"] });
+
+        await runCollect(redis);
+
+        expect(
+          blockedFor({ pipeline_name: "unknown", job_type: "unknown", job_name: "unknown" }),
+        ).toBe(1);
+      });
+    });
+  });
+
+  describe("given a group that stays blocked across cycles", () => {
+    describe("when a later cycle runs", () => {
+      it("resolves its labels once rather than every cycle", async () => {
+        const { redis } = makeRedis({
+          blocked: ["t1/a"],
+          routing: { "t1/a": ["trace_processing", "projection", "traceSummary"] },
+        });
+        const collector = makeCollector({ redis });
+        await collector.collect();
+        const callsAfterFirst = vi.mocked(redis.evalsha).mock.calls.length;
+
+        await collector.collect();
+
+        expect(vi.mocked(redis.evalsha).mock.calls.length).toBe(callsAfterFirst);
+        expect(blockedFor(traceFold)).toBe(1);
+      });
+    });
+  });
+});
+
+describe("GroupQueueMetricsCollector — oldest pending age by pipeline and job", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+    vi.useFakeTimers({ now: Date.now() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    meter.uninstall();
+  });
+
+  describe("given the oldest eligible group changes between cycles", () => {
+    /** @scenario "The oldest pending age names the oldest group's pipeline and job" */
+    it("labels the age with the oldest group's job and zeroes the previous holder", async () => {
+      const readyZset = [{ member: "t1/a", score: Date.now() - 5_000 }];
+      const { redis } = makeRedis({
+        readyZset,
+        routing: {
+          "t1/a": ["trace_processing", "projection", "traceSummary"],
+          "t1/b": ["evaluation", "handler", "runEval"],
+        },
+      });
+      const collector = makeCollector({ redis });
+      await collector.collect();
+      expect(
+        meter
+          .valuesOf("gq_oldest_pending_age_milliseconds", {
+            queue_name: QUEUE,
+            pipeline_name: "trace_processing",
+            job_name: "traceSummary",
+          })
+          .at(-1),
+      ).toBe(5_000);
+
+      // The next tick advances the frozen clock by one interval before reading.
+      readyZset.splice(0, 1, { member: "t1/b", score: Date.now() + METRICS_INTERVAL_MS - 2_000 });
+      await collector.collect();
+
+      const ageOf = (job_name: string) =>
+        meter
+          .valuesOf("gq_oldest_pending_age_milliseconds", { queue_name: QUEUE, job_name })
+          .at(-1);
+      expect(ageOf("traceSummary")).toBe(0);
+      expect(ageOf("runEval")).toBe(2_000);
+    });
+  });
+});
+
+describe("GroupQueueMetricsCollector — parked tenant transitions", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+    vi.useFakeTimers({ now: Date.now() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    meter.uninstall();
+  });
+
+  const parkLines = (lines: TestLogLines, fragment: string) =>
+    lines.filter((line) => String(line.msg).includes(fragment));
+
+  function collectorWithTestLogger(redis: IORedis | Cluster) {
+    const { logger, lines } = createTestLogger();
+    return { lines, ...makeCollector({ redis, logger: logger as never }) };
+  }
+
+  /** @scenario "A tenant's park start and stop are each logged once" */
+  it("warns once when a tenant starts being parked and logs once when it stops", async () => {
+    const parked: Record<string, number> = { "tenant-a": 3 };
+    const { redis } = makeRedis({ parked });
+    const { lines, collect } = collectorWithTestLogger(redis);
+
+    await collect();
+    parked["tenant-a"] = 7;
+    await collect();
+    delete parked["tenant-a"];
+    await collect();
+    await collect();
+
+    const started = parkLines(lines, "started being parked");
+    expect(started).toHaveLength(1);
+    expect(started[0]).toMatchObject({
+      level: 40,
+      queueName: QUEUE,
+      tenantId: "tenant-a",
+      parkedGroups: 3,
+    });
+    const stopped = parkLines(lines, "stopped being parked");
+    expect(stopped).toHaveLength(1);
+    expect(stopped[0]).toMatchObject({ level: 30, queueName: QUEUE, tenantId: "tenant-a" });
+  });
+
+  it("treats a tenant whose parked set emptied as no longer parked", async () => {
+    const parked: Record<string, number> = { "tenant-a": 2 };
+    const { redis } = makeRedis({ parked });
+    const { lines, collect } = collectorWithTestLogger(redis);
+
+    await collect();
+    parked["tenant-a"] = 0;
+    await collect();
+
+    expect(lines.findLine("info", "stopped being parked")).toMatchObject({ tenantId: "tenant-a" });
   });
 });
