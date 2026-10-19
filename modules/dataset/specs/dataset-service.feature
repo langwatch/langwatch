@@ -30,11 +30,11 @@ Feature: Shared Dataset service
     And it does not expose Prisma records
 
   @unit
-  Scenario: Records created at the same instant read back in creation order
-    Given two records created in one batch with the same creation time
-    And their ids differ only where one has "Z" and the other "a"
+  Scenario: The in-memory record repository reads same-instant records back in id creation order
+    Given the in-memory Dataset record repository holds two records created in one batch at the same instant
+    And the id of the earlier record sorts after the later one under locale collation
     When the records are read, a page at a time or all at once
-    Then the record whose id sorts first by code unit comes first
+    Then they come back in id creation order
 
   @unit
   Scenario: Dataset copy remains a Dataset operation
