@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "croner": "catalog:",
-    "temporal-polyfill": "^1.0.4"
+    "temporal-polyfill": "^1.0.5"
   },
   "devDependencies": {
     "typescript": "catalog:",
