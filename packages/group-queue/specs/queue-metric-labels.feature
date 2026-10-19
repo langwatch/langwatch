@@ -42,6 +42,20 @@ Feature: Group-queue metrics name the pipeline and job behind a stuck or refused
     And the series still sum to the queue's blocked total
 
   @unit
+  Scenario: Blocked groups beyond the scan cap are counted as unknown
+    Given more groups are blocked than one cycle scans
+    When the metrics collector runs a cycle
+    Then the unscanned remainder is counted under "unknown"
+    And the series still sum to the queue's blocked total
+
+  @unit
+  Scenario: A failed label lookup or blocked scan does not stop the cycle
+    Given the label script or the blocked scan fails
+    When the metrics collector runs a cycle
+    Then the affected groups are counted under "unknown"
+    And the cycle's other gauges still publish
+
+  @unit
   Scenario: The oldest pending age names the oldest group's pipeline and job
     Given the oldest eligible group changes between two cycles
     When the metrics collector runs both cycles

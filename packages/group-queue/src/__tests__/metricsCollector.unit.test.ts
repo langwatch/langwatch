@@ -84,6 +84,9 @@ function makeRedis(
     blocked?: string[];
     /** SCARD of the blocked set when it exceeds the members a scan returns. */
     blockedTotal?: number;
+    /** Make the label script reject, or the blocked-set scan throw. */
+    evalshaRejects?: boolean;
+    blockedScanRejects?: boolean;
     /** groupId -> the [pipeline, jobType, jobName] its head job's header carries. */
     routing?: Record<string, [string, string, string]>;
     /** tenantId -> parked group count; the keys are the parked-tenants registry. */
@@ -105,6 +108,7 @@ function makeRedis(
     // group that is parked, blocked or claimed is in pending-groups and in
     // no ready set at all.
     const key = String(args[0]);
+    if (opts.blockedScanRejects && key.endsWith("blocked")) throw new Error("scan failed");
     let members = readyMembers;
     if (key.endsWith("pending-groups")) members = opts.pendingGroups ?? readyMembers;
     else if (key.endsWith("blocked")) members = opts.blocked ?? [];
@@ -116,8 +120,10 @@ function makeRedis(
     return [nextCursor, page];
   });
   const evalsha = vi.fn(
-    async (_sha: string, _numKeys: number, _key: string, _prefix: string, ...ids: string[]) =>
-      ids.flatMap((id) => opts.routing?.[id] ?? ["", "", ""]),
+    async (_sha: string, _numKeys: number, _key: string, _prefix: string, ...ids: string[]) => {
+      if (opts.evalshaRejects) throw new Error("script failed");
+      return ids.flatMap((id) => opts.routing?.[id] ?? ["", "", ""]);
+    },
   );
   const redis = redisDouble({
     zcard: vi.fn(async (key: string) => {
@@ -806,7 +812,7 @@ describe("GroupQueueMetricsCollector — blocked groups by pipeline and job", ()
 
   describe("given more blocked groups than the scan returns", () => {
     describe("when a cycle runs", () => {
-      /** @scenario "A blocked group without routing metadata counts as unknown" */
+      /** @scenario "Blocked groups beyond the scan cap are counted as unknown" */
       it("attributes the remainder to unknown so the series still sum to SCARD", async () => {
         const { redis } = makeRedis({
           blocked: ["t1/a", "t2/a"],
@@ -827,20 +833,58 @@ describe("GroupQueueMetricsCollector — blocked groups by pipeline and job", ()
     });
   });
 
+  describe("given the label script rejects", () => {
+    describe("when a cycle runs", () => {
+      /** @scenario "A failed label lookup or blocked scan does not stop the cycle" */
+      it("counts the groups as unknown and still publishes the other gauges", async () => {
+        const { redis } = makeRedis({ blocked: ["t1/a", "t2/a"], evalshaRejects: true });
+
+        await runCollect(redis);
+
+        expect(
+          blockedFor({ pipeline_name: "unknown", job_type: "unknown", job_name: "unknown" }),
+        ).toBe(2);
+        expect(readGauge()).toBeDefined();
+      });
+    });
+  });
+
+  describe("given the blocked-set scan fails", () => {
+    describe("when a cycle runs", () => {
+      /** @scenario "A failed label lookup or blocked scan does not stop the cycle" */
+      it("counts the whole total as unknown and still publishes the other gauges", async () => {
+        const { redis } = makeRedis({
+          blocked: ["t1/a", "t2/a"],
+          blockedScanRejects: true,
+        });
+
+        await runCollect(redis);
+
+        expect(
+          blockedFor({ pipeline_name: "unknown", job_type: "unknown", job_name: "unknown" }),
+        ).toBe(2);
+        expect(readGauge()).toBeDefined();
+      });
+    });
+  });
+
   describe("given a group that stays blocked across cycles", () => {
     describe("when a later cycle runs", () => {
       it("resolves its labels once rather than every cycle", async () => {
         const { redis, evalsha } = makeRedis({
+          readyZset: [{ member: "t9/ready", score: Date.now() - 5_000 }],
           blocked: ["t1/a"],
           routing: { "t1/a": ["trace_processing", "projection", "traceSummary"] },
         });
         const collector = makeCollector({ redis });
         await collector.collect();
-        const callsAfterFirst = evalsha.mock.calls.length;
+        const namingBlocked = () =>
+          evalsha.mock.calls.filter((call) => call.includes("t1/a")).length;
+        expect(namingBlocked()).toBe(1);
 
         await collector.collect();
 
-        expect(evalsha.mock.calls.length).toBe(callsAfterFirst);
+        expect(namingBlocked()).toBe(1);
         expect(blockedFor(traceFold)).toBe(1);
       });
     });

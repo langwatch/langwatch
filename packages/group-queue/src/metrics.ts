@@ -89,9 +89,9 @@ export const gqJobsNonRetryableTotal = counter({
 });
 
 /** Why a failure was not retried, by error TYPE: error text would make the label unbounded. */
-export type NonRetryableReason = "non_retryable_error" | "group_queue_error" | "classified";
+type NonRetryableReason = "non_retryable_error" | "group_queue_error" | "classified";
 
-export function nonRetryableReasonOf(error: unknown): NonRetryableReason {
+function nonRetryableReasonOf(error: unknown): NonRetryableReason {
   if (error instanceof NonRetryableGroupQueueError) return "non_retryable_error";
   if (error instanceof GroupQueueError) return "group_queue_error";
   return "classified";

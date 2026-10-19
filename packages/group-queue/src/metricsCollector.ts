@@ -271,7 +271,20 @@ export class GroupQueueMetricsCollector {
     blockedKey: string;
   }): Promise<void> {
     const total = await this.params.redisConnection.scard(blockedKey);
-    const members = total > 0 ? await this.scanBlockedMembers(blockedKey) : [];
+    let members: string[] = [];
+    if (total > 0) {
+      try {
+        members = await this.scanBlockedMembers(blockedKey);
+      } catch (error) {
+        this.params.logger.debug(
+          {
+            queueName: this.params.queueName,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Failed to scan blocked groups for metrics",
+        );
+      }
+    }
 
     const unseen = members.filter((groupId) => !this.blockedGroupLabels.has(groupId));
     for (const [groupId, labels] of await this.resolveGroupLabels({
