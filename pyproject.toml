@@ -37,4 +37,5 @@ constraint-dependencies = [
   "jupyterlab>=4.6.4", # security: jupyterlab advisories covering 4.6.0-4.6.3 (#2814, #2816, #2817)
   "notebook>=7.6.3", # security: notebook advisory covering 7.5.0-7.6.2 (#2815)
   "multidict>=6.9.1", # security: multidict advisory covering 6.7.0-6.9.0 (#2818)
+  "mcp>=1.30.0", # security: MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 (#2829)
 ]
